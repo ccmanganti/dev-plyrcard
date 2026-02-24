@@ -25,7 +25,8 @@ class DatabaseSeeder extends Seeder
         // 
         $role = Role::create(['name' => 'Superadmin']);
         $user = User::factory()->create([
-            'name' => 'Superadmin',
+            'first_name' => 'Superadmin',
+            'last_name' => 'User',
             'email' => 'superadmin@plyrcard.com',
             'password' => static::$password ??= Hash::make('password'),
         ]);
