@@ -25,14 +25,17 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
-
+use UnitEnum;
 
 
 class LeagueResource extends Resource
 {
     protected static ?string $model = League::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTrophy;
+    protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::Trophy;
+
+    protected static string | UnitEnum | null $navigationGroup = 'Organizations';
 
     public static function form(Schema $schema): Schema
     {

@@ -33,13 +33,26 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Checkbox;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\FusedGroup;
-
+use Filament\Forms\Components\Select;
+use UnitEnum;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
+    protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::UserGroup;
+
+    protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::count();
+    }
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'The number of users';
+    }
 
     protected static ?string $recordTitleAttribute = 'People';
 
@@ -57,7 +70,12 @@ class UserResource extends Resource
                     TextInput::make('last_name')->required(),
                     TextInput::make('personal_email')->email(),
                     TextInput::make('email')->label('PlyrCard Email')->email(),
-                    TextInput::make('phone')->columnSpan(2),
+                    TextInput::make('phone'),
+                    Select::make('role')
+                        ->label('Role')
+                        ->relationship('roles', 'name')
+                        ->required()
+                        ->preload(),                    
 
                     FusedGroup::make([
                         TextInput::make('street')->placeholder('Street'),
@@ -180,6 +198,7 @@ class UserResource extends Resource
         ->columns([
             TextColumn::make('first_name'),
             TextColumn::make('last_name'),
+            TextColumn::make('email'),
             TextColumn::make('updated_at')
                 ->since()
                 ->label('Updated'),

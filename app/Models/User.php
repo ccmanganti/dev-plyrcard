@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\School;
 use App\Models\Club;
+use App\Models\Website;
 use Filament\Models\Contracts\HasName;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 
 
@@ -30,6 +32,7 @@ class User extends Authenticatable implements HasName
         'last_name',
         'email',
         'password',
+        'domain',
     ];
 
     public function getFilamentName(): string
@@ -69,5 +72,10 @@ class User extends Authenticatable implements HasName
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function website(): HasOne
+    {
+        return $this->hasOne(Website::class);
     }
 }

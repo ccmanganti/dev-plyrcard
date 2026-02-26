@@ -17,14 +17,17 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\CheckboxList;
-
+use UnitEnum;
 
 
 class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
+    protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::UserCircle;
+
+    protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
 
     public static function form(Schema $schema): Schema
     {

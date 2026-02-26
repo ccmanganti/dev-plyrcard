@@ -52,7 +52,7 @@ return new class extends Migration
             $table->string('snc_trainer_email')->nullable();
             $table->string('snc_trainer_phone')->nullable();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->default(bcrypt('password'));
             $table->string('domain')->nullable();
             $table->rememberToken();
             $table->timestamps();

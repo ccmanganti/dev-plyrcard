@@ -25,12 +25,18 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
+use UnitEnum;
+
 
 class SchoolResource extends Resource
 {
     protected static ?string $model = School::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAcademicCap;
+    protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::AcademicCap;
+
+    protected static string | UnitEnum | null $navigationGroup = 'Organizations';
+
 
     public static function form(Schema $schema): Schema
     {
