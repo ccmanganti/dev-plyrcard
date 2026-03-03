@@ -140,11 +140,7 @@ class WebsiteResource extends Resource
                                 ->schema([
                                     ColorPicker::make('primary_color')->label('Primary')->nullable(),
                                     ColorPicker::make('secondary_color')->label('Secondary')->nullable(),
-                                    ColorPicker::make('accent_color')->label('Accent')->nullable(),
                                     ColorPicker::make('background_color')->label('Background')->nullable(),
-                                    ColorPicker::make('surface_color')->label('Surface')->nullable(),
-                                    ColorPicker::make('text_primary_color')->label('Text Primary')->nullable(),
-                                    ColorPicker::make('text_secondary_color')->label('Text Secondary')->nullable(),
                                 ]),
                         ]),
 
