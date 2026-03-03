@@ -7,7 +7,7 @@
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=bebas-neue:400|poppins:300,400,500,600,700" rel="stylesheet" />
 
     <!-- Styles / Scripts -->
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
@@ -69,7 +69,7 @@
 
         /**
          * COACHING STAFF (FROM USER MODEL FIELDS)
-         * Include ONLY if name is not empty. No “presence checks” for the whole section.
+         * Include ONLY if name is not empty.
          * Email rule:
          * - Use the specific coach email field when available
          * - Otherwise fall back to player's email ($user->email)
@@ -79,37 +79,48 @@
         $coachRows = collect([
             [
                 'name'   => $user->club_coach ?? '',
-                'label'  => 'Head Coach',
+                'label'  => 'HEAD COACH',
                 'title'  => $user->club?->name ?? ($user->team_name ?? ''),
                 'email'  => $user->club_coach_email ?? $playerEmail,
             ],
             [
-                'name'   => $user->natl_coach ?? '',
-                'label'  => 'National Team Coach',
-                'title'  => $user->natl_team_exp ?? '',
-                'email'  => $user->natl_coach_email ?? $playerEmail,
-            ],
-            [
                 'name'   => $user->tech_trainer ?? '',
-                'label'  => 'Technical Training & Mentorship',
+                'label'  => 'TECHNICAL TRAINING & MENTORSHIP',
                 'title'  => '',
                 'email'  => $user->tech_trainer_email ?? $playerEmail,
             ],
             [
                 'name'   => $user->snc_trainer ?? '',
-                'label'  => 'Agility & Strength Training',
+                'label'  => 'AGILITY AND STRENGTH TRAINING',
                 'title'  => '',
                 'email'  => $user->snc_trainer_email ?? $playerEmail,
+            ],
+            [
+                'name'   => $user->natl_coach ?? '',
+                'label'  => 'NATIONAL TEAM COACH',
+                'title'  => $user->natl_team_exp ?? '',
+                'email'  => $user->natl_coach_email ?? $playerEmail,
             ],
         ])->filter(fn($c) => trim((string)($c['name'] ?? '')) !== '')
           ->values();
 
         /**
          * FOOTER (FROM USER + WEBSITE)
-         * - Logos from Website model `logos` array
+         * - ONE logo container only (use first logo in Website->logos)
          * - Social links from user fields (ig_handle/x_handle/yt_url)
          */
         $logos = collect($website?->logos ?? [])->values();
+
+        // FIRST LOGO ONLY
+        $footerLogoUrl = '';
+        $firstLogo = $logos->first();
+
+        if (is_string($firstLogo)) {
+            $footerLogoUrl = $firstLogo;
+        } elseif (is_array($firstLogo)) {
+            $footerLogoUrl = $firstLogo['url'] ?? $firstLogo['path'] ?? $firstLogo['image_url'] ?? '';
+        }
+        $footerLogoUrl = $hideIfDefault($footerLogoUrl);
 
         // Social URLs
         $igUrl = '';
@@ -140,10 +151,58 @@
     @endif
 
     <style>
+        :root{
+            --primary: {{ $primary }};
+            --secondary: {{ $secondary }};
+            --accent: {{ $accent }};
+            --bg: {{ $bg }};
+            --surface: {{ $surface }};
+            --text1: {{ $text1 }};
+            --text2: {{ $text2 }};
+        }
+
+        body{
+            font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+        }
+
+        .font-heading{
+            font-family: "Bebas Neue", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        }
+
         .embed-responsive iframe { width: 100%; height: 100%; }
 
-        /* Optional: make empty logo slots still keep the same size */
-        .logo-slot { background: rgba(255,255,255,0.2); }
+        .logo-slot{
+            background: rgba(255,255,255,0.14);
+        }
+
+        .acad-list ul {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+    }
+
+    .acad-list li {
+        position: relative;
+        padding-left: 30px;
+        margin: 0.4rem 0;
+        line-height: 1.6;
+    }
+
+    /* Custom 3-line icon */
+    .acad-list li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.4em;
+        width: 18px;
+        height: 18px;
+
+        background-color: {{ $accent }}; /* ✅ Dynamic color */
+
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
+
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
+    }
     </style>
 </head>
 
@@ -185,11 +244,11 @@
 
                 {{-- ABOUT --}}
                 <div id="tab-about" class="tab-content">
-                    <h2 class="text-4xl font-extrabold tracking-tight mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <h2 class="text-4xl font-heading tracking-[0.17em] mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $aboutHeadline }}
                     </h2>
 
-                    <div class="text-lg mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
+                    <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.1em]" style="color: {{ $accent }};">
                         {{ $aboutTagline }}
                     </div>
 
@@ -208,11 +267,11 @@
 
                 {{-- SCHEDULE --}}
                 <div id="tab-schedule" class="tab-content hidden">
-                    <h2 class="text-4xl font-extrabold tracking-tight mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <h2 class="text-4xl font-heading tracking-[0.17em] mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $scheduleHeadline }}
                     </h2>
 
-                    <div class="text-lg mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
+                    <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $accent }};">
                         {{ $scheduleTagline }}
                     </div>
 
@@ -221,11 +280,11 @@
 
                 {{-- HIGHLIGHTS --}}
                 <div id="tab-highlights" class="tab-content hidden">
-                    <div class="tracking-[0.35em] uppercase font-extrabold text-4xl mb-2 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <div class="tracking-[0.17em] uppercase font-heading text-4xl mb-2 min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $highHeadline }}
                     </div>
 
-                    <div class="text-lg tracking-[0.25em] uppercase mb-8 min-h-[1.75rem]" style="color: {{ $accent }};">
+                    <div class="tracking-[0.17em] text-lg mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
                         {{ $highTagline }}
                     </div>
 
@@ -235,21 +294,21 @@
                 {{-- ACCOLADES --}}
                 <div id="tab-accolades" class="tab-content hidden">
                     <div class="mb-10">
-                        <h2 class="text-4xl font-extrabold tracking-tight mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                        <h2 class="text-4xl tracking-[0.17em] font-heading uppercase mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $acadHeadline }}
                         </h2>
 
-                        <div class="text-lg mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
+                        <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $accent }};">
                             {{ $acadTagline }}
                         </div>
 
-                        <div class="space-y-3 text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                        <div class="acad-list space-y-3 text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
                             {!! $acadBody !!}
                         </div>
                     </div>
 
                     <div>
-                        <h2 class="text-4xl font-extrabold tracking-tight mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                        <h2 class="text-4xl font-extrabold uppercase mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $sportHeadline }}
                         </h2>
 
@@ -268,11 +327,11 @@
 
         {{-- RIGHT COLUMN --}}
         <div class="w-1/3 text-white p-10" style="background: {{ $secondary }};">
-            <h2 class="text-2xl font-bold mb-6">
+            <!-- <h2 class="text-2xl font-bold mb-6">
                 Interested in Recruiting?
-            </h2>
+            </h2> -->
 
-            <div class="bg-white/10 p-6 rounded min-h-[180px]">
+            <div class="p-6 rounded min-h-[180px]">
                 {!! $hideIfDefault($website?->contact_form_embed ?? '') !!}
             </div>
         </div>
@@ -282,9 +341,9 @@
     <section class="w-full">
 
         {{-- Header with wave --}}
-        <div class="relative overflow-hidden" style="background: {{ $secondary }}; color: #fff;">
+        <div class="relative overflow-hidden pt-[20px]" style="background: {{ $secondary }}; color: #ffff;">
             <div class="absolute top-0 left-0 w-full -translate-y-[1px]">
-                <svg viewBox="0 0 1440 120" class="w-full h-[70px] md:h-[90px]" preserveAspectRatio="none">
+                <svg viewBox="0 0 1440 100" class="w-full h-[70px] md:h-[90px]" preserveAspectRatio="none">
                     <path
                         fill="{{ $bg }}"
                         d="M0,64L80,58.7C160,53,320,43,480,53.3C640,64,800,96,960,101.3C1120,107,1280,85,1360,74.7L1440,64L1440,0L0,0Z">
@@ -292,95 +351,82 @@
                 </svg>
             </div>
 
-            <div class="relative text-center py-20 md:py-24">
-                <h2 class="text-5xl md:text-6xl font-extrabold tracking-wide uppercase">
+            <div class="relative text-center py-10 md:py-30 mb-[-50px]">
+                <h2 class="font-heading text-6xl md:text-8xl leading-none uppercase">
                     Coaching Staff
                 </h2>
-                <p class="mt-4 text-lg md:text-xl font-light tracking-wide uppercase" style="color: rgba(255,255,255,0.85);">
+                <p class="text-lg md:text-2xl uppercase"
+                   style="font-family: Poppins, ui-sans-serif, system-ui; color: rgba(255,255,255,0.85); letter-spacing: 0.01em;">
                     Guided by the Best in the Game
                 </p>
             </div>
         </div>
 
-        {{-- Staff grid --}}
-        <div class="py-16 px-6 md:px-20" style="background: {{ $bg }};">
-            <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16">
+{{-- Staff grid (horizontal centered row(s) that wrap) --}}
+<div class="py-16 px-6 md:px-20" style="background: {{ $bg }};">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex flex-wrap justify-center gap-12 md:gap-16">
 
-                @foreach ($coachRows as $coach)
-                    @php
-                        $name  = $coach['name'] ?? '';
-                        $label = $coach['label'] ?? '';
-                        $title = $coach['title'] ?? '';
-                        $email = $coach['email'] ?? $playerEmail;
-                        $mailto = $email ? 'mailto:' . $email : '#';
-                    @endphp
+            @foreach ($coachRows as $coach)
+                @php
+                    $name   = $coach['name'] ?? '';
+                    $label  = $coach['label'] ?? '';
+                    $title  = $coach['title'] ?? '';
+                    $email  = $coach['email'] ?? $playerEmail;
+                    $mailto = $email ? 'mailto:' . $email : '#';
+                @endphp
 
-                    <div class="text-left">
-                        <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
-                            {{ $name }}
-                        </div>
-
-                        <div class="mt-1 text-xs uppercase tracking-widest font-semibold" style="color: {{ $accent }};">
-                            {{ $label }}
-                        </div>
-
-                        <div class="mt-6">
-                            <a href="{{ $mailto }}" class="inline-flex items-center justify-center" aria-label="Email coach">
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                     class="w-12 h-12"
-                                     viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="{{ $accent }}"
-                                     stroke-width="1.8"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
-                                    <path d="M4 4h16v16H4z"></path>
-                                    <path d="m4 6 8 6 8-6"></path>
-                                </svg>
-                            </a>
-                        </div>
-
-                        <div class="mt-6 text-sm" style="color: {{ $text1 }};">
-                            {{ $title }}
-                        </div>
+                {{-- Card --}}
+                <div class="w-[280px] sm:w-[300px] md:w-[320px] text-center">
+                    <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
+                        {{ $name }}
                     </div>
-                @endforeach
 
-            </div>
+                    <div class="mt-1 text-xs uppercase tracking-widest" style="color: {{ $accent }};">
+                        {{ $label }}
+                    </div>
+
+                    <div class="mt-6 flex justify-center">
+                        <a href="{{ $mailto }}" class="inline-flex items-center justify-center" aria-label="Email coach">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="w-12 h-12"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="{{ $accent }}"
+                                 stroke-width="1.8"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M4 4h16v16H4z"></path>
+                                <path d="m4 6 8 6 8-6"></path>
+                            </svg>
+                        </a>
+                    </div>
+
+                    <div class="mt-6 text-sm" style="color: {{ $text1 }};">
+                        {{ $title }}
+                    </div>
+                </div>
+            @endforeach
+
         </div>
+    </div>
+</div>
     </section>
 
-    {{-- FOOTER (DYNAMIC COLORS + LOGOS FROM WEBSITE.LOGOS ARRAY) --}}
+    {{-- FOOTER (ONE LOGO CONTAINER) --}}
     <footer class="w-full">
-
-        <div class="py-16 px-6 md:px-20" style="background: {{ $secondary }}; color: #fff;">
+        <div class="py-16 px-6 md:px-20" style="background: {{ $secondary }}; color: rgba(255, 255, 255, 1)
             <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-start">
 
-                {{-- LEFT: LOGOS (keep 3 slots) --}}
-                <div class="flex items-center gap-8 flex-wrap">
-                    @php
-                        $logoSlots = collect($logos)->take(3);
-                        while ($logoSlots->count() < 3) $logoSlots->push(null);
-                    @endphp
-
-                    @foreach ($logoSlots as $logo)
-                        @php
-                            // Accept common shapes:
-                            // - ["url" => "..."] or ["path" => "..."] or direct string URL
-                            $logoUrl = '';
-                            if (is_string($logo)) $logoUrl = $logo;
-                            if (is_array($logo))  $logoUrl = $logo['url'] ?? $logo['path'] ?? $logo['image_url'] ?? '';
-                            $logoUrl = $hideIfDefault($logoUrl);
-                        @endphp
-
-                        <div class="logo-slot h-12 w-28 rounded flex items-center justify-center overflow-hidden">
-                            @if (!empty($logoUrl))
-                                <img src="{{ $logoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-2">
-                            @else
-                                <div class="h-full w-full"></div>
-                            @endif
-                        </div>
-                    @endforeach
+                {{-- LEFT: SINGLE LOGO CONTAINER --}}
+                <div class="flex items-center">
+                    <div class="logo-slot h-16 w-48 rounded flex items-center justify-center overflow-hidden">
+                        @if (!empty($footerLogoUrl))
+                            <img src="{{ $footerLogoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-3">
+                        @else
+                            <div class="h-full w-full"></div>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- RIGHT: CONTACT --}}
@@ -457,36 +503,60 @@
     </footer>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const buttons = document.querySelectorAll(".tab-btn");
-            const contents = document.querySelectorAll(".tab-content");
-            const primaryBg = @json($primary);
+    document.addEventListener("DOMContentLoaded", function () {
 
-            buttons.forEach(button => {
-                button.addEventListener("click", function () {
-                    const target = this.dataset.tab;
+        const buttons  = document.querySelectorAll(".tab-btn");
+        const contents = document.querySelectorAll(".tab-content");
 
-                    // Reset buttons
-                    buttons.forEach(btn => {
-                        btn.classList.remove("bg-white", "text-gray-900");
-                        btn.classList.add("text-white");
-                        btn.style.background = primaryBg;
-                    });
+        const primary = @json($primary);
+        const accent  = @json($accent);
 
-                    // Hide all content
-                    contents.forEach(content => content.classList.add("hidden"));
+        buttons.forEach(button => {
 
-                    // Activate clicked
-                    this.classList.remove("text-white");
-                    this.classList.add("bg-white", "text-gray-900");
-                    this.style.background = "";
+            // ✅ Pointer cursor only
+            button.style.cursor = "pointer";
 
-                    // Show correct content
-                    const active = document.getElementById("tab-" + target);
-                    if (active) active.classList.remove("hidden");
-                });
+            // ✅ Simple hover (only if NOT active)
+            button.addEventListener("mouseenter", function () {
+                if (!this.classList.contains("bg-white")) {
+                    this.style.background = accent;
+                }
             });
+
+            button.addEventListener("mouseleave", function () {
+                if (!this.classList.contains("bg-white")) {
+                    this.style.background = primary;
+                }
+            });
+
+            // Click behavior (your original logic preserved)
+            button.addEventListener("click", function () {
+
+                const target = this.dataset.tab;
+
+                // Reset buttons
+                buttons.forEach(btn => {
+                    btn.classList.remove("bg-white", "text-gray-900");
+                    btn.classList.add("text-white");
+                    btn.style.background = primary;
+                });
+
+                // Activate clicked
+                this.classList.remove("text-white");
+                this.classList.add("bg-white", "text-gray-900");
+                this.style.background = "";
+
+                // Hide all content
+                contents.forEach(content => content.classList.add("hidden"));
+
+                // Show correct content
+                const active = document.getElementById("tab-" + target);
+                if (active) active.classList.remove("hidden");
+            });
+
         });
+
+    });
     </script>
 
     @if (Route::has('login'))
