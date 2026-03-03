@@ -2,7 +2,8 @@
   /* wrap the editor so scaling doesn't break layout */
   .studio-zoom-wrap {
     width: 100%;
-    height: 80vh;
+    height: 100 vh;
+    /* position:relative; */
     overflow: hidden;         /* prevents scrollbars caused by scaling */
     background: #0b0b0b;      /* optional */
   }
@@ -103,7 +104,8 @@ GrapesJsStudioSDK.createStudioEditor({
         },
         autosaveChanges: 100,
         autosaveIntervalMs: 10000
-    }
+        
+    },
 });
 @endif
 </script>

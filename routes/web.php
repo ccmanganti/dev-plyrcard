@@ -34,10 +34,17 @@ Route::get('/', function (Request $request) {
 
     // return view('template_one', compact('user', 'projectJson'));
 
-    $user = User::where('first_name', 'Christopher Clark')
-        ->first();
-    $html = $user->website->html;
-    $css = $user->website->css;
+    $user = User::where('first_name', 'Sebastian')
+        ->with('website')
+        ->firstOrFail();
+
+    $html = null;
+    $css = null;
+
+    if ($user->website && $user->website->html && $user->website->css) {
+        $html = $user->website->html;
+        $css = $user->website->css;
+    }
     return view('template_one', compact('user', 'html', 'css'));
 });
 
@@ -53,4 +60,13 @@ Route::middleware(['web', 'auth'])->group(function () {
 
     Route::delete('/websites/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
         ->name('websites.assets.delete');
+});
+
+Route::prefix('admin')->middleware(['auth'])->group(function () {
+    Route::get('/websites/{id}/load', [WebsiteEditorController::class, 'loadProject'])->name('websites.load');
+    Route::post('/websites/{id}/save', [WebsiteEditorController::class, 'saveProject'])->name('websites.save');
+
+    // NEW: iframe editor page
+    Route::get('/websites/{id}/editor', [WebsiteEditorController::class, 'editor'])
+        ->name('websites.editor');
 });

@@ -41,7 +41,7 @@ return new class extends Migration
             $table->string('sec_parent_phone')->nullable();
             $table->string('club_coach')->nullable();
             $table->string('club_coach_email')->nullable();
-            $table->string('club_coach_phone]')->nullable();
+            $table->string('club_coach_phone')->nullable();
             $table->string('natl_coach')->nullable();
             $table->string('natl_coach_email')->nullable();
             $table->string('natl_coach_phone')->nullable();

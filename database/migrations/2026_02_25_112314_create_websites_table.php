@@ -14,8 +14,7 @@ return new class extends Migration
         Schema::create('websites', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('light_color');
-            $table->string('dark_color');
+            // Hero Section Saving | GrapeJS
             $table->longText('project_json')->nullable();
             $table->longText('html')->nullable();
             $table->longText('css')->nullable();

@@ -8,6 +8,15 @@ use Illuminate\Support\Facades\Storage;
 
 class WebsiteEditorController extends Controller
 {
+        public function editor($id)
+    {
+        $website = Website::findOrFail($id);
+
+        return view('website-editor-iframe', [
+            'record' => $website,
+        ]);
+    }
+
     public function loadProject($id)
     {
         $website = Website::findOrFail($id);
