@@ -163,8 +163,10 @@ class WebsiteResource extends Resource
                                         ->nullable(),
 
                                     Textarea::make('yt_playlist_embed')
-                                        ->label('YouTube Playlist URL or Embed')
-                                        ->rows(4)
+                                        ->label('YouTube Video URLs')
+                                        ->placeholder("Paste one YouTube URL per line\nhttps://www.youtube.com/watch?v=gOW0GpXKvOg\nhttps://youtu.be/7H9oZSbxWrk")
+                                        ->rows(5)
+                                        ->helperText('Paste one YouTube video link per line.')
                                         ->nullable(),
                                 ]),
 

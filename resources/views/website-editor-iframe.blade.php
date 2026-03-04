@@ -51,7 +51,7 @@ html, body {
   box-sizing: border-box !important;
 
   /* put your spacing here instead */
-  padding: 24px 360px 24px 24px !important; /* right padding avoids right panel overlap */
+  /* padding: 24px 360px 24px 24px !important;
 }
 
 /* The frame wrapper should be centered */

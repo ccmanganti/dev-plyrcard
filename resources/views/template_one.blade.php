@@ -33,9 +33,69 @@
         $text1     = $website?->text_primary_color   ?: '#0f172a'; // slate-900
         $text2     = $website?->text_secondary_color ?: '#475569'; // slate-600
 
-        // YouTube embeds
-        $ytEmbed         = $website?->yt_embed ?? '';
-        $ytPlaylistEmbed = $website?->yt_playlist_embed ?? '';
+        // ===== YouTube URL -> embed helper =====
+        $toYoutubeEmbed = function (string $url) {
+            $url = trim($url);
+            if ($url === '') return null;
+
+            $videoId = null;
+
+            // Handle youtu.be/<id>
+            if (preg_match('~youtu\.be/([^?&/]+)~', $url, $m)) {
+                $videoId = $m[1];
+            }
+
+            // Handle youtube.com/watch?v=<id>
+            if (!$videoId && preg_match('~v=([^&]+)~', $url, $m)) {
+                $videoId = $m[1];
+            }
+
+            // Handle youtube.com/shorts/<id>
+            if (!$videoId && preg_match('~youtube\.com/shorts/([^?&/]+)~', $url, $m)) {
+                $videoId = $m[1];
+            }
+
+            // Handle youtube.com/embed/<id>
+            if (!$videoId && preg_match('~youtube\.com/embed/([^?&/]+)~', $url, $m)) {
+                $videoId = $m[1];
+            }
+
+            if (!$videoId) return null;
+
+            // Reduce overlays as much as YouTube allows (not all are removable)
+            $params = http_build_query([
+                'rel' => 0,
+                'modestbranding' => 1,
+                'playsinline' => 1,
+            ]);
+
+            return "https://www.youtube.com/embed/{$videoId}?{$params}";
+        };
+
+        $parseUrlList = function ($raw) use ($toYoutubeEmbed) {
+            if (!is_string($raw) || trim($raw) === '') return [];
+
+            // allow newline list OR csv
+            $raw = str_replace(["\r\n", "\r"], "\n", $raw);
+            $parts = preg_split('/\n|,/', $raw);
+
+            $out = [];
+            foreach ($parts as $p) {
+                $embed = $toYoutubeEmbed(trim($p));
+                if ($embed) $out[] = $embed;
+            }
+
+            // de-dupe
+            return array_values(array_unique($out));
+        };
+
+        // ===== ABOUT videos =====
+        $about_video_urls = $website?->yt_embed ?? '';
+        $aboutVideos = $parseUrlList($about_video_urls);
+
+        // ===== HIGHLIGHTS videos =====
+        $yt_video_urls = $website?->yt_playlist_embed ?? ''; // keep your existing db field name for highlights for now
+        $highlightVideos = $parseUrlList($yt_video_urls);
 
         // Helper: strip default placeholder content but keep layout
         $hideIfDefault = function ($value) {
@@ -324,13 +384,27 @@
                         {!! $aboutBio !!}
                     </div>
 
-                    {{-- YouTube embed under bio --}}
-                    <div class="mt-6 md:mt-8">
-                        <div class="embed-responsive w-full aspect-video border rounded overflow-hidden"
-                             style="background: {{ $bg }}; border-color: rgba(15, 23, 42, 0.12);">
-                            {!! $ytEmbed ?: ($ytPlaylistEmbed ?: '<div class="w-full h-full"></div>') !!}
+                    {{-- About Me videos (URL list -> responsive grid) --}}
+                    @if(!empty($aboutVideos))
+                        <div class="mt-6 md:mt-8">
+                            <div class="grid grid-cols-1 gap-6">
+                                @foreach($aboutVideos as $video)
+                                    <div class="w-full aspect-video rounded overflow-hidden border"
+                                        style="background: {{ $bg }}; border-color: rgba(15, 23, 42, 0.12);">
+                                        <iframe
+                                            class="w-full h-full"
+                                            src="{{ $video }}"
+                                            title="YouTube video"
+                                            frameborder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowfullscreen>
+                                        </iframe>
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
+                    @endif
+                    
                 </div>
 
                 {{-- SCHEDULE --}}
@@ -355,6 +429,24 @@
                     <div class="tracking-[0.17em] text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem]" style="color: {{ $primary }};">
                         {{ $highTagline }}
                     </div>
+                    
+                    @if(!empty($highlightVideos))
+                        <div class="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            @foreach($highlightVideos as $video)
+                            <div class="w-full aspect-video rounded overflow-hidden">
+                                <iframe
+                                    class="w-full h-full"
+                                    src="{{ $video }}"
+                                    title="YouTube video"
+                                    frameborder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen>
+                                </iframe>
+                            </div>
+                        @endforeach
+                    </div>
+                    @endif
+
 
                     <div class="min-h-[10rem]"></div>
                 </div>
@@ -407,15 +499,14 @@
         {{-- Header with wave --}}
         <div class="relative overflow-hidden pt-[20px]" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="absolute top-0 left-0 w-full -translate-y-[1px]">
-                <svg viewBox="0 0 1440 100" class="w-full h-[70px] md:h-[200]" preserveAspectRatio="none">
+                <svg viewBox="0 0 1440 160" class="w-full h-[90px] md:h-[120px]" preserveAspectRatio="none">
                     <path
                         fill="{{ $bg }}"
-                        d="M0,64L80,58.7C160,53,320,43,480,53.3C640,64,800,96,960,101.3C1120,107,1280,85,1360,74.7L1440,64L1440,0L0,0Z">
+                        d="M0,100L80,94C160,88,320,76,480,86C640,96,800,128,960,134C1120,140,1280,118,1360,108L1440,100L1440,0L0,0Z">
                     </path>
                 </svg>
             </div>
-
-            <div class="relative text-center py-8 md:py-10 mb-[-40px] md:mb-[-50px]">
+            <div class="relative text-center py-8 md:py-30 mb-[-50px] md:mb-[-60px]">
                 <h2 class="font-heading text-5xl md:text-8xl leading-none uppercase">
                     Coaching Staff
                 </h2>
