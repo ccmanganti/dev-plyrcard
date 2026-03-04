@@ -60,7 +60,6 @@
         };
 
         $relativeLuminance = function (array $rgb) {
-            // sRGB -> linear
             $toLinear = function ($v) {
                 $v = $v / 255;
                 return ($v <= 0.03928) ? ($v / 12.92) : pow((($v + 0.055) / 1.055), 2.4);
@@ -73,7 +72,6 @@
 
         $contrastText = function (string $bgHex) use ($hexToRgb, $relativeLuminance) {
             $lum = $relativeLuminance($hexToRgb($bgHex));
-            // Threshold tuned for UI readability
             return ($lum < 0.55) ? '#ffffff' : '#0f172a';
         };
 
@@ -140,17 +138,17 @@
         /**
          * FOOTER
          */
-        $logos = collect($website?->logos ?? [])->values();
+        $logos = collect($website?->logos ?? [])->filter()->values();
 
         $footerLogoUrl = '';
-        $firstLogo = $logos->first();
+        $first = $logos->first();
 
-        if (is_string($firstLogo)) {
-            $footerLogoUrl = $firstLogo;
-        } elseif (is_array($firstLogo)) {
-            $footerLogoUrl = $firstLogo['url'] ?? $firstLogo['path'] ?? $firstLogo['image_url'] ?? '';
+        if (is_string($first) && $first !== '') {
+            $footerLogoUrl = asset('storage/' . ltrim($first, '/'));
+        } elseif (is_array($first)) {
+            $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? '';
+            if ($path) $footerLogoUrl = asset('storage/' . ltrim($path, '/'));
         }
-        $footerLogoUrl = $hideIfDefault($footerLogoUrl);
 
         // Social URLs
         $igUrl = '';
@@ -188,13 +186,13 @@
             --surface: {{ $surface }};
             --text1: {{ $text1 }};
             --text2: {{ $text2 }};
-
             --on-primary: {{ $onPrimary }};
             --on-secondary: {{ $onSecondary }};
         }
 
         body{
             font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+            background: var(--bg);
         }
 
         .font-heading{
@@ -203,14 +201,11 @@
 
         .embed-responsive iframe { width: 100%; height: 100%; }
 
-        .logo-slot{
-            background: rgba(255,255,255,0.14);
-        }
-
-        /* Tabs: keep your layout, just add proper hover + active-on-primary */
+        /* Tabs: hover + active */
         .tab-btn{
             cursor: pointer;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .tab-btn:not(.is-active):hover{
             background: var(--secondary) !important;
@@ -219,8 +214,7 @@
         .tab-btn.is-active{
             background: var(--secondary) !important;
             color: var(--on-secondary) !important;
-            box-shadow: none;          /* remove underline/border effect */
-            }
+        }
 
         /* Icon hover (do not change SVG markup; only style on hover) */
         .icon-link{
@@ -228,16 +222,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            -webkit-tap-highlight-color: transparent;
         }
         .icon-link svg{
             transition: 150ms ease;
         }
         .icon-link:hover svg{
-            /* Works for stroke-based icons */
             stroke: var(--secondary);
         }
         .icon-link:hover{
-            /* Works for fill=currentColor icons (social) */
             color: var(--secondary);
         }
 
@@ -247,14 +240,12 @@
             padding-left: 0;
             margin: 0;
         }
-
         .acad-list li {
             position: relative;
             padding-left: 30px;
             margin: 0.4rem 0;
             line-height: 1.6;
         }
-
         .acad-list li::before {
             content: "";
             position: absolute;
@@ -262,11 +253,14 @@
             top: 0.4em;
             width: 18px;
             height: 18px;
-
             background-color: {{ $primary }};
-
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
                     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
+        }
+
+        /* Mobile sticky social bar spacing */
+        @media (max-width: 767px){
+            body{ padding-bottom: 76px; } /* leaves room for sticky bar */
         }
     </style>
 </head>
@@ -279,33 +273,34 @@
         </div>
     @endif
 
-    {{-- TOP: Tabs + Right column --}}
-    <div class="flex h-auto">
+    {{-- TOP: Tabs + Right column (Responsive) --}}
+    <div class="flex flex-col md:flex-row h-auto">
 
         {{-- LEFT COLUMN --}}
-        <div class="w-8/12 mt-[-50px]">
+        <div class="w-full md:w-8/12 md:mt-[-50px]">
 
+            {{-- Tabs (mobile: full-width + wraps nicely) --}}
             {{-- Tabs --}}
-            <div class="flex" id="tabs">
-                <button class="tab-btn px-6 py-3 font-semibold transition-all is-active"
-                        style="background: {{ $primary }}; color: {{ $onPrimary }};"
+            <div id="tabs" class="flex flex-wrap md:flex-nowrap w-full">
+                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
+                        style="background: {{ $secondary }}; color: {{ $onSecondary }};"
                         data-tab="about">
                     ABOUT ME
                 </button>
 
-                <button class="tab-btn px-6 py-3 font-semibold transition-all"
+                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="schedule">
                     SCHEDULE
                 </button>
 
-                <button class="tab-btn px-6 py-3 font-semibold transition-all"
+                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="highlights">
                     HIGHLIGHTS
                 </button>
 
-                <button class="tab-btn px-6 py-3 font-semibold transition-all"
+                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="accolades">
                     ACCOLADES
@@ -313,24 +308,24 @@
             </div>
 
             {{-- Tab Content --}}
-            <div class="bg-white p-10">
+            <div class="bg-white p-6 md:p-10">
 
                 {{-- ABOUT --}}
                 <div id="tab-about" class="tab-content">
-                    <h2 class="text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $aboutHeadline }}
                     </h2>
 
-                    <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.1em]" style="color: {{ $primary }};">
+                    <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.1em]" style="color: {{ $primary }};">
                         {{ $aboutTagline }}
                     </div>
 
-                    <div class="space-y-6 text-[17px] leading-4 min-h-[4rem]" style="color: {{ $text2 }};">
+                    <div class="space-y-5 md:space-y-6 text-[16px] md:text-[17px] leading-6 min-h-[4rem]" style="color: {{ $text2 }};">
                         {!! $aboutBio !!}
                     </div>
 
-                    {{-- YouTube embed under bio (slot always visible) --}}
-                    <div class="mt-8">
+                    {{-- YouTube embed under bio --}}
+                    <div class="mt-6 md:mt-8">
                         <div class="embed-responsive w-full aspect-video border rounded overflow-hidden"
                              style="background: {{ $bg }}; border-color: rgba(15, 23, 42, 0.12);">
                             {!! $ytEmbed ?: ($ytPlaylistEmbed ?: '<div class="w-full h-full"></div>') !!}
@@ -340,11 +335,11 @@
 
                 {{-- SCHEDULE --}}
                 <div id="tab-schedule" class="tab-content hidden">
-                    <h2 class="text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $scheduleHeadline }}
                     </h2>
 
-                    <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
+                    <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
                         {{ $scheduleTagline }}
                     </div>
 
@@ -353,11 +348,11 @@
 
                 {{-- HIGHLIGHTS --}}
                 <div id="tab-highlights" class="tab-content hidden">
-                    <div class="tracking-[0.17em] uppercase font-heading text-4xl min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <div class="tracking-[0.17em] uppercase font-heading text-3xl md:text-4xl min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $highHeadline }}
                     </div>
 
-                    <div class="tracking-[0.17em] text-lg mb-6 min-h-[1.75rem]" style="color: {{ $primary }};">
+                    <div class="tracking-[0.17em] text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem]" style="color: {{ $primary }};">
                         {{ $highTagline }}
                     </div>
 
@@ -366,30 +361,30 @@
 
                 {{-- ACCOLADES --}}
                 <div id="tab-accolades" class="tab-content hidden">
-                    <div class="mb-10">
-                        <h2 class="text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <div class="mb-8 md:mb-10">
+                        <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $acadHeadline }}
                         </h2>
 
-                        <div class="text-lg mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
+                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
                             {{ $acadTagline }}
                         </div>
 
-                        <div class="acad-list space-y-3 text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                        <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
                             {!! $acadBody !!}
                         </div>
                     </div>
 
                     <div>
-                        <h2 class="text-4xl font-extrabold uppercase mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                        <h2 class="text-3xl md:text-4xl font-extrabold uppercase mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $sportHeadline }}
                         </h2>
 
-                        <div class="text-lg mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
+                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
                             {{ $sportTagline }}
                         </div>
 
-                        <div class="space-y-3 text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                        <div class="space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
                             {!! $sportBody !!}
                         </div>
                     </div>
@@ -398,9 +393,9 @@
             </div>
         </div>
 
-        {{-- RIGHT COLUMN --}}
-        <div class="w-4/12 p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
-            <div class="p-6 rounded min-h-[180px]">
+        {{-- RIGHT COLUMN (mobile stacks under tabs content) --}}
+        <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
+            <div class="p-4 md:p-6 rounded min-h-[180px]">
                 {!! $hideIfDefault($website?->contact_form_embed ?? '') !!}
             </div>
         </div>
@@ -412,7 +407,7 @@
         {{-- Header with wave --}}
         <div class="relative overflow-hidden pt-[20px]" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="absolute top-0 left-0 w-full -translate-y-[1px]">
-                <svg viewBox="0 0 1440 100" class="w-full h-[70px] md:h-[90px]" preserveAspectRatio="none">
+                <svg viewBox="0 0 1440 100" class="w-full h-[70px] md:h-[200]" preserveAspectRatio="none">
                     <path
                         fill="{{ $bg }}"
                         d="M0,64L80,58.7C160,53,320,43,480,53.3C640,64,800,96,960,101.3C1120,107,1280,85,1360,74.7L1440,64L1440,0L0,0Z">
@@ -420,21 +415,21 @@
                 </svg>
             </div>
 
-            <div class="relative text-center py-10 md:py-30 mb-[-50px]">
-                <h2 class="font-heading text-6xl md:text-8xl leading-none uppercase">
+            <div class="relative text-center py-8 md:py-10 mb-[-40px] md:mb-[-50px]">
+                <h2 class="font-heading text-5xl md:text-8xl leading-none uppercase">
                     Coaching Staff
                 </h2>
-                <p class="text-lg md:text-2xl uppercase"
+                <p class="text-base md:text-2xl uppercase"
                    style="font-family: Poppins, ui-sans-serif, system-ui; opacity: 0.85; letter-spacing: 0.01em;">
                     Guided by the Best in the Game
                 </p>
             </div>
         </div>
 
-        {{-- Staff grid (horizontal centered row(s) that wrap) --}}
-        <div class="py-16 px-6 md:px-20" style="background: {{ $bg }};">
+        {{-- Staff grid --}}
+        <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
             <div class="max-w-7xl mx-auto">
-                <div class="flex flex-wrap justify-center gap-12 md:gap-16">
+                <div class="flex flex-wrap justify-center gap-10 md:gap-16">
 
                     @foreach ($coachRows as $coach)
                         @php
@@ -445,7 +440,7 @@
                             $mailto = $email ? 'mailto:' . $email : '#';
                         @endphp
 
-                        <div class="w-[280px] sm:w-[300px] md:w-[320px] text-center">
+                        <div class="w-full sm:w-[320px] text-center">
                             <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
                                 {{ $name }}
                             </div>
@@ -481,14 +476,14 @@
         </div>
     </section>
 
-    {{-- FOOTER (ONE LOGO CONTAINER) --}}
+    {{-- FOOTER --}}
     <footer class="w-full">
-        <div class="py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
-            <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-start">
+        <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-start">
 
-                {{-- LEFT: SINGLE LOGO CONTAINER --}}
-                <div class="flex items-center">
-                    <div class="logo-slot h-16 w-48 rounded flex items-center justify-center overflow-hidden">
+                {{-- LEFT: LOGO --}}
+                <div class="flex items-center justify-start md:justify-start">
+                    <div class="h-40 md:h-60 w-full md:w-auto rounded flex items-center justify-center overflow-hidden">
                         @if (!empty($footerLogoUrl))
                             <img src="{{ $footerLogoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-3">
                         @else
@@ -498,8 +493,9 @@
                 </div>
 
                 {{-- RIGHT: CONTACT --}}
-                <div class="border-l pl-8" style="border-color: rgba(255,255,255,0.25);">
-                    <h3 class="text-xl font-bold uppercase tracking-wide mb-6">
+                <div class="md:border-l md:pl-8 border-t md:border-t-0 pt-8 md:pt-0"
+                     style="border-color: rgba(255,255,255,0.25);">
+                    <h3 class="text-lg md:text-xl font-bold uppercase tracking-wide mb-6">
                         Get in Touch
                     </h3>
 
@@ -531,14 +527,13 @@
                         @endif
                     </div>
 
-                    {{-- Social --}}
-                    <div>
+                    {{-- Social (desktop only here; mobile uses sticky bar below) --}}
+                    <div class="hidden md:block">
                         <p class="text-sm uppercase tracking-wider mb-3" style="opacity: 0.8;">
                             Connect
                         </p>
 
                         <div class="flex items-center gap-6" style="color: {{ $onPrimary }};">
-                            {{-- Instagram --}}
                             <a href="{{ $igUrl ?: '#' }}"
                                class="icon-link {{ empty($igUrl) ? 'pointer-events-none opacity-60' : '' }}"
                                aria-label="Instagram">
@@ -547,7 +542,6 @@
                                 </svg>
                             </a>
 
-                            {{-- YouTube --}}
                             <a href="{{ $ytUrl ?: '#' }}"
                                class="icon-link {{ empty($ytUrl) ? 'pointer-events-none opacity-60' : '' }}"
                                aria-label="YouTube">
@@ -556,7 +550,6 @@
                                 </svg>
                             </a>
 
-                            {{-- X --}}
                             <a href="{{ $xUrl ?: '#' }}"
                                class="icon-link {{ empty($xUrl) ? 'pointer-events-none opacity-60' : '' }}"
                                aria-label="X">
@@ -571,10 +564,58 @@
             </div>
         </div>
 
-        <div class="text-center py-4 text-sm uppercase tracking-wider" style="background: {{ $secondary }}; color: {{ $onPrimary }};">
+        <div class="text-center py-4 text-xs md:text-sm uppercase tracking-wider" style="background: {{ $secondary }}; color: {{ $onSecondary }};">
             {{ $copyright }}
         </div>
     </footer>
+
+    {{-- MOBILE STICKY SOCIAL BAR (matches your screenshot behavior) --}}
+    <div class="fixed bottom-0 left-0 w-full z-50 md:hidden border-t"
+         style="background: {{ $surface }}; border-color: rgba(15,23,42,0.12);">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-6" style="color: {{ $text1 }};">
+                <a href="{{ $igUrl ?: '#' }}"
+                   class="icon-link {{ empty($igUrl) ? 'pointer-events-none opacity-40' : '' }}"
+                   aria-label="Instagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm4.25 5.5A4.75 4.75 0 1016.75 12 4.76 4.76 0 0012 7.5zm0 7.8A3.05 3.05 0 1115.05 12 3.05 3.05 0 0112 15.3zm4.9-8.55a1.1 1.1 0 11-1.1-1.1 1.1 1.1 0 011.1 1.1z"/>
+                    </svg>
+                </a>
+
+                <a href="{{ $xUrl ?: '#' }}"
+                   class="icon-link {{ empty($xUrl) ? 'pointer-events-none opacity-40' : '' }}"
+                   aria-label="X">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.244 2H21l-6.5 7.43L22 22h-6.828l-4.27-5.588L5.6 22H3l7.1-8.12L2 2h6.828l3.84 5.088L18.244 2z"/>
+                    </svg>
+                </a>
+
+                <a href="{{ $ytUrl ?: '#' }}"
+                   class="icon-link {{ empty($ytUrl) ? 'pointer-events-none opacity-40' : '' }}"
+                   aria-label="YouTube">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 00.5 6.2 31.4 31.4 0 000 12a31.4 31.4 0 00.5 5.8 3 3 0 002.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 002.1-2.1A31.4 31.4 0 0024 12a31.4 31.4 0 00-.5-5.8zM9.8 15.5v-7l6.2 3.5-6.2 3.5z"/>
+                    </svg>
+                </a>
+
+                <a href="mailto:{{ $playerEmail ?: '#' }}"
+                   class="icon-link {{ empty($playerEmail) ? 'pointer-events-none opacity-40' : '' }}"
+                   aria-label="Email">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16v16H4z"></path>
+                        <path d="m4 6 8 6 8-6"></path>
+                    </svg>
+                </a>
+            </div>
+
+            {{-- Optional sticky CTA like your screenshot --}}
+            <a href="#"
+               class="text-xs font-semibold px-4 py-2 rounded-full"
+               style="background: {{ $secondary }}; color: {{ $onSecondary }};">
+                TEXT COACH
+            </a>
+        </div>
+    </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -588,12 +629,9 @@
             const onSecondary = @json($onSecondary);
 
             // Pointer cursor
-            buttons.forEach(btn => {
-                btn.style.cursor = "pointer";
-            });
+            buttons.forEach(btn => { btn.style.cursor = "pointer"; });
 
             buttons.forEach(button => {
-
                 button.addEventListener("click", function () {
 
                     const target = this.dataset.tab;
@@ -605,7 +643,7 @@
                         btn.style.color = onPrimary;
                     });
 
-                    // Active tab → SECONDARY
+                    // Active tab → SECONDARY (full fill)
                     this.classList.add("is-active");
                     this.style.background = secondary;
                     this.style.color = onSecondary;
@@ -618,11 +656,10 @@
                     if (active) active.classList.remove("hidden");
 
                 });
-
             });
 
         });
-        </script>
+    </script>
 
     @if (Route::has('login'))
         <div class="h-14.5 hidden lg:block"></div>

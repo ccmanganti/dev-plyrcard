@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
+use Filament\Infolists\Components\ImageEntry;
+
 use UnitEnum;
 
 
@@ -169,16 +171,18 @@ class WebsiteResource extends Resource
                             Section::make('Footer')
                                 ->schema([
                                     FileUpload::make('logos')
-                                        ->label('Footer Logos')
-                                        ->multiple()
+                                        ->label('Footer Logo')
                                         ->image()
-                                        ->reorderable()
-                                        ->disk(config('filesystems.default'))
+                                        ->disk('public')                 // IMPORTANT
                                         ->directory('website-logos')
-                                        ->imagePreviewHeight('80')
+                                        ->visibility('public')
+                                        ->multiple()                     // IMPORTANT (logos is stored as array)
+                                        ->maxFiles(1)                    // only one image
+                                        ->reorderable(false)             // optional, not needed for 1
+                                        ->imagePreviewHeight('40')
                                         ->panelLayout('grid')
                                         ->nullable(),
-                                ]),
+                                ])
                         ]),
 
                     Tabs\Tab::make('Builder')
