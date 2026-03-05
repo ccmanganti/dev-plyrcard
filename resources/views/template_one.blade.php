@@ -62,7 +62,7 @@
 
             if (!$videoId) return null;
 
-            // Reduce overlays as much as YouTube allows (not all are removable)
+            // Reduce overlays as much as YouTube allows
             $params = http_build_query([
                 'rel' => 0,
                 'modestbranding' => 1,
@@ -94,7 +94,7 @@
         $aboutVideos = $parseUrlList($about_video_urls);
 
         // ===== HIGHLIGHTS videos =====
-        $yt_video_urls = $website?->yt_playlist_embed ?? ''; // keep your existing db field name for highlights for now
+        $yt_video_urls = $website?->yt_playlist_embed ?? ''; // existing db field name for highlights
         $highlightVideos = $parseUrlList($yt_video_urls);
 
         // Helper: strip default placeholder content but keep layout
@@ -230,10 +230,39 @@
         $copyright   = 'Plyr Card 2026 © All Rights Reserved';
     @endphp
 
+    {{-- ✅ IMPORTANT: Scope GrapesJS CSS so it cannot affect the rest of the page --}}
     @if (!empty($css))
         <style>
-            #website-preview { all: initial; display:block; }
-            {!! str_replace(['body','html'], ['#website-preview','#website-preview'], $css) !!}
+            /* Preview wrapper: keep it safe and contained */
+            #website-preview{
+                display:block;
+                width:100%;
+                max-width:100%;
+                overflow:hidden;
+            }
+            #website-preview *{ box-sizing: border-box; }
+        </style>
+
+        <style>
+            {!!
+                // Prefix most normal selectors with #website-preview
+                // Skips @media/@keyframes blocks and tries to avoid breaking CSS.
+                preg_replace_callback('/(^|})\s*([^{@}][^{]+)\s*{/', function($m){
+                    $prefix = $m[1];
+                    $sel = trim($m[2]);
+
+                    // Split selectors, prefix each
+                    $sels = array_map('trim', explode(',', $sel));
+                    $sels = array_map(function($s){
+                        if ($s === '') return $s;
+                        // If selector already starts with #website-preview, leave it
+                        if (str_starts_with($s, '#website-preview')) return $s;
+                        return '#website-preview ' . $s;
+                    }, $sels);
+
+                    return $prefix . ' ' . implode(', ', $sels) . ' {';
+                }, $css)
+            !!}
         </style>
     @endif
 
@@ -253,6 +282,7 @@
         body{
             font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
             background: var(--bg);
+            margin: 0;
         }
 
         .font-heading{
@@ -276,7 +306,7 @@
             color: var(--on-secondary) !important;
         }
 
-        /* Icon hover (do not change SVG markup; only style on hover) */
+        /* Icon hover */
         .icon-link{
             cursor: pointer;
             display: inline-flex;
@@ -320,7 +350,7 @@
 
         /* Mobile sticky social bar spacing */
         @media (max-width: 767px){
-            body{ padding-bottom: 76px; } /* leaves room for sticky bar */
+            body{ padding-bottom: 76px; }
         }
     </style>
 </head>
@@ -334,15 +364,14 @@
     @endif
 
     {{-- TOP: Tabs + Right column (Responsive) --}}
-    <div class="flex flex-col md:flex-row h-auto">
+    <div class="flex flex-col md:flex-row h-auto w-full">
 
         {{-- LEFT COLUMN --}}
-        <div class="w-full md:w-8/12 md:mt-[-50px]">
+        <div class="w-full md:w-8/12 md:mt-[-50px] min-w-0">
 
-            {{-- Tabs (mobile: full-width + wraps nicely) --}}
             {{-- Tabs --}}
             <div id="tabs" class="flex flex-wrap md:flex-nowrap w-full">
-                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
+                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center is-active"
                         style="background: {{ $secondary }}; color: {{ $onSecondary }};"
                         data-tab="about">
                     ABOUT ME
@@ -384,7 +413,7 @@
                         {!! $aboutBio !!}
                     </div>
 
-                    {{-- About Me videos (URL list -> responsive grid) --}}
+                    {{-- About Me videos --}}
                     @if(!empty($aboutVideos))
                         <div class="mt-6 md:mt-8">
                             <div class="grid grid-cols-1 gap-6">
@@ -404,7 +433,6 @@
                             </div>
                         </div>
                     @endif
-                    
                 </div>
 
                 {{-- SCHEDULE --}}
@@ -429,24 +457,23 @@
                     <div class="tracking-[0.17em] text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem]" style="color: {{ $primary }};">
                         {{ $highTagline }}
                     </div>
-                    
+
                     @if(!empty($highlightVideos))
                         <div class="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             @foreach($highlightVideos as $video)
-                            <div class="w-full aspect-video rounded overflow-hidden">
-                                <iframe
-                                    class="w-full h-full"
-                                    src="{{ $video }}"
-                                    title="YouTube video"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        @endforeach
-                    </div>
+                                <div class="w-full aspect-video rounded overflow-hidden">
+                                    <iframe
+                                        class="w-full h-full"
+                                        src="{{ $video }}"
+                                        title="YouTube video"
+                                        frameborder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowfullscreen>
+                                    </iframe>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
-
 
                     <div class="min-h-[10rem]"></div>
                 </div>
@@ -485,7 +512,7 @@
             </div>
         </div>
 
-        {{-- RIGHT COLUMN (mobile stacks under tabs content) --}}
+        {{-- RIGHT COLUMN --}}
         <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="p-4 md:p-6 rounded min-h-[180px]">
                 {!! $hideIfDefault($website?->contact_form_embed ?? '') !!}
@@ -496,17 +523,15 @@
     {{-- COACHING STAFF --}}
     <section class="w-full">
 
-        {{-- Header with wave --}}
         <div class="relative overflow-hidden pt-[20px]" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="absolute top-0 left-0 w-full -translate-y-[1px]">
-                <svg viewBox="0 0 1440 160" class="w-full h-[90px] md:h-[120px]" preserveAspectRatio="none">
-                    <path
-                        fill="{{ $bg }}"
-                        d="M0,100L80,94C160,88,320,76,480,86C640,96,800,128,960,134C1120,140,1280,118,1360,108L1440,100L1440,0L0,0Z">
+                <svg viewBox="0 0 1440 160" class="w-full h-[120px] md:h-[120px]" preserveAspectRatio="none">
+                    <path fill="{{ $bg }}"
+                          d="M0,100L80,94C160,88,320,76,480,86C640,96,800,128,960,134C1120,140,1280,118,1360,108L1440,100L1440,0L0,0Z">
                     </path>
                 </svg>
             </div>
-            <div class="relative text-center py-8 md:py-30 mb-[-50px] md:mb-[-60px]">
+            <div class="relative text-center py-30 md:py-30 mb-[-50px] md:mb-[-60px]">
                 <h2 class="font-heading text-5xl md:text-8xl leading-none uppercase">
                     Coaching Staff
                 </h2>
@@ -517,7 +542,6 @@
             </div>
         </div>
 
-        {{-- Staff grid --}}
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
             <div class="max-w-7xl mx-auto">
                 <div class="flex flex-wrap justify-center gap-10 md:gap-16">
@@ -572,7 +596,6 @@
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-start">
 
-                {{-- LEFT: LOGO --}}
                 <div class="flex items-center justify-start md:justify-start">
                     <div class="h-40 md:h-60 w-full md:w-auto rounded flex items-center justify-center overflow-hidden">
                         @if (!empty($footerLogoUrl))
@@ -583,14 +606,12 @@
                     </div>
                 </div>
 
-                {{-- RIGHT: CONTACT --}}
                 <div class="md:border-l md:pl-8 border-t md:border-t-0 pt-8 md:pt-0"
                      style="border-color: rgba(255,255,255,0.25);">
                     <h3 class="text-lg md:text-xl font-bold uppercase tracking-wide mb-6">
                         Get in Touch
                     </h3>
 
-                    {{-- Phone --}}
                     <div class="flex items-center gap-4 mb-4 min-h-[1.5rem]">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h2l2 5-2 1a11 11 0 005 5l1-2 5 2v2a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
@@ -604,7 +625,6 @@
                         @endif
                     </div>
 
-                    {{-- Email --}}
                     <div class="flex items-center gap-4 mb-6 min-h-[1.5rem]">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>
@@ -618,7 +638,6 @@
                         @endif
                     </div>
 
-                    {{-- Social (desktop only here; mobile uses sticky bar below) --}}
                     <div class="hidden md:block">
                         <p class="text-sm uppercase tracking-wider mb-3" style="opacity: 0.8;">
                             Connect
@@ -660,7 +679,7 @@
         </div>
     </footer>
 
-    {{-- MOBILE STICKY SOCIAL BAR (matches your screenshot behavior) --}}
+    {{-- MOBILE STICKY SOCIAL BAR --}}
     <div class="fixed bottom-0 left-0 w-full z-50 md:hidden border-t"
          style="background: {{ $surface }}; border-color: rgba(15,23,42,0.12);">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -699,7 +718,6 @@
                 </a>
             </div>
 
-            {{-- Optional sticky CTA like your screenshot --}}
             <a href="#"
                class="text-xs font-semibold px-4 py-2 rounded-full"
                style="background: {{ $secondary }}; color: {{ $onSecondary }};">
@@ -710,7 +728,6 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-
             const buttons  = document.querySelectorAll(".tab-btn");
             const contents = document.querySelectorAll(".tab-content");
 
@@ -719,36 +736,28 @@
             const secondary   = @json($secondary);
             const onSecondary = @json($onSecondary);
 
-            // Pointer cursor
             buttons.forEach(btn => { btn.style.cursor = "pointer"; });
 
             buttons.forEach(button => {
                 button.addEventListener("click", function () {
-
                     const target = this.dataset.tab;
 
-                    // Reset all tabs → PRIMARY
                     buttons.forEach(btn => {
                         btn.classList.remove("is-active");
                         btn.style.background = primary;
                         btn.style.color = onPrimary;
                     });
 
-                    // Active tab → SECONDARY (full fill)
                     this.classList.add("is-active");
                     this.style.background = secondary;
                     this.style.color = onSecondary;
 
-                    // Hide all content
                     contents.forEach(content => content.classList.add("hidden"));
 
-                    // Show selected content
                     const active = document.getElementById("tab-" + target);
                     if (active) active.classList.remove("hidden");
-
                 });
             });
-
         });
     </script>
 
@@ -756,4 +765,4 @@
         <div class="h-14.5 hidden lg:block"></div>
     @endif
 </body>
-</html>
+</html> 
