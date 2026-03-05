@@ -13,7 +13,9 @@
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
-
+    <!-- AOS On-Scroll Animations -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    
     @php
         /**
          * DATA
@@ -364,13 +366,13 @@
     @endif
 
     {{-- TOP: Tabs + Right column (Responsive) --}}
-    <div class="flex flex-col md:flex-row h-auto w-full">
+    <div class="flex flex-col md:flex-row h-auto w-full z-[999]">
 
         {{-- LEFT COLUMN --}}
-        <div class="w-full md:w-8/12 md:mt-[-50px] min-w-0">
+        <div class="w-full md:w-8/12 min-w-0">
 
             {{-- Tabs --}}
-            <div id="tabs" class="flex flex-wrap md:flex-nowrap w-full">
+            <div id="tabs" class="flex flex-wrap md:flex-nowrap w-full md:mt-[-47px]">
                 <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center is-active"
                         style="background: {{ $secondary }}; color: {{ $onSecondary }};"
                         data-tab="about">
@@ -760,7 +762,10 @@
             });
         });
     </script>
-
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init();
+    </script>
     @if (Route::has('login'))
         <div class="h-14.5 hidden lg:block"></div>
     @endif

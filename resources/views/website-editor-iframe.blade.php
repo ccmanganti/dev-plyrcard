@@ -50,8 +50,8 @@ html, body {
   min-width: 100% !important;
   box-sizing: border-box !important;
 
-  /* put your spacing here instead */
-  /* padding: 24px 360px 24px 24px !important;
+  /* put your spacing here instead
+  /* padding: 24px 360px 24px 24px !important; */
 }
 
 /* The frame wrapper should be centered */
@@ -65,7 +65,6 @@ html, body {
 
 <body>
   <div id="studio-editor"></div>
-
   <script src="https://unpkg.com/@grapesjs/studio-sdk/dist/index.umd.js"></script>
 
 <script>
