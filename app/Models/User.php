@@ -14,10 +14,11 @@ use App\Models\Club;
 use App\Models\Website;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
 
-
-class User extends Authenticatable implements HasName
+class User extends Authenticatable implements HasName, FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles, SoftDeletes;
@@ -112,5 +113,10 @@ class User extends Authenticatable implements HasName
     public function website(): HasOne
     {
         return $this->hasOne(Website::class);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return true;
     }
 }
