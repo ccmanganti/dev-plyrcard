@@ -39,6 +39,14 @@ Route::get('/', function (Request $request) {
     if (! $user || ! $user->website) {
         abort(404);
     }
+    $html = null;
+    $css = null;
+
+    if ($user->website && $user->website->html && $user->website->css) {
+        $html = $user->website->html;
+        $css = $user->website->css;
+    }
+    
     return view('template_one', compact('user', 'html', 'css'));
 
 

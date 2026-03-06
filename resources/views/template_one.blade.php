@@ -596,129 +596,107 @@
     </div>
 
     {{-- COACHING STAFF --}}
-<section class="w-full mt-5">
-    {{-- Header Area --}}
-    <div class="relative pt-20 pb-24 md:pt-24 md:pb-10 overflow-hidden"
-         style="background: {{ $primary }}; color: {{ $onPrimary }};">
+    {{-- COACHING STAFF SECTION --}}
+    <section class="w-full mt-5">
+        {{-- Header Area: Preserve your dynamic $primary color --}}
+        <div class="relative pt-20 pb-24 md:pt-30 md:pb-10 overflow-hidden" style="background: {{ $primary }}; color: {{ $onPrimary }};">
+            
+            {{-- THE FULL BRUSH WAVE SVG (Restored and scaled up) --}}
+            <div class="absolute top-0 left-0 w-full overflow-hidden leading-[0] z-20">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1899 357" preserveAspectRatio="none">
+                    <rect width="1899" height="357" fill="{{ $primary }}"/>
 
-        {{-- Brush Wave SVG --}}
-        <div class="absolute top-0 left-0 w-full overflow-hidden leading-[0] z-20 pointer-events-none">
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 1899 357"
-                preserveAspectRatio="none"
-                class="block w-full h-[110px] md:h-[150px]"
-            >
-                <rect width="1899" height="357" fill="{{ $primary }}"/>
+                    <!-- top white shape -->
+                    <path d="
+                        M0,0
+                        H1899
+                        V38
+                        C1715,50 1540,58 1368,52
+                        C1215,47 1085,58 954,67
+                        C774,79 585,58 396,40
+                        C267,28 136,22 0,24
+                        Z" fill="#ffffffff"/>
 
-                <!-- top white shape -->
-                <path d="
-                    M0,0
-                    H1899
-                    V38
-                    C1715,50 1540,58 1368,52
-                    C1215,47 1085,58 954,67
-                    C774,79 585,58 396,40
-                    C267,28 136,22 0,24
-                    Z" fill="#ffffff"/>
+                    <!-- brush strokes -->
+                    <path d="
+                        M0,20
+                        C48,18 92,18 133,19
+                        C106,20 62,22 0,22
+                        Z" fill="{{ $primary }}"/>
 
-                <!-- brush strokes -->
-                <path d="
-                    M0,20
-                    C48,18 92,18 133,19
-                    C106,20 62,22 0,22
-                    Z" fill="{{ $primary }}"/>
+                    <path d="
+                        M646,50
+                        C820,58 1000,63 1147,58
+                        C996,66 810,65 646,50
+                        Z" fill="{{ $primary }}"/>
 
-                <path d="
-                    M646,50
-                    C820,58 1000,63 1147,58
-                    C996,66 810,65 646,50
-                    Z" fill="{{ $primary }}"/>
+                    <path d="
+                        M728,69
+                        C846,77 980,80 1087,74
+                        C972,84 839,83 728,69
+                        Z" fill="#ffffff" opacity="0.7"/>
 
-                <path d="
-                    M728,69
-                    C846,77 980,80 1087,74
-                    C972,84 839,83 728,69
-                    Z" fill="#ffffff" opacity="0.7"/>
+                    <path d="
+                        M1065,28
+                        C1278,29 1524,27 1818,8
+                        C1644,26 1397,36 1065,28
+                        Z"
+                        fill="{{ $primary }}"
+                        transform="translate(0,7)" />
 
-                <path d="
-                    M1065,28
-                    C1278,29 1524,27 1818,8
-                    C1644,26 1397,36 1065,28
-                    Z"
-                    fill="{{ $primary }}"
-                    transform="translate(0,7)" />
+                    <path d="
+                        M1868,34
+                        C1878,33 1888,32 1899,31
+                        V35
+                        C1888,36 1878,36 1868,34
+                        Z" fill="{{ $primary }}"/>
 
-                <path d="
-                    M1868,34
-                    C1878,33 1888,32 1899,31
-                    V35
-                    C1888,36 1878,36 1868,34
-                    Z" fill="{{ $primary }}"/>
+                    <!-- bottom white band -->
+                    <rect x="0" y="344" width="1899" height="13" fill="{{ $primary }}"/>
+                </svg>
+            </div>
 
-                <!-- bottom band -->
-                <rect x="0" y="344" width="1899" height="13" fill="{{ $primary }}"/>
-            </svg>
-        </div>
-
-        {{-- Text Content --}}
-        <div class="relative text-center z-30 px-4">
-            <h2 class="font-heading text-6xl md:text-[100px] leading-none uppercase tracking-tight"
-                style="color: {{ $onPrimary }};">
-                Coaching Staff
-            </h2>
-
-            <p class="text-base md:text-[27px] uppercase tracking-[0.1rem] font-thin"
-               style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
-                Guided by the Best in the Game
-            </p>
-        </div>
-    </div>
-
-    {{-- Coaching Grid Area --}}
-    <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-wrap justify-center lg:justify-between gap-y-8 gap-x-6 md:gap-x-8">
-                @foreach ($coachRows as $coach)
-                    <div class="flex-1 min-w-[220px] max-w-[320px] text-center">
-                        <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
-                            {{ $coach['name'] ?? '' }}
-                        </div>
-
-                        <div class="mt-1 text-xs uppercase tracking-widest" style="color: {{ $primary }};">
-                            {{ $coach['label'] ?? '' }}
-                        </div>
-
-                        @if(!empty($coach['title']))
-                            <div class="mt-2 text-sm" style="color: {{ $text2 }};">
-                                {{ $coach['title'] }}
-                            </div>
-                        @endif
-
-                        <div class="mt-6 flex justify-center">
-                            @if(!empty($coach['email']) || !empty($playerEmail))
-                                <a href="mailto:{{ $coach['email'] ?? $playerEmail }}"
-                                   class="icon-link inline-flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                         class="w-12 h-12"
-                                         viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="{{ $primary }}"
-                                         stroke-width="1.8"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <path d="M4 4h16v16H4z"></path>
-                                        <path d="m4 6 8 6 8-6"></path>
-                                    </svg>
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
+            {{-- Text Content: Positioned over the dynamic background --}}
+            <div class="relative text-center z-30 px-0">
+                <h2 class="font-heading text-6xl md:text-[100px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
+                    Coaching Staff
+                </h2>
+                <p class="text-base md:text-[27px] uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
+                    Guided by the Best in the Game
+                </p>
             </div>
         </div>
-    </div>
-</section>
+
+        {{-- Coaching Grid Area --}}
+        <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-wrap justify-center lg:justify-between gap-y-8 gap-x-6 md:gap-x-8">
+                    @foreach ($coachRows as $coach)
+                        <div class="flex-1 min-w-[220px] max-w-[320px] text-center">
+                            <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
+                                {{ $coach['name'] ?? '' }}
+                            </div>
+
+                            <div class="mt-1 text-xs uppercase tracking-widest" style="color: {{ $primary }};">
+                                {{ $coach['label'] ?? '' }}
+                            </div>
+
+                            <div class="mt-6 flex justify-center">
+                                @if(!empty($coach['email']) || !empty($playerEmail))
+                                    <a href="mailto:{{ $coach['email'] ?? $playerEmail }}" class="icon-link inline-flex items-center justify-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M4 4h16v16H4z"></path>
+                                            <path d="m4 6 8 6 8-6"></path>
+                                        </svg>
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </section>
 
     {{-- FOOTER --}}
     <footer class="w-full">
