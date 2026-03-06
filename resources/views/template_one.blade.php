@@ -94,6 +94,25 @@
         // ===== ABOUT videos =====
         $about_video_urls = $website?->yt_embed ?? '';
         $aboutVideos = $parseUrlList($about_video_urls);
+        $aboutThumbnail = collect($website?->thumbnail ?? [])->filter()->values();
+
+        $aboutThumbnailUrl = '';
+        $first = $aboutThumbnail->first();
+
+        if (is_string($first) && $first !== '') {
+            $aboutThumbnailUrl = asset('storage/' . ltrim($first, '/'));
+        }
+        elseif (is_array($first)) {
+            $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? '';
+            if ($path) {
+                $aboutThumbnailUrl = asset('storage/' . ltrim($path, '/'));
+            }
+        }
+
+        /* fallback if no uploaded thumbnail */
+        if (!$aboutThumbnailUrl) {
+            $aboutThumbnailUrl = asset('temp-thumbnail.png');
+        }
 
         // ===== HIGHLIGHTS videos =====
         $yt_video_urls = $website?->yt_playlist_embed ?? ''; // existing db field name for highlights
@@ -287,6 +306,15 @@
             margin: 0;
         }
 
+        .no-scrollbar::-webkit-scrollbar {
+        display: none;
+        }
+
+        .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+        }
+
         .font-heading{
             font-family: "Bebas Neue", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
         }
@@ -372,73 +400,119 @@
         <div class="w-full md:w-8/12 min-w-0">
 
             {{-- Tabs --}}
-            <div id="tabs" class="flex flex-wrap md:flex-nowrap w-full md:mt-[-47px]">
-                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center is-active"
+            <div id="tabs" class="flex w-full overflow-x-auto whitespace-nowrap md:mt-[-47px] no-scrollbar">
+                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center is-active"
                         style="background: {{ $secondary }}; color: {{ $onSecondary }};"
                         data-tab="about">
                     ABOUT ME
                 </button>
 
-                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
+                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="schedule">
                     SCHEDULE
                 </button>
 
-                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
+                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="highlights">
                     HIGHLIGHTS
                 </button>
 
-                <button class="tab-btn w-1/2 md:w-auto px-5 py-3 font-semibold whitespace-nowrap text-center"
+                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
                         style="background: {{ $primary }}; color: {{ $onPrimary }};"
                         data-tab="accolades">
                     ACCOLADES
                 </button>
+
             </div>
 
             {{-- Tab Content --}}
-            <div class="bg-white p-6 md:p-10">
+            <div class="bg-white">
 
                 {{-- ABOUT --}}
                 <div id="tab-about" class="tab-content">
-                    <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
-                        {{ $aboutHeadline }}
-                    </h2>
+                    <div class="p-6 md:p-10">
+                        <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
+                            {{ $aboutHeadline }}
+                        </h2>
 
-                    <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.1em]" style="color: {{ $primary }};">
-                        {{ $aboutTagline }}
+                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.1em]" style="color: {{ $primary }};">
+                            {{ $aboutTagline }}
+                        </div>
+
+                        <div class="space-y-5 md:space-y-6 text-[16px] md:text-[17px] leading-6 min-h-[4rem]" style="color: {{ $text2 }};">
+                            {!! $aboutBio !!}
+                        </div>
                     </div>
-
-                    <div class="space-y-5 md:space-y-6 text-[16px] md:text-[17px] leading-6 min-h-[4rem]" style="color: {{ $text2 }};">
-                        {!! $aboutBio !!}
-                    </div>
-
                     {{-- About Me videos --}}
-                    @if(!empty($aboutVideos))
+                    @if(!empty($aboutVideos) && !empty($aboutVideos[0]))
+
+                        @php
+                            $video = $aboutVideos[0];
+
+                            $videoId = null;
+
+                            if (preg_match('/(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/', $video, $matches)) {
+                                $videoId = $matches[1];
+                            }
+
+                            $embedUrl = $videoId
+                                ? "https://www.youtube.com/embed/".$videoId."?autoplay=1&rel=0"
+                                : $video;
+                        @endphp
+
                         <div class="mt-6 md:mt-8">
                             <div class="grid grid-cols-1 gap-6">
-                                @foreach($aboutVideos as $video)
-                                    <div class="w-full aspect-video rounded overflow-hidden border"
-                                        style="background: {{ $bg }}; border-color: rgba(15, 23, 42, 0.12);">
-                                        <iframe
-                                            class="w-full h-full"
-                                            src="{{ $video }}"
-                                            title="YouTube video"
-                                            frameborder="0"
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowfullscreen>
-                                        </iframe>
+
+                                <div class="w-full aspect-video overflow-hidden relative"
+                                    style="background: {{ $bg }};"
+                                    id="about-video-player">
+
+                                    <div
+                                        class="relative w-full h-full cursor-pointer group"
+                                        onclick="document.getElementById('about-video-player').innerHTML = `
+                                            <iframe
+                                                class='w-full h-full'
+                                                src='{{ $embedUrl }}'
+                                                title='YouTube video'
+                                                frameborder='0'
+                                                allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+                                                allowfullscreen>
+                                            </iframe>`"
+                                    >
+
+                                        {{-- Thumbnail --}}
+                                        <img
+                                            src="{{ $aboutThumbnailUrl }}"
+                                            alt="Video Thumbnail"
+                                            class="w-full h-full object-cover"
+                                        />
+
+                                        {{-- Overlay --}}
+                                        <div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition"></div>
+
+                                        {{-- Play button --}}
+                                        <div class="absolute inset-0 flex items-center justify-center">
+                                            <div class="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 84" class="w-10 h-10 ml-1">
+                                                    <path d="M32 25.5v33l26-16.5-26-16.5z" fill="{{ $primary }}"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+
                                     </div>
-                                @endforeach
+
+                                </div>
+
                             </div>
                         </div>
+
                     @endif
                 </div>
 
                 {{-- SCHEDULE --}}
-                <div id="tab-schedule" class="tab-content hidden">
+                <div id="tab-schedule" class="tab-content hidden p-6 md:p-10">
                     <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $scheduleHeadline }}
                     </h2>
@@ -451,7 +525,7 @@
                 </div>
 
                 {{-- HIGHLIGHTS --}}
-                <div id="tab-highlights" class="tab-content hidden">
+                <div id="tab-highlights" class="tab-content hidden p-6 md:p-10">
                     <div class="tracking-[0.17em] uppercase font-heading text-3xl md:text-4xl min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $highHeadline }}
                     </div>
@@ -481,7 +555,7 @@
                 </div>
 
                 {{-- ACCOLADES --}}
-                <div id="tab-accolades" class="tab-content hidden">
+                <div id="tab-accolades" class="tab-content hidden p-6 md:p-10">
                     <div class="mb-8 md:mb-10">
                         <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $acadHeadline }}
@@ -495,17 +569,16 @@
                             {!! $acadBody !!}
                         </div>
                     </div>
-
-                    <div>
-                        <h2 class="text-3xl md:text-4xl font-extrabold uppercase mb-3 min-h-[2.5rem]" style="color: {{ $text1 }};">
+                    <div class="mb-8 md:mb-10">
+                        <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $sportHeadline }}
                         </h2>
 
-                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem]" style="color: {{ $accent }};">
+                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
                             {{ $sportTagline }}
                         </div>
 
-                        <div class="space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                        <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
                             {!! $sportBody !!}
                         </div>
                     </div>
@@ -523,71 +596,103 @@
     </div>
 
     {{-- COACHING STAFF --}}
-    <section class="w-full">
+    {{-- COACHING STAFF SECTION --}}
+    <section class="w-full mt-5">
+        {{-- Header Area: Preserve your dynamic $primary color --}}
+        <div class="relative pt-20 pb-24 md:pt-30 md:pb-10 overflow-hidden" style="background: {{ $primary }}; color: {{ $onPrimary }};">
+            
+            {{-- THE FULL BRUSH WAVE SVG (Restored and scaled up) --}}
+            <div class="absolute top-0 left-0 w-full overflow-hidden leading-[0] z-20">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1899 357" preserveAspectRatio="none">
+                    <rect width="1899" height="357" fill="{{ $primary }}"/>
 
-        <div class="relative overflow-hidden pt-[20px]" style="background: {{ $primary }}; color: {{ $onPrimary }};">
-            <div class="absolute top-0 left-0 w-full -translate-y-[1px]">
-                <svg viewBox="0 0 1440 160" class="w-full h-[120px] md:h-[120px]" preserveAspectRatio="none">
-                    <path fill="{{ $bg }}"
-                          d="M0,100L80,94C160,88,320,76,480,86C640,96,800,128,960,134C1120,140,1280,118,1360,108L1440,100L1440,0L0,0Z">
-                    </path>
+                    <!-- top white shape -->
+                    <path d="
+                        M0,0
+                        H1899
+                        V38
+                        C1715,50 1540,58 1368,52
+                        C1215,47 1085,58 954,67
+                        C774,79 585,58 396,40
+                        C267,28 136,22 0,24
+                        Z" fill="#ffffffff"/>
+
+                    <!-- brush strokes -->
+                    <path d="
+                        M0,20
+                        C48,18 92,18 133,19
+                        C106,20 62,22 0,22
+                        Z" fill="{{ $primary }}"/>
+
+                    <path d="
+                        M646,50
+                        C820,58 1000,63 1147,58
+                        C996,66 810,65 646,50
+                        Z" fill="{{ $primary }}"/>
+
+                    <path d="
+                        M728,69
+                        C846,77 980,80 1087,74
+                        C972,84 839,83 728,69
+                        Z" fill="#ffffff" opacity="0.7"/>
+
+                    <path d="
+                        M1065,28
+                        C1278,29 1524,27 1818,8
+                        C1644,26 1397,36 1065,28
+                        Z"
+                        fill="{{ $primary }}"
+                        transform="translate(0,7)" />
+
+                    <path d="
+                        M1868,34
+                        C1878,33 1888,32 1899,31
+                        V35
+                        C1888,36 1878,36 1868,34
+                        Z" fill="{{ $primary }}"/>
+
+                    <!-- bottom white band -->
+                    <rect x="0" y="344" width="1899" height="13" fill="{{ $primary }}"/>
                 </svg>
             </div>
-            <div class="relative text-center py-30 md:py-30 mb-[-50px] md:mb-[-60px]">
-                <h2 class="font-heading text-5xl md:text-8xl leading-none uppercase">
+
+            {{-- Text Content: Positioned over the dynamic background --}}
+            <div class="relative text-center z-30 px-0">
+                <h2 class="font-heading text-6xl md:text-[100px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
                     Coaching Staff
                 </h2>
-                <p class="text-base md:text-2xl uppercase"
-                   style="font-family: Poppins, ui-sans-serif, system-ui; opacity: 0.85; letter-spacing: 0.01em;">
+                <p class="text-base md:text-[27px] uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
                     Guided by the Best in the Game
                 </p>
             </div>
         </div>
 
+        {{-- Coaching Grid Area --}}
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
             <div class="max-w-7xl mx-auto">
-                <div class="flex flex-wrap justify-center gap-10 md:gap-16">
-
+                <div class="flex flex-wrap justify-center lg:justify-between gap-y-8 gap-x-6 md:gap-x-8">
                     @foreach ($coachRows as $coach)
-                        @php
-                            $name   = $coach['name'] ?? '';
-                            $label  = $coach['label'] ?? '';
-                            $title  = $coach['title'] ?? '';
-                            $email  = $coach['email'] ?? $playerEmail;
-                            $mailto = $email ? 'mailto:' . $email : '#';
-                        @endphp
-
-                        <div class="w-full sm:w-[320px] text-center">
+                        <div class="flex-1 min-w-[220px] max-w-[320px] text-center">
                             <div class="font-extrabold uppercase tracking-wide text-lg" style="color: {{ $text1 }};">
-                                {{ $name }}
+                                {{ $coach['name'] ?? '' }}
                             </div>
 
                             <div class="mt-1 text-xs uppercase tracking-widest" style="color: {{ $primary }};">
-                                {{ $label }}
+                                {{ $coach['label'] ?? '' }}
                             </div>
 
                             <div class="mt-6 flex justify-center">
-                                <a href="{{ $mailto }}" class="icon-link inline-flex items-center justify-center" aria-label="Email coach">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                         class="w-12 h-12"
-                                         viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="{{ $primary }}"
-                                         stroke-width="1.8"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <path d="M4 4h16v16H4z"></path>
-                                        <path d="m4 6 8 6 8-6"></path>
-                                    </svg>
-                                </a>
-                            </div>
-
-                            <div class="mt-6 text-sm" style="color: {{ $text1 }};">
-                                {{ $title }}
+                                @if(!empty($coach['email']) || !empty($playerEmail))
+                                    <a href="mailto:{{ $coach['email'] ?? $playerEmail }}" class="icon-link inline-flex items-center justify-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M4 4h16v16H4z"></path>
+                                            <path d="m4 6 8 6 8-6"></path>
+                                        </svg>
+                                    </a>
+                                @endif
                             </div>
                         </div>
                     @endforeach
-
                 </div>
             </div>
         </div>

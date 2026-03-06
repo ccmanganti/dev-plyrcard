@@ -158,12 +158,12 @@ class WebsiteResource extends Resource
                                         ->nullable(),
 
                                     Textarea::make('yt_embed')
-                                        ->label('YouTube Video URL or Embed')
+                                        ->label('About Me | YouTube Video')
                                         ->rows(4)
                                         ->nullable(),
 
                                     Textarea::make('yt_playlist_embed')
-                                        ->label('YouTube Video URLs')
+                                        ->label('Highlights | YouTube Video URLs')
                                         ->placeholder("Paste one YouTube URL per line\nhttps://www.youtube.com/watch?v=gOW0GpXKvOg\nhttps://youtu.be/7H9oZSbxWrk")
                                         ->rows(5)
                                         ->helperText('Paste one YouTube video link per line.')
@@ -219,7 +219,7 @@ class WebsiteResource extends Resource
         return WebsiteInfolist::configure($schema);
     }
 
-    public static function table(Table $table): Table
+        public static function table(Table $table): Table
     {
         return WebsitesTable::configure($table)->columns([
             TextColumn::make('user_full_name')
