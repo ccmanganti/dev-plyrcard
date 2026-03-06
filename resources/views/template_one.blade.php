@@ -10,9 +10,7 @@
     <link href="https://fonts.bunny.net/css?family=bebas-neue:400|poppins:300,400,500,600,700" rel="stylesheet" />
 
     <!-- Styles / Scripts -->
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @endif
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <!-- AOS On-Scroll Animations -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
