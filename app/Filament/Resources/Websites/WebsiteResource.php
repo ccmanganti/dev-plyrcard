@@ -168,6 +168,20 @@ class WebsiteResource extends Resource
                                         ->rows(5)
                                         ->helperText('Paste one YouTube video link per line.')
                                         ->nullable(),
+
+                                    FileUpload::make('highlights_thumbnail')
+                                        ->label('Thumbnail for Video Highlights')
+                                        ->image()
+                                        ->columnSpan(2)
+                                        ->disk('public')                 // IMPORTANT
+                                        ->directory('video-highlights-thumbnail')
+                                        ->visibility('public')
+                                        ->multiple()                     // IMPORTANT (logos is stored as array)
+                                        ->maxFiles(1)                    // only one image
+                                        ->reorderable(false)             // optional, not needed for 1
+                                        ->imagePreviewHeight('40')
+                                        ->panelLayout('grid')
+                                        ->nullable(),
                                 ]),
 
                             Section::make('Footer')

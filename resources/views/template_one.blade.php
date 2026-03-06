@@ -94,7 +94,7 @@
         // ===== ABOUT videos =====
         $about_video_urls = $website?->yt_embed ?? '';
         $aboutVideos = $parseUrlList($about_video_urls);
-        $aboutThumbnail = collect($website?->thumbnail ?? [])->filter()->values();
+        $aboutThumbnail = collect($website?->highlights_thumbnail ?? [])->filter()->values();
 
         $aboutThumbnailUrl = '';
         $first = $aboutThumbnail->first();

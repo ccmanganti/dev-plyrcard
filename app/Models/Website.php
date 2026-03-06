@@ -48,10 +48,12 @@ class Website extends Model
         'yt_embed',
         'yt_playlist_embed',
         'logos',
+        'highlights_thumbnail',
     ];
 
     protected $casts = [
         'logos' => 'array',
+        'highlights_thumbnail' => 'array',
     ];
 
     public function user(): BelongsTo
