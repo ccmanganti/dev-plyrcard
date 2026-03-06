@@ -9,43 +9,42 @@ Route::get('/', function (Request $request) {
 
     $host = $request->getHost();
     // MAIN PLATFORM
-    // if ($host === 'dev.plyrcard.com') {
-    //     return redirect('/admin'); // or main landing
-    // }
+    if ($host === 'dev.plyrcard.com') {
+        return redirect('/admin'); // or main landing
+    }
 
-    // if ($host === '127.0.0.1') {
-    //     return redirect('/admin'); // or main landing
-    // }
+    if ($host === '127.0.0.1') {        
+        $user = User::where('first_name', 'Sebastian')
+            ->with('website')
+            ->firstOrFail();
 
-    // return view('template_one'); // or main landing
-    // return view('slide_builder'); // or main landing
+        $html = null;
+        $css = null;
+
+        if ($user->website && $user->website->html && $user->website->css) {
+            $html = $user->website->html;
+            $css = $user->website->css;
+        }
+        
+        return view('template_one', compact('user', 'html', 'css'));
+    }
 
 
+    // If other domain
     // CUSTOM DOMAIN
-    // $user = User::where('domain', $host)
-    //     ->with('website')
-    //     ->first();
-
-    // if (! $user || ! $user->website) {
-    //     abort(404);
-    // }
-
-    // $projectJson = $user->website->project_json;
-
-    // return view('template_one', compact('user', 'projectJson'));
-
-    $user = User::where('first_name', 'Sebastian')
+    $user = User::where('domain', $host)
         ->with('website')
-        ->firstOrFail();
+        ->first();
 
-    $html = null;
-    $css = null;
-
-    if ($user->website && $user->website->html && $user->website->css) {
-        $html = $user->website->html;
-        $css = $user->website->css;
+    if (! $user || ! $user->website) {
+        abort(404);
     }
     return view('template_one', compact('user', 'html', 'css'));
+
+
+    // $projectJson = $user->website->project_json;
+    // return view('template_one', compact('user', 'projectJson'));
+
 });
 
 
