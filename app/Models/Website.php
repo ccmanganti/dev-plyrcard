@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\User;
 
 class Website extends Model
 {
@@ -13,28 +13,16 @@ class Website extends Model
 
     protected $fillable = [
         'user_id',
-
-        // GrapesJS
+        'site_template_id',
+        'hero_template_id',
+        'name',
+        'slug',
+        'domain',
+        'is_active',
+        'is_published',
         'project_json',
         'html',
         'css',
-
-        // Text content
-        'aboutme_headline',
-        'player_tagline',
-        'player_bio',
-        'highlights_headline',
-        'highlights_tagline',
-        'schedules_headline',
-        'schedules_tagline',
-        'acad_accolades_headline',
-        'acad_accolades_tagline',
-        'academic_accolades',
-        'sport_accolades_headline',
-        'sport_accolades_tagline',
-        'sports_accolades',
-
-        // Colors
         'primary_color',
         'secondary_color',
         'accent_color',
@@ -42,22 +30,35 @@ class Website extends Model
         'surface_color',
         'text_primary_color',
         'text_secondary_color',
-
-        // Embeds / assets
-        'contact_form_embed',
-        'yt_embed',
-        'yt_playlist_embed',
-        'logos',
-        'highlights_thumbnail',
     ];
 
     protected $casts = [
-        'logos' => 'array',
-        'highlights_thumbnail' => 'array',
+        'is_active' => 'boolean',
+        'is_published' => 'boolean',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function siteTemplate(): BelongsTo
+    {
+        return $this->belongsTo(SiteTemplate::class);
+    }
+
+    public function heroTemplate(): BelongsTo
+    {
+        return $this->belongsTo(HeroTemplate::class);
+    }
+
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(WebsiteFieldValue::class);
+    }
+
+    public function heroFieldValues(): HasMany
+    {
+        return $this->hasMany(WebsiteHeroFieldValue::class);
     }
 }

@@ -1,65 +1,163 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use App\Models\User;
 use App\Http\Controllers\WebsiteEditorController;
+use App\Models\Website;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function (Request $request) {
-
     $host = $request->getHost();
-    // MAIN PLATFORM
-    if ($host === 'dev.plyrcard.com') {
-        return redirect('/admin'); // or main landing
+
+    /*
+    |--------------------------------------------------------------------------
+    | Platform domain -> admin
+    |--------------------------------------------------------------------------
+    */
+    $platformHosts = [
+        'dev.plyrcard.com',
+        'plyrcard.com',
+        'www.plyrcard.com',
+    ];
+
+    if (in_array($host, $platformHosts, true)) {
+        return redirect('/admin');
     }
 
-    if ($host === '127.0.0.1') {        
-        $user = User::where('first_name', 'Sebastian')
-            ->with('website')
-            ->firstOrFail();
+    /*
+    |--------------------------------------------------------------------------
+    | Local development
+    |--------------------------------------------------------------------------
+    | Example:
+    | http://127.0.0.1:8000
+    | http://localhost:8000
+    |--------------------------------------------------------------------------
+    */
+    if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
+        $website = Website::query()
+            ->with([
+                'user.school',
+                'user.club.league',
+                'siteTemplate',
+                'heroTemplate',
+                'fieldValues.templateField',
+                'heroFieldValues.templateField',
+            ])
+            ->orderBy('id')
+            ->first();
 
-        $html = null;
-        $css = null;
+        abort_unless($website, 404, 'No website record found.');
 
-        if ($user->website && $user->website->html && $user->website->css) {
-            $html = $user->website->html;
-            $css = $user->website->css;
-        }
-        
-        return view('template_one', compact('user', 'html', 'css'));
+        abort_unless(
+            $website->siteTemplate && $website->siteTemplate->blade_view,
+            404,
+            'The website does not have a valid site template.'
+        );
+
+        return view($website->siteTemplate->blade_view, compact('website'));
     }
 
-
-    // If other domain
-    // CUSTOM DOMAIN
-    $user = User::where('domain', $host)
-        ->with('website')
+    /*
+    |--------------------------------------------------------------------------
+    | Production custom domains
+    |--------------------------------------------------------------------------
+    | Match websites.domain first
+    |--------------------------------------------------------------------------
+    */
+    $website = Website::query()
+        ->where('domain', $host)
+        ->with([
+            'user.school',
+            'user.club.league',
+            'siteTemplate',
+            'heroTemplate',
+            'fieldValues.templateField',
+            'heroFieldValues.templateField',
+        ])
         ->first();
 
-    if (! $user || ! $user->website) {
+    if (! $website) {
         abort(404);
     }
-    $html = null;
-    $css = null;
 
-    if ($user->website && $user->website->html && $user->website->css) {
-        $html = $user->website->html;
-        $css = $user->website->css;
+    if (! $website->siteTemplate || ! $website->siteTemplate->blade_view) {
+        abort(404, 'The website does not have a valid site template.');
     }
-    
-    return view('template_one', compact('user', 'html', 'css'));
 
+    return view($website->siteTemplate->blade_view, compact('website'));
+})->name('website.home');
 
-    // $projectJson = $user->website->project_json;
-    // return view('template_one', compact('user', 'projectJson'));
+/*
+|--------------------------------------------------------------------------
+| Local/manual preview routes
+|--------------------------------------------------------------------------
+| Useful for previewing a specific website even without domain setup.
+|--------------------------------------------------------------------------
+*/
+Route::get('/preview/{website}', function (Website $website) {
+    $website->load([
+        'user.school',
+        'user.club.league',
+        'siteTemplate',
+        'heroTemplate',
+        'fieldValues.templateField',
+        'heroFieldValues.templateField',
+    ]);
 
-});
+    abort_unless(
+        $website->siteTemplate && $website->siteTemplate->blade_view,
+        404,
+        'The website does not have a valid site template.'
+    );
 
+    return view($website->siteTemplate->blade_view, compact('website'));
+})->name('website.preview');
 
-Route::prefix('admin')->middleware(['auth'])->group(function () {
-    Route::get('/websites/{id}/load', [WebsiteEditorController::class, 'loadProject'])->name('websites.load');
-    Route::post('/websites/{id}/save', [WebsiteEditorController::class, 'saveProject'])->name('websites.save');
-});
+/*
+|--------------------------------------------------------------------------
+| Optional slug route
+|--------------------------------------------------------------------------
+| Lets you preview by slug like /site/my-first-site
+|--------------------------------------------------------------------------
+*/
+Route::get('/site/{slug}', function (string $slug) {
+    $website = Website::query()
+        ->where('slug', $slug)
+        ->with([
+            'user.school',
+            'user.club.league',
+            'siteTemplate',
+            'heroTemplate',
+            'fieldValues.templateField',
+            'heroFieldValues.templateField',
+        ])
+        ->firstOrFail();
+
+    abort_unless(
+        $website->siteTemplate && $website->siteTemplate->blade_view,
+        404,
+        'The website does not have a valid site template.'
+    );
+
+    return view($website->siteTemplate->blade_view, compact('website'));
+})->name('website.slug');
+
+/*
+|--------------------------------------------------------------------------
+| Website editor routes
+|--------------------------------------------------------------------------
+*/
+Route::prefix('admin')
+    ->middleware(['auth'])
+    ->group(function () {
+        Route::get('/websites/{id}/load', [WebsiteEditorController::class, 'loadProject'])
+            ->name('websites.load');
+
+        Route::post('/websites/{id}/save', [WebsiteEditorController::class, 'saveProject'])
+            ->name('websites.save');
+
+        Route::get('/websites/{id}/editor', [WebsiteEditorController::class, 'editor'])
+            ->name('websites.editor');
+    });
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/websites/{id}/assets/upload', [WebsiteEditorController::class, 'uploadAsset'])
@@ -67,13 +165,4 @@ Route::middleware(['web', 'auth'])->group(function () {
 
     Route::delete('/websites/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
         ->name('websites.assets.delete');
-});
-
-Route::prefix('admin')->middleware(['auth'])->group(function () {
-    Route::get('/websites/{id}/load', [WebsiteEditorController::class, 'loadProject'])->name('websites.load');
-    Route::post('/websites/{id}/save', [WebsiteEditorController::class, 'saveProject'])->name('websites.save');
-
-    // NEW: iframe editor page
-    Route::get('/websites/{id}/editor', [WebsiteEditorController::class, 'editor'])
-        ->name('websites.editor');
 });

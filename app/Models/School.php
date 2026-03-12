@@ -3,14 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\User;
-use App\Models\Club;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class School extends Model
 {
@@ -21,16 +15,16 @@ class School extends Model
         'state',
         'city',
         'street',
-        'zip',
+        'zipcode',
     ];
 
-    public function clubs(): HasMany
-    {
-        return $this->hasMany(Club::class);
-    }
+    // public function clubs(): HasMany
+    // {
+    //     return $this->hasMany(Club::class);
+    // }
 
-    public function users(): HasManyThrough
+    public function users(): HasMany
     {
-        return $this->hasManyThrough(User::class, Club::class);
+        return $this->hasMany(User::class);
     }
 }

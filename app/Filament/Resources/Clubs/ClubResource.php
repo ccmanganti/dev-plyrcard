@@ -6,74 +6,71 @@ use App\Filament\Resources\Clubs\Pages\CreateClub;
 use App\Filament\Resources\Clubs\Pages\EditClub;
 use App\Filament\Resources\Clubs\Pages\ListClubs;
 use App\Filament\Resources\Clubs\Pages\ViewClub;
-use App\Filament\Resources\Clubs\Schemas\ClubForm;
-use App\Filament\Resources\Clubs\Schemas\ClubInfolist;
-use App\Filament\Resources\Clubs\Tables\ClubsTable;
 use App\Models\Club;
 use BackedEnum;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreBulkAction;
 use UnitEnum;
 
 class ClubResource extends Resource
 {
     protected static ?string $model = Club::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPuzzlePiece;
-    protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::PuzzlePiece;
-
-    protected static string | UnitEnum | null $navigationGroup = 'Organizations';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
+    protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::ShieldCheck;
+    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {
-        return ClubForm::configure($schema);
-    }
+        return $schema->components([
+            Section::make('Club')
+                ->columns(2)
+                ->schema([
+                    TextInput::make('name')->required()->maxLength(255),
 
-    public static function infolist(Schema $schema): Schema
-    {
-        return ClubInfolist::configure($schema);
+                    // Select::make('school_id')
+                    //     ->relationship('school', 'name')
+                    //     ->searchable()
+                    //     ->preload()
+                    //     ->nullable(),
+
+                    Select::make('league_id')
+                        ->relationship('league', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
+                ]),
+        ]);
     }
 
     public static function table(Table $table): Table
     {
-        return ClubsTable::configure($table)->recordActions([
-            // You may add these actions to your table if you're using a simple
-            // resource, or you just want to be able to delete records without
-            // leaving the table.
-            DeleteAction::make(),
-            ForceDeleteAction::make(),
-            RestoreAction::make(),
-            // ...
-        ])->toolbarActions([
-            BulkActionGroup::make([
-                DeleteBulkAction::make(),
-                ForceDeleteBulkAction::make(),
-                RestoreBulkAction::make(),
-                // ...
-            ]),
-        ])->filters([
-            TrashedFilter::make(),
-            // ...
-        ]);
+        return $table
+            ->columns([
+                TextColumn::make('name')->searchable()->sortable(),
+                // TextColumn::make('school.name')->label('School')->toggleable(),
+                TextColumn::make('league.name')->label('League')->toggleable(),
+                TextColumn::make('updated_at')->since()->label('Updated'),
+            ])
+            ->filters([
+                TrashedFilter::make(),
+            ])
+            ->recordUrl(fn (Club $record): string => static::getUrl('edit', ['record' => $record]));
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

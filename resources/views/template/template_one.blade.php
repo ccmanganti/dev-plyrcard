@@ -3,66 +3,116 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=bebas-neue:400|poppins:300,400,500,600,700" rel="stylesheet" />
-
-    <!-- Styles / Scripts -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <!-- AOS On-Scroll Animations -->
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    
     @php
-        /**
-         * DATA
-         */
-        $website = $user->website;
+        $user = $website->user;
 
-        // GrapesJS HTML/CSS (optional)
-        $css  = $website?->css ?? '';
-        $html = $website?->html ?? '';
+        /*
+        |--------------------------------------------------------------------------
+        | Theme Colors
+        |--------------------------------------------------------------------------
+        */
+        $primary   = $website->primary_color ?: '#334155';
+        $secondary = $website->secondary_color ?: '#0f172a';
+        $accent    = $website->accent_color ?: '#2563eb';
+        $bg        = $website->background_color ?: '#f8fafc';
+        $surface   = $website->surface_color ?: '#ffffff';
+        $text1     = $website->text_primary_color ?: '#0f172a';
+        $text2     = $website->text_secondary_color ?: '#475569';
 
-        // Colors
-        $primary   = $website?->primary_color        ?: '#334155'; // slate-700
-        $secondary = $website?->secondary_color      ?: '#0f172a'; // slate-900
-        $accent    = $website?->accent_color         ?: '#2563eb'; // (kept, but not used for tabs now)
-        $bg        = $website?->background_color     ?: '#f8fafc'; // slate-50
-        $surface   = $website?->surface_color        ?: '#ffffff';
-        $text1     = $website?->text_primary_color   ?: '#0f172a'; // slate-900
-        $text2     = $website?->text_secondary_color ?: '#475569'; // slate-600
+        /*
+        |--------------------------------------------------------------------------
+        | Field Value Helpers
+        |--------------------------------------------------------------------------
+        */
+        $fieldValues = $website->relationLoaded('fieldValues')
+            ? $website->fieldValues
+            : $website->fieldValues()->with('templateField')->get();
 
-        // ===== YouTube URL -> embed helper =====
+        $getFieldRecord = function (string $fieldName) use ($fieldValues) {
+            return $fieldValues->first(function ($item) use ($fieldName) {
+                return optional($item->templateField)->name === $fieldName;
+            });
+        };
+
+        $getFieldValue = function (string $fieldName, $default = null) use ($getFieldRecord) {
+            $record = $getFieldRecord($fieldName);
+            return $record?->value ?? $default;
+        };
+
+        $getJsonFieldValue = function (string $fieldName, $default = null) use ($getFieldValue) {
+            $raw = $getFieldValue($fieldName);
+
+            if (blank($raw)) {
+                return $default;
+            }
+
+            if (is_array($raw)) {
+                return $raw;
+            }
+
+            $decoded = json_decode($raw, true);
+
+            return json_last_error() === JSON_ERROR_NONE ? $decoded : $default;
+        };
+
+        $hideIfDefault = function ($value) {
+            if (! is_string($value) || $value === '') {
+                return $value;
+            }
+
+            return str_starts_with(trim($value), '[DEFAULT PLACEHOLDER:') ? '' : $value;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hero Field Helpers
+        |--------------------------------------------------------------------------
+        */
+        $heroFieldValues = $website->relationLoaded('heroFieldValues')
+            ? $website->heroFieldValues
+            : $website->heroFieldValues()->with('templateField')->get();
+
+        $getHeroFieldRecord = function (string $fieldName) use ($heroFieldValues) {
+            return $heroFieldValues->first(function ($item) use ($fieldName) {
+                return optional($item->templateField)->name === $fieldName;
+            });
+        };
+
+        $getHeroFieldValue = function (string $fieldName, $default = null) use ($getHeroFieldRecord) {
+            $record = $getHeroFieldRecord($fieldName);
+            return $record?->value ?? $default;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | YouTube Helpers
+        |--------------------------------------------------------------------------
+        */
         $toYoutubeEmbed = function (string $url) {
             $url = trim($url);
             if ($url === '') return null;
 
             $videoId = null;
 
-            // Handle youtu.be/<id>
             if (preg_match('~youtu\.be/([^?&/]+)~', $url, $m)) {
                 $videoId = $m[1];
             }
 
-            // Handle youtube.com/watch?v=<id>
-            if (!$videoId && preg_match('~v=([^&]+)~', $url, $m)) {
+            if (! $videoId && preg_match('~v=([^&]+)~', $url, $m)) {
                 $videoId = $m[1];
             }
 
-            // Handle youtube.com/shorts/<id>
-            if (!$videoId && preg_match('~youtube\.com/shorts/([^?&/]+)~', $url, $m)) {
+            if (! $videoId && preg_match('~youtube\.com/shorts/([^?&/]+)~', $url, $m)) {
                 $videoId = $m[1];
             }
 
-            // Handle youtube.com/embed/<id>
-            if (!$videoId && preg_match('~youtube\.com/embed/([^?&/]+)~', $url, $m)) {
+            if (! $videoId && preg_match('~youtube\.com/embed/([^?&/]+)~', $url, $m)) {
                 $videoId = $m[1];
             }
 
-            if (!$videoId) return null;
+            if (! $videoId) return null;
 
-            // Reduce overlays as much as YouTube allows
             $params = http_build_query([
                 'rel' => 0,
                 'modestbranding' => 1,
@@ -73,64 +123,145 @@
         };
 
         $parseUrlList = function ($raw) use ($toYoutubeEmbed) {
-            if (!is_string($raw) || trim($raw) === '') return [];
+            if (! is_string($raw) || trim($raw) === '') return [];
 
-            // allow newline list OR csv
             $raw = str_replace(["\r\n", "\r"], "\n", $raw);
             $parts = preg_split('/\n|,/', $raw);
 
             $out = [];
             foreach ($parts as $p) {
                 $embed = $toYoutubeEmbed(trim($p));
-                if ($embed) $out[] = $embed;
+                if ($embed) {
+                    $out[] = $embed;
+                }
             }
 
-            // de-dupe
             return array_values(array_unique($out));
         };
 
-        // ===== ABOUT videos =====
-        $about_video_urls = $website?->yt_embed ?? '';
-        $aboutVideos = $parseUrlList($about_video_urls);
-        $aboutThumbnail = collect($website?->highlights_thumbnail ?? [])->filter()->values();
-
-        $aboutThumbnailUrl = '';
-        $first = $aboutThumbnail->first();
-
-        if (is_string($first) && $first !== '') {
-            $aboutThumbnailUrl = asset('storage/' . ltrim($first, '/'));
-        }
-        elseif (is_array($first)) {
-            $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? '';
-            if ($path) {
-                $aboutThumbnailUrl = asset('storage/' . ltrim($path, '/'));
+        /*
+        |--------------------------------------------------------------------------
+        | Media Helpers
+        |--------------------------------------------------------------------------
+        */
+        $resolveMediaUrl = function ($raw, $fallback = '') {
+            if (blank($raw)) {
+                return $fallback;
             }
-        }
 
-        /* fallback if no uploaded thumbnail */
-        if (!$aboutThumbnailUrl) {
-            $aboutThumbnailUrl = asset('temp-thumbnail.png');
-        }
+            if (is_string($raw)) {
+                $trimmed = trim($raw);
 
-        // ===== HIGHLIGHTS videos =====
-        $yt_video_urls = $website?->yt_playlist_embed ?? ''; // existing db field name for highlights
-        $highlightVideos = $parseUrlList($yt_video_urls);
+                if (filter_var($trimmed, FILTER_VALIDATE_URL)) {
+                    return $trimmed;
+                }
 
-        // Helper: strip default placeholder content but keep layout
-        $hideIfDefault = function ($value) {
-            if (!is_string($value) || $value === '') return $value;
-            return str_starts_with(trim($value), '[DEFAULT PLACEHOLDER:') ? '' : $value;
+                $decoded = json_decode($trimmed, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $raw = $decoded;
+                } else {
+                    return asset('storage/' . ltrim($trimmed, '/'));
+                }
+            }
+
+            if (is_array($raw)) {
+                if (isset($raw[0])) {
+                    $first = $raw[0];
+
+                    if (is_string($first)) {
+                        return filter_var($first, FILTER_VALIDATE_URL)
+                            ? $first
+                            : asset('storage/' . ltrim($first, '/'));
+                    }
+
+                    if (is_array($first)) {
+                        $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? null;
+                        if ($path) {
+                            return filter_var($path, FILTER_VALIDATE_URL)
+                                ? $path
+                                : asset('storage/' . ltrim($path, '/'));
+                        }
+                    }
+                }
+
+                $path = $raw['url'] ?? $raw['path'] ?? $raw['image_url'] ?? null;
+                if ($path) {
+                    return filter_var($path, FILTER_VALIDATE_URL)
+                        ? $path
+                        : asset('storage/' . ltrim($path, '/'));
+                }
+            }
+
+            return $fallback;
         };
 
-        /**
-         * Contrast helper: returns #ffffff or #0f172a depending on background
-         */
+        /*
+        |--------------------------------------------------------------------------
+        | Content Fields
+        |--------------------------------------------------------------------------
+        */
+        $aboutHeadline = $hideIfDefault($getFieldValue('aboutme_headline', ''));
+        $aboutTagline  = $hideIfDefault($getFieldValue('player_tagline', ''));
+        $aboutBio      = $hideIfDefault($getFieldValue('player_bio', ''));
+
+        $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''));
+        $scheduleTagline  = $hideIfDefault($getFieldValue('schedules_tagline', ''));
+
+        $highHeadline = $hideIfDefault($getFieldValue('highlights_headline', ''));
+        $highTagline  = $hideIfDefault($getFieldValue('highlights_tagline', ''));
+
+        $acadHeadline = $hideIfDefault($getFieldValue('acad_accolades_headline', ''));
+        $acadTagline  = $hideIfDefault($getFieldValue('acad_accolades_tagline', ''));
+        $acadBody     = $hideIfDefault($getFieldValue('academic_accolades', ''));
+
+        $sportHeadline = $hideIfDefault($getFieldValue('sport_accolades_headline', ''));
+        $sportTagline  = $hideIfDefault($getFieldValue('sport_accolades_tagline', ''));
+        $sportBody     = $hideIfDefault($getFieldValue('sports_accolades', ''));
+
+        $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
+        $aboutVideoUrls   = $getFieldValue('yt_embed', '');
+        $playlistUrls     = $getFieldValue('yt_playlist_embed', '');
+
+        $aboutVideos     = $parseUrlList($aboutVideoUrls);
+        $highlightVideos = $parseUrlList($playlistUrls);
+
+        $aboutThumbnailUrl = $resolveMediaUrl(
+            $getJsonFieldValue('highlights_thumbnail', $getFieldValue('highlights_thumbnail')),
+            asset('temp-thumbnail.png')
+        );
+
+        $footerLogoUrl = $resolveMediaUrl(
+            $getJsonFieldValue('logos', $getFieldValue('logos')),
+            ''
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hero Media
+        |--------------------------------------------------------------------------
+        */
+        $heroPlyrCardUrl = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image'), '');
+        $heroBallLogoUrl = $resolveMediaUrl($getHeroFieldValue('hero_ball_logo'), '');
+        $heroCompositeImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_composite_image'), '');
+        $heroBackgroundImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_background_image'), '');
+        $heroMobileImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image'), '');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Contrast Helpers
+        |--------------------------------------------------------------------------
+        */
         $hexToRgb = function (string $hex) {
             $hex = ltrim(trim($hex), '#');
+
             if (strlen($hex) === 3) {
                 $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
             }
-            if (strlen($hex) !== 6) return [15, 23, 42]; // fallback slate-900
+
+            if (strlen($hex) !== 6) {
+                return [15, 23, 42];
+            }
+
             return [
                 hexdec(substr($hex, 0, 2)),
                 hexdec(substr($hex, 2, 2)),
@@ -143,9 +274,11 @@
                 $v = $v / 255;
                 return ($v <= 0.03928) ? ($v / 12.92) : pow((($v + 0.055) / 1.055), 2.4);
             };
+
             $r = $toLinear($rgb[0]);
             $g = $toLinear($rgb[1]);
             $b = $toLinear($rgb[2]);
+
             return 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
         };
 
@@ -157,135 +290,386 @@
         $onPrimary   = $contrastText($primary);
         $onSecondary = $contrastText($secondary);
 
-        /**
-         * ABOUT TAB CONTENT
-         */
-        $aboutHeadline = $hideIfDefault($website?->aboutme_headline ?? '');
-        $aboutTagline  = $hideIfDefault($website?->player_tagline ?? '');
-        $aboutBio      = $hideIfDefault($website?->player_bio ?? '');
-
-        /**
-         * OTHER TAB HEADLINES/TAGLINES
-         */
-        $scheduleHeadline = $hideIfDefault($website?->schedules_headline ?? '');
-        $scheduleTagline  = $hideIfDefault($website?->schedules_tagline ?? '');
-
-        $highHeadline = $hideIfDefault($website?->highlights_headline ?? '');
-        $highTagline  = $hideIfDefault($website?->highlights_tagline ?? '');
-
-        $acadHeadline  = $hideIfDefault($website?->acad_accolades_headline ?? '');
-        $acadTagline   = $hideIfDefault($website?->acad_accolades_tagline ?? '');
-        $acadBody      = $hideIfDefault($website?->academic_accolades ?? '');
-
-        $sportHeadline = $hideIfDefault($website?->sport_accolades_headline ?? '');
-        $sportTagline  = $hideIfDefault($website?->sport_accolades_tagline ?? '');
-        $sportBody     = $hideIfDefault($website?->sports_accolades ?? '');
-
-        /**
-         * COACHING STAFF
-         */
+        /*
+        |--------------------------------------------------------------------------
+        | Coaching Staff
+        |--------------------------------------------------------------------------
+        */
         $playerEmail = $user->email ?? '';
 
         $coachRows = collect([
             [
-                'name'   => $user->club_coach ?? '',
-                'label'  => 'HEAD COACH',
-                'title'  => $user->club?->name ?? ($user->team_name ?? ''),
-                'email'  => $user->club_coach_email ?? $playerEmail,
+                'name'  => $user->club_coach ?? '',
+                'label' => 'HEAD COACH',
+                'title' => $user->club?->name ?? ($user->team_name ?? ''),
+                'email' => $user->club_coach_email ?? $playerEmail,
             ],
             [
-                'name'   => $user->tech_trainer ?? '',
-                'label'  => 'TECHNICAL TRAINING & MENTORSHIP',
-                'title'  => '',
-                'email'  => $user->tech_trainer_email ?? $playerEmail,
+                'name'  => $user->tech_trainer ?? '',
+                'label' => 'TECHNICAL TRAINING & MENTORSHIP',
+                'email' => $user->tech_trainer_email ?? $playerEmail,
             ],
             [
-                'name'   => $user->snc_trainer ?? '',
-                'label'  => 'AGILITY AND STRENGTH TRAINING',
-                'title'  => '',
-                'email'  => $user->snc_trainer_email ?? $playerEmail,
+                'name'  => $user->snc_trainer ?? '',
+                'label' => 'AGILITY AND STRENGTH TRAINING',
+                'email' => $user->snc_trainer_email ?? $playerEmail,
             ],
             [
-                'name'   => $user->natl_coach ?? '',
-                'label'  => 'NATIONAL TEAM COACH',
-                'title'  => $user->natl_team_exp ?? '',
-                'email'  => $user->natl_coach_email ?? $playerEmail,
+                'name'  => $user->natl_coach ?? '',
+                'label' => 'NATIONAL TEAM COACH',
+                'email' => $user->natl_coach_email ?? $playerEmail,
             ],
-        ])->filter(fn($c) => trim((string)($c['name'] ?? '')) !== '')
-          ->values();
+        ])->filter(fn ($c) => trim((string) ($c['name'] ?? '')) !== '')->values();
 
-        /**
-         * FOOTER
-         */
-        $logos = collect($website?->logos ?? [])->filter()->values();
-
-        $footerLogoUrl = '';
-        $first = $logos->first();
-
-        if (is_string($first) && $first !== '') {
-            $footerLogoUrl = asset('storage/' . ltrim($first, '/'));
-        } elseif (is_array($first)) {
-            $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? '';
-            if ($path) $footerLogoUrl = asset('storage/' . ltrim($path, '/'));
-        }
-
-        // Social URLs
+        /*
+        |--------------------------------------------------------------------------
+        | Footer / Social
+        |--------------------------------------------------------------------------
+        */
         $igUrl = '';
-        if (!empty($user->ig_handle)) {
+        if (! empty($user->ig_handle)) {
             $handle = ltrim(trim($user->ig_handle), '@');
             $igUrl = 'https://instagram.com/' . $handle;
         }
 
         $xUrl = '';
-        if (!empty($user->x_handle)) {
+        if (! empty($user->x_handle)) {
             $handle = ltrim(trim($user->x_handle), '@');
             $xUrl = 'https://x.com/' . $handle;
         }
 
         $ytUrl = $user->yt_url ?? '';
-
         $footerPhone = $user->phone ?? '';
         $footerEmail = $user->email ?? '';
         $copyright   = 'Plyr Card 2026 © All Rights Reserved';
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEO Helpers
+        |--------------------------------------------------------------------------
+        */
+        $normalizePlainText = function ($value) {
+            if (blank($value)) {
+                return '';
+            }
+
+            $text = is_string($value) ? $value : json_encode($value);
+            $text = strip_tags($text);
+            $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $text = preg_replace('/\s+/u', ' ', $text);
+
+            return trim((string) $text);
+        };
+
+        $truncate = function (?string $text, int $limit = 160) {
+            $text = trim((string) $text);
+
+            if ($text === '') {
+                return '';
+            }
+
+            return \Illuminate\Support\Str::limit($text, $limit, '...');
+        };
+
+        $normalizeDisplayValue = function ($value, $separator = ' / ') {
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $value = $decoded;
+                }
+            }
+
+            if (is_array($value)) {
+                return implode($separator, array_filter(array_map(function ($item) {
+                    return is_scalar($item) ? (string) $item : '';
+                }, $value)));
+            }
+
+            return filled($value) ? (string) $value : '';
+        };
+
+        $formatPositionDisplay = function ($value) use ($normalizeDisplayValue) {
+            $position = $normalizeDisplayValue($value);
+
+            if ($position === '') {
+                return '';
+            }
+
+            return collect(explode(' / ', $position))
+                ->map(fn ($item) => str($item)->replace('_', ' ')->title()->toString())
+                ->implode(' / ');
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEO Template Fields (overrides)
+        |--------------------------------------------------------------------------
+        */
+        $seoTitleField = $normalizePlainText($getFieldValue('seo_title', ''));
+        $seoDescriptionField = $normalizePlainText($getFieldValue('seo_description', ''));
+        $seoKeywordsField = $normalizePlainText($getFieldValue('seo_keywords', ''));
+        $seoRobotsField = $normalizePlainText($getFieldValue('seo_robots', ''));
+        $seoCanonicalField = $normalizePlainText($getFieldValue('seo_canonical_url', ''));
+
+        $ogTitleField = $normalizePlainText($getFieldValue('og_title', ''));
+        $ogDescriptionField = $normalizePlainText($getFieldValue('og_description', ''));
+        $ogImageField = $resolveMediaUrl($getFieldValue('og_image'), '');
+
+        $twitterTitleField = $normalizePlainText($getFieldValue('twitter_title', ''));
+        $twitterDescriptionField = $normalizePlainText($getFieldValue('twitter_description', ''));
+        $twitterImageField = $resolveMediaUrl($getFieldValue('twitter_image'), '');
+
+        $faviconField = $resolveMediaUrl($getFieldValue('favicon'), '');
+        $schemaNameOverride = $normalizePlainText($getFieldValue('schema_override_name', ''));
+        $schemaDescriptionOverride = $normalizePlainText($getFieldValue('schema_override_description', ''));
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEO Defaults
+        |--------------------------------------------------------------------------
+        */
+        $playerName = trim(
+            $website->name ?: (($user?->first_name ?? '') . ' ' . ($user?->last_name ?? ''))
+        );
+
+        $sportText = filled($user?->sport)
+            ? str($user->sport)->replace('_', ' ')->title()->toString()
+            : '';
+
+        $positionText = $formatPositionDisplay($user?->position ?? '');
+
+        $schoolName = $user?->school?->name ?? '';
+        $clubName = $user?->club?->name ?? ($user?->team_name ?? '');
+        $leagueName = $user?->club?->league?->name ?? '';
+
+        $locationText = collect([$user?->city, $user?->state])
+            ->filter(fn ($v) => filled($v))
+            ->implode(', ');
+
+        $coachNamesForSeo = $coachRows->pluck('name')->filter()->implode(', ');
+
+        $canonicalUrl = filled($seoCanonicalField) ? $seoCanonicalField : url()->current();
+
+        $defaultSeoTitle = collect([
+            $playerName,
+            $positionText,
+            $sportText,
+            filled($schoolName) ? $schoolName : null,
+            'PlyrCard',
+        ])->filter(fn ($v) => filled($v))->implode(' | ');
+
+        $defaultLongDescription = collect([
+            filled($playerName) ? "{$playerName} athlete profile." : null,
+            filled($positionText) ? "Position: {$positionText}." : null,
+            filled($sportText) ? "Sport: {$sportText}." : null,
+            filled($schoolName) ? "School: {$schoolName}." : null,
+            filled($clubName) ? "Club/Team: {$clubName}." : null,
+            filled($leagueName) ? "League: {$leagueName}." : null,
+            filled($locationText) ? "Location: {$locationText}." : null,
+            filled($aboutTagline) ? $aboutTagline : null,
+            filled($aboutHeadline) ? $aboutHeadline . '.' : null,
+            filled($aboutBio) ? $truncate($normalizePlainText($aboutBio), 220) : null,
+            filled($sportBody) ? $truncate($normalizePlainText($sportBody), 180) : null,
+            filled($acadBody) ? $truncate($normalizePlainText($acadBody), 180) : null,
+            filled($coachNamesForSeo) ? "Coaching staff includes {$coachNamesForSeo}." : null,
+        ])->filter(fn ($v) => filled($v))->implode(' ');
+
+        $defaultSeoDescription = $truncate($defaultLongDescription, 160);
+
+        $defaultKeywords = collect([
+            $playerName,
+            $sportText,
+            $positionText,
+            $schoolName,
+            $clubName,
+            $leagueName,
+            $locationText,
+            'athlete profile',
+            'player profile',
+            'student athlete',
+            'recruiting profile',
+            'PlyrCard',
+        ])->filter(fn ($v) => filled($v))->implode(', ');
+
+        $seoTitle = filled($seoTitleField) ? $seoTitleField : $defaultSeoTitle;
+        $seoDescription = filled($seoDescriptionField)
+            ? $truncate($seoDescriptionField, 160)
+            : $defaultSeoDescription;
+        $seoKeywords = filled($seoKeywordsField) ? $seoKeywordsField : $defaultKeywords;
+        $seoRobots = filled($seoRobotsField) ? $seoRobotsField : 'index,follow';
+
+        $shareImage = $ogImageField
+            ?: $twitterImageField
+            ?: $heroCompositeImageUrl
+            ?: $heroBackgroundImageUrl
+            ?: $heroMobileImageUrl
+            ?: $aboutThumbnailUrl
+            ?: $footerLogoUrl
+            ?: $heroPlyrCardUrl
+            ?: asset('temp-thumbnail.png');
+
+        $faviconUrl = $faviconField ?: asset('favicon.ico');
+
+        $ogTitle = filled($ogTitleField) ? $ogTitleField : $seoTitle;
+        $ogDescription = filled($ogDescriptionField)
+            ? $truncate($ogDescriptionField, 200)
+            : $seoDescription;
+
+        $twitterTitle = filled($twitterTitleField) ? $twitterTitleField : $ogTitle;
+        $twitterDescription = filled($twitterDescriptionField)
+            ? $truncate($twitterDescriptionField, 200)
+            : $ogDescription;
+
+        $igHandle = filled($user?->ig_handle) ? '@' . ltrim(trim($user->ig_handle), '@') : '';
+        $xHandle = filled($user?->x_handle) ? '@' . ltrim(trim($user->x_handle), '@') : '';
+
+        $schemaName = filled($schemaNameOverride) ? $schemaNameOverride : ($playerName ?: 'PlyrCard Athlete');
+        $schemaDescription = filled($schemaDescriptionOverride)
+            ? $truncate($schemaDescriptionOverride, 220)
+            : $truncate($defaultLongDescription, 220);
+
+        $sameAs = collect([
+            $igUrl ?: null,
+            $xUrl ?: null,
+            $ytUrl ?: null,
+        ])->filter(fn ($v) => filled($v))->values()->all();
+
+        $personSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Person',
+            'name' => $schemaName,
+            'url' => $canonicalUrl,
+            'description' => $schemaDescription,
+            'image' => $shareImage,
+        ];
+
+        if (filled($schoolName)) {
+            $personSchema['alumniOf'] = [
+                '@type' => 'EducationalOrganization',
+                'name' => $schoolName,
+            ];
+        }
+
+        if (filled($clubName)) {
+            $personSchema['memberOf'] = [
+                '@type' => 'SportsOrganization',
+                'name' => $clubName,
+            ];
+        }
+
+        if (filled($sportText)) {
+            $personSchema['sport'] = $sportText;
+        }
+
+        if (! empty($sameAs)) {
+            $personSchema['sameAs'] = $sameAs;
+        }
+
+        $webPageSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ProfilePage',
+            'name' => $seoTitle,
+            'url' => $canonicalUrl,
+            'description' => $seoDescription,
+            'mainEntity' => [
+                '@type' => 'Person',
+                'name' => $schemaName,
+            ],
+        ];
     @endphp
 
-    {{-- ✅ IMPORTANT: Scope GrapesJS CSS so it cannot affect the rest of the page --}}
-    @if (!empty($css))
-        <style>
-            /* Preview wrapper: keep it safe and contained */
-            #website-preview{
-                display:block;
-                width:100%;
-                max-width:100%;
-                overflow:hidden;
-            }
-            #website-preview *{ box-sizing: border-box; }
-        </style>
+    <title>{{ $seoTitle }}</title>
 
-        <style>
-            {!!
-                // Prefix most normal selectors with #website-preview
-                // Skips @media/@keyframes blocks and tries to avoid breaking CSS.
-                preg_replace_callback('/(^|})\s*([^{@}][^{]+)\s*{/', function($m){
-                    $prefix = $m[1];
-                    $sel = trim($m[2]);
+    <meta name="description" content="{{ $seoDescription }}">
+    <meta name="keywords" content="{{ $seoKeywords }}">
+    <meta name="robots" content="{{ $seoRobots }}">
+    <meta name="theme-color" content="{{ $primary }}">
+    <meta name="author" content="{{ $playerName ?: 'PlyrCard' }}">
 
-                    // Split selectors, prefix each
-                    $sels = array_map('trim', explode(',', $sel));
-                    $sels = array_map(function($s){
-                        if ($s === '') return $s;
-                        // If selector already starts with #website-preview, leave it
-                        if (str_starts_with($s, '#website-preview')) return $s;
-                        return '#website-preview ' . $s;
-                    }, $sels);
+    <link rel="canonical" href="{{ $canonicalUrl }}">
+    <link rel="icon" href="{{ $faviconUrl }}">
+    <link rel="shortcut icon" href="{{ $faviconUrl }}">
+    <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
 
-                    return $prefix . ' ' . implode(', ', $sels) . ' {';
-                }, $css)
-            !!}
-        </style>
+    <meta property="og:type" content="profile">
+    <meta property="og:site_name" content="PlyrCard">
+    <meta property="og:title" content="{{ $ogTitle }}">
+    <meta property="og:description" content="{{ $ogDescription }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
+    <meta property="og:image" content="{{ $shareImage }}">
+    <meta property="og:image:secure_url" content="{{ $shareImage }}">
+    <meta property="og:image:alt" content="{{ $playerName ?: 'PlyrCard athlete profile' }}">
+    <meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}">
+
+    @if (filled($user?->first_name))
+        <meta property="profile:first_name" content="{{ $user->first_name }}">
+    @endif
+    @if (filled($user?->last_name))
+        <meta property="profile:last_name" content="{{ $user->last_name }}">
+    @endif
+    @if (filled($igHandle))
+        <meta property="profile:username" content="{{ $igHandle }}">
     @endif
 
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $twitterTitle }}">
+    <meta name="twitter:description" content="{{ $twitterDescription }}">
+    <meta name="twitter:image" content="{{ $twitterImageField ?: $shareImage }}">
+    @if (filled($xHandle))
+        <meta name="twitter:site" content="{{ $xHandle }}">
+        <meta name="twitter:creator" content="{{ $xHandle }}">
+    @endif
+
+    <meta itemprop="name" content="{{ $seoTitle }}">
+    <meta itemprop="description" content="{{ $seoDescription }}">
+    <meta itemprop="image" content="{{ $shareImage }}">
+
+    <script type="application/ld+json">
+{!! json_encode($personSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <script type="application/ld+json">
+{!! json_encode($webPageSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=bebas-neue:400|poppins:300,400,500,600,700" rel="stylesheet" />
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
     <style>
+        /* Page Loader */
+
+        #page-loader{
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity .45s ease, visibility .45s ease;
+        }
+
+        #page-loader.hidden{
+            opacity:0;
+            visibility:hidden;
+        }
+
+        .loader-spinner{
+            width:48px;
+            height:48px;
+            border-radius:50%;
+            border:4px solid rgba(255,255,255,0.15);
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin{
+            to{ transform: rotate(360deg); }
+        }
         :root{
             --primary: {{ $primary }};
             --secondary: {{ $secondary }};
@@ -304,14 +688,8 @@
             margin: 0;
         }
 
-        .no-scrollbar::-webkit-scrollbar {
-        display: none;
-        }
-
-        .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         .font-heading{
             font-family: "Bebas Neue", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
@@ -319,22 +697,22 @@
 
         .embed-responsive iframe { width: 100%; height: 100%; }
 
-        /* Tabs: hover + active */
         .tab-btn{
             cursor: pointer;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
+
         .tab-btn:not(.is-active):hover{
             background: var(--secondary) !important;
             color: var(--on-secondary) !important;
         }
+
         .tab-btn.is-active{
             background: var(--secondary) !important;
             color: var(--on-secondary) !important;
         }
 
-        /* Icon hover */
         .icon-link{
             cursor: pointer;
             display: inline-flex;
@@ -342,28 +720,32 @@
             justify-content: center;
             -webkit-tap-highlight-color: transparent;
         }
+
         .icon-link svg{
             transition: 150ms ease;
         }
+
         .icon-link:hover svg{
             stroke: var(--secondary);
         }
+
         .icon-link:hover{
             color: var(--secondary);
         }
 
-        /* Accolades list icon */
         .acad-list ul {
             list-style: none;
             padding-left: 0;
             margin: 0;
         }
+
         .acad-list li {
             position: relative;
             padding-left: 30px;
             margin: 0.4rem 0;
             line-height: 1.6;
         }
+
         .acad-list li::before {
             content: "";
             position: absolute;
@@ -376,29 +758,26 @@
                     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
         }
 
-        /* Mobile sticky social bar spacing */
         @media (max-width: 767px){
             body{ padding-bottom: 76px; }
         }
     </style>
 </head>
 
-<body class="">
-    {{-- GrapesJS Render (optional) --}}
-    @if (!empty($html))
-        <div id="website-preview">
-            {!! $html !!}
+<body>
+    <div id="page-loader">
+        <div class="loader-spinner"></div>
+    </div>
+    {{-- HERO SLOT --}}
+    @if ($website->heroTemplate?->blade_view)
+        <div id="hero-container">
+            @include($website->heroTemplate->blade_view, ['website' => $website])
         </div>
     @endif
 
-    {{-- TOP: Tabs + Right column (Responsive) --}}
-    <div class="flex flex-col md:flex-row h-auto w-full z-[999]">
-
-        {{-- LEFT COLUMN --}}
+    <div class="relative z-30 flex flex-col md:flex-row h-auto w-full">
         <div class="w-full md:w-8/12 min-w-0">
-
-            {{-- Tabs --}}
-            <div id="tabs" class="flex w-full overflow-x-auto whitespace-nowrap md:mt-[-47px] no-scrollbar">
+            <div id="tabs" class="flex w-full overflow-x-auto whitespace-nowrap no-scrollbar -mt-12">
                 <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center is-active"
                         style="background: {{ $secondary }}; color: {{ $onSecondary }};"
                         data-tab="about">
@@ -422,13 +801,9 @@
                         data-tab="accolades">
                     ACCOLADES
                 </button>
-
             </div>
 
-            {{-- Tab Content --}}
             <div class="bg-white">
-
-                {{-- ABOUT --}}
                 <div id="tab-about" class="tab-content">
                     <div class="p-6 md:p-10">
                         <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
@@ -443,12 +818,10 @@
                             {!! $aboutBio !!}
                         </div>
                     </div>
-                    {{-- About Me videos --}}
-                    @if(!empty($aboutVideos) && !empty($aboutVideos[0]))
 
+                    @if(!empty($aboutVideos) && !empty($aboutVideos[0]))
                         @php
                             $video = $aboutVideos[0];
-
                             $videoId = null;
 
                             if (preg_match('/(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/', $video, $matches)) {
@@ -462,11 +835,9 @@
 
                         <div class="mt-6 md:mt-8">
                             <div class="grid grid-cols-1 gap-6">
-
                                 <div class="w-full aspect-video overflow-hidden relative"
-                                    style="background: {{ $bg }};"
-                                    id="about-video-player">
-
+                                     style="background: {{ $bg }};"
+                                     id="about-video-player">
                                     <div
                                         class="relative w-full h-full cursor-pointer group"
                                         onclick="document.getElementById('about-video-player').innerHTML = `
@@ -479,18 +850,14 @@
                                                 allowfullscreen>
                                             </iframe>`"
                                     >
-
-                                        {{-- Thumbnail --}}
                                         <img
                                             src="{{ $aboutThumbnailUrl }}"
                                             alt="Video Thumbnail"
                                             class="w-full h-full object-cover"
                                         />
 
-                                        {{-- Overlay --}}
                                         <div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition"></div>
 
-                                        {{-- Play button --}}
                                         <div class="absolute inset-0 flex items-center justify-center">
                                             <div class="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 84" class="w-10 h-10 ml-1">
@@ -498,18 +865,13 @@
                                                 </svg>
                                             </div>
                                         </div>
-
                                     </div>
-
                                 </div>
-
                             </div>
                         </div>
-
                     @endif
                 </div>
 
-                {{-- SCHEDULE --}}
                 <div id="tab-schedule" class="tab-content hidden p-6 md:p-10">
                     <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $scheduleHeadline }}
@@ -522,7 +884,6 @@
                     <div class="min-h-[6rem]"></div>
                 </div>
 
-                {{-- HIGHLIGHTS --}}
                 <div id="tab-highlights" class="tab-content hidden p-6 md:p-10">
                     <div class="tracking-[0.17em] uppercase font-heading text-3xl md:text-4xl min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $highHeadline }}
@@ -552,7 +913,6 @@
                     <div class="min-h-[10rem]"></div>
                 </div>
 
-                {{-- ACCOLADES --}}
                 <div id="tab-accolades" class="tab-content hidden p-6 md:p-10">
                     <div class="mb-8 md:mb-10">
                         <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
@@ -567,6 +927,7 @@
                             {!! $acadBody !!}
                         </div>
                     </div>
+
                     <div class="mb-8 md:mb-10">
                         <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
                             {{ $sportHeadline }}
@@ -581,80 +942,31 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
-        {{-- RIGHT COLUMN --}}
         <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="p-4 md:p-6 rounded min-h-[180px]">
-                {!! $hideIfDefault($website?->contact_form_embed ?? '') !!}
+                {!! $contactFormEmbed !!}
             </div>
         </div>
     </div>
 
-    {{-- COACHING STAFF --}}
-    {{-- COACHING STAFF SECTION --}}
     <section class="w-full mt-5">
-        {{-- Header Area: Preserve your dynamic $primary color --}}
         <div class="relative pt-20 pb-24 md:pt-30 md:pb-10 overflow-hidden" style="background: {{ $primary }}; color: {{ $onPrimary }};">
-            
-            {{-- THE FULL BRUSH WAVE SVG (Restored and scaled up) --}}
             <div class="absolute top-0 left-0 w-full overflow-hidden leading-[0] z-20">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1899 357" preserveAspectRatio="none">
                     <rect width="1899" height="357" fill="{{ $primary }}"/>
-
-                    <!-- top white shape -->
-                    <path d="
-                        M0,0
-                        H1899
-                        V38
-                        C1715,50 1540,58 1368,52
-                        C1215,47 1085,58 954,67
-                        C774,79 585,58 396,40
-                        C267,28 136,22 0,24
-                        Z" fill="#ffffffff"/>
-
-                    <!-- brush strokes -->
-                    <path d="
-                        M0,20
-                        C48,18 92,18 133,19
-                        C106,20 62,22 0,22
-                        Z" fill="{{ $primary }}"/>
-
-                    <path d="
-                        M646,50
-                        C820,58 1000,63 1147,58
-                        C996,66 810,65 646,50
-                        Z" fill="{{ $primary }}"/>
-
-                    <path d="
-                        M728,69
-                        C846,77 980,80 1087,74
-                        C972,84 839,83 728,69
-                        Z" fill="#ffffff" opacity="0.7"/>
-
-                    <path d="
-                        M1065,28
-                        C1278,29 1524,27 1818,8
-                        C1644,26 1397,36 1065,28
-                        Z"
-                        fill="{{ $primary }}"
-                        transform="translate(0,7)" />
-
-                    <path d="
-                        M1868,34
-                        C1878,33 1888,32 1899,31
-                        V35
-                        C1888,36 1878,36 1868,34
-                        Z" fill="{{ $primary }}"/>
-
-                    <!-- bottom white band -->
+                    <path d="M0,0 H1899 V38 C1715,50 1540,58 1368,52 C1215,47 1085,58 954,67 C774,79 585,58 396,40 C267,28 136,22 0,24 Z" fill="#ffffffff"/>
+                    <path d="M0,20 C48,18 92,18 133,19 C106,20 62,22 0,22 Z" fill="{{ $primary }}"/>
+                    <path d="M646,50 C820,58 1000,63 1147,58 C996,66 810,65 646,50 Z" fill="{{ $primary }}"/>
+                    <path d="M728,69 C846,77 980,80 1087,74 C972,84 839,83 728,69 Z" fill="#ffffff" opacity="0.7"/>
+                    <path d="M1065,28 C1278,29 1524,27 1818,8 C1644,26 1397,36 1065,28 Z" fill="{{ $primary }}" transform="translate(0,7)" />
+                    <path d="M1868,34 C1878,33 1888,32 1899,31 V35 C1888,36 1878,36 1868,34 Z" fill="{{ $primary }}"/>
                     <rect x="0" y="344" width="1899" height="13" fill="{{ $primary }}"/>
                 </svg>
             </div>
 
-            {{-- Text Content: Positioned over the dynamic background --}}
             <div class="relative text-center z-30 px-0">
                 <h2 class="font-heading text-6xl md:text-[100px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
                     Coaching Staff
@@ -665,7 +977,6 @@
             </div>
         </div>
 
-        {{-- Coaching Grid Area --}}
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $bg }};">
             <div class="max-w-7xl mx-auto">
                 <div class="flex flex-wrap justify-center lg:justify-between gap-y-8 gap-x-6 md:gap-x-8">
@@ -696,11 +1007,9 @@
         </div>
     </section>
 
-    {{-- FOOTER --}}
     <footer class="w-full">
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-start">
-
                 <div class="flex items-center justify-start md:justify-start">
                     <div class="h-40 md:h-60 w-full md:w-auto rounded flex items-center justify-center overflow-hidden">
                         @if (!empty($footerLogoUrl))
@@ -774,7 +1083,6 @@
                             </a>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -784,7 +1092,6 @@
         </div>
     </footer>
 
-    {{-- MOBILE STICKY SOCIAL BAR --}}
     <div class="fixed bottom-0 left-0 w-full z-50 md:hidden border-t"
          style="background: {{ $surface }}; border-color: rgba(15,23,42,0.12);">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -832,6 +1139,43 @@
     </div>
 
     <script>
+        window.addEventListener("load", function () {
+
+            const loader = document.getElementById("page-loader");
+            const heroImages = document.querySelectorAll("#hero-container img");
+
+            if(heroImages.length === 0){
+                loader.classList.add("hidden");
+                return;
+            }
+
+            let loaded = 0;
+
+            heroImages.forEach(img => {
+
+                if(img.complete){
+                    loaded++;
+                }else{
+                    img.addEventListener("load", checkDone);
+                    img.addEventListener("error", checkDone);
+                }
+
+            });
+
+            function checkDone(){
+                loaded++;
+                if(loaded >= heroImages.length){
+                    loader.classList.add("hidden");
+                }
+            }
+
+            if(loaded === heroImages.length){
+                loader.classList.add("hidden");
+            }
+
+        });
+        </script>
+    <script>
         document.addEventListener("DOMContentLoaded", function () {
             const buttons  = document.querySelectorAll(".tab-btn");
             const contents = document.querySelectorAll(".tab-content");
@@ -865,12 +1209,10 @@
             });
         });
     </script>
+
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         AOS.init();
     </script>
-    @if (Route::has('login'))
-        <div class="h-14.5 hidden lg:block"></div>
-    @endif
 </body>
-</html> 
+</html>

@@ -8,17 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('leagues', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('gender');
-            $table->timestamps();
-            $table->softDeletes();
+        Schema::table('site_templates', function (Blueprint $table) {
+            $table->json('sports')->nullable()->after('description');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('leagues');
+        Schema::table('site_templates', function (Blueprint $table) {
+            $table->dropColumn('sports');
+        });
     }
 };

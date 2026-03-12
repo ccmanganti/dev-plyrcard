@@ -2,32 +2,22 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\School;
-use App\Models\Club;
-use App\Models\Website;
-use Filament\Models\Contracts\HasName;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
-
 
 class User extends Authenticatable implements HasName, FilamentUser
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'first_name',
         'last_name',
@@ -41,7 +31,11 @@ class User extends Authenticatable implements HasName, FilamentUser
         'gpa',
         'year',
         'birth',
+        'height',
+        'weight',
         'jersey_number',
+        'sport',
+        'position',
         'accolades',
         'natl_team_exp',
         'team_name',
@@ -57,7 +51,7 @@ class User extends Authenticatable implements HasName, FilamentUser
         'sec_parent_phone',
         'club_coach',
         'club_coach_email',
-        'club_coach_phone', // ⚠ from your migration (typo)
+        'club_coach_phone',
         'natl_coach',
         'natl_coach_email',
         'natl_coach_phone',
@@ -67,42 +61,30 @@ class User extends Authenticatable implements HasName, FilamentUser
         'snc_trainer',
         'snc_trainer_email',
         'snc_trainer_phone',
+        'school_id',
+        'club_id',
         'domain',
         'password',
     ];
 
-    public function getFilamentName(): string
-    {
-        return $this->first_name . ' ' . $this->last_name; // Return the desired string
-    }
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'natl_team_exp' => 'boolean',
+            'position' => 'array',
         ];
     }
 
-
-    public function club(): BelongsTo
+    public function getFilamentName(): string
     {
-        return $this->belongsTo(Club::class);
+        return trim($this->first_name . ' ' . $this->last_name);
     }
 
     public function school(): BelongsTo
@@ -110,9 +92,19 @@ class User extends Authenticatable implements HasName, FilamentUser
         return $this->belongsTo(School::class);
     }
 
-    public function website(): HasOne
+    public function club(): BelongsTo
     {
-        return $this->hasOne(Website::class);
+        return $this->belongsTo(Club::class);
+    }
+
+    public function websites(): HasMany
+    {
+        return $this->hasMany(Website::class);
+    }
+
+    public function activeWebsite(): HasOne
+    {
+        return $this->hasOne(Website::class)->where('is_active', true);
     }
 
     public function canAccessPanel(Panel $panel): bool
