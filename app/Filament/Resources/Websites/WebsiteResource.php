@@ -40,7 +40,6 @@ use Filament\Actions\EditAction;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 
-
 class WebsiteResource extends Resource
 {
     protected static ?string $model = Website::class;
@@ -76,15 +75,6 @@ class WebsiteResource extends Resource
                                     TextInput::make('name')
                                         ->maxLength(255)
                                         ->helperText('Internal website name'),
-
-                                    TextInput::make('slug')
-                                        ->maxLength(255)
-                                        ->unique(ignoreRecord: true)
-                                        ->helperText('Used for internal/public route if needed'),
-
-                                    TextInput::make('domain')
-                                        ->maxLength(255)
-                                        ->nullable(),
 
                                     Select::make('site_template_id')
                                         ->label('Site Template')
@@ -245,7 +235,6 @@ class WebsiteResource extends Resource
 
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),
-                TextColumn::make('slug')->toggleable(),
                 IconColumn::make('is_active')->boolean(),
                 IconColumn::make('is_published')->boolean(),
                 TextColumn::make('updated_at')->since()->label('Updated'),
@@ -358,26 +347,9 @@ class WebsiteResource extends Resource
         return null;
     }
 
-    protected static function getPreviewUrl(Website $record): ?string
-    {
-        $domain = trim((string) $record->domain);
-
-        if (blank($domain)) {
-            return null;
-        }
-
-        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-            $domain = preg_replace('#^https?://#', '', $domain);
-        }
-
-        $scheme = app()->environment('local') ? 'http://' : 'https://';
-
-        return $scheme . ltrim($domain, '/');
-    }
-
     protected static function getWebsiteUrl(Website $record): ?string
     {
-        $domain = trim((string) $record->domain);
+        $domain = trim((string) ($record->user?->domain ?? ''));
 
         if (blank($domain)) {
             return null;
