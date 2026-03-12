@@ -8,29 +8,28 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
-
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
-    protected static ?string $password;
-    
+    protected static ?string $password = null;
+
     public function run(): void
     {
-        // User::factory(10)->create();
+        $role = Role::firstOrCreate(['name' => 'Superadmin']);
 
-        // 
-        $role = Role::create(['name' => 'Superadmin']);
-        $user = User::factory()->create([
-            'first_name' => 'Superadmin',
-            'last_name' => 'User',
-            'email' => 'superadmin@plyrcard.com',
-            'password' => static::$password ??= Hash::make('password'),
-        ]);
+        $user = User::updateOrCreate(
+            ['email' => 'superadmin@plyrcard.com'],
+            [
+                'first_name' => 'Superadmin',
+                'last_name' => 'User',
+                'email_verified_at' => now(),
+                'password' => static::$password ??= Hash::make('password'),
+            ]
+        );
 
-        $user->assignRole($role);
+        if (! $user->hasRole($role->name)) {
+            $user->assignRole($role);
+        }
     }
 }
