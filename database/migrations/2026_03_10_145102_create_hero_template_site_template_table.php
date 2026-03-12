@@ -11,12 +11,20 @@ return new class extends Migration
         Schema::create('hero_template_site_template', function (Blueprint $table) {
             $table->id();
 
-            $table->foreign('hero_template_id', 'htst_hero_fk')->references('id')->on('hero_templates')->cascadeOnDelete();
-            $table->foreign('site_template_id', 'htst_site_fk')->references('id')->on('site_templates')->cascadeOnDelete();
+            $table->foreignId('hero_template_id')
+                ->constrained('hero_templates')
+                ->cascadeOnDelete();
+
+            $table->foreignId('site_template_id')
+                ->constrained('site_templates')
+                ->cascadeOnDelete();
+
+            $table->unique(
+                ['hero_template_id', 'site_template_id'],
+                'ht_st_unique'
+            );
 
             $table->timestamps();
-
-            $table->unique(['hero_template_id', 'site_template_id'], 'hero_site_unique');
         });
     }
 
