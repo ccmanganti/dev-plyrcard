@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('name');
 
             // $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('league_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedBigInteger('league_id')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
