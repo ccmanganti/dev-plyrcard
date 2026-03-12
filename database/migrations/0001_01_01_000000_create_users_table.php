@@ -64,8 +64,8 @@ return new class extends Migration
             $table->string('snc_trainer_email')->nullable();
             $table->string('snc_trainer_phone')->nullable();
 
-            $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('club_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedBigInteger('school_id')->nullable();
+            $table->unsignedBigInteger('club_id')->nullable();
 
             $table->string('domain')->nullable();
 
