@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function (Request $request) {
-    $host = $request->getHost();
+    $host = strtolower($request->getHost());
+    $normalizedHost = preg_replace('/^www\./', '', $host);
 
     /*
     |--------------------------------------------------------------------------
@@ -60,11 +61,18 @@ Route::get('/', function (Request $request) {
     |--------------------------------------------------------------------------
     | Production custom domains
     |--------------------------------------------------------------------------
-    | Match websites.domain first
+    | Match users.domain
     |--------------------------------------------------------------------------
     */
     $website = Website::query()
-        ->where('domain', $host)
+        ->whereHas('user', function ($query) use ($host, $normalizedHost) {
+            $query->where(function ($subQuery) use ($host, $normalizedHost) {
+                $subQuery
+                    ->whereRaw('LOWER(domain) = ?', [$host])
+                    ->orWhereRaw('LOWER(domain) = ?', [$normalizedHost])
+                    ->orWhereRaw("LOWER(REPLACE(domain, 'www.', '')) = ?", [$normalizedHost]);
+            });
+        })
         ->with([
             'user.school',
             'user.club.league',
@@ -111,35 +119,6 @@ Route::get('/preview/{website}', function (Website $website) {
 
     return view($website->siteTemplate->blade_view, compact('website'));
 })->name('website.preview');
-
-/*
-|--------------------------------------------------------------------------
-| Optional slug route
-|--------------------------------------------------------------------------
-| Lets you preview by slug like /site/my-first-site
-|--------------------------------------------------------------------------
-*/
-Route::get('/site/{slug}', function (string $slug) {
-    $website = Website::query()
-        ->where('slug', $slug)
-        ->with([
-            'user.school',
-            'user.club.league',
-            'siteTemplate',
-            'heroTemplate',
-            'fieldValues.templateField',
-            'heroFieldValues.templateField',
-        ])
-        ->firstOrFail();
-
-    abort_unless(
-        $website->siteTemplate && $website->siteTemplate->blade_view,
-        404,
-        'The website does not have a valid site template.'
-    );
-
-    return view($website->siteTemplate->blade_view, compact('website'));
-})->name('website.slug');
 
 /*
 |--------------------------------------------------------------------------
