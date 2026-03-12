@@ -359,7 +359,7 @@
                             {{ strtoupper($firstName) }}
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="mt-5 flex items-center gap-3">
                             <div class="font-antonio font-bold text-[44px] leading-[0.84] tracking-tight text-white md:text-[60px] lg:text-[50px]">
                                 {{ strtoupper($lastName) }}
                             </div>
