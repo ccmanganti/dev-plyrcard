@@ -19,7 +19,10 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['website_id', 'hero_template_field_id']);
+            $table->unique(
+                ['website_id', 'hero_template_field_id'],
+                'whfv_unique'
+            );
         });
     }
 
