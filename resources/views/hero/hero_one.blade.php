@@ -1,68 +1,3 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $website->name ?: (($website->user?->first_name ?? '') . ' ' . ($website->user?->last_name ?? '')) }}</title>
-
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700|iceberg:400|poppins:300,400,500,600,700" rel="stylesheet" />
-
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-
-    <style>
-        .font-antonio{
-            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-        }
-
-        .font-iceberg{
-            font-family: "Iceberg", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-        }
-
-        .hero-desktop {
-            display: block;
-        }
-
-        .hero-mobile-fallback {
-            display: none;
-        }
-
-        @media (max-width: 1023px) {
-            .hero-desktop {
-                display: none;
-            }
-
-            .hero-mobile-fallback {
-                display: block;
-            }
-        }
-
-        /* Slightly scale down desktop hero as screen shrinks, while keeping layout intact */
-        @media (max-width: 1535px) {
-            .hero-scale {
-                transform: scale(0.94);
-                transform-origin: center center;
-            }
-        }
-
-        @media (max-width: 1280px) {
-            .hero-scale {
-                transform: scale(0.88);
-                transform-origin: center center;
-            }
-        }
-
-        @media (max-width: 1150px) {
-            .hero-scale {
-                transform: scale(0.82);
-                transform-origin: center center;
-            }
-        }
-    </style>
-</head>
-
-<body>
 @php
     $user = $website->user;
 
@@ -306,7 +241,55 @@
     $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
 @endphp
 
-{{-- Desktop/Laptop hero --}}
+<style>
+    .font-antonio{
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    .font-iceberg{
+        font-family: "Iceberg", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    .hero-desktop {
+        display: block;
+    }
+
+    .hero-mobile-fallback {
+        display: none;
+    }
+
+    @media (max-width: 1023px) {
+        .hero-desktop {
+            display: none;
+        }
+
+        .hero-mobile-fallback {
+            display: block;
+        }
+    }
+
+    @media (max-width: 1535px) {
+        .hero-scale {
+            transform: scale(0.94);
+            transform-origin: center center;
+        }
+    }
+
+    @media (max-width: 1280px) {
+        .hero-scale {
+            transform: scale(0.88);
+            transform-origin: center center;
+        }
+    }
+
+    @media (max-width: 1150px) {
+        .hero-scale {
+            transform: scale(0.82);
+            transform-origin: center center;
+        }
+    }
+</style>
+
 <section
     class="hero-desktop relative z-0 overflow-hidden h-[95vh] min-h-[700px] max-h-[940px]"
     style="background-color: {{ $primary }};"
@@ -387,9 +370,9 @@
 
                 <div class="relative z-10 h-full w-full max-w-[820px]">
                     <div class="flex items-start justify-between gap-4">
-                        <h1 class="relative font-antonio left-30 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px]">
+                        <div class="relative font-antonio left-30 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px]">
                             {{ strtoupper($statsTitle) }}
-                        </h1>
+                        </div>
 
                         @if ($ballLogoUrl)
                             <img
@@ -431,7 +414,6 @@
     </div>
 </section>
 
-{{-- Tablet/Mobile fallback image --}}
 <section class="hero-mobile-fallback w-full" style="background-color: {{ $primary }};">
     @if ($mobileHeroImageUrl)
         <img
@@ -447,7 +429,3 @@
         />
     @endif
 </section>
-
-<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-</body>
-</html>
