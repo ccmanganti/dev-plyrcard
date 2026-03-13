@@ -23,6 +23,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\RichEditor;
 
 class HeroFieldValuesRelationManager extends RelationManager
 {
