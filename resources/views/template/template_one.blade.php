@@ -229,7 +229,8 @@
         };
 
         $playerDisplayName = trim(
-            $user?->first_name ?? '' . ' ' . $user?->last_name ?? '');
+            ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')
+        );
 
         $leagueOrClub = $user?->club?->league?->name
             ?? $user?->club?->name
