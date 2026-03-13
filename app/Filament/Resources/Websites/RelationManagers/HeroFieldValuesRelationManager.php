@@ -111,8 +111,17 @@ class HeroFieldValuesRelationManager extends RelationManager
     {
         $type = $this->getTemplateFieldType($data['hero_template_field_id'] ?? null);
         $proxyField = $this->getProxyFieldName($type);
+        $value = $data[$proxyField] ?? null;
 
-        $data['value'] = $data[$proxyField] ?? null;
+        if ($type === 'image') {
+            if (is_array($value)) {
+                $value = count($value) ? reset($value) : null;
+            }
+
+            $data['value'] = filled($value) ? (string) $value : null;
+        } else {
+            $data['value'] = $value;
+        }
 
         unset(
             $data['value_text'],
@@ -162,21 +171,18 @@ class HeroFieldValuesRelationManager extends RelationManager
                     TextInput::make('value_text')
                         ->label('Value')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'text')
-                        ->dehydrated(false),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'text'),
 
                     TextInput::make('value_url')
                         ->label('URL')
                         ->url()
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'url')
-                        ->dehydrated(false),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'url'),
 
                     ColorPicker::make('value_color')
                         ->label('Color')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'color')
-                        ->dehydrated(false),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'color'),
 
                     FileUpload::make('value_image')
                         ->label('Image')
@@ -185,8 +191,7 @@ class HeroFieldValuesRelationManager extends RelationManager
                         ->directory('hero-field-images')
                         ->visibility('public')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'image')
-                        ->dehydrated(false),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'image'),
 
                     RichEditor::make('value_richtext')
                         ->label('Value')
@@ -197,11 +202,7 @@ class HeroFieldValuesRelationManager extends RelationManager
                                 return '';
                             }
 
-                            if (is_array($state)) {
-                                return '';
-                            }
-
-                            return (string) $state;
+                            return is_string($state) ? $state : '';
                         }),
 
                     Textarea::make('value_textarea')
@@ -212,8 +213,7 @@ class HeroFieldValuesRelationManager extends RelationManager
                             $this->getTemplateFieldType($get('hero_template_field_id')),
                             ['textarea', 'embed', 'json'],
                             true
-                        ))
-                        ->dehydrated(false),
+                        )),
 
                     KeyValue::make('meta')
                         ->columnSpanFull(),
