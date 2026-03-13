@@ -417,6 +417,9 @@
         $footerEmail = $user->email ?? '';
         $copyright   = 'Plyr Card 2026 © All Rights Reserved';
 
+        $smsPhone = !empty($footerPhone) ? preg_replace('/\D+/', '', $footerPhone) : '';
+        $textCoachUrl = $smsPhone ? 'sms:' . $smsPhone : ($playerEmail ? 'mailto:' . $playerEmail : '#');
+
         /*
         |--------------------------------------------------------------------------
         | SEO Helpers
@@ -831,9 +834,130 @@
                     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
         }
 
-        @media (max-width: 767px){
-            body{ padding-bottom: 76px; }
-        }
+        .mobile-social-footer{
+    background: #ffffff;
+    border-top: 1px solid rgba(15,23,42,0.12);
+}
+
+.mobile-social-inner{
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    gap: 0;
+    padding: 8px 10px 9px;
+}
+
+.mobile-social-icon,
+.mobile-text-coach{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.mobile-social-icon{
+    width: 30px;
+    height: 30px;
+    color: #111111;
+}
+
+.mobile-social-icon svg{
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.mobile-social-icon.instagram svg{
+    width: 31px;
+    height: 31px;
+}
+
+.mobile-social-icon.x svg{
+    width: 26px;
+    height: 26px;
+}
+
+.mobile-social-icon.youtube svg{
+    width: 30px;
+    height: 30px;
+}
+
+.mobile-social-icon.mail svg{
+    width: 31px;
+    height: 31px;
+}
+
+.mobile-text-coach{
+    min-width: 118px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 12px;
+    background: #000000;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.mobile-social-icon.is-disabled,
+.mobile-text-coach.is-disabled{
+    opacity: .4;
+    pointer-events: none;
+}
+
+@media (min-width: 420px){
+    .mobile-social-inner{
+        padding: 10px 14px 11px;
+    }
+
+    .mobile-social-icon{
+        width: 34px;
+        height: 34px;
+    }
+
+    .mobile-social-icon.instagram svg{
+        width: 35px;
+        height: 35px;
+    }
+
+    .mobile-social-icon.x svg{
+        width: 29px;
+        height: 29px;
+    }
+
+    .mobile-social-icon.youtube svg{
+        width: 33px;
+        height: 33px;
+    }
+
+    .mobile-social-icon.mail svg{
+        width: 34px;
+        height: 34px;
+    }
+
+    .mobile-text-coach{
+        min-width: 132px;
+        height: 46px;
+        padding: 0 18px;
+        border-radius: 12px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 767px){
+    body{ padding-bottom: 72px; }
+}
+
+@media (min-width: 768px){
+    .mobile-social-footer{
+        display: none;
+    }
+}
     </style>
 </head>
 
@@ -1133,7 +1257,8 @@
                         <div class="flex items-center gap-6" style="color: {{ $onPrimary }};">
                             <a href="{{ $igUrl ?: '#' }}"
                                class="icon-link {{ empty($igUrl) ? 'pointer-events-none opacity-60' : '' }}"
-                               aria-label="Instagram">
+                               aria-label="Instagram"
+                               @if(!empty($igUrl)) target="_blank" rel="noopener noreferrer" @endif>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm4.25 5.5A4.75 4.75 0 1016.75 12 4.76 4.76 0 0012 7.5zm0 7.8A3.05 3.05 0 1115.05 12 3.05 3.05 0 0112 15.3zm4.9-8.55a1.1 1.1 0 11-1.1-1.1 1.1 1.1 0 011.1 1.1z"/>
                                 </svg>
@@ -1141,7 +1266,8 @@
 
                             <a href="{{ $ytUrl ?: '#' }}"
                                class="icon-link {{ empty($ytUrl) ? 'pointer-events-none opacity-60' : '' }}"
-                               aria-label="YouTube">
+                               aria-label="YouTube"
+                               @if(!empty($ytUrl)) target="_blank" rel="noopener noreferrer" @endif>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 00.5 6.2 31.4 31.4 0 000 12a31.4 31.4 0 00.5 5.8 3 3 0 002.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 002.1-2.1A31.4 31.4 0 0024 12a31.4 31.4 0 00-.5-5.8zM9.8 15.5v-7l6.2 3.5-6.2 3.5z"/>
                                 </svg>
@@ -1149,7 +1275,8 @@
 
                             <a href="{{ $xUrl ?: '#' }}"
                                class="icon-link {{ empty($xUrl) ? 'pointer-events-none opacity-60' : '' }}"
-                               aria-label="X">
+                               aria-label="X"
+                               @if(!empty($xUrl)) target="_blank" rel="noopener noreferrer" @endif>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M18.244 2H21l-6.5 7.43L22 22h-6.828l-4.27-5.588L5.6 22H3l7.1-8.12L2 2h6.828l3.84 5.088L18.244 2z"/>
                                 </svg>
@@ -1165,51 +1292,56 @@
         </div>
     </footer>
 
-    <div class="fixed bottom-0 left-0 w-full z-50 md:hidden border-t"
-         style="background: {{ $surface }}; border-color: rgba(15,23,42,0.12);">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-6" style="color: {{ $text1 }};">
-                <a href="{{ $igUrl ?: '#' }}"
-                   class="icon-link {{ empty($igUrl) ? 'pointer-events-none opacity-40' : '' }}"
-                   aria-label="Instagram">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm4.25 5.5A4.75 4.75 0 1016.75 12 4.76 4.76 0 0012 7.5zm0 7.8A3.05 3.05 0 1115.05 12 3.05 3.05 0 0112 15.3zm4.9-8.55a1.1 1.1 0 11-1.1-1.1 1.1 1.1 0 011.1 1.1z"/>
-                    </svg>
-                </a>
+    <div class="mobile-social-footer fixed bottom-0 left-0 w-full z-50 md:hidden">
+    <div class="mobile-social-inner max-w-7xl mx-auto">
+        <a href="{{ $igUrl ?: '#' }}"
+           class="mobile-social-icon instagram {{ empty($igUrl) ? 'is-disabled' : '' }}"
+           aria-label="Instagram"
+           target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
+           rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
+                <circle cx="12" cy="12" r="4.2"></circle>
+                <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
+            </svg>
+        </a>
 
-                <a href="{{ $xUrl ?: '#' }}"
-                   class="icon-link {{ empty($xUrl) ? 'pointer-events-none opacity-40' : '' }}"
-                   aria-label="X">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M18.244 2H21l-6.5 7.43L22 22h-6.828l-4.27-5.588L5.6 22H3l7.1-8.12L2 2h6.828l3.84 5.088L18.244 2z"/>
-                    </svg>
-                </a>
+        <a href="{{ $xUrl ?: '#' }}"
+           class="mobile-social-icon x {{ empty($xUrl) ? 'is-disabled' : '' }}"
+           aria-label="X"
+           target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
+           rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
+            </svg>
+        </a>
 
-                <a href="{{ $ytUrl ?: '#' }}"
-                   class="icon-link {{ empty($ytUrl) ? 'pointer-events-none opacity-40' : '' }}"
-                   aria-label="YouTube">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 00.5 6.2 31.4 31.4 0 000 12a31.4 31.4 0 00.5 5.8 3 3 0 002.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 002.1-2.1A31.4 31.4 0 0024 12a31.4 31.4 0 00-.5-5.8zM9.8 15.5v-7l6.2 3.5-6.2 3.5z"/>
-                    </svg>
-                </a>
+        <a href="{{ $ytUrl ?: '#' }}"
+           class="mobile-social-icon youtube {{ empty($ytUrl) ? 'is-disabled' : '' }}"
+           aria-label="YouTube"
+           target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
+           rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
+            </svg>
+        </a>
 
-                <a href="mailto:{{ $playerEmail ?: '#' }}"
-                   class="icon-link {{ empty($playerEmail) ? 'pointer-events-none opacity-40' : '' }}"
-                   aria-label="Email">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h16v16H4z"></path>
-                        <path d="m4 6 8 6 8-6"></path>
-                    </svg>
-                </a>
-            </div>
+        <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
+           class="mobile-social-icon mail {{ empty($playerEmail) ? 'is-disabled' : '' }}"
+           aria-label="Email">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 5.5h18v13H3z"></path>
+                <path d="m4 7 8 6 8-6"></path>
+            </svg>
+        </a>
 
-            <a href="#"
-               class="text-xs font-semibold px-4 py-2 rounded-full"
-               style="background: {{ $secondary }}; color: {{ $onSecondary }};">
-                TEXT COACH
-            </a>
-        </div>
+        <a href="{{ $textCoachUrl }}"
+           class="mobile-text-coach {{ $textCoachUrl === '#' ? 'is-disabled' : '' }}"
+           aria-label="Text Coach">
+            TEXT COACH
+        </a>
     </div>
+</div>
 
     <script>
         window.addEventListener("load", function () {

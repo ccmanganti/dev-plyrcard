@@ -1,4 +1,3 @@
-
 @php
     $user = $website->user;
 
@@ -289,6 +288,79 @@
             transform-origin: center center;
         }
     }
+
+    /* only beyond normal 2xl/default */
+@media (min-width: 1800px) {
+    .stats-ultra-wrap {
+        max-width: 1060px;
+    }
+
+    .stats-ultra-title {
+        left: 12rem;
+    }
+
+    .stats-ultra-grid-wrap {
+        left: 12rem;
+    }
+
+    .stats-ultra-grid {
+        grid-template-columns: minmax(145px, 210px) 1fr;
+        column-gap: 0.75rem;
+        row-gap: 0.9rem;
+    }
+
+    .stats-ultra-team {
+        width: 75%;
+    }
+}
+
+@media (min-width: 2100px) {
+    .stats-ultra-wrap {
+        max-width: 1180px;
+    }
+
+    .stats-ultra-title {
+        left: 20rem;
+    }
+
+    .stats-ultra-grid-wrap {
+        left: 20rem;
+    }
+
+    .stats-ultra-grid {
+        grid-template-columns: minmax(165px, 245px) 1fr;
+        column-gap: 1rem;
+        row-gap: 1rem;
+    }
+
+    .stats-ultra-team {
+        width: 79%;
+    }
+}
+
+@media (min-width: 2400px) {
+    .stats-ultra-wrap {
+        max-width: 1280px;
+    }
+
+    .stats-ultra-title {
+        left: 30rem;
+    }
+
+    .stats-ultra-grid-wrap {
+        left: 30rem;
+    }
+
+    .stats-ultra-grid {
+        grid-template-columns: minmax(180px, 270px) 1fr;
+        column-gap: 1.1rem;
+        row-gap: 1.05rem;
+    }
+
+    .stats-ultra-team {
+        width: 82%;
+    }
+}
 </style>
 
 <section
@@ -362,16 +434,16 @@
                 </div>
             </div>
 
-            <div class="relative flex items-start justify-end md:pt-2 lg:pt-2">
+            <div class="relative flex items-end justify-end md:pt-2 lg:pt-2">
                 @if ($bgJerseyNumber)
                     <div class="pointer-events-none absolute left-[-140px] z-[1] font-iceberg text-[340px] leading-none tracking-[-0.02em] text-white/[0.05] md:text-[460px] lg:text-[560px] xl:text-[700px]">
                         {{ $bgJerseyNumber }}
                     </div>
                 @endif
 
-                <div class="relative z-10 h-full w-full max-w-[820px]">
+                <div class="stats-ultra-wrap relative z-10 h-full w-full max-w-[820px]">
                     <div class="flex items-start justify-between gap-4">
-                        <div class="relative font-antonio left-30 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px]">
+                        <div class="stats-ultra-title relative font-antonio left-30 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px]">
                             {{ strtoupper($statsTitle) }}
                         </div>
 
@@ -384,15 +456,15 @@
                         @endif
                     </div>
 
-                    <div class="relative left-30 pl-1 md:pl-2 lg:pl-3 mt-5">
-                        <div class="relative grid grid-cols-[minmax(100px,150px)_1fr] gap-x-0 gap-y-[12px]">
+                    <div class="stats-ultra-grid-wrap relative left-30 pl-1 md:pl-2 lg:pl-3 mt-5">
+                        <div class="stats-ultra-grid relative grid grid-cols-[minmax(100px,150px)_1fr] gap-x-0 gap-y-[12px]">
                             @foreach ($stats as $label => $value)
                                 @if (filled($value))
-                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white/95 md:text-[23px] lg:text-[21px]">
+                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white/95 md:text-[23px] lg:text-[21px] 2xl:text-[23px]">
                                         {{ $label }}
                                     </div>
 
-                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white md:text-[23px] lg:text-[21px]">
+                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white md:text-[23px] lg:text-[21px] 2xl:text-[23px]">
                                         {{ $value }}
                                     </div>
                                 @endif
@@ -401,7 +473,7 @@
                     </div>
 
                     @if ($bottomTeamImageUrl)
-                        <div class="pointer-events-none absolute bottom-[-2px] right-0 z-[4] w-[44%] md:w-[46%] lg:w-[70%]">
+                        <div class="stats-ultra-team pointer-events-none absolute bottom-[-2px] right-0 z-[4] w-[44%] md:w-[46%] lg:w-[70%]">
                             <img
                                 src="{{ $bottomTeamImageUrl }}"
                                 alt="Team image"
