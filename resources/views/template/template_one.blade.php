@@ -499,15 +499,15 @@
         $seoKeywords = filled($seoKeywordsField) ? $seoKeywordsField : $defaultKeywords;
         $seoRobots = filled($seoRobotsField) ? $seoRobotsField : 'index,follow';
 
-        $shareImage = $ogImageField
-            ?: $twitterImageField
-            ?: $heroCompositeImageUrl
-            ?: $heroBackgroundImageUrl
-            ?: $heroMobileImageUrl
-            ?: $aboutThumbnailUrl
-            ?: $footerLogoUrl
-            ?: $heroPlyrCardUrl
-            ?: asset('temp-thumbnail.png');
+    $shareImage = $ogImageField
+        ?: $twitterImageField
+        ?: $aboutThumbnailUrl
+        ?: $heroCompositeImageUrl
+        ?: $heroBackgroundImageUrl
+        ?: $heroMobileImageUrl
+        ?: $footerLogoUrl
+        ?: $heroPlyrCardUrl
+        ?: asset('temp-thumbnail.png');
 
         $faviconUrl = $faviconField ?: asset('favicon.ico');
 
