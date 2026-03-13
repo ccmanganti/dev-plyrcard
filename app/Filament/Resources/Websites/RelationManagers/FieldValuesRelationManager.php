@@ -134,18 +134,13 @@ class FieldValuesRelationManager extends RelationManager
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'image'),
 
-                    RichEditor::make('value')
-                        ->label('Value')
-                        ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'richtext'),
-
                     Textarea::make('value')
                         ->label('Value')
                         ->rows(6)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => in_array(
                             $this->getTemplateFieldType($get('site_template_field_id')),
-                            ['textarea', 'embed', 'json'],
+                            ['textarea', 'richtext', 'embed', 'json'],
                             true
                         )),
 

@@ -145,7 +145,7 @@ class HeroFieldValuesRelationManager extends RelationManager
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => in_array(
                             $this->getTemplateFieldType($get('hero_template_field_id')),
-                            ['textarea', 'embed', 'json'],
+                            ['textarea', 'richtext', 'embed', 'json'],
                             true
                         )),
 
