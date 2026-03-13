@@ -192,7 +192,6 @@ class HeroFieldValuesRelationManager extends RelationManager
                         ->label('Value')
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'richtext')
-                        ->dehydrated(false)
                         ->formatStateUsing(function ($state) {
                             if (blank($state)) {
                                 return '';
