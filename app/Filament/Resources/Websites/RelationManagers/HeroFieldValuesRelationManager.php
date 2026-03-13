@@ -134,11 +134,6 @@ class HeroFieldValuesRelationManager extends RelationManager
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'image'),
 
-                    RichEditor::make('value')
-                        ->label('Value')
-                        ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'richtext'),
-
                     Textarea::make('value')
                         ->label('Value')
                         ->rows(6)
