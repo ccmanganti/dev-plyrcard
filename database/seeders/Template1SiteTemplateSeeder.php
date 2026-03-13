@@ -136,7 +136,7 @@ class Template1SiteTemplateSeeder extends Seeder
             [
                 'name' => 'academic_accolades',
                 'label' => 'Academic Accolades',
-                'type' => 'richtext',
+                'type' => 'textarea',
                 'guide_image' => null,
                 'is_required' => false,
                 'sort_order' => 130,
@@ -163,7 +163,7 @@ class Template1SiteTemplateSeeder extends Seeder
             [
                 'name' => 'sports_accolades',
                 'label' => 'Sports Accolades',
-                'type' => 'richtext',
+                'type' => 'textarea',
                 'guide_image' => null,
                 'is_required' => false,
                 'sort_order' => 160,

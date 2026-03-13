@@ -91,7 +91,9 @@
         */
         $toYoutubeEmbed = function (string $url) {
             $url = trim($url);
-            if ($url === '') return null;
+            if ($url === '') {
+                return null;
+            }
 
             $videoId = null;
 
@@ -111,7 +113,9 @@
                 $videoId = $m[1];
             }
 
-            if (! $videoId) return null;
+            if (! $videoId) {
+                return null;
+            }
 
             $params = http_build_query([
                 'rel' => 0,
@@ -123,7 +127,9 @@
         };
 
         $parseUrlList = function ($raw) use ($toYoutubeEmbed) {
-            if (! is_string($raw) || trim($raw) === '') return [];
+            if (! is_string($raw) || trim($raw) === '') {
+                return [];
+            }
 
             $raw = str_replace(["\r\n", "\r"], "\n", $raw);
             $parts = preg_split('/\n|,/', $raw);
@@ -176,6 +182,7 @@
 
                     if (is_array($first)) {
                         $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? null;
+
                         if ($path) {
                             return filter_var($path, FILTER_VALIDATE_URL)
                                 ? $path
@@ -185,6 +192,7 @@
                 }
 
                 $path = $raw['url'] ?? $raw['path'] ?? $raw['image_url'] ?? null;
+
                 if ($path) {
                     return filter_var($path, FILTER_VALIDATE_URL)
                         ? $path
@@ -200,23 +208,88 @@
         | Content Fields
         |--------------------------------------------------------------------------
         */
-        $aboutHeadline = $hideIfDefault($getFieldValue('aboutme_headline', ''));
-        $aboutTagline  = $hideIfDefault($getFieldValue('player_tagline', ''));
-        $aboutBio      = $hideIfDefault($getFieldValue('player_bio', ''));
+        $listifyText = function ($value) {
+            if (blank($value)) {
+                return '';
+            }
 
-        $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''));
-        $scheduleTagline  = $hideIfDefault($getFieldValue('schedules_tagline', ''));
+            $text = is_string($value) ? $value : (string) $value;
+            $text = str_replace(["\r\n", "\r"], "\n", $text);
 
-        $highHeadline = $hideIfDefault($getFieldValue('highlights_headline', ''));
-        $highTagline  = $hideIfDefault($getFieldValue('highlights_tagline', ''));
+            $lines = collect(explode("\n", $text))
+                ->map(fn ($line) => trim(strip_tags($line)))
+                ->filter()
+                ->values();
 
-        $acadHeadline = $hideIfDefault($getFieldValue('acad_accolades_headline', ''));
-        $acadTagline  = $hideIfDefault($getFieldValue('acad_accolades_tagline', ''));
-        $acadBody     = $hideIfDefault($getFieldValue('academic_accolades', ''));
+            if ($lines->isEmpty()) {
+                return '';
+            }
 
-        $sportHeadline = $hideIfDefault($getFieldValue('sport_accolades_headline', ''));
-        $sportTagline  = $hideIfDefault($getFieldValue('sport_accolades_tagline', ''));
-        $sportBody     = $hideIfDefault($getFieldValue('sports_accolades', ''));
+            return '<ul>' . $lines->map(fn ($line) => '<li>' . e($line) . '</li>')->implode('') . '</ul>';
+        };
+
+        $playerDisplayName = trim(
+            $user?->first_name ?? '' . ' ' . $user?->last_name ?? '');
+
+        $leagueOrClub = $user?->club?->league?->name
+            ?? $user?->club?->name
+            ?? $user?->team_name
+            ?? '';
+
+        $gradYearText = filled($user?->year) ? "CLASS OF " . $user->year : '';
+
+        $defaultPlayerTagline = collect([
+            filled($playerDisplayName) ? strtoupper($playerDisplayName) : null,
+            filled($leagueOrClub) ? strtoupper($leagueOrClub) : null,
+            filled($gradYearText) ? strtoupper($gradYearText) : null,
+        ])->filter(fn ($value) => filled($value))->implode(' | ');
+
+        $aboutHeadline = $hideIfDefault($getFieldValue('aboutme_headline', ''))
+            ?: 'About Me in 60 Seconds';
+
+        $aboutTagline = $hideIfDefault($getFieldValue('player_tagline', ''))
+            ?: $defaultPlayerTagline;
+
+        $aboutBio = $hideIfDefault($getFieldValue('player_bio', ''));
+
+        $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''))
+            ?: 'Games Schedule';
+
+        $scheduleTagline = $hideIfDefault($getFieldValue('schedules_tagline', ''))
+            ?: 'Upcoming games and key dates.';
+
+        $highHeadline = $hideIfDefault($getFieldValue('highlights_headline', ''))
+            ?: 'Game Highlights';
+
+        $highTagline = $hideIfDefault($getFieldValue('highlights_tagline', ''))
+            ?: 'Top plays and standout moments.';
+
+        $websiteAcademicAccolades = $getFieldValue('academic_accolades', '');
+        $websiteSportsAccolades = $getFieldValue('sports_accolades', '');
+
+        $acadRaw = filled($websiteAcademicAccolades)
+            ? $websiteAcademicAccolades
+            : ($user?->academic_accolades ?? '');
+
+        $sportRaw = filled($websiteSportsAccolades)
+            ? $websiteSportsAccolades
+            : ($user?->sports_accolades ?? '');
+
+        $acadHeadline = $hideIfDefault($getFieldValue('acad_accolades_headline', ''))
+            ?: 'Academic Accolades';
+
+        $acadTagline = $hideIfDefault($getFieldValue('acad_accolades_tagline', ''))
+            ?: 'A collection of awards & accomplishments';
+
+        $acadBody = $listifyText($hideIfDefault($acadRaw));
+
+        $sportHeadline = $hideIfDefault($getFieldValue('sport_accolades_headline', ''))
+            ?: 'Sports Accolades';
+
+        $sportTagline = $hideIfDefault($getFieldValue('sport_accolades_tagline', ''))
+            ?: 'A collection of awards & accomplishments';
+
+        $sportBody = $listifyText($hideIfDefault($sportRaw));
 
         $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
         $aboutVideoUrls   = $getFieldValue('yt_embed', '');
@@ -255,7 +328,7 @@
             $hex = ltrim(trim($hex), '#');
 
             if (strlen($hex) === 3) {
-                $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+                $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
             }
 
             if (strlen($hex) !== 6) {
@@ -499,15 +572,15 @@
         $seoKeywords = filled($seoKeywordsField) ? $seoKeywordsField : $defaultKeywords;
         $seoRobots = filled($seoRobotsField) ? $seoRobotsField : 'index,follow';
 
-    $shareImage = $ogImageField
-        ?: $twitterImageField
-        ?: $aboutThumbnailUrl
-        ?: $heroCompositeImageUrl
-        ?: $heroBackgroundImageUrl
-        ?: $heroMobileImageUrl
-        ?: $footerLogoUrl
-        ?: $heroPlyrCardUrl
-        ?: asset('temp-thumbnail.png');
+        $shareImage = $ogImageField
+            ?: $twitterImageField
+            ?: $aboutThumbnailUrl
+            ?: $heroCompositeImageUrl
+            ?: $heroBackgroundImageUrl
+            ?: $heroMobileImageUrl
+            ?: $footerLogoUrl
+            ?: $heroPlyrCardUrl
+            ?: asset('temp-thumbnail.png');
 
         $faviconUrl = $faviconField ?: asset('favicon.ico');
 
@@ -640,8 +713,6 @@
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 
     <style>
-        /* Page Loader */
-
         #page-loader{
             position: fixed;
             inset: 0;
@@ -670,6 +741,7 @@
         @keyframes spin{
             to{ transform: rotate(360deg); }
         }
+
         :root{
             --primary: {{ $primary }};
             --secondary: {{ $secondary }};
@@ -768,7 +840,7 @@
     <div id="page-loader">
         <div class="loader-spinner"></div>
     </div>
-    {{-- HERO SLOT --}}
+
     @if ($website->heroTemplate?->blade_view)
         <div id="hero-container">
             @include($website->heroTemplate->blade_view, ['website' => $website])
@@ -1140,11 +1212,10 @@
 
     <script>
         window.addEventListener("load", function () {
-
             const loader = document.getElementById("page-loader");
             const heroImages = document.querySelectorAll("#hero-container img");
 
-            if(heroImages.length === 0){
+            if (heroImages.length === 0) {
                 loader.classList.add("hidden");
                 return;
             }
@@ -1152,29 +1223,27 @@
             let loaded = 0;
 
             heroImages.forEach(img => {
-
-                if(img.complete){
+                if (img.complete) {
                     loaded++;
-                }else{
+                } else {
                     img.addEventListener("load", checkDone);
                     img.addEventListener("error", checkDone);
                 }
-
             });
 
-            function checkDone(){
+            function checkDone() {
                 loaded++;
-                if(loaded >= heroImages.length){
+                if (loaded >= heroImages.length) {
                     loader.classList.add("hidden");
                 }
             }
 
-            if(loaded === heroImages.length){
+            if (loaded === heroImages.length) {
                 loader.classList.add("hidden");
             }
-
         });
-        </script>
+    </script>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const buttons  = document.querySelectorAll(".tab-btn");
@@ -1185,7 +1254,9 @@
             const secondary   = @json($secondary);
             const onSecondary = @json($onSecondary);
 
-            buttons.forEach(btn => { btn.style.cursor = "pointer"; });
+            buttons.forEach(btn => {
+                btn.style.cursor = "pointer";
+            });
 
             buttons.forEach(button => {
                 button.addEventListener("click", function () {
@@ -1204,7 +1275,9 @@
                     contents.forEach(content => content.classList.add("hidden"));
 
                     const active = document.getElementById("tab-" + target);
-                    if (active) active.classList.remove("hidden");
+                    if (active) {
+                        active.classList.remove("hidden");
+                    }
                 });
             });
         });

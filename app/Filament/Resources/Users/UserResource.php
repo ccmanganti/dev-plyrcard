@@ -300,7 +300,13 @@ class UserResource extends Resource
                     Toggle::make('natl_team_exp')
                         ->label('National Team Experience'),
 
-                    Textarea::make('accolades')
+                    Textarea::make('academic_accolades')
+                        ->label('Academic Accolades')
+                        ->rows(5)
+                        ->columnSpanFull(),
+
+                    Textarea::make('sports_accolades')
+                        ->label('Sports Accolades')
                         ->rows(5)
                         ->columnSpanFull(),
                 ]),
