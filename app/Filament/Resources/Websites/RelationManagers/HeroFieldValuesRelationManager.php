@@ -129,22 +129,22 @@ class HeroFieldValuesRelationManager extends RelationManager
                         ->label('Image')
                         ->image()
                         ->disk('public')
-                        ->directory('website-field-images')
+                        ->directory('hero-field-images')
                         ->visibility('public')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'image'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'image'),
 
                     RichEditor::make('value')
                         ->label('Value')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'richtext'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('hero_template_field_id')) === 'richtext'),
 
                     Textarea::make('value')
                         ->label('Value')
                         ->rows(6)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => in_array(
-                            $this->getTemplateFieldType($get('site_template_field_id')),
+                            $this->getTemplateFieldType($get('hero_template_field_id')),
                             ['textarea', 'embed', 'json'],
                             true
                         )),
