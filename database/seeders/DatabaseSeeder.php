@@ -8,6 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
+
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
@@ -31,5 +32,10 @@ class DatabaseSeeder extends Seeder
         if (! $user->hasRole($role->name)) {
             $user->assignRole($role);
         }
+
+        $this->call([
+            Template1SiteTemplateSeeder::class,
+            Template1HeroTemplateSeeder::class,
+        ]);
     }
 }

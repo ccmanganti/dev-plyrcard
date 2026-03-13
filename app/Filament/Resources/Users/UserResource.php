@@ -9,21 +9,24 @@ use App\Filament\Resources\Users\Pages\ViewUser;
 use App\Models\User;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
-use Filament\Forms\Components\DatePicker;
 
 class UserResource extends Resource
 {
@@ -386,7 +389,175 @@ class UserResource extends Resource
                     })
                     ->badge(),
             ])
+            ->filtersFormColumns(3)
             ->filters([
+                SelectFilter::make('school_id')
+                    ->label('School')
+                    ->relationship('school', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('club_id')
+                    ->label('Club')
+                    ->relationship('club', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('roles')
+                    ->label('Roles')
+                    ->relationship('roles', 'name')
+                    ->multiple()
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('sport')
+                    ->label('Sport')
+                    ->options(static::getSportOptions())
+                    ->multiple(),
+
+                SelectFilter::make('year')
+                    ->label('Graduation Year')
+                    ->options(
+                        User::query()
+                            ->whereNotNull('year')
+                            ->distinct()
+                            ->orderBy('year')
+                            ->pluck('year', 'year')
+                            ->mapWithKeys(fn ($year) => [$year => (string) $year])
+                            ->all()
+                    )
+                    ->multiple(),
+
+                /**
+                 * Assumes Club model has a league() relationship.
+                 * Remove this filter if that relationship does not exist.
+                 */
+                SelectFilter::make('league')
+                    ->label('League')
+                    ->options(function (): array {
+                        return User::query()
+                            ->whereHas('club.league')
+                            ->with('club.league')
+                            ->get()
+                            ->filter(fn ($user) => $user->club?->league?->id && $user->club?->league?->name)
+                            ->mapWithKeys(fn ($user) => [
+                                $user->club->league->id => $user->club->league->name,
+                            ])
+                            ->sort()
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = $data['value'] ?? null;
+
+                        if (blank($value)) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('club.league', fn (Builder $q) => $q->whereKey($value));
+                    }),
+
+                TernaryFilter::make('natl_team_exp')
+                    ->label('National Team Experience')
+                    ->nullable(),
+
+                TernaryFilter::make('has_website')
+                    ->label('Has Website')
+                    ->placeholder('All users')
+                    ->trueLabel('With website')
+                    ->falseLabel('Without website')
+                    ->queries(
+                        true: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNotNull('domain')
+                                ->where('domain', '!=', '')
+                                ->orWhereHas('websites');
+                        }),
+                        false: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNull('domain')
+                                ->orWhere('domain', '=', '');
+                        })->whereDoesntHave('websites'),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_school')
+                    ->label('Assigned School')
+                    ->placeholder('All users')
+                    ->trueLabel('With school')
+                    ->falseLabel('Without school')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('school_id'),
+                        false: fn (Builder $query) => $query->whereNull('school_id'),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_club')
+                    ->label('Assigned Club')
+                    ->placeholder('All users')
+                    ->trueLabel('With club')
+                    ->falseLabel('Without club')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('club_id'),
+                        false: fn (Builder $query) => $query->whereNull('club_id'),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_phone')
+                    ->label('Has Phone')
+                    ->placeholder('All users')
+                    ->trueLabel('With phone')
+                    ->falseLabel('Without phone')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('phone')->where('phone', '!=', ''),
+                        false: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNull('phone')->orWhere('phone', '=', '');
+                        }),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_parent_email')
+                    ->label('Has Parent Email')
+                    ->placeholder('All users')
+                    ->trueLabel('With parent email')
+                    ->falseLabel('Without parent email')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('parent_email')->where('parent_email', '!=', ''),
+                        false: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNull('parent_email')->orWhere('parent_email', '=', '');
+                        }),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_socials')
+                    ->label('Has Social Profiles')
+                    ->placeholder('All users')
+                    ->trueLabel('With socials')
+                    ->falseLabel('Without socials')
+                    ->queries(
+                        true: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNotNull('ig_handle')->where('ig_handle', '!=', '')
+                                ->orWhereNotNull('x_handle')->where('x_handle', '!=', '')
+                                ->orWhereNotNull('yt_url')->where('yt_url', '!=', '');
+                        }),
+                        false: fn (Builder $query) => $query->where(function (Builder $q) {
+                            $q->whereNull('ig_handle')->orWhere('ig_handle', '=', '');
+                        })->where(function (Builder $q) {
+                            $q->whereNull('x_handle')->orWhere('x_handle', '=', '');
+                        })->where(function (Builder $q) {
+                            $q->whereNull('yt_url')->orWhere('yt_url', '=', '');
+                        }),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                Filter::make('missing_core_profile')
+                    ->label('Missing Core Profile Info')
+                    ->query(fn (Builder $query): Builder => $query->where(function (Builder $q) {
+                        $q->whereNull('school_id')
+                            ->orWhereNull('club_id')
+                            ->orWhereNull('sport')
+                            ->orWhere(function (Builder $inner) {
+                                $inner->whereNull('phone')->orWhere('phone', '=', '');
+                            });
+                    })),
+
                 TrashedFilter::make(),
             ])
             ->recordUrl(fn (User $record): string => static::getUrl('edit', ['record' => $record]));

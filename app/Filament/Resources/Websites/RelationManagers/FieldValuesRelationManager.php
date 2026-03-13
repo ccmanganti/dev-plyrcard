@@ -23,6 +23,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\RichEditor;
 
 class FieldValuesRelationManager extends RelationManager
 {
@@ -133,13 +134,18 @@ class FieldValuesRelationManager extends RelationManager
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'image'),
 
+                    RichEditor::make('value')
+                        ->label('Value')
+                        ->columnSpanFull()
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'richtext'),
+
                     Textarea::make('value')
                         ->label('Value')
                         ->rows(6)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => in_array(
                             $this->getTemplateFieldType($get('site_template_field_id')),
-                            ['textarea', 'richtext', 'embed', 'json'],
+                            ['textarea', 'embed', 'json'],
                             true
                         )),
 
