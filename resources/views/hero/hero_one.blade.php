@@ -1,3 +1,4 @@
+
 @php
     $user = $website->user;
 
@@ -258,10 +259,6 @@
         display: none;
     }
 
-    .hero-inner {
-        width: min(96vw, 2200px);
-    }
-
     @media (max-width: 1023px) {
         .hero-desktop {
             display: none;
@@ -313,8 +310,8 @@
         style="background: linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.82) 22%, rgba(0,0,0,0.48) 48%, rgba(0,0,0,0.18) 68%, rgba(0,0,0,0) 100%);"
     ></div>
 
-    <div class="hero-scale hero-inner relative z-10 mx-auto h-full px-4 md:px-8 lg:px-10 2xl:px-12">
-        <div class="grid h-full grid-cols-1 lg:grid-cols-[48%_52%]">
+    <div class="hero-scale relative z-10 mx-auto h-full max-w-[1800px] px-4 md:px-8 lg:px-10">
+        <div class="grid h-full grid-cols-1 lg:grid-cols-[46%_54%]">
             <div class="relative flex items-end min-h-0">
                 @if ($plyrCardImageUrl)
                     <div class="absolute left-2 top-5 z-30 md:left-3 md:top-6">
@@ -331,23 +328,23 @@
                         <img
                             src="{{ $compositeImageUrl }}"
                             alt="{{ $playerFullName }}"
-                            class="max-h-[98%] w-auto max-w-[115%] 2xl:max-w-[122%] object-contain drop-shadow-[0_18px_35px_rgba(0,0,0,.45)]"
+                            class="max-h-[98%] w-auto max-w-[115%] object-contain drop-shadow-[0_18px_35px_rgba(0,0,0,.45)]"
                         />
                     </div>
                 @endif
 
                 <div class="relative z-20 w-full pb-6 pt-6 md:pb-8 lg:pb-20">
-                    <div class="max-w-[420px] 2xl:max-w-[500px] pl-1 md:pl-2">
-                        <div class="font-antonio font-bold text-[54px] leading-[0.82] tracking-tight text-white md:text-[70px] lg:text-[55px] 2xl:text-[64px]">
+                    <div class="max-w-[420px] pl-1 md:pl-2">
+                        <div class="font-antonio font-bold text-[54px] leading-[0.82] tracking-tight text-white md:text-[70px] lg:text-[55px]">
                             {{ $rightPosition }}
                         </div>
 
-                        <div class="mt-5 font-antonio font-light text-[36px] leading-[0.86] tracking-tight text-white md:text-[50px] lg:text-[50px] 2xl:text-[58px]">
+                        <div class="mt-5 font-antonio font-light text-[36px] leading-[0.86] tracking-tight text-white md:text-[50px] lg:text-[50px]">
                             {{ strtoupper($firstName) }}
                         </div>
 
                         <div class="mt-3 flex items-center gap-3">
-                            <div class="font-antonio font-bold text-[44px] leading-[0.84] tracking-tight text-white md:text-[60px] lg:text-[50px] 2xl:text-[58px]">
+                            <div class="font-antonio font-bold text-[44px] leading-[0.84] tracking-tight text-white md:text-[60px] lg:text-[50px]">
                                 {{ strtoupper($lastName) }}
                             </div>
 
@@ -356,7 +353,7 @@
                                     <img
                                         src="{{ $logosImageUrl }}"
                                         alt="Player logos"
-                                        class="h-auto max-h-[42px] md:max-h-[50px] lg:max-h-[58px] 2xl:max-h-[66px] w-auto object-contain"
+                                        class="h-auto max-h-[42px] md:max-h-[50px] lg:max-h-[58px] w-auto object-contain"
                                     />
                                 </div>
                             @endif
@@ -367,14 +364,14 @@
 
             <div class="relative flex items-start justify-end md:pt-2 lg:pt-2">
                 @if ($bgJerseyNumber)
-                    <div class="pointer-events-none absolute left-[-140px] 2xl:left-[-180px] z-[1] font-iceberg text-[340px] leading-none tracking-[-0.02em] text-white/[0.05] md:text-[460px] lg:text-[560px] xl:text-[700px] 2xl:text-[820px]">
+                    <div class="pointer-events-none absolute left-[-140px] z-[1] font-iceberg text-[340px] leading-none tracking-[-0.02em] text-white/[0.05] md:text-[460px] lg:text-[560px] xl:text-[700px]">
                         {{ $bgJerseyNumber }}
                     </div>
                 @endif
 
-                <div class="relative z-10 h-full w-full max-w-[820px] xl:max-w-[920px] 2xl:max-w-[1080px]">
+                <div class="relative z-10 h-full w-full max-w-[820px]">
                     <div class="flex items-start justify-between gap-4">
-                        <div class="relative font-antonio left-30 2xl:left-36 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px] 2xl:text-[116px]">
+                        <div class="relative font-antonio left-30 font-bold text-[70px] leading-[0.90] tracking-normal text-white md:text-[70px] lg:text-[90px] xl:text-[100px]">
                             {{ strtoupper($statsTitle) }}
                         </div>
 
@@ -382,20 +379,20 @@
                             <img
                                 src="{{ $ballLogoUrl }}"
                                 alt="Ball logo"
-                                class="mt-1 h-auto max-h-[72px] md:max-h-[90px] lg:max-h-[104px] 2xl:max-h-[116px] w-auto object-contain"
+                                class="mt-1 h-auto max-h-[72px] md:max-h-[90px] lg:max-h-[104px] w-auto object-contain"
                             />
                         @endif
                     </div>
 
-                    <div class="relative left-30 2xl:left-36 pl-1 md:pl-2 lg:pl-3 mt-5 2xl:mt-7">
-                        <div class="relative grid grid-cols-[minmax(100px,150px)_1fr] 2xl:grid-cols-[minmax(120px,180px)_1fr] gap-x-0 gap-y-[12px] 2xl:gap-y-[14px]">
+                    <div class="relative left-30 pl-1 md:pl-2 lg:pl-3 mt-5">
+                        <div class="relative grid grid-cols-[minmax(100px,150px)_1fr] gap-x-0 gap-y-[12px]">
                             @foreach ($stats as $label => $value)
                                 @if (filled($value))
-                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white/95 md:text-[23px] lg:text-[21px] 2xl:text-[24px]">
+                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white/95 md:text-[23px] lg:text-[21px]">
                                         {{ $label }}
                                     </div>
 
-                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white md:text-[23px] lg:text-[21px] 2xl:text-[24px]">
+                                    <div class="font-antonio font-light text-[18px] uppercase leading-[1.03] tracking-[0.01em] text-white md:text-[23px] lg:text-[21px]">
                                         {{ $value }}
                                     </div>
                                 @endif
@@ -404,7 +401,7 @@
                     </div>
 
                     @if ($bottomTeamImageUrl)
-                        <div class="pointer-events-none absolute bottom-[-2px] right-0 z-[4] w-[44%] md:w-[46%] lg:w-[70%] 2xl:w-[74%]">
+                        <div class="pointer-events-none absolute bottom-[-2px] right-0 z-[4] w-[44%] md:w-[46%] lg:w-[70%]">
                             <img
                                 src="{{ $bottomTeamImageUrl }}"
                                 alt="Team image"
