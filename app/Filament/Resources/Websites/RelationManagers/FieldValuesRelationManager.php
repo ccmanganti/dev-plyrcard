@@ -10,6 +10,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -23,7 +24,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
-use Filament\Forms\Components\RichEditor;
 
 class FieldValuesRelationManager extends RelationManager
 {
@@ -76,6 +76,56 @@ class FieldValuesRelationManager extends RelationManager
             ->all();
     }
 
+    protected function getProxyFieldName(?string $type): string
+    {
+        return match ($type) {
+            'text' => 'value_text',
+            'url' => 'value_url',
+            'color' => 'value_color',
+            'image' => 'value_image',
+            'richtext' => 'value_richtext',
+            'textarea', 'embed', 'json' => 'value_textarea',
+            default => 'value_text',
+        };
+    }
+
+    protected function fillProxyFields(array $data): array
+    {
+        $type = $this->getTemplateFieldType($data['site_template_field_id'] ?? null);
+        $proxyField = $this->getProxyFieldName($type);
+        $value = $data['value'] ?? null;
+
+        $data['value_text'] = null;
+        $data['value_url'] = null;
+        $data['value_color'] = null;
+        $data['value_image'] = null;
+        $data['value_richtext'] = null;
+        $data['value_textarea'] = null;
+
+        $data[$proxyField] = $value;
+
+        return $data;
+    }
+
+    protected function collapseProxyFields(array $data): array
+    {
+        $type = $this->getTemplateFieldType($data['site_template_field_id'] ?? null);
+        $proxyField = $this->getProxyFieldName($type);
+
+        $data['value'] = $data[$proxyField] ?? null;
+
+        unset(
+            $data['value_text'],
+            $data['value_url'],
+            $data['value_color'],
+            $data['value_image'],
+            $data['value_richtext'],
+            $data['value_textarea'],
+        );
+
+        return $data;
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -109,40 +159,62 @@ class FieldValuesRelationManager extends RelationManager
                             );
                         }),
 
-                    TextInput::make('value')
+                    TextInput::make('value_text')
                         ->label('Value')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'text'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'text')
+                        ->dehydrated(false),
 
-                    TextInput::make('value')
+                    TextInput::make('value_url')
                         ->label('URL')
                         ->url()
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'url'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'url')
+                        ->dehydrated(false),
 
-                    ColorPicker::make('value')
+                    ColorPicker::make('value_color')
                         ->label('Color')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'color'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'color')
+                        ->dehydrated(false),
 
-                    FileUpload::make('value')
+                    FileUpload::make('value_image')
                         ->label('Image')
                         ->image()
                         ->disk('public')
                         ->directory('website-field-images')
                         ->visibility('public')
                         ->columnSpanFull()
-                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'image'),
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'image')
+                        ->dehydrated(false),
 
-                    Textarea::make('value')
+                    RichEditor::make('value_richtext')
+                        ->label('Value')
+                        ->columnSpanFull()
+                        ->visible(fn (Get $get) => $this->getTemplateFieldType($get('site_template_field_id')) === 'richtext')
+                        ->dehydrated(false)
+                        ->formatStateUsing(function ($state) {
+                            if (blank($state)) {
+                                return '';
+                            }
+
+                            if (is_array($state)) {
+                                return '';
+                            }
+
+                            return (string) $state;
+                        }),
+
+                    Textarea::make('value_textarea')
                         ->label('Value')
                         ->rows(6)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => in_array(
                             $this->getTemplateFieldType($get('site_template_field_id')),
-                            ['textarea', 'richtext', 'embed', 'json'],
+                            ['textarea', 'embed', 'json'],
                             true
-                        )),
+                        ))
+                        ->dehydrated(false),
 
                     KeyValue::make('meta')
                         ->columnSpanFull(),
@@ -180,10 +252,20 @@ class FieldValuesRelationManager extends RelationManager
                     ->visible(fn ($record = null) => $record?->templateField?->type !== 'image'),
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->mutateFormDataUsing(function (array $data): array {
+                        return $this->collapseProxyFields($data);
+                    }),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->mutateRecordDataUsing(function (array $data): array {
+                        return $this->fillProxyFields($data);
+                    })
+                    ->mutateFormDataUsing(function (array $data): array {
+                        return $this->collapseProxyFields($data);
+                    }),
+
                 DeleteAction::make(),
             ]);
     }
