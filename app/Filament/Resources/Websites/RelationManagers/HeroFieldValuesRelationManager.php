@@ -58,6 +58,9 @@ class HeroFieldValuesRelationManager extends RelationManager
         $website = $this->getOwnerRecord();
 
         $usedFieldIds = $website->heroFieldValues()
+            ->whereHas('templateField', function (Builder $query) use ($website) {
+                $query->where('hero_template_id', $website->hero_template_id);
+            })
             ->when(
                 $currentFieldId,
                 fn ($query) => $query->where('hero_template_field_id', '!=', $currentFieldId)
@@ -223,8 +226,16 @@ class HeroFieldValuesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        $website = $this->getOwnerRecord();
+
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('templateField'))
+            ->modifyQueryUsing(function (Builder $query) use ($website) {
+                $query
+                    ->with('templateField')
+                    ->whereHas('templateField', function (Builder $templateFieldQuery) use ($website) {
+                        $templateFieldQuery->where('hero_template_id', $website->hero_template_id);
+                    });
+            })
             ->columns([
                 TextColumn::make('templateField.label')
                     ->label('Field')

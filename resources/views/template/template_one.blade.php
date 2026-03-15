@@ -711,7 +711,7 @@
     </script>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700|bebas-neue:400|iceberg:400|poppins:300,400,500,600,700" rel="stylesheet" />
+<link href="https://fonts.bunny.net/css?family=anton-sc:400|antonio:300,400,500,600,700|bebas-neue:400|iceberg:400|poppins:300,400,500,600,700" rel="stylesheet" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">

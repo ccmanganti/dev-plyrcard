@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             Template1SiteTemplateSeeder::class,
             Template1HeroTemplateSeeder::class,
+            Template2HeroTemplateSeeder::class,
         ]);
     }
 }
