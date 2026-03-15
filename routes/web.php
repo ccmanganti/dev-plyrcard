@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\WebsiteEditorController;
 use App\Models\Website;
 use Illuminate\Http\Request;
@@ -119,6 +120,17 @@ Route::get('/preview/{website}', function (Website $website) {
 
     return view($website->siteTemplate->blade_view, compact('website'));
 })->name('website.preview');
+
+/*
+|--------------------------------------------------------------------------
+| Public player intake routes
+|--------------------------------------------------------------------------
+*/
+Route::get('/player-intake', [PublicPlayerIntakeController::class, 'create'])
+    ->name('public.player-intake.create');
+
+Route::post('/player-intake', [PublicPlayerIntakeController::class, 'store'])
+    ->name('public.player-intake.store');
 
 /*
 |--------------------------------------------------------------------------
