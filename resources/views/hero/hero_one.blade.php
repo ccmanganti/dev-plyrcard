@@ -201,13 +201,61 @@
     $rightPosition = $abbreviatePosition($getHeroFieldValue('hero_right_position', $user?->position ?? 'PG'));
     $statsTitle = $getHeroFieldValue('hero_stats_title', 'STATISTICS');
 
-    $plyrCardImageUrl    = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image'), '');
-    $ballLogoUrl         = $resolveMediaUrl($getHeroFieldValue('hero_ball_logo'), '');
-    $compositeImageUrl   = $resolveMediaUrl($getHeroFieldValue('hero_composite_image'), '');
-    $logosImageUrl       = $resolveMediaUrl($getHeroFieldValue('hero_logos_image'), '');
-    $backgroundImageUrl  = $resolveMediaUrl($getHeroFieldValue('hero_background_image'), '');
-    $bottomTeamImageUrl  = $resolveMediaUrl($getHeroFieldValue('hero_bottom_team_image'), '');
-    $mobileHeroImageUrl  = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image'), '');
+    $plyrCardImageUrl   = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image'), '');
+    $compositeImageUrl  = $resolveMediaUrl($getHeroFieldValue('hero_composite_image'), '');
+    $logosImageUrl      = $resolveMediaUrl($getHeroFieldValue('hero_logos_image'), '');
+    $bottomTeamImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_bottom_team_image'), '');
+    $mobileHeroImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image'), '');
+
+    $defaultBackgroundImageUrl = asset('hero_images/hero_one/background.png');
+
+    $backgroundImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_background_image'),
+        $defaultBackgroundImageUrl
+    );
+
+    $sportRaw = $normalizeDisplayValue(
+        $getHeroFieldValue(
+            'hero_sport',
+            $user?->sport?->name
+                ?? $user?->sport
+                ?? $website?->sport
+                ?? $website?->sports
+                ?? ''
+        )
+    );
+
+    $sportKey = str($sportRaw)
+        ->lower()
+        ->trim()
+        ->replace('&', 'and')
+        ->replace('-', '_')
+        ->replace(' ', '_')
+        ->replace('__', '_')
+        ->toString();
+
+    $sportBallMap = [
+        'basketball' => 'basketball.png',
+        'football' => 'football.png',
+        'american_football' => 'football.png',
+        'baseball' => 'baseball.png',
+        'softball' => 'softball.png',
+        'soccer' => 'soccer.png',
+        'futbol' => 'soccer.png',
+        'volleyball' => 'volleyball.png',
+        'tennis' => 'tennis.png',
+        'golf' => 'golf.png',
+        'lacrosse' => 'lacrosse.png',
+    ];
+
+    $defaultBallLogoUrl = isset($sportBallMap[$sportKey])
+        ? asset('hero_images/hero_one/' . $sportBallMap[$sportKey])
+        : '';
+
+    $ballLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_ball_logo'),
+        $defaultBallLogoUrl
+    );
 
     $bgJerseyNumber = $getHeroFieldValue('hero_bg_jersey_number', $user?->jersey_number ?? '');
 
@@ -289,78 +337,77 @@
         }
     }
 
-    /* only beyond normal 2xl/default */
-@media (min-width: 1800px) {
-    .stats-ultra-wrap {
-        max-width: 1060px;
+    @media (min-width: 1800px) {
+        .stats-ultra-wrap {
+            max-width: 1060px;
+        }
+
+        .stats-ultra-title {
+            left: 12rem;
+        }
+
+        .stats-ultra-grid-wrap {
+            left: 12rem;
+        }
+
+        .stats-ultra-grid {
+            grid-template-columns: minmax(145px, 210px) 1fr;
+            column-gap: 0.75rem;
+            row-gap: 0.9rem;
+        }
+
+        .stats-ultra-team {
+            width: 75%;
+        }
     }
 
-    .stats-ultra-title {
-        left: 12rem;
+    @media (min-width: 2100px) {
+        .stats-ultra-wrap {
+            max-width: 1180px;
+        }
+
+        .stats-ultra-title {
+            left: 20rem;
+        }
+
+        .stats-ultra-grid-wrap {
+            left: 20rem;
+        }
+
+        .stats-ultra-grid {
+            grid-template-columns: minmax(165px, 245px) 1fr;
+            column-gap: 1rem;
+            row-gap: 1rem;
+        }
+
+        .stats-ultra-team {
+            width: 79%;
+        }
     }
 
-    .stats-ultra-grid-wrap {
-        left: 12rem;
-    }
+    @media (min-width: 2400px) {
+        .stats-ultra-wrap {
+            max-width: 1280px;
+        }
 
-    .stats-ultra-grid {
-        grid-template-columns: minmax(145px, 210px) 1fr;
-        column-gap: 0.75rem;
-        row-gap: 0.9rem;
-    }
+        .stats-ultra-title {
+            left: 30rem;
+        }
 
-    .stats-ultra-team {
-        width: 75%;
-    }
-}
+        .stats-ultra-grid-wrap {
+            left: 30rem;
+        }
 
-@media (min-width: 2100px) {
-    .stats-ultra-wrap {
-        max-width: 1180px;
-    }
+        .stats-ultra-grid {
+            grid-template-columns: minmax(180px, 270px) 1fr;
+            column-gap: 1.1rem;
+            row-gap: 1.05rem;
+        }
 
-    .stats-ultra-title {
-        left: 20rem;
+        .stats-ultra-team {
+            width: 82%;
+        }
     }
-
-    .stats-ultra-grid-wrap {
-        left: 20rem;
-    }
-
-    .stats-ultra-grid {
-        grid-template-columns: minmax(165px, 245px) 1fr;
-        column-gap: 1rem;
-        row-gap: 1rem;
-    }
-
-    .stats-ultra-team {
-        width: 79%;
-    }
-}
-
-@media (min-width: 2400px) {
-    .stats-ultra-wrap {
-        max-width: 1280px;
-    }
-
-    .stats-ultra-title {
-        left: 30rem;
-    }
-
-    .stats-ultra-grid-wrap {
-        left: 30rem;
-    }
-
-    .stats-ultra-grid {
-        grid-template-columns: minmax(180px, 270px) 1fr;
-        column-gap: 1.1rem;
-        row-gap: 1.05rem;
-    }
-
-    .stats-ultra-team {
-        width: 82%;
-    }
-}
 </style>
 
 <section
