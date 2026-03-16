@@ -937,4 +937,5 @@
             class="absolute inset-0 block w-full h-full object-cover"
         />
     @endif
+    
 </section>
