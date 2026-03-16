@@ -749,11 +749,6 @@
         radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
         color: {{ $text1 }};"
 >
-    <div style="position:fixed;bottom:10px;left:10px;z-index:99999;background:#000;color:#fff;padding:10px;font-size:12px;">
-        plyrcard raw: {{ is_array($user?->plyrcard_image) ? json_encode($user?->plyrcard_image) : ($user?->plyrcard_image ?? 'EMPTY') }}<br>
-        mobile raw: {{ is_array($user?->mobile_hero_image) ? json_encode($user?->mobile_hero_image) : ($user?->mobile_hero_image ?? 'EMPTY') }}<br>
-        player raw: {{ is_array($user?->player_image) ? json_encode($user?->player_image) : ($user?->player_image ?? 'EMPTY') }}
-    </div>
     <div class="absolute inset-0 z-0 pointer-events-none">
         <div class="absolute inset-x-0 bottom-0 h-[36%]" style="background: linear-gradient(to top, rgba(0,0,0,.34), rgba(0,0,0,0));"></div>
         <div class="absolute inset-y-0 left-0 w-[15%]" style="background: linear-gradient(to right, rgba(0, 12, 70, .48), rgba(0, 12, 70, 0));"></div>

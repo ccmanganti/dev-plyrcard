@@ -565,7 +565,7 @@ class PublicPlayerIntakeController extends Controller
 
     protected function resolveSiteTemplateId(string $sport): ?int
     {
-        $templateId = 1;
+        $templateId = 2;
 
         $template = SiteTemplate::find($templateId);
 
