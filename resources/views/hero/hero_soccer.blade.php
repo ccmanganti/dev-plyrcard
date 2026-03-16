@@ -206,8 +206,10 @@
     $centerGradient = $lightenHex($primary, 24);
     $fullName = trim($firstName . ' ' . $lastName);
 
-    $firstNameLength = mb_strlen($firstName);
-    $positionBesideLastName = $firstNameLength >= 8;
+    $firstNameLength = mb_strlen(preg_replace('/\s+/', '', $firstName));
+    $lastNameLength = mb_strlen(preg_replace('/\s+/', '', $lastName));
+
+    $positionBesideLastName = $firstNameLength > $lastNameLength;
 
     $buildInstagramUrl = function ($value) {
         $value = trim((string) $value);
