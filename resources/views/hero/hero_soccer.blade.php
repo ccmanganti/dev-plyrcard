@@ -494,7 +494,9 @@
 
     .hero-two-player-wrap {
         position: absolute;
-        right: clamp(5rem, 10vw, 25rem);
+            right: clamp(7rem, 12vw, 40rem);
+
+        /* right: clamp(5rem, 10vw, 30rem); */
         bottom: 0;
         z-index: 12;
     }
@@ -536,7 +538,10 @@
         }
 
         .hero-two-player-wrap {
-            right: clamp(5rem, 10vw, 25rem);
+            right: clamp(7rem, 12vw, 40rem);
+
+        /* right: clamp(5rem, 10vw, 30rem); */
+            /* right: clamp(5rem, 10vw, 25rem); */
         }
     }
 
@@ -634,7 +639,10 @@
 
         .hero-two-player-wrap {
             /* right: clamp(1rem, 2.5vw, 3rem); */
-            right: clamp(5rem, 10vw, 25rem);
+            right: clamp(7rem, 12vw, 40rem);
+    
+        /* right: clamp(5rem, 10vw, 30rem); */
+
 
         }
 
@@ -667,7 +675,10 @@
 
         .hero-two-player-wrap {
             /* right: clamp(.5rem, 1.8vw, 2rem); */
-            right: clamp(5rem, 10vw, 25rem);
+                /* right: clamp(5rem, 10vw, 25rem); */
+            right: clamp(7rem, 12vw, 40rem);
+
+
         }
 
         .hero-two-card-wrap {
