@@ -580,7 +580,7 @@ class PublicPlayerIntakeController extends Controller
     {
         $map = [
             'basketball' => 1,
-            'soccer' => 7,
+            'soccer' => 4,
         ];
 
         $templateId = $map[$sport] ?? null;
