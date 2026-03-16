@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('youtube_thumbnail')->nullable()->after('youtube_url');
+            $table->string('youtube_thumbnail')->nullable()->after('yt_url');
         });
     }
 
