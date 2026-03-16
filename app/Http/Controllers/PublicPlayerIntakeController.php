@@ -308,6 +308,7 @@ class PublicPlayerIntakeController extends Controller
 
             $fullNameNoSpaces = $this->fullNameNoSpaces(
                 $validated['first_name'],
+                $validated['middle_name'] ?? null,
                 $validated['last_name']
             );
 
