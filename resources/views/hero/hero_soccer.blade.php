@@ -931,176 +931,179 @@
         color: {{ $text1 }};"
 >
     @if ($mobileHeroImageUrl)
-        <img
-            src="{{ $mobileHeroImageUrl }}"
-            alt="Mobile hero"
-            class="block w-full h-full pb-10 object-cover"
-        />
-    @else
-        @if ($jerseyNumber)
-            <div class="pointer-events-none absolute left-1/2 top-[40%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back text-[250px] leading-none tracking-[-0.03em] text-white/[0.16]">
-                {{ $jerseyNumber }}
-            </div>
-        @endif
+        <div class="absolute inset-0 z-0">
+            <img
+                src="{{ $mobileHeroImageUrl }}"
+                alt="Mobile hero background"
+                class="block w-full h-full object-cover opacity-100"
+            />
+        </div>
+        <div class="absolute inset-0 z-[1]" style="background: linear-gradient(to bottom, rgba(0,0,0,.08), rgba(0,0,0,.18));"></div>
+    @endif
 
-        <div class="relative z-10 px-5 pt-5 pb-8">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    @if ($jerseyNumber)
-                        <div class="hero-two-font-jersey-front text-[60px] leading-[0.82] tracking-[-0.03em] text-white">
-                            #{{ $jerseyNumber }}
-                        </div>
-                    @endif
-                </div>
+    @if ($jerseyNumber)
+        <div class="pointer-events-none absolute left-1/2 top-[40%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back text-[250px] leading-none tracking-[-0.03em] text-white/[0.16]">
+            {{ $jerseyNumber }}
+        </div>
+    @endif
 
-                @if ($playerCardImageUrl)
-                    <img
-                        src="{{ $playerCardImageUrl }}"
-                        alt="Player card"
-                        class="h-auto w-[138px] object-contain hero-two-card-shadow"
-                    />
-                @endif
-            </div>
-
-            <div class="mt-[-6px]">
-                @if ($firstName)
-                    <div class="flex items-end gap-3">
-                        <div class="hero-two-font-name hero-two-name-line text-white text-[62px]">
-                            {{ $firstName }}
-                        </div>
-
-                        @if ($position && ! $positionBesideLastName)
-                            <div class="hero-two-font-sans hero-two-position mb-[10px] text-[18px]">
-                                {{ $position }}
-                            </div>
-                        @endif
+    <div class="relative z-10 px-5 pt-5 pb-8">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                @if ($jerseyNumber)
+                    <div class="hero-two-font-jersey-front text-[60px] leading-[0.82] tracking-[-0.03em] text-white">
+                        #{{ $jerseyNumber }}
                     </div>
                 @endif
+            </div>
 
-                <div class="flex items-end gap-3 mt-[-2px]">
-                    @if ($lastName)
-                        <div class="hero-two-font-name hero-two-name-line text-white text-[54px]">
-                            {{ $lastName }}
-                        </div>
-                    @endif
+            @if ($playerCardImageUrl)
+                <img
+                    src="{{ $playerCardImageUrl }}"
+                    alt="Player card"
+                    class="h-auto w-[138px] object-contain hero-two-card-shadow"
+                />
+            @endif
+        </div>
 
-                    @if ($position && $positionBesideLastName)
-                        <div class="hero-two-font-sans hero-two-position mb-[8px] text-[18px]">
+        <div class="mt-[-6px]">
+            @if ($firstName)
+                <div class="flex items-end gap-3">
+                    <div class="hero-two-font-name hero-two-name-line text-white text-[62px]">
+                        {{ $firstName }}
+                    </div>
+
+                    @if ($position && ! $positionBesideLastName)
+                        <div class="hero-two-font-sans hero-two-position mb-[10px] text-[18px]">
                             {{ $position }}
                         </div>
                     @endif
                 </div>
-            </div>
-
-            @if ($playerImageUrl)
-                <div class="relative z-[12] mt-4 flex justify-end">
-                    <img
-                        src="{{ $playerImageUrl }}"
-                        alt="{{ $fullName }}"
-                        class="hero-two-shadow h-auto max-h-[390px] w-auto object-contain"
-                    />
-                </div>
             @endif
 
-            @if ($playerActionImageUrl)
-                <div class="relative z-[30] -mt-12 flex justify-center">
-                    <img
-                        src="{{ $playerActionImageUrl }}"
-                        alt="Player action image"
-                        class="hero-two-shadow h-auto w-[145px] object-contain"
-                    />
-                </div>
-            @endif
-
-            <div class="relative z-[18] mt-5 rounded-[14px] px-5 py-5 hero-two-info-panel">
-                @if ($hasAnySocial)
-                    <div class="hero-two-social-floating top-[18px] right-[18px] gap-2">
-                        <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
-                           class="hero-two-social-link {{ empty($playerEmail) ? 'is-disabled' : '' }}"
-                           aria-label="Email">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 5.5h18v13H3z"></path>
-                                <path d="m4 7 8 6 8-6"></path>
-                            </svg>
-                        </a>
-
-                        <a href="{{ $igUrl ?: '#' }}"
-                           class="hero-two-social-link {{ empty($igUrl) ? 'is-disabled' : '' }}"
-                           aria-label="Instagram"
-                           target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
-                           rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
-                                <circle cx="12" cy="12" r="4.2"></circle>
-                                <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
-                            </svg>
-                        </a>
-
-                        <a href="{{ $ytUrl ?: '#' }}"
-                           class="hero-two-social-link {{ empty($ytUrl) ? 'is-disabled' : '' }}"
-                           aria-label="YouTube"
-                           target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
-                           rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
-                            </svg>
-                        </a>
-
-                        <a href="{{ $xUrl ?: '#' }}"
-                           class="hero-two-social-link {{ empty($xUrl) ? 'is-disabled' : '' }}"
-                           aria-label="X"
-                           target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
-                           rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-                            </svg>
-                        </a>
+            <div class="flex items-end gap-3 mt-[-2px]">
+                @if ($lastName)
+                    <div class="hero-two-font-name hero-two-name-line text-white text-[54px]">
+                        {{ $lastName }}
                     </div>
                 @endif
 
-                <div class="hero-two-font-sans space-y-3">
-                    <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[170px]' : '' }}">
-                        <div class="hero-two-stat-label text-[14px]">Full Name</div>
-                        <div class="hero-two-stat-value text-[16px]">{{ $fullName }}</div>
+                @if ($position && $positionBesideLastName)
+                    <div class="hero-two-font-sans hero-two-position mb-[8px] text-[18px]">
+                        {{ $position }}
                     </div>
-
-                    @if ($bornYear || $dateOfBirth)
-                        <div class="hero-two-stat-row">
-                            <div class="hero-two-stat-label text-[14px]">Born</div>
-                            <div class="hero-two-stat-value text-[16px]">{{ $bornYear ?: $dateOfBirth }}</div>
-                        </div>
-                    @endif
-
-                    @if ($club)
-                        <div class="hero-two-stat-row">
-                            <div class="hero-two-stat-label text-[14px]">Club</div>
-                            <div class="hero-two-stat-value text-[16px]">{{ $club }}</div>
-                        </div>
-                    @endif
-
-                    @if ($highSchool || $gpa)
-                        <div class="hero-two-stat-row">
-                            <div class="hero-two-stat-label text-[14px]">High School</div>
-                            <div class="hero-two-stat-value text-[16px]">
-                                @if ($highSchool && $gpa)
-                                    {{ $highSchool }} - GPA {{ $gpa }}
-                                @elseif ($highSchool)
-                                    {{ $highSchool }}
-                                @else
-                                    GPA {{ $gpa }}
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-
-                    @if ($coach)
-                        <div class="hero-two-stat-row">
-                            <div class="hero-two-stat-label text-[14px]">Coach</div>
-                            <div class="hero-two-stat-value text-[16px] uppercase font-semibold tracking-[0.02em]">{{ $coach }}</div>
-                        </div>
-                    @endif
-                </div>
+                @endif
             </div>
         </div>
-    @endif
+
+        @if ($playerImageUrl)
+            <div class="relative z-[12] mt-4 flex justify-end">
+                <img
+                    src="{{ $playerImageUrl }}"
+                    alt="{{ $fullName }}"
+                    class="hero-two-shadow h-auto max-h-[390px] w-auto object-contain"
+                />
+            </div>
+        @endif
+
+        @if ($playerActionImageUrl)
+            <div class="relative z-[30] -mt-12 flex justify-center">
+                <img
+                    src="{{ $playerActionImageUrl }}"
+                    alt="Player action image"
+                    class="hero-two-shadow h-auto w-[145px] object-contain"
+                />
+            </div>
+        @endif
+
+        <div class="relative z-[18] mt-5 rounded-[14px] px-5 py-5 hero-two-info-panel">
+            @if ($hasAnySocial)
+                <div class="hero-two-social-floating top-[18px] right-[18px] gap-2">
+                    <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
+                       class="hero-two-social-link {{ empty($playerEmail) ? 'is-disabled' : '' }}"
+                       aria-label="Email">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 5.5h18v13H3z"></path>
+                            <path d="m4 7 8 6 8-6"></path>
+                        </svg>
+                    </a>
+
+                    <a href="{{ $igUrl ?: '#' }}"
+                       class="hero-two-social-link {{ empty($igUrl) ? 'is-disabled' : '' }}"
+                       aria-label="Instagram"
+                       target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
+                       rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
+                            <circle cx="12" cy="12" r="4.2"></circle>
+                            <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
+                        </svg>
+                    </a>
+
+                    <a href="{{ $ytUrl ?: '#' }}"
+                       class="hero-two-social-link {{ empty($ytUrl) ? 'is-disabled' : '' }}"
+                       aria-label="YouTube"
+                       target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
+                       rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
+                        </svg>
+                    </a>
+
+                    <a href="{{ $xUrl ?: '#' }}"
+                       class="hero-two-social-link {{ empty($xUrl) ? 'is-disabled' : '' }}"
+                       aria-label="X"
+                       target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
+                       rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
+                        </svg>
+                    </a>
+                </div>
+            @endif
+
+            <div class="hero-two-font-sans space-y-3">
+                <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[170px]' : '' }}">
+                    <div class="hero-two-stat-label text-[14px]">Full Name</div>
+                    <div class="hero-two-stat-value text-[16px]">{{ $fullName }}</div>
+                </div>
+
+                @if ($bornYear || $dateOfBirth)
+                    <div class="hero-two-stat-row">
+                        <div class="hero-two-stat-label text-[14px]">Born</div>
+                        <div class="hero-two-stat-value text-[16px]">{{ $bornYear ?: $dateOfBirth }}</div>
+                    </div>
+                @endif
+
+                @if ($club)
+                    <div class="hero-two-stat-row">
+                        <div class="hero-two-stat-label text-[14px]">Club</div>
+                        <div class="hero-two-stat-value text-[16px]">{{ $club }}</div>
+                    </div>
+                @endif
+
+                @if ($highSchool || $gpa)
+                    <div class="hero-two-stat-row">
+                        <div class="hero-two-stat-label text-[14px]">High School</div>
+                        <div class="hero-two-stat-value text-[16px]">
+                            @if ($highSchool && $gpa)
+                                {{ $highSchool }} - GPA {{ $gpa }}
+                            @elseif ($highSchool)
+                                {{ $highSchool }}
+                            @else
+                                GPA {{ $gpa }}
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                @if ($coach)
+                    <div class="hero-two-stat-row">
+                        <div class="hero-two-stat-label text-[14px]">Coach</div>
+                        <div class="hero-two-stat-value text-[16px] uppercase font-semibold tracking-[0.02em]">{{ $coach }}</div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
 </section>
