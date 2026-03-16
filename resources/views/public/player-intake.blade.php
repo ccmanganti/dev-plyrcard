@@ -337,17 +337,17 @@
                     <div class="grid">
                         <div class="col-4">
                             <label for="first_name">First Name <span class="required">*</span></label>
-                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" required>
+                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" maxlength="255" required>
                         </div>
 
                         <div class="col-4">
                             <label for="middle_name">Middle Name</label>
-                            <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name') }}">
+                            <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="last_name">Last Name <span class="required">*</span></label>
-                            <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
+                            <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" maxlength="255" required>
                         </div>
 
                         <div class="col-4">
@@ -360,18 +360,19 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div class="hint">Used only if a new club and league need to be created.</div>
+                            <div class="hint">Used only if you choose Other for club and need to create a new league.</div>
                         </div>
 
                         <div class="col-4">
                             <label for="personal_email">Personal Email <span class="required">*</span></label>
-                            <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" required>
+                            <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required>
                             <div class="hint">The PlyrCard email will be generated automatically.</div>
                         </div>
 
                         <div class="col-4">
                             <label for="phone">Phone</label>
-                            <input type="text" id="phone" name="phone" value="{{ old('phone') }}">
+                            <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel">
+                            <div class="hint">Use the athlete's direct phone if available.</div>
                         </div>
 
                         <div class="col-4">
@@ -381,7 +382,7 @@
 
                         <div class="col-4">
                             <label for="year">Graduation Year</label>
-                            <input type="text" id="year" name="year" value="{{ old('year') }}">
+                            <input type="text" id="year" name="year" value="{{ old('year') }}" maxlength="50" inputmode="numeric">
                         </div>
 
                         <div class="col-4">
@@ -389,36 +390,45 @@
                             <select id="sport" name="sport" required>
                                 <option value="">Select sport</option>
                                 @foreach ($sportPositions as $sportKey => $positions)
-                                    <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
-                                        {{ str($sportKey)->replace('_', ' ')->title() }}
+                                    @php
+                                        $enabledSports = ['basketball', 'soccer'];
+                                        $isEnabled = in_array($sportKey, $enabledSports, true);
+                                    @endphp
+                                    <option
+                                        value="{{ $sportKey }}"
+                                        {{ old('sport') === $sportKey ? 'selected' : '' }}
+                                        {{ $isEnabled ? '' : 'disabled' }}
+                                    >
+                                        {{ str($sportKey)->replace('_', ' ')->title() }}{{ $isEnabled ? '' : ' (Coming Soon)' }}
                                     </option>
                                 @endforeach
                             </select>
+                            <div class="hint">Currently available: Basketball and Soccer only.</div>
                         </div>
 
                         <div class="col-4">
                             <label for="jersey_number">Jersey Number</label>
-                            <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}">
+                            <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50">
                         </div>
 
                         <div class="col-4">
                             <label for="team_name">Team Name</label>
-                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}">
+                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="gpa">GPA</label>
-                            <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}">
+                            <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}" maxlength="50">
                         </div>
 
                         <div class="col-4">
                             <label for="height">Height</label>
-                            <input type="text" id="height" name="height" value="{{ old('height') }}">
+                            <input type="text" id="height" name="height" value="{{ old('height') }}" maxlength="50">
                         </div>
 
                         <div class="col-4">
                             <label for="weight">Weight</label>
-                            <input type="text" id="weight" name="weight" value="{{ old('weight') }}">
+                            <input type="text" id="weight" name="weight" value="{{ old('weight') }}" maxlength="50">
                         </div>
 
                         <div class="col-12">
@@ -438,29 +448,64 @@
 
                         <div class="col-4">
                             <label for="ig_handle">Instagram Handle</label>
-                            <input type="text" id="ig_handle" name="ig_handle" value="{{ old('ig_handle') }}">
+                            <input type="text" id="ig_handle" name="ig_handle" value="{{ old('ig_handle') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="x_handle">X Handle</label>
-                            <input type="text" id="x_handle" name="x_handle" value="{{ old('x_handle') }}">
+                            <input type="text" id="x_handle" name="x_handle" value="{{ old('x_handle') }}" maxlength="255">
+                        </div>
+
+                        <div class="col-12">
+                            <label for="yt_url">YouTube URL</label>
+                            <input type="url" id="yt_url" name="yt_url" value="{{ old('yt_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
+                            <div class="hint">Paste the main highlights video URL.</div>
                         </div>
 
                         <div class="col-6">
-                            <label for="yt_url">YouTube URL</label>
-                            <input type="url" id="yt_url" name="yt_url" value="{{ old('yt_url') }}">
+                            <label for="featured_video_url">Featured Video URL</label>
+                            <input type="url" id="featured_video_url" name="featured_video_url" value="{{ old('featured_video_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
+                            <div class="hint">This is the main featured video for the website.</div>
                         </div>
 
-                        <div class="col-6"></div>
+                        <div class="col-6">
+                            <label for="featured_video_urls">Featured Video URLs</label>
+                            <textarea
+                                id="featured_video_urls"
+                                name="featured_video_urls"
+                                placeholder="Enter one video URL per line&#10;https://www.youtube.com/watch?v=abc123&#10;https://www.youtube.com/watch?v=def456"
+                            >{{ old('featured_video_urls') }}</textarea>
+                            <div class="hint">Enter one additional featured video URL per line.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="player_bio">Player Bio</label>
+                            <textarea
+                                id="player_bio"
+                                name="player_bio"
+                                placeholder="Write a short player bio for the website."
+                            >{{ old('player_bio') }}</textarea>
+                            <div class="hint">This will be used in the website bio/about section.</div>
+                        </div>
 
                         <div class="col-6">
                             <label for="academic_accolades">Academic Accolades</label>
-                            <textarea id="academic_accolades" name="academic_accolades">{{ old('academic_accolades') }}</textarea>
+                            <textarea
+                                id="academic_accolades"
+                                name="academic_accolades"
+                                placeholder="Enter one accolade per line&#10;Honor Roll&#10;National Honor Society&#10;AP Scholar"
+                            >{{ old('academic_accolades') }}</textarea>
+                            <div class="hint">Enter one accolade per line.</div>
                         </div>
 
                         <div class="col-6">
                             <label for="sports_accolades">Sports Accolades</label>
-                            <textarea id="sports_accolades" name="sports_accolades">{{ old('sports_accolades') }}</textarea>
+                            <textarea
+                                id="sports_accolades"
+                                name="sports_accolades"
+                                placeholder="Enter one accolade per line&#10;All League First Team&#10;MVP&#10;Team Captain"
+                            >{{ old('sports_accolades') }}</textarea>
+                            <div class="hint">Enter one accolade per line.</div>
                         </div>
 
                         <div class="col-12">
@@ -475,7 +520,7 @@
                     <div class="grid">
                         <div class="col-3">
                             <label for="country">Country</label>
-                            <input type="text" id="country" name="country" value="{{ old('country', 'USA') }}">
+                            <input type="text" id="country" name="country" value="{{ old('country', 'USA') }}" maxlength="255">
                         </div>
 
                         <div class="col-3">
@@ -493,12 +538,12 @@
 
                         <div class="col-3">
                             <label for="city">City</label>
-                            <input type="text" id="city" name="city" value="{{ old('city') }}">
+                            <input type="text" id="city" name="city" value="{{ old('city') }}" maxlength="255">
                         </div>
 
                         <div class="col-3">
                             <label for="street">Street</label>
-                            <input type="text" id="street" name="street" value="{{ old('street') }}">
+                            <input type="text" id="street" name="street" value="{{ old('street') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
@@ -512,8 +557,9 @@
                                 @endforeach
                                 <option value="__other__" {{ old('school_id') === '__other__' ? 'selected' : '' }}>Other</option>
                             </select>
+                            <div class="hint">Choose Other to manually enter a school not listed.</div>
                             <div id="school_other_wrap" class="other-wrap">
-                                <input type="text" name="school_other" placeholder="Enter school name" value="{{ old('school_other') }}">
+                                <input type="text" name="school_other" placeholder="Enter school name" value="{{ old('school_other') }}" maxlength="255">
                             </div>
                         </div>
 
@@ -533,24 +579,25 @@
                                 @endforeach
                                 <option value="__other__" {{ old('club_id') === '__other__' ? 'selected' : '' }}>Other</option>
                             </select>
+                            <div class="hint">Choose Other to add a new club and league.</div>
                         </div>
 
                         <div class="col-4">
                             <label>League</label>
                             <div id="league_display" class="readonly-box">Select a club first</div>
-                            <div class="hint">League is automatically assigned from the selected club.</div>
+                            <div class="hint">If you choose Other for club, enter the new league below.</div>
                         </div>
 
                         <div id="club_other_section" class="col-12 other-wrap">
                             <div class="grid">
                                 <div class="col-6">
                                     <label for="club_other">New Club Name</label>
-                                    <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" placeholder="Enter new club name">
+                                    <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" placeholder="Enter new club name" maxlength="255">
                                 </div>
 
                                 <div class="col-6">
                                     <label for="league_other">New League Name</label>
-                                    <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" placeholder="Enter new league name">
+                                    <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" placeholder="Enter new league name" maxlength="255">
                                 </div>
                             </div>
                         </div>
@@ -562,32 +609,32 @@
                     <div class="grid">
                         <div class="col-4">
                             <label for="parent">Primary Parent / Guardian</label>
-                            <input type="text" id="parent" name="parent" value="{{ old('parent') }}">
+                            <input type="text" id="parent" name="parent" value="{{ old('parent') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="parent_email">Primary Parent Email</label>
-                            <input type="email" id="parent_email" name="parent_email" value="{{ old('parent_email') }}">
+                            <input type="email" id="parent_email" name="parent_email" value="{{ old('parent_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="parent_phone">Primary Parent Phone</label>
-                            <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}">
+                            <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel">
                         </div>
 
                         <div class="col-4">
                             <label for="sec_parent">Secondary Parent / Guardian</label>
-                            <input type="text" id="sec_parent" name="sec_parent" value="{{ old('sec_parent') }}">
+                            <input type="text" id="sec_parent" name="sec_parent" value="{{ old('sec_parent') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="sec_parent_email">Secondary Parent Email</label>
-                            <input type="email" id="sec_parent_email" name="sec_parent_email" value="{{ old('sec_parent_email') }}">
+                            <input type="email" id="sec_parent_email" name="sec_parent_email" value="{{ old('sec_parent_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="sec_parent_phone">Secondary Parent Phone</label>
-                            <input type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}">
+                            <input type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}" maxlength="50" inputmode="tel">
                         </div>
                     </div>
                 </div>
@@ -597,62 +644,62 @@
                     <div class="grid">
                         <div class="col-4">
                             <label for="club_coach">Club Coach</label>
-                            <input type="text" id="club_coach" name="club_coach" value="{{ old('club_coach') }}">
+                            <input type="text" id="club_coach" name="club_coach" value="{{ old('club_coach') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="club_coach_email">Club Coach Email</label>
-                            <input type="email" id="club_coach_email" name="club_coach_email" value="{{ old('club_coach_email') }}">
+                            <input type="email" id="club_coach_email" name="club_coach_email" value="{{ old('club_coach_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="club_coach_phone">Club Coach Phone</label>
-                            <input type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}">
+                            <input type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}" maxlength="50" inputmode="tel">
                         </div>
 
                         <div class="col-4">
                             <label for="natl_coach">National Coach</label>
-                            <input type="text" id="natl_coach" name="natl_coach" value="{{ old('natl_coach') }}">
+                            <input type="text" id="natl_coach" name="natl_coach" value="{{ old('natl_coach') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="natl_coach_email">National Coach Email</label>
-                            <input type="email" id="natl_coach_email" name="natl_coach_email" value="{{ old('natl_coach_email') }}">
+                            <input type="email" id="natl_coach_email" name="natl_coach_email" value="{{ old('natl_coach_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="natl_coach_phone">National Coach Phone</label>
-                            <input type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}">
+                            <input type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}" maxlength="50" inputmode="tel">
                         </div>
 
                         <div class="col-4">
                             <label for="tech_trainer">Technical Trainer</label>
-                            <input type="text" id="tech_trainer" name="tech_trainer" value="{{ old('tech_trainer') }}">
+                            <input type="text" id="tech_trainer" name="tech_trainer" value="{{ old('tech_trainer') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="tech_trainer_email">Technical Trainer Email</label>
-                            <input type="email" id="tech_trainer_email" name="tech_trainer_email" value="{{ old('tech_trainer_email') }}">
+                            <input type="email" id="tech_trainer_email" name="tech_trainer_email" value="{{ old('tech_trainer_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="tech_trainer_phone">Technical Trainer Phone</label>
-                            <input type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}">
+                            <input type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}" maxlength="50" inputmode="tel">
                         </div>
 
                         <div class="col-4">
                             <label for="snc_trainer">Strength & Conditioning Trainer</label>
-                            <input type="text" id="snc_trainer" name="snc_trainer" value="{{ old('snc_trainer') }}">
+                            <input type="text" id="snc_trainer" name="snc_trainer" value="{{ old('snc_trainer') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="snc_trainer_email">S&C Trainer Email</label>
-                            <input type="email" id="snc_trainer_email" name="snc_trainer_email" value="{{ old('snc_trainer_email') }}">
+                            <input type="email" id="snc_trainer_email" name="snc_trainer_email" value="{{ old('snc_trainer_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
                             <label for="snc_trainer_phone">S&C Trainer Phone</label>
-                            <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}">
+                            <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel">
                         </div>
                     </div>
                 </div>
@@ -660,27 +707,43 @@
                 <div class="section">
                     <h2>Images</h2>
                     <div class="grid">
-                        <div class="col-4">
+                        <div class="col-3">
                             <label for="player_card_image">Player Card Image</label>
                             <input type="file" id="player_card_image" name="player_card_image" accept="image/png">
-                            <div class="hint">
+                            <div class="hint" id="player_card_hint">
                                 Upload a PNG player card image. Transparent background preferred. Max 5MB.
                             </div>
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
                             <label for="player_image">Player Image</label>
                             <input type="file" id="player_image" name="player_image" accept="image/png">
-                            <div class="hint">
+                            <div class="hint" id="player_image_hint">
                                 Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.
                             </div>
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
                             <label for="mobile_view_image">Mobile View Image</label>
                             <input type="file" id="mobile_view_image" name="mobile_view_image" accept="image/png">
-                            <div class="hint">
+                            <div class="hint" id="mobile_view_hint">
                                 Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.
+                            </div>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="youtube_thumbnail">YouTube Thumbnail / Social Image</label>
+                            <input type="file" id="youtube_thumbnail" name="youtube_thumbnail" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+                            <div class="hint">
+                                Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.
+                            </div>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="logos_image">Logos</label>
+                            <input type="file" id="logos_image" name="logos_image" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+                            <div class="hint">
+                                Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.
                             </div>
                         </div>
                     </div>
@@ -697,6 +760,7 @@
 <script>
     const sportPositions = @json($sportPositions);
     const oldPositions = @json(old('position', []));
+    const enabledSports = ['basketball', 'soccer'];
 
     function renderPositions() {
         const sportSelect = document.getElementById('sport');
@@ -705,7 +769,7 @@
 
         container.innerHTML = '';
 
-        if (!selectedSport || !sportPositions[selectedSport]) {
+        if (!selectedSport || !sportPositions[selectedSport] || !enabledSports.includes(selectedSport)) {
             return;
         }
 
@@ -797,6 +861,6 @@
     toggleSchoolOther();
     updateLeagueDisplay();
     updateImageInstructions();
-</script>   
+</script>
 </body>
 </html>

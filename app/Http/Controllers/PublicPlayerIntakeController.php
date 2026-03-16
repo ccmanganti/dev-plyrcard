@@ -283,6 +283,11 @@ class PublicPlayerIntakeController extends Controller
             'player_card_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
             'player_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
             'mobile_view_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
+            'youtube_thumbnail' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'logos_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+            'player_bio' => ['nullable', 'string'],
+            'featured_video_url' => ['nullable', 'url', 'max:500'],
+            'featured_video_urls' => ['nullable', 'string'],
         ]);
 
         $sport = $validated['sport'];
@@ -314,7 +319,11 @@ class PublicPlayerIntakeController extends Controller
             $nameDomainStem = preg_replace('/[^a-z0-9]/', '', $nameDomainStem) ?: ('player' . time());
 
             $generatedEmail = $firstNameSlug . '@' . $nameDomainStem . '.com';
-            $generatedDomain = $nameDomainStem . '.plyrcard.com';
+            $generatedDomain = $nameDomainStem . '.com';
+
+            if (! empty($userImageUploads['youtube_thumbnail'])) {
+                $user->youtube_thumbnail = $userImageUploads['youtube_thumbnail'];
+            }
 
             $user = User::withTrashed()
                 ->where('personal_email', $validated['personal_email'])
@@ -377,6 +386,9 @@ class PublicPlayerIntakeController extends Controller
                 'school_id' => $school?->id,
                 'club_id' => $club?->id,
                 'domain' => $generatedDomain,
+                'player_bio' => $validated['player_bio'] ?? null,
+                'featured_video_url' => $validated['featured_video_url'] ?? null,
+                'featured_video_urls' => $validated['featured_video_urls'] ?? null,
             ]);
 
             $userImageUploads = $this->storeUserImageUploads($request);
@@ -391,6 +403,14 @@ class PublicPlayerIntakeController extends Controller
 
             if (! empty($userImageUploads['mobile_hero_image'])) {
                 $user->mobile_hero_image = $userImageUploads['mobile_hero_image'];
+            }
+
+            if (! empty($userImageUploads['youtube_thumbnail'])) {
+                $user->youtube_thumbnail = $userImageUploads['youtube_thumbnail'];
+            }
+
+            if (! empty($userImageUploads['logos_image'])) {
+                $user->logos_image = $userImageUploads['logos_image'];
             }
 
             $user->save();
@@ -565,7 +585,9 @@ class PublicPlayerIntakeController extends Controller
 
     protected function resolveSiteTemplateId(string $sport): ?int
     {
+        // $templateId = 1;
         $templateId = 2;
+        // For production, use 2
 
         $template = SiteTemplate::find($templateId);
 
@@ -580,7 +602,9 @@ class PublicPlayerIntakeController extends Controller
     {
         $map = [
             'basketball' => 1,
+            // 'soccer' => 7,
             'soccer' => 4,
+            // For production: use 4 for soccer
         ];
 
         $templateId = $map[$sport] ?? null;
@@ -629,6 +653,8 @@ class PublicPlayerIntakeController extends Controller
             'player_card_image' => 'plyrcard_image',
             'player_image' => 'player_image',
             'mobile_view_image' => 'mobile_hero_image',
+            'youtube_thumbnail' => 'youtube_thumbnail',
+            'logos_image' => 'logos_image',
         ];
 
         $paths = [];

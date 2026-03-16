@@ -69,6 +69,11 @@ protected $fillable = [
     'plyrcard_image',
     'player_image',
     'mobile_hero_image',
+    'youtube_thumbnail',
+    'logos_image',
+    'player_bio',
+    'featured_video_url',
+    'featured_video_urls',
 ];
 
     protected $hidden = [

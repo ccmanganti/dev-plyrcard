@@ -251,7 +251,11 @@
         $aboutTagline = $hideIfDefault($getFieldValue('player_tagline', ''))
             ?: $defaultPlayerTagline;
 
-        $aboutBio = $hideIfDefault($getFieldValue('player_bio', ''));
+        $aboutBio = $hideIfDefault(
+            filled($user?->player_bio)
+                ? $user->player_bio
+                : $getFieldValue('player_bio', '')
+        );
 
         $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''))
             ?: 'Games Schedule';
@@ -293,19 +297,27 @@
         $sportBody = $listifyText($hideIfDefault($sportRaw));
 
         $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
-        $aboutVideoUrls   = $getFieldValue('yt_embed', '');
-        $playlistUrls     = $getFieldValue('yt_playlist_embed', '');
+        $aboutVideoUrls = filled($user?->featured_video_url)
+            ? $user->featured_video_url
+            : $getFieldValue('yt_embed', '');
+        $playlistUrls = filled($user?->featured_video_urls)
+            ? $user->featured_video_urls
+            : $getFieldValue('yt_playlist_embed', '');
 
         $aboutVideos     = $parseUrlList($aboutVideoUrls);
         $highlightVideos = $parseUrlList($playlistUrls);
 
         $aboutThumbnailUrl = $resolveMediaUrl(
-            $getJsonFieldValue('highlights_thumbnail', $getFieldValue('highlights_thumbnail')),
+            filled($user?->youtube_thumbnail)
+                ? $user->youtube_thumbnail
+                : $getJsonFieldValue('highlights_thumbnail', $getFieldValue('highlights_thumbnail')),
             asset('temp-thumbnail.png')
         );
 
         $footerLogoUrl = $resolveMediaUrl(
-            $getJsonFieldValue('logos', $getFieldValue('logos')),
+            filled($user?->logos_image)
+                ? $user->logos_image
+                : $getJsonFieldValue('logos', $getFieldValue('logos')),
             ''
         );
 

@@ -90,8 +90,7 @@ class UserResource extends Resource
 
                     TextInput::make('phone')
                         ->tel()
-                        ->maxLength(255)
-                        ->unique(ignoreRecord: true),
+                        ->maxLength(255),
 
                     Select::make('school_id')
                         ->relationship('school', 'name')
@@ -301,14 +300,21 @@ class UserResource extends Resource
                     Toggle::make('natl_team_exp')
                         ->label('National Team Experience'),
 
+                    Textarea::make('player_bio')
+                        ->label('Player Bio')
+                        ->rows(6)
+                        ->columnSpanFull(),
+
                     Textarea::make('academic_accolades')
                         ->label('Academic Accolades')
                         ->rows(5)
+                        ->helperText('Enter one accolade per line.')
                         ->columnSpanFull(),
 
                     Textarea::make('sports_accolades')
                         ->label('Sports Accolades')
                         ->rows(5)
+                        ->helperText('Enter one accolade per line.')
                         ->columnSpanFull(),
                 ]),
 
@@ -318,6 +324,15 @@ class UserResource extends Resource
                     TextInput::make('ig_handle')->prefix('@')->maxLength(255),
                     TextInput::make('x_handle')->prefix('@')->maxLength(255),
                     TextInput::make('yt_url')->url()->columnSpanFull(),
+                    TextInput::make('featured_video_url')
+                        ->label('Featured Video URL')
+                        ->url()
+                        ->columnSpanFull(),
+                    Textarea::make('featured_video_urls')
+                        ->label('Featured Video URLs')
+                        ->rows(5)
+                        ->helperText('Enter one video URL per line.')
+                        ->columnSpanFull(),
                     Textarea::make('press')->rows(5)->columnSpanFull(),
                 ]),
 
@@ -369,7 +384,7 @@ class UserResource extends Resource
 
             Section::make('Hero Images')
                 ->description('Shared player images used across hero templates.')
-                ->columns(3)
+                ->columns(5)
                 ->schema([
                     FileUpload::make('plyrcard_image')
                         ->label('PlyrCard Image')
@@ -397,6 +412,24 @@ class UserResource extends Resource
                         ->directory('user-player-images')
                         ->visibility('public')
                         ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+
+                    FileUpload::make('youtube_thumbnail')
+                        ->label('YouTube Thumbnail')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
+
+                    FileUpload::make('logos_image')
+                        ->label('Logos')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the logos image used in the footer or logo area of the website.'),
                 ]),
         ]);
     }
