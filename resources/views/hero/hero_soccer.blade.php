@@ -621,7 +621,7 @@
 </style>
 
 <section
-    class="hero-two-desktop relative z-0 overflow-hidden h-[100vh] min-h-[720px] max-h-[1200px]"
+    class="hero-two-desktop relative z-0 overflow-hidden h-[100vh] min-h-[700px] max-h-[1200px]"
     style="background:
         radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
         color: {{ $text1 }};"
