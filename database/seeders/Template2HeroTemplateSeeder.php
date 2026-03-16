@@ -15,10 +15,10 @@ class Template2HeroTemplateSeeder extends Seeder
             [
                 'name' => 'Hero Template 2',
                 'slug' => 'hero_template_2',
-                'blade_view' => 'template.hero_template_2',
-                'sports' => null,
+                'blade_view' => 'hero.hero_soccer',
+                'sports' => ['soccer'],
                 'preview_image' => null,
-                'description' => 'A bold athlete hero template with a large stacked name layout, top-right player card, bottom-right player image, center action image, bottom-left info panel, and mobile fallback image.',
+                'description' => 'A bold soccer athlete hero template with stacked name layout, top-right player card, bottom-right player image, center action image, bottom-left info panel, and mobile fallback image.',
                 'is_active' => true,
                 'settings' => null,
             ]

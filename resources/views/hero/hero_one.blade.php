@@ -201,11 +201,11 @@
     $rightPosition = $abbreviatePosition($getHeroFieldValue('hero_right_position', $user?->position ?? 'PG'));
     $statsTitle = $getHeroFieldValue('hero_stats_title', 'STATISTICS');
 
-    $plyrCardImageUrl   = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image'), '');
-    $compositeImageUrl  = $resolveMediaUrl($getHeroFieldValue('hero_composite_image'), '');
+    $plyrCardImageUrl   = $resolveMediaUrl($user?->plyrcard_image, '');
+    $compositeImageUrl  = $resolveMediaUrl($user?->player_image, '');
+    $mobileHeroImageUrl = $resolveMediaUrl($user?->mobile_hero_image, '');
     $logosImageUrl      = $resolveMediaUrl($getHeroFieldValue('hero_logos_image'), '');
     $bottomTeamImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_bottom_team_image'), '');
-    $mobileHeroImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image'), '');
 
     $defaultBackgroundImageUrl = asset('hero_images/hero_one/background.png');
 

@@ -10,6 +10,7 @@ use App\Models\User;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -365,6 +366,38 @@ class UserResource extends Resource
                         ->unique(ignoreRecord: true)
                         ->nullable(),
                 ]),
+
+            Section::make('Hero Images')
+                ->description('Shared player images used across hero templates.')
+                ->columns(3)
+                ->schema([
+                    FileUpload::make('plyrcard_image')
+                        ->label('PlyrCard Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the card-style PNG image used across templates.'),
+
+                    FileUpload::make('player_image')
+                        ->label('Player Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the half-body player PNG image used across templates.'),
+
+                    FileUpload::make('mobile_hero_image')
+                        ->label('Vertical Hero Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+                ]),
         ]);
     }
 
@@ -434,10 +467,6 @@ class UserResource extends Resource
                     )
                     ->multiple(),
 
-                /**
-                 * Assumes Club model has a league() relationship.
-                 * Remove this filter if that relationship does not exist.
-                 */
                 SelectFilter::make('league')
                     ->label('League')
                     ->options(function (): array {

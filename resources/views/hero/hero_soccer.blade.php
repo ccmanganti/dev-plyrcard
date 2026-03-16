@@ -198,14 +198,10 @@
     $gpa = $formatGpaDisplay($getHeroFieldValue('hero_gpa', $user?->gpa ?? ''));
     $coach = $normalizeDisplayValue($getHeroFieldValue('hero_coach', $user?->club_coach ?? ''));
 
-    $playerCardImageUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_player_card'),
-        ''
-    );
-
-    $mobileHeroImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_two_mobile_image'), '');
-    $playerImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_player_image'), '');
-    $playerActionImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_player_action_image'), '');
+    $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
+    $mobileHeroImageUrl = $resolveMediaUrl($user?->mobile_hero_image, '');
+    $playerImageUrl = $resolveMediaUrl($user?->player_image, '');
+    $playerActionImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_action_image'), '');
 
     $centerGradient = $lightenHex($primary, 24);
     $fullName = trim($firstName . ' ' . $lastName);

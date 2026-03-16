@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Club;
 use App\Models\HeroTemplate;
+use App\Models\HeroTemplateField;
 use App\Models\League;
 use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
+use App\Models\WebsiteHeroFieldValue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,11 +141,19 @@ class PublicPlayerIntakeController extends Controller
         ],
     ];
 
+    protected array $genderOptions = [
+        'male' => 'Male',
+        'female' => 'Female',
+        'coed' => 'Coed',
+    ];
+
     public function create(): View
     {
         $schools = School::query()->orderBy('name')->get();
-        $leagues = League::query()->orderBy('name')->get();
-        $clubs = Club::query()->orderBy('name')->get();
+        $clubs = Club::query()
+            ->with('league')
+            ->orderBy('name')
+            ->get();
 
         $states = [
             'AL' => 'Alabama',
@@ -201,10 +211,10 @@ class PublicPlayerIntakeController extends Controller
 
         return view('public.player-intake', [
             'schools' => $schools,
-            'leagues' => $leagues,
             'clubs' => $clubs,
             'states' => $states,
             'sportPositions' => $this->sportPositions,
+            'genderOptions' => $this->genderOptions,
         ]);
     }
 
@@ -216,6 +226,7 @@ class PublicPlayerIntakeController extends Controller
             'last_name' => ['required', 'string', 'max:255'],
             'personal_email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'gender' => ['nullable', 'in:' . implode(',', array_keys($this->genderOptions))],
 
             'country' => ['nullable', 'string', 'max:255'],
             'state' => ['nullable', 'string', 'size:2'],
@@ -265,14 +276,13 @@ class PublicPlayerIntakeController extends Controller
             'school_id' => ['nullable', 'string'],
             'school_other' => ['nullable', 'string', 'max:255'],
 
-            'league_id' => ['nullable', 'string'],
-            'league_other' => ['nullable', 'string', 'max:255'],
-
             'club_id' => ['nullable', 'string'],
             'club_other' => ['nullable', 'string', 'max:255'],
+            'league_other' => ['nullable', 'string', 'max:255'],
 
-            'player_card_image' => ['nullable', 'image', 'max:5120'],
-            'mobile_view_image' => ['nullable', 'image', 'max:5120'],
+            'player_card_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
+            'player_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
+            'mobile_view_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
         ]);
 
         $sport = $validated['sport'];
@@ -289,8 +299,7 @@ class PublicPlayerIntakeController extends Controller
 
         $user = DB::transaction(function () use ($request, $validated) {
             $school = $this->resolveSchool($validated);
-            $league = $this->resolveLeague($validated);
-            $club = $this->resolveClub($validated, $league?->id);
+            [$league, $club] = $this->resolveClubAndLeague($validated);
 
             $fullNameNoSpaces = $this->fullNameNoSpaces(
                 $validated['first_name'],
@@ -370,9 +379,23 @@ class PublicPlayerIntakeController extends Controller
                 'domain' => $generatedDomain,
             ]);
 
+            $userImageUploads = $this->storeUserImageUploads($request);
+
+            if (! empty($userImageUploads['plyrcard_image'])) {
+                $user->plyrcard_image = $userImageUploads['plyrcard_image'];
+            }
+
+            if (! empty($userImageUploads['player_image'])) {
+                $user->player_image = $userImageUploads['player_image'];
+            }
+
+            if (! empty($userImageUploads['mobile_hero_image'])) {
+                $user->mobile_hero_image = $userImageUploads['mobile_hero_image'];
+            }
+
             $user->save();
 
-            $uploads = $this->storeUploads($request, $user);
+            $uploads = $this->storeHeroUploads($request, $user);
 
             $this->createWebsiteIfSupported($user, $validated, $uploads, $generatedDomain);
 
@@ -405,67 +428,43 @@ class PublicPlayerIntakeController extends Controller
         return null;
     }
 
-    protected function resolveLeague(array $validated): ?League
+    protected function resolveClubAndLeague(array $validated): array
     {
-        if (($validated['league_id'] ?? null) === '__other__' && filled($validated['league_other'] ?? null)) {
-            $attributes = ['name' => trim($validated['league_other'])];
-            $values = [];
+        $clubId = $validated['club_id'] ?? null;
 
-            if (Schema::hasColumn('leagues', 'gender')) {
-                $values['gender'] = null;
+        if ($clubId === '__other__') {
+            if (
+                blank($validated['club_other'] ?? null) ||
+                blank($validated['league_other'] ?? null) ||
+                blank($validated['gender'] ?? null)
+            ) {
+                return [null, null];
             }
 
-            return League::firstOrCreate($attributes, $values);
-        }
-
-        if (! empty($validated['league_id']) && $validated['league_id'] !== '__other__') {
-            return League::find($validated['league_id']);
-        }
-
-        return null;
-    }
-
-    protected function resolveClub(array $validated, ?int $leagueId = null): ?Club
-    {
-        if (($validated['club_id'] ?? null) === '__other__' && filled($validated['club_other'] ?? null)) {
-            if (! $leagueId) {
-                return null;
-            }
-
-            return Club::firstOrCreate(
-                [
-                    'name' => trim($validated['club_other']),
-                    'league_id' => $leagueId,
-                ]
+            $league = League::updateOrCreate(
+                ['name' => trim($validated['league_other'])],
+                ['gender' => $validated['gender']]
             );
+
+            $club = Club::firstOrCreate([
+                'name' => trim($validated['club_other']),
+                'league_id' => $league->id,
+            ]);
+
+            return [$league, $club];
         }
 
-        if (! empty($validated['club_id']) && $validated['club_id'] !== '__other__') {
-            return Club::find($validated['club_id']);
+        if (filled($clubId)) {
+            $club = Club::with('league')->find($clubId);
+            return [$club?->league, $club];
         }
 
-        return null;
+        return [null, null];
     }
 
-    protected function storeUploads(Request $request, User $user): array
+    protected function storeHeroUploads(Request $request): array
     {
-        $fields = [
-            'player_card_image',
-            'mobile_view_image',
-        ];
-
-        $paths = [];
-
-        foreach ($fields as $field) {
-            if ($request->hasFile($field)) {
-                $paths[$field] = $request->file($field)->store(
-                    'player-intake/' . $user->id,
-                    'public'
-                );
-            }
-        }
-
-        return $paths;
+        return [];
     }
 
     protected function createWebsiteIfSupported(User $user, array $validated, array $uploads, string $generatedDomain): ?Website
@@ -488,7 +487,7 @@ class PublicPlayerIntakeController extends Controller
         $slugBase = Str::slug($websiteName ?: ('player-' . $user->id));
         $slug = $this->generateUniqueWebsiteSlug($slugBase);
 
-        return Website::create([
+        $website = Website::create([
             'user_id' => $user->id,
             'site_template_id' => $siteTemplate->id,
             'hero_template_id' => $heroTemplate->id,
@@ -497,7 +496,7 @@ class PublicPlayerIntakeController extends Controller
             'domain' => $generatedDomain,
             'is_active' => true,
             'is_published' => false,
-            'project_json' => ! empty($uploads) ? json_encode(['uploads' => $uploads]) : null,
+            'project_json' => ! empty($uploads) ? json_encode(['hero_uploads' => $uploads]) : null,
             'html' => null,
             'css' => null,
             'primary_color' => null,
@@ -508,28 +507,69 @@ class PublicPlayerIntakeController extends Controller
             'text_primary_color' => null,
             'text_secondary_color' => null,
         ]);
+
+        $this->attachHeroFieldUploads($website, $uploads);
+
+        return $website;
+    }
+
+    protected function attachHeroFieldUploads(Website $website, array $uploads): void
+    {
+        if (empty($uploads) || ! $website->hero_template_id) {
+            return;
+        }
+
+        $heroFieldMapByTemplate = [
+            1 => [
+                'mobile_view_image' => ['hero_mobile_image'],
+            ],
+            2 => [
+                'mobile_view_image' => ['hero_mobile_image'],
+            ],
+        ];
+
+        $fieldMap = $heroFieldMapByTemplate[$website->hero_template_id] ?? [];
+
+        foreach ($fieldMap as $requestField => $candidateNames) {
+            $path = $uploads[$requestField] ?? null;
+
+            if (! $path) {
+                continue;
+            }
+
+            $templateField = \App\Models\HeroTemplateField::query()
+                ->where('hero_template_id', $website->hero_template_id)
+                ->whereIn('name', $candidateNames)
+                ->first();
+
+            if (! $templateField) {
+                continue;
+            }
+
+            \App\Models\WebsiteHeroFieldValue::updateOrCreate(
+                [
+                    'website_id' => $website->id,
+                    'hero_template_field_id' => $templateField->id,
+                ],
+                [
+                    'value' => $path,
+                    'meta' => [
+                        'disk' => 'public',
+                        'type' => 'image',
+                        'source' => 'public_player_intake',
+                    ],
+                ]
+            );
+        }
     }
 
     protected function resolveSiteTemplateId(string $sport): ?int
     {
-        $map = [
-            'basketball' => 1,
-            'soccer' => 2,
-        ];
-
-        $templateId = $map[$sport] ?? null;
-
-        if (! $templateId) {
-            return null;
-        }
+        $templateId = 1;
 
         $template = SiteTemplate::find($templateId);
 
         if (! $template || ! $template->is_active) {
-            return null;
-        }
-
-        if (method_exists($template, 'supportsSport') && ! $template->supportsSport($sport)) {
             return null;
         }
 
@@ -540,7 +580,7 @@ class PublicPlayerIntakeController extends Controller
     {
         $map = [
             'basketball' => 1,
-            'soccer' => 2,
+            'soccer' => 7,
         ];
 
         $templateId = $map[$sport] ?? null;
@@ -582,4 +622,26 @@ class PublicPlayerIntakeController extends Controller
             ->map(fn ($value) => trim($value))
             ->implode('');
     }
-}
+
+    protected function storeUserImageUploads(Request $request): array
+    {
+        $map = [
+            'player_card_image' => 'plyrcard_image',
+            'player_image' => 'player_image',
+            'mobile_view_image' => 'mobile_hero_image',
+        ];
+
+        $paths = [];
+
+        foreach ($map as $requestField => $userColumn) {
+            if ($request->hasFile($requestField)) {
+                $paths[$userColumn] = $request->file($requestField)->store(
+                    'user-player-images',
+                    'public'
+                );
+            }
+        }
+
+        return $paths;
+    }
+}   

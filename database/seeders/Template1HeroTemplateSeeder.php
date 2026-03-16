@@ -15,7 +15,7 @@ class Template1HeroTemplateSeeder extends Seeder
             [
                 'name' => 'Hero Template 1',
                 'slug' => 'hero_template_1',
-                'blade_view' => 'template.hero_template_1',
+                'blade_view' => 'template.hero_basketball',
                 'sports' => null,
                 'preview_image' => null,
                 'description' => 'A bold athlete hero template with layered desktop composition, stats panel, background jersey number, logos, and a mobile fallback image.',

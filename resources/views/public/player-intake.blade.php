@@ -28,9 +28,7 @@
             --radius-sm: 12px;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         html, body {
             margin: 0;
@@ -40,9 +38,7 @@
             color: var(--text);
         }
 
-        body.embed-mode {
-            padding: 12px;
-        }
+        body.embed-mode { padding: 12px; }
 
         .wrapper {
             width: 100%;
@@ -138,9 +134,7 @@
             color: #111827;
         }
 
-        .required {
-            color: var(--accent);
-        }
+        .required { color: var(--accent); }
 
         input[type="text"],
         input[type="email"],
@@ -162,9 +156,7 @@
         }
 
         input::placeholder,
-        textarea::placeholder {
-            color: #9ca3af;
-        }
+        textarea::placeholder { color: #9ca3af; }
 
         input:focus,
         select:focus,
@@ -248,6 +240,19 @@
             margin-top: 10px;
         }
 
+        .readonly-box {
+            width: 100%;
+            padding: 13px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--field-border);
+            background: #f3f4f6;
+            color: #111827;
+            font-size: 14px;
+            min-height: 47px;
+            display: flex;
+            align-items: center;
+        }
+
         .actions {
             display: flex;
             justify-content: flex-end;
@@ -278,46 +283,18 @@
         }
 
         @media (max-width: 980px) {
-            .header h1 {
-                font-size: 28px;
-            }
-
-            .content {
-                padding: 18px;
-            }
-
-            .header {
-                padding: 24px 20px 18px;
-            }
-
-            .section {
-                padding: 18px;
-            }
-
-            .col-6,
-            .col-4,
-            .col-3 {
-                grid-column: span 12;
-            }
-
-            .actions {
-                justify-content: stretch;
-            }
-
-            .btn {
-                width: 100%;
-            }
+            .header h1 { font-size: 28px; }
+            .content { padding: 18px; }
+            .header { padding: 24px 20px 18px; }
+            .section { padding: 18px; }
+            .col-6, .col-4, .col-3 { grid-column: span 12; }
+            .actions { justify-content: stretch; }
+            .btn { width: 100%; }
         }
 
         @media (max-width: 640px) {
-            body.embed-mode {
-                padding: 0;
-            }
-
-            .wrapper {
-                max-width: 100%;
-            }
-
+            body.embed-mode { padding: 0; }
+            .wrapper { max-width: 100%; }
             .card {
                 border-radius: 0;
                 border-left: 0;
@@ -333,7 +310,7 @@
         <div class="header">
             <div class="eyebrow">PlyrCard Intake</div>
             <h1>Player Intake Form</h1>
-            <p>Complete the form below so we can create your athlete record.</p>
+            <p>Complete the form below so we can create the athlete record and website automatically when supported.</p>
         </div>
 
         <div class="content">
@@ -373,13 +350,26 @@
                             <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
                         </div>
 
-                        <div class="col-6">
+                        <div class="col-4">
+                            <label for="gender">Gender</label>
+                            <select id="gender" name="gender">
+                                <option value="">Select gender</option>
+                                @foreach ($genderOptions as $value => $label)
+                                    <option value="{{ $value }}" {{ old('gender') === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="hint">Used only if a new club and league need to be created.</div>
+                        </div>
+
+                        <div class="col-4">
                             <label for="personal_email">Personal Email <span class="required">*</span></label>
                             <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" required>
                             <div class="hint">The PlyrCard email will be generated automatically.</div>
                         </div>
 
-                        <div class="col-6">
+                        <div class="col-4">
                             <label for="phone">Phone</label>
                             <input type="text" id="phone" name="phone" value="{{ old('phone') }}">
                         </div>
@@ -528,29 +518,14 @@
                         </div>
 
                         <div class="col-4">
-                            <label for="league_id">League</label>
-                            <select id="league_id" name="league_id">
-                                <option value="">Select league</option>
-                                @foreach ($leagues as $league)
-                                    <option value="{{ $league->id }}" {{ (string) old('league_id') === (string) $league->id ? 'selected' : '' }}>
-                                        {{ $league->name }}
-                                    </option>
-                                @endforeach
-                                <option value="__other__" {{ old('league_id') === '__other__' ? 'selected' : '' }}>Other</option>
-                            </select>
-                            <div id="league_other_wrap" class="other-wrap">
-                                <input type="text" name="league_other" placeholder="Enter league name" value="{{ old('league_other') }}">
-                            </div>
-                        </div>
-
-                        <div class="col-4">
                             <label for="club_id">Club</label>
                             <select id="club_id" name="club_id">
                                 <option value="">Select club</option>
                                 @foreach ($clubs as $club)
                                     <option
                                         value="{{ $club->id }}"
-                                        data-league-id="{{ $club->league_id }}"
+                                        data-league-name="{{ $club->league?->name }}"
+                                        data-league-gender="{{ $club->league?->gender }}"
                                         {{ (string) old('club_id') === (string) $club->id ? 'selected' : '' }}
                                     >
                                         {{ $club->name }}
@@ -558,8 +533,25 @@
                                 @endforeach
                                 <option value="__other__" {{ old('club_id') === '__other__' ? 'selected' : '' }}>Other</option>
                             </select>
-                            <div id="club_other_wrap" class="other-wrap">
-                                <input type="text" name="club_other" placeholder="Enter club name" value="{{ old('club_other') }}">
+                        </div>
+
+                        <div class="col-4">
+                            <label>League</label>
+                            <div id="league_display" class="readonly-box">Select a club first</div>
+                            <div class="hint">League is automatically assigned from the selected club.</div>
+                        </div>
+
+                        <div id="club_other_section" class="col-12 other-wrap">
+                            <div class="grid">
+                                <div class="col-6">
+                                    <label for="club_other">New Club Name</label>
+                                    <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" placeholder="Enter new club name">
+                                </div>
+
+                                <div class="col-6">
+                                    <label for="league_other">New League Name</label>
+                                    <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" placeholder="Enter new league name">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -668,14 +660,28 @@
                 <div class="section">
                     <h2>Images</h2>
                     <div class="grid">
-                        <div class="col-6">
-                            <label for="mobile_view_image">Mobile View Image</label>
-                            <input type="file" id="mobile_view_image" name="mobile_view_image" accept="image/*">
+                        <div class="col-4">
+                            <label for="player_card_image">Player Card Image</label>
+                            <input type="file" id="player_card_image" name="player_card_image" accept="image/png">
+                            <div class="hint">
+                                Upload a PNG player card image. Transparent background preferred. Max 5MB.
+                            </div>
                         </div>
 
-                        <div class="col-6">
-                            <label for="player_card_image">Player Card Image</label>
-                            <input type="file" id="player_card_image" name="player_card_image" accept="image/*">
+                        <div class="col-4">
+                            <label for="player_image">Player Image</label>
+                            <input type="file" id="player_image" name="player_image" accept="image/png">
+                            <div class="hint">
+                                Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.
+                            </div>
+                        </div>
+
+                        <div class="col-4">
+                            <label for="mobile_view_image">Mobile View Image</label>
+                            <input type="file" id="mobile_view_image" name="mobile_view_image" accept="image/png">
+                            <div class="hint">
+                                Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -691,7 +697,6 @@
 <script>
     const sportPositions = @json($sportPositions);
     const oldPositions = @json(old('position', []));
-    const oldClubId = @json(old('club_id'));
 
     function renderPositions() {
         const sportSelect = document.getElementById('sport');
@@ -726,74 +731,72 @@
         });
     }
 
-    function toggleOther(selectId, wrapId) {
-        const select = document.getElementById(selectId);
-        const wrap = document.getElementById(wrapId);
+    function toggleSchoolOther() {
+        const select = document.getElementById('school_id');
+        const wrap = document.getElementById('school_other_wrap');
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
     }
 
-    const originalClubOptions = Array.from(document.querySelectorAll('#club_id option')).map(opt => ({
-        value: opt.value,
-        text: opt.textContent,
-        leagueId: opt.dataset.leagueId || '',
-        selected: opt.selected,
-    }));
-
-    function renderClubs() {
-        const leagueSelect = document.getElementById('league_id');
+    function updateLeagueDisplay() {
         const clubSelect = document.getElementById('club_id');
-        const selectedLeagueId = leagueSelect.value;
+        const leagueDisplay = document.getElementById('league_display');
+        const clubOtherSection = document.getElementById('club_other_section');
+        const selectedOption = clubSelect.options[clubSelect.selectedIndex];
 
-        clubSelect.innerHTML = '';
+        if (!clubSelect.value) {
+            leagueDisplay.textContent = 'Select a club first';
+            clubOtherSection.style.display = 'none';
+            return;
+        }
 
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Select club';
-        clubSelect.appendChild(placeholder);
+        if (clubSelect.value === '__other__') {
+            leagueDisplay.textContent = 'Enter a new league below';
+            clubOtherSection.style.display = 'block';
+            return;
+        }
 
-        originalClubOptions.forEach(opt => {
-            if (!opt.value) return;
-
-            if (opt.value === '__other__') {
-                const otherOption = document.createElement('option');
-                otherOption.value = '__other__';
-                otherOption.textContent = 'Other';
-                if (String(oldClubId) === '__other__') {
-                    otherOption.selected = true;
-                }
-                clubSelect.appendChild(otherOption);
-                return;
-            }
-
-            if (!selectedLeagueId || selectedLeagueId === '__other__' || opt.leagueId === selectedLeagueId) {
-                const option = document.createElement('option');
-                option.value = opt.value;
-                option.textContent = opt.text;
-                option.dataset.leagueId = opt.leagueId;
-
-                if (String(opt.value) === String(oldClubId)) {
-                    option.selected = true;
-                }
-
-                clubSelect.appendChild(option);
-            }
-        });
+        const leagueName = selectedOption?.dataset?.leagueName || 'League not found';
+        clubOtherSection.style.display = 'none';
+        leagueDisplay.textContent = leagueName;
     }
 
-    document.getElementById('sport').addEventListener('change', renderPositions);
-    document.getElementById('school_id').addEventListener('change', () => toggleOther('school_id', 'school_other_wrap'));
-    document.getElementById('league_id').addEventListener('change', () => {
-        toggleOther('league_id', 'league_other_wrap');
-        renderClubs();
-        toggleOther('club_id', 'club_other_wrap');
+    function updateImageInstructions() {
+        const sport = document.getElementById('sport').value;
+        const playerCardHint = document.getElementById('player_card_hint');
+        const playerImageHint = document.getElementById('player_image_hint');
+        const mobileViewHint = document.getElementById('mobile_view_hint');
+
+        if (sport === 'soccer') {
+            playerCardHint.textContent = 'Upload a PNG soccer player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
+            playerImageHint.textContent = 'Upload a PNG solo soccer player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
+            mobileViewHint.textContent = 'Upload a PNG soccer mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+            return;
+        }
+
+        if (sport === 'basketball') {
+            playerCardHint.textContent = 'Upload a PNG basketball player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
+            playerImageHint.textContent = 'Upload a PNG solo basketball player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
+            mobileViewHint.textContent = 'Upload a PNG basketball mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+            return;
+        }
+
+        playerCardHint.textContent = 'Upload a PNG player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
+        playerImageHint.textContent = 'Upload a PNG solo player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
+        mobileViewHint.textContent = 'Upload a PNG mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+    }
+
+    document.getElementById('sport').addEventListener('change', () => {
+        renderPositions();
+        updateImageInstructions();
     });
-    document.getElementById('club_id').addEventListener('change', () => toggleOther('club_id', 'club_other_wrap'));
+
+    document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
+    document.getElementById('club_id').addEventListener('change', updateLeagueDisplay);
 
     renderPositions();
-    toggleOther('school_id', 'school_other_wrap');
-    toggleOther('league_id', 'league_other_wrap');
-    renderClubs();
-    toggleOther('club_id', 'club_other_wrap');
-</script>
+    toggleSchoolOther();
+    updateLeagueDisplay();
+    updateImageInstructions();
+</script>   
 </body>
 </html>
