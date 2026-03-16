@@ -254,47 +254,25 @@
 
     $hasAnySocial = filled($playerEmail) || filled($igUrl) || filled($ytUrl) || filled($xUrl);
 @endphp
-
 <style>
-    /*
-    |--------------------------------------------------------------------------
-    | TWEAK ZONE
-    |--------------------------------------------------------------------------
-    | Change these values first when you want to resize things quickly.
-    */
     :root{
-        --hero-two-card-width: clamp(17rem, 19.5vw, 22rem);
-        --hero-two-player-max-width: clamp(39rem, 46vw, 53rem);
-        --hero-two-player-max-height: min(86vh, 980px);
-        --hero-two-action-width: clamp(12rem, 14.5vw, 16.5rem);
+        --hero-two-shell-max: 1720px;
 
-        --hero-two-first-name-size: clamp(6.6rem, 8.9vw, 9.4rem);
-        --hero-two-first-name-size-with-pos: clamp(7rem, 9.4vw, 9.9rem);
-        --hero-two-last-name-size: clamp(5.7rem, 7.6vw, 8.6rem);
+        --hero-two-card-width: clamp(16rem, 16vw, 21rem);
+        --hero-two-player-max-width: clamp(32rem, 34vw, 44rem);
+        --hero-two-player-max-height: min(84vh, 920px);
+        --hero-two-action-width: clamp(10rem, 10vw, 14rem);
 
-        --hero-two-front-jersey-size: clamp(5.2rem, 8.1vw, 7.9rem);
-        --hero-two-back-jersey-size: clamp(29rem, 37vw, 45rem);
+        --hero-two-first-name-size: clamp(5.5rem, 7.2vw, 8.8rem);
+        --hero-two-first-name-size-with-pos: clamp(5.9rem, 7.7vw, 9.1rem);
+        --hero-two-last-name-size: clamp(4.8rem, 6.4vw, 7.9rem);
 
-        --hero-two-pos-size: clamp(1.75rem, 2.1vw, 2.45rem);
-        --hero-two-panel-width: clamp(460px, 33vw, 400px);
+        --hero-two-front-jersey-size: clamp(4.5rem, 6vw, 7.2rem);
+        --hero-two-back-jersey-size: clamp(22rem, 26vw, 34rem);
+
+        --hero-two-pos-size: clamp(1.5rem, 1.9vw, 2.3rem);
+        --hero-two-panel-width: clamp(360px, 35vw, 500px);
     }
-
-    .hero-two-stat-block {
-    display: block;
-}
-
-.hero-two-stat-block .hero-two-stat-label {
-    display: block;
-    margin-bottom: .32rem;
-}
-
-.hero-two-stat-block .hero-two-stat-value {
-    display: block;
-    width: 100%;
-    min-width: 0;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
 
     .hero-two-font-jersey-front {
         font-family: "Anton SC", "Antonio", "Anton", "Bebas Neue", Arial, sans-serif;
@@ -336,18 +314,18 @@
 
     .hero-two-shell {
         position: relative;
-        width: min(100%, 1680px);
+        width: min(100%, var(--hero-two-shell-max));
         height: 100%;
         margin: 0 auto;
-        padding: 0 2rem;
+        padding-inline: clamp(1.5rem, 2.5vw, 2.75rem);
     }
 
     .hero-two-shadow {
-        filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.30));
+        filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.26));
     }
 
     .hero-two-card-shadow {
-        filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.26));
+        filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.22));
     }
 
     .hero-two-name-line {
@@ -362,8 +340,25 @@
         gap: .55rem .75rem;
     }
 
+    .hero-two-stat-block {
+        display: block;
+    }
+
+    .hero-two-stat-block .hero-two-stat-label {
+        display: block;
+        margin-bottom: .32rem;
+    }
+
+    .hero-two-stat-block .hero-two-stat-value {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
     .hero-two-stat-label {
-        font-size: 16px;
+        font-size: clamp(14px, .9vw, 18px);
         line-height: 1.05;
         font-weight: 800;
         text-transform: uppercase;
@@ -372,7 +367,7 @@
     }
 
     .hero-two-stat-value {
-        font-size: 17px;
+        font-size: clamp(15px, 1vw, 19px);
         line-height: 1.32;
         font-weight: 500;
         color: rgba(255,255,255,.98);
@@ -384,28 +379,28 @@
 
     .hero-two-info-panel {
         position: relative;
+        width: var(--hero-two-panel-width);
         border: 1px solid rgba(255,255,255,.08);
+        border-radius: 16px;
+        padding: 1.2rem 1.35rem 1.3rem;
         background:
             linear-gradient(90deg,
-                rgba(11, 73, 154, .74) 0%,
-                rgba(20, 97, 182, .54) 45%,
-                rgba(17, 69, 145, .44) 100%);
+                rgba(11, 73, 154, .78) 0%,
+                rgba(20, 97, 182, .58) 45%,
+                rgba(17, 69, 145, .46) 100%);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
         box-shadow: 0 16px 34px rgba(0,0,0,.18);
-        width: var(--hero-two-panel-width);
-        border-radius: 14px;
-        padding: 1.25rem 1.4rem 1.35rem;
     }
 
     .hero-two-social-floating {
         position: absolute;
-        top: 1.15rem;
-        right: 1.15rem;
+        top: 1rem;
+        right: 1rem;
         z-index: 80;
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
         pointer-events: auto;
     }
 
@@ -413,8 +408,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         color: rgba(255,255,255,.92);
         transition: opacity .2s ease, transform .2s ease;
         text-decoration: none;
@@ -432,8 +427,8 @@
     }
 
     .hero-two-social-link svg {
-        width: 30px;
-        height: 30px;
+        width: 28px;
+        height: 28px;
         display: block;
     }
 
@@ -446,35 +441,16 @@
 
     .hero-two-left-group {
         position: absolute;
-        left: 3.2%;
-        top: 4.2%;
+        left: clamp(2rem, 3vw, 3rem);
+        top: clamp(2rem, 4.2vh, 3.2rem);
         z-index: 20;
-        width: min(58%, 980px);
+        width: min(54%, 860px);
     }
 
     .hero-two-info-wrap {
-        margin-top: clamp(1.2rem, 1.8vw, 1.8rem);
+        margin-top: clamp(1rem, 1.5vw, 1.5rem);
         position: relative;
         z-index: 24;
-    }
-
-        .hero-two-stat-row-stacked {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: .35rem;
-    }
-
-    .hero-two-stat-row-stacked .hero-two-stat-label {
-        flex: 0 0 auto;
-    }
-
-    .hero-two-stat-row-stacked .hero-two-stat-value {
-        flex: 0 0 auto;
-        width: 100%;
-        min-width: 0;
-        overflow-wrap: anywhere;
-        word-break: break-word;
     }
 
     .hero-two-name-first {
@@ -491,7 +467,7 @@
 
     .hero-two-front-jersey {
         font-size: var(--hero-two-front-jersey-size);
-        line-height: 1.05;
+        line-height: 1.02;
     }
 
     .hero-two-back-jersey {
@@ -503,9 +479,16 @@
         width: var(--hero-two-card-width);
     }
 
+    .hero-two-card-wrap {
+        position: absolute;
+        right: clamp(1.5rem, 2.4vw, 2.4rem);
+        top: clamp(2rem, 4.2vh, 3rem);
+        z-index: 25;
+    }
+
     .hero-two-player-wrap {
         position: absolute;
-        right: 15.5%;
+        right: clamp(12rem, 18vw, 19rem);
         bottom: 0;
         z-index: 12;
     }
@@ -520,8 +503,8 @@
 
     .hero-two-action-wrap {
         position: absolute;
-        left: 40.7%;
-        bottom: -35px;
+        left: clamp(37%, 40%, 42%);
+        bottom: -26px;
         transform: translateX(-50%);
         z-index: 32;
         pointer-events: none;
@@ -533,239 +516,131 @@
         object-fit: contain;
     }
 
-    @media (max-width: 1600px) {
-        .hero-two-shell {
-            width: min(100%, 1560px);
+    @media (max-width: 1536px) {
+        .hero-two-left-group {
+            width: min(56%, 820px);
         }
 
         .hero-two-player-wrap {
-            right: 18.5%;
+            right: clamp(10rem, 15vw, 16rem);
         }
     }
 
-    @media (max-width: 1360px) {
+    @media (max-width: 1366px) {
         .hero-two-left-group {
-            width: min(60%, 900px);
+            width: min(58%, 780px);
         }
 
         .hero-two-player-wrap {
-            right: 12%;
+            right: 8.5rem;
+        }
+
+        .hero-two-card {
+            width: clamp(15rem, 15vw, 18rem);
         }
 
         .hero-two-player-image {
-            max-width: clamp(34rem, 41vw, 45rem);
-        }
-
-        .hero-two-action-image {
-            width: clamp(10.8rem, 12.2vw, 13.2rem);
+            max-width: clamp(29rem, 33vw, 39rem);
         }
     }
 
     @media (max-width: 1180px) {
         .hero-two-shell {
-            padding: 0 1.4rem;
+            padding-inline: 1.2rem;
         }
 
         .hero-two-left-group {
-            left: 2.4%;
-            width: 62%;
+            left: 1.6rem;
+            width: min(60%, 720px);
+        }
+
+        .hero-two-card-wrap {
+            right: 1.4rem;
         }
 
         .hero-two-player-wrap {
-            right: 10.2%;
+            right: 6rem;
         }
 
         .hero-two-social-floating {
             gap: 10px;
         }
 
-        .hero-two-social-link,
+        .hero-two-social-link {
+            width: 28px;
+            height: 28px;
+        }
+
         .hero-two-social-link svg {
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
         }
     }
 
     @media (min-width: 1800px) {
-    .hero-two-shell {
-        width: min(100%, 1820px);
+        :root{
+            --hero-two-shell-max: 1820px;
+            --hero-two-card-width: clamp(18rem, 15vw, 22rem);
+            --hero-two-player-max-width: clamp(36rem, 32vw, 46rem);
+            --hero-two-player-max-height: min(86vh, 980px);
+            --hero-two-action-width: clamp(11rem, 9vw, 15rem);
+            --hero-two-first-name-size: clamp(6.4rem, 6.7vw, 9.2rem);
+            --hero-two-first-name-size-with-pos: clamp(6.8rem, 7vw, 9.5rem);
+            --hero-two-last-name-size: clamp(5.5rem, 5.8vw, 8.2rem);
+            --hero-two-front-jersey-size: clamp(5rem, 5.2vw, 7.6rem);
+            --hero-two-back-jersey-size: clamp(25rem, 24vw, 36rem);
+            --hero-two-pos-size: clamp(1.8rem, 1.8vw, 2.45rem);
+            --hero-two-panel-width: clamp(390px, 24vw, 480px);
+        }
+
+        .hero-two-player-wrap {
+            right: 15rem;
+        }
     }
 
-    .hero-two-left-group {
-        left: 3.45%;
-        width: min(60%, 1080px);
-    }
+    @media (min-width: 2200px) {
+        :root{
+            --hero-two-shell-max: 1940px;
+            --hero-two-player-max-width: clamp(38rem, 30vw, 48rem);
+            --hero-two-back-jersey-size: clamp(27rem, 22vw, 38rem);
+            --hero-two-panel-width: clamp(410px, 22vw, 500px);
+        }
 
-    .hero-two-info-panel {
-        width: 460px;
-        padding: 1.45rem 1.6rem 1.55rem;
-    }
+        .hero-two-left-group {
+            width: min(52%, 900px);
+        }
 
-    .hero-two-stat-label {
-        font-size: 19px;
-    }
+        .hero-two-player-wrap {
+            right: 16rem;
+        }
 
-    .hero-two-stat-value {
-        font-size: 20px;
+        .hero-two-card-wrap {
+            right: 2rem;
+        }
     }
-
-    .hero-two-social-floating {
-        gap: 15px;
-    }
-
-    .hero-two-social-link {
-        width: 36px;
-        height: 36px;
-    }
-
-    .hero-two-social-link svg {
-        width: 32px;
-        height: 32px;
-    }
-
-    .hero-two-card {
-        width: 23rem;
-    }
-
-    .hero-two-name-first {
-        font-size: 10.4rem;
-    }
-
-    .hero-two-name-first.has-inline-position {
-        font-size: 10.9rem;
-    }
-
-    .hero-two-name-last {
-        font-size: 9.4rem;
-    }
-
-    .hero-two-front-jersey {
-        font-size: 8.8rem;
-    }
-
-    .hero-two-back-jersey {
-        font-size: 50rem;
-    }
-
-    .hero-two-position {
-        font-size: 2.95rem;
-    }
-
-    .hero-two-player-wrap {
-        right: 14%;
-    }
-
-    .hero-two-action-wrap {
-        left: 41.6%;
-        bottom: -38px;
-    }
-
-    .hero-two-action-image {
-        width: 17rem;
-    }
-}
-
-@media (min-width: 2100px) {
-    .hero-two-shell {
-        width: min(100%, 1980px);
-    }
-
-    .hero-two-left-group {
-        left: 3.7%;
-        width: min(61%, 1180px);
-    }
-
-    .hero-two-info-panel {
-        width: 490px;
-        padding: 1.55rem 1.75rem 1.65rem;
-    }
-
-    .hero-two-stat-label {
-        font-size: 20px;
-    }
-
-    .hero-two-stat-value {
-        font-size: 21px;
-    }
-
-    .hero-two-social-floating {
-        gap: 16px;
-    }
-
-    .hero-two-social-link {
-        width: 38px;
-        height: 38px;
-    }
-
-    .hero-two-social-link svg {
-        width: 33px;
-        height: 33px;
-    }
-
-    .hero-two-card {
-        width: 24rem;
-    }
-
-    .hero-two-name-first {
-        font-size: 11.1rem;
-    }
-
-    .hero-two-name-first.has-inline-position {
-        font-size: 11.6rem;
-    }
-
-    .hero-two-name-last {
-        font-size: 10.1rem;
-    }
-
-    .hero-two-front-jersey {
-        font-size: 9.2rem;
-    }
-
-    .hero-two-back-jersey {
-        font-size: 53rem;
-    }
-
-    .hero-two-position {
-        font-size: 3.15rem;
-    }
-
-    .hero-two-player-wrap {
-        right: 12.8%;
-    }
-
-    .hero-two-action-wrap {
-        left: 42.1%;
-        bottom: -40px;
-    }
-
-    .hero-two-action-image {
-        width: 18rem;
-    }
-}
 </style>
 
 <section
-    class="hero-two-desktop relative z-0 overflow-hidden h-[112vh] min-h-[760px] max-h-[1380px]"
+    class="hero-two-desktop relative z-0 overflow-hidden h-[100vh] min-h-[720px] max-h-[1200px]"
     style="background:
         radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
         color: {{ $text1 }};"
 >
     <div class="absolute inset-0 z-0 pointer-events-none">
-        <div class="absolute inset-x-0 bottom-0 h-[36%]" style="background: linear-gradient(to top, rgba(0,0,0,.34), rgba(0,0,0,0));"></div>
-        <div class="absolute inset-y-0 left-0 w-[15%]" style="background: linear-gradient(to right, rgba(0, 12, 70, .48), rgba(0, 12, 70, 0));"></div>
-        <div class="absolute inset-y-0 right-0 w-[15%]" style="background: linear-gradient(to left, rgba(0, 12, 70, .40), rgba(0, 12, 70, 0));"></div>
+        <div class="absolute inset-x-0 bottom-0 h-[34%]" style="background: linear-gradient(to top, rgba(0,0,0,.26), rgba(0,0,0,0));"></div>
+        <div class="absolute inset-y-0 left-0 w-[16%]" style="background: linear-gradient(to right, rgba(0, 12, 70, .44), rgba(0, 12, 70, 0));"></div>
+        <div class="absolute inset-y-0 right-0 w-[16%]" style="background: linear-gradient(to left, rgba(0, 12, 70, .34), rgba(0, 12, 70, 0));"></div>
     </div>
 
     <div class="hero-two-shell relative z-10">
         @if ($jerseyNumber)
-            <div class="pointer-events-none absolute left-[60%] top-[55%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back hero-two-back-jersey tracking-[-0.03em] text-white/[0.15]">
+            <div class="pointer-events-none absolute left-[60%] top-[54%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back hero-two-back-jersey tracking-[-0.03em] text-white/[0.14]">
                 {{ $jerseyNumber }}
             </div>
         @endif
 
         @if ($playerCardImageUrl)
-            <div class="absolute right-[2.3%] top-[4.7%] z-[25]">
+            <div class="hero-two-card-wrap">
                 <img
                     src="{{ $playerCardImageUrl }}"
                     alt="Player card"
@@ -789,14 +664,14 @@
                         </div>
 
                         @if ($position && ! $positionBesideLastName)
-                            <div class="hero-two-font-sans hero-two-position mb-[18px]">
+                            <div class="hero-two-font-sans hero-two-position mb-[0.75rem]">
                                 {{ $position }}
                             </div>
                         @endif
                     </div>
                 @endif
 
-                <div class="flex items-end gap-4 mt-5">
+                <div class="flex items-end gap-4 mt-3">
                     @if ($lastName)
                         <div class="hero-two-font-name hero-two-name-line hero-two-name-last text-white">
                             {{ $lastName }}
@@ -804,7 +679,7 @@
                     @endif
 
                     @if ($position && $positionBesideLastName)
-                        <div class="hero-two-font-sans hero-two-position mb-[15px]">
+                        <div class="hero-two-font-sans hero-two-position mb-[0.7rem]">
                             {{ $position }}
                         </div>
                     @endif
@@ -859,7 +734,7 @@
                     @endif
 
                     <div class="hero-two-font-sans space-y-3">
-                        <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[200px]' : '' }}">
+                        <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[190px]' : '' }}">
                             <div class="hero-two-stat-label">Full Name</div>
                             <div class="hero-two-stat-value">{{ $fullName }}</div>
                         </div>
@@ -927,18 +802,14 @@
 </section>
 
 <section
-    class="hero-two-mobile relative overflow-hidden min-h-screen"
-    style="background:
-        radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
-        color: {{ $text1 }};"
+    class="hero-two-mobile relative overflow-hidden h-[100svh] min-h-[100svh]"
+    style="background: {{ $primary }};"
 >
     @if ($mobileHeroImageUrl)
-        <div class="absolute inset-0 z-0">
-            <img
-                src="{{ $mobileHeroImageUrl }}"
-                alt="Mobile hero background"
-                class="block w-full h-full object-cover"
-            />
-        </div>
+        <img
+            src="{{ $mobileHeroImageUrl }}"
+            alt="Mobile hero"
+            class="absolute inset-0 block w-full h-full object-cover"
+        />
     @endif
 </section>
