@@ -927,7 +927,7 @@
 </section>
 
 <section
-    class="hero-two-mobile relative overflow-hidden min-h-[100svh]"
+    class="hero-two-mobile relative overflow-hidden min-h-screen"
     style="background:
         radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
         color: {{ $text1 }};"
@@ -943,27 +943,27 @@
     @endif
 
     @if ($jerseyNumber)
-        <div class="pointer-events-none absolute left-1/2 top-[28%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back text-[200px] leading-none tracking-[-0.03em] text-white/[0.12]">
+        <div class="pointer-events-none absolute left-1/2 top-[34%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back text-[220px] leading-none tracking-[-0.03em] text-white/[0.12]">
             {{ $jerseyNumber }}
         </div>
     @endif
 
-    <div class="relative z-10 min-h-[100svh] px-5 pt-6 pb-8">
+    <div class="relative z-10 px-5 pt-5 pb-8 min-h-screen">
         @if ($jerseyNumber)
-            <div class="hero-two-font-jersey-front text-[54px] leading-[0.82] tracking-[-0.03em] text-white">
+            <div class="hero-two-font-jersey-front text-[60px] leading-[0.82] tracking-[-0.03em] text-white">
                 #{{ $jerseyNumber }}
             </div>
         @endif
 
-        <div class="mt-1">
+        <div class="mt-[-6px]">
             @if ($firstName)
-                <div class="hero-two-font-name hero-two-name-line text-white text-[56px] leading-[0.84]">
+                <div class="hero-two-font-name hero-two-name-line text-white text-[62px]">
                     {{ $firstName }}
                 </div>
             @endif
 
             @if ($lastName)
-                <div class="hero-two-font-name hero-two-name-line text-white text-[48px] leading-[0.84] mt-[-2px]">
+                <div class="hero-two-font-name hero-two-name-line text-white text-[54px] mt-[-2px]">
                     {{ $lastName }}
                 </div>
             @endif
