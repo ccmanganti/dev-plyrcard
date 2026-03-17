@@ -429,7 +429,7 @@
         $footerEmail = $user->email ?? '';
         $copyright   = 'Plyr Card 2026 © All Rights Reserved';
 
-        $smsPhone = !empty($footerPhone) ? preg_replace('/\D+/', '', $footerPhone) : '';
+        $smsPhone = !empty($user->club_coach_phone) ? preg_replace('/\D+/', '', $user->club_coach_phone) : '';
         $textCoachUrl = $smsPhone ? 'sms:' . $smsPhone : ($playerEmail ? 'mailto:' . $playerEmail : '#');
 
         /*
