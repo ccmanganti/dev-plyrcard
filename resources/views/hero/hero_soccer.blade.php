@@ -261,7 +261,7 @@
         --hero-two-card-width: clamp(18rem, 16vw, 26rem);
         --hero-two-player-max-width: clamp(38rem, 39vw, 62rem);
         --hero-two-player-max-height: min(96vh, 1220px);
-        --hero-two-action-width: clamp(11rem, 10vw, 17rem);
+        --hero-two-action-width: clamp(18rem, 18vw, 30rem);
 
         --hero-two-first-name-size: clamp(6.3rem, 8.2vw, 12rem);
         --hero-two-first-name-size-with-pos: clamp(6.7rem, 8.6vw, 12.6rem);
@@ -510,8 +510,8 @@
 
     .hero-two-action-wrap {
         position: absolute;
-        left: clamp(39%, 42%, 44%);
-        bottom: -18px;
+        left: clamp(37%, 40%, 42%);
+        bottom: clamp(-28px, -1.2vw, -12px);
         transform: translateX(-50%);
         z-index: 32;
         pointer-events: none;
@@ -519,6 +519,7 @@
 
     .hero-two-action-image {
         width: var(--hero-two-action-width);
+        max-width: none;
         height: auto;
         object-fit: contain;
     }
@@ -539,6 +540,11 @@
         .hero-two-player-wrap {
             right: clamp(8rem, 15vw, 40rem);
 
+        }
+
+        .hero-two-action-wrap {
+            left: 39%;
+            bottom: -18px;
         }
     }
 
@@ -566,6 +572,11 @@
 
         .hero-two-card-wrap {
             right: 1.4rem;
+        }
+
+        .hero-two-action-wrap {
+            left: 38%;
+            bottom: -12px;
         }
     }
 
@@ -607,6 +618,11 @@
             width: 23px;
             height: 23px;
         }
+
+        .hero-two-action-wrap {
+            left: 37%;
+            bottom: -8px;
+        }
     }
 
     @media (min-width: 1800px) {
@@ -615,7 +631,7 @@
             --hero-two-card-width: clamp(20rem, 17vw, 29rem);
             --hero-two-player-max-width: clamp(42rem, 40vw, 66rem);
             --hero-two-player-max-height: min(98vh, 1280px);
-            --hero-two-action-width: clamp(12rem, 10.5vw, 18rem);
+            --hero-two-action-width: clamp(18rem, 15vw, 28rem);
             --hero-two-first-name-size: clamp(7rem, 9vw, 13rem);
             --hero-two-first-name-size-with-pos: clamp(7.4rem, 9.4vw, 13.6rem);
             --hero-two-last-name-size: clamp(6.1rem, 7.9vw, 11rem);
@@ -642,6 +658,13 @@
         .hero-two-card-wrap {
             right: clamp(1.25rem, 2.3vw, 2.5rem);
         }
+
+        .hero-two-action-wrap {
+            left: 40%;
+            bottom: -22px;
+        }
+
+        
     }
 
     @media (min-width: 2200px) {
@@ -649,6 +672,7 @@
             --hero-two-shell-max: 2800px;
             --hero-two-card-width: clamp(21rem, 17vw, 31rem);
             --hero-two-player-max-width: clamp(46rem, 42vw, 72rem);
+            --hero-two-action-width: clamp(20rem, 16vw, 32rem);
             --hero-two-player-max-height: min(100vh, 1360px);
             --hero-two-first-name-size: clamp(7.6rem, 9.4vw, 14rem);
             --hero-two-first-name-size-with-pos: clamp(8rem, 9.8vw, 14.6rem);
@@ -672,6 +696,11 @@
 
         .hero-two-card-wrap {
             right: clamp(1rem, 2vw, 2rem);
+        }
+
+        .hero-two-action-wrap {
+            left: 40.5%;
+            bottom: -26px;
         }
     }
 </style>
