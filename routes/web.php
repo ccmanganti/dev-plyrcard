@@ -1,125 +1,25 @@
 <?php
 
 use App\Http\Controllers\PublicPlayerIntakeController;
+use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
-use App\Models\Website;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function (Request $request) {
-    $host = strtolower($request->getHost());
-    $normalizedHost = preg_replace('/^www\./', '', $host);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Platform domain -> admin
-    |--------------------------------------------------------------------------
-    */
-    $platformHosts = [
-        'dev.plyrcard.com',
-        'plyrcard.com',
-        'www.plyrcard.com',
-    ];
-
-    if (in_array($host, $platformHosts, true)) {
-        return redirect('/admin');
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Local development
-    |--------------------------------------------------------------------------
-    | Example:
-    | http://127.0.0.1:8000
-    | http://localhost:8000
-    |--------------------------------------------------------------------------
-    */
-    if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
-        $website = Website::query()
-            ->with([
-                'user.school',
-                'user.club.league',
-                'siteTemplate',
-                'heroTemplate',
-                'fieldValues.templateField',
-                'heroFieldValues.templateField',
-            ])
-            ->orderBy('id')
-            ->first();
-
-        abort_unless($website, 404, 'No website record found.');
-
-        abort_unless(
-            $website->siteTemplate && $website->siteTemplate->blade_view,
-            404,
-            'The website does not have a valid site template.'
-        );
-
-        return view($website->siteTemplate->blade_view, compact('website'));
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Production custom domains
-    |--------------------------------------------------------------------------
-    | Match users.domain
-    |--------------------------------------------------------------------------
-    */
-    $website = Website::query()
-        ->whereHas('user', function ($query) use ($host, $normalizedHost) {
-            $query->where(function ($subQuery) use ($host, $normalizedHost) {
-                $subQuery
-                    ->whereRaw('LOWER(domain) = ?', [$host])
-                    ->orWhereRaw('LOWER(domain) = ?', [$normalizedHost])
-                    ->orWhereRaw("LOWER(REPLACE(domain, 'www.', '')) = ?", [$normalizedHost]);
-            });
-        })
-        ->with([
-            'user.school',
-            'user.club.league',
-            'siteTemplate',
-            'heroTemplate',
-            'fieldValues.templateField',
-            'heroFieldValues.templateField',
-        ])
-        ->first();
-
-    if (! $website) {
-        abort(404);
-    }
-
-    if (! $website->siteTemplate || ! $website->siteTemplate->blade_view) {
-        abort(404, 'The website does not have a valid site template.');
-    }
-
-    return view($website->siteTemplate->blade_view, compact('website'));
-})->name('website.home');
+/*
+|--------------------------------------------------------------------------
+| Public website routes
+|--------------------------------------------------------------------------
+*/
+Route::get('/', [PublicWebsiteController::class, 'home'])
+    ->name('website.home');
 
 /*
 |--------------------------------------------------------------------------
 | Local/manual preview routes
 |--------------------------------------------------------------------------
-| Useful for previewing a specific website even without domain setup.
-|--------------------------------------------------------------------------
 */
-Route::get('/preview/{website}', function (Website $website) {
-    $website->load([
-        'user.school',
-        'user.club.league',
-        'siteTemplate',
-        'heroTemplate',
-        'fieldValues.templateField',
-        'heroFieldValues.templateField',
-    ]);
-
-    abort_unless(
-        $website->siteTemplate && $website->siteTemplate->blade_view,
-        404,
-        'The website does not have a valid site template.'
-    );
-
-    return view($website->siteTemplate->blade_view, compact('website'));
-})->name('website.preview');
+Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
+    ->name('website.preview');
 
 /*
 |--------------------------------------------------------------------------
@@ -150,6 +50,11 @@ Route::prefix('admin')
             ->name('websites.editor');
     });
 
+/*
+|--------------------------------------------------------------------------
+| Website editor asset routes
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/websites/{id}/assets/upload', [WebsiteEditorController::class, 'uploadAsset'])
         ->name('websites.assets.upload');
@@ -157,3 +62,15 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::delete('/websites/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
         ->name('websites.assets.delete');
 });
+
+// Route::get('/ssl-debug', function () {
+//     return response()->json([
+//         'loaded_php_ini' => php_ini_loaded_file(),
+//         'curl.cainfo' => ini_get('curl.cainfo'),
+//         'openssl.cafile' => ini_get('openssl.cafile'),
+//         'cacert_exists' => file_exists(ini_get('curl.cainfo')),
+//         'cacert_readable' => is_readable(ini_get('curl.cainfo')),
+//         'php_sapi' => php_sapi_name(),
+//         'curl_version' => function_exists('curl_version') ? curl_version() : null,
+//     ]);
+// });

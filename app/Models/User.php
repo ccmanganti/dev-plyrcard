@@ -74,6 +74,8 @@ protected $fillable = [
     'player_bio',
     'featured_video_url',
     'featured_video_urls',
+    'youtube_cached_videos',
+    'youtube_cache_refreshed_at',
 ];
 
     protected $hidden = [
@@ -88,6 +90,8 @@ protected $fillable = [
             'password' => 'hashed',
             'natl_team_exp' => 'boolean',
             'position' => 'array',
+            'youtube_cached_videos' => 'array',
+            'youtube_cache_refreshed_at' => 'datetime',
         ];
     }
 

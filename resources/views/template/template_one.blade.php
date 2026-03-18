@@ -300,12 +300,24 @@
         $aboutVideoUrls = filled($user?->featured_video_url)
             ? $user->featured_video_url
             : $getFieldValue('yt_embed', '');
-        $playlistUrls = filled($user?->featured_video_urls)
+
+        $manualVideoSource = filled($user?->featured_video_urls)
             ? $user->featured_video_urls
             : $getFieldValue('yt_playlist_embed', '');
 
-        $aboutVideos     = $parseUrlList($aboutVideoUrls);
-        $highlightVideos = $parseUrlList($playlistUrls);
+        $manualHighlightVideos = $parseUrlList($manualVideoSource);
+
+        $highlightVideos = !empty($manualHighlightVideos)
+            ? collect($manualHighlightVideos)->map(fn ($url) => [
+                'embed_url' => $url,
+                'title' => 'YouTube video',
+            ])->values()->all()
+            : ($autoHighlightVideos ?? []);
+
+        if (empty($aboutVideos) && !empty($highlightVideos)) {
+            $firstEmbed = $highlightVideos[0]['embed_url'] ?? null;
+            $aboutVideos = $firstEmbed ? [$firstEmbed] : [];
+        }
 
         $aboutThumbnailUrl = $resolveMediaUrl(
             filled($user?->youtube_thumbnail)
@@ -1108,8 +1120,8 @@
                                 <div class="w-full aspect-video rounded overflow-hidden">
                                     <iframe
                                         class="w-full h-full"
-                                        src="{{ $video }}"
-                                        title="YouTube video"
+                                        src="{{ $video['embed_url'] ?? '' }}"
+                                        title="{{ $video['title'] ?? 'YouTube video' }}"
                                         frameborder="0"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                         allowfullscreen>
@@ -1118,7 +1130,6 @@
                             @endforeach
                         </div>
                     @endif
-
                     <div class="min-h-[10rem]"></div>
                 </div>
 
