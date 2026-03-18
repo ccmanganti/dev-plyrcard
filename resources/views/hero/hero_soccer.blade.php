@@ -535,9 +535,9 @@
     }
 
     .hero-two-accolade-icon {
-    width: 2.2em;
-    height: 2.2em;
-    flex: 0 0 2.2em;
+    width: 2.0em;
+    height: 2.0em;
+    flex: 0 0 2.0em;
     color: rgba(255,255,255,.98);
     display: block;
     }
