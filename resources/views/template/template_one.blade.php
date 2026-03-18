@@ -301,6 +301,7 @@
             ? $user->featured_video_url
             : $getFieldValue('yt_embed', '');
 
+        $aboutVideos = $parseUrlList($aboutVideoUrls);
         $manualVideoSource = filled($user?->featured_video_urls)
             ? $user->featured_video_urls
             : $getFieldValue('yt_playlist_embed', '');
