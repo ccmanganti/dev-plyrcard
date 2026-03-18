@@ -83,6 +83,31 @@ protected $fillable = [
         'remember_token',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function ($user) {
+            if (
+                $user->isDirty('yt_url') ||
+                $user->isDirty('featured_video_urls')
+            ) {
+                $user->youtube_channel_id = null;
+                $user->youtube_uploads_playlist_id = null;
+                $user->youtube_cached_videos = null;
+                $user->youtube_cache_refreshed_at = null;
+            }
+        });
+    }
+
+    public function clearYoutubeHighlightsCache(): void
+    {
+        $this->forceFill([
+            'youtube_channel_id' => null,
+            'youtube_uploads_playlist_id' => null,
+            'youtube_cached_videos' => null,
+            'youtube_cache_refreshed_at' => null,
+        ])->save();
+    }
+
     protected function casts(): array
     {
         return [
