@@ -187,6 +187,49 @@
         return sprintf('#%02x%02x%02x', $r, $g, $b);
     };
 
+    $normalizeAccolades = function ($value) {
+        if (blank($value)) {
+            return collect();
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            $decoded = json_decode($trimmed, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            } else {
+                $lines = preg_split('/\r\n|\r|\n/', $trimmed) ?: [];
+                $value = collect($lines)
+                    ->flatMap(function ($line) {
+                        return preg_split('/\s*\|\s*|\s*•\s*|\s*;\s*/', $line) ?: [];
+                    })
+                    ->map(fn ($item) => trim((string) $item))
+                    ->filter()
+                    ->values()
+                    ->all();
+            }
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->flatMap(function ($item) {
+                    if (is_array($item)) {
+                        return [
+                            $item['title'] ?? $item['name'] ?? $item['label'] ?? $item['value'] ?? null,
+                        ];
+                    }
+
+                    return [$item];
+                })
+                ->map(fn ($item) => trim((string) $item))
+                ->filter()
+                ->values();
+        }
+
+        return collect();
+    };
+
     $jerseyNumber = $normalizeDisplayValue($getHeroFieldValue('hero_jersey_number', $user?->jersey_number ?? ''));
     $firstName = trim($normalizeDisplayValue($getHeroFieldValue('hero_first_name', $user?->first_name ?? '')));
     $lastName = trim($normalizeDisplayValue($getHeroFieldValue('hero_last_name', $user?->last_name ?? '')));
@@ -197,6 +240,13 @@
     $highSchool = $normalizeDisplayValue($getHeroFieldValue('hero_high_school', $user?->school?->name ?? ''));
     $gpa = $formatGpaDisplay($getHeroFieldValue('hero_gpa', $user?->gpa ?? ''));
     $coach = $normalizeDisplayValue($getHeroFieldValue('hero_coach', $user?->club_coach ?? ''));
+
+    $sportAccolades = $normalizeAccolades(
+        $getHeroFieldValue(
+            'hero_sport_accolades',
+            $user?->sport_accolades ?? $user?->sports_accolades ?? $user?->accolades ?? []
+        )
+    );
 
     $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
     $mobileHeroImageUrl = $resolveMediaUrl($user?->mobile_hero_image, '');
@@ -254,6 +304,7 @@
 
     $hasAnySocial = filled($playerEmail) || filled($igUrl) || filled($ytUrl) || filled($xUrl);
 @endphp
+
 <style>
     :root{
         --hero-two-shell-max: 2400px;
@@ -278,6 +329,8 @@
 
         --hero-two-social-size: clamp(31px, 2vw, 44px);
         --hero-two-social-icon-size: clamp(25px, 1.7vw, 36px);
+
+        --hero-two-accolades-item-size: clamp(16px, 1.05vw, 24px);
     }
 
     .hero-two-font-jersey-front {
@@ -459,6 +512,42 @@
         z-index: 24;
     }
 
+    .hero-two-accolades-wrap {
+        width: var(--hero-two-panel-width);
+        margin-bottom: .85rem;
+    }
+
+    .hero-two-accolades-list {
+        display: flex;
+        flex-direction: column;
+        gap: .5rem;
+    }
+
+    .hero-two-accolade-item {
+        display: flex;
+        align-items: center;
+        gap: .72rem;
+        color: rgba(255,255,255,.98);
+        font-size: var(--hero-two-accolades-item-size);
+        line-height: 1.2;
+        font-weight: 800;
+        text-shadow: 0 6px 18px rgba(0,0,0,.18);
+    }
+
+    .hero-two-accolade-icon {
+    width: 2.2em;
+    height: 2.2em;
+    flex: 0 0 2.2em;
+    color: rgba(255,255,255,.98);
+    display: block;
+    }
+
+    .hero-two-accolade-icon,
+    .hero-two-accolade-icon * {
+        fill: currentColor !important;
+        stroke: none !important;
+    }
+
     .hero-two-name-first {
         font-size: var(--hero-two-first-name-size);
     }
@@ -495,7 +584,6 @@
     .hero-two-player-wrap {
         position: absolute;
         right: clamp(8rem, 15vw, 40rem);
-
         bottom: 0;
         z-index: 12;
     }
@@ -539,7 +627,6 @@
 
         .hero-two-player-wrap {
             right: clamp(8rem, 15vw, 40rem);
-
         }
 
         .hero-two-action-wrap {
@@ -652,7 +739,6 @@
 
         .hero-two-player-wrap {
             right: clamp(8rem, 15vw, 40rem);
-
         }
 
         .hero-two-card-wrap {
@@ -663,8 +749,6 @@
             left: 40%;
             bottom: -22px;
         }
-
-        
     }
 
     @media (min-width: 2200px) {
@@ -772,6 +856,21 @@
             </div>
 
             <div class="hero-two-info-wrap">
+                @if ($sportAccolades->isNotEmpty())
+                    <div class="hero-two-accolades-wrap hero-two-font-sans">
+                        <div class="hero-two-accolades-list">
+                            @foreach ($sportAccolades as $accolade)
+                                <div class="hero-two-accolade-item">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="hero-two-accolade-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M17 3H7v2H3v2c0 2.97 2.16 5.43 5 5.91.2.71.57 1.36 1.07 1.91.55.6 1.24 1.03 1.93 1.28V19H8v2h8v-2h-3v-2.9c.69-.25 1.38-.68 1.93-1.28.5-.55.87-1.2 1.07-1.91 2.84-.48 5-2.94 5-5.91V5h-4V3ZM5 7V7h2v.18c0 1.16.19 2.25.54 3.23C6.09 9.92 5 8.58 5 7Zm14 0c0 1.58-1.09 2.92-2.54 3.41.35-.98.54-2.07.54-3.23V7h2Z"/>
+                                    </svg>
+                                    <strong>{{ $accolade }}</strong>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="hero-two-info-panel">
                     @if ($hasAnySocial)
                         <div class="hero-two-social-floating">
@@ -789,10 +888,8 @@
                                aria-label="Instagram"
                                target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
                                rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
-                                    <circle cx="12" cy="12" r="4.2"></circle>
-                                    <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm8.5 1.8h-8.5A3.95 3.95 0 0 0 3.8 7.75v8.5a3.95 3.95 0 0 0 3.95 3.95h8.5a3.95 3.95 0 0 0 3.95-3.95v-8.5a3.95 3.95 0 0 0-3.95-3.95ZM12 7.1A4.9 4.9 0 1 1 7.1 12 4.91 4.91 0 0 1 12 7.1Zm0 1.8A3.1 3.1 0 1 0 15.1 12 3.1 3.1 0 0 0 12 8.9Zm5.15-2.3a1.2 1.2 0 1 1-1.2 1.2 1.2 1.2 0 0 1 1.2-1.2Z"/>
                                 </svg>
                             </a>
 
