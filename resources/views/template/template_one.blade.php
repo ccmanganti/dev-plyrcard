@@ -831,17 +831,16 @@
     <style>
         #hero-container{
             position: relative;
-            min-height: 320px;
         }
 
         #hero-loader{
             position: absolute;
             inset: 0;
-            z-index: 40;
-            background: var(--bg);
+            z-index: 60;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: transparent;
             transition: opacity .22s ease, visibility .22s ease;
             will-change: opacity;
             pointer-events: none;
@@ -852,11 +851,24 @@
             visibility: hidden;
         }
 
+        #hero-loader .loader-badge{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
         .loader-spinner{
-            width: 44px;
-            height: 44px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
-            border: 3px solid rgba(15, 23, 42, 0.12);
+            border: 3px solid rgba(15, 23, 42, 0.14);
             border-top-color: var(--primary);
             animation: spin .7s linear infinite;
         }
@@ -1474,11 +1486,13 @@
 <body>
     @if ($website->heroTemplate?->blade_view)
         <div id="hero-container">
-            <div id="hero-loader" aria-hidden="true">
-                <div class="loader-spinner"></div>
-            </div>
-
             @include($website->heroTemplate->blade_view, ['website' => $website])
+
+            <div id="hero-loader" aria-hidden="true">
+                <div class="loader-badge">
+                    <div class="loader-spinner"></div>
+                </div>
+            </div>
         </div>
     @endif
 
@@ -1938,34 +1952,55 @@
                 loader.classList.add('hidden');
             }
 
-            function waitForHeroImage(img, timeout = 900) {
+            function getHeroImages(container) {
+                if (!container) return [];
+
+                return Array.from(container.querySelectorAll('img')).filter(img => {
+                    const src = img.getAttribute('src') || '';
+                    return src.trim() !== '';
+                });
+            }
+
+            function waitForImages(images, timeout = 1200) {
                 return new Promise(resolve => {
-                    if (!img) {
+                    if (!images.length) {
                         resolve();
                         return;
                     }
 
-                    if (img.complete) {
-                        if (typeof img.decode === 'function') {
-                            img.decode().catch(() => {}).finally(resolve);
-                        } else {
-                            resolve();
-                        }
+                    let loaded = 0;
+                    let finished = false;
 
-                        return;
-                    }
-
-                    let done = false;
-
-                    const finish = () => {
-                        if (done) return;
-                        done = true;
+                    const done = () => {
+                        if (finished) return;
+                        finished = true;
                         resolve();
                     };
 
-                    img.addEventListener('load', finish, { once: true });
-                    img.addEventListener('error', finish, { once: true });
-                    setTimeout(finish, timeout);
+                    const markLoaded = () => {
+                        loaded++;
+
+                        if (loaded >= images.length) {
+                            done();
+                        }
+                    };
+
+                    images.forEach(img => {
+                        if (img.complete) {
+                            if (typeof img.decode === 'function') {
+                                img.decode()
+                                    .catch(() => {})
+                                    .finally(markLoaded);
+                            } else {
+                                markLoaded();
+                            }
+                        } else {
+                            img.addEventListener('load', markLoaded, { once: true });
+                            img.addEventListener('error', markLoaded, { once: true });
+                        }
+                    });
+
+                    setTimeout(done, timeout);
                 });
             }
 
@@ -1973,24 +2008,21 @@
                 const heroContainer = document.getElementById('hero-container');
 
                 if (!heroContainer) {
+                    hideHeroLoader();
                     return;
                 }
 
-                const priorityImage =
-                    heroContainer.querySelector('img[data-priority="true"]') ||
-                    heroContainer.querySelector('img[fetchpriority="high"]') ||
-                    heroContainer.querySelector('img');
+                const heroImages = getHeroImages(heroContainer);
 
-                await Promise.race([
-                    waitForHeroImage(priorityImage, 900),
-                    new Promise(resolve => setTimeout(resolve, 450)),
-                ]);
+                await waitForImages(heroImages, 1200);
 
-                requestAnimationFrame(hideHeroLoader);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(hideHeroLoader);
+                });
             });
 
             window.addEventListener('pageshow', hideHeroLoader);
-            setTimeout(hideHeroLoader, 1500);
+            setTimeout(hideHeroLoader, 1800);
         })();
     </script>
 
