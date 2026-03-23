@@ -3,42 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player Intake Form</title>
+    <title>Plyr Intake Form</title>
+
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700|bebas-neue:400" rel="stylesheet" />
+
     <style>
         :root {
-            --bg: #ffffff;
-            --panel: #ffffff;
-            --panel-soft: #fafafa;
-            --field: #ffffff;
-            --field-border: #d4d4d8;
+            --bg: #f8f8f6;
+            --panel: #f2f2f2;
+            --panel-2: #eceae5;
+            --field: #f7f7f7;
+            --field-border: #cfcfd4;
             --text: #111111;
             --muted: #6b7280;
-            --accent: #f97316;
-            --accent-hover: #ea580c;
-            --accent-soft: rgba(249, 115, 22, 0.08);
-            --border: #e5e7eb;
-            --success-bg: rgba(34, 197, 94, 0.10);
-            --success-border: rgba(34, 197, 94, 0.28);
-            --error-bg: rgba(239, 68, 68, 0.10);
-            --error-border: rgba(239, 68, 68, 0.28);
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+            --accent: #ff5f3a;
+            --accent-2: #f97316;
+            --border: #d8d8dc;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
             --radius-xl: 24px;
-            --radius-lg: 18px;
-            --radius-md: 14px;
-            --radius-sm: 12px;
+            --radius-lg: 20px;
+            --radius-md: 16px;
+            --radius-sm: 14px;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         html, body {
             margin: 0;
             padding: 0;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: var(--bg);
             color: var(--text);
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle, rgba(148, 163, 184, 0.28) 1px, transparent 1.2px);
+            background-size: 18px 18px;
         }
 
-        body.embed-mode { padding: 12px; }
+        body.embed-mode {
+            padding: 14px;
+        }
 
         .wrapper {
             width: 100%;
@@ -47,71 +52,77 @@
         }
 
         .card {
-            background: var(--panel);
             border: 1px solid var(--border);
-            border-radius: var(--radius-xl);
+            border-radius: 26px;
             overflow: hidden;
+            background: #f5f5f5;
             box-shadow: var(--shadow);
         }
 
         .header {
-            padding: 28px 28px 18px;
+            padding: 24px 24px 20px;
+            background: #ede8df;
             border-bottom: 1px solid var(--border);
-            background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
         }
 
         .eyebrow {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
+            justify-content: center;
+            min-height: 30px;
+            padding: 6px 14px;
             border-radius: 999px;
-            background: var(--accent-soft);
-            border: 1px solid rgba(249, 115, 22, 0.18);
-            color: var(--accent);
-            font-size: 12px;
+            border: 1px solid rgba(255, 95, 58, 0.2);
+            background: rgba(255, 95, 58, 0.08);
+            color: var(--accent-2);
+            font-size: 13px;
             font-weight: 700;
-            letter-spacing: 0.08em;
+            letter-spacing: .12em;
             text-transform: uppercase;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
-        .header h1 {
-            margin: 0 0 8px;
-            font-size: 34px;
-            line-height: 1.05;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #111827;
-        }
-
-        .header p {
+        .hero-title {
             margin: 0;
-            max-width: 760px;
-            color: var(--muted);
-            font-size: 15px;
-            line-height: 1.6;
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 68px;
+            line-height: .9;
+            letter-spacing: .015em;
+            text-transform: uppercase;
+            color: #000000;
+        }
+
+        .hero-title .accent {
+            color: var(--accent);
+        }
+
+        .header-copy {
+            margin: 8px 0 0;
+            font-size: 20px;
+            line-height: 1.3;
+            color: #232323;
+            max-width: 980px;
         }
 
         .content {
-            padding: 24px;
-            background: #ffffff;
+            padding: 20px;
+            background: #f7f7f7;
         }
 
         .section {
-            margin-bottom: 24px;
-            padding: 22px;
-            background: var(--panel-soft);
+            margin-bottom: 20px;
+            padding: 20px;
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
+            border-radius: 22px;
+            background: #f3f3f3;
         }
 
         .section h2 {
-            margin: 0 0 16px;
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: -0.01em;
-            color: #111827;
+            margin: 0 0 14px;
+            font-size: 22px;
+            line-height: 1.1;
+            font-weight: 700;
+            color: #1f2937;
         }
 
         .grid {
@@ -121,6 +132,7 @@
         }
 
         .col-12 { grid-column: span 12; }
+        .col-8 { grid-column: span 8; }
         .col-6 { grid-column: span 6; }
         .col-4 { grid-column: span 4; }
         .col-3 { grid-column: span 3; }
@@ -128,13 +140,100 @@
         label {
             display: block;
             margin-bottom: 8px;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
-            letter-spacing: 0.01em;
             color: #111827;
         }
 
-        .required { color: var(--accent); }
+        .required {
+            color: var(--accent-2);
+        }
+
+        .field-label-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tooltip-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 1px solid #111111;
+            background: #ffffff;
+            color: #111111;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: help;
+            font-family: Arial, sans-serif;
+        }
+
+        .tooltip-box {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 10px);
+            transform: translateX(-50%);
+            min-width: 280px;
+            max-width: 360px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #111111;
+            color: #ffffff;
+            font-size: 12px;
+            line-height: 1.5;
+            font-weight: 400;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
+            z-index: 40;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: normal;
+        }
+
+        .tooltip-box::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: #111111 transparent transparent transparent;
+        }
+
+        .tooltip-wrap:hover .tooltip-box,
+        .tooltip-wrap:focus-within .tooltip-box {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-2px);
+        }
+
+        .tooltip-box strong {
+            color: #ffffff;
+        }
+
+        .tooltip-box ul {
+            margin: 6px 0 0 18px;
+            padding: 0;
+        }
+
+        .tooltip-box li {
+            margin-bottom: 4px;
+        }
 
         input[type="text"],
         input[type="email"],
@@ -143,47 +242,52 @@
         select,
         textarea {
             width: 100%;
-            padding: 13px 14px;
-            border-radius: var(--radius-sm);
+            min-height: 44px;
+            padding: 11px 14px;
+            border-radius: 14px;
             border: 1px solid var(--field-border);
             background: var(--field);
             color: #111827;
             font-size: 14px;
-            line-height: 1.4;
+            line-height: 1.45;
             outline: none;
-            transition: border-color .18s ease, box-shadow .18s ease;
             appearance: none;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
         }
 
         input::placeholder,
-        textarea::placeholder { color: #9ca3af; }
+        textarea::placeholder {
+            color: #9ca3af;
+        }
 
         input:focus,
         select:focus,
         textarea:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(255, 95, 58, 0.12);
         }
 
         textarea {
-            min-height: 110px;
+            min-height: 108px;
             resize: vertical;
         }
 
         input[type="file"] {
             width: 100%;
-            padding: 12px;
-            border-radius: var(--radius-sm);
-            border: 1px dashed rgba(249, 115, 22, 0.45);
-            background: #fff7ed;
+            min-height: 46px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px dashed rgba(255, 95, 58, 0.35);
+            background: #fff7f3;
             color: #111827;
         }
 
         .hint {
             margin-top: 7px;
-            color: var(--muted);
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.45;
+            color: var(--muted);
         }
 
         .checkbox-group {
@@ -199,40 +303,14 @@
             gap: 8px;
             padding: 10px 14px;
             border-radius: 999px;
-            background: #ffffff;
             border: 1px solid var(--border);
-            color: #111827;
+            background: #ffffff;
             font-size: 14px;
-            transition: border-color .18s ease, background .18s ease;
-        }
-
-        .check-pill:hover {
-            border-color: rgba(249, 115, 22, 0.45);
-            background: #fff7ed;
+            color: #111827;
         }
 
         .check-pill input {
             accent-color: var(--accent);
-        }
-
-        .error-list,
-        .success-box {
-            margin-bottom: 18px;
-            padding: 14px 16px;
-            border-radius: var(--radius-md);
-            font-size: 14px;
-        }
-
-        .error-list {
-            background: var(--error-bg);
-            border: 1px solid var(--error-border);
-            color: #991b1b;
-        }
-
-        .success-box {
-            background: var(--success-bg);
-            border: 1px solid var(--success-border);
-            color: #166534;
         }
 
         .other-wrap {
@@ -240,29 +318,48 @@
             margin-top: 10px;
         }
 
+        .error-list,
+        .success-box {
+            margin-bottom: 18px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+        }
+
+        .error-list {
+            color: #991b1b;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .success-box {
+            color: #166534;
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            background: rgba(34, 197, 94, 0.08);
+        }
+
         .actions {
             display: flex;
             justify-content: flex-end;
-            margin-top: 8px;
+            margin-top: 10px;
         }
 
         .btn {
             appearance: none;
             border: 0;
+            border-radius: 14px;
             background: var(--accent);
             color: #ffffff;
-            font-weight: 800;
+            padding: 14px 24px;
             font-size: 15px;
-            padding: 15px 24px;
-            border-radius: 14px;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 10px 22px rgba(249, 115, 22, 0.22);
-            transition: transform .12s ease, box-shadow .18s ease, background .18s ease;
+            box-shadow: 0 12px 26px rgba(255, 95, 58, 0.22);
+            transition: background .18s ease, transform .12s ease;
         }
 
         .btn:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 14px 26px rgba(249, 115, 22, 0.26);
+            background: #f0522d;
         }
 
         .btn:active {
@@ -270,23 +367,81 @@
         }
 
         @media (max-width: 980px) {
-            .header h1 { font-size: 28px; }
-            .content { padding: 18px; }
-            .header { padding: 24px 20px 18px; }
-            .section { padding: 18px; }
-            .col-6, .col-4, .col-3 { grid-column: span 12; }
-            .actions { justify-content: stretch; }
-            .btn { width: 100%; }
+            .hero-title {
+                font-size: 52px;
+            }
+
+            .header-copy {
+                font-size: 17px;
+            }
+
+            .col-8,
+            .col-6,
+            .col-4,
+            .col-3 {
+                grid-column: span 12;
+            }
+
+            .actions {
+                justify-content: stretch;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .tooltip-box {
+                left: 0;
+                transform: translateX(0);
+                max-width: min(320px, calc(100vw - 48px));
+            }
+
+            .tooltip-box::after {
+                left: 18px;
+                transform: none;
+            }
+
+            .tooltip-wrap:hover .tooltip-box,
+            .tooltip-wrap:focus-within .tooltip-box {
+                transform: translateX(0) translateY(-2px);
+            }
         }
 
         @media (max-width: 640px) {
-            body.embed-mode { padding: 0; }
-            .wrapper { max-width: 100%; }
+            body.embed-mode {
+                padding: 0;
+            }
+
+            .wrapper {
+                max-width: 100%;
+            }
+
             .card {
                 border-radius: 0;
                 border-left: 0;
                 border-right: 0;
                 box-shadow: none;
+            }
+
+            .header {
+                padding: 18px 16px 16px;
+            }
+
+            .content {
+                padding: 14px;
+            }
+
+            .section {
+                padding: 16px;
+                border-radius: 18px;
+            }
+
+            .hero-title {
+                font-size: 42px;
+            }
+
+            .header-copy {
+                font-size: 15px;
             }
         }
     </style>
@@ -296,8 +451,10 @@
     <div class="card">
         <div class="header">
             <div class="eyebrow">PlyrCard Intake</div>
-            <h1>Player Intake Form</h1>
-            <p>Complete the form below so we can create the athlete record and website automatically when supported.</p>
+            <h1 class="hero-title">Plyr <span class="accent">Intake</span> Form</h1>
+            <p class="header-copy">
+                Use this form to build your PLYRCard Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
+            </p>
         </div>
 
         <div class="content">
@@ -321,6 +478,7 @@
 
                 <div class="section">
                     <h2>Athlete Details</h2>
+
                     <div class="grid">
                         <div class="col-4">
                             <label for="first_name">First Name <span class="required">*</span></label>
@@ -358,7 +516,7 @@
                         <div class="col-4">
                             <label for="phone">Phone</label>
                             <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel">
-                            <div class="hint">Use the athlete's direct phone if available.</div>
+                            <div class="hint">Use the athlete’s direct phone if available.</div>
                         </div>
 
                         <div class="col-4">
@@ -398,6 +556,11 @@
                         </div>
 
                         <div class="col-4">
+                            <label for="vertical_jump">Vertical Jump</label>
+                            <input type="text" id="vertical_jump" name="vertical_jump" value="{{ old('vertical_jump') }}" maxlength="50">
+                        </div>
+
+                        <div class="col-4">
                             <label for="gpa">GPA</label>
                             <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}" maxlength="50">
                         </div>
@@ -410,6 +573,11 @@
                         <div class="col-4">
                             <label for="weight">Weight</label>
                             <input type="text" id="weight" name="weight" value="{{ old('weight') }}" maxlength="50">
+                        </div>
+
+                        <div class="col-4">
+                            <label for="max_speed">Max Speed</label>
+                            <input type="text" id="max_speed" name="max_speed" value="{{ old('max_speed') }}" maxlength="50">
                         </div>
 
                         <div class="col-12">
@@ -428,29 +596,141 @@
                         </div>
 
                         <div class="col-4">
-                            <label for="ig_handle">Instagram Handle</label>
-                            <input type="text" id="ig_handle" name="ig_handle" value="{{ old('ig_handle') }}" maxlength="255">
+                            <label for="ig_handle">
+                                <span class="field-label-inline">
+                                    <span>Instagram Profile URL</span>
+                                    <span class="tooltip-wrap" tabindex="0">
+                                        <span class="info-icon">i</span>
+                                        <span class="tooltip-box">
+                                            Please paste your Instagram profile link (URL), not just your @handle.<br><br>
+                                            <strong>Example:</strong><br>
+                                            https://www.instagram.com/plyrcard/<br><br>
+                                            <strong>Not accepted:</strong><br>
+                                            @plyrcard or plyrcard
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
+                            <input
+                                type="url"
+                                id="ig_handle"
+                                name="ig_handle"
+                                value="{{ old('ig_handle') }}"
+                                maxlength="255"
+                                placeholder="https://www.instagram.com/yourprofile/"
+                            >
                         </div>
 
                         <div class="col-4">
-                            <label for="x_handle">X Handle</label>
-                            <input type="text" id="x_handle" name="x_handle" value="{{ old('x_handle') }}" maxlength="255">
+                            <label for="x_handle">
+                                <span class="field-label-inline">
+                                    <span>X Profile URL</span>
+                                    <span class="tooltip-wrap" tabindex="0">
+                                        <span class="info-icon">i</span>
+                                        <span class="tooltip-box">
+                                            Please paste your Twitter/X profile link (URL), not just your @handle.<br><br>
+                                            <strong>Example:</strong><br>
+                                            https://x.com/plyrcard<br><br>
+                                            <strong>Not accepted:</strong><br>
+                                            @plyrcard or plyrcard
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
+                            <input
+                                type="url"
+                                id="x_handle"
+                                name="x_handle"
+                                value="{{ old('x_handle') }}"
+                                maxlength="255"
+                                placeholder="https://x.com/yourprofile"
+                            >
                         </div>
 
                         <div class="col-12">
-                            <label for="yt_url">YouTube URL</label>
-                            <input type="url" id="yt_url" name="yt_url" value="{{ old('yt_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
-                            <div class="hint">Paste the main highlights video URL.</div>
+                            <label for="yt_url">
+                                <span class="field-label-inline">
+                                    <span>YouTube Channel URL</span>
+                                    <span class="tooltip-wrap" tabindex="0">
+                                        <span class="info-icon">i</span>
+                                        <span class="tooltip-box">
+                                            Please paste your YouTube channel link (URL), not just the channel name.<br><br>
+                                            We’ll automatically pull your portfolio content from this link when supported.<br><br>
+                                            <strong>Examples:</strong>
+                                            <ul>
+                                                <li>https://www.youtube.com/@YourChannelName</li>
+                                                <li>https://www.youtube.com/channel/UCxxxxxxxxxxxxxxx</li>
+                                                <li>https://www.youtube.com/c/YourCustomName</li>
+                                            </ul>
+                                            <strong>Not accepted:</strong><br>
+                                            Channel name only or handle only.
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
+                            <input
+                                type="url"
+                                id="yt_url"
+                                name="yt_url"
+                                value="{{ old('yt_url') }}"
+                                maxlength="500"
+                                placeholder="https://www.youtube.com/@YourChannelName"
+                            >
+                            <div class="hint">We’ll automatically pull your portfolio content from this link when supported.</div>
                         </div>
 
                         <div class="col-6">
-                            <label for="featured_video_url">Featured Video URL</label>
-                            <input type="url" id="featured_video_url" name="featured_video_url" value="{{ old('featured_video_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
+                            <label for="featured_video_url">
+                                <span class="field-label-inline">
+                                    <span>Featured Video URL</span>
+                                    <span class="tooltip-wrap" tabindex="0">
+                                        <span class="info-icon">i</span>
+                                        <span class="tooltip-box">
+                                            Paste the full URL to the one YouTube video you want featured on your PLYR Profile.<br><br>
+                                            This can be your personal intro video or your best highlight.<br><br>
+                                            <strong>Examples:</strong>
+                                            <ul>
+                                                <li>https://www.youtube.com/watch?v=dQw4w9WgXcQ</li>
+                                                <li>https://youtu.be/dQw4w9WgXcQ</li>
+                                            </ul>
+                                            <strong>Not accepted:</strong><br>
+                                            Video title only or channel link.
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
+                            <input
+                                type="url"
+                                id="featured_video_url"
+                                name="featured_video_url"
+                                value="{{ old('featured_video_url') }}"
+                                maxlength="500"
+                                placeholder="https://www.youtube.com/watch?v=..."
+                            >
                             <div class="hint">This is the main featured video for the website.</div>
                         </div>
 
                         <div class="col-6">
-                            <label for="featured_video_urls">Featured Video URLs</label>
+                            <label for="featured_video_urls">
+                                <span class="field-label-inline">
+                                    <span>Featured Video URLs</span>
+                                    <span class="tooltip-wrap" tabindex="0">
+                                        <span class="info-icon">i</span>
+                                        <span class="tooltip-box">
+                                            Use this if you want to add highlights manually.<br><br>
+                                            Paste full video URLs here, one per line, in the order you want them displayed.<br><br>
+                                            <strong>Examples:</strong>
+                                            <ul>
+                                                <li>https://www.youtube.com/watch?v=dQw4w9WgXcQ</li>
+                                                <li>https://youtu.be/dQw4w9WgXcQ</li>
+                                                <li>https://www.youtube.com/shorts/abcdeFGhijk</li>
+                                            </ul>
+                                            <strong>Not accepted:</strong><br>
+                                            Video titles only or channel links in this field.
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
                             <textarea
                                 id="featured_video_urls"
                                 name="featured_video_urls"
@@ -498,6 +778,7 @@
 
                 <div class="section">
                     <h2>Location, School, League & Club</h2>
+
                     <div class="grid">
                         <div class="col-3">
                             <label for="country">Country</label>
@@ -547,7 +828,7 @@
                         <div class="col-3">
                             <label for="league_other">League</label>
                             <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter league name">
-                            <div class="hint">League is entered independently and is no longer tied to club selection.</div>
+                            <div class="hint">League is entered independently and is not tied to club selection.</div>
                         </div>
 
                         <div class="col-3">
@@ -560,10 +841,7 @@
                             <select id="club_id" name="club_id">
                                 <option value="">Select club</option>
                                 @foreach ($clubs as $club)
-                                    <option
-                                        value="{{ $club->id }}"
-                                        {{ (string) old('club_id') === (string) $club->id ? 'selected' : '' }}
-                                    >
+                                    <option value="{{ $club->id }}" {{ (string) old('club_id') === (string) $club->id ? 'selected' : '' }}>
                                         {{ $club->name }}
                                     </option>
                                 @endforeach
@@ -585,6 +863,7 @@
 
                 <div class="section">
                     <h2>Parent / Guardian Information</h2>
+
                     <div class="grid">
                         <div class="col-4">
                             <label for="parent">Primary Parent / Guardian</label>
@@ -620,6 +899,7 @@
 
                 <div class="section">
                     <h2>Coaches & Trainers</h2>
+
                     <div class="grid">
                         <div class="col-4">
                             <label for="club_coach">Club Coach</label>
@@ -672,12 +952,12 @@
                         </div>
 
                         <div class="col-4">
-                            <label for="snc_trainer_email">S&C Trainer Email</label>
+                            <label for="snc_trainer_email">S&amp;C Trainer Email</label>
                             <input type="email" id="snc_trainer_email" name="snc_trainer_email" value="{{ old('snc_trainer_email') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
-                            <label for="snc_trainer_phone">S&C Trainer Phone</label>
+                            <label for="snc_trainer_phone">S&amp;C Trainer Phone</label>
                             <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel">
                         </div>
                     </div>
@@ -685,6 +965,7 @@
 
                 <div class="section">
                     <h2>Images</h2>
+
                     <div class="grid">
                         <div class="col-3">
                             <label for="player_card_image">Player Card Image</label>
@@ -777,6 +1058,8 @@
     function toggleSchoolOther() {
         const select = document.getElementById('school_id');
         const wrap = document.getElementById('school_other_wrap');
+
+        if (!select || !wrap) return;
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
     }
 
@@ -784,10 +1067,7 @@
         const clubSelect = document.getElementById('club_id');
         const clubOtherSection = document.getElementById('club_other_section');
 
-        if (!clubSelect || !clubOtherSection) {
-            return;
-        }
-
+        if (!clubSelect || !clubOtherSection) return;
         clubOtherSection.style.display = clubSelect.value === '__other__' ? 'block' : 'none';
     }
 
