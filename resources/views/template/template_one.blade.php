@@ -2042,7 +2042,7 @@
 
                 await Promise.all([
                     waitForImages(heroImages, 1200),
-                    new Promise(resolve => setTimeout(resolve, 1000)),
+                    new Promise(resolve => setTimeout(resolve, 2000)),
                 ]);
 
                 requestAnimationFrame(() => {
