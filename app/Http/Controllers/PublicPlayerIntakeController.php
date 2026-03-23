@@ -4,18 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Club;
 use App\Models\HeroTemplate;
-use App\Models\HeroTemplateField;
 use App\Models\League;
 use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
-use App\Models\WebsiteHeroFieldValue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -150,8 +147,8 @@ class PublicPlayerIntakeController extends Controller
     public function create(): View
     {
         $schools = School::query()->orderBy('name')->get();
+
         $clubs = Club::query()
-            ->with('league')
             ->orderBy('name')
             ->get();
 
@@ -321,10 +318,6 @@ class PublicPlayerIntakeController extends Controller
             $generatedEmail = $firstNameSlug . '@' . $nameDomainStem . '.com';
             $generatedDomain = $nameDomainStem . '.com';
 
-            if (! empty($userImageUploads['youtube_thumbnail'])) {
-                $user->youtube_thumbnail = $userImageUploads['youtube_thumbnail'];
-            }
-
             $user = User::withTrashed()
                 ->where('personal_email', $validated['personal_email'])
                 ->orWhere('email', $generatedEmail)
@@ -415,7 +408,7 @@ class PublicPlayerIntakeController extends Controller
 
             $user->save();
 
-            $uploads = $this->storeHeroUploads($request, $user);
+            $uploads = $this->storeHeroUploads($request);
 
             $this->createWebsiteIfSupported($user, $validated, $uploads, $generatedDomain);
 
@@ -451,35 +444,40 @@ class PublicPlayerIntakeController extends Controller
     protected function resolveClubAndLeague(array $validated): array
     {
         $clubId = $validated['club_id'] ?? null;
+        $league = null;
+        $club = null;
 
         if ($clubId === '__other__') {
-            if (
-                blank($validated['club_other'] ?? null) ||
-                blank($validated['league_other'] ?? null) ||
-                blank($validated['gender'] ?? null)
-            ) {
-                return [null, null];
+            if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
+                $league = League::updateOrCreate(
+                    ['name' => trim($validated['league_other'])],
+                    ['gender' => $validated['gender']]
+                );
             }
 
-            $league = League::updateOrCreate(
-                ['name' => trim($validated['league_other'])],
-                ['gender' => $validated['gender']]
-            );
-
-            $club = Club::firstOrCreate([
-                'name' => trim($validated['club_other']),
-                'league_id' => $league->id,
-            ]);
+            if (filled($validated['club_other'] ?? null)) {
+                $club = Club::firstOrCreate([
+                    'name' => trim($validated['club_other']),
+                ]);
+            }
 
             return [$league, $club];
         }
 
         if (filled($clubId)) {
-            $club = Club::with('league')->find($clubId);
-            return [$club?->league, $club];
+            $club = Club::find($clubId);
+
+            return [null, $club];
         }
 
-        return [null, null];
+        if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
+            $league = League::updateOrCreate(
+                ['name' => trim($validated['league_other'])],
+                ['gender' => $validated['gender']]
+            );
+        }
+
+        return [$league, null];
     }
 
     protected function storeHeroUploads(Request $request): array
@@ -585,9 +583,7 @@ class PublicPlayerIntakeController extends Controller
 
     protected function resolveSiteTemplateId(string $sport): ?int
     {
-        // $templateId = 1;
         $templateId = 2;
-        // For production, use 2
 
         $template = SiteTemplate::find($templateId);
 
@@ -602,9 +598,7 @@ class PublicPlayerIntakeController extends Controller
     {
         $map = [
             'basketball' => 1,
-            // 'soccer' => 7,
             'soccer' => 4,
-            // For production: use 4 for soccer
         ];
 
         $templateId = $map[$sport] ?? null;
@@ -670,4 +664,4 @@ class PublicPlayerIntakeController extends Controller
 
         return $paths;
     }
-}   
+}

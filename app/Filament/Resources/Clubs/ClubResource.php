@@ -8,7 +8,6 @@ use App\Filament\Resources\Clubs\Pages\ListClubs;
 use App\Filament\Resources\Clubs\Pages\ViewClub;
 use App\Models\Club;
 use BackedEnum;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -36,19 +35,9 @@ class ClubResource extends Resource
             Section::make('Club')
                 ->columns(2)
                 ->schema([
-                    TextInput::make('name')->required()->maxLength(255),
-
-                    // Select::make('school_id')
-                    //     ->relationship('school', 'name')
-                    //     ->searchable()
-                    //     ->preload()
-                    //     ->nullable(),
-
-                    Select::make('league_id')
-                        ->relationship('league', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->nullable(),
+                    TextInput::make('name')
+                        ->required()
+                        ->maxLength(255),
                 ]),
         ]);
     }
@@ -57,10 +46,13 @@ class ClubResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')->searchable()->sortable(),
-                // TextColumn::make('school.name')->label('School')->toggleable(),
-                TextColumn::make('league.name')->label('League')->toggleable(),
-                TextColumn::make('updated_at')->since()->label('Updated'),
+                TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('updated_at')
+                    ->since()
+                    ->label('Updated'),
             ])
             ->filters([
                 TrashedFilter::make(),

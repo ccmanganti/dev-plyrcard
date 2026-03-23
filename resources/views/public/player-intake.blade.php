@@ -826,14 +826,20 @@
                         </div>
 
                         <div class="col-3">
-                            <label for="league_other">League</label>
-                            <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter league name">
-                            <div class="hint">League is entered independently and is not tied to club selection.</div>
-                        </div>
-
-                        <div class="col-3">
-                            <label for="team_name">Team Name</label>
-                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
+                            <label for="league_id">League</label>
+                            <select id="league_id" name="league_id">
+                                <option value="">Select league</option>
+                                @foreach ($leagues as $league)
+                                    <option value="{{ $league->id }}" {{ (string) old('league_id') === (string) $league->id ? 'selected' : '' }}>
+                                        {{ $league->name }}
+                                    </option>
+                                @endforeach
+                                <option value="__other__" {{ old('league_id') === '__other__' ? 'selected' : '' }}>Other</option>
+                            </select>
+                            <div class="hint">League is selected independently and is not tied to club selection.</div>
+                            <div id="league_other_wrap" class="other-wrap">
+                                <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter new league name">
+                            </div>
                         </div>
 
                         <div class="col-3">
@@ -848,6 +854,11 @@
                                 <option value="__other__" {{ old('club_id') === '__other__' ? 'selected' : '' }}>Other</option>
                             </select>
                             <div class="hint">Choose Other to manually enter a club not listed.</div>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="team_name">Team</label>
+                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
                         </div>
 
                         <div id="club_other_section" class="col-12 other-wrap">
@@ -1063,6 +1074,14 @@
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
     }
 
+    function toggleLeagueOther() {
+        const select = document.getElementById('league_id');
+        const wrap = document.getElementById('league_other_wrap');
+
+        if (!select || !wrap) return;
+        wrap.style.display = select.value === '__other__' ? 'block' : 'none';
+    }
+
     function toggleClubOther() {
         const clubSelect = document.getElementById('club_id');
         const clubOtherSection = document.getElementById('club_other_section');
@@ -1102,10 +1121,12 @@
     });
 
     document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
+    document.getElementById('league_id').addEventListener('change', toggleLeagueOther);
     document.getElementById('club_id').addEventListener('change', toggleClubOther);
 
     renderPositions();
     toggleSchoolOther();
+    toggleLeagueOther();
     toggleClubOther();
     updateImageInstructions();
 </script>

@@ -28,7 +28,7 @@ class PublicWebsiteController extends Controller
             $website = Website::query()
                 ->with([
                     'user.school',
-                    'user.club.league',
+                    'user.club',
                     'user.schedules',
                     'siteTemplate',
                     'heroTemplate',
@@ -54,7 +54,7 @@ class PublicWebsiteController extends Controller
             })
             ->with([
                 'user.school',
-                'user.club.league',
+                'user.club',
                 'user.schedules',
                 'siteTemplate',
                 'heroTemplate',
@@ -74,7 +74,7 @@ class PublicWebsiteController extends Controller
     {
         $website->load([
             'user.school',
-            'user.club.league',
+            'user.club',
             'user.schedules',
             'siteTemplate',
             'heroTemplate',
@@ -92,7 +92,7 @@ class PublicWebsiteController extends Controller
         $website = Website::query()
             ->with([
                 'user.school',
-                'user.club.league',
+                'user.club',
                 'user.schedules',
                 'siteTemplate',
                 'heroTemplate',
