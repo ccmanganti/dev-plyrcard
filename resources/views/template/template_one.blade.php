@@ -831,6 +831,7 @@
     <style>
         #hero-container{
             position: relative;
+            overflow: hidden;
         }
 
         #hero-loader{
@@ -840,7 +841,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: transparent;
+            background: var(--primary, #334155);
             transition: opacity .22s ease, visibility .22s ease;
             will-change: opacity;
             pointer-events: none;
@@ -851,30 +852,18 @@
             visibility: hidden;
         }
 
-        #hero-loader .loader-badge{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 64px;
-            height: 64px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.82);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
+        #hero-loader .loader-media{
+            display: block;
+            width: min(220px, 42vw);
+            max-width: 220px;
+            height: auto;
+            object-fit: contain;
         }
 
-        .loader-spinner{
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            border: 3px solid rgba(15, 23, 42, 0.14);
-            border-top-color: var(--primary);
-            animation: spin .7s linear infinite;
-        }
-
-        @keyframes spin{
-            to{ transform: rotate(360deg); }
+        @media (max-width: 640px) {
+            #hero-loader .loader-media{
+                width: min(180px, 52vw);
+            }
         }
 
         :root{
@@ -1489,9 +1478,14 @@
             @include($website->heroTemplate->blade_view, ['website' => $website])
 
             <div id="hero-loader" aria-hidden="true">
-                <div class="loader-badge">
-                    <div class="loader-spinner"></div>
-                </div>
+                <img
+                    src="{{ asset('PLYR_LOGO_TRANS_GIF.webp') }}"
+                    alt="Plyr loading"
+                    class="loader-media"
+                    width="220"
+                    height="220"
+                    decoding="async"
+                >
             </div>
         </div>
     @endif
