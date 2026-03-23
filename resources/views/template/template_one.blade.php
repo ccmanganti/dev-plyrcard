@@ -829,29 +829,36 @@
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 
     <style>
-        #page-loader{
-            position: fixed;
+        #hero-container{
+            position: relative;
+            min-height: 320px;
+        }
+
+        #hero-loader{
+            position: absolute;
             inset: 0;
-            z-index: 9999;
+            z-index: 40;
             background: var(--bg);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity .45s ease, visibility .45s ease;
+            transition: opacity .22s ease, visibility .22s ease;
+            will-change: opacity;
+            pointer-events: none;
         }
 
-        #page-loader.hidden{
-            opacity:0;
-            visibility:hidden;
+        #hero-loader.hidden{
+            opacity: 0;
+            visibility: hidden;
         }
 
         .loader-spinner{
-            width:48px;
-            height:48px;
-            border-radius:50%;
-            border:4px solid rgba(255,255,255,0.15);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 3px solid rgba(15, 23, 42, 0.12);
             border-top-color: var(--primary);
-            animation: spin 1s linear infinite;
+            animation: spin .7s linear infinite;
         }
 
         @keyframes spin{
@@ -1465,12 +1472,12 @@
 </head>
 
 <body>
-    <div id="page-loader">
-        <div class="loader-spinner"></div>
-    </div>
-
     @if ($website->heroTemplate?->blade_view)
         <div id="hero-container">
+            <div id="hero-loader" aria-hidden="true">
+                <div class="loader-spinner"></div>
+            </div>
+
             @include($website->heroTemplate->blade_view, ['website' => $website])
         </div>
     @endif
@@ -1554,6 +1561,8 @@
                                             src="{{ $aboutThumbnailUrl }}"
                                             alt="Video Thumbnail"
                                             class="w-full h-full object-cover"
+                                            loading="lazy"
+                                            decoding="async"
                                         />
 
                                         <div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition"></div>
@@ -1784,7 +1793,7 @@
                 <div class="flex items-center justify-start md:justify-start">
                     <div class="h-40 md:h-60 w-full md:w-auto rounded flex items-center justify-center overflow-hidden">
                         @if (!empty($footerLogoUrl))
-                            <img src="{{ $footerLogoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-3">
+                            <img src="{{ $footerLogoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-3" loading="lazy" decoding="async">
                         @else
                             <div class="h-full w-full"></div>
                         @endif
@@ -1918,37 +1927,71 @@
     </div>
 
     <script>
-        window.addEventListener("load", function () {
-            const loader = document.getElementById("page-loader");
-            const heroImages = document.querySelectorAll("#hero-container img");
+        (function () {
+            function hideHeroLoader() {
+                const loader = document.getElementById('hero-loader');
 
-            if (heroImages.length === 0) {
-                loader.classList.add("hidden");
-                return;
+                if (!loader || loader.classList.contains('hidden')) {
+                    return;
+                }
+
+                loader.classList.add('hidden');
             }
 
-            let loaded = 0;
+            function waitForHeroImage(img, timeout = 900) {
+                return new Promise(resolve => {
+                    if (!img) {
+                        resolve();
+                        return;
+                    }
 
-            heroImages.forEach(img => {
-                if (img.complete) {
-                    loaded++;
-                } else {
-                    img.addEventListener("load", checkDone);
-                    img.addEventListener("error", checkDone);
+                    if (img.complete) {
+                        if (typeof img.decode === 'function') {
+                            img.decode().catch(() => {}).finally(resolve);
+                        } else {
+                            resolve();
+                        }
+
+                        return;
+                    }
+
+                    let done = false;
+
+                    const finish = () => {
+                        if (done) return;
+                        done = true;
+                        resolve();
+                    };
+
+                    img.addEventListener('load', finish, { once: true });
+                    img.addEventListener('error', finish, { once: true });
+                    setTimeout(finish, timeout);
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', async function () {
+                const heroContainer = document.getElementById('hero-container');
+
+                if (!heroContainer) {
+                    return;
                 }
+
+                const priorityImage =
+                    heroContainer.querySelector('img[data-priority="true"]') ||
+                    heroContainer.querySelector('img[fetchpriority="high"]') ||
+                    heroContainer.querySelector('img');
+
+                await Promise.race([
+                    waitForHeroImage(priorityImage, 900),
+                    new Promise(resolve => setTimeout(resolve, 450)),
+                ]);
+
+                requestAnimationFrame(hideHeroLoader);
             });
 
-            function checkDone() {
-                loaded++;
-                if (loaded >= heroImages.length) {
-                    loader.classList.add("hidden");
-                }
-            }
-
-            if (loaded === heroImages.length) {
-                loader.classList.add("hidden");
-            }
-        });
+            window.addEventListener('pageshow', hideHeroLoader);
+            setTimeout(hideHeroLoader, 1500);
+        })();
     </script>
 
     <script>
