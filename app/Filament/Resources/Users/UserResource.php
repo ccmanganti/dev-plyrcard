@@ -163,6 +163,7 @@ class UserResource extends Resource
                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
                     TextInput::make('team_name')
+                        ->label('Team')
                         ->maxLength(255),
 
                     Select::make('sport')
@@ -462,6 +463,7 @@ class UserResource extends Resource
                 TextColumn::make('club.name')->label('Club')->toggleable(),
                 TextColumn::make('roles.name')->badge(),
                 TextColumn::make('updated_at')->since()->label('Updated'),
+
                 TextColumn::make('sport')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => str($state)->replace('_', ' ')->title())
@@ -516,30 +518,6 @@ class UserResource extends Resource
                             ->all()
                     )
                     ->multiple(),
-
-                SelectFilter::make('league')
-                    ->label('League')
-                    ->options(function (): array {
-                        return User::query()
-                            ->whereHas('club.league')
-                            ->with('club.league')
-                            ->get()
-                            ->filter(fn ($user) => $user->club?->league?->id && $user->club?->league?->name)
-                            ->mapWithKeys(fn ($user) => [
-                                $user->club->league->id => $user->club->league->name,
-                            ])
-                            ->sort()
-                            ->all();
-                    })
-                    ->query(function (Builder $query, array $data): Builder {
-                        $value = $data['value'] ?? null;
-
-                        if (blank($value)) {
-                            return $query;
-                        }
-
-                        return $query->whereHas('club.league', fn (Builder $q) => $q->whereKey($value));
-                    }),
 
                 TernaryFilter::make('natl_team_exp')
                     ->label('National Team Experience')
