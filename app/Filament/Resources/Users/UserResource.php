@@ -88,6 +88,23 @@ class UserResource extends Resource
                         ->maxLength(255)
                         ->unique(ignoreRecord: true),
 
+                    TextInput::make('password')
+                        ->label('Password')
+                        ->password()
+                        ->revealable()
+                        ->dehydrated(fn ($state) => filled($state))
+                        ->dehydrateStateUsing(fn ($state) => filled($state) ? $state : null)
+                        ->same('password_confirmation')
+                        ->nullable()
+                        ->helperText('Leave blank to keep the current password.'),
+
+                    TextInput::make('password_confirmation')
+                        ->label('Confirm Password')
+                        ->password()
+                        ->revealable()
+                        ->dehydrated(false)
+                        ->nullable(),
+
                     TextInput::make('phone')
                         ->tel()
                         ->maxLength(255),

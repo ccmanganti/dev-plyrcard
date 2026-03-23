@@ -347,6 +347,93 @@
 
         /*
         |--------------------------------------------------------------------------
+        | Schedules
+        |--------------------------------------------------------------------------
+        */
+        $playerSchedules = collect();
+
+        if ($user?->id && $user?->club_id) {
+            $playerSchedules = \App\Models\Schedule::query()
+                ->where('club_id', $user->club_id)
+                ->whereHas('users', function ($query) use ($user) {
+                    $query->where('users.id', $user->id)
+                        ->where('schedule_user.will_come', true);
+                })
+                ->orderBy('game_date')
+                ->orderBy('game_time')
+                ->get();
+        }
+
+        $formatScheduleTitle = function ($schedule) {
+            $opponent = trim((string) ($schedule->opponent ?? ''));
+            $title = trim((string) ($schedule->title ?? ''));
+
+            if ($opponent !== '') {
+                return ($schedule->is_home ? 'Home vs ' : 'Away @ ') . $opponent;
+            }
+
+            return $title !== '' ? $title : 'Game Day';
+        };
+
+        $schedulePayload = $playerSchedules
+            ->filter(fn ($schedule) => ! blank($schedule->game_date))
+            ->map(function ($schedule) use ($formatScheduleTitle) {
+                $date = optional($schedule->game_date);
+
+                $timeDisplay = 'Time TBD';
+                if (! blank($schedule->game_time)) {
+                    try {
+                        $timeDisplay = $schedule->game_time instanceof \Carbon\CarbonInterface
+                            ? $schedule->game_time->format('g:i A')
+                            : \Carbon\Carbon::parse($schedule->game_time)->format('g:i A');
+                    } catch (\Throwable $e) {
+                        $timeDisplay = 'Time TBD';
+                    }
+                }
+
+                $locationLine = collect([
+                    $schedule->location,
+                    $schedule->venue,
+                ])->filter(fn ($value) => filled($value))->implode(' ');
+
+                return [
+                    'id' => $schedule->id,
+                    'title' => $formatScheduleTitle($schedule),
+                    'date' => $date?->format('Y-m-d'),
+                    'year' => $date?->format('Y'),
+                    'month' => $date?->format('m'),
+                    'month_label' => $date?->format('F'),
+                    'month_year' => $date?->format('F Y'),
+                    'day_name' => $date?->format('D'),
+                    'day_number' => $date?->format('d'),
+                    'month_short' => $date?->format('M'),
+                    'full_date_label' => $date?->format('M d, Y'),
+                    'time' => $timeDisplay,
+                    'location' => $schedule->location ?? '',
+                    'venue' => $schedule->venue ?? '',
+                    'location_line' => $locationLine,
+                    'notes' => $schedule->notes ?? '',
+                    'opponent' => $schedule->opponent ?? '',
+                    'is_home' => (bool) $schedule->is_home,
+                    'status' => $schedule->status ?? '',
+                    'result' => $schedule->result ?? '',
+                    'score' => $schedule->score ?? '',
+                    'search_blob' => strtolower(trim(collect([
+                        $formatScheduleTitle($schedule),
+                        $schedule->opponent,
+                        $schedule->location,
+                        $schedule->venue,
+                        $schedule->notes,
+                        $date?->format('F Y'),
+                        $date?->format('M d, Y'),
+                    ])->filter(fn ($value) => filled($value))->implode(' '))),
+                ];
+            })
+            ->values()
+            ->all();
+
+        /*
+        |--------------------------------------------------------------------------
         | Contrast Helpers
         |--------------------------------------------------------------------------
         */
@@ -736,7 +823,7 @@
     </script>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-<link href="https://fonts.bunny.net/css?family=anton-sc:400|antonio:300,400,500,600,700|bebas-neue:400|iceberg:400|poppins:300,400,500,600,700" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=anton-sc:400|antonio:300,400,500,600,700|bebas-neue:400|iceberg:400|poppins:300,400,500,600,700" rel="stylesheet" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -859,130 +946,521 @@
                     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
         }
 
+        .schedule-shell{
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+            overflow: hidden;
+        }
+
+        .schedule-toolbar{
+            display: grid;
+            grid-template-columns: minmax(0, 240px) minmax(0, 120px) minmax(0, 1fr) auto;
+            gap: 0;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .schedule-control{
+            position: relative;
+            min-height: 48px;
+            border-right: 1px solid rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+        }
+
+        .schedule-control:last-child{
+            border-right: 0;
+        }
+
+        .schedule-control select,
+        .schedule-control input,
+        .schedule-reset-btn{
+            width: 100%;
+            height: 100%;
+            min-height: 48px;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: {{ $text1 }};
+            font-size: 14px;
+            padding: 0 14px 0 44px;
+        }
+
+        .schedule-control select{
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 38px;
+            cursor: pointer;
+        }
+
+        .schedule-control-icon{
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: {{ $primary }};
+            pointer-events: none;
+        }
+
+        .schedule-control-caret{
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 14px;
+            color: rgba(15,23,42,.55);
+            pointer-events: none;
+        }
+
+        .schedule-reset-btn{
+            padding: 0 18px;
+            cursor: pointer;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: {{ $text2 }};
+        }
+
+        .schedule-reset-btn:hover{
+            background: rgba(15,23,42,.03);
+            color: {{ $text1 }};
+        }
+
+        .schedule-header{
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, rgba(248,250,252,1) 0%, rgba(255,255,255,1) 100%);
+        }
+
+        .schedule-month-row{
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            min-height: 50px;
+            padding: 0 16px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .schedule-month-label{
+            text-align: center;
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 2rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: {{ $text1 }};
+        }
+
+        .schedule-month-next{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            color: {{ $primary }};
+        }
+
+        .schedule-week-row{
+            display: grid;
+            grid-template-columns: 72px 1fr 72px;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+        }
+
+        .schedule-nav-btn{
+            width: 50px;
+            height: 50px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            color: {{ $primary }};
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+            cursor: pointer;
+            transition: 180ms ease;
+        }
+
+        .schedule-nav-btn:hover:not(:disabled){
+            transform: translateY(-1px);
+            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.09);
+        }
+
+        .schedule-nav-btn:disabled{
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        .schedule-week-center{
+            text-align: center;
+        }
+
+        .schedule-week-label{
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 2.4rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: {{ $text1 }};
+            line-height: 1;
+        }
+
+        .schedule-days-grid{
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+        }
+
+        .schedule-day-cell{
+            min-height: 48px;
+            padding: 8px 6px;
+            text-align: center;
+            border-right: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .schedule-day-cell:last-child{
+            border-right: 0;
+        }
+
+        .schedule-day-name{
+            display: block;
+            font-size: .82rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            color: {{ $text1 }};
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .schedule-day-date{
+            display: block;
+            margin-top: 4px;
+            font-size: .92rem;
+            font-weight: 700;
+            color: {{ $text1 }};
+        }
+
+        .schedule-day-cell.is-muted .schedule-day-name,
+        .schedule-day-cell.is-muted .schedule-day-date{
+            opacity: .45;
+        }
+
+        .schedule-list-wrap{
+            background: #fff;
+        }
+
+        .schedule-listing{
+            min-height: 140px;
+        }
+
+        .schedule-row{
+            display: grid;
+            grid-template-columns: 94px minmax(0, 1fr);
+            gap: 18px;
+            padding: 22px 22px;
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .schedule-row:first-child{
+            border-top: 0;
+        }
+
+        .schedule-date-block{
+            text-align: center;
+            color: {{ $primary }};
+            line-height: 1;
+            padding-top: 4px;
+        }
+
+        .schedule-date-block .num{
+            display: block;
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 3.1rem;
+            letter-spacing: .03em;
+        }
+
+        .schedule-date-block .mon{
+            display: block;
+            margin-top: 3px;
+            font-size: .9rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-weight: 700;
+        }
+
+        .schedule-event-time{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: {{ $primary }};
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .schedule-event-title{
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 2.2rem;
+            line-height: 1;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+            color: {{ $text1 }};
+            margin: 0 0 10px;
+        }
+
+        .schedule-event-sub{
+            color: {{ $text2 }};
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .schedule-event-sub + .schedule-event-sub{
+            margin-top: 2px;
+        }
+
+        .schedule-empty{
+            padding: 34px 24px;
+            color: {{ $text2 }};
+        }
+
+        .schedule-empty-title{
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 2rem;
+            line-height: 1;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: {{ $text1 }};
+            margin-bottom: 8px;
+        }
+
+        .schedule-empty-copy{
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+
         .mobile-social-footer{
-    background: #ffffff;
-    border-top: 1px solid rgba(15,23,42,0.12);
-}
+            background: #ffffff;
+            border-top: 1px solid rgba(15,23,42,0.12);
+        }
 
-.mobile-social-inner{
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    align-items: center;
-    gap: 0;
-    padding: 8px 10px 9px;
-}
+        .mobile-social-inner{
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            align-items: center;
+            gap: 0;
+            padding: 8px 10px 9px;
+        }
 
-.mobile-social-icon,
-.mobile-text-coach{
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    justify-self: center;
-    text-decoration: none;
-    flex-shrink: 0;
-}
+        .mobile-social-icon,
+        .mobile-text-coach{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            justify-self: center;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
 
-.mobile-social-icon{
-    width: 30px;
-    height: 30px;
-    color: #111111;
-}
+        .mobile-social-icon{
+            width: 30px;
+            height: 30px;
+            color: #111111;
+        }
 
-.mobile-social-icon svg{
-    width: 100%;
-    height: 100%;
-    display: block;
-}
+        .mobile-social-icon svg{
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
 
-.mobile-social-icon.instagram svg{
-    width: 31px;
-    height: 31px;
-}
+        .mobile-social-icon.instagram svg{
+            width: 31px;
+            height: 31px;
+        }
 
-.mobile-social-icon.x svg{
-    width: 26px;
-    height: 26px;
-}
+        .mobile-social-icon.x svg{
+            width: 26px;
+            height: 26px;
+        }
 
-.mobile-social-icon.youtube svg{
-    width: 30px;
-    height: 30px;
-}
+        .mobile-social-icon.youtube svg{
+            width: 30px;
+            height: 30px;
+        }
 
-.mobile-social-icon.mail svg{
-    width: 31px;
-    height: 31px;
-}
+        .mobile-social-icon.mail svg{
+            width: 31px;
+            height: 31px;
+        }
 
-.mobile-text-coach{
-    min-width: 118px;
-    height: 42px;
-    padding: 0 16px;
-    border-radius: 12px;
-    background: #000000;
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 13px;
-    line-height: 1;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
+        .mobile-text-coach{
+            min-width: 118px;
+            height: 42px;
+            padding: 0 16px;
+            border-radius: 12px;
+            background: #000000;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 13px;
+            line-height: 1;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
 
-.mobile-social-icon.is-disabled,
-.mobile-text-coach.is-disabled{
-    opacity: .4;
-    pointer-events: none;
-}
+        .mobile-social-icon.is-disabled,
+        .mobile-text-coach.is-disabled{
+            opacity: .4;
+            pointer-events: none;
+        }
 
-@media (min-width: 420px){
-    .mobile-social-inner{
-        padding: 10px 14px 11px;
-    }
+        @media (max-width: 1023px){
+            .schedule-toolbar{
+                grid-template-columns: 1fr 110px;
+            }
 
-    .mobile-social-icon{
-        width: 34px;
-        height: 34px;
-    }
+            .schedule-control.search{
+                grid-column: 1 / -1;
+                border-top: 1px solid rgba(15, 23, 42, 0.08);
+                border-right: 1px solid rgba(15, 23, 42, 0.08);
+            }
+        }
 
-    .mobile-social-icon.instagram svg{
-        width: 35px;
-        height: 35px;
-    }
+        @media (max-width: 767px){
+            body{ padding-bottom: 72px; }
 
-    .mobile-social-icon.x svg{
-        width: 29px;
-        height: 29px;
-    }
+            .schedule-toolbar{
+                grid-template-columns: 1fr;
+            }
 
-    .mobile-social-icon.youtube svg{
-        width: 33px;
-        height: 33px;
-    }
+            .schedule-control{
+                border-right: 0;
+                border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            }
 
-    .mobile-social-icon.mail svg{
-        width: 34px;
-        height: 34px;
-    }
+            .schedule-control.search{
+                border-top: 0;
+            }
 
-    .mobile-text-coach{
-        min-width: 132px;
-        height: 46px;
-        padding: 0 18px;
-        border-radius: 12px;
-        font-size: 14px;
-    }
-}
+            .schedule-control.reset{
+                border-bottom: 0;
+            }
 
-@media (max-width: 767px){
-    body{ padding-bottom: 72px; }
-}
+            .schedule-month-row{
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 10px 14px;
+            }
 
-@media (min-width: 768px){
-    .mobile-social-footer{
-        display: none;
-    }
-}
+            .schedule-month-label{
+                font-size: 1.55rem;
+            }
+
+            .schedule-month-next{
+                display: none;
+            }
+
+            .schedule-week-row{
+                grid-template-columns: 54px 1fr 54px;
+                gap: 8px;
+                padding: 10px 12px;
+            }
+
+            .schedule-nav-btn{
+                width: 42px;
+                height: 42px;
+            }
+
+            .schedule-week-label{
+                font-size: 1.9rem;
+            }
+
+            .schedule-day-cell{
+                min-height: 52px;
+                padding: 8px 3px;
+            }
+
+            .schedule-day-name{
+                font-size: .72rem;
+            }
+
+            .schedule-day-date{
+                font-size: .84rem;
+            }
+
+            .schedule-row{
+                grid-template-columns: 70px minmax(0, 1fr);
+                gap: 12px;
+                padding: 18px 14px;
+            }
+
+            .schedule-date-block .num{
+                font-size: 2.35rem;
+            }
+
+            .schedule-date-block .mon{
+                font-size: .78rem;
+            }
+
+            .schedule-event-title{
+                font-size: 1.65rem;
+            }
+
+            .schedule-event-time,
+            .schedule-event-sub{
+                font-size: .93rem;
+            }
+        }
+
+        @media (min-width: 420px){
+            .mobile-social-inner{
+                padding: 10px 14px 11px;
+            }
+
+            .mobile-social-icon{
+                width: 34px;
+                height: 34px;
+            }
+
+            .mobile-social-icon.instagram svg{
+                width: 35px;
+                height: 35px;
+            }
+
+            .mobile-social-icon.x svg{
+                width: 29px;
+                height: 29px;
+            }
+
+            .mobile-social-icon.youtube svg{
+                width: 33px;
+                height: 33px;
+            }
+
+            .mobile-social-icon.mail svg{
+                width: 34px;
+                height: 34px;
+            }
+
+            .mobile-text-coach{
+                min-width: 132px;
+                height: 46px;
+                padding: 0 18px;
+                border-radius: 12px;
+                font-size: 14px;
+            }
+        }
+
+        @media (min-width: 768px){
+            .mobile-social-footer{
+                display: none;
+            }
+        }
     </style>
 </head>
 
@@ -1103,7 +1581,79 @@
                         {{ $scheduleTagline }}
                     </div>
 
-                    <div class="min-h-[6rem]"></div>
+                    <div class="schedule-shell" id="schedule-calendar-root">
+                        <div class="schedule-toolbar">
+                            <div class="schedule-control">
+                                <svg class="schedule-control-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                                    <path d="M16 2v4M8 2v4M3 10h18"></path>
+                                </svg>
+                                <select id="schedule-month-select" aria-label="Select month"></select>
+                                <svg class="schedule-control-caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7 10l5 5 5-5H7z"></path>
+                                </svg>
+                            </div>
+
+                            <div class="schedule-control">
+                                <select id="schedule-year-select" aria-label="Select year"></select>
+                                <svg class="schedule-control-caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7 10l5 5 5-5H7z"></path>
+                                </svg>
+                            </div>
+
+                            <div class="schedule-control search">
+                                <svg class="schedule-control-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="7"></circle>
+                                    <path d="m20 20-3.5-3.5"></path>
+                                </svg>
+                                <input id="schedule-search-input" type="text" placeholder="Search schedule..." />
+                            </div>
+
+                            <div class="schedule-control reset">
+                                <button id="schedule-reset-btn" type="button" class="schedule-reset-btn">Reset</button>
+                            </div>
+                        </div>
+
+                        <div class="schedule-header">
+                            <div class="schedule-month-row">
+                                <div></div>
+                                <div class="schedule-month-label" id="schedule-current-month-label">Schedule</div>
+                                <div class="schedule-month-next">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m9 18 6-6-6-6"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="schedule-week-row">
+                                <div class="flex items-center justify-start">
+                                    <button type="button" class="schedule-nav-btn" id="schedule-prev-week" aria-label="Previous week">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="m15 18-6-6 6-6"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div class="schedule-week-center">
+                                    <div class="schedule-week-label" id="schedule-week-label">Week 1</div>
+                                </div>
+
+                                <div class="flex items-center justify-end">
+                                    <button type="button" class="schedule-nav-btn" id="schedule-next-week" aria-label="Next week">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="m9 18 6-6-6-6"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="schedule-days-grid" id="schedule-days-grid"></div>
+                        </div>
+
+                        <div class="schedule-list-wrap">
+                            <div id="schedule-listing" class="schedule-listing"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="tab-highlights" class="tab-content hidden p-6 md:p-10">
@@ -1317,55 +1867,55 @@
     </footer>
 
     <div class="mobile-social-footer fixed bottom-0 left-0 w-full z-50 md:hidden">
-    <div class="mobile-social-inner max-w-7xl mx-auto">
-        <a href="{{ $igUrl ?: '#' }}"
-           class="mobile-social-icon instagram {{ empty($igUrl) ? 'is-disabled' : '' }}"
-           aria-label="Instagram"
-           target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
-           rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
-                <circle cx="12" cy="12" r="4.2"></circle>
-                <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
-            </svg>
-        </a>
+        <div class="mobile-social-inner max-w-7xl mx-auto">
+            <a href="{{ $igUrl ?: '#' }}"
+               class="mobile-social-icon instagram {{ empty($igUrl) ? 'is-disabled' : '' }}"
+               aria-label="Instagram"
+               target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
+               rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.25" ry="5.25"></rect>
+                    <circle cx="12" cy="12" r="4.2"></circle>
+                    <circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"></circle>
+                </svg>
+            </a>
 
-        <a href="{{ $xUrl ?: '#' }}"
-           class="mobile-social-icon x {{ empty($xUrl) ? 'is-disabled' : '' }}"
-           aria-label="X"
-           target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
-           rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-            </svg>
-        </a>
+            <a href="{{ $xUrl ?: '#' }}"
+               class="mobile-social-icon x {{ empty($xUrl) ? 'is-disabled' : '' }}"
+               aria-label="X"
+               target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
+               rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
+                </svg>
+            </a>
 
-        <a href="{{ $ytUrl ?: '#' }}"
-           class="mobile-social-icon youtube {{ empty($ytUrl) ? 'is-disabled' : '' }}"
-           aria-label="YouTube"
-           target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
-           rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
-            </svg>
-        </a>
+            <a href="{{ $ytUrl ?: '#' }}"
+               class="mobile-social-icon youtube {{ empty($ytUrl) ? 'is-disabled' : '' }}"
+               aria-label="YouTube"
+               target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
+               rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
+                </svg>
+            </a>
 
-        <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
-           class="mobile-social-icon mail {{ empty($playerEmail) ? 'is-disabled' : '' }}"
-           aria-label="Email">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 5.5h18v13H3z"></path>
-                <path d="m4 7 8 6 8-6"></path>
-            </svg>
-        </a>
+            <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
+               class="mobile-social-icon mail {{ empty($playerEmail) ? 'is-disabled' : '' }}"
+               aria-label="Email">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 5.5h18v13H3z"></path>
+                    <path d="m4 7 8 6 8-6"></path>
+                </svg>
+            </a>
 
-        <a href="{{ $textCoachUrl }}"
-           class="mobile-text-coach {{ $textCoachUrl === '#' ? 'is-disabled' : '' }}"
-           aria-label="Text Coach">
-            TEXT COACH
-        </a>
+            <a href="{{ $textCoachUrl }}"
+               class="mobile-text-coach {{ $textCoachUrl === '#' ? 'is-disabled' : '' }}"
+               aria-label="Text Coach">
+                TEXT COACH
+            </a>
+        </div>
     </div>
-</div>
 
     <script>
         window.addEventListener("load", function () {
@@ -1437,6 +1987,351 @@
                     }
                 });
             });
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const schedules = @json($schedulePayload);
+
+            const monthSelect = document.getElementById("schedule-month-select");
+            const yearSelect = document.getElementById("schedule-year-select");
+            const searchInput = document.getElementById("schedule-search-input");
+            const resetBtn = document.getElementById("schedule-reset-btn");
+            const prevWeekBtn = document.getElementById("schedule-prev-week");
+            const nextWeekBtn = document.getElementById("schedule-next-week");
+            const monthLabel = document.getElementById("schedule-current-month-label");
+            const weekLabel = document.getElementById("schedule-week-label");
+            const daysGrid = document.getElementById("schedule-days-grid");
+            const listing = document.getElementById("schedule-listing");
+
+            if (!monthSelect || !yearSelect || !searchInput || !resetBtn || !prevWeekBtn || !nextWeekBtn || !monthLabel || !weekLabel || !daysGrid || !listing) {
+                return;
+            }
+
+            const monthNames = [
+                "January","February","March","April","May","June",
+                "July","August","September","October","November","December"
+            ];
+
+            const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+            const uniqueYears = [...new Set(schedules.map(item => item.year).filter(Boolean))].sort();
+            const uniqueMonths = [...new Set(schedules.map(item => item.month).filter(Boolean))].sort();
+
+            const today = new Date();
+            const currentYearFallback = String(today.getFullYear());
+            const currentMonthFallback = String(today.getMonth() + 1).padStart(2, "0");
+
+            let selectedYear = uniqueYears.includes(currentYearFallback)
+                ? currentYearFallback
+                : (uniqueYears[0] || currentYearFallback);
+
+            const monthsForInitialYear = schedules
+                .filter(item => item.year === selectedYear)
+                .map(item => item.month);
+
+            let selectedMonth = monthsForInitialYear.includes(currentMonthFallback)
+                ? currentMonthFallback
+                : (([...new Set(monthsForInitialYear)].sort()[0]) || uniqueMonths[0] || currentMonthFallback);
+
+            let searchTerm = "";
+            let selectedWeekIndex = 0;
+
+            function parseLocalDate(dateString) {
+                const [y, m, d] = dateString.split("-").map(Number);
+                return new Date(y, m - 1, d);
+            }
+
+            function toIsoDate(dateObj) {
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+                const d = String(dateObj.getDate()).padStart(2, "0");
+                return `${y}-${m}-${d}`;
+            }
+
+            function startOfWeekMonday(dateObj) {
+                const date = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+                const day = date.getDay();
+                const diff = day === 0 ? -6 : 1 - day;
+                date.setDate(date.getDate() + diff);
+                return date;
+            }
+
+            function addDays(dateObj, days) {
+                const copy = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+                copy.setDate(copy.getDate() + days);
+                return copy;
+            }
+
+            function getWeeksForMonth(year, month) {
+                const monthIndex = Number(month) - 1;
+                const firstOfMonth = new Date(Number(year), monthIndex, 1);
+                const lastOfMonth = new Date(Number(year), monthIndex + 1, 0);
+                const start = startOfWeekMonday(firstOfMonth);
+
+                const weeks = [];
+                let cursor = new Date(start);
+
+                while (cursor <= lastOfMonth || cursor.getMonth() === monthIndex) {
+                    const days = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = addDays(cursor, i);
+                        days.push({
+                            iso: toIsoDate(day),
+                            dayName: dayNames[i],
+                            dateNum: day.getDate(),
+                            inMonth: day.getMonth() === monthIndex,
+                        });
+                    }
+                    weeks.push(days);
+                    cursor = addDays(cursor, 7);
+
+                    if (weeks.length > 6) {
+                        break;
+                    }
+                }
+
+                return weeks;
+            }
+
+            function fillMonthOptions() {
+                const monthsForYear = [...new Set(
+                    schedules
+                        .filter(item => item.year === selectedYear)
+                        .map(item => item.month)
+                )].sort();
+
+                monthSelect.innerHTML = "";
+
+                monthsForYear.forEach(month => {
+                    const option = document.createElement("option");
+                    option.value = month;
+                    option.textContent = monthNames[Number(month) - 1] || month;
+                    if (month === selectedMonth) {
+                        option.selected = true;
+                    }
+                    monthSelect.appendChild(option);
+                });
+
+                if (!monthsForYear.includes(selectedMonth)) {
+                    selectedMonth = monthsForYear[0] || currentMonthFallback;
+                }
+            }
+
+            function fillYearOptions() {
+                yearSelect.innerHTML = "";
+
+                uniqueYears.forEach(year => {
+                    const option = document.createElement("option");
+                    option.value = year;
+                    option.textContent = year;
+                    if (year === selectedYear) {
+                        option.selected = true;
+                    }
+                    yearSelect.appendChild(option);
+                });
+            }
+
+            function getFilteredSchedules() {
+                const normalizedSearch = searchTerm.trim().toLowerCase();
+
+                return schedules.filter(item => {
+                    const matchesMonth = item.year === selectedYear && item.month === selectedMonth;
+                    const matchesSearch = normalizedSearch === "" || (item.search_blob || "").includes(normalizedSearch);
+                    return matchesMonth && matchesSearch;
+                });
+            }
+
+            function render() {
+                fillYearOptions();
+                fillMonthOptions();
+
+                const monthIndex = Number(selectedMonth) - 1;
+                monthLabel.textContent = `${selectedYear} ${monthNames[monthIndex] || ""}`.trim().toUpperCase();
+
+                const weeks = getWeeksForMonth(selectedYear, selectedMonth);
+
+                if (selectedWeekIndex < 0) {
+                    selectedWeekIndex = 0;
+                }
+                if (selectedWeekIndex >= weeks.length) {
+                    selectedWeekIndex = Math.max(0, weeks.length - 1);
+                }
+
+                const activeWeek = weeks[selectedWeekIndex] || [];
+                weekLabel.textContent = `Week ${selectedWeekIndex + 1}`;
+
+                prevWeekBtn.disabled = selectedWeekIndex <= 0;
+                nextWeekBtn.disabled = selectedWeekIndex >= weeks.length - 1;
+
+                daysGrid.innerHTML = "";
+                activeWeek.forEach(day => {
+                    const cell = document.createElement("div");
+                    cell.className = `schedule-day-cell${day.inMonth ? "" : " is-muted"}`;
+                    cell.innerHTML = `
+                        <span class="schedule-day-name">${day.dayName}</span>
+                        <span class="schedule-day-date">${day.dateNum}</span>
+                    `;
+                    daysGrid.appendChild(cell);
+                });
+
+                const weekDates = new Set(activeWeek.map(day => day.iso));
+                const filteredSchedules = getFilteredSchedules().filter(item => weekDates.has(item.date));
+
+                listing.innerHTML = "";
+
+                if (!filteredSchedules.length) {
+                    listing.innerHTML = `
+                        <div class="schedule-empty">
+                            <div class="schedule-empty-title">No Games Found</div>
+                            <div class="schedule-empty-copy">
+                                There are no schedule entries for this week${searchTerm.trim() ? " that match your search" : ""}.
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                filteredSchedules.sort((a, b) => a.date.localeCompare(b.date));
+
+                filteredSchedules.forEach(item => {
+                    const row = document.createElement("div");
+                    row.className = "schedule-row";
+
+                    const locationLine = [item.location, item.venue].filter(Boolean).join(" ");
+                    const notesLine = item.notes ? `<div class="schedule-event-sub">${escapeHtml(item.notes)}</div>` : "";
+                    const statusLine = item.status ? `<div class="schedule-event-sub">${escapeHtml(item.status)}</div>` : "";
+                    const resultLine = (item.result || item.score)
+                        ? `<div class="schedule-event-sub">${escapeHtml([item.result, item.score].filter(Boolean).join(" • "))}</div>`
+                        : "";
+
+                    row.innerHTML = `
+                        <div class="schedule-date-block">
+                            <span class="num">${item.day_number}</span>
+                            <span class="mon">${item.month_short}</span>
+                        </div>
+
+                        <div>
+                            <div class="schedule-event-time">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="{{ $primary }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="9"></circle>
+                                    <path d="M12 7v5l3 3"></path>
+                                </svg>
+                                <span>${escapeHtml(item.time)}</span>
+                            </div>
+
+                            <h3 class="schedule-event-title">${escapeHtml(item.title)}</h3>
+
+                            ${locationLine ? `<div class="schedule-event-sub">${escapeHtml(locationLine)}</div>` : ""}
+                            ${statusLine}
+                            ${resultLine}
+                            ${notesLine}
+                        </div>
+                    `;
+
+                    listing.appendChild(row);
+                });
+            }
+
+            function escapeHtml(value) {
+                return String(value || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            yearSelect.addEventListener("change", function () {
+                selectedYear = this.value;
+                const monthsForYear = [...new Set(
+                    schedules.filter(item => item.year === selectedYear).map(item => item.month)
+                )].sort();
+                selectedMonth = monthsForYear[0] || selectedMonth;
+                selectedWeekIndex = 0;
+                render();
+            });
+
+            monthSelect.addEventListener("change", function () {
+                selectedMonth = this.value;
+                selectedWeekIndex = 0;
+                render();
+            });
+
+            searchInput.addEventListener("input", function () {
+                searchTerm = this.value || "";
+                render();
+            });
+
+            prevWeekBtn.addEventListener("click", function () {
+                if (selectedWeekIndex > 0) {
+                    selectedWeekIndex--;
+                    render();
+                }
+            });
+
+            nextWeekBtn.addEventListener("click", function () {
+                const totalWeeks = getWeeksForMonth(selectedYear, selectedMonth).length;
+                if (selectedWeekIndex < totalWeeks - 1) {
+                    selectedWeekIndex++;
+                    render();
+                }
+            });
+
+            resetBtn.addEventListener("click", function () {
+                selectedYear = uniqueYears.includes(currentYearFallback)
+                    ? currentYearFallback
+                    : (uniqueYears[0] || currentYearFallback);
+
+                const monthsForYear = schedules
+                    .filter(item => item.year === selectedYear)
+                    .map(item => item.month);
+
+                selectedMonth = monthsForYear.includes(currentMonthFallback)
+                    ? currentMonthFallback
+                    : (([...new Set(monthsForYear)].sort()[0]) || uniqueMonths[0] || currentMonthFallback);
+
+                searchTerm = "";
+                selectedWeekIndex = 0;
+                searchInput.value = "";
+                render();
+            });
+
+            if (!schedules.length) {
+                listing.innerHTML = `
+                    <div class="schedule-empty">
+                        <div class="schedule-empty-title">No Upcoming Games Yet</div>
+                        <div class="schedule-empty-copy">
+                            Once this player confirms attendance for club schedules, upcoming games will appear here.
+                        </div>
+                    </div>
+                `;
+
+                monthLabel.textContent = "No Schedule";
+                weekLabel.textContent = "Week 1";
+                prevWeekBtn.disabled = true;
+                nextWeekBtn.disabled = true;
+                daysGrid.innerHTML = dayNames.map(name => `
+                    <div class="schedule-day-cell is-muted">
+                        <span class="schedule-day-name">${name}</span>
+                        <span class="schedule-day-date">--</span>
+                    </div>
+                `).join("");
+                return;
+            }
+
+            const selectedDateString = `${selectedYear}-${selectedMonth}-01`;
+            const todayMonthString = `${currentYearFallback}-${currentMonthFallback}-01`;
+
+            if (selectedDateString === todayMonthString) {
+                const todayIso = toIsoDate(today);
+                const weeks = getWeeksForMonth(selectedYear, selectedMonth);
+                const weekIndexContainingToday = weeks.findIndex(week => week.some(day => day.iso === todayIso));
+                selectedWeekIndex = weekIndexContainingToday >= 0 ? weekIndexContainingToday : 0;
+            }
+
+            render();
         });
     </script>
 

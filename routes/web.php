@@ -63,6 +63,21 @@ Route::middleware(['web', 'auth'])->group(function () {
         ->name('websites.assets.delete');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Public website-by-name route
+|--------------------------------------------------------------------------
+|
+| This must stay LAST so it does not override:
+| - /admin
+| - /preview/{website}
+| - /player-intake
+|
+*/
+Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
+    ->where('websiteName', '[A-Za-z0-9\-]+')
+    ->name('website.show-by-name');
+
 // Route::get('/ssl-debug', function () {
 //     return response()->json([
 //         'loaded_php_ini' => php_ini_loaded_file(),

@@ -240,19 +240,6 @@
             margin-top: 10px;
         }
 
-        .readonly-box {
-            width: 100%;
-            padding: 13px 14px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--field-border);
-            background: #f3f4f6;
-            color: #111827;
-            font-size: 14px;
-            min-height: 47px;
-            display: flex;
-            align-items: center;
-        }
-
         .actions {
             display: flex;
             justify-content: flex-end;
@@ -360,7 +347,6 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div class="hint">Used only if you choose Other for club and need to create a new league.</div>
                         </div>
 
                         <div class="col-4">
@@ -409,11 +395,6 @@
                         <div class="col-4">
                             <label for="jersey_number">Jersey Number</label>
                             <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50">
-                        </div>
-
-                        <div class="col-4">
-                            <label for="team_name">Team Name</label>
-                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
                         </div>
 
                         <div class="col-4">
@@ -516,7 +497,7 @@
                 </div>
 
                 <div class="section">
-                    <h2>Location, School & Club</h2>
+                    <h2>Location, School, League & Club</h2>
                     <div class="grid">
                         <div class="col-3">
                             <label for="country">Country</label>
@@ -546,7 +527,7 @@
                             <input type="text" id="street" name="street" value="{{ old('street') }}" maxlength="255">
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
                             <label for="school_id">School</label>
                             <select id="school_id" name="school_id">
                                 <option value="">Select school</option>
@@ -563,15 +544,24 @@
                             </div>
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
+                            <label for="league_other">League</label>
+                            <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter league name">
+                            <div class="hint">League is entered independently and is no longer tied to club selection.</div>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="team_name">Team Name</label>
+                            <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
+                        </div>
+
+                        <div class="col-3">
                             <label for="club_id">Club</label>
                             <select id="club_id" name="club_id">
                                 <option value="">Select club</option>
                                 @foreach ($clubs as $club)
                                     <option
                                         value="{{ $club->id }}"
-                                        data-league-name="{{ $club->league?->name }}"
-                                        data-league-gender="{{ $club->league?->gender }}"
                                         {{ (string) old('club_id') === (string) $club->id ? 'selected' : '' }}
                                     >
                                         {{ $club->name }}
@@ -579,13 +569,7 @@
                                 @endforeach
                                 <option value="__other__" {{ old('club_id') === '__other__' ? 'selected' : '' }}>Other</option>
                             </select>
-                            <div class="hint">Choose Other to add a new club and league.</div>
-                        </div>
-
-                        <div class="col-4">
-                            <label>League</label>
-                            <div id="league_display" class="readonly-box">Select a club first</div>
-                            <div class="hint">If you choose Other for club, enter the new league below.</div>
+                            <div class="hint">Choose Other to manually enter a club not listed.</div>
                         </div>
 
                         <div id="club_other_section" class="col-12 other-wrap">
@@ -593,11 +577,6 @@
                                 <div class="col-6">
                                     <label for="club_other">New Club Name</label>
                                     <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" placeholder="Enter new club name" maxlength="255">
-                                </div>
-
-                                <div class="col-6">
-                                    <label for="league_other">New League Name</label>
-                                    <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" placeholder="Enter new league name" maxlength="255">
                                 </div>
                             </div>
                         </div>
@@ -801,27 +780,15 @@
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
     }
 
-    function updateLeagueDisplay() {
+    function toggleClubOther() {
         const clubSelect = document.getElementById('club_id');
-        const leagueDisplay = document.getElementById('league_display');
         const clubOtherSection = document.getElementById('club_other_section');
-        const selectedOption = clubSelect.options[clubSelect.selectedIndex];
 
-        if (!clubSelect.value) {
-            leagueDisplay.textContent = 'Select a club first';
-            clubOtherSection.style.display = 'none';
+        if (!clubSelect || !clubOtherSection) {
             return;
         }
 
-        if (clubSelect.value === '__other__') {
-            leagueDisplay.textContent = 'Enter a new league below';
-            clubOtherSection.style.display = 'block';
-            return;
-        }
-
-        const leagueName = selectedOption?.dataset?.leagueName || 'League not found';
-        clubOtherSection.style.display = 'none';
-        leagueDisplay.textContent = leagueName;
+        clubOtherSection.style.display = clubSelect.value === '__other__' ? 'block' : 'none';
     }
 
     function updateImageInstructions() {
@@ -855,11 +822,11 @@
     });
 
     document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
-    document.getElementById('club_id').addEventListener('change', updateLeagueDisplay);
+    document.getElementById('club_id').addEventListener('change', toggleClubOther);
 
     renderPositions();
     toggleSchoolOther();
-    updateLeagueDisplay();
+    toggleClubOther();
     updateImageInstructions();
 </script>
 </body>

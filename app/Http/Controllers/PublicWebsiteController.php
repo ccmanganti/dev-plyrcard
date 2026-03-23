@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Website;
 use App\Services\YouTubeChannelService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PublicWebsiteController extends Controller
 {
@@ -28,6 +29,7 @@ class PublicWebsiteController extends Controller
                 ->with([
                     'user.school',
                     'user.club.league',
+                    'user.schedules',
                     'siteTemplate',
                     'heroTemplate',
                     'fieldValues.templateField',
@@ -38,20 +40,7 @@ class PublicWebsiteController extends Controller
 
             abort_unless($website, 404, 'No website record found.');
 
-            abort_unless(
-                $website->siteTemplate && $website->siteTemplate->blade_view,
-                404,
-                'The website does not have a valid site template.'
-            );
-
-            $autoHighlightVideos = $website->user
-                ? $youtube->getUserVideos($website->user, limit: 12, refreshDays: 3)
-                : [];
-
-            return view($website->siteTemplate->blade_view, [
-                'website' => $website,
-                'autoHighlightVideos' => $autoHighlightVideos,
-            ]);
+            return $this->renderWebsite($website, $youtube);
         }
 
         $website = Website::query()
@@ -66,6 +55,7 @@ class PublicWebsiteController extends Controller
             ->with([
                 'user.school',
                 'user.club.league',
+                'user.schedules',
                 'siteTemplate',
                 'heroTemplate',
                 'fieldValues.templateField',
@@ -77,12 +67,72 @@ class PublicWebsiteController extends Controller
             abort(404);
         }
 
-        if (! $website->siteTemplate || ! $website->siteTemplate->blade_view) {
-            abort(404, 'The website does not have a valid site template.');
+        return $this->renderWebsite($website, $youtube);
+    }
+
+    public function preview(Website $website, YouTubeChannelService $youtube)
+    {
+        $website->load([
+            'user.school',
+            'user.club.league',
+            'user.schedules',
+            'siteTemplate',
+            'heroTemplate',
+            'fieldValues.templateField',
+            'heroFieldValues.templateField',
+        ]);
+
+        return $this->renderWebsite($website, $youtube);
+    }
+
+    public function showByName(string $websiteName, YouTubeChannelService $youtube)
+    {
+        $normalizedRequestedName = $this->normalizeWebsiteName($websiteName);
+
+        $website = Website::query()
+            ->with([
+                'user.school',
+                'user.club.league',
+                'user.schedules',
+                'siteTemplate',
+                'heroTemplate',
+                'fieldValues.templateField',
+                'heroFieldValues.templateField',
+            ])
+            ->where('is_active', true)
+            ->where('is_published', true)
+            ->get()
+            ->first(function (Website $website) use ($normalizedRequestedName) {
+                return $this->normalizeWebsiteName($website->name) === $normalizedRequestedName;
+            });
+
+        if (! $website) {
+            abort(404);
         }
 
-        $autoHighlightVideos = $website->user
-            ? $youtube->getUserVideos($website->user, limit: 12, refreshDays: 3)
+        return $this->renderWebsite($website, $youtube);
+    }
+
+    protected function renderWebsite(Website $website, YouTubeChannelService $youtube)
+    {
+        abort_unless(
+            $website->siteTemplate && $website->siteTemplate->blade_view,
+            404,
+            'The website does not have a valid site template.'
+        );
+
+        $user = $website->user;
+
+        if ($user) {
+            $user->loadMissing([
+                'schedules' => fn ($query) => $query
+                    ->orderBy('game_date')
+                    ->orderBy('game_time'),
+            ]);
+        }
+
+        $autoHighlightVideos = $user
+            ? $youtube->getUserVideos($user, limit: 12, refreshDays: 3)
             : [];
 
         return view($website->siteTemplate->blade_view, [
@@ -91,30 +141,8 @@ class PublicWebsiteController extends Controller
         ]);
     }
 
-    public function preview(Website $website, YouTubeChannelService $youtube)
+    protected function normalizeWebsiteName(?string $value): string
     {
-        $website->load([
-            'user.school',
-            'user.club.league',
-            'siteTemplate',
-            'heroTemplate',
-            'fieldValues.templateField',
-            'heroFieldValues.templateField',
-        ]);
-
-        abort_unless(
-            $website->siteTemplate && $website->siteTemplate->blade_view,
-            404,
-            'The website does not have a valid site template.'
-        );
-
-        $autoHighlightVideos = $website->user
-            ? $youtube->getUserVideos($website->user, limit: 12, refreshDays: 3)
-            : [];
-
-        return view($website->siteTemplate->blade_view, [
-            'website' => $website,
-            'autoHighlightVideos' => $autoHighlightVideos,
-        ]);
+        return Str::slug((string) $value);
     }
 }
