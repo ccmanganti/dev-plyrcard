@@ -841,9 +841,35 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--primary, #334155);
-            transition: opacity .22s ease, visibility .22s ease;
+            pointer-events: none;
+            transition: opacity .28s ease, visibility .28s ease;
             will-change: opacity;
+            background:
+                radial-gradient(circle at center,
+                    rgba(0, 0, 0, 0.10) 0%,
+                    rgba(0, 0, 0, 0.22) 42%,
+                    rgba(0, 0, 0, 0.42) 72%,
+                    rgba(0, 0, 0, 0.62) 100%
+                ),
+                linear-gradient(
+                    135deg,
+                    color-mix(in srgb, var(--primary) 92%, black 8%) 0%,
+                    color-mix(in srgb, var(--primary) 78%, black 22%) 50%,
+                    color-mix(in srgb, var(--primary) 58%, black 42%) 100%
+                );
+        }
+
+        #hero-loader::after{
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at center,
+                    transparent 0%,
+                    transparent 38%,
+                    rgba(0, 0, 0, 0.08) 58%,
+                    rgba(0, 0, 0, 0.26) 100%
+                );
             pointer-events: none;
         }
 
@@ -853,11 +879,16 @@
         }
 
         #hero-loader .loader-media{
+            position: relative;
+            z-index: 2;
             display: block;
-            width: min(220px, 42vw);
+            width: clamp(120px, 16vw, 220px);
             max-width: 220px;
             height: auto;
             object-fit: contain;
+            filter:
+                drop-shadow(0 14px 30px rgba(0, 0, 0, 0.28))
+                drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
         }
 
         @media (max-width: 640px) {
@@ -1951,7 +1982,8 @@
 
                 return Array.from(container.querySelectorAll('img')).filter(img => {
                     const src = img.getAttribute('src') || '';
-                    return src.trim() !== '';
+                    const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
+                    return src.trim() !== '' && !isLoaderGif;
                 });
             }
 
@@ -2008,7 +2040,10 @@
 
                 const heroImages = getHeroImages(heroContainer);
 
-                await waitForImages(heroImages, 1200);
+                await Promise.all([
+                    waitForImages(heroImages, 1200),
+                    new Promise(resolve => setTimeout(resolve, 1000)),
+                ]);
 
                 requestAnimationFrame(() => {
                     requestAnimationFrame(hideHeroLoader);
@@ -2016,7 +2051,7 @@
             });
 
             window.addEventListener('pageshow', hideHeroLoader);
-            setTimeout(hideHeroLoader, 1800);
+            setTimeout(hideHeroLoader, 2200);
         })();
     </script>
 
