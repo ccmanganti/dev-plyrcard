@@ -433,7 +433,7 @@
 
     .hero-two-back-jersey {
         position: absolute;
-        left: 63%;
+        left: 60%;
         top: 35.5%;
         transform: translate(-50%, -50%);
         z-index: 1;
@@ -603,7 +603,7 @@
 
     .hero-two-player-wrap {
         position: absolute;
-        right: 19.5%;
+        right: 21%;
         bottom: 0;
         z-index: 14;
     }
@@ -628,7 +628,7 @@
         width: var(--hero-two-action-width);
         max-width: none;
         height: auto;
-        margin-bottom:-40px;
+        margin-bottom:-80px;
         object-fit: contain;
         display: block;
     }
@@ -651,9 +651,9 @@
             --hero-two-action-width: clamp(18.5rem, 16.5vw, 22rem);
         }
 
-        .hero-two-player-wrap { right: 18%; bottom: 0; }
+        .hero-two-player-wrap { right: 21%; bottom: 0; }
         .hero-two-card-wrap { right: 1%; }
-        .hero-two-back-jersey { left: 63%; top: 35%; }
+        .hero-two-back-jersey { left: 60%; top: 35%; }
         .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 1.8rem); bottom: 0; }
     }
 
@@ -676,11 +676,11 @@
         }
 
         .hero-two-left-group { width: 50%; }
-        .hero-two-player-wrap { right: 16%; bottom: 0; }
+        .hero-two-player-wrap { right: 21%; bottom: 0; }
         .hero-two-card-wrap { right: .8%; top: 3.2%; }
         .hero-two-info-panel { padding: 1.05rem 1.15rem 1.05rem; }
         .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 1.2rem); bottom: 0; }
-        .hero-two-back-jersey { left: 63%; top: 39.5%; }
+        .hero-two-back-jersey { left: 60%; top: 39.5%; }
     }
 
     /* Tablet view: keep same structure, just scale it down */
@@ -749,7 +749,7 @@
         }
 
         .hero-two-player-wrap {
-            right: 15.5%;
+            right: 21%;
             bottom: 0;
         }
 
@@ -759,7 +759,7 @@
         }
 
         .hero-two-back-jersey {
-            left: 63%;
+            left: 60%;
             top: 41%;
         }
     }
@@ -782,9 +782,9 @@
             --hero-two-action-width: clamp(23rem, 19.5vw, 27rem);
         }
 
-        .hero-two-player-wrap { right: 20.5%; bottom: 0; }
+        .hero-two-player-wrap { right: 21%; bottom: 0; }
         .hero-two-card-wrap { right: 1.8%; }
-        .hero-two-back-jersey { left: 62%; top: 41.2%; }
+        .hero-two-back-jersey { left: 60%; top: 41.2%; }
         .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 2.4rem); bottom: 0; }
     }
 </style>
