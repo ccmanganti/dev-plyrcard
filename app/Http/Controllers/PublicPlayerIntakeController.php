@@ -146,9 +146,15 @@ class PublicPlayerIntakeController extends Controller
 
     public function create(): View
     {
-        $schools = School::query()->orderBy('name')->get();
+        $schools = School::query()
+            ->orderBy('name')
+            ->get();
 
         $clubs = Club::query()
+            ->orderBy('name')
+            ->get();
+
+        $leagues = League::query()
             ->orderBy('name')
             ->get();
 
@@ -209,6 +215,7 @@ class PublicPlayerIntakeController extends Controller
         return view('public.player-intake', [
             'schools' => $schools,
             'clubs' => $clubs,
+            'leagues' => $leagues,
             'states' => $states,
             'sportPositions' => $this->sportPositions,
             'genderOptions' => $this->genderOptions,
@@ -236,6 +243,8 @@ class PublicPlayerIntakeController extends Controller
             'height' => ['nullable', 'string', 'max:50'],
             'weight' => ['nullable', 'string', 'max:50'],
             'jersey_number' => ['nullable', 'string', 'max:50'],
+            'vertical_jump' => ['nullable', 'string', 'max:50'],
+            'max_speed' => ['nullable', 'string', 'max:50'],
 
             'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
             'position' => ['nullable', 'array'],
@@ -245,8 +254,8 @@ class PublicPlayerIntakeController extends Controller
             'sports_accolades' => ['nullable', 'string'],
             'natl_team_exp' => ['nullable', 'in:0,1'],
             'team_name' => ['nullable', 'string', 'max:255'],
-            'ig_handle' => ['nullable', 'string', 'max:255'],
-            'x_handle' => ['nullable', 'string', 'max:255'],
+            'ig_handle' => ['nullable', 'url', 'max:255'],
+            'x_handle' => ['nullable', 'url', 'max:255'],
             'yt_url' => ['nullable', 'url', 'max:500'],
             'press' => ['nullable', 'string'],
 
@@ -273,9 +282,11 @@ class PublicPlayerIntakeController extends Controller
             'school_id' => ['nullable', 'string'],
             'school_other' => ['nullable', 'string', 'max:255'],
 
+            'league_id' => ['nullable', 'string'],
+            'league_other' => ['nullable', 'string', 'max:255'],
+
             'club_id' => ['nullable', 'string'],
             'club_other' => ['nullable', 'string', 'max:255'],
-            'league_other' => ['nullable', 'string', 'max:255'],
 
             'player_card_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
             'player_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
@@ -443,41 +454,38 @@ class PublicPlayerIntakeController extends Controller
 
     protected function resolveClubAndLeague(array $validated): array
     {
-        $clubId = $validated['club_id'] ?? null;
         $league = null;
         $club = null;
 
-        if ($clubId === '__other__') {
+        $leagueId = $validated['league_id'] ?? null;
+        $clubId = $validated['club_id'] ?? null;
+
+        if ($leagueId === '__other__') {
             if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
-                $league = League::updateOrCreate(
-                    ['name' => trim($validated['league_other'])],
-                    ['gender' => $validated['gender']]
+                $league = League::firstOrCreate(
+                    [
+                        'name' => trim($validated['league_other']),
+                    ],
+                    [
+                        'gender' => $validated['gender'],
+                    ]
                 );
             }
+        } elseif (filled($leagueId)) {
+            $league = League::find($leagueId);
+        }
 
+        if ($clubId === '__other__') {
             if (filled($validated['club_other'] ?? null)) {
                 $club = Club::firstOrCreate([
                     'name' => trim($validated['club_other']),
                 ]);
             }
-
-            return [$league, $club];
-        }
-
-        if (filled($clubId)) {
+        } elseif (filled($clubId)) {
             $club = Club::find($clubId);
-
-            return [null, $club];
         }
 
-        if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
-            $league = League::updateOrCreate(
-                ['name' => trim($validated['league_other'])],
-                ['gender' => $validated['gender']]
-            );
-        }
-
-        return [$league, null];
+        return [$league, $club];
     }
 
     protected function storeHeroUploads(Request $request): array

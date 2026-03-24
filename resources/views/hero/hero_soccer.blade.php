@@ -258,7 +258,6 @@
 
     $firstNameLength = mb_strlen(preg_replace('/\s+/', '', $firstName));
     $lastNameLength = mb_strlen(preg_replace('/\s+/', '', $lastName));
-
     $positionBesideLastName = $firstNameLength > $lastNameLength;
 
     $buildInstagramUrl = function ($value) {
@@ -301,36 +300,34 @@
 
     $ytUrl = trim((string) ($user?->youtube_url ?? $user?->youtube ?? $user?->yt_url ?? ''));
     $playerEmail = trim((string) ($user?->email ?? ''));
-
     $hasAnySocial = filled($playerEmail) || filled($igUrl) || filled($ytUrl) || filled($xUrl);
 @endphp
-
 <style>
     :root{
-        --hero-two-shell-max: 2400px;
+        --hero-two-stage-max-width: 2600px;
 
-        --hero-two-card-width: clamp(18rem, 16vw, 26rem);
-        --hero-two-player-max-width: clamp(38rem, 39vw, 62rem);
-        --hero-two-player-max-height: min(96vh, 1220px);
-        --hero-two-action-width: clamp(18rem, 18vw, 30rem);
+        --hero-two-name-first: clamp(10.8rem, 10.05vw, 14.4rem);
+        --hero-two-name-first-inline: clamp(11.0rem, 10.3vw, 14.65rem);
+        --hero-two-name-last: clamp(8.65rem, 8.05vw, 10.8rem);
+        --hero-two-front-number: clamp(8.65rem, 8.05vw, 10.8rem);
 
-        --hero-two-first-name-size: clamp(6.3rem, 8.2vw, 12rem);
-        --hero-two-first-name-size-with-pos: clamp(6.7rem, 8.6vw, 12.6rem);
-        --hero-two-last-name-size: clamp(5.4rem, 7.2vw, 10.3rem);
+        --hero-two-back-number: clamp(28rem, 35vw, 46rem);
+        --hero-two-position-size: clamp(2rem, 1.9vw, 2.55rem);
 
-        --hero-two-front-jersey-size: clamp(4.9rem, 6.2vw, 8.5rem);
-        --hero-two-back-jersey-size: clamp(27rem, 29vw, 48rem);
+        --hero-two-panel-width: clamp(480px, 30vw, 640px);
+        --hero-two-panel-font-size: clamp(16px, 1vw, 19px);
 
-        --hero-two-pos-size: clamp(1.7rem, 2vw, 3rem);
-        --hero-two-panel-width: clamp(500px, 38vw, 920px);
+        --hero-two-social-size: clamp(27px, 1.75vw, 32px);
+        --hero-two-social-icon-size: clamp(20px, 1.35vw, 24px);
 
-        --hero-two-panel-label-size: clamp(16px, 1vw, 24px);
-        --hero-two-panel-value-size: clamp(20px, 1.35vw, 32px);
+        --hero-two-card-width: clamp(22rem, 18.5vw, 26rem);
+        --hero-two-player-width: clamp(33rem, 29.5vw, 42rem);
+        --hero-two-action-width: clamp(22rem, 19.5vw, 26rem);
 
-        --hero-two-social-size: clamp(31px, 2vw, 44px);
-        --hero-two-social-icon-size: clamp(25px, 1.7vw, 36px);
+        --hero-two-accolade-size: clamp(16px, .95vw, 19px);
 
-        --hero-two-accolades-item-size: clamp(16px, 1.05vw, 24px);
+        --hero-two-top-pad: clamp(2rem, 3vw, 3.2rem);
+        --hero-two-content-bottom-space: 0px;
     }
 
     .hero-two-font-jersey-front {
@@ -353,87 +350,142 @@
         font-family: "Poppins", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    .hero-two-desktop {
-        display: block;
+    .hero-two-desktop { display:block; }
+    .hero-two-mobile { display:none; }
+
+    /* Keep same structure for tablet. Mobile only on small screens. */
+    @media (max-width: 767px) {
+        .hero-two-desktop { display:none; }
+        .hero-two-mobile { display:block; }
     }
 
-    .hero-two-mobile {
-        display: none;
+    .hero-two-hero.hero-two-has-accolades {
+        --hero-two-content-bottom-space: clamp(80px, 9vh, 150px);
     }
 
-    @media (max-width: 1023px) {
-        .hero-two-desktop {
-            display: none;
-        }
-
-        .hero-two-mobile {
-            display: block;
-        }
+    .hero-two-hero {
+        position: relative;
+        overflow: hidden;
+        min-height: 100svh;
+        height: auto;
+        padding-top: var(--hero-two-top-pad);
     }
 
     .hero-two-shell {
         position: relative;
-        width: min(100%, var(--hero-two-shell-max));
-        height: 100%;
+        width: 100%;
+        max-width: var(--hero-two-stage-max-width);
         margin: 0 auto;
-        padding-inline: clamp(1.5rem, 2.8vw, 3.75rem);
+        min-height: calc(100svh - var(--hero-two-top-pad));
+    }
+
+    .hero-two-stage {
+        position: relative;
+        width: 100%;
+        min-height: calc(100svh - var(--hero-two-top-pad));
     }
 
     .hero-two-shadow {
-        filter: drop-shadow(0 20px 32px rgba(0, 0, 0, 0.26));
+        filter: drop-shadow(0 18px 30px rgba(0,0,0,.24));
     }
 
     .hero-two-card-shadow {
-        filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.24));
+        filter: drop-shadow(0 14px 28px rgba(0,0,0,.22));
     }
 
     .hero-two-name-line {
-        line-height: 0.84;
+        line-height: .84;
         white-space: nowrap;
     }
 
-    .hero-two-stat-row {
+    .hero-two-left-group {
+        position: relative;
+        z-index: 20;
+        width: min(50.5%, 760px);
+        margin-left: 3.2%;
+        padding-bottom: var(--hero-two-content-bottom-space);
+    }
+
+    .hero-two-front-jersey {
+        font-size: var(--hero-two-front-number);
+        line-height: 1;
+        letter-spacing: -.04em;
+    }
+
+    .hero-two-name-first {
+        font-size: var(--hero-two-name-first);
+    }
+
+    .hero-two-name-first.has-inline-position {
+        font-size: var(--hero-two-name-first-inline);
+    }
+
+    .hero-two-name-last {
+        font-size: var(--hero-two-name-last);
+    }
+
+    .hero-two-position {
+        white-space: nowrap;
+        line-height: 1;
+        color: rgba(255,255,255,.95);
+        font-size: var(--hero-two-position-size);
+    }
+
+    .hero-two-back-jersey {
+        position: absolute;
+        left: 63%;
+        top: 35.5%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        font-size: var(--hero-two-back-number);
+        line-height: .88;
+        font-weight:800;
+        letter-spacing: -.05em;
+        color: rgba(255,255,255,.16);
+        pointer-events: none;
+    }
+
+    .hero-two-accolades-wrap {
+        width: var(--hero-two-panel-width);
+        margin-top: 1rem;
+        margin-bottom: .8rem;
+    }
+
+    .hero-two-accolades-list {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: .4rem;
+    }
+
+    .hero-two-accolade-item {
+        display: flex;
         align-items: center;
-        gap: .7rem 1rem;
-    }
-
-    .hero-two-stat-block {
-        display: block;
-    }
-
-    .hero-two-stat-block .hero-two-stat-label {
-        display: block;
-        margin-bottom: .42rem;
-    }
-
-    .hero-two-stat-block .hero-two-stat-value {
-        display: block;
-        width: 100%;
-        min-width: 0;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-    }
-
-    .hero-two-stat-label {
-        font-size: var(--hero-two-panel-label-size);
-        line-height: 1.05;
-        font-weight: 800;
-        text-transform: uppercase;
+        gap: .62rem;
         color: rgba(255,255,255,.98);
-        flex: 0 0 auto;
-    }
-
-    .hero-two-stat-value {
-        font-size: var(--hero-two-panel-value-size);
-        line-height: 1.34;
+        font-size: var(--hero-two-accolade-size);
+        line-height: 1.2;
         font-weight: 500;
-        color: rgba(255,255,255,.98);
-        flex: 1 1 240px;
-        min-width: 0;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        text-shadow: 0 6px 18px rgba(0,0,0,.18);
+    }
+
+    .hero-two-accolade-icon {
+        width: 1.65em;
+        height: 1.65em;
+        flex: 0 0 1.65em;
+        color: rgba(255, 255, 0, 0.98);
+        display: block;
+    }
+
+    .hero-two-accolade-icon,
+    .hero-two-accolade-icon * {
+        fill: currentColor !important;
+        stroke: none !important;
+    }
+
+    .hero-two-info-wrap {
+        margin-top: 1rem;
+        position: relative;
+        z-index: 25;
     }
 
     .hero-two-info-panel {
@@ -441,25 +493,26 @@
         width: var(--hero-two-panel-width);
         border: 1px solid rgba(255,255,255,.10);
         border-radius: 18px;
-        padding: 1.5rem 1.7rem 1.55rem;
-        background:
-            linear-gradient(90deg,
-                rgba(11, 73, 154, .83) 0%,
-                rgba(20, 97, 182, .64) 45%,
-                rgba(17, 69, 145, .54) 100%);
+        padding: 1.2rem 1.35rem 1.2rem;
+        background: linear-gradient(
+            90deg,
+            rgba(11,73,154,.82) 0%,
+            rgba(20,97,182,.63) 45%,
+            rgba(17,69,145,.54) 100%
+        );
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
-        box-shadow: 0 18px 38px rgba(0,0,0,.20);
+        box-shadow: 0 16px 34px rgba(0,0,0,.18);
     }
 
     .hero-two-social-floating {
         position: absolute;
-        top: 1.15rem;
-        right: 1.15rem;
+        top: .85rem;
+        right: .9rem;
         z-index: 80;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         pointer-events: auto;
     }
 
@@ -470,8 +523,8 @@
         width: var(--hero-two-social-size);
         height: var(--hero-two-social-size);
         color: rgba(255,255,255,.92);
-        transition: opacity .2s ease, transform .2s ease;
         text-decoration: none;
+        transition: opacity .2s ease, transform .2s ease;
         flex: 0 0 auto;
     }
 
@@ -491,117 +544,83 @@
         display: block;
     }
 
-    .hero-two-position {
-        white-space: nowrap;
-        line-height: 1;
-        color: rgba(255,255,255,.95);
-        font-size: var(--hero-two-pos-size);
-    }
-
-    .hero-two-left-group {
-        position: absolute;
-        left: clamp(2rem, 4vw, 5rem);
-        top: clamp(2.3rem, 5vh, 4rem);
-        z-index: 20;
-        width: min(56%, 1160px);
-    }
-
-    .hero-two-info-wrap {
-        margin-top: clamp(1.2rem, 1.7vw, 2rem);
-        position: relative;
-        z-index: 24;
-    }
-
-    .hero-two-accolades-wrap {
-        width: var(--hero-two-panel-width);
-        margin-bottom: .85rem;
-    }
-
-    .hero-two-accolades-list {
+    .hero-two-stat-row {
         display: flex;
-        flex-direction: column;
-        gap: .5rem;
+        align-items: flex-start;
+        gap: .8rem;
     }
 
-    .hero-two-accolade-item {
-        display: flex;
-        align-items: center;
-        gap: .72rem;
+    .hero-two-stat-block {
+        display: block;
+    }
+
+    .hero-two-stat-block .hero-two-stat-label {
+        display: block;
+        margin-bottom: .28rem;
+    }
+
+    .hero-two-stat-block .hero-two-stat-value {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .hero-two-stat-label,
+    .hero-two-stat-value {
+        font-size: var(--hero-two-panel-font-size);
+        line-height: 1.24;
         color: rgba(255,255,255,.98);
-        font-size: var(--hero-two-accolades-item-size);
-        line-height: 1.2;
+    }
+
+    .hero-two-stat-label {
         font-weight: 800;
-        text-shadow: 0 6px 18px rgba(0,0,0,.18);
+        text-transform: uppercase;
+        flex: 0 0 auto;
+        letter-spacing: .01em;
     }
 
-    .hero-two-accolade-icon {
-    width: 2.0em;
-    height: 2.0em;
-    flex: 0 0 2.0em;
-    color: rgba(255,255,255,.98);
-    display: block;
-    }
-
-    .hero-two-accolade-icon,
-    .hero-two-accolade-icon * {
-        fill: currentColor !important;
-        stroke: none !important;
-    }
-
-    .hero-two-name-first {
-        font-size: var(--hero-two-first-name-size);
-    }
-
-    .hero-two-name-first.has-inline-position {
-        font-size: var(--hero-two-first-name-size-with-pos);
-    }
-
-    .hero-two-name-last {
-        font-size: var(--hero-two-last-name-size);
-    }
-
-    .hero-two-front-jersey {
-        font-size: var(--hero-two-front-jersey-size);
-        line-height: 1.02;
-    }
-
-    .hero-two-back-jersey {
-        font-size: var(--hero-two-back-jersey-size);
-        line-height: 1;
-    }
-
-    .hero-two-card {
-        width: var(--hero-two-card-width);
+    .hero-two-stat-value {
+        font-weight: 500;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     .hero-two-card-wrap {
         position: absolute;
-        right: clamp(1.5rem, 2.8vw, 3.5rem);
-        top: clamp(2.3rem, 5vh, 3.8rem);
-        z-index: 25;
+        right: 1.1%;
+        top: 2.8%;
+        z-index: 26;
+    }
+
+    .hero-two-card {
+        width: var(--hero-two-card-width);
+        object-fit: contain;
     }
 
     .hero-two-player-wrap {
         position: absolute;
-        right: clamp(8rem, 15vw, 40rem);
+        right: 19.5%;
         bottom: 0;
-        z-index: 12;
+        z-index: 14;
     }
 
     .hero-two-player-image {
-        max-height: var(--hero-two-player-max-height);
-        max-width: var(--hero-two-player-max-width);
-        width: auto;
+        width: var(--hero-two-player-width);
+        max-width: 100%;
         height: auto;
         object-fit: contain;
+        display: block;
     }
 
     .hero-two-action-wrap {
         position: absolute;
-        left: clamp(37%, 40%, 42%);
-        bottom: clamp(-28px, -1.2vw, -12px);
-        transform: translateX(-50%);
-        z-index: 32;
+        left: calc(3.2% + var(--hero-two-panel-width) - 2.2rem);
+        bottom: 0;
+        z-index: 28;
         pointer-events: none;
     }
 
@@ -609,377 +628,360 @@
         width: var(--hero-two-action-width);
         max-width: none;
         height: auto;
+        margin-bottom:-40px;
         object-fit: contain;
+        display: block;
     }
 
     @media (max-width: 1536px) {
         :root{
-            --hero-two-card-width: clamp(16.5rem, 15vw, 20rem);
-            --hero-two-player-max-width: clamp(32rem, 33vw, 42rem);
-            --hero-two-panel-width: clamp(430px, 31vw, 620px);
-            --hero-two-panel-label-size: clamp(14px, .85vw, 18px);
-            --hero-two-panel-value-size: clamp(17px, 1vw, 21px);
+            --hero-two-name-first: clamp(8.9rem, 8.25vw, 11.9rem);
+            --hero-two-name-first-inline: clamp(9.1rem, 8.5vw, 12.1rem);
+            --hero-two-name-last: clamp(7.15rem, 6.6vw, 9.6rem);
+            --hero-two-front-number: clamp(7.15rem, 6.6vw, 9.6rem);
+
+            --hero-two-back-number: clamp(25rem, 35vw, 45rem);
+            --hero-two-position-size: clamp(1.8rem, 1.65vw, 2.2rem);
+
+            --hero-two-panel-width: clamp(450px, 30vw, 600px);
+            --hero-two-panel-font-size: clamp(15px, .96vw, 18px);
+
+            --hero-two-card-width: clamp(19.5rem, 16.5vw, 23rem);
+            --hero-two-player-width: clamp(30rem, 27vw, 38rem);
+            --hero-two-action-width: clamp(18.5rem, 16.5vw, 22rem);
         }
 
-        .hero-two-left-group {
-            width: min(56%, 920px);
-        }
-
-        .hero-two-player-wrap {
-            right: clamp(8rem, 15vw, 40rem);
-        }
-
-        .hero-two-action-wrap {
-            left: 39%;
-            bottom: -18px;
-        }
+        .hero-two-player-wrap { right: 18%; bottom: 0; }
+        .hero-two-card-wrap { right: 1%; }
+        .hero-two-back-jersey { left: 63%; top: 35%; }
+        .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 1.8rem); bottom: 0; }
     }
 
-    @media (max-width: 1366px) {
+    @media (max-width: 1280px) {
         :root{
-            --hero-two-first-name-size: clamp(5.3rem, 6.8vw, 7.8rem);
-            --hero-two-first-name-size-with-pos: clamp(5.6rem, 7.1vw, 8.2rem);
-            --hero-two-last-name-size: clamp(4.6rem, 5.9vw, 6.8rem);
-            --hero-two-card-width: clamp(15rem, 14vw, 18.5rem);
-            --hero-two-player-max-width: clamp(30rem, 31vw, 38rem);
-            --hero-two-back-jersey-size: clamp(22rem, 23vw, 30rem);
-            --hero-two-panel-width: clamp(380px, 31vw, 500px);
-            --hero-two-panel-label-size: clamp(14px, .82vw, 17px);
-            --hero-two-panel-value-size: clamp(16px, .95vw, 19px);
+            --hero-two-name-first: clamp(7.3rem, 6.8vw, 9.6rem);
+            --hero-two-name-first-inline: clamp(7.45rem, 7vw, 9.8rem);
+            --hero-two-name-last: clamp(5.75rem, 5.35vw, 7.3rem);
+            --hero-two-front-number: clamp(5.75rem, 5.35vw, 7.3rem);
+
+            --hero-two-back-number: clamp(21rem, 35vw, 32rem);
+            --hero-two-position-size: clamp(1.45rem, 1.35vw, 1.8rem);
+
+            --hero-two-panel-width: clamp(390px, 28vw, 520px);
+            --hero-two-panel-font-size: clamp(14px, .92vw, 16px);
+
+            --hero-two-card-width: clamp(16rem, 15vw, 19rem);
+            --hero-two-player-width: clamp(25rem, 23vw, 31rem);
+            --hero-two-action-width: clamp(14.5rem, 12.5vw, 17rem);
         }
 
-        .hero-two-left-group {
-            width: min(57%, 780px);
-            left: 1.8rem;
-        }
-
-        .hero-two-player-wrap {
-            right: 3.5rem;
-        }
-
-        .hero-two-card-wrap {
-            right: 1.4rem;
-        }
-
-        .hero-two-action-wrap {
-            left: 38%;
-            bottom: -12px;
-        }
+        .hero-two-left-group { width: 50%; }
+        .hero-two-player-wrap { right: 16%; bottom: 0; }
+        .hero-two-card-wrap { right: .8%; top: 3.2%; }
+        .hero-two-info-panel { padding: 1.05rem 1.15rem 1.05rem; }
+        .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 1.2rem); bottom: 0; }
+        .hero-two-back-jersey { left: 63%; top: 39.5%; }
     }
 
-    @media (max-width: 1180px) {
+    /* Tablet view: keep same structure, just scale it down */
+    @media (max-width: 1023px) and (min-width: 768px) {
         :root{
-            --hero-two-first-name-size: clamp(4.9rem, 6.2vw, 6.9rem);
-            --hero-two-first-name-size-with-pos: clamp(5.1rem, 6.5vw, 7.2rem);
-            --hero-two-last-name-size: clamp(4.2rem, 5.4vw, 6.1rem);
-            --hero-two-front-jersey-size: clamp(4rem, 4.8vw, 5.8rem);
-            --hero-two-back-jersey-size: clamp(19rem, 20vw, 25rem);
-            --hero-two-panel-width: clamp(340px, 31vw, 440px);
-            --hero-two-panel-label-size: clamp(13px, .75vw, 16px);
-            --hero-two-panel-value-size: clamp(15px, .88vw, 18px);
+            --hero-two-name-first: clamp(5.6rem, 7.5vw, 7.2rem);
+            --hero-two-name-first-inline: clamp(5.8rem, 7.7vw, 7.4rem);
+            --hero-two-name-last: clamp(4.45rem, 5.9vw, 5.8rem);
+            --hero-two-front-number: clamp(4.45rem, 5.9vw, 5.8rem);
+
+            --hero-two-back-number: clamp(16rem, 35vw, 22rem);
+            --hero-two-position-size: clamp(1.2rem, 1.7vw, 1.5rem);
+
+            --hero-two-panel-width: clamp(330px, 40vw, 400px);
+            --hero-two-panel-font-size: clamp(12px, 1.4vw, 14px);
+
+            --hero-two-card-width: clamp(12rem, 17vw, 14rem);
+            --hero-two-player-width: clamp(20rem, 29vw, 24rem);
+            --hero-two-action-width: clamp(11rem, 15vw, 13rem);
+
+            --hero-two-accolade-size: clamp(12px, 1.4vw, 14px);
+            --hero-two-content-bottom-space: 0px;
+        }
+
+        .hero-two-hero.hero-two-has-accolades {
+            --hero-two-content-bottom-space: clamp(56px, 8vh, 100px);
         }
 
         .hero-two-left-group {
-            left: 1.4rem;
-            width: min(58%, 700px);
+            width: min(54%, 440px);
+            margin-left: 2.4%;
         }
 
-        .hero-two-card-wrap {
-            right: 1rem;
+        .hero-two-position {
+            white-space: normal;
         }
 
-        .hero-two-player-wrap {
-            right: 2.5rem;
+        .hero-two-accolades-wrap {
+            width: var(--hero-two-panel-width);
+            margin-top: .7rem;
+            margin-bottom: .6rem;
+        }
+
+        .hero-two-info-wrap {
+            margin-top: .75rem;
+        }
+
+        .hero-two-info-panel {
+            border-radius: 14px;
+            padding: .95rem 1rem .95rem;
         }
 
         .hero-two-social-floating {
-            gap: 9px;
+            top: .65rem;
+            right: .7rem;
+            gap: 8px;
         }
 
-        .hero-two-social-link {
-            width: 27px;
-            height: 27px;
+        .hero-two-stat-row {
+            gap: .55rem;
         }
 
-        .hero-two-social-link svg {
-            width: 23px;
-            height: 23px;
+        .hero-two-card-wrap {
+            right: 1.5%;
+            top: 2.2%;
+        }
+
+        .hero-two-player-wrap {
+            right: 15.5%;
+            bottom: 0;
         }
 
         .hero-two-action-wrap {
-            left: 37%;
-            bottom: -8px;
+            left: calc(2.4% + var(--hero-two-panel-width) - .6rem);
+            bottom: 0;
+        }
+
+        .hero-two-back-jersey {
+            left: 63%;
+            top: 41%;
         }
     }
 
     @media (min-width: 1800px) {
         :root{
-            --hero-two-shell-max: 2500px;
-            --hero-two-card-width: clamp(20rem, 17vw, 29rem);
-            --hero-two-player-max-width: clamp(42rem, 40vw, 66rem);
-            --hero-two-player-max-height: min(98vh, 1280px);
-            --hero-two-action-width: clamp(18rem, 15vw, 28rem);
-            --hero-two-first-name-size: clamp(7rem, 9vw, 13rem);
-            --hero-two-first-name-size-with-pos: clamp(7.4rem, 9.4vw, 13.6rem);
-            --hero-two-last-name-size: clamp(6.1rem, 7.9vw, 11rem);
-            --hero-two-front-jersey-size: clamp(5.4rem, 6.8vw, 9.2rem);
-            --hero-two-back-jersey-size: clamp(30rem, 32vw, 54rem);
-            --hero-two-pos-size: clamp(1.9rem, 2.25vw, 3.3rem);
-            --hero-two-panel-width: clamp(560px, 35vw, 1040px);
-            --hero-two-panel-label-size: clamp(18px, 1.2vw, 26px);
-            --hero-two-panel-value-size: clamp(22px, 1.5vw, 34px);
-            --hero-two-social-size: clamp(34px, 2vw, 46px);
-            --hero-two-social-icon-size: clamp(27px, 1.7vw, 37px);
+            --hero-two-name-first: clamp(11.5rem, 10.6vw, 15.45rem);
+            --hero-two-name-first-inline: clamp(11.7rem, 10.85vw, 15.7rem);
+            --hero-two-name-last: clamp(9.25rem, 8.55vw, 11.55rem);
+            --hero-two-front-number: clamp(9.25rem, 8.55vw, 11.55rem);
+
+            --hero-two-back-number: clamp(31rem, 29vw, 48rem);
+            --hero-two-position-size: clamp(2.15rem, 1.95vw, 2.7rem);
+
+            --hero-two-panel-width: clamp(560px, 32vw, 760px);
+            --hero-two-panel-font-size: clamp(17px, 1.08vw, 21px);
+
+            --hero-two-card-width: clamp(23rem, 18.8vw, 27rem);
+            --hero-two-player-width: clamp(35rem, 29vw, 43rem);
+            --hero-two-action-width: clamp(23rem, 19.5vw, 27rem);
         }
 
-        .hero-two-left-group {
-            left: clamp(2rem, 3vw, 4rem);
-            width: min(60%, 1320px);
-        }
-
-        .hero-two-player-wrap {
-            right: clamp(8rem, 15vw, 40rem);
-        }
-
-        .hero-two-card-wrap {
-            right: clamp(1.25rem, 2.3vw, 2.5rem);
-        }
-
-        .hero-two-action-wrap {
-            left: 40%;
-            bottom: -22px;
-        }
-    }
-
-    @media (min-width: 2200px) {
-        :root{
-            --hero-two-shell-max: 2800px;
-            --hero-two-card-width: clamp(21rem, 17vw, 31rem);
-            --hero-two-player-max-width: clamp(46rem, 42vw, 72rem);
-            --hero-two-action-width: clamp(20rem, 16vw, 32rem);
-            --hero-two-player-max-height: min(100vh, 1360px);
-            --hero-two-first-name-size: clamp(7.6rem, 9.4vw, 14rem);
-            --hero-two-first-name-size-with-pos: clamp(8rem, 9.8vw, 14.6rem);
-            --hero-two-last-name-size: clamp(6.6rem, 8.2vw, 11.6rem);
-            --hero-two-front-jersey-size: clamp(5.8rem, 7vw, 9.8rem);
-            --hero-two-back-jersey-size: clamp(33rem, 34vw, 58rem);
-            --hero-two-pos-size: clamp(2rem, 2.35vw, 3.5rem);
-            --hero-two-panel-width: clamp(620px, 35vw, 1180px);
-            --hero-two-panel-label-size: clamp(19px, 1.25vw, 28px);
-            --hero-two-panel-value-size: clamp(23px, 1.58vw, 36px);
-        }
-
-        .hero-two-left-group {
-            left: clamp(1.8rem, 2.5vw, 3.2rem);
-            width: min(62%, 1460px);
-        }
-
-        .hero-two-player-wrap {
-            right: clamp(8rem, 15vw, 40rem);
-        }
-
-        .hero-two-card-wrap {
-            right: clamp(1rem, 2vw, 2rem);
-        }
-
-        .hero-two-action-wrap {
-            left: 40.5%;
-            bottom: -26px;
-        }
+        .hero-two-player-wrap { right: 20.5%; bottom: 0; }
+        .hero-two-card-wrap { right: 1.8%; }
+        .hero-two-back-jersey { left: 62%; top: 41.2%; }
+        .hero-two-action-wrap { left: calc(3.2% + var(--hero-two-panel-width) - 2.4rem); bottom: 0; }
     }
 </style>
 
 <section
-    class="hero-two-desktop relative z-0 overflow-hidden h-[118vh] min-h-[820px] max-h-[1500px]"
+    class="hero-two-desktop hero-two-hero {{ $sportAccolades->isNotEmpty() ? 'hero-two-has-accolades' : '' }} z-0"
     style="background:
         radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
         color: {{ $text1 }};"
 >
     <div class="absolute inset-0 z-0 pointer-events-none">
-        <div class="absolute inset-x-0 bottom-0 h-[34%]" style="background: linear-gradient(to top, rgba(0,0,0,.26), rgba(0,0,0,0));"></div>
+        <div class="absolute inset-x-0 bottom-0 h-[34%]" style="background: linear-gradient(to top, rgba(0,0,0,.24), rgba(0,0,0,0));"></div>
         <div class="absolute inset-y-0 left-0 w-[16%]" style="background: linear-gradient(to right, rgba(0, 12, 70, .44), rgba(0, 12, 70, 0));"></div>
         <div class="absolute inset-y-0 right-0 w-[16%]" style="background: linear-gradient(to left, rgba(0, 12, 70, .34), rgba(0, 12, 70, 0));"></div>
     </div>
 
-    <div class="hero-two-shell relative z-10">
-        @if ($jerseyNumber)
-            <div class="pointer-events-none absolute left-[61%] top-[54.5%] z-[1] -translate-x-1/2 -translate-y-1/2 hero-two-font-jersey-back hero-two-back-jersey tracking-[-0.03em] text-white/[0.14]">
-                {{ $jerseyNumber }}
-            </div>
-        @endif
-
-        @if ($playerCardImageUrl)
-            <div class="hero-two-card-wrap">
-                <img
-                    src="{{ $playerCardImageUrl }}"
-                    alt="Player card"
-                    class="hero-two-card-shadow hero-two-card object-contain"
-                />
-            </div>
-        @endif
-
-        <div class="hero-two-left-group">
+    <div class="hero-two-shell">
+        <div class="hero-two-stage">
             @if ($jerseyNumber)
-                <div class="hero-two-font-jersey-front hero-two-front-jersey tracking-[-0.04em] text-white">
-                    #{{ $jerseyNumber }}
+                <div class="hero-two-font-jersey-back hero-two-back-jersey">
+                    {{ $jerseyNumber }}
                 </div>
             @endif
 
-            <div>
-                @if ($firstName)
-                    <div class="flex items-end gap-4">
-                        <div class="hero-two-font-name hero-two-name-line hero-two-name-first text-white {{ ! $positionBesideLastName && $position ? 'has-inline-position' : '' }}">
-                            {{ $firstName }}
-                        </div>
+            @if ($playerCardImageUrl)
+                <div class="hero-two-card-wrap">
+                    <img
+                        src="{{ $playerCardImageUrl }}"
+                        alt="Player card"
+                        class="hero-two-card-shadow hero-two-card"
+                    />
+                </div>
+            @endif
 
-                        @if ($position && ! $positionBesideLastName)
-                            <div class="hero-two-font-sans hero-two-position mb-[0.75rem]">
+            <div class="hero-two-left-group">
+                @if ($jerseyNumber)
+                    <div class="hero-two-font-jersey-front hero-two-front-jersey text-white">
+                        #{{ $jerseyNumber }}
+                    </div>
+                @endif
+
+                <div>
+                    @if ($firstName)
+                        <div class="flex items-end gap-3">
+                            <div class="hero-two-font-name hero-two-name-line hero-two-name-first text-white {{ ! $positionBesideLastName && $position ? 'has-inline-position' : '' }}">
+                                {{ $firstName }}
+                            </div>
+
+                            @if ($position && ! $positionBesideLastName)
+                                <div class="hero-two-font-sans hero-two-position mb-[0.35rem]">
+                                    {{ $position }}
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="flex items-end gap-3 mt-1">
+                        @if ($lastName)
+                            <div class="hero-two-font-name hero-two-name-line hero-two-name-last text-white">
+                                {{ $lastName }}
+                            </div>
+                        @endif
+
+                        @if ($position && $positionBesideLastName)
+                            <div class="hero-two-font-sans hero-two-position mb-[0.32rem]">
                                 {{ $position }}
                             </div>
                         @endif
                     </div>
-                @endif
-
-                <div class="flex items-end gap-4 mt-3">
-                    @if ($lastName)
-                        <div class="hero-two-font-name hero-two-name-line hero-two-name-last text-white">
-                            {{ $lastName }}
-                        </div>
-                    @endif
-
-                    @if ($position && $positionBesideLastName)
-                        <div class="hero-two-font-sans hero-two-position mb-[0.7rem]">
-                            {{ $position }}
-                        </div>
-                    @endif
                 </div>
-            </div>
 
-            <div class="hero-two-info-wrap">
-                @if ($sportAccolades->isNotEmpty())
-                    <div class="hero-two-accolades-wrap hero-two-font-sans">
-                        <div class="hero-two-accolades-list">
-                            @foreach ($sportAccolades as $accolade)
-                                <div class="hero-two-accolade-item">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="hero-two-accolade-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M17 3H7v2H3v2c0 2.97 2.16 5.43 5 5.91.2.71.57 1.36 1.07 1.91.55.6 1.24 1.03 1.93 1.28V19H8v2h8v-2h-3v-2.9c.69-.25 1.38-.68 1.93-1.28.5-.55.87-1.2 1.07-1.91 2.84-.48 5-2.94 5-5.91V5h-4V3ZM5 7V7h2v.18c0 1.16.19 2.25.54 3.23C6.09 9.92 5 8.58 5 7Zm14 0c0 1.58-1.09 2.92-2.54 3.41.35-.98.54-2.07.54-3.23V7h2Z"/>
+                <div class="hero-two-info-wrap">
+                    @if ($sportAccolades->isNotEmpty())
+                        <div class="hero-two-accolades-wrap hero-two-font-sans">
+                            <div class="hero-two-accolades-list">
+                                @foreach ($sportAccolades as $accolade)
+                                    <div class="hero-two-accolade-item">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="hero-two-accolade-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M17 3H7v2H3v2c0 2.97 2.16 5.43 5 5.91.2.71.57 1.36 1.07 1.91.55.6 1.24 1.03 1.93 1.28V19H8v2h8v-2h-3v-2.9c.69-.25 1.38-.68 1.93-1.28.5-.55.87-1.2 1.07-1.91 2.84-.48 5-2.94 5-5.91V5h-4V3ZM5 7V7h2v.18c0 1.16.19 2.25.54 3.23C6.09 9.92 5 8.58 5 7Zm14 0c0 1.58-1.09 2.92-2.54 3.41.35-.98.54-2.07.54-3.23V7h2Z"/>
+                                        </svg>
+                                        <strong>{{ $accolade }}</strong>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="hero-two-info-panel">
+                        @if ($hasAnySocial)
+                            <div class="hero-two-social-floating">
+                                <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
+                                   class="hero-two-social-link {{ empty($playerEmail) ? 'is-disabled' : '' }}"
+                                   aria-label="Email">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 5.5h18v13H3z"></path>
+                                        <path d="m4 7 8 6 8-6"></path>
                                     </svg>
-                                    <strong>{{ $accolade }}</strong>
+                                </a>
+
+                                <a href="{{ $igUrl ?: '#' }}"
+                                   class="hero-two-social-link {{ empty($igUrl) ? 'is-disabled' : '' }}"
+                                   aria-label="Instagram"
+                                   target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
+                                   rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm8.5 1.8h-8.5A3.95 3.95 0 0 0 3.8 7.75v8.5a3.95 3.95 0 0 0 3.95 3.95h8.5a3.95 3.95 0 0 0 3.95-3.95v-8.5a3.95 3.95 0 0 0-3.95-3.95ZM12 7.1A4.9 4.9 0 1 1 7.1 12 4.91 4.91 0 0 1 12 7.1Zm0 1.8A3.1 3.1 0 1 0 15.1 12 3.1 3.1 0 0 0 12 8.9Zm5.15-2.3a1.2 1.2 0 1 1-1.2 1.2 1.2 1.2 0 0 1 1.2-1.2Z"/>
+                                    </svg>
+                                </a>
+
+                                <a href="{{ $ytUrl ?: '#' }}"
+                                   class="hero-two-social-link {{ empty($ytUrl) ? 'is-disabled' : '' }}"
+                                   aria-label="YouTube"
+                                   target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
+                                   rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
+                                    </svg>
+                                </a>
+
+                                <a href="{{ $xUrl ?: '#' }}"
+                                   class="hero-two-social-link {{ empty($xUrl) ? 'is-disabled' : '' }}"
+                                   aria-label="X"
+                                   target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
+                                   rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                        <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
+                                    </svg>
+                                </a>
+                            </div>
+                        @endif
+
+                        <div class="hero-two-font-sans space-y-2">
+                            <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[105px]' : '' }}">
+                                <div class="hero-two-stat-label">Full Name</div>
+                                <div class="hero-two-stat-value">{{ $fullName }}</div>
+                            </div>
+
+                            @if ($bornYear || $dateOfBirth)
+                                <div class="hero-two-stat-row">
+                                    <div class="hero-two-stat-label">Born</div>
+                                    <div class="hero-two-stat-value">{{ $bornYear ?: $dateOfBirth }}</div>
                                 </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
+                            @endif
 
-                <div class="hero-two-info-panel">
-                    @if ($hasAnySocial)
-                        <div class="hero-two-social-floating">
-                            <a href="{{ $playerEmail ? 'mailto:' . $playerEmail : '#' }}"
-                               class="hero-two-social-link {{ empty($playerEmail) ? 'is-disabled' : '' }}"
-                               aria-label="Email">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M3 5.5h18v13H3z"></path>
-                                    <path d="m4 7 8 6 8-6"></path>
-                                </svg>
-                            </a>
-
-                            <a href="{{ $igUrl ?: '#' }}"
-                               class="hero-two-social-link {{ empty($igUrl) ? 'is-disabled' : '' }}"
-                               aria-label="Instagram"
-                               target="{{ !empty($igUrl) ? '_blank' : '_self' }}"
-                               rel="{{ !empty($igUrl) ? 'noopener noreferrer' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm8.5 1.8h-8.5A3.95 3.95 0 0 0 3.8 7.75v8.5a3.95 3.95 0 0 0 3.95 3.95h8.5a3.95 3.95 0 0 0 3.95-3.95v-8.5a3.95 3.95 0 0 0-3.95-3.95ZM12 7.1A4.9 4.9 0 1 1 7.1 12 4.91 4.91 0 0 1 12 7.1Zm0 1.8A3.1 3.1 0 1 0 15.1 12 3.1 3.1 0 0 0 12 8.9Zm5.15-2.3a1.2 1.2 0 1 1-1.2 1.2 1.2 1.2 0 0 1 1.2-1.2Z"/>
-                                </svg>
-                            </a>
-
-                            <a href="{{ $ytUrl ?: '#' }}"
-                               class="hero-two-social-link {{ empty($ytUrl) ? 'is-disabled' : '' }}"
-                               aria-label="YouTube"
-                               target="{{ !empty($ytUrl) ? '_blank' : '_self' }}"
-                               rel="{{ !empty($ytUrl) ? 'noopener noreferrer' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8ZM9.8 15.5v-7l6.2 3.5-6.2 3.5Z"/>
-                                </svg>
-                            </a>
-
-                            <a href="{{ $xUrl ?: '#' }}"
-                               class="hero-two-social-link {{ empty($xUrl) ? 'is-disabled' : '' }}"
-                               aria-label="X"
-                               target="{{ !empty($xUrl) ? '_blank' : '_self' }}"
-                               rel="{{ !empty($xUrl) ? 'noopener noreferrer' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                    <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-                                </svg>
-                            </a>
-                        </div>
-                    @endif
-
-                    <div class="hero-two-font-sans space-y-3">
-                        <div class="hero-two-stat-row {{ $hasAnySocial ? 'pr-[170px]' : '' }}">
-                            <div class="hero-two-stat-label">Full Name</div>
-                            <div class="hero-two-stat-value">{{ $fullName }}</div>
-                        </div>
-
-                        @if ($bornYear || $dateOfBirth)
-                            <div class="hero-two-stat-row">
-                                <div class="hero-two-stat-label">Born</div>
-                                <div class="hero-two-stat-value">{{ $bornYear ?: $dateOfBirth }}</div>
-                            </div>
-                        @endif
-
-                        @if ($club)
-                            <div class="hero-two-stat-row">
-                                <div class="hero-two-stat-label">Club</div>
-                                <div class="hero-two-stat-value">{{ $club }}</div>
-                            </div>
-                        @endif
-
-                        @if ($highSchool || $gpa)
-                            <div class="hero-two-stat-block">
-                                <div class="hero-two-stat-label">High School</div>
-                                <div class="hero-two-stat-value">
-                                    @if ($highSchool && $gpa)
-                                        {{ $highSchool }} - GPA {{ $gpa }}
-                                    @elseif ($highSchool)
-                                        {{ $highSchool }}
-                                    @else
-                                        GPA {{ $gpa }}
-                                    @endif
+                            @if ($club)
+                                <div class="hero-two-stat-row">
+                                    <div class="hero-two-stat-label">Club</div>
+                                    <div class="hero-two-stat-value">{{ $club }}</div>
                                 </div>
-                            </div>
-                        @endif
+                            @endif
 
-                        @if ($coach)
-                            <div class="hero-two-stat-block">
-                                <div class="hero-two-stat-label">Coach</div>
-                                <div class="hero-two-stat-value uppercase font-semibold tracking-[0.02em]">{{ $coach }}</div>
-                            </div>
-                        @endif
+                            @if ($highSchool || $gpa)
+                                <div class="hero-two-stat-block">
+                                    <div class="hero-two-stat-label">High School</div>
+                                    <div class="hero-two-stat-value">
+                                        @if ($highSchool && $gpa)
+                                            {{ $highSchool }} - GPA {{ $gpa }}
+                                        @elseif ($highSchool)
+                                            {{ $highSchool }}
+                                        @else
+                                            GPA {{ $gpa }}
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($coach)
+                                <div class="hero-two-stat-block">
+                                    <div class="hero-two-stat-label">Coach</div>
+                                    <div class="hero-two-stat-value uppercase font-semibold tracking-[0.02em]">{{ $coach }}</div>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
+
+            @if ($playerImageUrl)
+                <div class="hero-two-player-wrap">
+                    <img
+                        src="{{ $playerImageUrl }}"
+                        alt="{{ $fullName }}"
+                        class="hero-two-shadow hero-two-player-image"
+                    />
+                </div>
+            @endif
+
+            @if ($playerActionImageUrl)
+                <div class="hero-two-action-wrap">
+                    <img
+                        src="{{ $playerActionImageUrl }}"
+                        alt="Player action image"
+                        class="hero-two-shadow hero-two-action-image"
+                    />
+                </div>
+            @endif
         </div>
-
-        @if ($playerImageUrl)
-            <div class="pointer-events-none hero-two-player-wrap">
-                <img
-                    src="{{ $playerImageUrl }}"
-                    alt="{{ $fullName }}"
-                    class="hero-two-shadow hero-two-player-image"
-                />
-            </div>
-        @endif
-
-        @if ($playerActionImageUrl)
-            <div class="hero-two-action-wrap">
-                <img
-                    src="{{ $playerActionImageUrl }}"
-                    alt="Player action image"
-                    class="hero-two-shadow hero-two-action-image"
-                />
-            </div>
-        @endif
     </div>
 </section>
 
