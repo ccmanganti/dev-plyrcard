@@ -135,7 +135,122 @@
         return $gpa;
     };
 
-    $formatPositionDisplay = function ($value) use ($normalizeDisplayValue) {
+$positionShorthandMap = [
+    // basketball
+    'point_guard' => 'Point Gd',
+    'shooting_guard' => 'Shooting Gd',
+    'small_forward' => 'Small Fwd',
+    'power_forward' => 'Power Fwd',
+    'center' => 'Center',
+
+    // volleyball
+    'setter' => 'Setter',
+    'outside_hitter' => 'Outside Hit',
+    'opposite_hitter' => 'Opp Hit',
+    'middle_blocker' => 'Middle Block',
+    'libero' => 'Libero',
+    'defensive_specialist' => 'Def Specialist',
+
+    // football
+    'quarterback' => 'Quarterback',
+    'running_back' => 'Running Back',
+    'wide_receiver' => 'Wide Rec',
+    'tight_end' => 'Tight End',
+    'offensive_line' => 'Off Line',
+    'defensive_line' => 'Def Line',
+    'linebacker' => 'Linebacker',
+    'cornerback' => 'Cornerback',
+    'safety' => 'Safety',
+    'kicker' => 'Kicker',
+    'punter' => 'Punter',
+
+    // baseball / softball
+    'pitcher' => 'Pitcher',
+    'catcher' => 'Catcher',
+    'first_base' => '1st Base',
+    'second_base' => '2nd Base',
+    'third_base' => '3rd Base',
+    'shortstop' => 'Shortstop',
+    'left_field' => 'Left Field',
+    'center_field' => 'Center Field',
+    'right_field' => 'Right Field',
+    'designated_hitter' => 'Desig Hit',
+
+    // soccer
+    'goalkeeper' => 'Goalkeeper',
+    'defender' => 'Def',
+    'center_back' => 'Center Back',
+    'full_back' => 'Full Back',
+    'wing_back' => 'Wing Back',
+    'midfielder' => 'Mid',
+    'defensive_midfielder' => 'Def Mid',
+    'central_midfielder' => 'Central Mid',
+    'attacking_midfielder' => 'Att Mid',
+    'winger' => 'Winger',
+    'forward' => 'Fwd',
+    'striker' => 'Striker',
+
+    // tennis / badminton / table tennis
+    'singles' => 'Singles',
+    'doubles' => 'Doubles',
+    'mixed_doubles' => 'Mixed Doubles',
+
+    // track and field
+    'sprinter' => 'Sprinter',
+    'middle_distance' => 'Mid Distance',
+    'long_distance' => 'Long Distance',
+    'hurdler' => 'Hurdler',
+    'jumper' => 'Jumper',
+    'thrower' => 'Thrower',
+    'relay_runner' => 'Relay Runner',
+    'decathlete' => 'Decathlete',
+    'heptathlete' => 'Heptathlete',
+
+    // swimming
+    'freestyle' => 'Freestyle',
+    'backstroke' => 'Backstroke',
+    'breaststroke' => 'Breaststroke',
+    'butterfly' => 'Butterfly',
+    'individual_medley' => 'Ind Medley',
+    'relay' => 'Relay',
+
+    // boxing
+    'flyweight' => 'Flyweight',
+    'bantamweight' => 'Bantamweight',
+    'featherweight' => 'Featherweight',
+    'lightweight' => 'Lightweight',
+    'welterweight' => 'Welterweight',
+    'middleweight' => 'Middleweight',
+    'light_heavyweight' => 'Light Heavy',
+    'heavyweight' => 'Heavyweight',
+
+    // martial arts
+    'striker' => 'Striker',
+    'grappler' => 'Grappler',
+    'all_rounder' => 'All-Rounder',
+];
+
+    $formatPositionDisplay = function ($value) use ($normalizeDisplayValue, $positionShorthandMap) {
+        $normalizePositionKey = function ($item) {
+            return str((string) $item)
+                ->trim()
+                ->lower()
+                ->replace('-', '_')
+                ->replace(' ', '_')
+                ->squish()
+                ->replace('__', '_')
+                ->toString();
+        };
+
+        $formatFallback = function ($item) {
+            return str((string) $item)
+                ->replace('_', ' ')
+                ->replace('-', ' ')
+                ->squish()
+                ->title()
+                ->toString();
+        };
+
         if (is_string($value)) {
             $decoded = json_decode($value, true);
 
@@ -147,7 +262,10 @@
         if (is_array($value)) {
             return collect($value)
                 ->filter()
-                ->map(fn ($item) => str((string) $item)->replace('_', ' ')->replace('-', ' ')->squish()->title()->toString())
+                ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallback) {
+                    $key = $normalizePositionKey($item);
+                    return $positionShorthandMap[$key] ?? $formatFallback($item);
+                })
                 ->implode(', ');
         }
 
@@ -161,7 +279,10 @@
 
         return collect($parts)
             ->filter()
-            ->map(fn ($item) => str((string) $item)->replace('_', ' ')->replace('-', ' ')->squish()->title()->toString())
+            ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallback) {
+                $key = $normalizePositionKey($item);
+                return $positionShorthandMap[$key] ?? $formatFallback($item);
+            })
             ->implode(', ');
     };
 
