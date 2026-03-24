@@ -9,11 +9,14 @@ use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
+use App\Models\HeroTemplateField;
+use App\Models\WebsiteHeroFieldValue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PublicPlayerIntakeController extends Controller
@@ -212,11 +215,48 @@ class PublicPlayerIntakeController extends Controller
             'DC' => 'District of Columbia',
         ];
 
+        $countryOptions = [
+            'USA' => 'United States',
+            'Austria' => 'Austria',
+            'Belgium' => 'Belgium',
+            'Bulgaria' => 'Bulgaria',
+            'Croatia' => 'Croatia',
+            'Cyprus' => 'Cyprus',
+            'Czech Republic' => 'Czech Republic',
+            'Denmark' => 'Denmark',
+            'Estonia' => 'Estonia',
+            'Finland' => 'Finland',
+            'France' => 'France',
+            'Germany' => 'Germany',
+            'Greece' => 'Greece',
+            'Hungary' => 'Hungary',
+            'Iceland' => 'Iceland',
+            'Ireland' => 'Ireland',
+            'Italy' => 'Italy',
+            'Latvia' => 'Latvia',
+            'Lithuania' => 'Lithuania',
+            'Luxembourg' => 'Luxembourg',
+            'Malta' => 'Malta',
+            'Netherlands' => 'Netherlands',
+            'Norway' => 'Norway',
+            'Poland' => 'Poland',
+            'Portugal' => 'Portugal',
+            'Romania' => 'Romania',
+            'Slovakia' => 'Slovakia',
+            'Slovenia' => 'Slovenia',
+            'Spain' => 'Spain',
+            'Sweden' => 'Sweden',
+            'Switzerland' => 'Switzerland',
+            'United Kingdom' => 'United Kingdom',
+            '__other__' => 'Other',
+        ];
+
         return view('public.player-intake', [
             'schools' => $schools,
             'clubs' => $clubs,
             'leagues' => $leagues,
             'states' => $states,
+            'countryOptions' => $countryOptions,
             'sportPositions' => $this->sportPositions,
             'genderOptions' => $this->genderOptions,
         ]);
@@ -233,7 +273,8 @@ class PublicPlayerIntakeController extends Controller
             'gender' => ['nullable', 'in:' . implode(',', array_keys($this->genderOptions))],
 
             'country' => ['nullable', 'string', 'max:255'],
-            'state' => ['nullable', 'string', 'size:2'],
+            'country_other' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'street' => ['nullable', 'string', 'max:255'],
 
@@ -293,10 +334,26 @@ class PublicPlayerIntakeController extends Controller
             'mobile_view_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
             'youtube_thumbnail' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'logos_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+
             'player_bio' => ['nullable', 'string'],
             'featured_video_url' => ['nullable', 'url', 'max:500'],
+            'use_custom_highlights' => ['nullable', 'boolean'],
             'featured_video_urls' => ['nullable', 'string'],
         ]);
+
+        if (($validated['country'] ?? null) === '__other__' && filled($validated['country_other'] ?? null)) {
+            $validated['country'] = trim($validated['country_other']);
+        }
+
+        if (($validated['country'] ?? null) === '__other__' && blank($validated['country_other'] ?? null)) {
+            return back()
+                ->withErrors(['country_other' => 'Please enter a country name.'])
+                ->withInput();
+        }
+
+        if (($validated['country'] ?? null) === 'USA' && filled($validated['state'] ?? null)) {
+            $validated['state'] = strtoupper(trim($validated['state']));
+        }
 
         $sport = $validated['sport'];
         $allowedPositions = array_keys($this->sportPositions[$sport] ?? []);
@@ -310,7 +367,16 @@ class PublicPlayerIntakeController extends Controller
             }
         }
 
-        $user = DB::transaction(function () use ($request, $validated) {
+        $useCustomHighlights = $request->boolean('use_custom_highlights');
+        $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
+
+        if ($useCustomHighlights && empty($manualVideoUrls)) {
+            throw ValidationException::withMessages([
+                'featured_video_urls' => 'Please add at least one highlight video URL or turn off "Pick My Own Videos".',
+            ]);
+        }
+
+        $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls) {
             $school = $this->resolveSchool($validated);
             [$league, $club] = $this->resolveClubAndLeague($validated);
 
@@ -359,6 +425,8 @@ class PublicPlayerIntakeController extends Controller
                 'height' => $validated['height'] ?? null,
                 'weight' => $validated['weight'] ?? null,
                 'jersey_number' => $validated['jersey_number'] ?? null,
+                'vertical_jump' => $validated['vertical_jump'] ?? null,
+                'max_speed' => $validated['max_speed'] ?? null,
                 'sport' => $validated['sport'],
                 'position' => $validated['position'] ?? [],
                 'academic_accolades' => $validated['academic_accolades'] ?? null,
@@ -392,7 +460,7 @@ class PublicPlayerIntakeController extends Controller
                 'domain' => $generatedDomain,
                 'player_bio' => $validated['player_bio'] ?? null,
                 'featured_video_url' => $validated['featured_video_url'] ?? null,
-                'featured_video_urls' => $validated['featured_video_urls'] ?? null,
+                'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
             ]);
 
             $userImageUploads = $this->storeUserImageUploads($request);
@@ -431,6 +499,22 @@ class PublicPlayerIntakeController extends Controller
             ->with('success', 'Player intake submitted successfully for ' . $user->first_name . '.');
     }
 
+    protected function normalizeVideoUrls(?string $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($value)) ?: [];
+
+        return collect($lines)
+            ->map(fn ($line) => trim((string) $line))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     protected function resolveSchool(array $validated): ?School
     {
         if (($validated['school_id'] ?? null) === '__other__' && filled($validated['school_other'] ?? null)) {
@@ -463,12 +547,8 @@ class PublicPlayerIntakeController extends Controller
         if ($leagueId === '__other__') {
             if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
                 $league = League::firstOrCreate(
-                    [
-                        'name' => trim($validated['league_other']),
-                    ],
-                    [
-                        'gender' => $validated['gender'],
-                    ]
+                    ['name' => trim($validated['league_other'])],
+                    ['gender' => $validated['gender']]
                 );
             }
         } elseif (filled($leagueId)) {
@@ -495,22 +575,42 @@ class PublicPlayerIntakeController extends Controller
 
     protected function createWebsiteIfSupported(User $user, array $validated, array $uploads, string $generatedDomain): ?Website
     {
-        $siteTemplateId = $this->resolveSiteTemplateId($validated['sport']);
-        $heroTemplateId = $this->resolveHeroTemplateId($validated['sport']);
-
-        if (! $siteTemplateId || ! $heroTemplateId) {
-            return null;
-        }
-
-        $siteTemplate = SiteTemplate::find($siteTemplateId);
-        $heroTemplate = HeroTemplate::find($heroTemplateId);
+        $siteTemplate = $this->resolveSiteTemplate($validated['sport']);
+        $heroTemplate = $this->resolveHeroTemplate($validated['sport']);
 
         if (! $siteTemplate || ! $heroTemplate) {
             return null;
         }
 
+        $existingWebsite = Website::query()
+            ->where('user_id', $user->id)
+            ->first();
+
         $websiteName = trim($user->first_name . ' ' . $user->last_name);
         $slugBase = Str::slug($websiteName ?: ('player-' . $user->id));
+
+        if ($existingWebsite) {
+            $existingWebsite->fill([
+                'site_template_id' => $siteTemplate->id,
+                'hero_template_id' => $heroTemplate->id,
+                'name' => $websiteName,
+                'domain' => $generatedDomain,
+                'is_active' => true,
+                'is_published' => false,
+                'project_json' => ! empty($uploads) ? json_encode(['hero_uploads' => $uploads]) : $existingWebsite->project_json,
+            ]);
+
+            if (blank($existingWebsite->slug)) {
+                $existingWebsite->slug = $this->generateUniqueWebsiteSlug($slugBase);
+            }
+
+            $existingWebsite->save();
+
+            $this->attachHeroFieldUploads($existingWebsite, $uploads);
+
+            return $existingWebsite;
+        }
+
         $slug = $this->generateUniqueWebsiteSlug($slugBase);
 
         $website = Website::create([
@@ -539,6 +639,40 @@ class PublicPlayerIntakeController extends Controller
         return $website;
     }
 
+    protected function resolveSiteTemplate(string $sport): ?SiteTemplate
+    {
+        return SiteTemplate::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('sports')
+                    ->orWhereJsonLength('sports', 0);
+            })
+            ->orderBy('id')
+            ->first();
+    }
+
+    protected function resolveHeroTemplate(string $sport): ?HeroTemplate
+    {
+        $exactMatch = HeroTemplate::query()
+            ->where('is_active', true)
+            ->whereJsonContains('sports', $sport)
+            ->orderBy('id')
+            ->first();
+
+        if ($exactMatch) {
+            return $exactMatch;
+        }
+
+        return HeroTemplate::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('sports')
+                    ->orWhereJsonLength('sports', 0);
+            })
+            ->orderBy('id')
+            ->first();
+    }
+
     protected function attachHeroFieldUploads(Website $website, array $uploads): void
     {
         if (empty($uploads) || ! $website->hero_template_id) {
@@ -552,9 +686,14 @@ class PublicPlayerIntakeController extends Controller
             2 => [
                 'mobile_view_image' => ['hero_mobile_image'],
             ],
+            4 => [
+                'mobile_view_image' => ['hero_mobile_image'],
+            ],
         ];
 
-        $fieldMap = $heroFieldMapByTemplate[$website->hero_template_id] ?? [];
+        $fieldMap = $heroFieldMapByTemplate[$website->hero_template_id] ?? [
+            'mobile_view_image' => ['hero_mobile_image'],
+        ];
 
         foreach ($fieldMap as $requestField => $candidateNames) {
             $path = $uploads[$requestField] ?? null;
@@ -563,7 +702,7 @@ class PublicPlayerIntakeController extends Controller
                 continue;
             }
 
-            $templateField = \App\Models\HeroTemplateField::query()
+            $templateField = HeroTemplateField::query()
                 ->where('hero_template_id', $website->hero_template_id)
                 ->whereIn('name', $candidateNames)
                 ->first();
@@ -572,7 +711,7 @@ class PublicPlayerIntakeController extends Controller
                 continue;
             }
 
-            \App\Models\WebsiteHeroFieldValue::updateOrCreate(
+            WebsiteHeroFieldValue::updateOrCreate(
                 [
                     'website_id' => $website->id,
                     'hero_template_field_id' => $templateField->id,
@@ -587,45 +726,6 @@ class PublicPlayerIntakeController extends Controller
                 ]
             );
         }
-    }
-
-    protected function resolveSiteTemplateId(string $sport): ?int
-    {
-        $templateId = 2;
-
-        $template = SiteTemplate::find($templateId);
-
-        if (! $template || ! $template->is_active) {
-            return null;
-        }
-
-        return $templateId;
-    }
-
-    protected function resolveHeroTemplateId(string $sport): ?int
-    {
-        $map = [
-            'basketball' => 1,
-            'soccer' => 4,
-        ];
-
-        $templateId = $map[$sport] ?? null;
-
-        if (! $templateId) {
-            return null;
-        }
-
-        $template = HeroTemplate::find($templateId);
-
-        if (! $template || ! $template->is_active) {
-            return null;
-        }
-
-        if (! blank($template->sports) && ! in_array($sport, $template->sports, true)) {
-            return null;
-        }
-
-        return $templateId;
     }
 
     protected function generateUniqueWebsiteSlug(string $baseSlug): string

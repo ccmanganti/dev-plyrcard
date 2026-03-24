@@ -318,6 +318,86 @@
             margin-top: 10px;
         }
 
+        .hidden-section {
+            display: none;
+        }
+
+        .toggle-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 2px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: #ffffff;
+        }
+
+        .toggle-copy {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .toggle-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .toggle-description {
+            margin: 4px 0 0;
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--muted);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 30px;
+            flex: 0 0 auto;
+        }
+
+        .switch input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            background: #d1d5db;
+            transition: .2s ease;
+        }
+
+        .slider::before {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            left: 4px;
+            top: 4px;
+            border-radius: 999px;
+            background: #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,.18);
+            transition: .2s ease;
+        }
+
+        .switch input:checked + .slider {
+            background: var(--accent);
+        }
+
+        .switch input:checked + .slider::before {
+            transform: translateX(24px);
+        }
+
         .error-list,
         .success-box {
             margin-bottom: 18px;
@@ -655,7 +735,7 @@
                                         <span class="info-icon">i</span>
                                         <span class="tooltip-box">
                                             Please paste your YouTube channel link (URL), not just the channel name.<br><br>
-                                            We’ll automatically pull your portfolio content from this link when supported.<br><br>
+                                            We’ll use this to automatically pull highlights from your channel if you do not choose to manually pick your own videos.<br><br>
                                             <strong>Examples:</strong>
                                             <ul>
                                                 <li>https://www.youtube.com/@YourChannelName</li>
@@ -676,7 +756,7 @@
                                 maxlength="500"
                                 placeholder="https://www.youtube.com/@YourChannelName"
                             >
-                            <div class="hint">We’ll automatically pull your portfolio content from this link when supported.</div>
+                            <div class="hint">Optional. If you leave manual highlight selection off, the backend can use this channel URL to pull videos.</div>
                         </div>
 
                         <div class="col-6">
@@ -707,17 +787,40 @@
                                 maxlength="500"
                                 placeholder="https://www.youtube.com/watch?v=..."
                             >
-                            <div class="hint">This is the main featured video for the website.</div>
+                            <div class="hint">Optional. This is the main featured video for the website.</div>
                         </div>
 
                         <div class="col-6">
+                            <label>Highlight Videos</label>
+                            <div class="toggle-card">
+                                <div class="toggle-copy">
+                                    <p class="toggle-title">Pick My Own Videos</p>
+                                    <p class="toggle-description">
+                                        Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.
+                                    </p>
+                                </div>
+
+                                <label class="switch" for="use_custom_highlights">
+                                    <input
+                                        type="checkbox"
+                                        id="use_custom_highlights"
+                                        name="use_custom_highlights"
+                                        value="1"
+                                        {{ old('use_custom_highlights') ? 'checked' : '' }}
+                                    >
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="custom_highlights_wrap" class="col-12 hidden-section">
                             <label for="featured_video_urls">
                                 <span class="field-label-inline">
-                                    <span>Featured Video URLs</span>
+                                    <span>Highlight Video URLs</span>
                                     <span class="tooltip-wrap" tabindex="0">
                                         <span class="info-icon">i</span>
                                         <span class="tooltip-box">
-                                            Use this if you want to add highlights manually.<br><br>
+                                            Use this only if you turned on <strong>Pick My Own Videos</strong>.<br><br>
                                             Paste full video URLs here, one per line, in the order you want them displayed.<br><br>
                                             <strong>Examples:</strong>
                                             <ul>
@@ -736,7 +839,7 @@
                                 name="featured_video_urls"
                                 placeholder="Enter one video URL per line&#10;https://www.youtube.com/watch?v=abc123&#10;https://www.youtube.com/watch?v=def456"
                             >{{ old('featured_video_urls') }}</textarea>
-                            <div class="hint">Enter one additional featured video URL per line.</div>
+                            <div class="hint">One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.</div>
                         </div>
 
                         <div class="col-12">
@@ -782,12 +885,31 @@
                     <div class="grid">
                         <div class="col-3">
                             <label for="country">Country</label>
-                            <input type="text" id="country" name="country" value="{{ old('country', 'USA') }}" maxlength="255">
+                            <select id="country" name="country">
+                                <option value="">Select country</option>
+                                @foreach ($countryOptions as $value => $label)
+                                    <option value="{{ $value }}" {{ old('country', 'USA') === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
 
-                        <div class="col-3">
-                            <label for="state">State</label>
-                            <select id="state" name="state">
+                        <div id="country_other_wrap" class="col-3 other-wrap">
+                            <label for="country_other">Country Name</label>
+                            <input
+                                type="text"
+                                id="country_other"
+                                name="country_other"
+                                value="{{ old('country_other') }}"
+                                maxlength="255"
+                                placeholder="Enter country name"
+                            >
+                        </div>
+
+                        <div id="state_us_wrap" class="col-3">
+                            <label for="state_us">State</label>
+                            <select id="state_us">
                                 <option value="">Select state</option>
                                 @foreach ($states as $abbr => $label)
                                     <option value="{{ $abbr }}" {{ old('state') === $abbr ? 'selected' : '' }}>
@@ -797,6 +919,20 @@
                             </select>
                             <div class="hint">State will be saved as its abbreviation.</div>
                         </div>
+
+                        <div id="state_international_wrap" class="col-3 other-wrap">
+                            <label for="state_international">State / Province / Region</label>
+                            <input
+                                type="text"
+                                id="state_international"
+                                value="{{ old('state') }}"
+                                maxlength="255"
+                                placeholder="Enter state, province, or region"
+                            >
+                            <div class="hint">For non-U.S. countries, enter the region, province, or state if applicable.</div>
+                        </div>
+
+                        <input type="hidden" id="state_hidden" name="state" value="{{ old('state') }}">
 
                         <div class="col-3">
                             <label for="city">City</label>
@@ -1115,6 +1251,63 @@
         mobileViewHint.textContent = 'Upload a PNG mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
     }
 
+    function toggleCustomHighlights() {
+        const toggle = document.getElementById('use_custom_highlights');
+        const wrap = document.getElementById('custom_highlights_wrap');
+
+        if (!toggle || !wrap) return;
+        wrap.style.display = toggle.checked ? 'block' : 'none';
+    }
+
+    function toggleCountryFields() {
+        const countrySelect = document.getElementById('country');
+        const countryOtherWrap = document.getElementById('country_other_wrap');
+        const stateUsWrap = document.getElementById('state_us_wrap');
+        const stateInternationalWrap = document.getElementById('state_international_wrap');
+        const stateUs = document.getElementById('state_us');
+        const stateInternational = document.getElementById('state_international');
+        const stateHidden = document.getElementById('state_hidden');
+
+        if (!countrySelect || !countryOtherWrap || !stateUsWrap || !stateInternationalWrap || !stateUs || !stateInternational || !stateHidden) {
+            return;
+        }
+
+        const selectedCountry = countrySelect.value;
+
+        if (selectedCountry === 'USA' || selectedCountry === '') {
+            countryOtherWrap.style.display = 'none';
+            stateUsWrap.style.display = 'block';
+            stateInternationalWrap.style.display = 'none';
+            stateHidden.value = stateUs.value || '';
+            return;
+        }
+
+        if (selectedCountry === '__other__') {
+            countryOtherWrap.style.display = 'block';
+        } else {
+            countryOtherWrap.style.display = 'none';
+        }
+
+        stateUsWrap.style.display = 'none';
+        stateInternationalWrap.style.display = 'block';
+        stateHidden.value = stateInternational.value || '';
+    }
+
+    function syncStateValue() {
+        const country = document.getElementById('country').value;
+        const stateUs = document.getElementById('state_us');
+        const stateInternational = document.getElementById('state_international');
+        const stateHidden = document.getElementById('state_hidden');
+
+        if (!stateUs || !stateInternational || !stateHidden) return;
+
+        if (country === 'USA' || country === '') {
+            stateHidden.value = stateUs.value || '';
+        } else {
+            stateHidden.value = stateInternational.value || '';
+        }
+    }
+
     document.getElementById('sport').addEventListener('change', () => {
         renderPositions();
         updateImageInstructions();
@@ -1123,12 +1316,22 @@
     document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
     document.getElementById('league_id').addEventListener('change', toggleLeagueOther);
     document.getElementById('club_id').addEventListener('change', toggleClubOther);
+    document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
+    document.getElementById('country').addEventListener('change', () => {
+        toggleCountryFields();
+        syncStateValue();
+    });
+    document.getElementById('state_us').addEventListener('change', syncStateValue);
+    document.getElementById('state_international').addEventListener('input', syncStateValue);
 
     renderPositions();
     toggleSchoolOther();
     toggleLeagueOther();
     toggleClubOther();
     updateImageInstructions();
+    toggleCustomHighlights();
+    toggleCountryFields();
+    syncStateValue();
 </script>
 </body>
 </html>
