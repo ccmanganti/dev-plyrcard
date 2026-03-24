@@ -384,12 +384,33 @@
     $gpa = $formatGpaDisplay($getHeroFieldValue('hero_gpa', $user?->gpa ?? ''));
     $coach = $normalizeDisplayValue($getHeroFieldValue('hero_coach', $user?->club_coach ?? ''));
 
-    $sportAccolades = $normalizeAccolades(
+    $rawSportAccolades = $normalizeAccolades(
         $getHeroFieldValue(
             'hero_sport_accolades',
             $user?->sport_accolades ?? $user?->sports_accolades ?? $user?->accolades ?? []
         )
     );
+
+    $rawAcademicAccolades = $normalizeAccolades(
+        $getHeroFieldValue(
+            'hero_academic_accolades',
+            $user?->academic_accolades ?? []
+        )
+    );
+
+    $sportAccolades = $rawSportAccolades->values();
+    $academicAccolades = $rawAcademicAccolades->values();
+
+    if ($sportAccolades->isNotEmpty() && $academicAccolades->isNotEmpty()) {
+        $combinedAccolades = $sportAccolades->concat($academicAccolades)->values();
+        $displayAccolades = $combinedAccolades->count() <= 3
+            ? $combinedAccolades
+            : $sportAccolades->take(3)->values();
+    } elseif ($sportAccolades->isNotEmpty()) {
+        $displayAccolades = $sportAccolades->take(3)->values();
+    } else {
+        $displayAccolades = $academicAccolades->take(3)->values();
+    }
 
     $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
     $mobileHeroImageUrl = $resolveMediaUrl($user?->mobile_hero_image, '');
@@ -936,7 +957,7 @@
 </style>
 
 <section
-    class="hero-two-desktop hero-two-hero {{ $sportAccolades->isNotEmpty() ? 'hero-two-has-accolades' : '' }} z-0"
+    class="hero-two-desktop hero-two-hero {{ $displayAccolades->isNotEmpty() ? 'hero-two-has-accolades' : '' }} z-0"
     style="background:
         radial-gradient(circle at center, {{ $lightestPrimary }} 0%, rgba(255,255,255,0) 16%),
         radial-gradient(circle at center, {{ $lighterPrimary }} 0%, rgba(255,255,255,0) 30%),
@@ -1013,10 +1034,10 @@
                 </div>
 
                 <div class="hero-two-info-wrap">
-                    @if ($sportAccolades->isNotEmpty())
+                    @if ($displayAccolades->isNotEmpty())
                         <div class="hero-two-accolades-wrap hero-two-font-sans">
                             <div class="hero-two-accolades-list">
-                                @foreach ($sportAccolades as $accolade)
+                                @foreach ($displayAccolades as $accolade)
                                     <div class="hero-two-accolade-item">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="hero-two-accolade-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                             <path d="M17 3H7v2H3v2c0 2.97 2.16 5.43 5 5.91.2.71.57 1.36 1.07 1.91.55.6 1.24 1.03 1.93 1.28V19H8v2h8v-2h-3v-2.9c.69-.25 1.38-.68 1.93-1.28.5-.55.87-1.2 1.07-1.91 2.84-.48 5-2.94 5-5.91V5h-4V3ZM5 7V7h2v.18c0 1.16.19 2.25.54 3.23C6.09 9.92 5 8.58 5 7Zm14 0c0 1.58-1.09 2.92-2.54 3.41.35-.98.54-2.07.54-3.23V7h2Z"/>
