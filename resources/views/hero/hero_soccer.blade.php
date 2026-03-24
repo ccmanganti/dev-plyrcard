@@ -468,7 +468,7 @@
         --hero-two-social-size: clamp(27px, 1.75vw, 32px);
         --hero-two-social-icon-size: clamp(20px, 1.35vw, 24px);
 
-        --hero-two-card-width: clamp(22rem, 18.5vw, 26rem);
+        --hero-two-card-width: clamp(22rem, 22vw, 25rem);
         --hero-two-player-width: clamp(33rem, 29.5vw, 42rem);
         --hero-two-action-width: clamp(22rem, 19.5vw, 26rem);
 
@@ -729,7 +729,7 @@
     }
 
     .hero-two-stat-value {
-        font-weight: 500;
+        font-weight: 100;
         flex: 1 1 auto;
         min-width: 0;
         overflow-wrap: anywhere;
@@ -739,7 +739,7 @@
     .hero-two-card-wrap {
         position: absolute;
         right: 1.1%;
-        top: 2.8%;
+        top: 0%;
         z-index: 26;
     }
 
@@ -793,7 +793,7 @@
             --hero-two-panel-width: clamp(450px, 30vw, 600px);
             --hero-two-panel-font-size: clamp(15px, .96vw, 18px);
 
-            --hero-two-card-width: clamp(19.5rem, 16.5vw, 23rem);
+            --hero-two-card-width: clamp(19.5rem, 22vw, 25rem);
             --hero-two-player-width: clamp(30rem, 27vw, 38rem);
             --hero-two-action-width: clamp(18.5rem, 16.5vw, 22rem);
         }
@@ -817,7 +817,7 @@
             --hero-two-panel-width: clamp(390px, 28vw, 520px);
             --hero-two-panel-font-size: clamp(14px, .92vw, 16px);
 
-            --hero-two-card-width: clamp(16rem, 15vw, 19rem);
+            --hero-two-card-width: clamp(16rem, 22vw, 19rem);
             --hero-two-player-width: clamp(25rem, 23vw, 31rem);
             --hero-two-action-width: clamp(14.5rem, 12.5vw, 17rem);
         }
@@ -843,7 +843,7 @@
             --hero-two-panel-width: clamp(330px, 40vw, 400px);
             --hero-two-panel-font-size: clamp(12px, 1.4vw, 14px);
 
-            --hero-two-card-width: clamp(12rem, 17vw, 14rem);
+            --hero-two-card-width: clamp(12rem, 22vw, 14rem);
             --hero-two-player-width: clamp(20rem, 29vw, 24rem);
             --hero-two-action-width: clamp(11rem, 15vw, 13rem);
 
@@ -923,7 +923,7 @@
             --hero-two-panel-width: clamp(560px, 32vw, 760px);
             --hero-two-panel-font-size: clamp(17px, 1.08vw, 21px);
 
-            --hero-two-card-width: clamp(23rem, 18.8vw, 27rem);
+            --hero-two-card-width: clamp(23rem, 22vw, 27rem);
             --hero-two-player-width: clamp(35rem, 29vw, 43rem);
             --hero-two-action-width: clamp(23rem, 19.5vw, 27rem);
         }
