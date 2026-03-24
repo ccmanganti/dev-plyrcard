@@ -135,100 +135,100 @@
         return $gpa;
     };
 
-$positionShorthandMap = [
-    // basketball
-    'point_guard' => 'Point Gd',
-    'shooting_guard' => 'Shooting Gd',
-    'small_forward' => 'Small Fwd',
-    'power_forward' => 'Power Fwd',
-    'center' => 'Center',
+    $positionShorthandMap = [
+        // basketball
+        'point_guard' => 'Point Gd',
+        'shooting_guard' => 'Shooting Gd',
+        'small_forward' => 'Small Fwd',
+        'power_forward' => 'Power Fwd',
+        'center' => 'Center',
 
-    // volleyball
-    'setter' => 'Setter',
-    'outside_hitter' => 'Outside Hit',
-    'opposite_hitter' => 'Opp Hit',
-    'middle_blocker' => 'Middle Block',
-    'libero' => 'Libero',
-    'defensive_specialist' => 'Def Specialist',
+        // volleyball
+        'setter' => 'Setter',
+        'outside_hitter' => 'Outside Hit',
+        'opposite_hitter' => 'Opp Hit',
+        'middle_blocker' => 'Middle Block',
+        'libero' => 'Libero',
+        'defensive_specialist' => 'Def Specialist',
 
-    // football
-    'quarterback' => 'Quarterback',
-    'running_back' => 'Running Back',
-    'wide_receiver' => 'Wide Rec',
-    'tight_end' => 'Tight End',
-    'offensive_line' => 'Off Line',
-    'defensive_line' => 'Def Line',
-    'linebacker' => 'Linebacker',
-    'cornerback' => 'Cornerback',
-    'safety' => 'Safety',
-    'kicker' => 'Kicker',
-    'punter' => 'Punter',
+        // football
+        'quarterback' => 'Quarterback',
+        'running_back' => 'Running Back',
+        'wide_receiver' => 'Wide Rec',
+        'tight_end' => 'Tight End',
+        'offensive_line' => 'Off Line',
+        'defensive_line' => 'Def Line',
+        'linebacker' => 'Linebacker',
+        'cornerback' => 'Cornerback',
+        'safety' => 'Safety',
+        'kicker' => 'Kicker',
+        'punter' => 'Punter',
 
-    // baseball / softball
-    'pitcher' => 'Pitcher',
-    'catcher' => 'Catcher',
-    'first_base' => '1st Base',
-    'second_base' => '2nd Base',
-    'third_base' => '3rd Base',
-    'shortstop' => 'Shortstop',
-    'left_field' => 'Left Field',
-    'center_field' => 'Center Field',
-    'right_field' => 'Right Field',
-    'designated_hitter' => 'Desig Hit',
+        // baseball / softball
+        'pitcher' => 'Pitcher',
+        'catcher' => 'Catcher',
+        'first_base' => '1st Base',
+        'second_base' => '2nd Base',
+        'third_base' => '3rd Base',
+        'shortstop' => 'Shortstop',
+        'left_field' => 'Left Field',
+        'center_field' => 'Center Field',
+        'right_field' => 'Right Field',
+        'designated_hitter' => 'Desig Hit',
 
-    // soccer
-    'goalkeeper' => 'Goalkeeper',
-    'defender' => 'Def',
-    'center_back' => 'Center Back',
-    'full_back' => 'Full Back',
-    'wing_back' => 'Wing Back',
-    'midfielder' => 'Mid',
-    'defensive_midfielder' => 'Def Mid',
-    'central_midfielder' => 'Central Mid',
-    'attacking_midfielder' => 'Att Mid',
-    'winger' => 'Winger',
-    'forward' => 'Fwd',
-    'striker' => 'Striker',
+        // soccer
+        'goalkeeper' => 'Goalkeeper',
+        'defender' => 'Def',
+        'center_back' => 'Center Back',
+        'full_back' => 'Full Back',
+        'wing_back' => 'Wing Back',
+        'midfielder' => 'Mid',
+        'defensive_midfielder' => 'Def Mid',
+        'central_midfielder' => 'Central Mid',
+        'attacking_midfielder' => 'Att Mid',
+        'winger' => 'Winger',
+        'forward' => 'Fwd',
+        'striker' => 'Striker',
 
-    // tennis / badminton / table tennis
-    'singles' => 'Singles',
-    'doubles' => 'Doubles',
-    'mixed_doubles' => 'Mixed Doubles',
+        // tennis / badminton / table tennis
+        'singles' => 'Singles',
+        'doubles' => 'Doubles',
+        'mixed_doubles' => 'Mixed Doubles',
 
-    // track and field
-    'sprinter' => 'Sprinter',
-    'middle_distance' => 'Mid Distance',
-    'long_distance' => 'Long Distance',
-    'hurdler' => 'Hurdler',
-    'jumper' => 'Jumper',
-    'thrower' => 'Thrower',
-    'relay_runner' => 'Relay Runner',
-    'decathlete' => 'Decathlete',
-    'heptathlete' => 'Heptathlete',
+        // track and field
+        'sprinter' => 'Sprinter',
+        'middle_distance' => 'Mid Distance',
+        'long_distance' => 'Long Distance',
+        'hurdler' => 'Hurdler',
+        'jumper' => 'Jumper',
+        'thrower' => 'Thrower',
+        'relay_runner' => 'Relay Runner',
+        'decathlete' => 'Decathlete',
+        'heptathlete' => 'Heptathlete',
 
-    // swimming
-    'freestyle' => 'Freestyle',
-    'backstroke' => 'Backstroke',
-    'breaststroke' => 'Breaststroke',
-    'butterfly' => 'Butterfly',
-    'individual_medley' => 'Ind Medley',
-    'relay' => 'Relay',
+        // swimming
+        'freestyle' => 'Freestyle',
+        'backstroke' => 'Backstroke',
+        'breaststroke' => 'Breaststroke',
+        'butterfly' => 'Butterfly',
+        'individual_medley' => 'Ind Medley',
+        'relay' => 'Relay',
 
-    // boxing
-    'flyweight' => 'Flyweight',
-    'bantamweight' => 'Bantamweight',
-    'featherweight' => 'Featherweight',
-    'lightweight' => 'Lightweight',
-    'welterweight' => 'Welterweight',
-    'middleweight' => 'Middleweight',
-    'light_heavyweight' => 'Light Heavy',
-    'heavyweight' => 'Heavyweight',
+        // boxing
+        'flyweight' => 'Flyweight',
+        'bantamweight' => 'Bantamweight',
+        'featherweight' => 'Featherweight',
+        'lightweight' => 'Lightweight',
+        'welterweight' => 'Welterweight',
+        'middleweight' => 'Middleweight',
+        'light_heavyweight' => 'Light Heavy',
+        'heavyweight' => 'Heavyweight',
 
-    // martial arts
-    'striker' => 'Striker',
-    'grappler' => 'Grappler',
-    'all_rounder' => 'All-Rounder',
-];
+        // martial arts
+        'striker' => 'Striker',
+        'grappler' => 'Grappler',
+        'all_rounder' => 'All-Rounder',
+    ];
 
     $formatPositionDisplay = function ($value) use ($normalizeDisplayValue, $positionShorthandMap) {
         $normalizePositionKey = function ($item) {
@@ -308,6 +308,28 @@ $positionShorthandMap = [
         return sprintf('#%02x%02x%02x', $r, $g, $b);
     };
 
+    $darkenHex = function ($hex, $percent = 20) {
+        $hex = ltrim((string) $hex, '#');
+
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+
+        if (strlen($hex) !== 6) {
+            return '#0a3d68';
+        }
+
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+
+        $r = (int) round($r * (1 - ($percent / 100)));
+        $g = (int) round($g * (1 - ($percent / 100)));
+        $b = (int) round($b * (1 - ($percent / 100)));
+
+        return sprintf('#%02x%02x%02x', $r, $g, $b);
+    };
+
     $normalizeAccolades = function ($value) {
         if (blank($value)) {
             return collect();
@@ -374,7 +396,11 @@ $positionShorthandMap = [
     $playerImageUrl = $resolveMediaUrl($user?->player_image, '');
     $playerActionImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_action_image'), '');
 
-    $centerGradient = $lightenHex($primary, 24);
+    $lightPrimary = $lightenHex($primary, 12);
+    $lighterPrimary = $lightenHex($primary, 24);
+    $lightestPrimary = $lightenHex($primary, 36);
+    $darkPrimary = $darkenHex($primary, 18);
+    $deeperPrimary = $darkenHex($primary, 30);
     $fullName = trim($firstName . ' ' . $lastName);
 
     $firstNameLength = mb_strlen(preg_replace('/\s+/', '', $firstName));
@@ -423,6 +449,7 @@ $positionShorthandMap = [
     $playerEmail = trim((string) ($user?->email ?? ''));
     $hasAnySocial = filled($playerEmail) || filled($igUrl) || filled($ytUrl) || filled($xUrl);
 @endphp
+
 <style>
     :root{
         --hero-two-stage-max-width: 2600px;
@@ -474,7 +501,6 @@ $positionShorthandMap = [
     .hero-two-desktop { display:block; }
     .hero-two-mobile { display:none; }
 
-    /* Keep same structure for tablet. Mobile only on small screens. */
     @media (max-width: 767px) {
         .hero-two-desktop { display:none; }
         .hero-two-mobile { display:block; }
@@ -804,7 +830,6 @@ $positionShorthandMap = [
         .hero-two-back-jersey { left: 60%; top: 39.5%; }
     }
 
-    /* Tablet view: keep same structure, just scale it down */
     @media (max-width: 1023px) and (min-width: 768px) {
         :root{
             --hero-two-name-first: clamp(5.6rem, 7.5vw, 7.2rem);
@@ -913,13 +938,23 @@ $positionShorthandMap = [
 <section
     class="hero-two-desktop hero-two-hero {{ $sportAccolades->isNotEmpty() ? 'hero-two-has-accolades' : '' }} z-0"
     style="background:
-        radial-gradient(circle at center, {{ $centerGradient }} 0%, {{ $primary }} 48%, {{ $secondary }} 100%);
+        radial-gradient(circle at center, {{ $lightestPrimary }} 0%, rgba(255,255,255,0) 16%),
+        radial-gradient(circle at center, {{ $lighterPrimary }} 0%, rgba(255,255,255,0) 30%),
+        radial-gradient(circle at center, {{ $lightPrimary }} 0%, {{ $primary }} 44%, {{ $darkPrimary }} 72%, {{ $deeperPrimary }} 100%);
         color: {{ $text1 }};"
 >
     <div class="absolute inset-0 z-0 pointer-events-none">
-        <div class="absolute inset-x-0 bottom-0 h-[34%]" style="background: linear-gradient(to top, rgba(0,0,0,.24), rgba(0,0,0,0));"></div>
-        <div class="absolute inset-y-0 left-0 w-[16%]" style="background: linear-gradient(to right, rgba(0, 12, 70, .44), rgba(0, 12, 70, 0));"></div>
-        <div class="absolute inset-y-0 right-0 w-[16%]" style="background: linear-gradient(to left, rgba(0, 12, 70, .34), rgba(0, 12, 70, 0));"></div>
+        <div
+            class="absolute inset-0"
+            style="background:
+                radial-gradient(circle at center, rgba(255,255,255,.025) 0%, rgba(255,255,255,0) 26%),
+                radial-gradient(circle at center, rgba(0,0,0,0) 46%, rgba(0,0,0,.14) 68%, rgba(0,0,0,.28) 84%, rgba(0,0,0,.42) 100%);"
+        ></div>
+
+        <div class="absolute inset-x-0 top-0 h-[18%]" style="background: linear-gradient(to bottom, rgba(0,0,0,.16), rgba(0,0,0,0));"></div>
+        <div class="absolute inset-x-0 bottom-0 h-[34%]" style="background: linear-gradient(to top, rgba(0,0,0,.34), rgba(0,0,0,0));"></div>
+        <div class="absolute inset-y-0 left-0 w-[18%]" style="background: linear-gradient(to right, rgba(0,0,0,.26), rgba(0,0,0,0));"></div>
+        <div class="absolute inset-y-0 right-0 w-[18%]" style="background: linear-gradient(to left, rgba(0,0,0,.22), rgba(0,0,0,0));"></div>
     </div>
 
     <div class="hero-two-shell">
@@ -1108,8 +1143,18 @@ $positionShorthandMap = [
 
 <section
     class="hero-two-mobile relative overflow-hidden h-[100svh] min-h-[100svh]"
-    style="background: {{ $primary }};"
+    style="background:
+        radial-gradient(circle at center, {{ $lighterPrimary }} 0%, {{ $primary }} 52%, {{ $darkPrimary }} 82%, {{ $deeperPrimary }} 100%);"
 >
+    <div class="absolute inset-0 z-0 pointer-events-none">
+        <div
+            class="absolute inset-0"
+            style="background:
+                radial-gradient(circle at center, rgba(255,255,255,.02) 0%, rgba(255,255,255,0) 24%),
+                radial-gradient(circle at center, rgba(0,0,0,0) 48%, rgba(0,0,0,.12) 70%, rgba(0,0,0,.24) 86%, rgba(0,0,0,.36) 100%);"
+        ></div>
+    </div>
+
     @if ($mobileHeroImageUrl)
         <img
             src="{{ $mobileHeroImageUrl }}"
