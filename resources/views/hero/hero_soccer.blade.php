@@ -585,7 +585,7 @@ $positionShorthandMap = [
         color: rgba(255,255,255,.98);
         font-size: var(--hero-two-accolade-size);
         line-height: 1.2;
-        font-weight: 500;
+        font-weight: 100;
         text-shadow: 0 6px 18px rgba(0,0,0,.18);
     }
 
@@ -955,14 +955,14 @@ $positionShorthandMap = [
                             </div>
 
                             @if ($position && ! $positionBesideLastName)
-                                <div class="hero-two-font-sans hero-two-position mb-[0.35rem]">
+                                <div class="hero-two-font-sans hero-two-position mb-[0.5rem]">
                                     {{ $position }}
                                 </div>
                             @endif
                         </div>
                     @endif
 
-                    <div class="flex items-end gap-3 mt-1">
+                    <div class="flex items-end gap-3 mt-3">
                         @if ($lastName)
                             <div class="hero-two-font-name hero-two-name-line hero-two-name-last text-white">
                                 {{ $lastName }}
