@@ -336,6 +336,13 @@
 
         /*
         |--------------------------------------------------------------------------
+        | Player Card Media
+        |--------------------------------------------------------------------------
+        */
+        $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
+
+        /*
+        |--------------------------------------------------------------------------
         | Hero Media
         |--------------------------------------------------------------------------
         */
@@ -696,9 +703,13 @@
             ?: $heroMobileImageUrl
             ?: $footerLogoUrl
             ?: $heroPlyrCardUrl
+            ?: $playerCardImageUrl
             ?: asset('temp-thumbnail.png');
 
-        $faviconUrl = $faviconField ?: asset('favicon.ico');
+        $faviconUrl = $faviconField
+            ?: $playerCardImageUrl
+            ?: $heroPlyrCardUrl
+            ?: asset('favicon.ico');
 
         $ogTitle = filled($ogTitleField) ? $ogTitleField : $seoTitle;
         $ogDescription = filled($ogDescriptionField)
