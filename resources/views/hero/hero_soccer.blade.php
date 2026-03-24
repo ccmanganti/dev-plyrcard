@@ -137,97 +137,97 @@
 
     $positionShorthandMap = [
         // basketball
-        'point_guard' => 'Point Gd',
-        'shooting_guard' => 'Shooting Gd',
-        'small_forward' => 'Small Fwd',
-        'power_forward' => 'Power Fwd',
-        'center' => 'Center',
+        'point_guard' => 'PG',
+        'shooting_guard' => 'SG',
+        'small_forward' => 'SF',
+        'power_forward' => 'PF',
+        'center' => 'C',
 
         // volleyball
-        'setter' => 'Setter',
-        'outside_hitter' => 'Outside Hit',
-        'opposite_hitter' => 'Opp Hit',
-        'middle_blocker' => 'Middle Block',
-        'libero' => 'Libero',
-        'defensive_specialist' => 'Def Specialist',
+        'setter' => 'Set',
+        'outside_hitter' => 'OH',
+        'opposite_hitter' => 'Opp',
+        'middle_blocker' => 'MB',
+        'libero' => 'Lib',
+        'defensive_specialist' => 'DS',
 
         // football
-        'quarterback' => 'Quarterback',
-        'running_back' => 'Running Back',
-        'wide_receiver' => 'Wide Rec',
-        'tight_end' => 'Tight End',
-        'offensive_line' => 'Off Line',
-        'defensive_line' => 'Def Line',
-        'linebacker' => 'Linebacker',
-        'cornerback' => 'Cornerback',
-        'safety' => 'Safety',
-        'kicker' => 'Kicker',
-        'punter' => 'Punter',
+        'quarterback' => 'QB',
+        'running_back' => 'RB',
+        'wide_receiver' => 'WR',
+        'tight_end' => 'TE',
+        'offensive_line' => 'OL',
+        'defensive_line' => 'DL',
+        'linebacker' => 'LB',
+        'cornerback' => 'CB',
+        'safety' => 'S',
+        'kicker' => 'K',
+        'punter' => 'P',
 
         // baseball / softball
-        'pitcher' => 'Pitcher',
-        'catcher' => 'Catcher',
-        'first_base' => '1st Base',
-        'second_base' => '2nd Base',
-        'third_base' => '3rd Base',
-        'shortstop' => 'Shortstop',
-        'left_field' => 'Left Field',
-        'center_field' => 'Center Field',
-        'right_field' => 'Right Field',
-        'designated_hitter' => 'Desig Hit',
+        'pitcher' => 'P',
+        'catcher' => 'C',
+        'first_base' => '1B',
+        'second_base' => '2B',
+        'third_base' => '3B',
+        'shortstop' => 'SS',
+        'left_field' => 'LF',
+        'center_field' => 'CF',
+        'right_field' => 'RF',
+        'designated_hitter' => 'DH',
 
         // soccer
-        'goalkeeper' => 'Goalkeeper',
+        'goalkeeper' => 'GK',
         'defender' => 'Def',
-        'center_back' => 'Center Back',
-        'full_back' => 'Full Back',
-        'wing_back' => 'Wing Back',
+        'center_back' => 'CB',
+        'full_back' => 'FB',
+        'wing_back' => 'WB',
         'midfielder' => 'Mid',
         'defensive_midfielder' => 'Def Mid',
-        'central_midfielder' => 'Central Mid',
-        'attacking_midfielder' => 'Att Mid',
-        'winger' => 'Winger',
+        'central_midfielder' => 'CM',
+        'attacking_midfielder' => 'AM',
+        'winger' => 'Wing',
         'forward' => 'Fwd',
-        'striker' => 'Striker',
+        'striker' => 'ST',
 
         // tennis / badminton / table tennis
-        'singles' => 'Singles',
-        'doubles' => 'Doubles',
-        'mixed_doubles' => 'Mixed Doubles',
+        'singles' => 'Sgl',
+        'doubles' => 'Dbl',
+        'mixed_doubles' => 'Mix Dbl',
 
         // track and field
-        'sprinter' => 'Sprinter',
-        'middle_distance' => 'Mid Distance',
-        'long_distance' => 'Long Distance',
-        'hurdler' => 'Hurdler',
-        'jumper' => 'Jumper',
-        'thrower' => 'Thrower',
-        'relay_runner' => 'Relay Runner',
-        'decathlete' => 'Decathlete',
-        'heptathlete' => 'Heptathlete',
+        'sprinter' => 'Sprint',
+        'middle_distance' => 'Mid Dist',
+        'long_distance' => 'Long Dist',
+        'hurdler' => 'Hurdles',
+        'jumper' => 'Jump',
+        'thrower' => 'Throw',
+        'relay_runner' => 'Relay',
+        'decathlete' => 'Dec',
+        'heptathlete' => 'Hep',
 
         // swimming
-        'freestyle' => 'Freestyle',
-        'backstroke' => 'Backstroke',
-        'breaststroke' => 'Breaststroke',
-        'butterfly' => 'Butterfly',
-        'individual_medley' => 'Ind Medley',
+        'freestyle' => 'Free',
+        'backstroke' => 'Back',
+        'breaststroke' => 'Breast',
+        'butterfly' => 'Fly',
+        'individual_medley' => 'IM',
         'relay' => 'Relay',
 
         // boxing
-        'flyweight' => 'Flyweight',
-        'bantamweight' => 'Bantamweight',
-        'featherweight' => 'Featherweight',
-        'lightweight' => 'Lightweight',
-        'welterweight' => 'Welterweight',
-        'middleweight' => 'Middleweight',
-        'light_heavyweight' => 'Light Heavy',
-        'heavyweight' => 'Heavyweight',
+        'flyweight' => 'Fly',
+        'bantamweight' => 'Bantam',
+        'featherweight' => 'Feather',
+        'lightweight' => 'Light',
+        'welterweight' => 'Welter',
+        'middleweight' => 'Middle',
+        'light_heavyweight' => 'L Heavy',
+        'heavyweight' => 'Heavy',
 
         // martial arts
         'striker' => 'Striker',
         'grappler' => 'Grappler',
-        'all_rounder' => 'All-Rounder',
+        'all_rounder' => 'All-Rnd',
     ];
 
     $formatPositionDisplay = function ($value) use ($normalizeDisplayValue, $positionShorthandMap) {
@@ -242,13 +242,103 @@
                 ->toString();
         };
 
-        $formatFallback = function ($item) {
-            return str((string) $item)
-                ->replace('_', ' ')
-                ->replace('-', ' ')
-                ->squish()
-                ->title()
-                ->toString();
+        $formatFallbackShortcut = function ($item) {
+            $parts = preg_split('/[\s\-_]+/', trim((string) $item)) ?: [];
+            $parts = array_values(array_filter($parts));
+
+            if (empty($parts)) {
+                return '';
+            }
+
+            if (count($parts) === 1) {
+                $word = strtolower($parts[0]);
+
+                $singleWordShortcuts = [
+                    'goalkeeper' => 'GK',
+                    'midfielder' => 'Mid',
+                    'defender' => 'Def',
+                    'forward' => 'Fwd',
+                    'striker' => 'ST',
+                    'winger' => 'Wing',
+                    'setter' => 'Set',
+                    'libero' => 'Lib',
+                    'center' => 'C',
+                    'pitcher' => 'P',
+                    'catcher' => 'C',
+                    'quarterback' => 'QB',
+                    'linebacker' => 'LB',
+                    'cornerback' => 'CB',
+                    'safety' => 'S',
+                    'kicker' => 'K',
+                    'punter' => 'P',
+                ];
+
+                if (isset($singleWordShortcuts[$word])) {
+                    return $singleWordShortcuts[$word];
+                }
+
+                return strtoupper(substr($word, 0, 3));
+            }
+
+            $wordMap = [
+                'point' => 'P',
+                'shooting' => 'S',
+                'small' => 'S',
+                'power' => 'P',
+                'guard' => 'G',
+                'forward' => 'Fwd',
+                'center' => 'C',
+                'outside' => 'Out',
+                'opposite' => 'Opp',
+                'middle' => 'Mid',
+                'blocker' => 'Blk',
+                'defensive' => 'Def',
+                'offensive' => 'Off',
+                'running' => 'R',
+                'wide' => 'W',
+                'receiver' => 'R',
+                'tight' => 'T',
+                'line' => 'L',
+                'back' => 'B',
+                'goalkeeper' => 'GK',
+                'defender' => 'Def',
+                'midfielder' => 'Mid',
+                'attacking' => 'Att',
+                'central' => 'Cent',
+                'wing' => 'Wing',
+                'winger' => 'Wing',
+                'full' => 'Full',
+                'first' => '1',
+                'second' => '2',
+                'third' => '3',
+                'base' => 'B',
+                'left' => 'L',
+                'right' => 'R',
+                'field' => 'F',
+                'shortstop' => 'SS',
+                'designated' => 'Des',
+                'hitter' => 'Hit',
+                'mixed' => 'Mix',
+                'doubles' => 'Dbl',
+                'singles' => 'Sgl',
+                'distance' => 'Dist',
+                'relay' => 'Relay',
+                'runner' => 'Run',
+                'individual' => 'Ind',
+                'medley' => 'Med',
+                'light' => 'L',
+                'heavyweight' => 'Heavy',
+                'heavy' => 'Heavy',
+                'rounder' => 'Rnd',
+                'all' => 'All',
+            ];
+
+            return collect($parts)
+                ->map(function ($part) use ($wordMap) {
+                    $part = strtolower($part);
+                    return $wordMap[$part] ?? ucfirst(substr($part, 0, 3));
+                })
+                ->implode(' ');
         };
 
         if (is_string($value)) {
@@ -262,9 +352,9 @@
         if (is_array($value)) {
             return collect($value)
                 ->filter()
-                ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallback) {
+                ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallbackShortcut) {
                     $key = $normalizePositionKey($item);
-                    return $positionShorthandMap[$key] ?? $formatFallback($item);
+                    return $positionShorthandMap[$key] ?? $formatFallbackShortcut($item);
                 })
                 ->implode(', ');
         }
@@ -279,9 +369,9 @@
 
         return collect($parts)
             ->filter()
-            ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallback) {
+            ->map(function ($item) use ($positionShorthandMap, $normalizePositionKey, $formatFallbackShortcut) {
                 $key = $normalizePositionKey($item);
-                return $positionShorthandMap[$key] ?? $formatFallback($item);
+                return $positionShorthandMap[$key] ?? $formatFallbackShortcut($item);
             })
             ->implode(', ');
     };
