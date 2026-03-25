@@ -512,6 +512,14 @@
     $lightestPrimary = $lightenHex($primary, 36);
     $darkPrimary = $darkenHex($primary, 18);
     $deeperPrimary = $darkenHex($primary, 30);
+
+    // Info panel colors derived from primary
+    $panelStart = $darkenHex($primary, 8);
+    $panelMid = $lightenHex($primary, 4);
+    $panelEnd = $darkenHex($primary, 16);
+    $panelBorder = $lightenHex($primary, 22);
+    $panelShadow = $darkenHex($primary, 38);
+
     $fullName = trim($firstName . ' ' . $lastName);
 
     $firstNameLength = mb_strlen(preg_replace('/\s+/', '', $firstName));
@@ -749,18 +757,20 @@
     .hero-two-info-panel {
         position: relative;
         width: var(--hero-two-panel-width);
-        border: 1px solid rgba(255,255,255,.10);
+        border: 1px solid {{ $panelBorder }};
         border-radius: 18px;
         padding: 1.2rem 1.35rem 1.2rem;
         background: linear-gradient(
             90deg,
-            rgba(11,73,154,.82) 0%,
-            rgba(20,97,182,.63) 45%,
-            rgba(17,69,145,.54) 100%
+            {{ $panelStart }}d9 0%,
+            {{ $panelMid }}bf 45%,
+            {{ $panelEnd }}b3 100%
         );
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
-        box-shadow: 0 16px 34px rgba(0,0,0,.18);
+        box-shadow:
+            0 16px 34px color-mix(in srgb, {{ $panelShadow }} 52%, transparent),
+            inset 0 1px 0 color-mix(in srgb, {{ $lightestPrimary }} 28%, transparent);
     }
 
     .hero-two-social-floating {
