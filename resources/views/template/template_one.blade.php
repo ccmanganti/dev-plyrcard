@@ -297,6 +297,30 @@
         $sportBody = $listifyText($hideIfDefault($sportRaw));
 
         $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
+
+        if (blank($contactFormEmbed)) {
+            $contactFormEmbed = <<<'HTML'
+        <iframe
+            src="https://systems.plyrcard.com/widget/form/HpnvlyetWs1wAL0DoT67"
+            style="width:100%;height:100%;border:none;border-radius:4px"
+            id="inline-HpnvlyetWs1wAL0DoT67" 
+            data-layout="{'id':'INLINE'}"
+            data-trigger-type="alwaysShow"
+            data-trigger-value=""
+            data-activation-type="alwaysActivated"
+            data-activation-value=""
+            data-deactivation-type="neverDeactivate"
+            data-deactivation-value=""
+            data-form-name="Follow Me Form - Coach"
+            data-height="482"
+            data-layout-iframe-id="inline-HpnvlyetWs1wAL0DoT67"
+            data-form-id="HpnvlyetWs1wAL0DoT67"
+            title="Follow Me Form - Coach"
+                >
+        </iframe>
+        <script src="https://systems.plyrcard.com/js/form_embed.js"></script>
+        HTML;
+        }
         $aboutVideoUrls = filled($user?->featured_video_url)
             ? $user->featured_video_url
             : $getFieldValue('yt_embed', '');
