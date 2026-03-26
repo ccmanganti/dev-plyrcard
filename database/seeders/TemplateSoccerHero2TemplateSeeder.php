@@ -89,8 +89,8 @@ class TemplateSoccerHero2TemplateSeeder extends Seeder
                 'options' => null,
             ],
             [
-                'name' => 'hero_logos_image',
-                'label' => 'Hero Logos Image',
+                'name' => 'hero_soccer_two_logos_image',
+                'label' => 'Hero Soccer Two Logos Image',
                 'type' => 'image',
                 'guide_image' => null,
                 'is_required' => false,
@@ -258,6 +258,7 @@ class TemplateSoccerHero2TemplateSeeder extends Seeder
             ->whereIn('name', [
                 'hero_composite_image',
                 'hero_stats_title',
+                'hero_logos_image',
             ])
             ->delete();
     }
