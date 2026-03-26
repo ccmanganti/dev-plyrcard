@@ -296,31 +296,36 @@
 
         $sportBody = $listifyText($hideIfDefault($sportRaw));
 
+        $hasAcademicAccolades = filled(trim(strip_tags($acadBody)));
+        $hasSportsAccolades = filled(trim(strip_tags($sportBody)));
+        $hasAnyAccolades = $hasAcademicAccolades || $hasSportsAccolades;
+
         $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
 
         if (blank($contactFormEmbed)) {
             $contactFormEmbed = <<<'HTML'
-        <iframe
-            src="https://systems.plyrcard.com/widget/form/HpnvlyetWs1wAL0DoT67"
-            style="width:100%;height:100%;border:none;border-radius:4px"
-            id="inline-HpnvlyetWs1wAL0DoT67" 
-            data-layout="{'id':'INLINE'}"
-            data-trigger-type="alwaysShow"
-            data-trigger-value=""
-            data-activation-type="alwaysActivated"
-            data-activation-value=""
-            data-deactivation-type="neverDeactivate"
-            data-deactivation-value=""
-            data-form-name="Follow Me Form - Coach"
-            data-height="482"
-            data-layout-iframe-id="inline-HpnvlyetWs1wAL0DoT67"
-            data-form-id="HpnvlyetWs1wAL0DoT67"
-            title="Follow Me Form - Coach"
-                >
-        </iframe>
-        <script src="https://systems.plyrcard.com/js/form_embed.js"></script>
-        HTML;
+<iframe
+    src="https://systems.plyrcard.com/widget/form/fNo3I29CD8EJ0N4bzMuA"
+    style="width:100%;height:100%;border:none;border-radius:4px"
+    id="inline-fNo3I29CD8EJ0N4bzMuA"
+    data-layout="{'id':'INLINE'}"
+    data-trigger-type="alwaysShow"
+    data-trigger-value=""
+    data-activation-type="alwaysActivated"
+    data-activation-value=""
+    data-deactivation-type="neverDeactivate"
+    data-deactivation-value=""
+    data-form-name="Follow Me Form - Coach"
+    data-height="450"
+    data-layout-iframe-id="inline-fNo3I29CD8EJ0N4bzMuA"
+    data-form-id="fNo3I29CD8EJ0N4bzMuA"
+    title="Follow Me Form - Coach"
+>
+</iframe>
+<script src="https://systems.plyrcard.com/js/form_embed.js"></script>
+HTML;
         }
+
         $aboutVideoUrls = filled($user?->featured_video_url)
             ? $user->featured_video_url
             : $getFieldValue('yt_embed', '');
@@ -412,13 +417,19 @@
                 $date = optional($schedule->game_date);
 
                 $timeDisplay = 'Time TBD';
+                $timeSortable = null;
+
                 if (! blank($schedule->game_time)) {
                     try {
-                        $timeDisplay = $schedule->game_time instanceof \Carbon\CarbonInterface
-                            ? $schedule->game_time->format('g:i A')
-                            : \Carbon\Carbon::parse($schedule->game_time)->format('g:i A');
+                        $parsedTime = $schedule->game_time instanceof \Carbon\CarbonInterface
+                            ? $schedule->game_time
+                            : \Carbon\Carbon::parse($schedule->game_time);
+
+                        $timeDisplay = $parsedTime->format('g:i A');
+                        $timeSortable = $parsedTime->format('H:i:s');
                     } catch (\Throwable $e) {
                         $timeDisplay = 'Time TBD';
+                        $timeSortable = null;
                     }
                 }
 
@@ -440,6 +451,7 @@
                     'month_short' => $date?->format('M'),
                     'full_date_label' => $date?->format('M d, Y'),
                     'time' => $timeDisplay,
+                    'time_sortable' => $timeSortable,
                     'location' => $schedule->location ?? '',
                     'venue' => $schedule->venue ?? '',
                     'location_line' => $locationLine,
@@ -1577,11 +1589,13 @@
                     HIGHLIGHTS
                 </button>
 
-                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
-                        style="background: {{ $primary }}; color: {{ $onPrimary }};"
-                        data-tab="accolades">
-                    ACCOLADES
-                </button>
+                @if($hasAnyAccolades)
+                    <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
+                            style="background: {{ $primary }}; color: {{ $onPrimary }};"
+                            data-tab="accolades">
+                        ACCOLADES
+                    </button>
+                @endif
             </div>
 
             <div class="bg-white">
@@ -1767,35 +1781,41 @@
                     <div class="min-h-[10rem]"></div>
                 </div>
 
-                <div id="tab-accolades" class="tab-content hidden p-6 md:p-10">
-                    <div class="mb-8 md:mb-10">
-                        <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
-                            {{ $acadHeadline }}
-                        </h2>
+                @if($hasAnyAccolades)
+                    <div id="tab-accolades" class="tab-content hidden p-6 md:p-10">
+                        @if($hasAcademicAccolades)
+                            <div class="mb-8 md:mb-10">
+                                <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
+                                    {{ $acadHeadline }}
+                                </h2>
 
-                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
-                            {{ $acadTagline }}
-                        </div>
+                                <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
+                                    {{ $acadTagline }}
+                                </div>
 
-                        <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
-                            {!! $acadBody !!}
-                        </div>
+                                <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                                    {!! $acadBody !!}
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($hasSportsAccolades)
+                            <div class="mb-8 md:mb-10">
+                                <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
+                                    {{ $sportHeadline }}
+                                </h2>
+
+                                <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
+                                    {{ $sportTagline }}
+                                </div>
+
+                                <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
+                                    {!! $sportBody !!}
+                                </div>
+                            </div>
+                        @endif
                     </div>
-
-                    <div class="mb-8 md:mb-10">
-                        <h2 class="text-3xl md:text-4xl tracking-[0.17em] font-heading uppercase min-h-[2.5rem]" style="color: {{ $text1 }};">
-                            {{ $sportHeadline }}
-                        </h2>
-
-                        <div class="text-base md:text-lg mb-5 md:mb-6 min-h-[1.75rem] tracking-[0.17em]" style="color: {{ $primary }};">
-                            {{ $sportTagline }}
-                        </div>
-
-                        <div class="acad-list space-y-3 text-[16px] md:text-[17px] min-h-[4rem]" style="color: {{ $text2 }};">
-                            {!! $sportBody !!}
-                        </div>
-                    </div>
-                </div>
+                @endif
             </div>
         </div>
 
@@ -2000,183 +2020,179 @@
         </div>
     </div>
 
-<script>
-    (function () {
-        const MIN_LOADER_MS = 2000;
+    <script>
+        (function () {
+            const MIN_LOADER_MS = 2000;
 
-        function hideHeroLoader() {
-            const loader = document.getElementById('hero-loader');
+            function hideHeroLoader() {
+                const loader = document.getElementById('hero-loader');
 
-            if (!loader || loader.classList.contains('hidden')) {
-                return;
-            }
-
-            loader.classList.add('hidden');
-        }
-
-        function isVisible(el) {
-            return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-        }
-
-        function getImageUrlFromBackground(backgroundImage) {
-            if (!backgroundImage || backgroundImage === 'none') {
-                return null;
-            }
-
-            const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
-            return match ? match[2] : null;
-        }
-
-        function getTrackedImages() {
-            const seen = new Set();
-
-            return Array.from(document.images).filter(img => {
-                const src = img.currentSrc || img.getAttribute('src') || '';
-                const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
-
-                if (!src.trim() || isLoaderGif || seen.has(src)) {
-                    return false;
-                }
-
-                seen.add(src);
-                return true;
-            });
-        }
-
-        function getTrackedBackgroundUrls() {
-            const urls = new Set();
-
-            Array.from(document.querySelectorAll('*')).forEach(el => {
-                if (!isVisible(el)) {
+                if (!loader || loader.classList.contains('hidden')) {
                     return;
                 }
 
-                const bg = window.getComputedStyle(el).backgroundImage;
-                const url = getImageUrlFromBackground(bg);
-
-                if (url && !url.includes('PLYR_LOGO_TRANS_GIF.webp')) {
-                    urls.add(url);
-                }
-            });
-
-            return Array.from(urls);
-        }
-
-        function waitForImages(images) {
-            return Promise.all(
-                images.map(img => {
-                    return new Promise(resolve => {
-                        const done = () => resolve();
-
-                        if (img.complete && img.naturalWidth > 0) {
-                            if (typeof img.decode === 'function') {
-                                img.decode().catch(() => {}).finally(done);
-                            } else {
-                                done();
-                            }
-                            return;
-                        }
-
-                        img.addEventListener('load', done, { once: true });
-                        img.addEventListener('error', done, { once: true });
-                    });
-                })
-            );
-        }
-
-        function waitForBackgroundImages(urls) {
-            return Promise.all(
-                urls.map(url => {
-                    return new Promise(resolve => {
-                        const img = new Image();
-                        img.onload = resolve;
-                        img.onerror = resolve;
-                        img.src = url;
-                    });
-                })
-            );
-        }
-
-        function waitForFonts() {
-            if (!('fonts' in document) || !document.fonts || !document.fonts.ready) {
-                return Promise.resolve();
+                loader.classList.add('hidden');
             }
 
-            return document.fonts.ready.catch(() => {});
-        }
+            function isVisible(el) {
+                return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+            }
 
-        function waitForIframes() {
-            const iframes = Array.from(document.querySelectorAll('iframe'));
+            function getImageUrlFromBackground(backgroundImage) {
+                if (!backgroundImage || backgroundImage === 'none') {
+                    return null;
+                }
 
-            return Promise.all(
-                iframes.map(frame => {
-                    return new Promise(resolve => {
-                        const done = () => resolve();
+                const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
+                return match ? match[2] : null;
+            }
 
-                        try {
-                            if (frame.contentWindow && frame.contentDocument?.readyState === 'complete') {
-                                done();
+            function getTrackedImages() {
+                const seen = new Set();
+
+                return Array.from(document.images).filter(img => {
+                    const src = img.currentSrc || img.getAttribute('src') || '';
+                    const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
+
+                    if (!src.trim() || isLoaderGif || seen.has(src)) {
+                        return false;
+                    }
+
+                    seen.add(src);
+                    return true;
+                });
+            }
+
+            function getTrackedBackgroundUrls() {
+                const urls = new Set();
+
+                Array.from(document.querySelectorAll('*')).forEach(el => {
+                    if (!isVisible(el)) {
+                        return;
+                    }
+
+                    const bg = window.getComputedStyle(el).backgroundImage;
+                    const url = getImageUrlFromBackground(bg);
+
+                    if (url && !url.includes('PLYR_LOGO_TRANS_GIF.webp')) {
+                        urls.add(url);
+                    }
+                });
+
+                return Array.from(urls);
+            }
+
+            function waitForImages(images) {
+                return Promise.all(
+                    images.map(img => {
+                        return new Promise(resolve => {
+                            const done = () => resolve();
+
+                            if (img.complete && img.naturalWidth > 0) {
+                                if (typeof img.decode === 'function') {
+                                    img.decode().catch(() => {}).finally(done);
+                                } else {
+                                    done();
+                                }
                                 return;
                             }
-                        } catch (e) {
-                            // Cross-origin iframe access can fail; fall back to load event only.
-                        }
 
-                        frame.addEventListener('load', done, { once: true });
-
-                        // safety fallback only for broken/blocked embeds
-                        setTimeout(done, 15000);
-                    });
-                })
-            );
-        }
-
-        async function waitForAllTrackedResources() {
-            const trackedImages = getTrackedImages();
-            const trackedBackgroundUrls = getTrackedBackgroundUrls();
-
-            await Promise.all([
-                waitForImages(trackedImages),
-                waitForBackgroundImages(trackedBackgroundUrls),
-                waitForFonts(),
-                waitForIframes(),
-            ]);
-        }
-
-        document.addEventListener('DOMContentLoaded', async function () {
-            const heroContainer = document.getElementById('hero-container');
-
-            if (!heroContainer) {
-                hideHeroLoader();
-                return;
+                            img.addEventListener('load', done, { once: true });
+                            img.addEventListener('error', done, { once: true });
+                        });
+                    })
+                );
             }
 
-            const startedAt = Date.now();
-
-            await Promise.all([
-                new Promise(resolve => window.addEventListener('load', resolve, { once: true })),
-                waitForAllTrackedResources(),
-            ]);
-
-            const elapsed = Date.now() - startedAt;
-            const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
-
-            if (remaining > 0) {
-                await new Promise(resolve => setTimeout(resolve, remaining));
+            function waitForBackgroundImages(urls) {
+                return Promise.all(
+                    urls.map(url => {
+                        return new Promise(resolve => {
+                            const img = new Image();
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                            img.src = url;
+                        });
+                    })
+                );
             }
 
-            requestAnimationFrame(() => {
-                requestAnimationFrame(hideHeroLoader);
+            function waitForFonts() {
+                if (!('fonts' in document) || !document.fonts || !document.fonts.ready) {
+                    return Promise.resolve();
+                }
+
+                return document.fonts.ready.catch(() => {});
+            }
+
+            function waitForIframes() {
+                const iframes = Array.from(document.querySelectorAll('iframe'));
+
+                return Promise.all(
+                    iframes.map(frame => {
+                        return new Promise(resolve => {
+                            const done = () => resolve();
+
+                            try {
+                                if (frame.contentWindow && frame.contentDocument?.readyState === 'complete') {
+                                    done();
+                                    return;
+                                }
+                            } catch (e) {}
+
+                            frame.addEventListener('load', done, { once: true });
+                            setTimeout(done, 15000);
+                        });
+                    })
+                );
+            }
+
+            async function waitForAllTrackedResources() {
+                const trackedImages = getTrackedImages();
+                const trackedBackgroundUrls = getTrackedBackgroundUrls();
+
+                await Promise.all([
+                    waitForImages(trackedImages),
+                    waitForBackgroundImages(trackedBackgroundUrls),
+                    waitForFonts(),
+                    waitForIframes(),
+                ]);
+            }
+
+            document.addEventListener('DOMContentLoaded', async function () {
+                const heroContainer = document.getElementById('hero-container');
+
+                if (!heroContainer) {
+                    hideHeroLoader();
+                    return;
+                }
+
+                const startedAt = Date.now();
+
+                await Promise.all([
+                    new Promise(resolve => window.addEventListener('load', resolve, { once: true })),
+                    waitForAllTrackedResources(),
+                ]);
+
+                const elapsed = Date.now() - startedAt;
+                const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+
+                if (remaining > 0) {
+                    await new Promise(resolve => setTimeout(resolve, remaining));
+                }
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(hideHeroLoader);
+                });
             });
-        });
 
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                hideHeroLoader();
-            }
-        });
-    })();
-</script>
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    hideHeroLoader();
+                }
+            });
+        })();
+    </script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -2195,6 +2211,11 @@
             buttons.forEach(button => {
                 button.addEventListener("click", function () {
                     const target = this.dataset.tab;
+                    const active = document.getElementById("tab-" + target);
+
+                    if (!active) {
+                        return;
+                    }
 
                     buttons.forEach(btn => {
                         btn.classList.remove("is-active");
@@ -2207,11 +2228,7 @@
                     this.style.color = onSecondary;
 
                     contents.forEach(content => content.classList.add("hidden"));
-
-                    const active = document.getElementById("tab-" + target);
-                    if (active) {
-                        active.classList.remove("hidden");
-                    }
+                    active.classList.remove("hidden");
                 });
             });
         });
@@ -2246,9 +2263,9 @@
             const uniqueYears = [...new Set(schedules.map(item => item.year).filter(Boolean))].sort();
             const uniqueMonths = [...new Set(schedules.map(item => item.month).filter(Boolean))].sort();
 
-            const today = new Date();
-            const currentYearFallback = String(today.getFullYear());
-            const currentMonthFallback = String(today.getMonth() + 1).padStart(2, "0");
+            const now = new Date();
+            const currentYearFallback = String(now.getFullYear());
+            const currentMonthFallback = String(now.getMonth() + 1).padStart(2, "0");
 
             let selectedYear = uniqueYears.includes(currentYearFallback)
                 ? currentYearFallback
@@ -2268,6 +2285,19 @@
             function parseLocalDate(dateString) {
                 const [y, m, d] = dateString.split("-").map(Number);
                 return new Date(y, m - 1, d);
+            }
+
+            function getScheduleDateTime(item) {
+                const date = parseLocalDate(item.date);
+
+                if (item.time_sortable) {
+                    const [hours, minutes, seconds] = item.time_sortable.split(":").map(Number);
+                    date.setHours(hours || 0, minutes || 0, seconds || 0, 0);
+                } else {
+                    date.setHours(23, 59, 59, 999);
+                }
+
+                return date;
             }
 
             function toIsoDate(dateObj) {
@@ -2420,7 +2450,11 @@
                     return;
                 }
 
-                filteredSchedules.sort((a, b) => a.date.localeCompare(b.date));
+                filteredSchedules.sort((a, b) => {
+                    const aTime = getScheduleDateTime(a).getTime();
+                    const bTime = getScheduleDateTime(b).getTime();
+                    return aTime - bTime;
+                });
 
                 filteredSchedules.forEach(item => {
                     const row = document.createElement("div");
@@ -2470,6 +2504,29 @@
                     .replace(/'/g, "&#039;");
             }
 
+            function setDefaultToNextUpcomingMatch() {
+                if (!schedules.length) {
+                    return;
+                }
+
+                const sortedSchedules = [...schedules].sort((a, b) => {
+                    return getScheduleDateTime(a).getTime() - getScheduleDateTime(b).getTime();
+                });
+
+                const nextUpcoming = sortedSchedules.find(item => getScheduleDateTime(item).getTime() >= now.getTime()) || sortedSchedules[0];
+
+                if (!nextUpcoming) {
+                    return;
+                }
+
+                selectedYear = nextUpcoming.year || selectedYear;
+                selectedMonth = nextUpcoming.month || selectedMonth;
+
+                const weeks = getWeeksForMonth(selectedYear, selectedMonth);
+                const weekIndex = weeks.findIndex(week => week.some(day => day.iso === nextUpcoming.date));
+                selectedWeekIndex = weekIndex >= 0 ? weekIndex : 0;
+            }
+
             yearSelect.addEventListener("change", function () {
                 selectedYear = this.value;
                 const monthsForYear = [...new Set(
@@ -2507,21 +2564,9 @@
             });
 
             resetBtn.addEventListener("click", function () {
-                selectedYear = uniqueYears.includes(currentYearFallback)
-                    ? currentYearFallback
-                    : (uniqueYears[0] || currentYearFallback);
-
-                const monthsForYear = schedules
-                    .filter(item => item.year === selectedYear)
-                    .map(item => item.month);
-
-                selectedMonth = monthsForYear.includes(currentMonthFallback)
-                    ? currentMonthFallback
-                    : (([...new Set(monthsForYear)].sort()[0]) || uniqueMonths[0] || currentMonthFallback);
-
                 searchTerm = "";
-                selectedWeekIndex = 0;
                 searchInput.value = "";
+                setDefaultToNextUpcomingMatch();
                 render();
             });
 
@@ -2548,16 +2593,7 @@
                 return;
             }
 
-            const selectedDateString = `${selectedYear}-${selectedMonth}-01`;
-            const todayMonthString = `${currentYearFallback}-${currentMonthFallback}-01`;
-
-            if (selectedDateString === todayMonthString) {
-                const todayIso = toIsoDate(today);
-                const weeks = getWeeksForMonth(selectedYear, selectedMonth);
-                const weekIndexContainingToday = weeks.findIndex(week => week.some(day => day.iso === todayIso));
-                selectedWeekIndex = weekIndexContainingToday >= 0 ? weekIndexContainingToday : 0;
-            }
-
+            setDefaultToNextUpcomingMatch();
             render();
         });
     </script>
