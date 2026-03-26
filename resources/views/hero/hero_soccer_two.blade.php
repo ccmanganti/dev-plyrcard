@@ -261,7 +261,9 @@
 
     $stats = [
         'GPA' => $formatGpaDisplay($getHeroFieldValue('hero_stat_gpa', $user?->gpa ?? '')),
-        'DOB' => $formatDateDisplay($getHeroFieldValue('hero_stat_dob', $user?->birth ?? '')),
+        'DOB' => filled($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''))
+            ? \Carbon\Carbon::parse($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''))->format('F Y')
+            : '',
         'Hometown' => $hometown,
         'International' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_international', '')),
         'League' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_league', $user?->club->league?->name ?? '')),
