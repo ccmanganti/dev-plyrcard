@@ -2000,95 +2000,183 @@
         </div>
     </div>
 
-    <script>
-        (function () {
-            function hideHeroLoader() {
-                const loader = document.getElementById('hero-loader');
+<script>
+    (function () {
+        const MIN_LOADER_MS = 2000;
 
-                if (!loader || loader.classList.contains('hidden')) {
+        function hideHeroLoader() {
+            const loader = document.getElementById('hero-loader');
+
+            if (!loader || loader.classList.contains('hidden')) {
+                return;
+            }
+
+            loader.classList.add('hidden');
+        }
+
+        function isVisible(el) {
+            return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+        }
+
+        function getImageUrlFromBackground(backgroundImage) {
+            if (!backgroundImage || backgroundImage === 'none') {
+                return null;
+            }
+
+            const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
+            return match ? match[2] : null;
+        }
+
+        function getTrackedImages() {
+            const seen = new Set();
+
+            return Array.from(document.images).filter(img => {
+                const src = img.currentSrc || img.getAttribute('src') || '';
+                const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
+
+                if (!src.trim() || isLoaderGif || seen.has(src)) {
+                    return false;
+                }
+
+                seen.add(src);
+                return true;
+            });
+        }
+
+        function getTrackedBackgroundUrls() {
+            const urls = new Set();
+
+            Array.from(document.querySelectorAll('*')).forEach(el => {
+                if (!isVisible(el)) {
                     return;
                 }
 
-                loader.classList.add('hidden');
-            }
+                const bg = window.getComputedStyle(el).backgroundImage;
+                const url = getImageUrlFromBackground(bg);
 
-            function getHeroImages(container) {
-                if (!container) return [];
-
-                return Array.from(container.querySelectorAll('img')).filter(img => {
-                    const src = img.getAttribute('src') || '';
-                    const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
-                    return src.trim() !== '' && !isLoaderGif;
-                });
-            }
-
-            function waitForImages(images, timeout = 1200) {
-                return new Promise(resolve => {
-                    if (!images.length) {
-                        resolve();
-                        return;
-                    }
-
-                    let loaded = 0;
-                    let finished = false;
-
-                    const done = () => {
-                        if (finished) return;
-                        finished = true;
-                        resolve();
-                    };
-
-                    const markLoaded = () => {
-                        loaded++;
-
-                        if (loaded >= images.length) {
-                            done();
-                        }
-                    };
-
-                    images.forEach(img => {
-                        if (img.complete) {
-                            if (typeof img.decode === 'function') {
-                                img.decode()
-                                    .catch(() => {})
-                                    .finally(markLoaded);
-                            } else {
-                                markLoaded();
-                            }
-                        } else {
-                            img.addEventListener('load', markLoaded, { once: true });
-                            img.addEventListener('error', markLoaded, { once: true });
-                        }
-                    });
-
-                    setTimeout(done, timeout);
-                });
-            }
-
-            document.addEventListener('DOMContentLoaded', async function () {
-                const heroContainer = document.getElementById('hero-container');
-
-                if (!heroContainer) {
-                    hideHeroLoader();
-                    return;
+                if (url && !url.includes('PLYR_LOGO_TRANS_GIF.webp')) {
+                    urls.add(url);
                 }
-
-                const heroImages = getHeroImages(heroContainer);
-
-                await Promise.all([
-                    waitForImages(heroImages, 1200),
-                    new Promise(resolve => setTimeout(resolve, 2000)),
-                ]);
-
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(hideHeroLoader);
-                });
             });
 
-            window.addEventListener('pageshow', hideHeroLoader);
-            setTimeout(hideHeroLoader, 2200);
-        })();
-    </script>
+            return Array.from(urls);
+        }
+
+        function waitForImages(images) {
+            return Promise.all(
+                images.map(img => {
+                    return new Promise(resolve => {
+                        const done = () => resolve();
+
+                        if (img.complete && img.naturalWidth > 0) {
+                            if (typeof img.decode === 'function') {
+                                img.decode().catch(() => {}).finally(done);
+                            } else {
+                                done();
+                            }
+                            return;
+                        }
+
+                        img.addEventListener('load', done, { once: true });
+                        img.addEventListener('error', done, { once: true });
+                    });
+                })
+            );
+        }
+
+        function waitForBackgroundImages(urls) {
+            return Promise.all(
+                urls.map(url => {
+                    return new Promise(resolve => {
+                        const img = new Image();
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = url;
+                    });
+                })
+            );
+        }
+
+        function waitForFonts() {
+            if (!('fonts' in document) || !document.fonts || !document.fonts.ready) {
+                return Promise.resolve();
+            }
+
+            return document.fonts.ready.catch(() => {});
+        }
+
+        function waitForIframes() {
+            const iframes = Array.from(document.querySelectorAll('iframe'));
+
+            return Promise.all(
+                iframes.map(frame => {
+                    return new Promise(resolve => {
+                        const done = () => resolve();
+
+                        try {
+                            if (frame.contentWindow && frame.contentDocument?.readyState === 'complete') {
+                                done();
+                                return;
+                            }
+                        } catch (e) {
+                            // Cross-origin iframe access can fail; fall back to load event only.
+                        }
+
+                        frame.addEventListener('load', done, { once: true });
+
+                        // safety fallback only for broken/blocked embeds
+                        setTimeout(done, 15000);
+                    });
+                })
+            );
+        }
+
+        async function waitForAllTrackedResources() {
+            const trackedImages = getTrackedImages();
+            const trackedBackgroundUrls = getTrackedBackgroundUrls();
+
+            await Promise.all([
+                waitForImages(trackedImages),
+                waitForBackgroundImages(trackedBackgroundUrls),
+                waitForFonts(),
+                waitForIframes(),
+            ]);
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            const heroContainer = document.getElementById('hero-container');
+
+            if (!heroContainer) {
+                hideHeroLoader();
+                return;
+            }
+
+            const startedAt = Date.now();
+
+            await Promise.all([
+                new Promise(resolve => window.addEventListener('load', resolve, { once: true })),
+                waitForAllTrackedResources(),
+            ]);
+
+            const elapsed = Date.now() - startedAt;
+            const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+
+            if (remaining > 0) {
+                await new Promise(resolve => setTimeout(resolve, remaining));
+            }
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(hideHeroLoader);
+            });
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                hideHeroLoader();
+            }
+        });
+    })();
+</script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
