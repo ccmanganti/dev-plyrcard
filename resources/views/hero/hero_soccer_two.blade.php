@@ -651,7 +651,7 @@
         }
 
         .hero-stats-block {
-            margin-top: -60px;
+            margin-top: -40px;
             max-width: 670px;
         }
 
