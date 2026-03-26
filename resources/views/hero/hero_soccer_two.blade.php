@@ -326,6 +326,7 @@
 
     .hero-position-line {
         margin-top: 4px;
+        margin-bottom:10px;
         font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
         font-weight: 300;
         font-size: 22px;
