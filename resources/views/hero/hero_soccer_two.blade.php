@@ -195,7 +195,7 @@
 
     $bottomTeamImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_bottom_team_image'), '');
 
-    $defaultBackgroundImageUrl = asset('hero_images/hero_one/background_soccer.png');
+    $defaultBackgroundImageUrl = asset('hero_images/hero_one/background.png');
 
     $backgroundImageUrl = $resolveMediaUrl(
         $getHeroFieldValue('hero_background_image'),
