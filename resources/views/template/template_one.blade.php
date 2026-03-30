@@ -2021,179 +2021,147 @@ HTML;
     </div>
 
     <script>
-        (function () {
-            const MIN_LOADER_MS = 2000;
+    (function () {
+        const MIN_LOADER_MS = 250;
 
-            function hideHeroLoader() {
-                const loader = document.getElementById('hero-loader');
+        function hideHeroLoader() {
+            const loader = document.getElementById('hero-loader');
 
-                if (!loader || loader.classList.contains('hidden')) {
+            if (!loader || loader.classList.contains('hidden')) {
+                return;
+            }
+
+            loader.classList.add('hidden');
+        }
+
+        function isVisible(el) {
+            return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+        }
+
+        function getImageUrlFromBackground(backgroundImage) {
+            if (!backgroundImage || backgroundImage === 'none') {
+                return null;
+            }
+
+            const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
+            return match ? match[2] : null;
+        }
+
+        function getTrackedImages(scope) {
+            const seen = new Set();
+
+            return Array.from(scope.querySelectorAll('img')).filter(img => {
+                const src = img.currentSrc || img.getAttribute('src') || '';
+                const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
+
+                if (!src.trim() || isLoaderGif || seen.has(src)) {
+                    return false;
+                }
+
+                seen.add(src);
+                return true;
+            });
+        }
+
+        function getTrackedBackgroundUrls(scope) {
+            const urls = new Set();
+
+            Array.from(scope.querySelectorAll('*')).forEach(el => {
+                if (!isVisible(el)) {
                     return;
                 }
 
-                loader.classList.add('hidden');
-            }
+                const bg = window.getComputedStyle(el).backgroundImage;
+                const url = getImageUrlFromBackground(bg);
 
-            function isVisible(el) {
-                return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-            }
-
-            function getImageUrlFromBackground(backgroundImage) {
-                if (!backgroundImage || backgroundImage === 'none') {
-                    return null;
+                if (url && !url.includes('PLYR_LOGO_TRANS_GIF.webp')) {
+                    urls.add(url);
                 }
+            });
 
-                const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
-                return match ? match[2] : null;
-            }
+            return Array.from(urls);
+        }
 
-            function getTrackedImages() {
-                const seen = new Set();
+        function waitForImages(images) {
+            return Promise.all(
+                images.map(img => {
+                    return new Promise(resolve => {
+                        const done = () => resolve();
 
-                return Array.from(document.images).filter(img => {
-                    const src = img.currentSrc || img.getAttribute('src') || '';
-                    const isLoaderGif = src.includes('PLYR_LOGO_TRANS_GIF.webp');
-
-                    if (!src.trim() || isLoaderGif || seen.has(src)) {
-                        return false;
-                    }
-
-                    seen.add(src);
-                    return true;
-                });
-            }
-
-            function getTrackedBackgroundUrls() {
-                const urls = new Set();
-
-                Array.from(document.querySelectorAll('*')).forEach(el => {
-                    if (!isVisible(el)) {
-                        return;
-                    }
-
-                    const bg = window.getComputedStyle(el).backgroundImage;
-                    const url = getImageUrlFromBackground(bg);
-
-                    if (url && !url.includes('PLYR_LOGO_TRANS_GIF.webp')) {
-                        urls.add(url);
-                    }
-                });
-
-                return Array.from(urls);
-            }
-
-            function waitForImages(images) {
-                return Promise.all(
-                    images.map(img => {
-                        return new Promise(resolve => {
-                            const done = () => resolve();
-
-                            if (img.complete && img.naturalWidth > 0) {
-                                if (typeof img.decode === 'function') {
-                                    img.decode().catch(() => {}).finally(done);
-                                } else {
-                                    done();
-                                }
-                                return;
+                        if (img.complete && img.naturalWidth > 0) {
+                            if (typeof img.decode === 'function') {
+                                img.decode().catch(() => {}).finally(done);
+                            } else {
+                                done();
                             }
+                            return;
+                        }
 
-                            img.addEventListener('load', done, { once: true });
-                            img.addEventListener('error', done, { once: true });
-                        });
-                    })
-                );
+                        img.addEventListener('load', done, { once: true });
+                        img.addEventListener('error', done, { once: true });
+
+                        setTimeout(done, 4000);
+                    });
+                })
+            );
+        }
+
+        function waitForBackgroundImages(urls) {
+            return Promise.all(
+                urls.map(url => {
+                    return new Promise(resolve => {
+                        const img = new Image();
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = url;
+
+                        setTimeout(resolve, 4000);
+                    });
+                })
+            );
+        }
+
+        function waitForHeroResources(heroContainer) {
+            const trackedImages = getTrackedImages(heroContainer);
+            const trackedBackgroundUrls = getTrackedBackgroundUrls(heroContainer);
+
+            return Promise.all([
+                waitForImages(trackedImages),
+                waitForBackgroundImages(trackedBackgroundUrls),
+            ]);
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            const heroContainer = document.getElementById('hero-container');
+
+            if (!heroContainer) {
+                hideHeroLoader();
+                return;
             }
 
-            function waitForBackgroundImages(urls) {
-                return Promise.all(
-                    urls.map(url => {
-                        return new Promise(resolve => {
-                            const img = new Image();
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                            img.src = url;
-                        });
-                    })
-                );
+            const startedAt = Date.now();
+
+            await waitForHeroResources(heroContainer);
+
+            const elapsed = Date.now() - startedAt;
+            const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+
+            if (remaining > 0) {
+                await new Promise(resolve => setTimeout(resolve, remaining));
             }
 
-            function waitForFonts() {
-                if (!('fonts' in document) || !document.fonts || !document.fonts.ready) {
-                    return Promise.resolve();
-                }
-
-                return document.fonts.ready.catch(() => {});
-            }
-
-            function waitForIframes() {
-                const iframes = Array.from(document.querySelectorAll('iframe'));
-
-                return Promise.all(
-                    iframes.map(frame => {
-                        return new Promise(resolve => {
-                            const done = () => resolve();
-
-                            try {
-                                if (frame.contentWindow && frame.contentDocument?.readyState === 'complete') {
-                                    done();
-                                    return;
-                                }
-                            } catch (e) {}
-
-                            frame.addEventListener('load', done, { once: true });
-                            setTimeout(done, 15000);
-                        });
-                    })
-                );
-            }
-
-            async function waitForAllTrackedResources() {
-                const trackedImages = getTrackedImages();
-                const trackedBackgroundUrls = getTrackedBackgroundUrls();
-
-                await Promise.all([
-                    waitForImages(trackedImages),
-                    waitForBackgroundImages(trackedBackgroundUrls),
-                    waitForFonts(),
-                    waitForIframes(),
-                ]);
-            }
-
-            document.addEventListener('DOMContentLoaded', async function () {
-                const heroContainer = document.getElementById('hero-container');
-
-                if (!heroContainer) {
-                    hideHeroLoader();
-                    return;
-                }
-
-                const startedAt = Date.now();
-
-                await Promise.all([
-                    new Promise(resolve => window.addEventListener('load', resolve, { once: true })),
-                    waitForAllTrackedResources(),
-                ]);
-
-                const elapsed = Date.now() - startedAt;
-                const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
-
-                if (remaining > 0) {
-                    await new Promise(resolve => setTimeout(resolve, remaining));
-                }
-
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(hideHeroLoader);
-                });
+            requestAnimationFrame(() => {
+                requestAnimationFrame(hideHeroLoader);
             });
+        });
 
-            window.addEventListener('pageshow', function (event) {
-                if (event.persisted) {
-                    hideHeroLoader();
-                }
-            });
-        })();
-    </script>
-
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                hideHeroLoader();
+            }
+        });
+    })();
+</script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const buttons  = document.querySelectorAll(".tab-btn");
