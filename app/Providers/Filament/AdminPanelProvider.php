@@ -19,6 +19,8 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\Width;
+use Filament\FontProviders\GoogleFontProvider;
+use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -28,12 +30,13 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->font('Antonio', provider: GoogleFontProvider::class)
             ->maxContentWidth(Width::Full)
             ->login()
             ->brandLogo(asset('logo.png'))
             ->brandLogoHeight('3rem')
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => '#ff6338',
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

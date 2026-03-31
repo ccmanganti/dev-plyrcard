@@ -8,11 +8,13 @@ use App\Filament\Resources\Clubs\Pages\ListClubs;
 use App\Filament\Resources\Clubs\Pages\ViewClub;
 use App\Models\Club;
 use BackedEnum;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
@@ -38,6 +40,15 @@ class ClubResource extends Resource
                     TextInput::make('name')
                         ->required()
                         ->maxLength(255),
+
+                    FileUpload::make('logo')
+                        ->label('Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('club-logos')
+                        ->visibility('public')
+                        ->helperText('Upload the club logo.'),
                 ]),
         ]);
     }
@@ -46,6 +57,12 @@ class ClubResource extends Resource
     {
         return $table
             ->columns([
+                ImageColumn::make('logo')
+                    ->label('Logo')
+                    ->disk('public')
+                    ->square()
+                    ->toggleable(),
+
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),

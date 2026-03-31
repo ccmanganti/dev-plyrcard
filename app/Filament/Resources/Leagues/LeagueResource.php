@@ -8,18 +8,20 @@ use App\Filament\Resources\Leagues\Pages\ListLeagues;
 use App\Filament\Resources\Leagues\Pages\ViewLeague;
 use App\Models\League;
 use BackedEnum;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
-use Filament\Forms\Components\Select;
 
 class LeagueResource extends Resource
 {
@@ -34,13 +36,28 @@ class LeagueResource extends Resource
     {
         return $schema->components([
             Section::make('League')
+                ->columns(2)
                 ->schema([
-                    TextInput::make('name')->required()->maxLength(255),
-                    Select::make('gender')->required()
-                    ->options([
-                        'Male' => 'Male',
-                        'Female' => 'Female',
-                    ]),
+                    TextInput::make('name')
+                        ->required()
+                        ->maxLength(255),
+
+                    Select::make('gender')
+                        ->required()
+                        ->options([
+                            'Male' => 'Male',
+                            'Female' => 'Female',
+                        ]),
+
+                    FileUpload::make('logo')
+                        ->label('Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('league-logos')
+                        ->visibility('public')
+                        ->helperText('Upload the league logo.')
+                        ->columnSpanFull(),
                 ]),
         ]);
     }
@@ -49,9 +66,23 @@ class LeagueResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')->searchable()->sortable(),
-                TextColumn::make('gender')->searchable()->sortable(),
-                TextColumn::make('updated_at')->since()->label('Updated'),
+                ImageColumn::make('logo')
+                    ->label('Logo')
+                    ->disk('public')
+                    ->square()
+                    ->toggleable(),
+
+                TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('gender')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('updated_at')
+                    ->since()
+                    ->label('Updated'),
             ])
             ->filters([
                 TrashedFilter::make(),

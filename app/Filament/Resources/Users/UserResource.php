@@ -28,6 +28,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
+use STS\FilamentImpersonate\Actions\Impersonate;
+use App\Models\League;
 
 class UserResource extends Resource
 {
@@ -59,6 +61,14 @@ class UserResource extends Resource
             'swimming' => 'Swimming',
             'boxing' => 'Boxing',
             'martial_arts' => 'Martial Arts',
+        ];
+    }
+
+    public static function getGenderOptions(): array
+    {
+        return [
+            'male' => 'Male',
+            'female' => 'Female',
         ];
     }
 
@@ -121,6 +131,14 @@ class UserResource extends Resource
                         ->preload()
                         ->nullable(),
 
+                    Select::make('league_id')
+                        ->label('League')
+                        ->relationship('league', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->nullable()
+                        ->live(),
+
                     CheckboxList::make('roles')
                         ->relationship('roles', 'name')
                         ->columns(2)
@@ -148,6 +166,12 @@ class UserResource extends Resource
 
                     DatePicker::make('birth')
                         ->label('Birth Year'),
+
+                    Select::make('gender')
+                        ->label('Gender')
+                        ->options(static::getGenderOptions())
+                        ->searchable()
+                        ->nullable(),
 
                     TextInput::make('jersey_number')
                         ->numeric(),
@@ -316,7 +340,25 @@ class UserResource extends Resource
                         ->helperText('Select one or more positions based on the chosen sport.'),
 
                     Toggle::make('natl_team_exp')
-                        ->label('National Team Experience'),
+                        ->label('National Team Experience')
+                        ->live(),
+
+                    TextInput::make('national_team_name')
+                        ->label('National Team Name')
+                        ->maxLength(255)
+                        ->visible(fn (callable $get): bool => (bool) $get('natl_team_exp'))
+                        ->required(fn (callable $get): bool => (bool) $get('natl_team_exp')),
+
+                    FileUpload::make('national_team_logo')
+                        ->label('National Team Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->visible(fn (callable $get): bool => (bool) $get('natl_team_exp'))
+                        ->required(fn (callable $get): bool => (bool) $get('natl_team_exp'))
+                        ->helperText('Upload the national team logo if the athlete has national team experience.'),
 
                     Textarea::make('player_bio')
                         ->label('Player Bio')
@@ -439,15 +481,6 @@ class UserResource extends Resource
                         ->directory('user-player-images')
                         ->visibility('public')
                         ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
-
-                    FileUpload::make('logos_image')
-                        ->label('Logos')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->helperText('Upload the logos image used in the footer or logo area of the website.'),
                 ]),
         ]);
     }
@@ -459,14 +492,23 @@ class UserResource extends Resource
                 TextColumn::make('first_name')->searchable()->sortable(),
                 TextColumn::make('last_name')->searchable()->sortable(),
                 TextColumn::make('email')->searchable(),
+
+                TextColumn::make('gender')
+                    ->label('Gender')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('school.name')->label('School')->toggleable(),
+                TextColumn::make('league.name')->label('League')->toggleable(),
                 TextColumn::make('club.name')->label('Club')->toggleable(),
                 TextColumn::make('roles.name')->badge(),
                 TextColumn::make('updated_at')->since()->label('Updated'),
 
                 TextColumn::make('sport')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => str($state)->replace('_', ' ')->title())
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title() : '-')
                     ->sortable()
                     ->searchable(),
 
@@ -479,6 +521,12 @@ class UserResource extends Resource
                             ->all();
                     })
                     ->badge(),
+            ])
+            ->recordActions([
+                Impersonate::make()
+                    ->visible(fn (User $record) => auth()->id() !== $record->id
+                        && auth()->user()?->hasRole('Superadmin'))
+                    ->redirectTo('/admin'),
             ])
             ->filtersFormColumns(3)
             ->filters([
@@ -493,6 +541,12 @@ class UserResource extends Resource
                     ->relationship('club', 'name')
                     ->searchable()
                     ->preload(),
+                
+                SelectFilter::make('league_id')
+                    ->label('League')
+                    ->relationship('league', 'name')
+                    ->searchable()
+                    ->preload(),
 
                 SelectFilter::make('roles')
                     ->label('Roles')
@@ -504,6 +558,11 @@ class UserResource extends Resource
                 SelectFilter::make('sport')
                     ->label('Sport')
                     ->options(static::getSportOptions())
+                    ->multiple(),
+
+                SelectFilter::make('gender')
+                    ->label('Gender')
+                    ->options(static::getGenderOptions())
                     ->multiple(),
 
                 SelectFilter::make('year')
@@ -560,6 +619,17 @@ class UserResource extends Resource
                     ->queries(
                         true: fn (Builder $query) => $query->whereNotNull('club_id'),
                         false: fn (Builder $query) => $query->whereNull('club_id'),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_league')
+                    ->label('Assigned League')
+                    ->placeholder('All users')
+                    ->trueLabel('With league')
+                    ->falseLabel('Without league')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('league_id'),
+                        false: fn (Builder $query) => $query->whereNull('league_id'),
                         blank: fn (Builder $query) => $query,
                     ),
 

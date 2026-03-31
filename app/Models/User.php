@@ -22,6 +22,7 @@ class User extends Authenticatable implements HasName, FilamentUser
     protected $fillable = [
         'first_name',
         'last_name',
+        'gender',
         'personal_email',
         'email',
         'phone',
@@ -40,6 +41,8 @@ class User extends Authenticatable implements HasName, FilamentUser
         'academic_accolades',
         'sports_accolades',
         'natl_team_exp',
+        'national_team_name',
+        'national_team_logo',
         'team_name',
         'ig_handle',
         'x_handle',
@@ -65,13 +68,13 @@ class User extends Authenticatable implements HasName, FilamentUser
         'snc_trainer_phone',
         'school_id',
         'club_id',
+        'league_id',
         'domain',
         'password',
         'plyrcard_image',
         'player_image',
         'mobile_hero_image',
         'youtube_thumbnail',
-        'logos_image',
         'player_bio',
         'featured_video_url',
         'featured_video_urls',
@@ -141,6 +144,11 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function websites(): HasMany
     {
         return $this->hasMany(Website::class);
+    }
+
+    public function league(): BelongsTo
+    {
+        return $this->belongsTo(League::class);
     }
 
     public function activeWebsite(): HasOne

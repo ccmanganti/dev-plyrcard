@@ -12,6 +12,7 @@ class Club extends Model
 
     protected $fillable = [
         'name',
+        'logo',
     ];
 
     public function users(): HasMany
