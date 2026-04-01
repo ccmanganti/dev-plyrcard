@@ -594,7 +594,7 @@
     font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
     font-weight: 300;
     font-size: 18px;
-    line-height: 1.08;
+    line-height: 1.2;
     letter-spacing: 0.01em;
     text-transform: uppercase;
     color: #fff;
