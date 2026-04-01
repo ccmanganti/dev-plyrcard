@@ -1146,36 +1146,59 @@
     // Hidden test override. Leave as null for real detection.
     // For testing, set for example: 'FR', 'DE', 'ES', 'IT', 'NL', 'PT', 'US'
     const REGION_TEST_OVERRIDE = null;
+const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
 
-    const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? 'US');
+function mapCountryToLanguage(countryCode) {
+    const countryToLanguage = {
+        FR: 'fr',
+        BE: 'fr',
+        CH: 'fr',
+        DE: 'de',
+        AT: 'de',
+        ES: 'es',
+        IT: 'it',
+        NL: 'nl',
+        PT: 'pt',
+    };
 
-    function getCountryCode() {
-        if (REGION_TEST_OVERRIDE) {
-            return String(REGION_TEST_OVERRIDE).toUpperCase();
-        }
+    return countryToLanguage[countryCode] || null;
+}
 
-        if (DETECTED_COUNTRY_FROM_SERVER) {
-            return String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
-        }
+function mapBrowserLanguageToSupportedLanguage(browserLang) {
+    const lang = String(browserLang || '').toLowerCase();
 
-        return 'US';
+    if (lang.startsWith('fr')) return 'fr';
+    if (lang.startsWith('de')) return 'de';
+    if (lang.startsWith('es')) return 'es';
+    if (lang.startsWith('it')) return 'it';
+    if (lang.startsWith('nl')) return 'nl';
+
+    return 'en';
+}
+
+function getTargetLanguage() {
+    if (REGION_TEST_OVERRIDE) {
+        const overrideCountry = String(REGION_TEST_OVERRIDE).toUpperCase();
+        return mapCountryToLanguage(overrideCountry) || 'en';
     }
 
-    function mapCountryToLanguage(countryCode) {
-        const countryToLanguage = {
-            FR: 'fr',
-            BE: 'fr',
-            CH: 'fr',
-            DE: 'de',
-            AT: 'de',
-            ES: 'es',
-            IT: 'it',
-            NL: 'nl',
-            PT: 'pt',
-        };
+    if (DETECTED_COUNTRY_FROM_SERVER) {
+        const serverCountry = String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
+        const langFromCountry = mapCountryToLanguage(serverCountry);
 
-        return countryToLanguage[countryCode] || 'en';
+        if (langFromCountry) {
+            return langFromCountry;
+        }
     }
+
+    const browserLanguage =
+        (navigator.languages && navigator.languages[0]) ||
+        navigator.language ||
+        navigator.userLanguage ||
+        'en';
+
+    return mapBrowserLanguageToSupportedLanguage(browserLanguage);
+}
 
     function getTargetLanguage() {
         return mapCountryToLanguage(getCountryCode());
