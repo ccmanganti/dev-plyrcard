@@ -157,6 +157,12 @@
             return collect();
         }
 
+        $text = str_replace(
+            ["\u{2018}", "\u{2019}", "\u{201C}", "\u{201D}", "’", "‘", "“", "”"],
+            ["'", "'", '"', '"', "'", "'", '"', '"'],
+            $text
+        );
+
         return collect(preg_split('/\r\n|\r|\n|[•|;]+/', $text) ?: [])
             ->flatMap(function ($item) {
                 return preg_split('/\s*,\s*/', (string) $item) ?: [];
@@ -165,7 +171,6 @@
             ->filter(fn ($item) => $item !== '')
             ->values();
     };
-
     $playerFullName = trim($getHeroFieldValue('hero_player_name', ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')));
 
     $nameParts = preg_split('/\s+/', trim($playerFullName)) ?: [];
