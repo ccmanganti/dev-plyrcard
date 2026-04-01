@@ -75,6 +75,7 @@ class User extends Authenticatable implements HasName, FilamentUser
         'player_image',
         'mobile_hero_image',
         'youtube_thumbnail',
+        'raw_player_images',
         'player_bio',
         'featured_video_url',
         'featured_video_urls',
@@ -113,6 +114,7 @@ class User extends Authenticatable implements HasName, FilamentUser
             'position' => 'array',
             'youtube_cached_videos' => 'array',
             'youtube_cache_refreshed_at' => 'datetime',
+            'raw_player_images' => 'array',
         ];
     }
 

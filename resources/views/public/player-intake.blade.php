@@ -530,11 +530,12 @@
 <div class="wrapper">
     <div class="card">
         <div class="header">
-            <div class="eyebrow">PlyrCard Intake</div>
-            <h1 class="hero-title">Plyr <span class="accent">Intake</span> Form</h1>
+            <div class="eyebrow"><span translate="no">PlyrCard</span> Intake</div>
+            <h1 class="hero-title"><span translate="no">Plyr</span> <span class="accent">Intake</span> Form</h1>
             <p class="header-copy">
-                Use this form to build your PLYRCard Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
+                Use this form to build your <span translate="no">PLYRCard</span> Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
             </p>
+            <p class="hint">This form will translate automatically based on detected region.</p>
         </div>
 
         <div class="content">
@@ -590,7 +591,7 @@
                         <div class="col-4">
                             <label for="personal_email">Personal Email <span class="required">*</span></label>
                             <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required>
-                            <div class="hint">The PlyrCard email will be generated automatically.</div>
+                            <div class="hint">The <span translate="no">PlyrCard</span> email will be generated automatically.</div>
                         </div>
 
                         <div class="col-4">
@@ -766,7 +767,7 @@
                                     <span class="tooltip-wrap" tabindex="0">
                                         <span class="info-icon">i</span>
                                         <span class="tooltip-box">
-                                            Paste the full URL to the one YouTube video you want featured on your PLYR Profile.<br><br>
+                                            Paste the full URL to the one YouTube video you want featured on your <span translate="no">PLYR</span> Profile.<br><br>
                                             This can be your personal intro video or your best highlight.<br><br>
                                             <strong>Examples:</strong>
                                             <ul>
@@ -1114,48 +1115,21 @@
                     <h2>Images</h2>
 
                     <div class="grid">
-                        <div class="col-3">
-                            <label for="player_card_image">Player Card Image</label>
-                            <input type="file" id="player_card_image" name="player_card_image" accept="image/png">
-                            <div class="hint" id="player_card_hint">
-                                Upload a PNG player card image. Transparent background preferred. Max 5MB.
-                            </div>
-                        </div>
-
-                        <div class="col-3">
-                            <label for="player_image">Player Image</label>
-                            <input type="file" id="player_image" name="player_image" accept="image/png">
+                        <div class="col-12">
+                            <label for="player_image">Raw Player Images</label>
+                            <input
+                                type="file"
+                                id="player_image"
+                                name="player_image[]"
+                                accept="image/png"
+                                multiple
+                            >
                             <div class="hint" id="player_image_hint">
-                                Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.
-                            </div>
-                        </div>
-
-                        <div class="col-3">
-                            <label for="mobile_view_image">Mobile View Image</label>
-                            <input type="file" id="mobile_view_image" name="mobile_view_image" accept="image/png">
-                            <div class="hint" id="mobile_view_hint">
-                                Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.
-                            </div>
-                        </div>
-
-                        <div class="col-3">
-                            <label for="youtube_thumbnail">YouTube Thumbnail / Social Image</label>
-                            <input type="file" id="youtube_thumbnail" name="youtube_thumbnail" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
-                            <div class="hint">
-                                Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.
-                            </div>
-                        </div>
-
-                        <div class="col-3">
-                            <label for="logos_image">Logos</label>
-                            <input type="file" id="logos_image" name="logos_image" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
-                            <div class="hint">
-                                Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.
+                                Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="actions">
                     <button type="submit" class="btn">Submit Intake Form</button>
                 </div>
@@ -1168,6 +1142,661 @@
     const sportPositions = @json($sportPositions);
     const oldPositions = @json(old('position', []));
     const enabledSports = ['basketball', 'soccer'];
+
+    // Hidden test override. Leave as null for real detection.
+    // For testing, set for example: 'FR', 'DE', 'ES', 'IT', 'NL', 'PT', 'US'
+    const REGION_TEST_OVERRIDE = null;
+
+    const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? 'US');
+
+    function getCountryCode() {
+        if (REGION_TEST_OVERRIDE) {
+            return String(REGION_TEST_OVERRIDE).toUpperCase();
+        }
+
+        if (DETECTED_COUNTRY_FROM_SERVER) {
+            return String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
+        }
+
+        return 'US';
+    }
+
+    function mapCountryToLanguage(countryCode) {
+        const countryToLanguage = {
+            FR: 'fr',
+            BE: 'fr',
+            CH: 'fr',
+            DE: 'de',
+            AT: 'de',
+            ES: 'es',
+            IT: 'it',
+            NL: 'nl',
+            PT: 'pt',
+        };
+
+        return countryToLanguage[countryCode] || 'en';
+    }
+
+    function getTargetLanguage() {
+        return mapCountryToLanguage(getCountryCode());
+    }
+
+    const phraseTranslations = {
+        es: {
+            "Intake": "Ingreso",
+            "Form": "Formulario",
+            "This form will translate automatically based on detected region.": "Este formulario se traducirá automáticamente según la región detectada.",
+            "Athlete Details": "Detalles del atleta",
+            "First Name": "Nombre",
+            "Middle Name": "Segundo nombre",
+            "Last Name": "Apellido",
+            "Gender": "Género",
+            "Select gender": "Seleccionar género",
+            "Personal Email": "Correo electrónico personal",
+            "The email will be generated automatically.": "El correo se generará automáticamente.",
+            "Phone": "Teléfono",
+            "Use the athlete’s direct phone if available.": "Use el teléfono directo del atleta si está disponible.",
+            "Birth Date": "Fecha de nacimiento",
+            "Graduation Year": "Año de graduación",
+            "Sport": "Deporte",
+            "Select sport": "Seleccionar deporte",
+            "Currently available: Basketball and Soccer only.": "Actualmente disponible: solo baloncesto y fútbol.",
+            "Jersey Number": "Número de camiseta",
+            "Vertical Jump": "Salto vertical",
+            "GPA": "Promedio",
+            "Height": "Altura",
+            "Weight": "Peso",
+            "Max Speed": "Velocidad máxima",
+            "Position": "Posición",
+            "Only positions for the selected sport will be shown.": "Solo se mostrarán las posiciones del deporte seleccionado.",
+            "National Team Experience": "Experiencia en selección nacional",
+            "Select one": "Seleccionar uno",
+            "Yes": "Sí",
+            "No": "No",
+            "Instagram Profile URL": "URL del perfil de Instagram",
+            "X Profile URL": "URL del perfil de X",
+            "YouTube Channel URL": "URL del canal de YouTube",
+            "Featured Video URL": "URL del video destacado",
+            "Highlight Videos": "Videos destacados",
+            "Pick My Own Videos": "Elegir mis propios videos",
+            "Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.": "Activa esto si quieres agregar manualmente las URLs de tus videos destacados línea por línea. Déjalo apagado para usar la URL del canal de YouTube de arriba.",
+            "Highlight Video URLs": "URLs de videos destacados",
+            "One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.": "Una URL completa de video por línea. Déjalo en blanco si quieres que el sistema use la URL de tu canal de YouTube.",
+            "Player Bio": "Biografía del jugador",
+            "This will be used in the website bio/about section.": "Esto se usará en la sección biografía/acerca de del sitio web.",
+            "Academic Accolades": "Logros académicos",
+            "Sports Accolades": "Logros deportivos",
+            "Enter one accolade per line.": "Ingresa un logro por línea.",
+            "Press / Notes": "Prensa / Notas",
+            "Location, School, League & Club": "Ubicación, escuela, liga y club",
+            "Country": "País",
+            "Select country": "Seleccionar país",
+            "Country Name": "Nombre del país",
+            "Enter country name": "Ingresar nombre del país",
+            "State": "Estado",
+            "Select state": "Seleccionar estado",
+            "State will be saved as its abbreviation.": "El estado se guardará como su abreviatura.",
+            "State / Province / Region": "Estado / Provincia / Región",
+            "Enter state, province, or region": "Ingresar estado, provincia o región",
+            "For non-U.S. countries, enter the region, province, or state if applicable.": "Para países fuera de EE. UU., ingresa la región, provincia o estado si aplica.",
+            "City": "Ciudad",
+            "Street": "Calle",
+            "School": "Escuela",
+            "Select school": "Seleccionar escuela",
+            "Other": "Otro",
+            "Choose Other to manually enter a school not listed.": "Elige Otro para ingresar manualmente una escuela que no figure en la lista.",
+            "Enter school name": "Ingresar nombre de la escuela",
+            "League": "Liga",
+            "Select league": "Seleccionar liga",
+            "League is selected independently and is not tied to club selection.": "La liga se selecciona de forma independiente y no está vinculada a la selección del club.",
+            "Enter new league name": "Ingresar nuevo nombre de la liga",
+            "Club": "Club",
+            "Select club": "Seleccionar club",
+            "Choose Other to manually enter a club not listed.": "Elige Otro para ingresar manualmente un club que no figure en la lista.",
+            "Team": "Equipo",
+            "New Club Name": "Nuevo nombre del club",
+            "Enter new club name": "Ingresar nuevo nombre del club",
+            "Parent / Guardian Information": "Información de padre / tutor",
+            "Primary Parent / Guardian": "Padre / tutor principal",
+            "Primary Parent Email": "Correo del padre / tutor principal",
+            "Primary Parent Phone": "Teléfono del padre / tutor principal",
+            "Secondary Parent / Guardian": "Padre / tutor secundario",
+            "Secondary Parent Email": "Correo del padre / tutor secundario",
+            "Secondary Parent Phone": "Teléfono del padre / tutor secundario",
+            "Coaches & Trainers": "Entrenadores y preparadores",
+            "Club Coach": "Entrenador del club",
+            "Club Coach Email": "Correo del entrenador del club",
+            "Club Coach Phone": "Teléfono del entrenador del club",
+            "National Coach": "Entrenador nacional",
+            "National Coach Email": "Correo del entrenador nacional",
+            "National Coach Phone": "Teléfono del entrenador nacional",
+            "Technical Trainer": "Entrenador técnico",
+            "Technical Trainer Email": "Correo del entrenador técnico",
+            "Technical Trainer Phone": "Teléfono del entrenador técnico",
+            "Strength & Conditioning Trainer": "Entrenador de fuerza y acondicionamiento",
+            "S&C Trainer Email": "Correo del entrenador de fuerza y acondicionamiento",
+            "S&C Trainer Phone": "Teléfono del entrenador de fuerza y acondicionamiento",
+            "Images": "Imágenes",
+            "Player Card Image": "Imagen de tarjeta del jugador",
+            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Sube una imagen PNG de tarjeta del jugador. Se prefiere fondo transparente. Máx. 5 MB.",
+            "Player Image": "Imagen del jugador",
+            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Sube una imagen PNG del jugador recortada de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máx. 5 MB.",
+            "Mobile View Image": "Imagen para vista móvil",
+            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Sube una imagen PNG principal para móvil para mostrar en teléfonos en tu sitio web. Se recomienda recorte vertical. Máx. 5 MB.",
+            "YouTube Thumbnail / Social Image": "Miniatura de YouTube / Imagen social",
+            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Sube la imagen usada como miniatura de destacados, imagen social del sitio y vista previa SEO. JPG, PNG o WEBP. Máx. 5 MB.",
+            "Logos": "Logotipos",
+            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Sube la imagen de logotipos usada en el pie de página o en el área de logotipo del sitio. JPG, PNG o WEBP. Máx. 5 MB.",
+            "Submit Intake Form": "Enviar formulario de ingreso",
+            "Please fix the following:": "Corrige lo siguiente:"
+        },
+        fr: {
+            "Intake": "Inscription",
+            "Form": "Formulaire",
+            "This form will translate automatically based on detected region.": "Ce formulaire sera traduit automatiquement en fonction de la région détectée.",
+            "Athlete Details": "Détails de l’athlète",
+            "First Name": "Prénom",
+            "Middle Name": "Deuxième prénom",
+            "Last Name": "Nom de famille",
+            "Gender": "Genre",
+            "Select gender": "Sélectionner le genre",
+            "Personal Email": "E-mail personnel",
+            "The email will be generated automatically.": "L’e-mail sera généré automatiquement.",
+            "Phone": "Téléphone",
+            "Use the athlete’s direct phone if available.": "Utilisez le téléphone direct de l’athlète s’il est disponible.",
+            "Birth Date": "Date de naissance",
+            "Graduation Year": "Année de diplôme",
+            "Sport": "Sport",
+            "Select sport": "Sélectionner un sport",
+            "Currently available: Basketball and Soccer only.": "Actuellement disponible : basket-ball et football uniquement.",
+            "Jersey Number": "Numéro de maillot",
+            "Vertical Jump": "Détente verticale",
+            "GPA": "Moyenne",
+            "Height": "Taille",
+            "Weight": "Poids",
+            "Max Speed": "Vitesse maximale",
+            "Position": "Poste",
+            "Only positions for the selected sport will be shown.": "Seules les positions du sport sélectionné seront affichées.",
+            "National Team Experience": "Expérience en équipe nationale",
+            "Select one": "Sélectionner une option",
+            "Yes": "Oui",
+            "No": "Non",
+            "Instagram Profile URL": "URL du profil Instagram",
+            "X Profile URL": "URL du profil X",
+            "YouTube Channel URL": "URL de la chaîne YouTube",
+            "Featured Video URL": "URL de la vidéo en vedette",
+            "Highlight Videos": "Vidéos de highlights",
+            "Pick My Own Videos": "Choisir mes propres vidéos",
+            "Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.": "Activez ceci si vous souhaitez ajouter manuellement les URL de vos vidéos highlight ligne par ligne. Laissez désactivé pour utiliser l’URL de la chaîne YouTube ci-dessus.",
+            "Highlight Video URLs": "URL des vidéos de highlights",
+            "One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.": "Une URL vidéo complète par ligne. Laissez vide si vous voulez que le système utilise l’URL de votre chaîne YouTube.",
+            "Player Bio": "Biographie du joueur",
+            "This will be used in the website bio/about section.": "Cela sera utilisé dans la section biographie/à propos du site web.",
+            "Academic Accolades": "Distinctions académiques",
+            "Sports Accolades": "Distinctions sportives",
+            "Enter one accolade per line.": "Saisissez une distinction par ligne.",
+            "Press / Notes": "Presse / Notes",
+            "Location, School, League & Club": "Lieu, école, ligue et club",
+            "Country": "Pays",
+            "Select country": "Sélectionner un pays",
+            "Country Name": "Nom du pays",
+            "Enter country name": "Saisir le nom du pays",
+            "State": "État",
+            "Select state": "Sélectionner un État",
+            "State will be saved as its abbreviation.": "L’État sera enregistré sous forme d’abréviation.",
+            "State / Province / Region": "État / Province / Région",
+            "Enter state, province, or region": "Saisir l’État, la province ou la région",
+            "For non-U.S. countries, enter the region, province, or state if applicable.": "Pour les pays hors États-Unis, saisissez la région, la province ou l’État si applicable.",
+            "City": "Ville",
+            "Street": "Rue",
+            "School": "École",
+            "Select school": "Sélectionner une école",
+            "Other": "Autre",
+            "Choose Other to manually enter a school not listed.": "Choisissez Autre pour saisir manuellement une école non répertoriée.",
+            "Enter school name": "Saisir le nom de l’école",
+            "League": "Ligue",
+            "Select league": "Sélectionner une ligue",
+            "League is selected independently and is not tied to club selection.": "La ligue est sélectionnée indépendamment et n’est pas liée au choix du club.",
+            "Enter new league name": "Saisir le nom de la nouvelle ligue",
+            "Club": "Club",
+            "Select club": "Sélectionner un club",
+            "Choose Other to manually enter a club not listed.": "Choisissez Autre pour saisir manuellement un club non répertorié.",
+            "Team": "Équipe",
+            "New Club Name": "Nouveau nom du club",
+            "Enter new club name": "Saisir le nouveau nom du club",
+            "Parent / Guardian Information": "Informations parent / tuteur",
+            "Primary Parent / Guardian": "Parent / tuteur principal",
+            "Primary Parent Email": "E-mail du parent principal",
+            "Primary Parent Phone": "Téléphone du parent principal",
+            "Secondary Parent / Guardian": "Parent / tuteur secondaire",
+            "Secondary Parent Email": "E-mail du parent secondaire",
+            "Secondary Parent Phone": "Téléphone du parent secondaire",
+            "Coaches & Trainers": "Entraîneurs et préparateurs",
+            "Club Coach": "Entraîneur du club",
+            "Club Coach Email": "E-mail de l’entraîneur du club",
+            "Club Coach Phone": "Téléphone de l’entraîneur du club",
+            "National Coach": "Entraîneur national",
+            "National Coach Email": "E-mail de l’entraîneur national",
+            "National Coach Phone": "Téléphone de l’entraîneur national",
+            "Technical Trainer": "Préparateur technique",
+            "Technical Trainer Email": "E-mail du préparateur technique",
+            "Technical Trainer Phone": "Téléphone du préparateur technique",
+            "Strength & Conditioning Trainer": "Préparateur physique",
+            "S&C Trainer Email": "E-mail du préparateur physique",
+            "S&C Trainer Phone": "Téléphone du préparateur physique",
+            "Images": "Images",
+            "Player Card Image": "Image de carte joueur",
+            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Téléchargez une image PNG de carte joueur. Fond transparent recommandé. Max 5 Mo.",
+            "Player Image": "Image du joueur",
+            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Téléchargez une image PNG du joueur seul recadrée de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo.",
+            "Mobile View Image": "Image pour vue mobile",
+            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Téléchargez une image PNG principale mobile pour l’affichage sur téléphone sur votre site. Recadrage vertical recommandé. Max 5 Mo.",
+            "YouTube Thumbnail / Social Image": "Miniature YouTube / Image sociale",
+            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Téléchargez l’image utilisée comme miniature de highlights, image sociale du site et aperçu SEO. JPG, PNG ou WEBP. Max 5 Mo.",
+            "Logos": "Logos",
+            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Téléchargez l’image des logos utilisée dans le pied de page ou la zone logo du site. JPG, PNG ou WEBP. Max 5 Mo.",
+            "Submit Intake Form": "Soumettre le formulaire d’inscription",
+            "Please fix the following:": "Veuillez corriger les éléments suivants :"
+        },
+        de: {
+            "Intake": "Anmeldung",
+            "Form": "Formular",
+            "This form will translate automatically based on detected region.": "Dieses Formular wird automatisch basierend auf der erkannten Region übersetzt.",
+            "Athlete Details": "Athletendaten",
+            "First Name": "Vorname",
+            "Middle Name": "Zweiter Vorname",
+            "Last Name": "Nachname",
+            "Gender": "Geschlecht",
+            "Select gender": "Geschlecht auswählen",
+            "Personal Email": "Persönliche E-Mail",
+            "The email will be generated automatically.": "Die E-Mail wird automatisch generiert.",
+            "Phone": "Telefon",
+            "Use the athlete’s direct phone if available.": "Verwenden Sie die direkte Telefonnummer des Athleten, falls verfügbar.",
+            "Birth Date": "Geburtsdatum",
+            "Graduation Year": "Abschlussjahr",
+            "Sport": "Sportart",
+            "Select sport": "Sportart auswählen",
+            "Currently available: Basketball and Soccer only.": "Derzeit verfügbar: nur Basketball und Fußball.",
+            "Jersey Number": "Trikotnummer",
+            "Vertical Jump": "Vertikalsprung",
+            "GPA": "Notendurchschnitt",
+            "Height": "Größe",
+            "Weight": "Gewicht",
+            "Max Speed": "Höchstgeschwindigkeit",
+            "Position": "Position",
+            "Only positions for the selected sport will be shown.": "Es werden nur Positionen für die ausgewählte Sportart angezeigt.",
+            "National Team Experience": "Erfahrung in der Nationalmannschaft",
+            "Select one": "Eine Option auswählen",
+            "Yes": "Ja",
+            "No": "Nein",
+            "Instagram Profile URL": "Instagram-Profil-URL",
+            "X Profile URL": "X-Profil-URL",
+            "YouTube Channel URL": "YouTube-Kanal-URL",
+            "Featured Video URL": "Empfohlene Video-URL",
+            "Highlight Videos": "Highlight-Videos",
+            "Pick My Own Videos": "Eigene Videos auswählen",
+            "Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.": "Aktivieren Sie dies, wenn Sie Ihre Highlight-Video-URLs manuell Zeile für Zeile hinzufügen möchten. Lassen Sie es deaktiviert, um die YouTube-Kanal-URL oben zu verwenden.",
+            "Highlight Video URLs": "Highlight-Video-URLs",
+            "One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.": "Eine vollständige Video-URL pro Zeile. Lassen Sie dies leer, wenn das System stattdessen Ihre YouTube-Kanal-URL verwenden soll.",
+            "Player Bio": "Spielerbiografie",
+            "This will be used in the website bio/about section.": "Dies wird im Bio-/Über-uns-Bereich der Website verwendet.",
+            "Academic Accolades": "Akademische Auszeichnungen",
+            "Sports Accolades": "Sportliche Auszeichnungen",
+            "Enter one accolade per line.": "Geben Sie eine Auszeichnung pro Zeile ein.",
+            "Press / Notes": "Presse / Notizen",
+            "Location, School, League & Club": "Standort, Schule, Liga und Verein",
+            "Country": "Land",
+            "Select country": "Land auswählen",
+            "Country Name": "Ländername",
+            "Enter country name": "Ländernamen eingeben",
+            "State": "Bundesland",
+            "Select state": "Bundesland auswählen",
+            "State will be saved as its abbreviation.": "Das Bundesland wird als Abkürzung gespeichert.",
+            "State / Province / Region": "Bundesland / Provinz / Region",
+            "Enter state, province, or region": "Bundesland, Provinz oder Region eingeben",
+            "For non-U.S. countries, enter the region, province, or state if applicable.": "Für Länder außerhalb der USA geben Sie Region, Provinz oder Bundesland an, falls zutreffend.",
+            "City": "Stadt",
+            "Street": "Straße",
+            "School": "Schule",
+            "Select school": "Schule auswählen",
+            "Other": "Andere",
+            "Choose Other to manually enter a school not listed.": "Wählen Sie Andere, um eine nicht aufgeführte Schule manuell einzugeben.",
+            "Enter school name": "Schulnamen eingeben",
+            "League": "Liga",
+            "Select league": "Liga auswählen",
+            "League is selected independently and is not tied to club selection.": "Die Liga wird unabhängig ausgewählt und ist nicht an die Vereinauswahl gebunden.",
+            "Enter new league name": "Neuen Liganamen eingeben",
+            "Club": "Verein",
+            "Select club": "Verein auswählen",
+            "Choose Other to manually enter a club not listed.": "Wählen Sie Andere, um einen nicht aufgeführten Verein manuell einzugeben.",
+            "Team": "Team",
+            "New Club Name": "Neuer Vereinsname",
+            "Enter new club name": "Neuen Vereinsnamen eingeben",
+            "Parent / Guardian Information": "Informationen zu Eltern / Erziehungsberechtigten",
+            "Primary Parent / Guardian": "Hauptelternteil / Erziehungsberechtigter",
+            "Primary Parent Email": "E-Mail des Haupterziehungsberechtigten",
+            "Primary Parent Phone": "Telefon des Haupterziehungsberechtigten",
+            "Secondary Parent / Guardian": "Zweiter Elternteil / Erziehungsberechtigter",
+            "Secondary Parent Email": "E-Mail des zweiten Erziehungsberechtigten",
+            "Secondary Parent Phone": "Telefon des zweiten Erziehungsberechtigten",
+            "Coaches & Trainers": "Trainer und Coaches",
+            "Club Coach": "Vereinstrainer",
+            "Club Coach Email": "E-Mail des Vereinstrainers",
+            "Club Coach Phone": "Telefon des Vereinstrainers",
+            "National Coach": "Nationaltrainer",
+            "National Coach Email": "E-Mail des Nationaltrainers",
+            "National Coach Phone": "Telefon des Nationaltrainers",
+            "Technical Trainer": "Techniktrainer",
+            "Technical Trainer Email": "E-Mail des Techniktrainers",
+            "Technical Trainer Phone": "Telefon des Techniktrainers",
+            "Strength & Conditioning Trainer": "Kraft- und Konditionstrainer",
+            "S&C Trainer Email": "E-Mail des Kraft- und Konditionstrainers",
+            "S&C Trainer Phone": "Telefon des Kraft- und Konditionstrainers",
+            "Images": "Bilder",
+            "Player Card Image": "Spielerkarte-Bild",
+            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Laden Sie ein PNG-Spielerkarte-Bild hoch. Transparenter Hintergrund bevorzugt. Max. 5 MB.",
+            "Player Image": "Spielerbild",
+            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Laden Sie ein PNG-Einzelbild des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB.",
+            "Mobile View Image": "Bild für mobile Ansicht",
+            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Laden Sie ein PNG-Mobil-Hero-Bild für die Anzeige auf dem Handy auf Ihrer Website hoch. Vertikaler Zuschnitt empfohlen. Max. 5 MB.",
+            "YouTube Thumbnail / Social Image": "YouTube-Miniatur / Social-Bild",
+            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Laden Sie das Bild hoch, das als Highlights-Miniatur, Website-Social-Bild und SEO-Vorschaubild verwendet wird. JPG, PNG oder WEBP. Max. 5 MB.",
+            "Logos": "Logos",
+            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Laden Sie das Logo-Bild hoch, das im Footer oder Logo-Bereich der Website verwendet wird. JPG, PNG oder WEBP. Max. 5 MB.",
+            "Submit Intake Form": "Anmeldeformular absenden",
+            "Please fix the following:": "Bitte korrigieren Sie Folgendes:"
+        },
+        it: {
+            "Intake": "Registrazione",
+            "Form": "Modulo",
+            "This form will translate automatically based on detected region.": "Questo modulo verrà tradotto automaticamente in base alla regione rilevata.",
+            "Athlete Details": "Dettagli dell’atleta",
+            "First Name": "Nome",
+            "Middle Name": "Secondo nome",
+            "Last Name": "Cognome",
+            "Gender": "Genere",
+            "Select gender": "Seleziona genere",
+            "Personal Email": "Email personale",
+            "The email will be generated automatically.": "L’email verrà generata automaticamente.",
+            "Phone": "Telefono",
+            "Use the athlete’s direct phone if available.": "Usa il telefono diretto dell’atleta se disponibile.",
+            "Birth Date": "Data di nascita",
+            "Graduation Year": "Anno di diploma",
+            "Sport": "Sport",
+            "Select sport": "Seleziona sport",
+            "Currently available: Basketball and Soccer only.": "Attualmente disponibili: solo basket e calcio.",
+            "Jersey Number": "Numero di maglia",
+            "Vertical Jump": "Salto verticale",
+            "GPA": "Media scolastica",
+            "Height": "Altezza",
+            "Weight": "Peso",
+            "Max Speed": "Velocità massima",
+            "Position": "Posizione",
+            "Only positions for the selected sport will be shown.": "Saranno mostrate solo le posizioni dello sport selezionato.",
+            "National Team Experience": "Esperienza in nazionale",
+            "Select one": "Seleziona una voce",
+            "Yes": "Sì",
+            "No": "No",
+            "Instagram Profile URL": "URL del profilo Instagram",
+            "X Profile URL": "URL del profilo X",
+            "YouTube Channel URL": "URL del canale YouTube",
+            "Featured Video URL": "URL del video in evidenza",
+            "Highlight Videos": "Video highlights",
+            "Pick My Own Videos": "Scegli i miei video",
+            "Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.": "Attiva questa opzione se vuoi aggiungere manualmente gli URL dei tuoi video highlight riga per riga. Lascia disattivato per usare l’URL del canale YouTube sopra.",
+            "Highlight Video URLs": "URL dei video highlights",
+            "One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.": "Un URL video completo per riga. Lascia vuoto se vuoi che il sistema usi l’URL del tuo canale YouTube.",
+            "Player Bio": "Biografia del giocatore",
+            "This will be used in the website bio/about section.": "Questo verrà usato nella sezione biografia/informazioni del sito.",
+            "Academic Accolades": "Riconoscimenti accademici",
+            "Sports Accolades": "Riconoscimenti sportivi",
+            "Enter one accolade per line.": "Inserisci un riconoscimento per riga.",
+            "Press / Notes": "Stampa / Note",
+            "Location, School, League & Club": "Località, scuola, lega e club",
+            "Country": "Paese",
+            "Select country": "Seleziona paese",
+            "Country Name": "Nome del paese",
+            "Enter country name": "Inserisci nome del paese",
+            "State": "Stato",
+            "Select state": "Seleziona stato",
+            "State will be saved as its abbreviation.": "Lo stato verrà salvato come abbreviazione.",
+            "State / Province / Region": "Stato / Provincia / Regione",
+            "Enter state, province, or region": "Inserisci stato, provincia o regione",
+            "For non-U.S. countries, enter the region, province, or state if applicable.": "Per i paesi non USA, inserisci la regione, provincia o stato se applicabile.",
+            "City": "Città",
+            "Street": "Via",
+            "School": "Scuola",
+            "Select school": "Seleziona scuola",
+            "Other": "Altro",
+            "Choose Other to manually enter a school not listed.": "Scegli Altro per inserire manualmente una scuola non presente nell’elenco.",
+            "Enter school name": "Inserisci nome della scuola",
+            "League": "Lega",
+            "Select league": "Seleziona lega",
+            "League is selected independently and is not tied to club selection.": "La lega è selezionata in modo indipendente e non è collegata alla selezione del club.",
+            "Enter new league name": "Inserisci nuovo nome della lega",
+            "Club": "Club",
+            "Select club": "Seleziona club",
+            "Choose Other to manually enter a club not listed.": "Scegli Altro per inserire manualmente un club non presente nell’elenco.",
+            "Team": "Squadra",
+            "New Club Name": "Nuovo nome del club",
+            "Enter new club name": "Inserisci nuovo nome del club",
+            "Parent / Guardian Information": "Informazioni genitore / tutore",
+            "Primary Parent / Guardian": "Genitore / tutore principale",
+            "Primary Parent Email": "Email del genitore principale",
+            "Primary Parent Phone": "Telefono del genitore principale",
+            "Secondary Parent / Guardian": "Genitore / tutore secondario",
+            "Secondary Parent Email": "Email del genitore secondario",
+            "Secondary Parent Phone": "Telefono del genitore secondario",
+            "Coaches & Trainers": "Allenatori e preparatori",
+            "Club Coach": "Allenatore del club",
+            "Club Coach Email": "Email dell’allenatore del club",
+            "Club Coach Phone": "Telefono dell’allenatore del club",
+            "National Coach": "Allenatore nazionale",
+            "National Coach Email": "Email dell’allenatore nazionale",
+            "National Coach Phone": "Telefono dell’allenatore nazionale",
+            "Technical Trainer": "Preparatore tecnico",
+            "Technical Trainer Email": "Email del preparatore tecnico",
+            "Technical Trainer Phone": "Telefono del preparatore tecnico",
+            "Strength & Conditioning Trainer": "Preparatore atletico",
+            "S&C Trainer Email": "Email del preparatore atletico",
+            "S&C Trainer Phone": "Telefono del preparatore atletico",
+            "Images": "Immagini",
+            "Player Card Image": "Immagine della card giocatore",
+            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Carica un’immagine PNG della card giocatore. Sfondo trasparente preferito. Max 5 MB.",
+            "Player Image": "Immagine del giocatore",
+            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Carica un’immagine PNG del solo giocatore ritagliata dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB.",
+            "Mobile View Image": "Immagine vista mobile",
+            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Carica un’immagine hero PNG per mobile da mostrare sui telefoni nel tuo sito. Si consiglia un ritaglio verticale. Max 5 MB.",
+            "YouTube Thumbnail / Social Image": "Miniatura YouTube / Immagine social",
+            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Carica l’immagine usata come miniatura highlights, immagine social del sito e anteprima SEO. JPG, PNG o WEBP. Max 5 MB.",
+            "Logos": "Loghi",
+            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Carica l’immagine dei loghi usata nel footer o nell’area logo del sito. JPG, PNG o WEBP. Max 5 MB.",
+            "Submit Intake Form": "Invia modulo di registrazione",
+            "Please fix the following:": "Correggi quanto segue:"
+        },
+        nl: {
+            "Intake": "Inschrijving",
+            "Form": "Formulier",
+            "This form will translate automatically based on detected region.": "Dit formulier wordt automatisch vertaald op basis van de gedetecteerde regio.",
+            "Athlete Details": "Gegevens van de atleet",
+            "First Name": "Voornaam",
+            "Middle Name": "Tweede naam",
+            "Last Name": "Achternaam",
+            "Gender": "Geslacht",
+            "Select gender": "Selecteer geslacht",
+            "Personal Email": "Persoonlijke e-mail",
+            "The email will be generated automatically.": "De e-mail wordt automatisch gegenereerd.",
+            "Phone": "Telefoon",
+            "Use the athlete’s direct phone if available.": "Gebruik het directe telefoonnummer van de atleet indien beschikbaar.",
+            "Birth Date": "Geboortedatum",
+            "Graduation Year": "Afstudeerjaar",
+            "Sport": "Sport",
+            "Select sport": "Selecteer sport",
+            "Currently available: Basketball and Soccer only.": "Momenteel beschikbaar: alleen basketbal en voetbal.",
+            "Jersey Number": "Rugnummer",
+            "Vertical Jump": "Verticale sprong",
+            "GPA": "Gemiddeld cijfer",
+            "Height": "Lengte",
+            "Weight": "Gewicht",
+            "Max Speed": "Maximale snelheid",
+            "Position": "Positie",
+            "Only positions for the selected sport will be shown.": "Alleen posities voor de geselecteerde sport worden getoond.",
+            "National Team Experience": "Ervaring in het nationale team",
+            "Select one": "Selecteer één",
+            "Yes": "Ja",
+            "No": "Nee",
+            "Instagram Profile URL": "Instagram-profiel-URL",
+            "X Profile URL": "X-profiel-URL",
+            "YouTube Channel URL": "YouTube-kanaal-URL",
+            "Featured Video URL": "Uitgelichte video-URL",
+            "Highlight Videos": "Highlight-video’s",
+            "Pick My Own Videos": "Mijn eigen video’s kiezen",
+            "Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.": "Zet dit aan als je handmatig je highlight-video-URL’s regel voor regel wilt toevoegen. Laat het uit om de YouTube-kanaal-URL hierboven te gebruiken.",
+            "Highlight Video URLs": "Highlight-video-URL’s",
+            "One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.": "Eén volledige video-URL per regel. Laat dit leeg als je wilt dat het systeem in plaats daarvan je YouTube-kanaal-URL gebruikt.",
+            "Player Bio": "Spelersbio",
+            "This will be used in the website bio/about section.": "Dit wordt gebruikt in de bio-/over-sectie van de website.",
+            "Academic Accolades": "Academische onderscheidingen",
+            "Sports Accolades": "Sportieve onderscheidingen",
+            "Enter one accolade per line.": "Voer één onderscheiding per regel in.",
+            "Press / Notes": "Pers / Notities",
+            "Location, School, League & Club": "Locatie, school, competitie en club",
+            "Country": "Land",
+            "Select country": "Selecteer land",
+            "Country Name": "Naam van land",
+            "Enter country name": "Voer landnaam in",
+            "State": "Staat",
+            "Select state": "Selecteer staat",
+            "State will be saved as its abbreviation.": "De staat wordt opgeslagen als afkorting.",
+            "State / Province / Region": "Staat / Provincie / Regio",
+            "Enter state, province, or region": "Voer staat, provincie of regio in",
+            "For non-U.S. countries, enter the region, province, or state if applicable.": "Voor niet-Amerikaanse landen voer je de regio, provincie of staat in indien van toepassing.",
+            "City": "Stad",
+            "Street": "Straat",
+            "School": "School",
+            "Select school": "Selecteer school",
+            "Other": "Anders",
+            "Choose Other to manually enter a school not listed.": "Kies Anders om handmatig een school in te voeren die niet in de lijst staat.",
+            "Enter school name": "Voer schoolnaam in",
+            "League": "Competitie",
+            "Select league": "Selecteer competitie",
+            "League is selected independently and is not tied to club selection.": "De competitie wordt onafhankelijk geselecteerd en is niet gekoppeld aan de clubkeuze.",
+            "Enter new league name": "Voer nieuwe competitienaam in",
+            "Club": "Club",
+            "Select club": "Selecteer club",
+            "Choose Other to manually enter a club not listed.": "Kies Anders om handmatig een club in te voeren die niet in de lijst staat.",
+            "Team": "Team",
+            "New Club Name": "Nieuwe clubnaam",
+            "Enter new club name": "Voer nieuwe clubnaam in",
+            "Parent / Guardian Information": "Informatie ouder / voogd",
+            "Primary Parent / Guardian": "Primaire ouder / voogd",
+            "Primary Parent Email": "E-mail primaire ouder",
+            "Primary Parent Phone": "Telefoon primaire ouder",
+            "Secondary Parent / Guardian": "Secundaire ouder / voogd",
+            "Secondary Parent Email": "E-mail secundaire ouder",
+            "Secondary Parent Phone": "Telefoon secundaire ouder",
+            "Coaches & Trainers": "Coaches en trainers",
+            "Club Coach": "Clubcoach",
+            "Club Coach Email": "E-mail clubcoach",
+            "Club Coach Phone": "Telefoon clubcoach",
+            "National Coach": "Nationale coach",
+            "National Coach Email": "E-mail nationale coach",
+            "National Coach Phone": "Telefoon nationale coach",
+            "Technical Trainer": "Technische trainer",
+            "Technical Trainer Email": "E-mail technische trainer",
+            "Technical Trainer Phone": "Telefoon technische trainer",
+            "Strength & Conditioning Trainer": "Kracht- en conditietrainer",
+            "S&C Trainer Email": "E-mail kracht- en conditietrainer",
+            "S&C Trainer Phone": "Telefoon kracht- en conditietrainer",
+            "Images": "Afbeeldingen",
+            "Player Card Image": "Spelerskaart-afbeelding",
+            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Upload een PNG-spelerskaartafbeelding. Transparante achtergrond heeft de voorkeur. Max 5 MB.",
+            "Player Image": "Spelersafbeelding",
+            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Upload een PNG-afbeelding van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Max 5 MB.",
+            "Mobile View Image": "Afbeelding mobiele weergave",
+            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Upload een PNG mobiele hero-afbeelding voor weergave op telefoons op je website. Een verticale uitsnede wordt aanbevolen. Max 5 MB.",
+            "YouTube Thumbnail / Social Image": "YouTube-miniatuur / Sociale afbeelding",
+            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Upload de afbeelding die wordt gebruikt als highlights-miniatuur, sociale website-afbeelding en SEO-voorbeeldafbeelding. JPG, PNG of WEBP. Max 5 MB.",
+            "Logos": "Logo’s",
+            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Upload de logo-afbeelding die wordt gebruikt in de footer of het logogebied van de website. JPG, PNG of WEBP. Max 5 MB.",
+            "Submit Intake Form": "Inschrijfformulier verzenden",
+            "Please fix the following:": "Corrigeer het volgende:"
+        }
+    };
+
+    function translateExactText(text, lang) {
+        const dict = phraseTranslations[lang];
+        if (!dict) return text;
+
+        const trimmed = text.trim();
+        if (!trimmed) return text;
+
+        if (dict[trimmed]) {
+            return text.replace(trimmed, dict[trimmed]);
+        }
+
+        return text;
+    }
+
+    function shouldSkipNode(node) {
+        if (!node || !node.parentElement) return true;
+
+        const parent = node.parentElement;
+
+        if (
+            parent.closest('[translate="no"]') ||
+            parent.closest('script') ||
+            parent.closest('style')
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function translateTextNodes(lang) {
+        if (!lang || lang === 'en' || !phraseTranslations[lang]) {
+            document.documentElement.setAttribute('lang', 'en');
+            return;
+        }
+
+        document.documentElement.setAttribute('lang', lang);
+
+        const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            null
+        );
+
+        const textNodes = [];
+
+        while (walker.nextNode()) {
+            textNodes.push(walker.currentNode);
+        }
+
+        textNodes.forEach((node) => {
+            if (shouldSkipNode(node)) return;
+
+            const original = node.nodeValue;
+            const translated = translateExactText(original, lang);
+
+            if (translated !== original) {
+                node.nodeValue = translated;
+            }
+        });
+
+        document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach((el) => {
+            if (el.closest('[translate="no"]')) return;
+
+            const original = el.getAttribute('placeholder');
+            if (!original) return;
+
+            const translated = translateExactText(original, lang);
+            if (translated !== original) {
+                el.setAttribute('placeholder', translated);
+            }
+        });
+    }
 
     function renderPositions() {
         const sportSelect = document.getElementById('sport');
@@ -1226,29 +1855,23 @@
         clubOtherSection.style.display = clubSelect.value === '__other__' ? 'block' : 'none';
     }
 
-    function updateImageInstructions() {
+function updateImageInstructions() {
         const sport = document.getElementById('sport').value;
-        const playerCardHint = document.getElementById('player_card_hint');
         const playerImageHint = document.getElementById('player_image_hint');
-        const mobileViewHint = document.getElementById('mobile_view_hint');
+
+        if (!playerImageHint) return;
 
         if (sport === 'soccer') {
-            playerCardHint.textContent = 'Upload a PNG soccer player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
-            playerImageHint.textContent = 'Upload a PNG solo soccer player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
-            mobileViewHint.textContent = 'Upload a PNG soccer mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+            playerImageHint.textContent = 'Upload up to 20 PNG solo soccer player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.';
             return;
         }
 
         if (sport === 'basketball') {
-            playerCardHint.textContent = 'Upload a PNG basketball player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
-            playerImageHint.textContent = 'Upload a PNG solo basketball player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
-            mobileViewHint.textContent = 'Upload a PNG basketball mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+            playerImageHint.textContent = 'Upload up to 20 PNG solo basketball player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.';
             return;
         }
 
-        playerCardHint.textContent = 'Upload a PNG player card image. Recommended portrait layout. Transparent background preferred. Max 5MB.';
-        playerImageHint.textContent = 'Upload a PNG solo player image cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB.';
-        mobileViewHint.textContent = 'Upload a PNG mobile hero image for phone display. Vertical-friendly crop recommended. Max 5MB.';
+        playerImageHint.textContent = 'Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.';
     }
 
     function toggleCustomHighlights() {
@@ -1308,30 +1931,38 @@
         }
     }
 
-    document.getElementById('sport').addEventListener('change', () => {
-        renderPositions();
-        updateImageInstructions();
-    });
+    document.addEventListener('DOMContentLoaded', () => {
+        const lang = getTargetLanguage();
 
-    document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
-    document.getElementById('league_id').addEventListener('change', toggleLeagueOther);
-    document.getElementById('club_id').addEventListener('change', toggleClubOther);
-    document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
-    document.getElementById('country').addEventListener('change', () => {
+        renderPositions();
+        toggleSchoolOther();
+        toggleLeagueOther();
+        toggleClubOther();
+        updateImageInstructions();
+        toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
-    });
-    document.getElementById('state_us').addEventListener('change', syncStateValue);
-    document.getElementById('state_international').addEventListener('input', syncStateValue);
 
-    renderPositions();
-    toggleSchoolOther();
-    toggleLeagueOther();
-    toggleClubOther();
-    updateImageInstructions();
-    toggleCustomHighlights();
-    toggleCountryFields();
-    syncStateValue();
+        translateTextNodes(lang);
+
+        document.getElementById('sport').addEventListener('change', () => {
+            renderPositions();
+            updateImageInstructions();
+            translateTextNodes(lang);
+        });
+
+        document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
+        document.getElementById('league_id').addEventListener('change', toggleLeagueOther);
+        document.getElementById('club_id').addEventListener('change', toggleClubOther);
+        document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
+        document.getElementById('country').addEventListener('change', () => {
+            toggleCountryFields();
+            syncStateValue();
+            translateTextNodes(lang);
+        });
+        document.getElementById('state_us').addEventListener('change', syncStateValue);
+        document.getElementById('state_international').addEventListener('input', syncStateValue);
+    });
 </script>
 </body>
 </html>

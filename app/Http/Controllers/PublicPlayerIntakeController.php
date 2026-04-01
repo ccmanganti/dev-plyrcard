@@ -147,7 +147,7 @@ class PublicPlayerIntakeController extends Controller
         'coed' => 'Coed',
     ];
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $schools = School::query()
             ->orderBy('name')
@@ -251,6 +251,8 @@ class PublicPlayerIntakeController extends Controller
             '__other__' => 'Other',
         ];
 
+        $detectedCountry = $this->detectCountryCode($request);
+
         return view('public.player-intake', [
             'schools' => $schools,
             'clubs' => $clubs,
@@ -259,7 +261,19 @@ class PublicPlayerIntakeController extends Controller
             'countryOptions' => $countryOptions,
             'sportPositions' => $this->sportPositions,
             'genderOptions' => $this->genderOptions,
+            'detectedCountry' => $detectedCountry,
         ]);
+    }
+
+    protected function detectCountryCode(Request $request): string
+    {
+        $country = strtoupper((string) $request->header('CF-IPCountry', ''));
+
+        if (preg_match('/^[A-Z]{2}$/', $country)) {
+            return $country;
+        }
+
+        return 'US';
     }
 
     public function store(Request $request): RedirectResponse
@@ -329,11 +343,8 @@ class PublicPlayerIntakeController extends Controller
             'club_id' => ['nullable', 'string'],
             'club_other' => ['nullable', 'string', 'max:255'],
 
-            'player_card_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
-            'player_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
-            'mobile_view_image' => ['nullable', 'image', 'mimes:png', 'max:5120'],
-            'youtube_thumbnail' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'logos_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+            'player_image' => ['nullable', 'array', 'max:20'],
+            'player_image.*' => ['image', 'mimes:png', 'max:5120'],
 
             'player_bio' => ['nullable', 'string'],
             'featured_video_url' => ['nullable', 'url', 'max:500'],
@@ -465,24 +476,8 @@ class PublicPlayerIntakeController extends Controller
 
             $userImageUploads = $this->storeUserImageUploads($request);
 
-            if (! empty($userImageUploads['plyrcard_image'])) {
-                $user->plyrcard_image = $userImageUploads['plyrcard_image'];
-            }
-
-            if (! empty($userImageUploads['player_image'])) {
-                $user->player_image = $userImageUploads['player_image'];
-            }
-
-            if (! empty($userImageUploads['mobile_hero_image'])) {
-                $user->mobile_hero_image = $userImageUploads['mobile_hero_image'];
-            }
-
-            if (! empty($userImageUploads['youtube_thumbnail'])) {
-                $user->youtube_thumbnail = $userImageUploads['youtube_thumbnail'];
-            }
-
-            if (! empty($userImageUploads['logos_image'])) {
-                $user->logos_image = $userImageUploads['logos_image'];
+            if (! empty($userImageUploads['raw_player_images'])) {
+                $user->raw_player_images = $userImageUploads['raw_player_images'];
             }
 
             $user->save();
@@ -751,23 +746,17 @@ class PublicPlayerIntakeController extends Controller
 
     protected function storeUserImageUploads(Request $request): array
     {
-        $map = [
-            'player_card_image' => 'plyrcard_image',
-            'player_image' => 'player_image',
-            'mobile_view_image' => 'mobile_hero_image',
-            'youtube_thumbnail' => 'youtube_thumbnail',
-            'logos_image' => 'logos_image',
-        ];
-
         $paths = [];
 
-        foreach ($map as $requestField => $userColumn) {
-            if ($request->hasFile($requestField)) {
-                $paths[$userColumn] = $request->file($requestField)->store(
-                    'user-player-images',
-                    'public'
-                );
-            }
+        if ($request->hasFile('player_image')) {
+            $files = array_filter($request->file('player_image') ?? []);
+
+            $paths['raw_player_images'] = collect($files)
+                ->filter(fn ($file) => $file && $file->isValid())
+                ->take(20)
+                ->map(fn ($file) => $file->store('user-player-images', 'public'))
+                ->values()
+                ->all();
         }
 
         return $paths;

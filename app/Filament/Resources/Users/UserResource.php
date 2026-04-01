@@ -442,46 +442,59 @@ class UserResource extends Resource
                         ->nullable(),
                 ]),
 
-            Section::make('Hero Images')
-                ->description('Shared player images used across hero templates.')
-                ->columns(5)
-                ->schema([
-                    FileUpload::make('plyrcard_image')
-                        ->label('PlyrCard Image')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->helperText('Upload the card-style PNG image used across templates.'),
+                Section::make('Hero Images')
+                    ->description('Shared player images used across hero templates.')
+                    ->columns(5)
+                    ->schema([
+                        FileUpload::make('plyrcard_image')
+                            ->label('PlyrCard Image')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('user-player-images')
+                            ->visibility('public')
+                            ->helperText('Upload the card-style PNG image used across templates.'),
 
-                    FileUpload::make('player_image')
-                        ->label('Player Image')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->helperText('Upload the half-body player PNG image used across templates.'),
+                        FileUpload::make('player_image')
+                            ->label('Player Image')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('user-player-images')
+                            ->visibility('public')
+                            ->helperText('Upload the half-body player PNG image used across templates.'),
 
-                    FileUpload::make('mobile_hero_image')
-                        ->label('Vertical Hero Image')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+                        FileUpload::make('mobile_hero_image')
+                            ->label('Vertical Hero Image')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('user-player-images')
+                            ->visibility('public')
+                            ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
 
-                    FileUpload::make('youtube_thumbnail')
-                        ->label('YouTube Thumbnail')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
-                ]),
+                        FileUpload::make('youtube_thumbnail')
+                            ->label('YouTube Thumbnail')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('user-player-images')
+                            ->visibility('public')
+                            ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
+
+                        FileUpload::make('raw_player_images')
+                            ->label('Raw Player Images')
+                            ->image()
+                            ->multiple()
+                            ->reorderable()
+                            ->appendFiles()
+                            ->maxFiles(20)
+                            ->disk('public')
+                            ->directory('user-player-images/raw')
+                            ->visibility('public')
+                            ->columnSpanFull()
+                            ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
+                    ]),
         ]);
     }
 
