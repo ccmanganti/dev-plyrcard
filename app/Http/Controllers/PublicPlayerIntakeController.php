@@ -265,16 +265,26 @@ class PublicPlayerIntakeController extends Controller
         ]);
     }
 
-    protected function detectCountryCode(Request $request): string
-    {
-        $country = strtoupper((string) $request->header('CF-IPCountry', ''));
+        protected function detectCountryCode(Request $request): string
+        {
+            $candidates = [
+                $request->header('CF-IPCountry'),
+                $request->header('CloudFront-Viewer-Country'),
+                $request->header('X-Country-Code'),
+                $request->server('GEOIP_COUNTRY_CODE'),
+                $request->server('HTTP_CF_IPCOUNTRY'),
+            ];
 
-        if (preg_match('/^[A-Z]{2}$/', $country)) {
-            return $country;
+            foreach ($candidates as $country) {
+                $country = strtoupper((string) $country);
+
+                if (preg_match('/^[A-Z]{2}$/', $country)) {
+                    return $country;
+                }
+            }
+
+            return 'US';
         }
-
-        return 'US';
-    }
 
     public function store(Request $request): RedirectResponse
     {
