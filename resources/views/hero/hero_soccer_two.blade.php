@@ -550,43 +550,45 @@
         row-gap: 0.45rem;
     }
 
-    .hero-accolades-list {
-        margin-top: 20px;
-        display: grid;
-        gap: 0.5rem;
-        width: 100%;
-        max-width: 100%;
-        overflow: hidden;
-    }
+.hero-accolades-list {
+    margin-top: 20px;
+    display: grid;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
 
-    .hero-accolade-row {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.55rem;
-        width: 100%;
-        max-width: 100%;
-        overflow: hidden;
-    }
+.hero-accolade-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
 
 .hero-accolade-icon-wrap {
     display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
     flex: 0 0 auto;
-    padding-top: 2px;
+    padding-top: 0;
 }
 
 .hero-accolade-icon {
-    width: 34px;
-    height: 34px;
+    width: 42px;
+    height: 42px;
     object-fit: contain;
     display: block;
-    flex: 0 0 34px;
+    flex: 0 0 42px;
 }
 
-    .hero-accolade-icon--trophy {
-        color: {{ $primary }};
-    }
+.hero-accolade-icon--trophy {
+    color: {{ $primary }};
+}
+
 .hero-accolade-text {
     min-width: 0;
     flex: 0 1 100%;
@@ -606,32 +608,15 @@
     -webkit-box-orient: vertical;
     line-clamp: 2;
 }
-    @media (min-width: 768px) {
-        .hero-accolade-row {
-            grid-template-columns: minmax(135px, 185px) minmax(0, 1fr);
-            column-gap: 1.35rem;
-        }
-
-        .hero-accolade-text {
-            font-size: 23px;
-        }
-
-        .hero-accolade-icon {
-            width: 36px;
-            height: 36px;
-            flex-basis: 36px;
-        }
-    }
-
 @media (min-width: 768px) {
     .hero-accolade-text {
         font-size: 23px;
     }
 
     .hero-accolade-icon {
-        width: 36px;
-        height: 36px;
-        flex-basis: 36px;
+        width: 46px;
+        height: 46px;
+        flex-basis: 46px;
     }
 }
 
@@ -641,8 +626,8 @@
     }
 
     .hero-accolade-icon {
-        width: 36px;
-        height: 36px;
+        width: 46px;
+        height: 46px;
     }
 }
 
@@ -652,8 +637,8 @@
     }
 
     .hero-accolade-icon {
-        width: 38px;
-        height: 38px;
+        width: 50px;
+        height: 50px;
     }
 }
 
