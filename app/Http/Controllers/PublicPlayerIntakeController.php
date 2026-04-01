@@ -264,40 +264,26 @@ class PublicPlayerIntakeController extends Controller
             'detectedCountry' => $detectedCountry,
         ]);
     }
+protected function detectCountryCode(Request $request): string
+{
+    try {
+        $ip = $request->ip();
+        $location = geoip()->getLocation($ip);
 
-    protected function detectCountryCode(Request $request): string
-    {
-        $headerCandidates = [
-            $request->header('CF-IPCountry'),
-            $request->server('HTTP_CF_IPCOUNTRY'),
-            $request->header('CloudFront-Viewer-Country'),
-            $request->header('X-Country-Code'),
-            $request->server('GEOIP_COUNTRY_CODE'),
-        ];
-
-        foreach ($headerCandidates as $country) {
-            $country = strtoupper(trim((string) $country));
-
-            if (preg_match('/^[A-Z]{2}$/', $country)) {
-                return $country;
-            }
-        }
-
-        try {
-            $ip = $request->ip();
-            $location = geoip()->getLocation($ip);
-            $countryCode = strtoupper((string) ($location->iso_code ?? ''));
-
-            if (preg_match('/^[A-Z]{2}$/', $countryCode)) {
-                return $countryCode;
-            }
-        } catch (\Throwable $e) {
-            // fail silently for now
-        }
-
-        return '';
+        dd([
+            'ip' => $ip,
+            'location' => $location,
+            'country_code' => $location->iso_code ?? null,
+        ]);
+    } catch (\Throwable $e) {
+        dd([
+            'ip' => $request->ip(),
+            'error' => $e->getMessage(),
+        ]);
     }
 
+    return '';
+}
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
