@@ -775,7 +775,6 @@
             grid-template-columns: minmax(145px, 195px) minmax(0, 1fr);
             column-gap: 1.4rem;
             row-gap: 0.55rem;
-            margin-top:-80px;
         }
 
         .hero-accolade-text {
