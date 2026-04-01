@@ -266,20 +266,32 @@ class PublicPlayerIntakeController extends Controller
     }
 protected function detectCountryCode(Request $request): string
 {
+    $headerCandidates = [
+        $request->header('CF-IPCountry'),
+        $request->server('HTTP_CF_IPCOUNTRY'),
+        $request->header('CloudFront-Viewer-Country'),
+        $request->header('X-Country-Code'),
+        $request->server('GEOIP_COUNTRY_CODE'),
+    ];
+
+    foreach ($headerCandidates as $country) {
+        $country = strtoupper(trim((string) $country));
+
+        if (preg_match('/^[A-Z]{2}$/', $country)) {
+            return $country;
+        }
+    }
+
     try {
         $ip = $request->ip();
         $location = geoip()->getLocation($ip);
+        $countryCode = strtoupper(trim((string) ($location->iso_code ?? '')));
 
-        dd([
-            'ip' => $ip,
-            'location' => $location,
-            'country_code' => $location->iso_code ?? null,
-        ]);
+        if (preg_match('/^[A-Z]{2}$/', $countryCode)) {
+            return $countryCode;
+        }
     } catch (\Throwable $e) {
-        dd([
-            'ip' => $request->ip(),
-            'error' => $e->getMessage(),
-        ]);
+        // Fail silently and fall back below.
     }
 
     return '';
