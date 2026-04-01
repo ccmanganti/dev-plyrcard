@@ -595,7 +595,7 @@
     font-weight: 300;
     font-size: 18px;
     line-height: 1.03;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #fff;
     overflow: hidden;
