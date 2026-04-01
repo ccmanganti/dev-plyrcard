@@ -578,11 +578,11 @@
 }
 
 .hero-accolade-icon {
-    width: 42px;
-    height: 42px;
+    width: 52px;
+    height: 52px;
     object-fit: contain;
     display: block;
-    flex: 0 0 42px;
+    flex: 0 0 52px;
 }
 
 .hero-accolade-icon--trophy {
@@ -614,9 +614,9 @@
     }
 
     .hero-accolade-icon {
-        width: 46px;
-        height: 46px;
-        flex-basis: 46px;
+        width: 56px;
+        height: 56px;
+        flex-basis: 56px;
     }
 }
 
@@ -626,8 +626,9 @@
     }
 
     .hero-accolade-icon {
-        width: 46px;
-        height: 46px;
+        width: 58px;
+        height: 58px;
+        flex-basis: 58px;
     }
 }
 
@@ -637,8 +638,9 @@
     }
 
     .hero-accolade-icon {
-        width: 50px;
-        height: 50px;
+        width: 80px;
+        height: 80px;
+        flex-basis: 80px;
     }
 }
 
