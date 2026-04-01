@@ -591,7 +591,7 @@
     flex: 1 1 auto;
     max-width: 100%;
     font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-    font-weight: 300;
+    font-weight: 100;
     font-size: 18px;
     line-height: 1.03;
     letter-spacing: 0.01em;
