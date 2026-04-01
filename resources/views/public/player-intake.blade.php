@@ -536,6 +536,10 @@
                 Use this form to build your <span translate="no">PLYRCard</span> Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
             </p>
             <p class="hint">This form will translate automatically based on detected region.</p>
+            <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:#111;color:#fff;font-size:13px;line-height:1.5;">
+                <div><strong>Detected country from server:</strong> {{ $detectedCountry ?: '(empty)' }}</div>
+                <div id="translation-debug"><strong>JS language:</strong> waiting...</div>
+            </div>
         </div>
 
         <div class="content">
@@ -1143,65 +1147,53 @@
     const oldPositions = @json(old('position', []));
     const enabledSports = ['basketball', 'soccer'];
 
-    // Hidden test override. Leave as null for real detection.
-    // For testing, set for example: 'FR', 'DE', 'ES', 'IT', 'NL', 'PT', 'US'
     const REGION_TEST_OVERRIDE = null;
     const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
 
-function mapCountryToLanguage(countryCode) {
-    const countryToLanguage = {
-        FR: 'fr',
-        BE: 'fr',
-        CH: 'fr',
-        DE: 'de',
-        AT: 'de',
-        ES: 'es',
-        IT: 'it',
-        NL: 'nl',
-        PT: 'pt',
-    };
-
-    return countryToLanguage[countryCode] || null;
-}
-
-function mapBrowserLanguageToSupportedLanguage(browserLang) {
-    const lang = String(browserLang || '').toLowerCase();
-
-    if (lang.startsWith('fr')) return 'fr';
-    if (lang.startsWith('de')) return 'de';
-    if (lang.startsWith('es')) return 'es';
-    if (lang.startsWith('it')) return 'it';
-    if (lang.startsWith('nl')) return 'nl';
-
-    return 'en';
-}
-
-function getTargetLanguage() {
-    if (REGION_TEST_OVERRIDE) {
-        const overrideCountry = String(REGION_TEST_OVERRIDE).toUpperCase();
-        return mapCountryToLanguage(overrideCountry) || 'en';
-    }
-
-    if (DETECTED_COUNTRY_FROM_SERVER) {
-        const serverCountry = String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
-        const langFromCountry = mapCountryToLanguage(serverCountry);
-
-        if (langFromCountry) {
-            return langFromCountry;
+    function getCountryCode() {
+        if (REGION_TEST_OVERRIDE) {
+            return String(REGION_TEST_OVERRIDE).toUpperCase();
         }
+
+        if (DETECTED_COUNTRY_FROM_SERVER) {
+            return String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
+        }
+
+        return '';
     }
 
-    const browserLanguage =
-        (navigator.languages && navigator.languages[0]) ||
-        navigator.language ||
-        navigator.userLanguage ||
-        'en';
+    function mapCountryToLanguage(countryCode) {
+        const countryToLanguage = {
+            FR: 'fr',
+            BE: 'fr',
+            CH: 'fr',
+            DE: 'de',
+            AT: 'de',
+            ES: 'es',
+            IT: 'it',
+            NL: 'nl',
+            PT: 'pt',
+        };
 
-    return mapBrowserLanguageToSupportedLanguage(browserLanguage);
-}
+        return countryToLanguage[countryCode] || 'en';
+    }
 
     function getTargetLanguage() {
-        return mapCountryToLanguage(getCountryCode());
+        const countryCode = getCountryCode();
+        const language = mapCountryToLanguage(countryCode);
+
+        console.log('DETECTED_COUNTRY_FROM_SERVER:', DETECTED_COUNTRY_FROM_SERVER);
+        console.log('countryCode:', countryCode);
+        console.log('language:', language);
+
+        const debugEl = document.getElementById('translation-debug');
+        if (debugEl) {
+            debugEl.innerHTML =
+                '<strong>JS language:</strong> ' + language +
+                ' &nbsp;|&nbsp; <strong>JS country:</strong> ' + (countryCode || '(empty)');
+        }
+
+        return language;
     }
 
     const phraseTranslations = {
@@ -1216,7 +1208,7 @@ function getTargetLanguage() {
             "Gender": "Género",
             "Select gender": "Seleccionar género",
             "Personal Email": "Correo electrónico personal",
-            "The email will be generated automatically.": "El correo se generará automáticamente.",
+            "The PlyrCard email will be generated automatically.": "El correo de PlyrCard se generará automáticamente.",
             "Phone": "Teléfono",
             "Use the athlete’s direct phone if available.": "Use el teléfono directo del atleta si está disponible.",
             "Birth Date": "Fecha de nacimiento",
@@ -1300,16 +1292,8 @@ function getTargetLanguage() {
             "S&C Trainer Email": "Correo del entrenador de fuerza y acondicionamiento",
             "S&C Trainer Phone": "Teléfono del entrenador de fuerza y acondicionamiento",
             "Images": "Imágenes",
-            "Player Card Image": "Imagen de tarjeta del jugador",
-            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Sube una imagen PNG de tarjeta del jugador. Se prefiere fondo transparente. Máx. 5 MB.",
-            "Player Image": "Imagen del jugador",
-            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Sube una imagen PNG del jugador recortada de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máx. 5 MB.",
-            "Mobile View Image": "Imagen para vista móvil",
-            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Sube una imagen PNG principal para móvil para mostrar en teléfonos en tu sitio web. Se recomienda recorte vertical. Máx. 5 MB.",
-            "YouTube Thumbnail / Social Image": "Miniatura de YouTube / Imagen social",
-            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Sube la imagen usada como miniatura de destacados, imagen social del sitio y vista previa SEO. JPG, PNG o WEBP. Máx. 5 MB.",
-            "Logos": "Logotipos",
-            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Sube la imagen de logotipos usada en el pie de página o en el área de logotipo del sitio. JPG, PNG o WEBP. Máx. 5 MB.",
+            "Raw Player Images": "Imágenes sin procesar del jugador",
+            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Sube hasta 20 imágenes PNG del jugador, recortadas de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.",
             "Submit Intake Form": "Enviar formulario de ingreso",
             "Please fix the following:": "Corrige lo siguiente:"
         },
@@ -1324,7 +1308,7 @@ function getTargetLanguage() {
             "Gender": "Genre",
             "Select gender": "Sélectionner le genre",
             "Personal Email": "E-mail personnel",
-            "The email will be generated automatically.": "L’e-mail sera généré automatiquement.",
+            "The PlyrCard email will be generated automatically.": "L’e-mail PlyrCard sera généré automatiquement.",
             "Phone": "Téléphone",
             "Use the athlete’s direct phone if available.": "Utilisez le téléphone direct de l’athlète s’il est disponible.",
             "Birth Date": "Date de naissance",
@@ -1408,16 +1392,8 @@ function getTargetLanguage() {
             "S&C Trainer Email": "E-mail du préparateur physique",
             "S&C Trainer Phone": "Téléphone du préparateur physique",
             "Images": "Images",
-            "Player Card Image": "Image de carte joueur",
-            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Téléchargez une image PNG de carte joueur. Fond transparent recommandé. Max 5 Mo.",
-            "Player Image": "Image du joueur",
-            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Téléchargez une image PNG du joueur seul recadrée de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo.",
-            "Mobile View Image": "Image pour vue mobile",
-            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Téléchargez une image PNG principale mobile pour l’affichage sur téléphone sur votre site. Recadrage vertical recommandé. Max 5 Mo.",
-            "YouTube Thumbnail / Social Image": "Miniature YouTube / Image sociale",
-            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Téléchargez l’image utilisée comme miniature de highlights, image sociale du site et aperçu SEO. JPG, PNG ou WEBP. Max 5 Mo.",
-            "Logos": "Logos",
-            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Téléchargez l’image des logos utilisée dans le pied de page ou la zone logo du site. JPG, PNG ou WEBP. Max 5 Mo.",
+            "Raw Player Images": "Images brutes du joueur",
+            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Téléchargez jusqu’à 20 images PNG du joueur seul recadrées de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.",
             "Submit Intake Form": "Soumettre le formulaire d’inscription",
             "Please fix the following:": "Veuillez corriger les éléments suivants :"
         },
@@ -1432,7 +1408,7 @@ function getTargetLanguage() {
             "Gender": "Geschlecht",
             "Select gender": "Geschlecht auswählen",
             "Personal Email": "Persönliche E-Mail",
-            "The email will be generated automatically.": "Die E-Mail wird automatisch generiert.",
+            "The PlyrCard email will be generated automatically.": "Die PlyrCard-E-Mail wird automatisch generiert.",
             "Phone": "Telefon",
             "Use the athlete’s direct phone if available.": "Verwenden Sie die direkte Telefonnummer des Athleten, falls verfügbar.",
             "Birth Date": "Geburtsdatum",
@@ -1516,16 +1492,8 @@ function getTargetLanguage() {
             "S&C Trainer Email": "E-Mail des Kraft- und Konditionstrainers",
             "S&C Trainer Phone": "Telefon des Kraft- und Konditionstrainers",
             "Images": "Bilder",
-            "Player Card Image": "Spielerkarte-Bild",
-            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Laden Sie ein PNG-Spielerkarte-Bild hoch. Transparenter Hintergrund bevorzugt. Max. 5 MB.",
-            "Player Image": "Spielerbild",
-            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Laden Sie ein PNG-Einzelbild des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB.",
-            "Mobile View Image": "Bild für mobile Ansicht",
-            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Laden Sie ein PNG-Mobil-Hero-Bild für die Anzeige auf dem Handy auf Ihrer Website hoch. Vertikaler Zuschnitt empfohlen. Max. 5 MB.",
-            "YouTube Thumbnail / Social Image": "YouTube-Miniatur / Social-Bild",
-            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Laden Sie das Bild hoch, das als Highlights-Miniatur, Website-Social-Bild und SEO-Vorschaubild verwendet wird. JPG, PNG oder WEBP. Max. 5 MB.",
-            "Logos": "Logos",
-            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Laden Sie das Logo-Bild hoch, das im Footer oder Logo-Bereich der Website verwendet wird. JPG, PNG oder WEBP. Max. 5 MB.",
+            "Raw Player Images": "Rohe Spielerbilder",
+            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Laden Sie bis zu 20 PNG-Einzelbilder des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.",
             "Submit Intake Form": "Anmeldeformular absenden",
             "Please fix the following:": "Bitte korrigieren Sie Folgendes:"
         },
@@ -1540,7 +1508,7 @@ function getTargetLanguage() {
             "Gender": "Genere",
             "Select gender": "Seleziona genere",
             "Personal Email": "Email personale",
-            "The email will be generated automatically.": "L’email verrà generata automaticamente.",
+            "The PlyrCard email will be generated automatically.": "L’email PlyrCard verrà generata automaticamente.",
             "Phone": "Telefono",
             "Use the athlete’s direct phone if available.": "Usa il telefono diretto dell’atleta se disponibile.",
             "Birth Date": "Data di nascita",
@@ -1624,16 +1592,8 @@ function getTargetLanguage() {
             "S&C Trainer Email": "Email del preparatore atletico",
             "S&C Trainer Phone": "Telefono del preparatore atletico",
             "Images": "Immagini",
-            "Player Card Image": "Immagine della card giocatore",
-            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Carica un’immagine PNG della card giocatore. Sfondo trasparente preferito. Max 5 MB.",
-            "Player Image": "Immagine del giocatore",
-            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Carica un’immagine PNG del solo giocatore ritagliata dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB.",
-            "Mobile View Image": "Immagine vista mobile",
-            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Carica un’immagine hero PNG per mobile da mostrare sui telefoni nel tuo sito. Si consiglia un ritaglio verticale. Max 5 MB.",
-            "YouTube Thumbnail / Social Image": "Miniatura YouTube / Immagine social",
-            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Carica l’immagine usata come miniatura highlights, immagine social del sito e anteprima SEO. JPG, PNG o WEBP. Max 5 MB.",
-            "Logos": "Loghi",
-            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Carica l’immagine dei loghi usata nel footer o nell’area logo del sito. JPG, PNG o WEBP. Max 5 MB.",
+            "Raw Player Images": "Immagini grezze del giocatore",
+            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Carica fino a 20 immagini PNG del giocatore, ritagliate dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.",
             "Submit Intake Form": "Invia modulo di registrazione",
             "Please fix the following:": "Correggi quanto segue:"
         },
@@ -1648,7 +1608,7 @@ function getTargetLanguage() {
             "Gender": "Geslacht",
             "Select gender": "Selecteer geslacht",
             "Personal Email": "Persoonlijke e-mail",
-            "The email will be generated automatically.": "De e-mail wordt automatisch gegenereerd.",
+            "The PlyrCard email will be generated automatically.": "De PlyrCard-e-mail wordt automatisch gegenereerd.",
             "Phone": "Telefoon",
             "Use the athlete’s direct phone if available.": "Gebruik het directe telefoonnummer van de atleet indien beschikbaar.",
             "Birth Date": "Geboortedatum",
@@ -1732,16 +1692,8 @@ function getTargetLanguage() {
             "S&C Trainer Email": "E-mail kracht- en conditietrainer",
             "S&C Trainer Phone": "Telefoon kracht- en conditietrainer",
             "Images": "Afbeeldingen",
-            "Player Card Image": "Spelerskaart-afbeelding",
-            "Upload a PNG player card image. Transparent background preferred. Max 5MB.": "Upload een PNG-spelerskaartafbeelding. Transparante achtergrond heeft de voorkeur. Max 5 MB.",
-            "Player Image": "Spelersafbeelding",
-            "Upload a PNG solo player image cropped from head to belly (half body). Transparent background preferred. Max 5MB.": "Upload een PNG-afbeelding van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Max 5 MB.",
-            "Mobile View Image": "Afbeelding mobiele weergave",
-            "Upload a PNG mobile hero image for phone display on your website. Vertical-friendly crop recommended. Max 5MB.": "Upload een PNG mobiele hero-afbeelding voor weergave op telefoons op je website. Een verticale uitsnede wordt aanbevolen. Max 5 MB.",
-            "YouTube Thumbnail / Social Image": "YouTube-miniatuur / Sociale afbeelding",
-            "Upload the image used as the highlights thumbnail, website social image, and SEO preview image. JPG, PNG, or WEBP. Max 5MB.": "Upload de afbeelding die wordt gebruikt als highlights-miniatuur, sociale website-afbeelding en SEO-voorbeeldafbeelding. JPG, PNG of WEBP. Max 5 MB.",
-            "Logos": "Logo’s",
-            "Upload the logos image used in the footer or logo area of the website. JPG, PNG, or WEBP. Max 5MB.": "Upload de logo-afbeelding die wordt gebruikt in de footer of het logogebied van de website. JPG, PNG of WEBP. Max 5 MB.",
+            "Raw Player Images": "Ruwe spelersafbeeldingen",
+            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Upload tot 20 PNG-afbeeldingen van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.",
             "Submit Intake Form": "Inschrijfformulier verzenden",
             "Please fix the following:": "Corrigeer het volgende:"
         }
@@ -1751,11 +1703,11 @@ function getTargetLanguage() {
         const dict = phraseTranslations[lang];
         if (!dict) return text;
 
-        const trimmed = text.trim();
+        const trimmed = text.trim().replace(/\s+/g, ' ');
         if (!trimmed) return text;
 
         if (dict[trimmed]) {
-            return text.replace(trimmed, dict[trimmed]);
+            return text.replace(text.trim(), dict[trimmed]);
         }
 
         return text;
@@ -1878,23 +1830,58 @@ function getTargetLanguage() {
         clubOtherSection.style.display = clubSelect.value === '__other__' ? 'block' : 'none';
     }
 
-function updateImageInstructions() {
+    function updateImageInstructions(lang) {
         const sport = document.getElementById('sport').value;
         const playerImageHint = document.getElementById('player_image_hint');
 
         if (!playerImageHint) return;
 
+        const translatedHints = {
+            en: {
+                soccer: 'Upload up to 20 PNG solo soccer player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.',
+                basketball: 'Upload up to 20 PNG solo basketball player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.',
+                default: 'Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.',
+            },
+            nl: {
+                soccer: 'Upload tot 20 PNG-afbeeldingen van alleen een voetballer, uitgesneden van de bovenkant van het hoofd tot ongeveer de buikstreek (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
+                basketball: 'Upload tot 20 PNG-afbeeldingen van alleen een basketballer, uitgesneden van de bovenkant van het hoofd tot ongeveer de buikstreek (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
+                default: 'Upload tot 20 PNG-afbeeldingen van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
+            },
+            fr: {
+                soccer: 'Téléchargez jusqu’à 20 images PNG d’un joueur de football seul, recadrées du haut de la tête jusqu’à la zone du ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
+                basketball: 'Téléchargez jusqu’à 20 images PNG d’un basketteur seul, recadrées du haut de la tête jusqu’à la zone du ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
+                default: 'Téléchargez jusqu’à 20 images PNG du joueur seul, recadrées de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
+            },
+            de: {
+                soccer: 'Laden Sie bis zu 20 PNG-Einzelbilder eines Fußballspielers hoch, zugeschnitten vom oberen Kopfbereich bis etwa zum Bauchbereich (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
+                basketball: 'Laden Sie bis zu 20 PNG-Einzelbilder eines Basketballspielers hoch, zugeschnitten vom oberen Kopfbereich bis etwa zum Bauchbereich (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
+                default: 'Laden Sie bis zu 20 PNG-Einzelbilder des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
+            },
+            es: {
+                soccer: 'Sube hasta 20 imágenes PNG de un jugador de fútbol, recortadas desde la parte superior de la cabeza hasta aproximadamente el área del abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
+                basketball: 'Sube hasta 20 imágenes PNG de un jugador de baloncesto, recortadas desde la parte superior de la cabeza hasta aproximadamente el área del abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
+                default: 'Sube hasta 20 imágenes PNG del jugador, recortadas de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
+            },
+            it: {
+                soccer: 'Carica fino a 20 immagini PNG di un calciatore, ritagliate dalla parte superiore della testa fino all’area dello stomaco (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
+                basketball: 'Carica fino a 20 immagini PNG di un giocatore di basket, ritagliate dalla parte superiore della testa fino all’area dello stomaco (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
+                default: 'Carica fino a 20 immagini PNG del giocatore, ritagliate dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
+            },
+        };
+
+        const hints = translatedHints[lang] || translatedHints.en;
+
         if (sport === 'soccer') {
-            playerImageHint.textContent = 'Upload up to 20 PNG solo soccer player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.';
+            playerImageHint.textContent = hints.soccer;
             return;
         }
 
         if (sport === 'basketball') {
-            playerImageHint.textContent = 'Upload up to 20 PNG solo basketball player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.';
+            playerImageHint.textContent = hints.basketball;
             return;
         }
 
-        playerImageHint.textContent = 'Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.';
+        playerImageHint.textContent = hints.default;
     }
 
     function toggleCustomHighlights() {
@@ -1957,20 +1944,25 @@ function updateImageInstructions() {
     document.addEventListener('DOMContentLoaded', () => {
         const lang = getTargetLanguage();
 
+        const accentEl = document.querySelector('.hero-title .accent');
+        if (accentEl) {
+            accentEl.textContent = 'Lang: ' + lang.toUpperCase();
+        }
+
         renderPositions();
         toggleSchoolOther();
         toggleLeagueOther();
         toggleClubOther();
-        updateImageInstructions();
         toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
 
         translateTextNodes(lang);
+        updateImageInstructions(lang);
 
         document.getElementById('sport').addEventListener('change', () => {
             renderPositions();
-            updateImageInstructions();
+            updateImageInstructions(lang);
             translateTextNodes(lang);
         });
 
