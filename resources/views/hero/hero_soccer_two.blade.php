@@ -349,13 +349,10 @@
     $desktopAccolades = collect();
 
     $desktopNationalTeamName = trim((string) ($user?->national_team_name ?? ''));
-    $desktopNationalTeamAccoladeText = $desktopNationalTeamName !== ''
-        ? $desktopNationalTeamName
-        : 'National Team Member';
 
-    if ($user?->natl_team_exp) {
+    if ($user?->natl_team_exp && $desktopNationalTeamName !== '') {
         $desktopAccolades->push([
-            'text' => $desktopNationalTeamAccoladeText,
+            'text' => $desktopNationalTeamName,
             'icon' => filled($mobileNationalLogoUrl) ? $mobileNationalLogoUrl : null,
             'is_national' => true,
         ]);
