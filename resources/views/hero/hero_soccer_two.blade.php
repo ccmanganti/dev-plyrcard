@@ -550,21 +550,23 @@
         row-gap: 0.45rem;
     }
 
-.hero-accolades-list {
-    margin-top: 20px;
-    display: grid;
-    gap: 0.5rem;
-    width: 100%;
-    max-width: 100%;
-}
+    .hero-accolades-list {
+        margin-top: 20px;
+        display: grid;
+        gap: 0.5rem;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
 
-.hero-accolade-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.55rem;
-    width: 100%;
-    max-width: 100%;
-}
+    .hero-accolade-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
 
 .hero-accolade-icon-wrap {
     display: flex;
@@ -582,27 +584,28 @@
     flex: 0 0 34px;
 }
 
-.hero-accolade-icon--trophy {
-    color: {{ $primary }};
-}
+    .hero-accolade-icon--trophy {
+        color: {{ $primary }};
+    }
+    .hero-accolade-text {
+        min-width: 0;
+        flex: 0 1 100%;
+        max-width: 100%;
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-weight: 300;
+        font-size: 18px;
+        line-height: 1.03;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+        color: #fff;
+        overflow: hidden;
+        word-break: break-word;
 
-.hero-accolade-text {
-    min-width: 0;
-    flex: 1 1 auto;
-    max-width: 100%;
-    font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-    font-weight: 100;
-    font-size: 18px;
-    line-height: 1.03;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    color: #fff;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    word-break: break-word;
-}
-
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+    }
     @media (min-width: 768px) {
         .hero-accolade-row {
             grid-template-columns: minmax(135px, 185px) minmax(0, 1fr);
