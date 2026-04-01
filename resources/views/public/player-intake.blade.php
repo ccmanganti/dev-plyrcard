@@ -536,10 +536,6 @@
                 Use this form to build your <span translate="no">PLYRCard</span> Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
             </p>
             <p class="hint">This form will translate automatically based on detected region.</p>
-            <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:#111;color:#fff;font-size:13px;line-height:1.5;">
-                <div><strong>Detected country from server:</strong> {{ $detectedCountry ?: '(empty)' }}</div>
-                <div id="translation-debug"><strong>JS language:</strong> waiting...</div>
-            </div>
         </div>
 
         <div class="content">
@@ -1944,9 +1940,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         const lang = getTargetLanguage();
 
-        const accentEl = document.querySelector('.hero-title .accent');
-        if (accentEl) {
-            accentEl.textContent = 'Lang: ' + lang.toUpperCase();
+        const heroTitle = document.querySelector('.hero-title');
+        if (heroTitle) {
+            heroTitle.innerHTML = '<span translate="no">Player</span> <span class="accent">Intake</span> Form';
         }
 
         renderPositions();
