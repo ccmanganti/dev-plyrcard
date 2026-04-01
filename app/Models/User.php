@@ -38,11 +38,10 @@ class User extends Authenticatable implements HasName, FilamentUser
         'jersey_number',
         'sport',
         'position',
+        'dominant_foot',
         'academic_accolades',
         'sports_accolades',
         'natl_team_exp',
-        'national_team_name',
-        'national_team_logo',
         'team_name',
         'ig_handle',
         'x_handle',
@@ -69,6 +68,7 @@ class User extends Authenticatable implements HasName, FilamentUser
         'school_id',
         'club_id',
         'league_id',
+        'national_team_id',
         'domain',
         'password',
         'plyrcard_image',
@@ -131,6 +131,11 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function getFilamentName(): string
     {
         return trim($this->first_name . ' ' . $this->last_name);
+    }
+
+    public function nationalTeam(): BelongsTo
+    {
+        return $this->belongsTo(NationalTeam::class);
     }
 
     public function school(): BelongsTo

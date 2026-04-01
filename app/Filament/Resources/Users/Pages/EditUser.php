@@ -22,4 +22,9 @@ class EditUser extends EditRecord
             RestoreAction::make(),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return UserResource::mutateUserFormData($data);
+    }
 }

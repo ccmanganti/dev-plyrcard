@@ -6,6 +6,10 @@ use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
+use App\Models\Club;
+use App\Models\League;
+use App\Models\NationalTeam;
+use App\Models\School;
 use App\Models\User;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
@@ -14,7 +18,6 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -27,9 +30,10 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use UnitEnum;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use STS\FilamentImpersonate\Actions\Impersonate;
-use App\Models\League;
+use UnitEnum;
 
 class UserResource extends Resource
 {
@@ -72,6 +76,211 @@ class UserResource extends Resource
         ];
     }
 
+    protected static function getClubOptions(): array
+    {
+        return ['__new__' => 'Add New'] + Club::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    protected static function getLeagueOptions(): array
+    {
+        return ['__new__' => 'Add New'] + League::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    protected static function getNationalTeamOptions(): array
+    {
+        return ['__new__' => 'Add New'] + NationalTeam::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    protected static function getPositionOptions(?string $sport): array
+    {
+        return match ($sport) {
+            'basketball' => [
+                'point_guard' => 'Point Guard',
+                'shooting_guard' => 'Shooting Guard',
+                'small_forward' => 'Small Forward',
+                'power_forward' => 'Power Forward',
+                'center' => 'Center',
+            ],
+            'volleyball' => [
+                'setter' => 'Setter',
+                'outside_hitter' => 'Outside Hitter',
+                'opposite_hitter' => 'Opposite Hitter',
+                'middle_blocker' => 'Middle Blocker',
+                'libero' => 'Libero',
+                'defensive_specialist' => 'Defensive Specialist',
+            ],
+            'football' => [
+                'quarterback' => 'Quarterback',
+                'running_back' => 'Running Back',
+                'wide_receiver' => 'Wide Receiver',
+                'tight_end' => 'Tight End',
+                'offensive_line' => 'Offensive Line',
+                'defensive_line' => 'Defensive Line',
+                'linebacker' => 'Linebacker',
+                'cornerback' => 'Cornerback',
+                'safety' => 'Safety',
+                'kicker' => 'Kicker',
+                'punter' => 'Punter',
+            ],
+            'baseball' => [
+                'pitcher' => 'Pitcher',
+                'catcher' => 'Catcher',
+                'first_base' => 'First Base',
+                'second_base' => 'Second Base',
+                'third_base' => 'Third Base',
+                'shortstop' => 'Shortstop',
+                'left_field' => 'Left Field',
+                'center_field' => 'Center Field',
+                'right_field' => 'Right Field',
+                'designated_hitter' => 'Designated Hitter',
+            ],
+            'softball' => [
+                'pitcher' => 'Pitcher',
+                'catcher' => 'Catcher',
+                'first_base' => 'First Base',
+                'second_base' => 'Second Base',
+                'third_base' => 'Third Base',
+                'shortstop' => 'Shortstop',
+                'left_field' => 'Left Field',
+                'center_field' => 'Center Field',
+                'right_field' => 'Right Field',
+            ],
+            'soccer' => [
+                'goalkeeper' => 'Goalkeeper',
+                'defender' => 'Defender',
+                'center_back' => 'Center Back',
+                'full_back' => 'Full Back',
+                'wing_back' => 'Wing Back',
+                'midfielder' => 'Midfielder',
+                'defensive_midfielder' => 'Defensive Midfielder',
+                'central_midfielder' => 'Central Midfielder',
+                'attacking_midfielder' => 'Attacking Midfielder',
+                'winger' => 'Winger',
+                'forward' => 'Forward',
+                'striker' => 'Striker',
+            ],
+            'tennis' => [
+                'singles' => 'Singles',
+                'doubles' => 'Doubles',
+            ],
+            'badminton' => [
+                'singles' => 'Singles',
+                'doubles' => 'Doubles',
+                'mixed_doubles' => 'Mixed Doubles',
+            ],
+            'table_tennis' => [
+                'singles' => 'Singles',
+                'doubles' => 'Doubles',
+                'mixed_doubles' => 'Mixed Doubles',
+            ],
+            'track_and_field' => [
+                'sprinter' => 'Sprinter',
+                'middle_distance' => 'Middle Distance',
+                'long_distance' => 'Long Distance',
+                'hurdler' => 'Hurdler',
+                'jumper' => 'Jumper',
+                'thrower' => 'Thrower',
+                'relay_runner' => 'Relay Runner',
+                'decathlete' => 'Decathlete',
+                'heptathlete' => 'Heptathlete',
+            ],
+            'swimming' => [
+                'freestyle' => 'Freestyle',
+                'backstroke' => 'Backstroke',
+                'breaststroke' => 'Breaststroke',
+                'butterfly' => 'Butterfly',
+                'individual_medley' => 'Individual Medley',
+                'relay' => 'Relay',
+            ],
+            'boxing' => [
+                'flyweight' => 'Flyweight',
+                'bantamweight' => 'Bantamweight',
+                'featherweight' => 'Featherweight',
+                'lightweight' => 'Lightweight',
+                'welterweight' => 'Welterweight',
+                'middleweight' => 'Middleweight',
+                'light_heavyweight' => 'Light Heavyweight',
+                'heavyweight' => 'Heavyweight',
+            ],
+            'martial_arts' => [
+                'lightweight' => 'Lightweight',
+                'welterweight' => 'Welterweight',
+                'middleweight' => 'Middleweight',
+                'heavyweight' => 'Heavyweight',
+                'striker' => 'Striker',
+                'grappler' => 'Grappler',
+                'all_rounder' => 'All-Rounder',
+            ],
+            default => [],
+        };
+    }
+
+    public static function mutateUserFormData(array $data): array
+    {
+        if (filled($data['password'] ?? null)) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        if (($data['club_id'] ?? null) === '__new__' && filled($data['new_club_name'] ?? null)) {
+            $club = Club::create([
+                'name' => trim($data['new_club_name']),
+                'logo' => $data['new_club_logo'] ?? null,
+            ]);
+
+            $data['club_id'] = $club->id;
+        } elseif (($data['club_id'] ?? null) === '__new__') {
+            $data['club_id'] = null;
+        }
+
+        if (($data['league_id'] ?? null) === '__new__' && filled($data['new_league_name'] ?? null)) {
+            $league = League::create([
+                'name' => trim($data['new_league_name']),
+                'logo' => $data['new_league_logo'] ?? null,
+            ]);
+
+            $data['league_id'] = $league->id;
+        } elseif (($data['league_id'] ?? null) === '__new__') {
+            $data['league_id'] = null;
+        }
+
+        if (($data['national_team_id'] ?? null) === '__new__' && filled($data['new_national_team_name'] ?? null)) {
+            $nationalTeam = NationalTeam::create([
+                'name' => trim($data['new_national_team_name']),
+                'logo' => $data['new_national_team_logo'] ?? null,
+            ]);
+
+            $data['national_team_id'] = $nationalTeam->id;
+        } elseif (($data['national_team_id'] ?? null) === '__new__') {
+            $data['national_team_id'] = null;
+        }
+
+        unset(
+            $data['password_confirmation'],
+            $data['new_club_name'],
+            $data['new_club_logo'],
+            $data['new_league_name'],
+            $data['new_league_logo'],
+            $data['new_national_team_name'],
+            $data['new_national_team_logo'],
+        );
+
+        return $data;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -103,7 +312,6 @@ class UserResource extends Resource
                         ->password()
                         ->revealable()
                         ->dehydrated(fn ($state) => filled($state))
-                        ->dehydrateStateUsing(fn ($state) => filled($state) ? $state : null)
                         ->same('password_confirmation')
                         ->nullable()
                         ->helperText('Leave blank to keep the current password.'),
@@ -125,20 +333,6 @@ class UserResource extends Resource
                         ->preload()
                         ->nullable(),
 
-                    Select::make('club_id')
-                        ->relationship('club', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->nullable(),
-
-                    Select::make('league_id')
-                        ->label('League')
-                        ->relationship('league', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->nullable()
-                        ->live(),
-
                     CheckboxList::make('roles')
                         ->relationship('roles', 'name')
                         ->columns(2)
@@ -149,6 +343,80 @@ class UserResource extends Resource
                     TextInput::make('city')->maxLength(255),
                     TextInput::make('state')->maxLength(255),
                     TextInput::make('country')->maxLength(255),
+                ]),
+
+            Section::make('Organization Details')
+                ->columns(2)
+                ->schema([
+                    Select::make('club_id')
+                        ->label('Club')
+                        ->options(fn () => static::getClubOptions())
+                        ->searchable()
+                        ->preload()
+                        ->live(),
+
+                    Select::make('league_id')
+                        ->label('League')
+                        ->options(fn () => static::getLeagueOptions())
+                        ->searchable()
+                        ->preload()
+                        ->live(),
+
+                    Select::make('national_team_id')
+                        ->label('National Team')
+                        ->options(fn () => static::getNationalTeamOptions())
+                        ->searchable()
+                        ->preload()
+                        ->live(),
+
+                    TextInput::make('team_name')
+                        ->label('Team')
+                        ->maxLength(255),
+
+                    TextInput::make('new_club_name')
+                        ->label('New Club Name')
+                        ->maxLength(255)
+                        ->visible(fn (callable $get) => $get('club_id') === '__new__')
+                        ->required(fn (callable $get) => $get('club_id') === '__new__'),
+
+                    FileUpload::make('new_club_logo')
+                        ->label('New Club Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('club-logos')
+                        ->visibility('public')
+                        ->visible(fn (callable $get) => $get('club_id') === '__new__'),
+
+                    TextInput::make('new_league_name')
+                        ->label('New League Name')
+                        ->maxLength(255)
+                        ->visible(fn (callable $get) => $get('league_id') === '__new__')
+                        ->required(fn (callable $get) => $get('league_id') === '__new__'),
+
+                    FileUpload::make('new_league_logo')
+                        ->label('New League Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('league-logos')
+                        ->visibility('public')
+                        ->visible(fn (callable $get) => $get('league_id') === '__new__'),
+
+                    TextInput::make('new_national_team_name')
+                        ->label('New National Team Name')
+                        ->maxLength(255)
+                        ->visible(fn (callable $get) => $get('national_team_id') === '__new__')
+                        ->required(fn (callable $get) => $get('national_team_id') === '__new__'),
+
+                    FileUpload::make('new_national_team_logo')
+                        ->label('New National Team Logo')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('national-team-logos')
+                        ->visibility('public')
+                        ->visible(fn (callable $get) => $get('national_team_id') === '__new__'),
                 ]),
 
             Section::make('Athletic & Academic Info')
@@ -186,10 +454,6 @@ class UserResource extends Resource
                         ->maxLength(255)
                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
-                    TextInput::make('team_name')
-                        ->label('Team')
-                        ->maxLength(255),
-
                     Select::make('sport')
                         ->label('Sport')
                         ->options(static::getSportOptions())
@@ -197,168 +461,25 @@ class UserResource extends Resource
                         ->searchable()
                         ->live(),
 
+                    Select::make('dominant_foot')
+                        ->label('Dominant Foot')
+                        ->options([
+                            'left' => 'Left',
+                            'right' => 'Right',
+                            'both' => 'Both',
+                        ])
+                        ->visible(fn (callable $get) => $get('sport') === 'soccer')
+                        ->required(fn (callable $get) => $get('sport') === 'soccer'),
+
                     Select::make('position')
                         ->label('Position')
                         ->multiple()
                         ->searchable()
                         ->preload()
                         ->required()
-                        ->options(fn (callable $get): array => match ($get('sport')) {
-                            'basketball' => [
-                                'point_guard' => 'Point Guard',
-                                'shooting_guard' => 'Shooting Guard',
-                                'small_forward' => 'Small Forward',
-                                'power_forward' => 'Power Forward',
-                                'center' => 'Center',
-                            ],
-
-                            'volleyball' => [
-                                'setter' => 'Setter',
-                                'outside_hitter' => 'Outside Hitter',
-                                'opposite_hitter' => 'Opposite Hitter',
-                                'middle_blocker' => 'Middle Blocker',
-                                'libero' => 'Libero',
-                                'defensive_specialist' => 'Defensive Specialist',
-                            ],
-
-                            'football' => [
-                                'quarterback' => 'Quarterback',
-                                'running_back' => 'Running Back',
-                                'wide_receiver' => 'Wide Receiver',
-                                'tight_end' => 'Tight End',
-                                'offensive_line' => 'Offensive Line',
-                                'defensive_line' => 'Defensive Line',
-                                'linebacker' => 'Linebacker',
-                                'cornerback' => 'Cornerback',
-                                'safety' => 'Safety',
-                                'kicker' => 'Kicker',
-                                'punter' => 'Punter',
-                            ],
-
-                            'baseball' => [
-                                'pitcher' => 'Pitcher',
-                                'catcher' => 'Catcher',
-                                'first_base' => 'First Base',
-                                'second_base' => 'Second Base',
-                                'third_base' => 'Third Base',
-                                'shortstop' => 'Shortstop',
-                                'left_field' => 'Left Field',
-                                'center_field' => 'Center Field',
-                                'right_field' => 'Right Field',
-                                'designated_hitter' => 'Designated Hitter',
-                            ],
-
-                            'softball' => [
-                                'pitcher' => 'Pitcher',
-                                'catcher' => 'Catcher',
-                                'first_base' => 'First Base',
-                                'second_base' => 'Second Base',
-                                'third_base' => 'Third Base',
-                                'shortstop' => 'Shortstop',
-                                'left_field' => 'Left Field',
-                                'center_field' => 'Center Field',
-                                'right_field' => 'Right Field',
-                            ],
-
-                            'soccer' => [
-                                'goalkeeper' => 'Goalkeeper',
-                                'defender' => 'Defender',
-                                'center_back' => 'Center Back',
-                                'full_back' => 'Full Back',
-                                'wing_back' => 'Wing Back',
-                                'midfielder' => 'Midfielder',
-                                'defensive_midfielder' => 'Defensive Midfielder',
-                                'central_midfielder' => 'Central Midfielder',
-                                'attacking_midfielder' => 'Attacking Midfielder',
-                                'winger' => 'Winger',
-                                'forward' => 'Forward',
-                                'striker' => 'Striker',
-                            ],
-
-                            'tennis' => [
-                                'singles' => 'Singles',
-                                'doubles' => 'Doubles',
-                            ],
-
-                            'badminton' => [
-                                'singles' => 'Singles',
-                                'doubles' => 'Doubles',
-                                'mixed_doubles' => 'Mixed Doubles',
-                            ],
-
-                            'table_tennis' => [
-                                'singles' => 'Singles',
-                                'doubles' => 'Doubles',
-                                'mixed_doubles' => 'Mixed Doubles',
-                            ],
-
-                            'track_and_field' => [
-                                'sprinter' => 'Sprinter',
-                                'middle_distance' => 'Middle Distance',
-                                'long_distance' => 'Long Distance',
-                                'hurdler' => 'Hurdler',
-                                'jumper' => 'Jumper',
-                                'thrower' => 'Thrower',
-                                'relay_runner' => 'Relay Runner',
-                                'decathlete' => 'Decathlete',
-                                'heptathlete' => 'Heptathlete',
-                            ],
-
-                            'swimming' => [
-                                'freestyle' => 'Freestyle',
-                                'backstroke' => 'Backstroke',
-                                'breaststroke' => 'Breaststroke',
-                                'butterfly' => 'Butterfly',
-                                'individual_medley' => 'Individual Medley',
-                                'relay' => 'Relay',
-                            ],
-
-                            'boxing' => [
-                                'flyweight' => 'Flyweight',
-                                'bantamweight' => 'Bantamweight',
-                                'featherweight' => 'Featherweight',
-                                'lightweight' => 'Lightweight',
-                                'welterweight' => 'Welterweight',
-                                'middleweight' => 'Middleweight',
-                                'light_heavyweight' => 'Light Heavyweight',
-                                'heavyweight' => 'Heavyweight',
-                            ],
-
-                            'martial_arts' => [
-                                'lightweight' => 'Lightweight',
-                                'welterweight' => 'Welterweight',
-                                'middleweight' => 'Middleweight',
-                                'heavyweight' => 'Heavyweight',
-                                'striker' => 'Striker',
-                                'grappler' => 'Grappler',
-                                'all_rounder' => 'All-Rounder',
-                            ],
-
-                            default => [],
-                        })
+                        ->options(fn (callable $get): array => static::getPositionOptions($get('sport')))
                         ->disabled(fn (callable $get): bool => blank($get('sport')))
                         ->helperText('Select one or more positions based on the chosen sport.'),
-
-                    Toggle::make('natl_team_exp')
-                        ->label('National Team Experience')
-                        ->live(),
-
-                    TextInput::make('national_team_name')
-                        ->label('National Team Name')
-                        ->maxLength(255)
-                        ->visible(fn (callable $get): bool => (bool) $get('natl_team_exp'))
-                        ->required(fn (callable $get): bool => (bool) $get('natl_team_exp')),
-
-                    FileUpload::make('national_team_logo')
-                        ->label('National Team Logo')
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('user-player-images')
-                        ->visibility('public')
-                        ->visible(fn (callable $get): bool => (bool) $get('natl_team_exp'))
-                        ->required(fn (callable $get): bool => (bool) $get('natl_team_exp'))
-                        ->helperText('Upload the national team logo if the athlete has national team experience.'),
 
                     Textarea::make('player_bio')
                         ->label('Player Bio')
@@ -442,59 +563,59 @@ class UserResource extends Resource
                         ->nullable(),
                 ]),
 
-                Section::make('Hero Images')
-                    ->description('Shared player images used across hero templates.')
-                    ->columns(5)
-                    ->schema([
-                        FileUpload::make('plyrcard_image')
-                            ->label('PlyrCard Image')
-                            ->image()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('user-player-images')
-                            ->visibility('public')
-                            ->helperText('Upload the card-style PNG image used across templates.'),
+            Section::make('Hero Images')
+                ->description('Shared player images used across hero templates.')
+                ->columns(5)
+                ->schema([
+                    FileUpload::make('plyrcard_image')
+                        ->label('PlyrCard Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the card-style PNG image used across templates.'),
 
-                        FileUpload::make('player_image')
-                            ->label('Player Image')
-                            ->image()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('user-player-images')
-                            ->visibility('public')
-                            ->helperText('Upload the half-body player PNG image used across templates.'),
+                    FileUpload::make('player_image')
+                        ->label('Player Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the half-body player PNG image used across templates.'),
 
-                        FileUpload::make('mobile_hero_image')
-                            ->label('Vertical Hero Image')
-                            ->image()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('user-player-images')
-                            ->visibility('public')
-                            ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+                    FileUpload::make('mobile_hero_image')
+                        ->label('Vertical Hero Image')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
 
-                        FileUpload::make('youtube_thumbnail')
-                            ->label('YouTube Thumbnail')
-                            ->image()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('user-player-images')
-                            ->visibility('public')
-                            ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
+                    FileUpload::make('youtube_thumbnail')
+                        ->label('YouTube Thumbnail')
+                        ->image()
+                        ->imageEditor()
+                        ->disk('public')
+                        ->directory('user-player-images')
+                        ->visibility('public')
+                        ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
 
-                        FileUpload::make('raw_player_images')
-                            ->label('Raw Player Images')
-                            ->image()
-                            ->multiple()
-                            ->reorderable()
-                            ->appendFiles()
-                            ->maxFiles(20)
-                            ->disk('public')
-                            ->directory('user-player-images/raw')
-                            ->visibility('public')
-                            ->columnSpanFull()
-                            ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
-                    ]),
+                    FileUpload::make('raw_player_images')
+                        ->label('Raw Player Images')
+                        ->image()
+                        ->multiple()
+                        ->reorderable()
+                        ->appendFiles()
+                        ->maxFiles(20)
+                        ->disk('public')
+                        ->directory('user-player-images/raw')
+                        ->visibility('public')
+                        ->columnSpanFull()
+                        ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
+                ]),
         ]);
     }
 
@@ -516,6 +637,7 @@ class UserResource extends Resource
                 TextColumn::make('school.name')->label('School')->toggleable(),
                 TextColumn::make('league.name')->label('League')->toggleable(),
                 TextColumn::make('club.name')->label('Club')->toggleable(),
+                TextColumn::make('nationalTeam.name')->label('National Team')->toggleable(),
                 TextColumn::make('roles.name')->badge(),
                 TextColumn::make('updated_at')->since()->label('Updated'),
 
@@ -524,6 +646,12 @@ class UserResource extends Resource
                     ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title() : '-')
                     ->sortable()
                     ->searchable(),
+
+                TextColumn::make('dominant_foot')
+                    ->label('Dominant Foot')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('position')
                     ->label('Positions')
@@ -554,10 +682,16 @@ class UserResource extends Resource
                     ->relationship('club', 'name')
                     ->searchable()
                     ->preload(),
-                
+
                 SelectFilter::make('league_id')
                     ->label('League')
                     ->relationship('league', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('national_team_id')
+                    ->label('National Team')
+                    ->relationship('nationalTeam', 'name')
                     ->searchable()
                     ->preload(),
 
@@ -590,10 +724,6 @@ class UserResource extends Resource
                             ->all()
                     )
                     ->multiple(),
-
-                TernaryFilter::make('natl_team_exp')
-                    ->label('National Team Experience')
-                    ->nullable(),
 
                 TernaryFilter::make('has_website')
                     ->label('Has Website')
@@ -643,6 +773,17 @@ class UserResource extends Resource
                     ->queries(
                         true: fn (Builder $query) => $query->whereNotNull('league_id'),
                         false: fn (Builder $query) => $query->whereNull('league_id'),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                TernaryFilter::make('has_national_team')
+                    ->label('Assigned National Team')
+                    ->placeholder('All users')
+                    ->trueLabel('With national team')
+                    ->falseLabel('Without national team')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('national_team_id'),
+                        false: fn (Builder $query) => $query->whereNull('national_team_id'),
                         blank: fn (Builder $query) => $query,
                     ),
 
