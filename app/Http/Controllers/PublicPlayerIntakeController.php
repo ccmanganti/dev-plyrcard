@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Club;
 use App\Models\HeroTemplate;
 use App\Models\League;
+use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
@@ -149,17 +150,10 @@ class PublicPlayerIntakeController extends Controller
 
     public function create(Request $request): View
     {
-        $schools = School::query()
-            ->orderBy('name')
-            ->get();
-
-        $clubs = Club::query()
-            ->orderBy('name')
-            ->get();
-
-        $leagues = League::query()
-            ->orderBy('name')
-            ->get();
+        $schools = School::query()->orderBy('name')->get();
+        $clubs = Club::query()->orderBy('name')->get();
+        $leagues = League::query()->orderBy('name')->get();
+        $nationalTeams = NationalTeam::query()->orderBy('name')->get();
 
         $states = [
             'AL' => 'Alabama',
@@ -257,6 +251,7 @@ class PublicPlayerIntakeController extends Controller
             'schools' => $schools,
             'clubs' => $clubs,
             'leagues' => $leagues,
+            'nationalTeams' => $nationalTeams,
             'states' => $states,
             'countryOptions' => $countryOptions,
             'sportPositions' => $this->sportPositions,
@@ -264,38 +259,40 @@ class PublicPlayerIntakeController extends Controller
             'detectedCountry' => $detectedCountry,
         ]);
     }
-protected function detectCountryCode(Request $request): string
-{
-    $headerCandidates = [
-        $request->header('CF-IPCountry'),
-        $request->server('HTTP_CF_IPCOUNTRY'),
-        $request->header('CloudFront-Viewer-Country'),
-        $request->header('X-Country-Code'),
-        $request->server('GEOIP_COUNTRY_CODE'),
-    ];
 
-    foreach ($headerCandidates as $country) {
-        $country = strtoupper(trim((string) $country));
+    protected function detectCountryCode(Request $request): string
+    {
+        $headerCandidates = [
+            $request->header('CF-IPCountry'),
+            $request->server('HTTP_CF_IPCOUNTRY'),
+            $request->header('CloudFront-Viewer-Country'),
+            $request->header('X-Country-Code'),
+            $request->server('GEOIP_COUNTRY_CODE'),
+        ];
 
-        if (preg_match('/^[A-Z]{2}$/', $country)) {
-            return $country;
+        foreach ($headerCandidates as $country) {
+            $country = strtoupper(trim((string) $country));
+
+            if (preg_match('/^[A-Z]{2}$/', $country)) {
+                return $country;
+            }
         }
+
+        try {
+            $ip = $request->ip();
+            $location = geoip()->getLocation($ip);
+            $countryCode = strtoupper(trim((string) ($location->country_code2 ?? '')));
+
+            if (preg_match('/^[A-Z]{2}$/', $countryCode)) {
+                return $countryCode;
+            }
+        } catch (\Throwable $e) {
+            // Fail silently.
+        }
+
+        return '';
     }
 
-    try {
-        $ip = $request->ip();
-        $location = geoip()->getLocation($ip);
-        $countryCode = strtoupper(trim((string) ($location->country_code2 ?? '')));
-
-        if (preg_match('/^[A-Z]{2}$/', $countryCode)) {
-            return $countryCode;
-        }
-    } catch (\Throwable $e) {
-        // Fail silently.
-    }
-
-    return '';
-}
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -363,6 +360,9 @@ protected function detectCountryCode(Request $request): string
             'club_id' => ['nullable', 'string'],
             'club_other' => ['nullable', 'string', 'max:255'],
 
+            'national_team_id' => ['nullable', 'string'],
+            'national_team_other' => ['nullable', 'string', 'max:255'],
+
             'player_image' => ['nullable', 'array', 'max:20'],
             'player_image.*' => ['image', 'mimes:png', 'max:5120'],
 
@@ -410,6 +410,7 @@ protected function detectCountryCode(Request $request): string
         $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls) {
             $school = $this->resolveSchool($validated);
             [$league, $club] = $this->resolveClubAndLeague($validated);
+            $nationalTeam = $this->resolveNationalTeam($validated);
 
             $fullNameNoSpaces = $this->fullNameNoSpaces(
                 $validated['first_name'],
@@ -440,6 +441,8 @@ protected function detectCountryCode(Request $request): string
                 $user->restore();
             }
 
+            $hasNationalTeamExperience = isset($validated['natl_team_exp']) ? (bool) $validated['natl_team_exp'] : false;
+
             $user->fill([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
@@ -462,7 +465,7 @@ protected function detectCountryCode(Request $request): string
                 'position' => $validated['position'] ?? [],
                 'academic_accolades' => $validated['academic_accolades'] ?? null,
                 'sports_accolades' => $validated['sports_accolades'] ?? null,
-                'natl_team_exp' => isset($validated['natl_team_exp']) ? (bool) $validated['natl_team_exp'] : false,
+                'natl_team_exp' => $hasNationalTeamExperience,
                 'team_name' => $validated['team_name'] ?? null,
                 'ig_handle' => $validated['ig_handle'] ?? null,
                 'x_handle' => $validated['x_handle'] ?? null,
@@ -488,6 +491,8 @@ protected function detectCountryCode(Request $request): string
                 'snc_trainer_phone' => $validated['snc_trainer_phone'] ?? null,
                 'school_id' => $school?->id,
                 'club_id' => $club?->id,
+                'league_id' => $league?->id,
+                'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
                 'domain' => $generatedDomain,
                 'player_bio' => $validated['player_bio'] ?? null,
                 'featured_video_url' => $validated['featured_video_url'] ?? null,
@@ -560,10 +565,10 @@ protected function detectCountryCode(Request $request): string
         $clubId = $validated['club_id'] ?? null;
 
         if ($leagueId === '__other__') {
-            if (filled($validated['league_other'] ?? null) && filled($validated['gender'] ?? null)) {
+            if (filled($validated['league_other'] ?? null)) {
                 $league = League::firstOrCreate(
                     ['name' => trim($validated['league_other'])],
-                    ['gender' => $validated['gender']]
+                    ['gender' => $validated['gender'] ?? null]
                 );
             }
         } elseif (filled($leagueId)) {
@@ -581,6 +586,27 @@ protected function detectCountryCode(Request $request): string
         }
 
         return [$league, $club];
+    }
+
+    protected function resolveNationalTeam(array $validated): ?NationalTeam
+    {
+        $nationalTeamId = $validated['national_team_id'] ?? null;
+
+        if ($nationalTeamId === '__other__') {
+            if (filled($validated['national_team_other'] ?? null)) {
+                return NationalTeam::firstOrCreate([
+                    'name' => trim($validated['national_team_other']),
+                ]);
+            }
+
+            return null;
+        }
+
+        if (filled($nationalTeamId)) {
+            return NationalTeam::find($nationalTeamId);
+        }
+
+        return null;
     }
 
     protected function storeHeroUploads(Request $request): array

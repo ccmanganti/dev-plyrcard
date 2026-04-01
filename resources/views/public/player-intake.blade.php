@@ -881,7 +881,7 @@
                 </div>
 
                 <div class="section">
-                    <h2>Location, School, League & Club</h2>
+                    <h2>Location, School, League, Club & National Team</h2>
 
                     <div class="grid">
                         <div class="col-3">
@@ -993,6 +993,20 @@
                             <div class="hint">Choose Other to manually enter a club not listed.</div>
                         </div>
 
+                        <div class="col-3" id="national_team_field_wrap">
+                            <label for="national_team_id">National Team</label>
+                            <select id="national_team_id" name="national_team_id">
+                                <option value="">Select national team</option>
+                                @foreach ($nationalTeams as $nationalTeam)
+                                    <option value="{{ $nationalTeam->id }}" {{ (string) old('national_team_id') === (string) $nationalTeam->id ? 'selected' : '' }}>
+                                        {{ $nationalTeam->name }}
+                                    </option>
+                                @endforeach
+                                <option value="__other__" {{ old('national_team_id') === '__other__' ? 'selected' : '' }}>Other</option>
+                            </select>
+                            <div class="hint">Choose Other to manually enter a national team not listed.</div>
+                        </div>
+
                         <div class="col-3">
                             <label for="team_name">Team</label>
                             <input type="text" id="team_name" name="team_name" value="{{ old('team_name') }}" maxlength="255">
@@ -1003,6 +1017,22 @@
                                 <div class="col-6">
                                     <label for="club_other">New Club Name</label>
                                     <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" placeholder="Enter new club name" maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="national_team_other_section" class="col-12 other-wrap">
+                            <div class="grid">
+                                <div class="col-6">
+                                    <label for="national_team_other">New National Team Name</label>
+                                    <input
+                                        type="text"
+                                        id="national_team_other"
+                                        name="national_team_other"
+                                        value="{{ old('national_team_other') }}"
+                                        placeholder="Enter new national team name"
+                                        maxlength="255"
+                                    >
                                 </div>
                             </div>
                         </div>
@@ -1130,6 +1160,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="actions">
                     <button type="submit" class="btn">Submit Intake Form</button>
                 </div>
@@ -1239,7 +1270,7 @@
             "Sports Accolades": "Logros deportivos",
             "Enter one accolade per line.": "Ingresa un logro por línea.",
             "Press / Notes": "Prensa / Notas",
-            "Location, School, League & Club": "Ubicación, escuela, liga y club",
+            "Location, School, League, Club & National Team": "Ubicación, escuela, liga, club y selección nacional",
             "Country": "País",
             "Select country": "Seleccionar país",
             "Country Name": "Nombre del país",
@@ -1264,9 +1295,14 @@
             "Club": "Club",
             "Select club": "Seleccionar club",
             "Choose Other to manually enter a club not listed.": "Elige Otro para ingresar manualmente un club que no figure en la lista.",
+            "National Team": "Selección nacional",
+            "Select national team": "Seleccionar selección nacional",
+            "Choose Other to manually enter a national team not listed.": "Elige Otro para ingresar manualmente una selección nacional que no figure en la lista.",
             "Team": "Equipo",
             "New Club Name": "Nuevo nombre del club",
             "Enter new club name": "Ingresar nuevo nombre del club",
+            "New National Team Name": "Nuevo nombre de la selección nacional",
+            "Enter new national team name": "Ingresar nuevo nombre de la selección nacional",
             "Parent / Guardian Information": "Información de padre / tutor",
             "Primary Parent / Guardian": "Padre / tutor principal",
             "Primary Parent Email": "Correo del padre / tutor principal",
@@ -1339,7 +1375,7 @@
             "Sports Accolades": "Distinctions sportives",
             "Enter one accolade per line.": "Saisissez une distinction par ligne.",
             "Press / Notes": "Presse / Notes",
-            "Location, School, League & Club": "Lieu, école, ligue et club",
+            "Location, School, League, Club & National Team": "Lieu, école, ligue, club et équipe nationale",
             "Country": "Pays",
             "Select country": "Sélectionner un pays",
             "Country Name": "Nom du pays",
@@ -1364,9 +1400,14 @@
             "Club": "Club",
             "Select club": "Sélectionner un club",
             "Choose Other to manually enter a club not listed.": "Choisissez Autre pour saisir manuellement un club non répertorié.",
+            "National Team": "Équipe nationale",
+            "Select national team": "Sélectionner une équipe nationale",
+            "Choose Other to manually enter a national team not listed.": "Choisissez Autre pour saisir manuellement une équipe nationale non répertoriée.",
             "Team": "Équipe",
             "New Club Name": "Nouveau nom du club",
             "Enter new club name": "Saisir le nouveau nom du club",
+            "New National Team Name": "Nouveau nom de l’équipe nationale",
+            "Enter new national team name": "Saisir le nouveau nom de l’équipe nationale",
             "Parent / Guardian Information": "Informations parent / tuteur",
             "Primary Parent / Guardian": "Parent / tuteur principal",
             "Primary Parent Email": "E-mail du parent principal",
@@ -1439,7 +1480,7 @@
             "Sports Accolades": "Sportliche Auszeichnungen",
             "Enter one accolade per line.": "Geben Sie eine Auszeichnung pro Zeile ein.",
             "Press / Notes": "Presse / Notizen",
-            "Location, School, League & Club": "Standort, Schule, Liga und Verein",
+            "Location, School, League, Club & National Team": "Standort, Schule, Liga, Verein und Nationalmannschaft",
             "Country": "Land",
             "Select country": "Land auswählen",
             "Country Name": "Ländername",
@@ -1464,9 +1505,14 @@
             "Club": "Verein",
             "Select club": "Verein auswählen",
             "Choose Other to manually enter a club not listed.": "Wählen Sie Andere, um einen nicht aufgeführten Verein manuell einzugeben.",
+            "National Team": "Nationalmannschaft",
+            "Select national team": "Nationalmannschaft auswählen",
+            "Choose Other to manually enter a national team not listed.": "Wählen Sie Andere, um eine nicht aufgeführte Nationalmannschaft manuell einzugeben.",
             "Team": "Team",
             "New Club Name": "Neuer Vereinsname",
             "Enter new club name": "Neuen Vereinsnamen eingeben",
+            "New National Team Name": "Neuer Name der Nationalmannschaft",
+            "Enter new national team name": "Neuen Namen der Nationalmannschaft eingeben",
             "Parent / Guardian Information": "Informationen zu Eltern / Erziehungsberechtigten",
             "Primary Parent / Guardian": "Hauptelternteil / Erziehungsberechtigter",
             "Primary Parent Email": "E-Mail des Haupterziehungsberechtigten",
@@ -1539,7 +1585,7 @@
             "Sports Accolades": "Riconoscimenti sportivi",
             "Enter one accolade per line.": "Inserisci un riconoscimento per riga.",
             "Press / Notes": "Stampa / Note",
-            "Location, School, League & Club": "Località, scuola, lega e club",
+            "Location, School, League, Club & National Team": "Località, scuola, lega, club e nazionale",
             "Country": "Paese",
             "Select country": "Seleziona paese",
             "Country Name": "Nome del paese",
@@ -1564,9 +1610,14 @@
             "Club": "Club",
             "Select club": "Seleziona club",
             "Choose Other to manually enter a club not listed.": "Scegli Altro per inserire manualmente un club non presente nell’elenco.",
+            "National Team": "Nazionale",
+            "Select national team": "Seleziona nazionale",
+            "Choose Other to manually enter a national team not listed.": "Scegli Altro per inserire manualmente una nazionale non presente nell’elenco.",
             "Team": "Squadra",
             "New Club Name": "Nuovo nome del club",
             "Enter new club name": "Inserisci nuovo nome del club",
+            "New National Team Name": "Nuovo nome della nazionale",
+            "Enter new national team name": "Inserisci nuovo nome della nazionale",
             "Parent / Guardian Information": "Informazioni genitore / tutore",
             "Primary Parent / Guardian": "Genitore / tutore principale",
             "Primary Parent Email": "Email del genitore principale",
@@ -1639,7 +1690,7 @@
             "Sports Accolades": "Sportieve onderscheidingen",
             "Enter one accolade per line.": "Voer één onderscheiding per regel in.",
             "Press / Notes": "Pers / Notities",
-            "Location, School, League & Club": "Locatie, school, competitie en club",
+            "Location, School, League, Club & National Team": "Locatie, school, competitie, club en nationaal team",
             "Country": "Land",
             "Select country": "Selecteer land",
             "Country Name": "Naam van land",
@@ -1664,9 +1715,14 @@
             "Club": "Club",
             "Select club": "Selecteer club",
             "Choose Other to manually enter a club not listed.": "Kies Anders om handmatig een club in te voeren die niet in de lijst staat.",
+            "National Team": "Nationaal team",
+            "Select national team": "Selecteer nationaal team",
+            "Choose Other to manually enter a national team not listed.": "Kies Anders om handmatig een nationaal team in te voeren dat niet in de lijst staat.",
             "Team": "Team",
             "New Club Name": "Nieuwe clubnaam",
             "Enter new club name": "Voer nieuwe clubnaam in",
+            "New National Team Name": "Nieuwe naam van nationaal team",
+            "Enter new national team name": "Voer nieuwe naam van nationaal team in",
             "Parent / Guardian Information": "Informatie ouder / voogd",
             "Primary Parent / Guardian": "Primaire ouder / voogd",
             "Primary Parent Email": "E-mail primaire ouder",
@@ -1826,6 +1882,31 @@
         clubOtherSection.style.display = clubSelect.value === '__other__' ? 'block' : 'none';
     }
 
+    function toggleNationalTeamOther() {
+        const natlTeamExp = document.getElementById('natl_team_exp');
+        const nationalTeamFieldWrap = document.getElementById('national_team_field_wrap');
+        const nationalTeamSelect = document.getElementById('national_team_id');
+        const nationalTeamOtherSection = document.getElementById('national_team_other_section');
+
+        if (!natlTeamExp || !nationalTeamFieldWrap || !nationalTeamSelect || !nationalTeamOtherSection) return;
+
+        const hasExperience = natlTeamExp.value === '1';
+
+        nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
+
+        if (!hasExperience) {
+            nationalTeamSelect.value = '';
+            nationalTeamOtherSection.style.display = 'none';
+            const otherInput = document.getElementById('national_team_other');
+            if (otherInput) {
+                otherInput.value = '';
+            }
+            return;
+        }
+
+        nationalTeamOtherSection.style.display = nationalTeamSelect.value === '__other__' ? 'block' : 'none';
+    }
+
     function updateImageInstructions(lang) {
         const sport = document.getElementById('sport').value;
         const playerImageHint = document.getElementById('player_image_hint');
@@ -1949,6 +2030,7 @@
         toggleSchoolOther();
         toggleLeagueOther();
         toggleClubOther();
+        toggleNationalTeamOther();
         toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
@@ -1965,6 +2047,8 @@
         document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
         document.getElementById('league_id').addEventListener('change', toggleLeagueOther);
         document.getElementById('club_id').addEventListener('change', toggleClubOther);
+        document.getElementById('national_team_id')?.addEventListener('change', toggleNationalTeamOther);
+        document.getElementById('natl_team_exp')?.addEventListener('change', toggleNationalTeamOther);
         document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
         document.getElementById('country').addEventListener('change', () => {
             toggleCountryFields();
