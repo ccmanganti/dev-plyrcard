@@ -1146,7 +1146,7 @@
     // Hidden test override. Leave as null for real detection.
     // For testing, set for example: 'FR', 'DE', 'ES', 'IT', 'NL', 'PT', 'US'
     const REGION_TEST_OVERRIDE = null;
-const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
+    const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
 
 function mapCountryToLanguage(countryCode) {
     const countryToLanguage = {
