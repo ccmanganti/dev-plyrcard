@@ -348,9 +348,14 @@
 
     $desktopAccolades = collect();
 
-    if ($user?->natl_team_exp && filled($user?->national_team_name)) {
+    $desktopNationalTeamName = trim((string) ($user?->national_team_name ?? ''));
+    $desktopNationalTeamAccoladeText = $desktopNationalTeamName !== ''
+        ? $desktopNationalTeamName
+        : 'National Team Member';
+
+    if ($user?->natl_team_exp) {
         $desktopAccolades->push([
-            'text' => trim((string) $user->national_team_name),
+            'text' => $desktopNationalTeamAccoladeText,
             'icon' => filled($mobileNationalLogoUrl) ? $mobileNationalLogoUrl : null,
             'is_national' => true,
         ]);
@@ -542,41 +547,110 @@
         column-gap: 1.1rem;
         row-gap: 0.45rem;
     }
-    .hero-accolades-list {
-        margin-top: 20px;
-        display: grid;
-        gap: 0.45rem;
+
+.hero-accolades-list {
+    margin-top: 20px;
+    display: grid;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+}
+
+.hero-accolade-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    width: 100%;
+    max-width: 100%;
+}
+
+.hero-accolade-icon-wrap {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    padding-top: 2px;
+}
+
+.hero-accolade-icon {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    display: block;
+    flex: 0 0 34px;
+}
+
+.hero-accolade-icon--trophy {
+    color: {{ $primary }};
+}
+
+.hero-accolade-text {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+    font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+    font-weight: 300;
+    font-size: 18px;
+    line-height: 1.03;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+}
+
+    @media (min-width: 768px) {
+        .hero-accolade-row {
+            grid-template-columns: minmax(135px, 185px) minmax(0, 1fr);
+            column-gap: 1.35rem;
+        }
+
+        .hero-accolade-text {
+            font-size: 23px;
+        }
+
+        .hero-accolade-icon {
+            width: 36px;
+            height: 36px;
+            flex-basis: 36px;
+        }
     }
 
-    .hero-accolade-row {
-        display: grid;
-        grid-template-columns: 28px minmax(0, 1fr);
-        column-gap: 0.8rem;
-        align-items: start;
+@media (min-width: 768px) {
+    .hero-accolade-text {
+        font-size: 23px;
     }
 
     .hero-accolade-icon {
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
-        display: block;
-        margin-top: 2px;
+        width: 36px;
+        height: 36px;
+        flex-basis: 36px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .hero-accolade-text {
+        font-size: 21px;
     }
 
-    .hero-accolade-text {
-        min-width: 0;
-        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-        font-weight: 300;
-        font-size: 18px;
-        line-height: 1.03;
-        letter-spacing: 0.01em;
-        text-transform: uppercase;
-        color: #fff;
-        white-space: normal;
-        overflow: visible;
-        text-overflow: unset;
-        word-break: break-word;
+    .hero-accolade-icon {
+        width: 36px;
+        height: 36px;
     }
+}
+
+@media (min-width: 1280px) {
+    .hero-accolade-text {
+        font-size: 23px;
+    }
+
+    .hero-accolade-icon {
+        width: 38px;
+        height: 38px;
+    }
+}
 
     .hero-main-player-wrap {
         position: absolute;
@@ -1446,29 +1520,31 @@
                             <div class="hero-accolades-list">
                                 @foreach ($desktopAccolades as $accolade)
                                     <div class="hero-accolade-row">
-                                        @if (filled($accolade['icon'] ?? ''))
-                                            <img
-                                                src="{{ $accolade['icon'] }}"
-                                                alt="Accolade logo"
-                                                class="hero-accolade-icon"
-                                            >
-                                        @else
-                                            <svg
-                                                class="hero-accolade-icon text-white/85"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="1.8"
-                                                aria-hidden="true"
-                                            >
-                                                <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                                <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                                <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                                <path d="M12 9v7"/>
-                                                <path d="M8 21h8"/>
-                                                <path d="M9.5 16h5"/>
-                                            </svg>
-                                        @endif
+                                        <div class="hero-accolade-icon-wrap">
+                                            @if (filled($accolade['icon'] ?? ''))
+                                                <img
+                                                    src="{{ $accolade['icon'] }}"
+                                                    alt="Accolade logo"
+                                                    class="hero-accolade-icon"
+                                                >
+                                            @else
+                                                <svg
+                                                    class="hero-accolade-icon hero-accolade-icon--trophy"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.9"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
+                                                    <path d="M6 5H4a3 3 0 0 0 3 3"/>
+                                                    <path d="M18 5h2a3 3 0 0 1-3 3"/>
+                                                    <path d="M12 9v7"/>
+                                                    <path d="M8 21h8"/>
+                                                    <path d="M9.5 16h5"/>
+                                                </svg>
+                                            @endif
+                                        </div>
 
                                         <div class="hero-accolade-text">
                                             {{ $accolade['text'] }}
