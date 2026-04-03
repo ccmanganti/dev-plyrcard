@@ -29,7 +29,6 @@ class PublicWebsiteController extends Controller
                 ->with([
                     'user.school',
                     'user.club',
-                    'user.schedules',
                     'siteTemplate',
                     'heroTemplate',
                     'fieldValues.templateField',
@@ -55,7 +54,6 @@ class PublicWebsiteController extends Controller
             ->with([
                 'user.school',
                 'user.club',
-                'user.schedules',
                 'siteTemplate',
                 'heroTemplate',
                 'fieldValues.templateField',
@@ -75,7 +73,6 @@ class PublicWebsiteController extends Controller
         $website->load([
             'user.school',
             'user.club',
-            'user.schedules',
             'siteTemplate',
             'heroTemplate',
             'fieldValues.templateField',
@@ -93,7 +90,6 @@ class PublicWebsiteController extends Controller
             ->with([
                 'user.school',
                 'user.club',
-                'user.schedules',
                 'siteTemplate',
                 'heroTemplate',
                 'fieldValues.templateField',
@@ -125,7 +121,7 @@ class PublicWebsiteController extends Controller
 
         if ($user) {
             $user->loadMissing([
-                'schedules' => fn ($query) => $query
+                'createdSchedules' => fn ($query) => $query
                     ->orderBy('game_date')
                     ->orderBy('game_time'),
             ]);

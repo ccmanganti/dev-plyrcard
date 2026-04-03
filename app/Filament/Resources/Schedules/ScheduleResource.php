@@ -6,11 +6,13 @@ use App\Filament\Resources\Schedules\Pages\CreateSchedule;
 use App\Filament\Resources\Schedules\Pages\EditSchedule;
 use App\Filament\Resources\Schedules\Pages\ListSchedules;
 use App\Models\Schedule;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -33,28 +35,55 @@ class ScheduleResource extends Resource
     protected static ?string $model = Schedule::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
-    protected static string|UnitEnum|null $navigationGroup = 'Content';
     protected static ?string $navigationLabel = 'Schedules';
     protected static ?string $modelLabel = 'Schedule';
     protected static ?string $pluralModelLabel = 'Schedules';
     protected static ?string $recordTitleAttribute = 'title';
 
+    protected static function isSuperadmin(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasRole('Superadmin')
+            || $user->hasRole('superadmin')
+            || $user->hasRole('Super Admin');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Game Details')
+            Section::make('Schedule Details')
+                ->icon(Heroicon::OutlinedCalendarDays)
+                ->description('Add the game or event details below.')
                 ->columns(2)
+                ->columnSpanFull()
                 ->schema([
+                    Hidden::make('created_by_user_id')
+                        ->default(fn () => auth()->id())
+                        ->dehydrated(true),
+
                     TextInput::make('title')
+                        ->label('Title')
+                        ->prefixIcon(Heroicon::OutlinedPencilSquare)
                         ->maxLength(255)
-                        ->placeholder('League Match, Tournament Game, Playoff Game'),
+                        ->placeholder('League Match, Tournament Game, Playoff Game')
+                        ->helperText('Optional label for the schedule entry.'),
 
                     TextInput::make('opponent')
+                        ->label('Opponent')
+                        ->prefixIcon(Heroicon::OutlinedShieldCheck)
                         ->maxLength(255)
                         ->placeholder('Team / School / Club Name')
-                        ->required(),
+                        ->required()
+                        ->helperText('Enter the opponent or event name.'),
 
                     Select::make('status')
+                        ->label('Status')
+                        ->prefixIcon(Heroicon::OutlinedFlag)
                         ->options([
                             'upcoming' => 'Upcoming',
                             'completed' => 'Completed',
@@ -62,35 +91,96 @@ class ScheduleResource extends Resource
                             'postponed' => 'Postponed',
                         ])
                         ->default('upcoming')
-                        ->required(),
+                        ->required()
+                        ->helperText('Set the current state of this schedule.'),
 
                     Toggle::make('is_home')
-                        ->label('Home Game'),
+                        ->label('Home Game')
+                        ->helperText('Turn on if this is a home game.')
+                        ->default(false),
 
                     DatePicker::make('game_date')
-                        ->required(),
+                        ->label('Game Date')
+                        ->native(false)
+                        ->prefixIcon(Heroicon::OutlinedCalendar)
+                        ->required()
+                        ->helperText('Choose the scheduled date.'),
 
                     TimePicker::make('game_time')
-                        ->seconds(false),
+                        ->label('Game Time')
+                        ->seconds(false)
+                        ->native(false)
+                        ->prefixIcon(Heroicon::OutlinedClock)
+                        ->helperText('Leave blank if the time is still to be confirmed.'),
 
                     TextInput::make('location')
+                        ->label('Location')
+                        ->prefixIcon(Heroicon::OutlinedMapPin)
                         ->maxLength(255)
-                        ->placeholder('City, State'),
+                        ->placeholder('City, State')
+                        ->helperText('General location of the event.'),
 
                     TextInput::make('venue')
+                        ->label('Venue')
+                        ->prefixIcon(Heroicon::OutlinedBuildingOffice2)
                         ->maxLength(255)
-                        ->placeholder('Gym / Field / Stadium / Court'),
+                        ->placeholder('Gym / Field / Stadium / Court')
+                        ->helperText('Specific venue or facility name.'),
 
                     TextInput::make('result')
+                        ->label('Result')
+                        ->prefixIcon(Heroicon::OutlinedTrophy)
                         ->maxLength(255)
-                        ->placeholder('W 3-1 / L 58-61'),
+                        ->placeholder('W 3-1 / L 58-61')
+                        ->helperText('Optional final result summary.'),
 
                     TextInput::make('score')
+                        ->label('Score')
+                        ->prefixIcon(Heroicon::OutlinedHashtag)
                         ->maxLength(255)
-                        ->placeholder('3-1 / 58-61'),
+                        ->placeholder('3-1 / 58-61')
+                        ->helperText('Optional score value.'),
+
+                    Select::make('users')
+                        ->label('Assigned Users')
+                        ->relationship(
+                            name: 'users',
+                            titleAttribute: 'first_name',
+                            modifyQueryUsing: fn (Builder $query) => $query
+                                ->orderBy('first_name')
+                                ->orderBy('last_name')
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn (User $record) => trim(($record->first_name ?? '') . ' ' . ($record->last_name ?? ''))
+                        )
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->visible(fn () => static::isSuperadmin())
+                        ->required(fn () => static::isSuperadmin())
+                        ->dehydrated(false)
+                        ->saveRelationshipsUsing(function (Select $component, ?array $state) {
+                            $record = $component->getRecord();
+
+                            if (! $record || ! auth()->check()) {
+                                return;
+                            }
+
+                            if (static::isSuperadmin()) {
+                                $record->users()->sync($state ?? []);
+                                return;
+                            }
+
+                            $record->users()->syncWithoutDetaching([auth()->id()]);
+                        })
+                        ->helperText('Superadmin can assign this schedule to one or more users.')
+                        ->columnSpanFull(),
 
                     Textarea::make('notes')
-                        ->rows(4)
+                        ->label('Notes')
+                        ->placeholder('Add any important schedule notes here...')
+                        ->helperText('Optional extra details for this event.')
+                        ->rows(5)
                         ->columnSpanFull(),
                 ]),
         ]);
@@ -102,57 +192,79 @@ class ScheduleResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['creator', 'users']);
 
-                if (! auth()->user()?->hasRole('superadmin')) {
-                    $query->whereHas('users', function (Builder $q) {
-                        $q->where('users.id', auth()->id());
-                    });
+                if (! static::isSuperadmin()) {
+                    $query->where('created_by_user_id', auth()->id());
                 }
             })
             ->defaultSort('game_date', 'asc')
             ->columns([
                 TextColumn::make('title')
+                    ->label('Title')
                     ->searchable()
-                    ->toggleable(),
+                    ->sortable()
+                    ->placeholder('—'),
 
                 TextColumn::make('opponent')
+                    ->label('Opponent')
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('game_date')
+                    ->label('Date')
                     ->date('M j, Y')
                     ->sortable(),
 
                 TextColumn::make('game_time')
+                    ->label('Time')
                     ->time('g:i A')
-                    ->sortable(),
+                    ->sortable()
+                    ->placeholder('TBD'),
 
                 IconColumn::make('is_home')
                     ->label('Home')
                     ->boolean(),
 
                 TextColumn::make('location')
+                    ->label('Location')
                     ->searchable()
                     ->toggleable(),
 
                 TextColumn::make('venue')
+                    ->label('Venue')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('status')
                     ->badge()
+                    ->sortable()
                     ->color(fn (string $state): string => match ($state) {
                         'upcoming' => 'info',
                         'completed' => 'success',
                         'cancelled' => 'danger',
                         'postponed' => 'warning',
                         default => 'gray',
+                    }),
+
+                TextColumn::make('users_list')
+                    ->label('User')
+                    ->state(function (Schedule $record): string {
+                        $names = $record->users
+                            ->map(fn ($user) => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')))
+                            ->filter()
+                            ->values()
+                            ->all();
+
+                        return empty($names) ? '—' : implode(', ', $names);
                     })
-                    ->sortable(),
+                    ->visible(static::isSuperadmin()),
 
                 TextColumn::make('result')
-                    ->toggleable(),
+                    ->label('Result')
+                    ->placeholder('—'),
 
                 TextColumn::make('score')
+                    ->label('Score')
+                    ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('creator_name')
@@ -165,8 +277,7 @@ class ScheduleResource extends Resource
                 TextColumn::make('updated_at')
                     ->label('Updated')
                     ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -176,14 +287,31 @@ class ScheduleResource extends Resource
                         'cancelled' => 'Cancelled',
                         'postponed' => 'Postponed',
                     ]),
+
+                SelectFilter::make('created_by_user_id')
+                    ->label('Created By')
+                    ->relationship('creator', 'first_name')
+                    ->getOptionLabelFromRecordUsing(
+                        fn (User $record) => trim(($record->first_name ?? '') . ' ' . ($record->last_name ?? ''))
+                    )
+                    ->searchable()
+                    ->preload()
+                    ->visible(fn () => static::isSuperadmin()),
             ])
             ->recordActions([
                 EditAction::make()
-                    ->visible(fn () => auth()->user()?->hasRole('superadmin')),
+                    ->visible(function (Schedule $record): bool {
+                        if (static::isSuperadmin()) {
+                            return true;
+                        }
+
+                        return (int) $record->created_by_user_id === (int) auth()->id();
+                    }),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => static::isSuperadmin()),
                 ]),
             ]);
     }
@@ -192,37 +320,25 @@ class ScheduleResource extends Resource
     {
         $query = parent::getEloquentQuery()->with(['creator', 'users']);
 
-        if (! auth()->user()?->hasRole('superadmin')) {
-            $query->whereHas('users', function (Builder $q) {
-                $q->where('users.id', auth()->id());
-            });
+        if (! static::isSuperadmin()) {
+            $query->where('created_by_user_id', auth()->id());
         }
 
         return $query;
     }
 
-    public static function mutateScheduleDataBeforeCreate(array $data): array
+    public static function canEdit(Model $record): bool
     {
-        $data['created_by_user_id'] = auth()->id();
-
-        return $data;
-    }
-
-    public static function mutateScheduleDataBeforeSave(array $data): array
-    {
-        return $data;
-    }
-
-    public static function afterCreate(Model $record): void
-    {
-        if (auth()->check() && ! $record->users()->where('users.id', auth()->id())->exists()) {
-            $record->users()->attach(auth()->id());
+        if (static::isSuperadmin()) {
+            return true;
         }
+
+        return (int) $record->created_by_user_id === (int) auth()->id();
     }
 
-    public static function getRedirectAfterSaveUrl(): string
+    public static function canDelete(Model $record): bool
     {
-        return static::getUrl('index');
+        return static::isSuperadmin();
     }
 
     public static function getRelations(): array

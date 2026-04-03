@@ -386,19 +386,17 @@ HTML;
         | Schedules
         |--------------------------------------------------------------------------
         */
-        $playerSchedules = collect();
-
-        if ($user?->id && $user?->club_id) {
-            $playerSchedules = \App\Models\Schedule::query()
-                ->where('club_id', $user->club_id)
-                ->whereHas('users', function ($query) use ($user) {
-                    $query->where('users.id', $user->id)
-                        ->where('schedule_user.will_come', true);
-                })
-                ->orderBy('game_date')
-                ->orderBy('game_time')
-                ->get();
-        }
+        $playerSchedules = collect(
+            $user?->createdSchedules
+                ? $user->createdSchedules
+                    ->sortBy([
+                        ['game_date', 'asc'],
+                        ['game_time', 'asc'],
+                    ])
+                    ->values()
+                    ->all()
+                : []
+        );
 
         $formatScheduleTitle = function ($schedule) {
             $opponent = trim((string) ($schedule->opponent ?? ''));
@@ -2409,9 +2407,9 @@ HTML;
                 if (!filteredSchedules.length) {
                     listing.innerHTML = `
                         <div class="schedule-empty">
-                            <div class="schedule-empty-title">No Games Found</div>
+                            <div class="schedule-empty-title">No Schedule Yet</div>
                             <div class="schedule-empty-copy">
-                                There are no schedule entries for this week${searchTerm.trim() ? " that match your search" : ""}.
+                                Upcoming games and event dates will appear here once this player adds them.
                             </div>
                         </div>
                     `;
