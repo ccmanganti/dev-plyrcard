@@ -958,34 +958,13 @@ class EditProfile extends Page implements HasForms
     {
         $data = $this->form->getState();
 
+        // Only website fields that are actually editable in this profile page
         $websiteKeys = [
-            'website_name',
-            'site_template_id',
-            'hero_template_id',
-            'website_is_active',
             'website_is_published',
-            'primary_color',
-            'secondary_color',
-            'accent_color',
-            'background_color',
-            'surface_color',
-            'text_primary_color',
-            'text_secondary_color',
         ];
 
         $websiteData = [
-            'name' => $data['website_name'] ?? null,
-            'site_template_id' => $data['site_template_id'] ?? null,
-            'hero_template_id' => $data['hero_template_id'] ?? null,
-            'is_active' => $data['website_is_active'] ?? true,
-            'is_published' => $data['website_is_published'] ?? false,
-            'primary_color' => $data['primary_color'] ?? null,
-            'secondary_color' => $data['secondary_color'] ?? null,
-            'accent_color' => $data['accent_color'] ?? null,
-            'background_color' => $data['background_color'] ?? null,
-            'surface_color' => $data['surface_color'] ?? null,
-            'text_primary_color' => $data['text_primary_color'] ?? null,
-            'text_secondary_color' => $data['text_secondary_color'] ?? null,
+            'is_published' => (bool) ($data['website_is_published'] ?? false),
         ];
 
         $userData = $data;
@@ -1000,15 +979,11 @@ class EditProfile extends Page implements HasForms
 
         $website = $this->user->websites()->first();
 
-        if (! $website) {
-            $website = new Website();
-            $website->user_id = $this->user->id;
+        if ($website) {
+            $website->update($websiteData);
+            $this->website = $website->fresh();
         }
 
-        $website->fill($websiteData);
-        $website->save();
-
-        $this->website = $website;
         $this->user->refresh()->loadMissing('roles', 'nationalTeam');
 
         Notification::make()
