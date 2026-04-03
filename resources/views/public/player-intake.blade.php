@@ -1208,6 +1208,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="actions">
                     <button type="submit" class="btn">Submit Intake Form</button>
                 </div>
@@ -1274,6 +1275,8 @@
         es: {
             "Intake": "Ingreso",
             "Form": "Formulario",
+            "Use this form to build your": "Use este formulario para crear su",
+            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portafolio: comparta sus datos clave, momentos destacados y enlaces para que podamos crear un portafolio preciso, pulido y listo para compartir.",
             "This form will translate automatically based on detected region.": "Este formulario se traducirá automáticamente según la región detectada.",
             "Athlete Details": "Detalles del atleta",
             "First Name": "Nombre",
@@ -1371,14 +1374,22 @@
             "S&C Trainer Email": "Correo del entrenador de fuerza y acondicionamiento",
             "S&C Trainer Phone": "Teléfono del entrenador de fuerza y acondicionamiento",
             "Images": "Imágenes",
-            "Raw Player Images": "Imágenes sin procesar del jugador",
-            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Sube hasta 20 imágenes PNG del jugador, recortadas de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.",
+            "Action Images": "Imágenes de acción",
+            "Upload action shots of the athlete. These will still be stored under raw player images.": "Sube fotos de acción del atleta. Estas seguirán guardándose dentro de las imágenes sin procesar del jugador.",
+            "Portrait Images": "Imágenes de retrato",
+            "National Team Images": "Imágenes de selección nacional",
+            "Upload images related to national team play. These will still be stored under raw player images.": "Sube imágenes relacionadas con la selección nacional. Estas seguirán guardándose dentro de las imágenes sin procesar del jugador.",
+            "Team Images": "Imágenes de equipo",
+            "Upload team-related images. These will still be stored under raw player images.": "Sube imágenes relacionadas con el equipo. Estas seguirán guardándose dentro de las imágenes sin procesar del jugador.",
+            "You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.": "Puedes subir un máximo combinado de 20 imágenes entre los cuatro grupos. Máximo 5 MB por imagen.",
             "Submit Intake Form": "Enviar formulario de ingreso",
             "Please fix the following:": "Corrige lo siguiente:"
         },
         fr: {
             "Intake": "Inscription",
             "Form": "Formulaire",
+            "Use this form to build your": "Utilisez ce formulaire pour créer votre",
+            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portfolio : partagez vos informations clés, vos highlights et vos liens afin que nous puissions créer un portfolio précis, soigné et prêt à être partagé.",
             "This form will translate automatically based on detected region.": "Ce formulaire sera traduit automatiquement en fonction de la région détectée.",
             "Athlete Details": "Détails de l’athlète",
             "First Name": "Prénom",
@@ -1476,14 +1487,22 @@
             "S&C Trainer Email": "E-mail du préparateur physique",
             "S&C Trainer Phone": "Téléphone du préparateur physique",
             "Images": "Images",
-            "Raw Player Images": "Images brutes du joueur",
-            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Téléchargez jusqu’à 20 images PNG du joueur seul recadrées de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.",
+            "Action Images": "Images d’action",
+            "Upload action shots of the athlete. These will still be stored under raw player images.": "Téléchargez des photos d’action de l’athlète. Elles seront toujours enregistrées dans les images brutes du joueur.",
+            "Portrait Images": "Images de portrait",
+            "National Team Images": "Images d’équipe nationale",
+            "Upload images related to national team play. These will still be stored under raw player images.": "Téléchargez des images liées au jeu en équipe nationale. Elles seront toujours enregistrées dans les images brutes du joueur.",
+            "Team Images": "Images d’équipe",
+            "Upload team-related images. These will still be stored under raw player images.": "Téléchargez des images liées à l’équipe. Elles seront toujours enregistrées dans les images brutes du joueur.",
+            "You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.": "Vous pouvez télécharger un maximum combiné de 20 images sur les quatre groupes d’images. Max 5 Mo par image.",
             "Submit Intake Form": "Soumettre le formulaire d’inscription",
             "Please fix the following:": "Veuillez corriger les éléments suivants :"
         },
         de: {
             "Intake": "Anmeldung",
             "Form": "Formular",
+            "Use this form to build your": "Verwenden Sie dieses Formular, um Ihr",
+            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portfolio zu erstellen: Teilen Sie Ihre wichtigsten Daten, Highlights und Links, damit wir ein Portfolio erstellen können, das präzise, professionell und bereit zum Teilen ist.",
             "This form will translate automatically based on detected region.": "Dieses Formular wird automatisch basierend auf der erkannten Region übersetzt.",
             "Athlete Details": "Athletendaten",
             "First Name": "Vorname",
@@ -1581,14 +1600,22 @@
             "S&C Trainer Email": "E-Mail des Kraft- und Konditionstrainers",
             "S&C Trainer Phone": "Telefon des Kraft- und Konditionstrainers",
             "Images": "Bilder",
-            "Raw Player Images": "Rohe Spielerbilder",
-            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Laden Sie bis zu 20 PNG-Einzelbilder des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.",
+            "Action Images": "Aktionsbilder",
+            "Upload action shots of the athlete. These will still be stored under raw player images.": "Laden Sie Actionfotos des Athleten hoch. Diese werden weiterhin unter den rohen Spielerbildern gespeichert.",
+            "Portrait Images": "Porträtbilder",
+            "National Team Images": "Nationalmannschaftsbilder",
+            "Upload images related to national team play. These will still be stored under raw player images.": "Laden Sie Bilder hoch, die mit Einsätzen in der Nationalmannschaft zusammenhängen. Diese werden weiterhin unter den rohen Spielerbildern gespeichert.",
+            "Team Images": "Teambilder",
+            "Upload team-related images. These will still be stored under raw player images.": "Laden Sie teambezogene Bilder hoch. Diese werden weiterhin unter den rohen Spielerbildern gespeichert.",
+            "You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.": "Sie können insgesamt maximal 20 Bilder über alle vier Bildgruppen hinweg hochladen. Max. 5 MB pro Bild.",
             "Submit Intake Form": "Anmeldeformular absenden",
             "Please fix the following:": "Bitte korrigieren Sie Folgendes:"
         },
         it: {
             "Intake": "Registrazione",
             "Form": "Modulo",
+            "Use this form to build your": "Usa questo modulo per creare il tuo",
+            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portfolio: condividi i tuoi dettagli principali, highlights e link così possiamo creare un portfolio accurato, curato e pronto da condividere.",
             "This form will translate automatically based on detected region.": "Questo modulo verrà tradotto automaticamente in base alla regione rilevata.",
             "Athlete Details": "Dettagli dell’atleta",
             "First Name": "Nome",
@@ -1686,14 +1713,22 @@
             "S&C Trainer Email": "Email del preparatore atletico",
             "S&C Trainer Phone": "Telefono del preparatore atletico",
             "Images": "Immagini",
-            "Raw Player Images": "Immagini grezze del giocatore",
-            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Carica fino a 20 immagini PNG del giocatore, ritagliate dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.",
+            "Action Images": "Immagini d'azione",
+            "Upload action shots of the athlete. These will still be stored under raw player images.": "Carica foto d'azione dell'atleta. Verranno comunque salvate nelle immagini grezze del giocatore.",
+            "Portrait Images": "Immagini ritratto",
+            "National Team Images": "Immagini della nazionale",
+            "Upload images related to national team play. These will still be stored under raw player images.": "Carica immagini relative alla nazionale. Verranno comunque salvate nelle immagini grezze del giocatore.",
+            "Team Images": "Immagini di squadra",
+            "Upload team-related images. These will still be stored under raw player images.": "Carica immagini relative alla squadra. Verranno comunque salvate nelle immagini grezze del giocatore.",
+            "You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.": "Puoi caricare un massimo combinato di 20 immagini in tutti e quattro i gruppi. Max 5 MB per immagine.",
             "Submit Intake Form": "Invia modulo di registrazione",
             "Please fix the following:": "Correggi quanto segue:"
         },
         nl: {
             "Intake": "Inschrijving",
             "Form": "Formulier",
+            "Use this form to build your": "Gebruik dit formulier om uw",
+            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portfolio op te bouwen: deel uw belangrijkste gegevens, highlights en links zodat wij een portfolio kunnen maken dat nauwkeurig, verzorgd en klaar is om te delen.",
             "This form will translate automatically based on detected region.": "Dit formulier wordt automatisch vertaald op basis van de gedetecteerde regio.",
             "Athlete Details": "Gegevens van de atleet",
             "First Name": "Voornaam",
@@ -1791,8 +1826,14 @@
             "S&C Trainer Email": "E-mail kracht- en conditietrainer",
             "S&C Trainer Phone": "Telefoon kracht- en conditietrainer",
             "Images": "Afbeeldingen",
-            "Raw Player Images": "Ruwe spelersafbeeldingen",
-            "Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.": "Upload tot 20 PNG-afbeeldingen van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.",
+            "Action Images": "Actieafbeeldingen",
+            "Upload action shots of the athlete. These will still be stored under raw player images.": "Upload actiefoto's van de atleet. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.",
+            "Portrait Images": "Portretafbeeldingen",
+            "National Team Images": "Afbeeldingen nationaal team",
+            "Upload images related to national team play. These will still be stored under raw player images.": "Upload afbeeldingen die te maken hebben met het nationale team. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.",
+            "Team Images": "Teamafbeeldingen",
+            "Upload team-related images. These will still be stored under raw player images.": "Upload teamgerelateerde afbeeldingen. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.",
+            "You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.": "U kunt in totaal maximaal 20 afbeeldingen uploaden verdeeld over alle vier afbeeldingsgroepen. Maximaal 5 MB per afbeelding.",
             "Submit Intake Form": "Inschrijfformulier verzenden",
             "Please fix the following:": "Corrigeer het volgende:"
         }
@@ -1944,10 +1985,16 @@
         nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
 
         if (nationalTeamImagesWrap) {
-            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'none';
+            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'block';
         }
 
         if (!hasExperience) {
+            nationalTeamFieldWrap.style.display = 'none';
+
+            if (nationalTeamImagesWrap) {
+                nationalTeamImagesWrap.style.display = 'none';
+            }
+
             nationalTeamSelect.value = '';
             nationalTeamOtherSection.style.display = 'none';
 
@@ -1967,58 +2014,58 @@
     }
 
     function updateImageInstructions(lang) {
-    const sport = document.getElementById('sport').value;
-    const portraitHint = document.getElementById('portrait_images_hint');
+        const sport = document.getElementById('sport').value;
+        const portraitHint = document.getElementById('portrait_images_hint');
 
-    if (!portraitHint) return;
+        if (!portraitHint) return;
 
-    const translatedHints = {
-        en: {
-            soccer: 'Upload portrait or solo soccer player images. These will still be stored under raw player images.',
-            basketball: 'Upload portrait or solo basketball player images. These will still be stored under raw player images.',
-            default: 'Upload portrait or solo player images. These will still be stored under raw player images.',
-        },
-        nl: {
-            soccer: 'Upload portret- of solo-afbeeldingen van de voetballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
-            basketball: 'Upload portret- of solo-afbeeldingen van de basketballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
-            default: 'Upload portret- of solo-afbeeldingen van de speler. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
-        },
-        fr: {
-            soccer: 'Téléchargez des portraits ou images solo du joueur de football. Elles seront toujours enregistrées dans les images brutes du joueur.',
-            basketball: 'Téléchargez des portraits ou images solo du basketteur. Elles seront toujours enregistrées dans les images brutes du joueur.',
-            default: 'Téléchargez des portraits ou images solo du joueur. Elles seront toujours enregistrées dans les images brutes du joueur.',
-        },
-        de: {
-            soccer: 'Laden Sie Porträt- oder Einzelbilder des Fußballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
-            basketball: 'Laden Sie Porträt- oder Einzelbilder des Basketballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
-            default: 'Laden Sie Porträt- oder Einzelbilder des Spielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
-        },
-        es: {
-            soccer: 'Sube retratos o imágenes individuales del jugador de fútbol. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
-            basketball: 'Sube retratos o imágenes individuales del jugador de baloncesto. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
-            default: 'Sube retratos o imágenes individuales del jugador. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
-        },
-        it: {
-            soccer: 'Carica ritratti o immagini singole del calciatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
-            basketball: 'Carica ritratti o immagini singole del giocatore di basket. Verranno comunque salvate nelle immagini grezze del giocatore.',
-            default: 'Carica ritratti o immagini singole del giocatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
-        },
-    };
+        const translatedHints = {
+            en: {
+                soccer: 'Upload portrait or solo soccer player images. These will still be stored under raw player images.',
+                basketball: 'Upload portrait or solo basketball player images. These will still be stored under raw player images.',
+                default: 'Upload portrait or solo player images. These will still be stored under raw player images.',
+            },
+            nl: {
+                soccer: 'Upload portret- of solo-afbeeldingen van de voetballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+                basketball: 'Upload portret- of solo-afbeeldingen van de basketballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+                default: 'Upload portret- of solo-afbeeldingen van de speler. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+            },
+            fr: {
+                soccer: 'Téléchargez des portraits ou images solo du joueur de football. Elles seront toujours enregistrées dans les images brutes du joueur.',
+                basketball: 'Téléchargez des portraits ou images solo du basketteur. Elles seront toujours enregistrées dans les images brutes du joueur.',
+                default: 'Téléchargez des portraits ou images solo du joueur. Elles seront toujours enregistrées dans les images brutes du joueur.',
+            },
+            de: {
+                soccer: 'Laden Sie Porträt- oder Einzelbilder des Fußballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+                basketball: 'Laden Sie Porträt- oder Einzelbilder des Basketballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+                default: 'Laden Sie Porträt- oder Einzelbilder des Spielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+            },
+            es: {
+                soccer: 'Sube retratos o imágenes individuales del jugador de fútbol. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+                basketball: 'Sube retratos o imágenes individuales del jugador de baloncesto. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+                default: 'Sube retratos o imágenes individuales del jugador. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+            },
+            it: {
+                soccer: 'Carica ritratti o immagini singole del calciatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
+                basketball: 'Carica ritratti o immagini singole del giocatore di basket. Verranno comunque salvate nelle immagini grezze del giocatore.',
+                default: 'Carica ritratti o immagini singole del giocatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
+            },
+        };
 
-    const hints = translatedHints[lang] || translatedHints.en;
+        const hints = translatedHints[lang] || translatedHints.en;
 
-    if (sport === 'soccer') {
-        portraitHint.textContent = hints.soccer;
-        return;
+        if (sport === 'soccer') {
+            portraitHint.textContent = hints.soccer;
+            return;
+        }
+
+        if (sport === 'basketball') {
+            portraitHint.textContent = hints.basketball;
+            return;
+        }
+
+        portraitHint.textContent = hints.default;
     }
-
-    if (sport === 'basketball') {
-        portraitHint.textContent = hints.basketball;
-        return;
-    }
-
-    portraitHint.textContent = hints.default;
-}
 
     function toggleCustomHighlights() {
         const toggle = document.getElementById('use_custom_highlights');
