@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Schedule extends Model
 {
     protected $fillable = [
-        'club_id',
         'created_by_user_id',
         'title',
         'opponent',
@@ -30,11 +29,6 @@ class Schedule extends Model
         'is_home' => 'boolean',
     ];
 
-    public function club(): BelongsTo
-    {
-        return $this->belongsTo(Club::class);
-    }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
@@ -42,11 +36,6 @@ class Schedule extends Model
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)
-            ->withPivot([
-                'will_come',
-                'responded_at',
-            ])
-            ->withTimestamps();
+        return $this->belongsToMany(User::class)->withTimestamps();
     }
 }

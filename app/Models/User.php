@@ -166,10 +166,6 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function schedules(): BelongsToMany
     {
         return $this->belongsToMany(Schedule::class, 'schedule_user')
-            ->withPivot([
-                'will_come',
-                'responded_at',
-            ])
             ->withTimestamps()
             ->orderBy('game_date')
             ->orderBy('game_time');

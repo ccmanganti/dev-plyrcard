@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Schedules;
 use App\Filament\Resources\Schedules\Pages\CreateSchedule;
 use App\Filament\Resources\Schedules\Pages\EditSchedule;
 use App\Filament\Resources\Schedules\Pages\ListSchedules;
-use App\Models\Club;
 use App\Models\Schedule;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
@@ -23,10 +22,10 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class ScheduleResource extends Resource
@@ -46,16 +45,6 @@ class ScheduleResource extends Resource
             Section::make('Game Details')
                 ->columns(2)
                 ->schema([
-                    Select::make('club_id')
-                        ->label('Club')
-                        ->relationship('club', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->default(fn () => auth()->user()?->hasRole('superadmin') ? null : auth()->user()?->club_id)
-                        ->disabled(fn () => ! auth()->user()?->hasRole('superadmin'))
-                        ->dehydrated(),
-
                     TextInput::make('title')
                         ->maxLength(255)
                         ->placeholder('League Match, Tournament Game, Playoff Game'),
@@ -111,24 +100,16 @@ class ScheduleResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['club.league', 'creator']);
+                $query->with(['creator', 'users']);
 
                 if (! auth()->user()?->hasRole('superadmin')) {
-                    $query->where('club_id', auth()->user()?->club_id);
+                    $query->whereHas('users', function (Builder $q) {
+                        $q->where('users.id', auth()->id());
+                    });
                 }
             })
             ->defaultSort('game_date', 'asc')
             ->columns([
-                TextColumn::make('club.name')
-                    ->label('Club')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('club.league.name')
-                    ->label('League')
-                    ->searchable()
-                    ->toggleable(),
-
                 TextColumn::make('title')
                     ->searchable()
                     ->toggleable(),
@@ -168,38 +149,6 @@ class ScheduleResource extends Resource
                     })
                     ->sortable(),
 
-                ToggleColumn::make('will_come_toggle')
-                    ->label('Attending / Show on Site')
-                    ->visible(fn () => ! auth()->user()?->hasRole('superadmin'))
-                    ->getStateUsing(function (Schedule $record): bool {
-                        $currentUser = $record->users()
-                            ->whereKey(auth()->id())
-                            ->first();
-
-                        return (bool) ($currentUser?->pivot?->will_come ?? false);
-                    })
-                    ->updateStateUsing(function (Schedule $record, bool $state): void {
-                        $userId = auth()->id();
-
-                        $exists = $record->users()
-                            ->whereKey($userId)
-                            ->exists();
-
-                        if ($exists) {
-                            $record->users()->updateExistingPivot($userId, [
-                                'will_come' => $state,
-                                'responded_at' => now(),
-                            ]);
-                        } else {
-                            $record->users()->attach($userId, [
-                                'will_come' => $state,
-                                'responded_at' => now(),
-                            ]);
-                        }
-
-                        unset($record->users);
-                    }),
-
                 TextColumn::make('result')
                     ->toggleable(),
 
@@ -220,38 +169,6 @@ class ScheduleResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('club_id')
-                    ->label('Club')
-                    ->relationship('club', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->visible(fn () => auth()->user()?->hasRole('superadmin')),
-
-                SelectFilter::make('league')
-                    ->label('League')
-                    ->options(function (): array {
-                        return Club::query()
-                            ->whereHas('league')
-                            ->with('league')
-                            ->get()
-                            ->filter(fn ($club) => $club->league?->id && $club->league?->name)
-                            ->mapWithKeys(fn ($club) => [
-                                $club->league->id => $club->league->name,
-                            ])
-                            ->sort()
-                            ->all();
-                    })
-                    ->query(function (Builder $query, array $data): Builder {
-                        $value = $data['value'] ?? null;
-
-                        if (blank($value)) {
-                            return $query;
-                        }
-
-                        return $query->whereHas('club.league', fn (Builder $q) => $q->whereKey($value));
-                    })
-                    ->visible(fn () => auth()->user()?->hasRole('superadmin')),
-
                 SelectFilter::make('status')
                     ->options([
                         'upcoming' => 'Upcoming',
@@ -273,27 +190,34 @@ class ScheduleResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['club.league', 'creator']);
+        $query = parent::getEloquentQuery()->with(['creator', 'users']);
+
+        if (! auth()->user()?->hasRole('superadmin')) {
+            $query->whereHas('users', function (Builder $q) {
+                $q->where('users.id', auth()->id());
+            });
+        }
+
+        return $query;
     }
 
     public static function mutateScheduleDataBeforeCreate(array $data): array
     {
         $data['created_by_user_id'] = auth()->id();
 
-        if (! auth()->user()?->hasRole('superadmin')) {
-            $data['club_id'] = auth()->user()?->club_id;
-        }
-
         return $data;
     }
 
     public static function mutateScheduleDataBeforeSave(array $data): array
     {
-        if (! auth()->user()?->hasRole('superadmin')) {
-            $data['club_id'] = auth()->user()?->club_id;
-        }
-
         return $data;
+    }
+
+    public static function afterCreate(Model $record): void
+    {
+        if (auth()->check() && ! $record->users()->where('users.id', auth()->id())->exists()) {
+            $record->users()->attach(auth()->id());
+        }
     }
 
     public static function getRedirectAfterSaveUrl(): string
