@@ -363,14 +363,36 @@ class PublicPlayerIntakeController extends Controller
             'national_team_id' => ['nullable', 'string'],
             'national_team_other' => ['nullable', 'string', 'max:255'],
 
-            'player_image' => ['nullable', 'array', 'max:20'],
-            'player_image.*' => ['image', 'mimes:png', 'max:5120'],
+            'action_images' => ['nullable', 'array'],
+            'action_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+
+            'portrait_images' => ['nullable', 'array'],
+            'portrait_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+
+            'national_team_images' => ['nullable', 'array'],
+            'national_team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+
+            'team_images' => ['nullable', 'array'],
+            'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+
 
             'player_bio' => ['nullable', 'string'],
             'featured_video_url' => ['nullable', 'url', 'max:500'],
             'use_custom_highlights' => ['nullable', 'boolean'],
             'featured_video_urls' => ['nullable', 'string'],
         ]);
+
+        $totalRawImages =
+            count($request->file('action_images', [])) +
+            count($request->file('portrait_images', [])) +
+            count($request->file('national_team_images', [])) +
+            count($request->file('team_images', []));
+
+        if ($totalRawImages > 20) {
+            throw ValidationException::withMessages([
+                'action_images' => 'You may upload a combined maximum of 20 raw images across Action, Portrait, National Team, and Team images.',
+            ]);
+        }
 
         if (($validated['country'] ?? null) === '__other__' && filled($validated['country_other'] ?? null)) {
             $validated['country'] = trim($validated['country_other']);
@@ -794,15 +816,24 @@ class PublicPlayerIntakeController extends Controller
     {
         $paths = [];
 
-        if ($request->hasFile('player_image')) {
-            $files = array_filter($request->file('player_image') ?? []);
+        $groupedFiles = collect([
+            ...array_filter($request->file('action_images') ?? []),
+            ...array_filter($request->file('portrait_images') ?? []),
+            ...array_filter($request->file('national_team_images') ?? []),
+            ...array_filter($request->file('team_images') ?? []),
+        ]);
 
-            $paths['raw_player_images'] = collect($files)
-                ->filter(fn ($file) => $file && $file->isValid())
-                ->take(20)
-                ->map(fn ($file) => $file->store('user-player-images', 'public'))
-                ->values()
-                ->all();
+        $storedFiles = $groupedFiles
+            ->filter(fn ($file) => $file && $file->isValid())
+            ->take(20)
+            ->map(function ($file) {
+                return $file->store('user-player-images', 'public');
+            })
+            ->values()
+            ->all();
+
+        if (! empty($storedFiles)) {
+            $paths['raw_player_images'] = $storedFiles;
         }
 
         return $paths;

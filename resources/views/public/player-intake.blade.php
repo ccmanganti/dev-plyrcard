@@ -1145,22 +1145,69 @@
                     <h2>Images</h2>
 
                     <div class="grid">
-                        <div class="col-12">
-                            <label for="player_image">Raw Player Images</label>
+                        <div class="col-6">
+                            <label for="action_images">Action Images</label>
                             <input
                                 type="file"
-                                id="player_image"
-                                name="player_image[]"
-                                accept="image/png"
+                                id="action_images"
+                                name="action_images[]"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
                                 multiple
                             >
-                            <div class="hint" id="player_image_hint">
-                                Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.
+                            <div class="hint">
+                                Upload action shots of the athlete. These will still be stored under raw player images.
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <label for="portrait_images">Portrait Images</label>
+                            <input
+                                type="file"
+                                id="portrait_images"
+                                name="portrait_images[]"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                multiple
+                            >
+                            <div class="hint" id="portrait_images_hint">
+                                Upload portrait or solo player images. These will still be stored under raw player images.
+                            </div>
+                        </div>
+
+                        <div class="col-6 other-wrap" id="national_team_images_wrap">
+                            <label for="national_team_images">National Team Images</label>
+                            <input
+                                type="file"
+                                id="national_team_images"
+                                name="national_team_images[]"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                multiple
+                            >
+                            <div class="hint">
+                                Upload images related to national team play. These will still be stored under raw player images.
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <label for="team_images">Team Images</label>
+                            <input
+                                type="file"
+                                id="team_images"
+                                name="team_images[]"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                multiple
+                            >
+                            <div class="hint">
+                                Upload team-related images. These will still be stored under raw player images.
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="hint" id="raw_images_total_hint">
+                                You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="actions">
                     <button type="submit" class="btn">Submit Intake Form</button>
                 </div>
@@ -1887,6 +1934,8 @@
         const nationalTeamFieldWrap = document.getElementById('national_team_field_wrap');
         const nationalTeamSelect = document.getElementById('national_team_id');
         const nationalTeamOtherSection = document.getElementById('national_team_other_section');
+        const nationalTeamImagesWrap = document.getElementById('national_team_images_wrap');
+        const nationalTeamImagesInput = document.getElementById('national_team_images');
 
         if (!natlTeamExp || !nationalTeamFieldWrap || !nationalTeamSelect || !nationalTeamOtherSection) return;
 
@@ -1894,13 +1943,23 @@
 
         nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
 
+        if (nationalTeamImagesWrap) {
+            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'none';
+        }
+
         if (!hasExperience) {
             nationalTeamSelect.value = '';
             nationalTeamOtherSection.style.display = 'none';
+
             const otherInput = document.getElementById('national_team_other');
             if (otherInput) {
                 otherInput.value = '';
             }
+
+            if (nationalTeamImagesInput) {
+                nationalTeamImagesInput.value = '';
+            }
+
             return;
         }
 
@@ -1908,58 +1967,58 @@
     }
 
     function updateImageInstructions(lang) {
-        const sport = document.getElementById('sport').value;
-        const playerImageHint = document.getElementById('player_image_hint');
+    const sport = document.getElementById('sport').value;
+    const portraitHint = document.getElementById('portrait_images_hint');
 
-        if (!playerImageHint) return;
+    if (!portraitHint) return;
 
-        const translatedHints = {
-            en: {
-                soccer: 'Upload up to 20 PNG solo soccer player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.',
-                basketball: 'Upload up to 20 PNG solo basketball player images cropped from the top of the head to around the belly area (half body). Transparent background preferred. Max 5MB per image.',
-                default: 'Upload up to 20 PNG solo player images cropped from head to belly (half body). Transparent background preferred. Max 5MB per image.',
-            },
-            nl: {
-                soccer: 'Upload tot 20 PNG-afbeeldingen van alleen een voetballer, uitgesneden van de bovenkant van het hoofd tot ongeveer de buikstreek (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
-                basketball: 'Upload tot 20 PNG-afbeeldingen van alleen een basketballer, uitgesneden van de bovenkant van het hoofd tot ongeveer de buikstreek (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
-                default: 'Upload tot 20 PNG-afbeeldingen van alleen de speler, uitgesneden van hoofd tot buik (half lichaam). Transparante achtergrond heeft de voorkeur. Maximaal 5 MB per afbeelding.',
-            },
-            fr: {
-                soccer: 'Téléchargez jusqu’à 20 images PNG d’un joueur de football seul, recadrées du haut de la tête jusqu’à la zone du ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
-                basketball: 'Téléchargez jusqu’à 20 images PNG d’un basketteur seul, recadrées du haut de la tête jusqu’à la zone du ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
-                default: 'Téléchargez jusqu’à 20 images PNG du joueur seul, recadrées de la tête au ventre (demi-corps). Fond transparent recommandé. Max 5 Mo par image.',
-            },
-            de: {
-                soccer: 'Laden Sie bis zu 20 PNG-Einzelbilder eines Fußballspielers hoch, zugeschnitten vom oberen Kopfbereich bis etwa zum Bauchbereich (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
-                basketball: 'Laden Sie bis zu 20 PNG-Einzelbilder eines Basketballspielers hoch, zugeschnitten vom oberen Kopfbereich bis etwa zum Bauchbereich (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
-                default: 'Laden Sie bis zu 20 PNG-Einzelbilder des Spielers hoch, zugeschnitten von Kopf bis Bauch (Halbkörper). Transparenter Hintergrund bevorzugt. Max. 5 MB pro Bild.',
-            },
-            es: {
-                soccer: 'Sube hasta 20 imágenes PNG de un jugador de fútbol, recortadas desde la parte superior de la cabeza hasta aproximadamente el área del abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
-                basketball: 'Sube hasta 20 imágenes PNG de un jugador de baloncesto, recortadas desde la parte superior de la cabeza hasta aproximadamente el área del abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
-                default: 'Sube hasta 20 imágenes PNG del jugador, recortadas de la cabeza al abdomen (medio cuerpo). Se prefiere fondo transparente. Máximo 5 MB por imagen.',
-            },
-            it: {
-                soccer: 'Carica fino a 20 immagini PNG di un calciatore, ritagliate dalla parte superiore della testa fino all’area dello stomaco (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
-                basketball: 'Carica fino a 20 immagini PNG di un giocatore di basket, ritagliate dalla parte superiore della testa fino all’area dello stomaco (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
-                default: 'Carica fino a 20 immagini PNG del giocatore, ritagliate dalla testa alla pancia (mezzo corpo). Sfondo trasparente preferito. Max 5 MB per immagine.',
-            },
-        };
+    const translatedHints = {
+        en: {
+            soccer: 'Upload portrait or solo soccer player images. These will still be stored under raw player images.',
+            basketball: 'Upload portrait or solo basketball player images. These will still be stored under raw player images.',
+            default: 'Upload portrait or solo player images. These will still be stored under raw player images.',
+        },
+        nl: {
+            soccer: 'Upload portret- of solo-afbeeldingen van de voetballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+            basketball: 'Upload portret- of solo-afbeeldingen van de basketballer. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+            default: 'Upload portret- of solo-afbeeldingen van de speler. Deze worden nog steeds opgeslagen onder ruwe spelersafbeeldingen.',
+        },
+        fr: {
+            soccer: 'Téléchargez des portraits ou images solo du joueur de football. Elles seront toujours enregistrées dans les images brutes du joueur.',
+            basketball: 'Téléchargez des portraits ou images solo du basketteur. Elles seront toujours enregistrées dans les images brutes du joueur.',
+            default: 'Téléchargez des portraits ou images solo du joueur. Elles seront toujours enregistrées dans les images brutes du joueur.',
+        },
+        de: {
+            soccer: 'Laden Sie Porträt- oder Einzelbilder des Fußballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+            basketball: 'Laden Sie Porträt- oder Einzelbilder des Basketballspielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+            default: 'Laden Sie Porträt- oder Einzelbilder des Spielers hoch. Diese werden weiterhin unter rohen Spielerbildern gespeichert.',
+        },
+        es: {
+            soccer: 'Sube retratos o imágenes individuales del jugador de fútbol. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+            basketball: 'Sube retratos o imágenes individuales del jugador de baloncesto. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+            default: 'Sube retratos o imágenes individuales del jugador. Estas seguirán guardándose en las imágenes sin procesar del jugador.',
+        },
+        it: {
+            soccer: 'Carica ritratti o immagini singole del calciatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
+            basketball: 'Carica ritratti o immagini singole del giocatore di basket. Verranno comunque salvate nelle immagini grezze del giocatore.',
+            default: 'Carica ritratti o immagini singole del giocatore. Verranno comunque salvate nelle immagini grezze del giocatore.',
+        },
+    };
 
-        const hints = translatedHints[lang] || translatedHints.en;
+    const hints = translatedHints[lang] || translatedHints.en;
 
-        if (sport === 'soccer') {
-            playerImageHint.textContent = hints.soccer;
-            return;
-        }
-
-        if (sport === 'basketball') {
-            playerImageHint.textContent = hints.basketball;
-            return;
-        }
-
-        playerImageHint.textContent = hints.default;
+    if (sport === 'soccer') {
+        portraitHint.textContent = hints.soccer;
+        return;
     }
+
+    if (sport === 'basketball') {
+        portraitHint.textContent = hints.basketball;
+        return;
+    }
+
+    portraitHint.textContent = hints.default;
+}
 
     function toggleCustomHighlights() {
         const toggle = document.getElementById('use_custom_highlights');
