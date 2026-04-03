@@ -29,6 +29,11 @@ class RoleResource extends Resource
 
     protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->check() && auth()->user()->hasRole('Superadmin');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return RoleForm::configure($schema)->components([

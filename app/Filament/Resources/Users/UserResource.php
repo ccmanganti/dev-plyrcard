@@ -44,6 +44,11 @@ class UserResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Users & Permissions';
     protected static ?string $recordTitleAttribute = 'first_name';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->check() && auth()->user()->hasRole('Superadmin');
+    }
+
     public static function getNavigationBadge(): ?string
     {
         return (string) static::getModel()::count();

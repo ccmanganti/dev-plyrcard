@@ -27,6 +27,11 @@ class PermissionResource extends Resource
 
     protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->check() && auth()->user()->hasRole('Superadmin');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PermissionForm::configure($schema)->components([
