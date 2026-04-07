@@ -365,11 +365,34 @@
         'Championship' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_championship', '')),
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Desktop accolades
-    |--------------------------------------------------------------------------
-    */
+    $desktopClubLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_club_logo', $clubLogoRaw),
+        ''
+    );
+
+    $desktopLeagueLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_league_logo', $leagueLogoRaw),
+        ''
+    );
+
+    $desktopNationalLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_national_logo', $nationalLogoRaw),
+        ''
+    );
+
+    $desktopMaxSpeed = strtoupper($normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
+        ' '
+    ));
+
+    $desktopDominantFoot = strtoupper($normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_dominant_foot', $user?->dominant_foot ?? ''),
+        ' '
+    ));
+
+    $hasDesktopCardLogos = filled($desktopClubLogoUrl) || filled($desktopLeagueLogoUrl) || filled($desktopNationalLogoUrl);
+    $hasDesktopCardStats = filled($desktopMaxSpeed) || filled($desktopDominantFoot);
+
     $sportsAccoladesRaw = trim($normalizeDisplayValue(
         $getHeroFieldValue('hero_sports_accolades', $user?->sports_accolades ?? '')
     ));
@@ -396,7 +419,7 @@
     if ($user?->natl_team_exp && $desktopNationalTeamName !== '') {
         $desktopAccolades->push([
             'text' => $desktopNationalTeamName,
-            'icon' => filled($resolveMediaUrl($nationalLogoRaw, '')) ? $resolveMediaUrl($nationalLogoRaw, '') : null,
+            'icon' => filled($desktopNationalLogoUrl) ? $desktopNationalLogoUrl : null,
             'is_national' => true,
         ]);
     }
@@ -425,11 +448,6 @@
         ->take(3)
         ->values();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Mobile values copied from the other template
-    |--------------------------------------------------------------------------
-    */
     $mobileClass = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_class', $user?->year ?? ''), ' '));
     $mobileGpa = strtoupper($formatGpaDisplay($getHeroFieldValue('hero_stat_gpa', $user?->gpa ?? '')));
     $mobileDob = $formatDateDisplay($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''));
@@ -460,20 +478,9 @@
         $getHeroFieldValue('hero_stat_dominant_foot', $user?->dominant_foot ?? '')
     );
 
-    $mobileClubLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_club_logo', $clubLogoRaw),
-        ''
-    );
-
-    $mobileLeagueLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_league_logo', $leagueLogoRaw),
-        ''
-    );
-
-    $mobileNationalLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_national_logo', $nationalLogoRaw),
-        ''
-    );
+    $mobileClubLogoUrl = $desktopClubLogoUrl;
+    $mobileLeagueLogoUrl = $desktopLeagueLogoUrl;
+    $mobileNationalLogoUrl = $desktopNationalLogoUrl;
 
     $mobileTopLogoUrl = $mobileLeagueLogoUrl ?: $ballLogoUrl ?: $mobileClubLogoUrl ?: '';
 
@@ -482,11 +489,6 @@
 
     $displayPositionMobile = $abbreviatePositionDisplay($getHeroFieldValue('hero_display_position', $user?->position ?? ''));
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dynamic mobile name sizing
-    |--------------------------------------------------------------------------
-    */
     $firstNameLength = mb_strlen(trim($firstName));
     $lastNameLength = mb_strlen(trim($lastName));
 
@@ -531,10 +533,10 @@
     }
 
     .hero-player-card {
-        width: 200px !important;
-        max-width: 200px !important;
+        width: 250px !important;
+        max-width: 250px !important;
         height: auto !important;
-        flex: 0 0 200px !important;
+        flex: 0 0 250px !important;
     }
 
     .hero-right-content {
@@ -542,52 +544,171 @@
         max-width: 760px;
         margin-left: auto;
         padding-top: 1.5rem;
+        --card-stack-width: 250px;
+        --card-stack-offset: 30px;
+        --card-under-width: 188px;
     }
 
     .hero-name-and-card {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
         position: relative;
+        display: block;
+        padding-right: calc(var(--card-stack-width) + var(--card-stack-offset));
+        min-height: 0;
     }
 
     .hero-name-block {
         margin: 0 !important;
         padding: 0 !important;
         min-width: 0;
+        max-width: calc(100% - var(--card-stack-width) - var(--card-stack-offset));
     }
 
-    .hero-position-line {
-        margin-top: 4px;
-        margin-bottom: 10px;
+    .hero-name-top-line {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        flex-wrap: nowrap;
+        min-width: 0;
+    }
+
+    .hero-first-name-inline {
         font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
         font-weight: 300;
-        font-size: 22px;
-        line-height: 0.95;
-        letter-spacing: 0.12em;
+        font-size: 60px;
+        line-height: 0.9;
+        color: #fff;
+        flex: 0 0 auto;
+    }
+
+    .hero-position-inline {
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-weight: 300;
+        font-size: 18px;
+        line-height: 1;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         color: rgba(255,255,255,0.92);
+        white-space: nowrap;
+        flex: 0 1 auto;
+        padding-bottom: 8px;
+    }
+
+    .hero-last-name-inline {
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-weight: 700;
+        font-size: 80px;
+        line-height: 0.95;
+        color: #fff;
+        margin-top: 2px;
     }
 
     .hero-card-stack {
-        position: relative;
-        width: 200px;
-        max-width: 200px;
-        flex: 0 0 200px;
-        display: flex;
-        justify-content: flex-end;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: var(--card-stack-width);
+        max-width: var(--card-stack-width);
+        flex: 0 0 var(--card-stack-width);
+        display: block;
+        z-index: 3;
     }
 
     .hero-card-stack-inner {
         position: relative;
         width: 100%;
+        display: block;
+    }
+
+    .hero-card-under {
+        position: absolute;
+        top: calc(100% + 12px);
+        right: 0;
+        width: var(--card-under-width);
+        display: grid;
+        gap: 12px;
+        justify-items: start;
+    }
+
+    .hero-card-logo-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        margin-top: 0;
+    }
+
+    .hero-card-logo-slot {
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .hero-card-logo {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+
+    .hero-card-basic-stats {
+        width: 100%;
+        display: grid;
+        gap: 8px;
+        margin-top: 0;
+    }
+
+    .hero-card-basic-stat {
+        display: grid;
+        grid-template-columns: 16px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+    }
+
+    .hero-card-basic-stat-icon {
+        width: 14px;
+        height: 14px;
+        color: rgba(255,255,255,.88);
+        display: block;
+    }
+
+    .hero-card-basic-stat-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .hero-card-basic-stat-label {
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 11px;
+        line-height: 1;
+        font-weight: 400;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,.78);
+    }
+
+    .hero-card-basic-stat-value {
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 16px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #fff;
     }
 
     .hero-stats-block {
+        margin-top: 18px;
         margin-left: 0 !important;
         padding-left: 0 !important;
-        max-width: 610px;
+        max-width: calc(100% - var(--card-stack-width) - var(--card-stack-offset));
     }
 
     .hero-stats-grid {
@@ -609,7 +730,7 @@
     .hero-accolade-row {
         display: flex;
         align-items: center;
-        gap: 0.7rem;
+        gap: 0.6rem;
         width: 100%;
         max-width: 100%;
         overflow: hidden;
@@ -633,6 +754,9 @@
     }
 
     .hero-accolade-icon--trophy {
+        width: 24px;
+        height: 24px;
+        flex-basis: 24px;
         color: {{ $primary }};
     }
 
@@ -653,42 +777,6 @@
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         line-clamp: 2;
-    }
-
-    @media (min-width: 768px) {
-        .hero-accolade-text {
-            font-size: 23px;
-        }
-
-        .hero-accolade-icon {
-            width: 56px;
-            height: 56px;
-            flex-basis: 56px;
-        }
-    }
-
-    @media (min-width: 1024px) {
-        .hero-accolade-text {
-            font-size: 21px;
-        }
-
-        .hero-accolade-icon {
-            width: 58px;
-            height: 58px;
-            flex-basis: 58px;
-        }
-    }
-
-    @media (min-width: 1280px) {
-        .hero-accolade-text {
-            font-size: 23px;
-        }
-
-        .hero-accolade-icon {
-            width: 80px;
-            height: 80px;
-            flex-basis: 80px;
-        }
     }
 
     .hero-main-player-wrap {
@@ -779,45 +867,64 @@
     }
 
     @media (min-width: 768px) {
+        .hero-accolade-text {
+            font-size: 23px;
+        }
+
+        .hero-accolade-icon {
+            width: 56px;
+            height: 56px;
+            flex-basis: 56px;
+        }
+
+        .hero-accolade-icon--trophy {
+            width: 26px;
+            height: 26px;
+            flex-basis: 26px;
+        }
+
         .hero-player-card {
-            width: 200px !important;
-            max-width: 200px !important;
-            flex-basis: 200px !important;
+            width: 250px !important;
+            max-width: 250px !important;
+            flex-basis: 250px !important;
         }
 
         .hero-right-content {
             max-width: 790px;
             padding-top: 1.25rem;
+            --card-stack-width: 250px;
+            --card-stack-offset: 32px;
+            --card-under-width: 196px;
         }
 
         .hero-card-stack {
-            width: 200px;
-            max-width: 200px;
-            flex-basis: 200px;
+            width: var(--card-stack-width);
+            max-width: var(--card-stack-width);
+            flex-basis: var(--card-stack-width);
         }
 
-        .hero-position-line {
-            font-size: 24px;
+        .hero-card-logo-slot {
+            width: 54px;
+            height: 54px;
         }
 
-        .hero-stats-block {
-            max-width: 640px;
+        .hero-first-name-inline {
+            font-size: 60px;
+        }
+
+        .hero-position-inline {
+            font-size: 19px;
+            padding-bottom: 8px;
+        }
+
+        .hero-last-name-inline {
+            font-size: 80px;
         }
 
         .hero-stats-grid {
             grid-template-columns: minmax(135px, 185px) minmax(0, 1fr);
             column-gap: 1.35rem;
             row-gap: 0.55rem;
-        }
-
-        .hero-accolade-text {
-            font-size: 23px;
-        }
-
-        .hero-accolade-icon {
-            width: 30px;
-            height: 30px;
-            flex-basis: 30px;
         }
 
         .hero-main-player-wrap {
@@ -841,57 +948,61 @@
         .hero-action-player-img {
             max-height: 66vh !important;
         }
-
-        .hero-national-player-wrap {
-            left: 30% !important;
-            bottom: 40% !important;
-            width: 35% !important;
-            max-width: 35% !important;
-        }
-
-        .hero-national-player-img {
-            max-height: 56vh !important;
-        }
     }
 
     @media (min-width: 1024px) {
+        .hero-accolade-text {
+            font-size: 21px;
+        }
+
+        .hero-accolade-icon {
+            width: 58px;
+            height: 58px;
+            flex-basis: 58px;
+        }
+
+        .hero-accolade-icon--trophy {
+            width: 28px;
+            height: 28px;
+            flex-basis: 28px;
+        }
+
         .hero-player-card {
-            width: 200px !important;
-            max-width: 200px !important;
-            flex-basis: 200px !important;
+            width: 250px !important;
+            max-width: 250px !important;
+            flex-basis: 250px !important;
         }
 
         .hero-right-content {
             max-width: 800px;
             padding-top: 0.75rem;
-        }
-
-        .hero-name-and-card {
-            gap: 0.75rem;
+            --card-stack-width: 250px;
+            --card-stack-offset: 34px;
+            --card-under-width: 198px;
         }
 
         .hero-card-stack {
-            width: 200px;
-            max-width: 200px;
-            flex-basis: 200px;
+            width: var(--card-stack-width);
+            max-width: var(--card-stack-width);
+            flex-basis: var(--card-stack-width);
         }
 
-        .hero-position-line {
-            font-size: 25px;
+        .hero-first-name-inline {
+            font-size: 60px;
         }
 
-        .hero-stats-block {
-            max-width: 650px;
+        .hero-position-inline {
+            font-size: 20px;
+        }
+
+        .hero-last-name-inline {
+            font-size: 90px;
         }
 
         .hero-stats-grid {
             grid-template-columns: minmax(145px, 195px) minmax(0, 1fr);
             column-gap: 1.4rem;
             row-gap: 0.55rem;
-        }
-
-        .hero-accolade-text {
-            font-size: 21px;
         }
 
         .hero-main-player-wrap {
@@ -915,53 +1026,73 @@
         .hero-action-player-img {
             max-height: 68vh !important;
         }
-
-        .hero-national-player-wrap {
-            left: 30% !important;
-            bottom: 40% !important;
-            width: 36% !important;
-            max-width: 36% !important;
-        }
-
-        .hero-national-player-img {
-            max-height: 58vh !important;
-        }
-
-        .hero-team-bottom {
-            width: 68% !important;
-            max-width: 68% !important;
-        }
     }
 
     @media (min-width: 1280px) {
+        .hero-accolade-text {
+            font-size: 23px;
+        }
+
+        .hero-accolade-icon {
+            width: 80px;
+            height: 80px;
+            flex-basis: 80px;
+        }
+
+        .hero-accolade-icon--trophy {
+            width: 32px;
+            height: 32px;
+            flex-basis: 32px;
+        }
+
         .hero-player-card {
             padding: 20px 20px 0 0;
-            width: 200px !important;
-            max-width: 200px !important;
-            flex-basis: 200px !important;
+            width: 270px !important;
+            max-width: 270px !important;
+            flex-basis: 270px !important;
         }
 
         .hero-right-content {
             max-width: 820px;
+            --card-stack-width: 270px;
+            --card-stack-offset: 36px;
+            --card-under-width: 208px;
         }
 
         .hero-card-stack {
-            width: 220px;
-            max-width: 220px;
-            flex-basis: 220px;
+            width: var(--card-stack-width);
+            max-width: var(--card-stack-width);
+            flex-basis: var(--card-stack-width);
         }
 
-        .hero-position-line {
-            font-size: 26px;
+        .hero-card-logo-slot {
+            width: 58px;
+            height: 58px;
+        }
+
+        .hero-card-basic-stat-label {
+            font-size: 12px;
+        }
+
+        .hero-card-basic-stat-value {
+            font-size: 18px;
+        }
+
+        .hero-first-name-inline {
+            font-size: 60px;
+        }
+
+        .hero-position-inline {
+            font-size: 21px;
+            padding-bottom: 10px;
+        }
+
+        .hero-last-name-inline {
+            font-size: 90px;
         }
 
         .hero-stats-block {
-            margin-top: -40px;
-            max-width: 670px;
-        }
-
-        .hero-accolade-text {
-            font-size: 23px;
+            margin-top: 18px;
         }
 
         .hero-main-player-wrap {
@@ -984,17 +1115,6 @@
 
         .hero-action-player-img {
             max-height: 70vh !important;
-        }
-
-        .hero-national-player-wrap {
-            left: 40% !important;
-            bottom: 40% !important;
-            width: 37% !important;
-            max-width: 37% !important;
-        }
-
-        .hero-national-player-img {
-            max-height: 60vh !important;
         }
     }
 
@@ -1422,16 +1542,6 @@
                 @endif
 
                 <div class="hero-layered-stack absolute inset-0 z-10">
-                    @if ($playerNationalImageUrl)
-                        <div class="hero-national-player-wrap">
-                            <img
-                                src="{{ $playerNationalImageUrl }}"
-                                alt="{{ $playerFullName }} national team"
-                                class="hero-national-player-img drop-shadow-[0_16px_30px_rgba(0,0,0,.28)]"
-                            />
-                        </div>
-                    @endif
-
                     @if ($playerActionImageUrl)
                         <div class="hero-action-player-wrap">
                             <img
@@ -1464,19 +1574,21 @@
                 <div class="hero-right-content relative z-10 h-full">
                     <div class="hero-name-and-card">
                         <div class="hero-name-block">
-                            <div class="font-antonio font-light text-[60px] leading-none text-white md:text-[60px] lg:text-[60px]">
-                                {{ $firstName }}
+                            <div class="hero-name-top-line">
+                                <div class="hero-first-name-inline">
+                                    {{ $firstName }}
+                                </div>
+
+                                @if (filled($positionDisplay))
+                                    <div class="hero-position-inline">
+                                        {{ $positionDisplay }}
+                                    </div>
+                                @endif
                             </div>
 
-                            <div class="font-antonio font-bold text-[80px] leading-none text-white md:text-[80px] lg:text-[90px]">
+                            <div class="hero-last-name-inline">
                                 {{ $lastName }}
                             </div>
-
-                            @if (filled($positionDisplay))
-                                <div class="hero-position-line">
-                                    {{ $positionDisplay }}
-                                </div>
-                            @endif
                         </div>
 
                         <div class="hero-card-stack">
@@ -1488,6 +1600,78 @@
                                             alt="PlyrCard"
                                             class="hero-player-card object-contain drop-shadow-[0_10px_24px_rgba(0,0,0,.35)]"
                                         />
+                                    </div>
+                                @endif
+
+                                @if ($hasDesktopCardLogos || $hasDesktopCardStats)
+                                    <div class="hero-card-under">
+                                        @if ($hasDesktopCardLogos)
+                                            <div class="hero-card-logo-row">
+                                                @if (filled($desktopClubLogoUrl))
+                                                    <div class="hero-card-logo-slot">
+                                                        <img
+                                                            src="{{ $desktopClubLogoUrl }}"
+                                                            alt="Club logo"
+                                                            class="hero-card-logo"
+                                                        >
+                                                    </div>
+                                                @endif
+
+                                                @if (filled($desktopLeagueLogoUrl))
+                                                    <div class="hero-card-logo-slot">
+                                                        <img
+                                                            src="{{ $desktopLeagueLogoUrl }}"
+                                                            alt="League logo"
+                                                            class="hero-card-logo"
+                                                        >
+                                                    </div>
+                                                @endif
+
+                                                @if (filled($desktopNationalLogoUrl))
+                                                    <div class="hero-card-logo-slot">
+                                                        <img
+                                                            src="{{ $desktopNationalLogoUrl }}"
+                                                            alt="National team logo"
+                                                            class="hero-card-logo"
+                                                        >
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        @if ($hasDesktopCardStats)
+                                            <div class="hero-card-basic-stats">
+                                                @if (filled($desktopMaxSpeed))
+                                                    <div class="hero-card-basic-stat">
+                                                        <svg class="hero-card-basic-stat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                            <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>
+                                                        </svg>
+
+                                                        <div class="hero-card-basic-stat-copy">
+                                                            <div class="hero-card-basic-stat-label">Max Speed</div>
+                                                            <div class="hero-card-basic-stat-value">{{ $desktopMaxSpeed }}</div>
+                                                        </div>
+                                                    </div>
+                                                @endif
+
+                                                @if (filled($desktopDominantFoot))
+                                                    <div class="hero-card-basic-stat">
+                                                        <svg class="hero-card-basic-stat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <path d="M7 6.5c0-1.4 1-2.5 2.2-2.5S11.5 5 11.5 6.2c0 1-.6 1.8-1.4 2.2"/>
+                                                            <path d="M12.7 7.1c.8-.4 1.4-1.2 1.4-2.1 0-1.2-1-2.2-2.2-2.2S9.7 3.8 9.7 5"/>
+                                                            <path d="M8.4 10.2c-1 .9-1.9 2.4-1.9 4.3 0 3.1 2.2 5.5 5.5 5.5 2.3 0 4.1-1 5.1-2.5"/>
+                                                            <path d="M9.6 9.4c1.4-.5 3-.3 4.2.8 1.5 1.4 1.8 3.6.9 5.4"/>
+                                                            <path d="M16.8 15.7c.8-.9 1.2-2 1.2-3.3 0-2.8-2.3-5.1-5.1-5.1-.8 0-1.6.2-2.3.5"/>
+                                                        </svg>
+
+                                                        <div class="hero-card-basic-stat-copy">
+                                                            <div class="hero-card-basic-stat-label">Dominant Foot</div>
+                                                            <div class="hero-card-basic-stat-value">{{ $desktopDominantFoot }}</div>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
                             </div>
