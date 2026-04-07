@@ -544,6 +544,13 @@ class EditProfile extends Page implements HasForms
                                             ])
                                             ->visible(fn (callable $get) => $get('sport') === 'soccer')
                                             ->required(fn (callable $get) => $get('sport') === 'soccer'),
+
+                                        TextInput::make('max_speed')
+                                            ->prefixIcon('heroicon-m-bolt')
+                                            ->label('Max Speed')
+                                            ->placeholder('e.g. 19.00')
+                                            ->numeric()
+                                            ->step('0.01'),
                                     ]),
 
                                 Section::make('Experience')
@@ -581,6 +588,12 @@ class EditProfile extends Page implements HasForms
                                             ->prefixIcon('heroicon-m-users')
                                             ->label('Team')
                                             ->placeholder('Enter team name')
+                                            ->maxLength(255),
+                                        
+                                        TextInput::make('national_team_period')
+                                            ->prefixIcon('heroicon-m-calendar')
+                                            ->label('National Team Period')
+                                            ->placeholder('e.g. 2025-2026')
                                             ->maxLength(255),
 
                                         TextInput::make('new_club_name')

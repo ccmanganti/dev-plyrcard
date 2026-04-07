@@ -83,6 +83,8 @@ class User extends Authenticatable implements HasName, FilamentUser
         'youtube_uploads_playlist_id',
         'youtube_cached_videos',
         'youtube_cache_refreshed_at',
+        'national_team_period',
+        'max_speed',
     ];
 
     protected $hidden = [

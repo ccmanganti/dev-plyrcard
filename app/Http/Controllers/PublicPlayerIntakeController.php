@@ -325,6 +325,7 @@ class PublicPlayerIntakeController extends Controller
             'academic_accolades' => ['nullable', 'string'],
             'sports_accolades' => ['nullable', 'string'],
             'natl_team_exp' => ['nullable', 'in:0,1'],
+            'national_team_period' => ['nullable', 'string', 'max:255'],
             'team_name' => ['nullable', 'string', 'max:255'],
             'ig_handle' => ['nullable', 'url', 'max:255'],
             'x_handle' => ['nullable', 'url', 'max:255'],
@@ -374,7 +375,6 @@ class PublicPlayerIntakeController extends Controller
 
             'team_images' => ['nullable', 'array'],
             'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-
 
             'player_bio' => ['nullable', 'string'],
             'featured_video_url' => ['nullable', 'url', 'max:500'],
@@ -488,6 +488,7 @@ class PublicPlayerIntakeController extends Controller
                 'academic_accolades' => $validated['academic_accolades'] ?? null,
                 'sports_accolades' => $validated['sports_accolades'] ?? null,
                 'natl_team_exp' => $hasNationalTeamExperience,
+                'national_team_period' => $hasNationalTeamExperience ? ($validated['national_team_period'] ?? null) : null,
                 'team_name' => $validated['team_name'] ?? null,
                 'ig_handle' => $validated['ig_handle'] ?? null,
                 'x_handle' => $validated['x_handle'] ?? null,
@@ -714,24 +715,11 @@ class PublicPlayerIntakeController extends Controller
             ->first();
     }
 
-    protected function resolveHeroTemplate(string $sport): ?HeroTemplate
+    protected function resolveHeroTemplate(string $sport = null): ?HeroTemplate
     {
-        $exactMatch = HeroTemplate::query()
-            ->where('is_active', true)
-            ->whereJsonContains('sports', $sport)
-            ->orderBy('id')
-            ->first();
-
-        if ($exactMatch) {
-            return $exactMatch;
-        }
-
         return HeroTemplate::query()
             ->where('is_active', true)
-            ->where(function ($query) {
-                $query->whereNull('sports')
-                    ->orWhereJsonLength('sports', 0);
-            })
+            ->where('blade_view', 'hero.hero_template_free')
             ->orderBy('id')
             ->first();
     }

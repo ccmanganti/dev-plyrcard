@@ -10,17 +10,17 @@
 
     <style>
         :root {
-            --bg: #f8f8f6;
-            --panel: #f2f2f2;
-            --panel-2: #eceae5;
-            --field: #f7f7f7;
-            --field-border: #cfcfd4;
-            --text: #111111;
-            --muted: #6b7280;
-            --accent: #ff5f3a;
-            --accent-2: #f97316;
-            --border: #d8d8dc;
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --bg: #0a0a0a;
+            --panel: #111111;
+            --panel-2: #181818;
+            --field: #141414;
+            --field-border: #2c2c2c;
+            --text: #f5f5f5;
+            --muted: #b0b0b0;
+            --accent: #ff7a00;
+            --accent-2: #ff9a1f;
+            --border: #2a2a2a;
+            --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
             --radius-xl: 24px;
             --radius-lg: 20px;
             --radius-md: 16px;
@@ -37,8 +37,10 @@
             color: var(--text);
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background-color: var(--bg);
-            background-image: radial-gradient(circle, rgba(148, 163, 184, 0.28) 1px, transparent 1.2px);
-            background-size: 18px 18px;
+            background-image:
+                radial-gradient(circle at top left, rgba(255, 122, 0, 0.08), transparent 32%),
+                radial-gradient(circle, rgba(255, 122, 0, 0.12) 1px, transparent 1.2px);
+            background-size: auto, 18px 18px;
         }
 
         body.embed-mode {
@@ -55,13 +57,15 @@
             border: 1px solid var(--border);
             border-radius: 26px;
             overflow: hidden;
-            background: #f5f5f5;
+            background: #101010;
             box-shadow: var(--shadow);
         }
 
         .header {
             padding: 24px 24px 20px;
-            background: #ede8df;
+            background:
+                linear-gradient(135deg, rgba(255, 122, 0, 0.18) 0%, rgba(255, 122, 0, 0.05) 36%, rgba(0, 0, 0, 0) 100%),
+                #111111;
             border-bottom: 1px solid var(--border);
         }
 
@@ -72,8 +76,8 @@
             min-height: 30px;
             padding: 6px 14px;
             border-radius: 999px;
-            border: 1px solid rgba(255, 95, 58, 0.2);
-            background: rgba(255, 95, 58, 0.08);
+            border: 1px solid rgba(255, 122, 0, 0.28);
+            background: rgba(255, 122, 0, 0.12);
             color: var(--accent-2);
             font-size: 13px;
             font-weight: 700;
@@ -89,7 +93,7 @@
             line-height: .9;
             letter-spacing: .015em;
             text-transform: uppercase;
-            color: #000000;
+            color: #ffffff;
         }
 
         .hero-title .accent {
@@ -100,13 +104,13 @@
             margin: 8px 0 0;
             font-size: 20px;
             line-height: 1.3;
-            color: #232323;
+            color: #d6d6d6;
             max-width: 980px;
         }
 
         .content {
             padding: 20px;
-            background: #f7f7f7;
+            background: #0f0f0f;
         }
 
         .section {
@@ -114,7 +118,7 @@
             padding: 20px;
             border: 1px solid var(--border);
             border-radius: 22px;
-            background: #f3f3f3;
+            background: linear-gradient(180deg, #151515 0%, #111111 100%);
         }
 
         .section h2 {
@@ -122,7 +126,7 @@
             font-size: 22px;
             line-height: 1.1;
             font-weight: 700;
-            color: #1f2937;
+            color: #ffffff;
         }
 
         .grid {
@@ -142,7 +146,7 @@
             margin-bottom: 8px;
             font-size: 14px;
             font-weight: 700;
-            color: #111827;
+            color: #f3f4f6;
         }
 
         .required {
@@ -169,9 +173,9 @@
             width: 18px;
             height: 18px;
             border-radius: 999px;
-            border: 1px solid #111111;
-            background: #ffffff;
-            color: #111111;
+            border: 1px solid rgba(255, 122, 0, 0.55);
+            background: #1b1b1b;
+            color: var(--accent-2);
             font-size: 11px;
             font-weight: 700;
             line-height: 1;
@@ -189,11 +193,12 @@
             padding: 12px 14px;
             border-radius: 12px;
             background: #111111;
+            border: 1px solid rgba(255, 122, 0, 0.25);
             color: #ffffff;
             font-size: 12px;
             line-height: 1.5;
             font-weight: 400;
-            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -247,7 +252,7 @@
             border-radius: 14px;
             border: 1px solid var(--field-border);
             background: var(--field);
-            color: #111827;
+            color: #f9fafb;
             font-size: 14px;
             line-height: 1.45;
             outline: none;
@@ -257,15 +262,15 @@
 
         input::placeholder,
         textarea::placeholder {
-            color: #9ca3af;
+            color: #7b7b7b;
         }
 
         input:focus,
         select:focus,
         textarea:focus {
             border-color: var(--accent);
-            background: #ffffff;
-            box-shadow: 0 0 0 4px rgba(255, 95, 58, 0.12);
+            background: #1a1a1a;
+            box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.12);
         }
 
         textarea {
@@ -278,9 +283,9 @@
             min-height: 46px;
             padding: 10px 12px;
             border-radius: 14px;
-            border: 1px dashed rgba(255, 95, 58, 0.35);
-            background: #fff7f3;
-            color: #111827;
+            border: 1px dashed rgba(255, 122, 0, 0.35);
+            background: rgba(255, 122, 0, 0.06);
+            color: #f3f4f6;
         }
 
         .hint {
@@ -304,9 +309,9 @@
             padding: 10px 14px;
             border-radius: 999px;
             border: 1px solid var(--border);
-            background: #ffffff;
+            background: #171717;
             font-size: 14px;
-            color: #111827;
+            color: #f3f4f6;
         }
 
         .check-pill input {
@@ -331,7 +336,7 @@
             padding: 14px 16px;
             border-radius: 16px;
             border: 1px solid var(--border);
-            background: #ffffff;
+            background: #171717;
         }
 
         .toggle-copy {
@@ -343,7 +348,7 @@
             margin: 0;
             font-size: 14px;
             font-weight: 700;
-            color: #111827;
+            color: #ffffff;
         }
 
         .toggle-description {
@@ -373,7 +378,7 @@
             inset: 0;
             cursor: pointer;
             border-radius: 999px;
-            background: #d1d5db;
+            background: #303030;
             transition: .2s ease;
         }
 
@@ -386,7 +391,7 @@
             top: 4px;
             border-radius: 999px;
             background: #ffffff;
-            box-shadow: 0 2px 6px rgba(0,0,0,.18);
+            box-shadow: 0 2px 6px rgba(0,0,0,.25);
             transition: .2s ease;
         }
 
@@ -407,15 +412,15 @@
         }
 
         .error-list {
-            color: #991b1b;
-            border: 1px solid rgba(239, 68, 68, 0.25);
-            background: rgba(239, 68, 68, 0.08);
+            color: #fecaca;
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            background: rgba(127, 29, 29, 0.22);
         }
 
         .success-box {
-            color: #166534;
-            border: 1px solid rgba(34, 197, 94, 0.25);
-            background: rgba(34, 197, 94, 0.08);
+            color: #fdba74;
+            border: 1px solid rgba(255, 122, 0, 0.28);
+            background: rgba(255, 122, 0, 0.10);
         }
 
         .actions {
@@ -428,18 +433,19 @@
             appearance: none;
             border: 0;
             border-radius: 14px;
-            background: var(--accent);
+            background: linear-gradient(135deg, #ff7a00 0%, #ff9a1f 100%);
             color: #ffffff;
             padding: 14px 24px;
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 12px 26px rgba(255, 95, 58, 0.22);
-            transition: background .18s ease, transform .12s ease;
+            box-shadow: 0 12px 26px rgba(255, 122, 0, 0.26);
+            transition: background .18s ease, transform .12s ease, box-shadow .18s ease;
         }
 
         .btn:hover {
-            background: #f0522d;
+            background: linear-gradient(135deg, #f06f00 0%, #ff9110 100%);
+            box-shadow: 0 14px 28px rgba(255, 122, 0, 0.32);
         }
 
         .btn:active {
@@ -674,6 +680,19 @@
                                 <option value="1" {{ old('natl_team_exp') === '1' ? 'selected' : '' }}>Yes</option>
                                 <option value="0" {{ old('natl_team_exp') === '0' ? 'selected' : '' }}>No</option>
                             </select>
+                        </div>
+
+                        <div class="col-4 other-wrap" id="national_team_period_wrap">
+                            <label for="national_team_period">National Team Period</label>
+                            <input
+                                type="text"
+                                id="national_team_period"
+                                name="national_team_period"
+                                value="{{ old('national_team_period') }}"
+                                maxlength="255"
+                                placeholder="Example: 2022-2024"
+                            >
+                            <div class="hint">Enter the year range or period played for the national team.</div>
                         </div>
 
                         <div class="col-4">
@@ -1302,6 +1321,9 @@
             "Position": "Posición",
             "Only positions for the selected sport will be shown.": "Solo se mostrarán las posiciones del deporte seleccionado.",
             "National Team Experience": "Experiencia en selección nacional",
+            "National Team Period": "Período en selección nacional",
+            "Example: 2022-2024": "Ejemplo: 2022-2024",
+            "Enter the year range or period played for the national team.": "Ingrese el rango de años o período jugado en la selección nacional.",
             "Select one": "Seleccionar uno",
             "Yes": "Sí",
             "No": "No",
@@ -1491,6 +1513,9 @@
             "Upload action shots of the athlete. These will still be stored under raw player images.": "Téléchargez des photos d’action de l’athlète. Elles seront toujours enregistrées dans les images brutes du joueur.",
             "Portrait Images": "Images de portrait",
             "National Team Images": "Images d’équipe nationale",
+            "National Team Period": "Période en équipe nationale",
+            "Example: 2022-2024": "Exemple : 2022-2024",
+            "Enter the year range or period played for the national team.": "Saisissez la période ou les années jouées en équipe nationale.",
             "Upload images related to national team play. These will still be stored under raw player images.": "Téléchargez des images liées au jeu en équipe nationale. Elles seront toujours enregistrées dans les images brutes du joueur.",
             "Team Images": "Images d’équipe",
             "Upload team-related images. These will still be stored under raw player images.": "Téléchargez des images liées à l’équipe. Elles seront toujours enregistrées dans les images brutes du joueur.",
@@ -1528,6 +1553,9 @@
             "Position": "Position",
             "Only positions for the selected sport will be shown.": "Es werden nur Positionen für die ausgewählte Sportart angezeigt.",
             "National Team Experience": "Erfahrung in der Nationalmannschaft",
+            "National Team Period": "Zeitraum in der Nationalmannschaft",
+            "Example: 2022-2024": "Beispiel: 2022-2024",
+            "Enter the year range or period played for the national team.": "Geben Sie den Zeitraum oder die Jahre in der Nationalmannschaft ein.",
             "Select one": "Eine Option auswählen",
             "Yes": "Ja",
             "No": "Nein",
@@ -1641,6 +1669,9 @@
             "Position": "Posizione",
             "Only positions for the selected sport will be shown.": "Saranno mostrate solo le posizioni dello sport selezionato.",
             "National Team Experience": "Esperienza in nazionale",
+            "National Team Period": "Periodo in nazionale",
+            "Example: 2022-2024": "Esempio: 2022-2024",
+            "Enter the year range or period played for the national team.": "Inserisci l'intervallo di anni o il periodo giocato in nazionale.",
             "Select one": "Seleziona una voce",
             "Yes": "Sì",
             "No": "No",
@@ -1754,6 +1785,9 @@
             "Position": "Positie",
             "Only positions for the selected sport will be shown.": "Alleen posities voor de geselecteerde sport worden getoond.",
             "National Team Experience": "Ervaring in het nationale team",
+            "National Team Period": "Periode in nationaal team",
+            "Example: 2022-2024": "Voorbeeld: 2022-2024",
+            "Enter the year range or period played for the national team.": "Voer de jaarrange of periode in waarin voor het nationale team is gespeeld.",
             "Select one": "Selecteer één",
             "Yes": "Ja",
             "No": "Nee",
@@ -1977,6 +2011,8 @@
         const nationalTeamOtherSection = document.getElementById('national_team_other_section');
         const nationalTeamImagesWrap = document.getElementById('national_team_images_wrap');
         const nationalTeamImagesInput = document.getElementById('national_team_images');
+        const nationalTeamPeriodWrap = document.getElementById('national_team_period_wrap');
+        const nationalTeamPeriodInput = document.getElementById('national_team_period');
 
         if (!natlTeamExp || !nationalTeamFieldWrap || !nationalTeamSelect || !nationalTeamOtherSection) return;
 
@@ -1984,12 +2020,20 @@
 
         nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
 
+        if (nationalTeamPeriodWrap) {
+            nationalTeamPeriodWrap.style.display = hasExperience ? 'block' : 'none';
+        }
+
         if (nationalTeamImagesWrap) {
-            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'block';
+            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'none';
         }
 
         if (!hasExperience) {
             nationalTeamFieldWrap.style.display = 'none';
+
+            if (nationalTeamPeriodWrap) {
+                nationalTeamPeriodWrap.style.display = 'none';
+            }
 
             if (nationalTeamImagesWrap) {
                 nationalTeamImagesWrap.style.display = 'none';
@@ -2001,6 +2045,10 @@
             const otherInput = document.getElementById('national_team_other');
             if (otherInput) {
                 otherInput.value = '';
+            }
+
+            if (nationalTeamPeriodInput) {
+                nationalTeamPeriodInput.value = '';
             }
 
             if (nationalTeamImagesInput) {
