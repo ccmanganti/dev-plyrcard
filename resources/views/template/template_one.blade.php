@@ -887,6 +887,36 @@ HTML;
             overflow: hidden;
         }
 
+        .footer-logos-wrap{
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .footer-logos-row{
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .footer-logo-item{
+            display: block;
+            height: 56px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        @media (min-width: 768px){
+            .footer-logo-item{
+                height: 80px;
+            }
+
+            .footer-logos-row{
+                gap: 32px;
+            }
+        }
+
         #hero-loader{
             position: absolute;
             inset: 0;
@@ -1891,36 +1921,38 @@ HTML;
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-start">
                 <div class="flex items-center justify-end md:justify-end">
-                    <div class="flex flex-wrap items-center gap-6 md:gap-8">
-                        @if (!empty($footerClubLogoUrl))
-                            <img
-                                src="{{ $footerClubLogoUrl }}"
-                                alt="Club logo"
-                                class="h-14 md:h-20 w-auto object-contain"
-                                loading="lazy"
-                                decoding="async"
-                            >
-                        @endif
+                    <div class="footer-logos-wrap">
+                        <div class="footer-logos-row">
+                            @if (!empty($footerClubLogoUrl))
+                                <img
+                                    src="{{ $footerClubLogoUrl }}"
+                                    alt="Club logo"
+                                    class="footer-logo-item"
+                                    loading="lazy"
+                                    decoding="async"
+                                >
+                            @endif
 
-                        @if (!empty($footerLeagueLogoUrl))
-                            <img
-                                src="{{ $footerLeagueLogoUrl }}"
-                                alt="League logo"
-                                class="h-14 md:h-20 w-auto object-contain"
-                                loading="lazy"
-                                decoding="async"
-                            >
-                        @endif
+                            @if (!empty($footerLeagueLogoUrl))
+                                <img
+                                    src="{{ $footerLeagueLogoUrl }}"
+                                    alt="League logo"
+                                    class="footer-logo-item"
+                                    loading="lazy"
+                                    decoding="async"
+                                >
+                            @endif
 
-                        @if (!empty($footerNationalTeamLogoUrl))
-                            <img
-                                src="{{ $footerNationalTeamLogoUrl }}"
-                                alt="National team logo"
-                                class="h-14 md:h-20 w-auto object-contain"
-                                loading="lazy"
-                                decoding="async"
-                            >
-                        @endif
+                            @if (!empty($footerNationalTeamLogoUrl))
+                                <img
+                                    src="{{ $footerNationalTeamLogoUrl }}"
+                                    alt="National team logo"
+                                    class="footer-logo-item"
+                                    loading="lazy"
+                                    decoding="async"
+                                >
+                            @endif
+                        </div>
                     </div>
                 </div>
 
