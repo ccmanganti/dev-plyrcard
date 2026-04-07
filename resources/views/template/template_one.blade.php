@@ -12,9 +12,9 @@
         | Theme Colors
         |--------------------------------------------------------------------------
         */
-        $primary   = $website->primary_color ?: '#334155';
+        $primary   = $website->primary_color ?: '#d8180aff';
         $secondary = $website->secondary_color ?: '#0f172a';
-        $accent    = $website->accent_color ?: '#2563eb';
+        $accent    = $website->accent_color ?: '#e34b18ff';
         $bg        = $website->background_color ?: '#f8fafc';
         $surface   = $website->surface_color ?: '#ffffff';
         $text1     = $website->text_primary_color ?: '#0f172a';
@@ -887,35 +887,80 @@ HTML;
             overflow: hidden;
         }
 
-        .footer-logos-wrap{
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-        }
+.footer-logos-wrap{
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+}
 
-        .footer-logos-row{
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 24px;
-        }
+.footer-logos-row{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0;
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+}
 
-        .footer-logo-item{
-            display: block;
-            height: 56px;
-            width: auto;
-            object-fit: contain;
-        }
+.footer-logo-slot{
+    width: 174px;
+    height: 104px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 174px;
+    margin-right: -38px;
+}
 
-        @media (min-width: 768px){
-            .footer-logo-item{
-                height: 80px;
-            }
+.footer-logo-slot:last-child{
+    margin-right: 0;
+}
 
-            .footer-logos-row{
-                gap: 32px;
-            }
-        }
+.footer-logo-item{
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+@media (min-width: 768px){
+    .footer-logos-row{
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        gap: 0;
+        width: fit-content;
+        margin-left: auto;
+    }
+
+    .footer-logo-slot{
+        width: 214px;
+        height: 122px;
+        flex-basis: 214px;
+        margin-right: -50px;
+    }
+
+    .footer-logo-slot:last-child{
+        margin-right: 0;
+    }
+}
+
+@media (min-width: 1280px){
+    .footer-logo-slot{
+        width: 242px;
+        height: 136px;
+        flex-basis: 242px;
+        margin-right: -58px;
+    }
+
+    .footer-logo-slot:last-child{
+        margin-right: 0;
+    }
+}
 
         #hero-loader{
             position: absolute;
@@ -1924,33 +1969,39 @@ HTML;
                     <div class="footer-logos-wrap">
                         <div class="footer-logos-row">
                             @if (!empty($footerClubLogoUrl))
-                                <img
-                                    src="{{ $footerClubLogoUrl }}"
-                                    alt="Club logo"
-                                    class="footer-logo-item"
-                                    loading="lazy"
-                                    decoding="async"
-                                >
+                                <div class="footer-logo-slot">
+                                    <img
+                                        src="{{ $footerClubLogoUrl }}"
+                                        alt="Club logo"
+                                        class="footer-logo-item"
+                                        loading="lazy"
+                                        decoding="async"
+                                    >
+                                </div>
                             @endif
 
                             @if (!empty($footerLeagueLogoUrl))
-                                <img
-                                    src="{{ $footerLeagueLogoUrl }}"
-                                    alt="League logo"
-                                    class="footer-logo-item"
-                                    loading="lazy"
-                                    decoding="async"
-                                >
+                                <div class="footer-logo-slot">
+                                    <img
+                                        src="{{ $footerLeagueLogoUrl }}"
+                                        alt="League logo"
+                                        class="footer-logo-item"
+                                        loading="lazy"
+                                        decoding="async"
+                                    >
+                                </div>
                             @endif
 
                             @if (!empty($footerNationalTeamLogoUrl))
-                                <img
-                                    src="{{ $footerNationalTeamLogoUrl }}"
-                                    alt="National team logo"
-                                    class="footer-logo-item"
-                                    loading="lazy"
-                                    decoding="async"
-                                >
+                                <div class="footer-logo-slot">
+                                    <img
+                                        src="{{ $footerNationalTeamLogoUrl }}"
+                                        alt="National team logo"
+                                        class="footer-logo-item"
+                                        loading="lazy"
+                                        decoding="async"
+                                    >
+                                </div>
                             @endif
                         </div>
                     </div>
