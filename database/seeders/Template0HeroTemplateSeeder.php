@@ -11,11 +11,11 @@ class Template0HeroTemplateSeeder extends Seeder
     public function run(): void
     {
         $heroTemplate = HeroTemplate::updateOrCreate(
-            ['slug' => 'hero_template_0'],
+            ['slug' => 'hero_template_free'],
             [
-                'name' => 'Hero Template 0',
-                'slug' => 'hero_template_0',
-                'blade_view' => 'hero.hero_template_0',
+                'name' => 'Hero Template Free',
+                'slug' => 'hero_template_Free',
+                'blade_view' => 'hero.hero_template_free',
                 'sports' => null,
                 'preview_image' => null,
                 'description' => 'A clean stat-driven athlete hero template with a large left jersey number, centered player image, right-side statistics, bottom PlyrCard, and mobile fallback.',
