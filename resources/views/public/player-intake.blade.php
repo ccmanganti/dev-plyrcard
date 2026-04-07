@@ -667,6 +667,17 @@
                             <input type="text" id="max_speed" name="max_speed" value="{{ old('max_speed') }}" maxlength="50">
                         </div>
 
+                        <div class="col-4 other-wrap" id="dominant_foot_wrap">
+                            <label for="dominant_foot">Dominant Foot</label>
+                            <select id="dominant_foot" name="dominant_foot">
+                                <option value="">Select dominant foot</option>
+                                <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
+                                <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
+                                <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
+                            </select>
+                            <div class="hint">Only shown for soccer players.</div>
+                        </div>
+
                         <div class="col-12">
                             <label>Position</label>
                             <div id="positionOptions" class="checkbox-group"></div>
@@ -2115,6 +2126,22 @@
         portraitHint.textContent = hints.default;
     }
 
+    function toggleDominantFoot() {
+        const sportSelect = document.getElementById('sport');
+        const dominantFootWrap = document.getElementById('dominant_foot_wrap');
+        const dominantFootSelect = document.getElementById('dominant_foot');
+
+        if (!sportSelect || !dominantFootWrap || !dominantFootSelect) return;
+
+        const isSoccer = sportSelect.value === 'soccer';
+
+        dominantFootWrap.style.display = isSoccer ? 'block' : 'none';
+
+        if (!isSoccer) {
+            dominantFootSelect.value = '';
+        }
+    }
+
     function toggleCustomHighlights() {
         const toggle = document.getElementById('use_custom_highlights');
         const wrap = document.getElementById('custom_highlights_wrap');
@@ -2188,12 +2215,14 @@
         toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
+        toggleDominantFoot();
 
         translateTextNodes(lang);
         updateImageInstructions(lang);
 
         document.getElementById('sport').addEventListener('change', () => {
             renderPositions();
+            toggleDominantFoot();
             updateImageInstructions(lang);
             translateTextNodes(lang);
         });

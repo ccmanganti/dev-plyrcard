@@ -291,6 +291,10 @@
     $mobileDob = $stats['DOB'] ?? '';
     $mobileHeight = $stats['HEIGHT'] ?? '';
     $mobileWeight = $stats['WEIGHT'] ?? '';
+    $mobileMaxSpeed = strtoupper($normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
+        ' '
+    ));
     $mobileCoach = $stats['COACH'] ?? '';
 
     $mobileInternational = $normalizeDisplayValue(
@@ -1033,6 +1037,11 @@
                                 <div class="mobile-meta-row">
                                     <div class="mobile-meta-label">WEIGHT:</div>
                                     <div class="mobile-meta-value">{{ filled($mobileWeight) ? $mobileWeight : '--' }}</div>
+                                </div>
+
+                                <div class="mobile-meta-row">
+                                    <div class="mobile-meta-label">MAX SPEED:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileMaxSpeed) ? $mobileMaxSpeed : '--' }}</div>
                                 </div>
 
                                 <div class="mobile-meta-row">

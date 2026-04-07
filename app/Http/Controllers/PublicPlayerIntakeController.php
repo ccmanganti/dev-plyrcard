@@ -316,6 +316,7 @@ class PublicPlayerIntakeController extends Controller
             'weight' => ['nullable', 'string', 'max:50'],
             'jersey_number' => ['nullable', 'string', 'max:50'],
             'vertical_jump' => ['nullable', 'string', 'max:50'],
+            'dominant_foot' => ['nullable', 'in:left,right,both'],
             'max_speed' => ['nullable', 'string', 'max:50'],
 
             'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
@@ -420,6 +421,16 @@ class PublicPlayerIntakeController extends Controller
             }
         }
 
+        if ($sport === 'soccer' && blank($validated['dominant_foot'] ?? null)) {
+            return back()
+                ->withErrors(['dominant_foot' => 'Dominant foot is required for soccer.'])
+                ->withInput();
+        }
+
+        if ($sport !== 'soccer') {
+            $validated['dominant_foot'] = null;
+        }
+
         $useCustomHighlights = $request->boolean('use_custom_highlights');
         $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
 
@@ -482,6 +493,9 @@ class PublicPlayerIntakeController extends Controller
                 'weight' => $validated['weight'] ?? null,
                 'jersey_number' => $validated['jersey_number'] ?? null,
                 'vertical_jump' => $validated['vertical_jump'] ?? null,
+                'dominant_foot' => ($validated['sport'] ?? null) === 'soccer'
+                ? ($validated['dominant_foot'] ?? null)
+                : null,
                 'max_speed' => $validated['max_speed'] ?? null,
                 'sport' => $validated['sport'],
                 'position' => $validated['position'] ?? [],

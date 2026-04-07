@@ -118,6 +118,71 @@
             ->implode(' / ');
     };
 
+    $abbreviatePositionDisplay = function ($value) use ($normalizeDisplayValue) {
+        $position = $normalizeDisplayValue($value, ' | ');
+
+        if ($position === '') {
+            return '';
+        }
+
+        $map = [
+            'goalkeeper' => 'GK',
+            'keeper' => 'GK',
+            'defender' => 'DEF',
+            'center_back' => 'CB',
+            'centre_back' => 'CB',
+            'left_back' => 'LB',
+            'right_back' => 'RB',
+            'wing_back' => 'WB',
+            'midfielder' => 'MID',
+            'defensive_midfielder' => 'CDM',
+            'central_midfielder' => 'CM',
+            'attacking_midfielder' => 'CAM',
+            'wide_midfielder' => 'WM',
+            'forward' => 'FWD',
+            'wide_forward' => 'WF',
+            'striker' => 'ST',
+            'winger' => 'WG',
+            'left_wing' => 'LW',
+            'right_wing' => 'RW',
+            'point_guard' => 'PG',
+            'shooting_guard' => 'SG',
+            'small_forward' => 'SF',
+            'power_forward' => 'PF',
+            'center' => 'C',
+            'setter' => 'S',
+            'libero' => 'L',
+            'outside_hitter' => 'OH',
+            'opposite_hitter' => 'OPP',
+            'middle_blocker' => 'MB',
+            'quarterback' => 'QB',
+            'running_back' => 'RB',
+            'wide_receiver' => 'WR',
+            'tight_end' => 'TE',
+        ];
+
+        return collect(explode(' | ', str_replace(' / ', ' | ', $position)))
+            ->map(function ($item) use ($map) {
+                $key = str($item)->lower()->replace('&', 'and')->replace('-', '_')->replace(' ', '_')->toString();
+                return $map[$key] ?? str($item)->replace('_', ' ')->upper()->toString();
+            })
+            ->implode(' | ');
+    };
+
+    $formatDateDisplay = function ($value) use ($normalizeDisplayValue) {
+        $date = trim($normalizeDisplayValue($value, ' '));
+
+        if ($date === '') {
+            return '';
+        }
+
+        try {
+            return strtoupper(\Carbon\Carbon::parse($date)->format('M j, Y'));
+        } catch (\Throwable $e) {
+            return strtoupper($date);
+        }
+    };
+
     $formatGpaDisplay = function ($value) use ($normalizeDisplayValue) {
         $gpa = trim($normalizeDisplayValue($value));
 
@@ -171,11 +236,20 @@
             ->filter(fn ($item) => $item !== '')
             ->values();
     };
+
     $playerFullName = trim($getHeroFieldValue('hero_player_name', ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')));
 
     $nameParts = preg_split('/\s+/', trim($playerFullName)) ?: [];
     $firstName = strtoupper($nameParts[0] ?? '');
     $lastName  = strtoupper(count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '');
+
+    $clubNameRaw = $user?->club?->name ?? $user?->team_name ?? '';
+    $leagueNameRaw = $user?->league?->name ?? $user?->club?->league?->name ?? '';
+    $nationalTeamNameRaw = $user?->nationalTeam?->name ?? $user?->national_team_name ?? '';
+
+    $clubLogoRaw = $user?->club?->logo ?? '';
+    $leagueLogoRaw = $user?->league?->logo ?? $user?->club?->league?->logo ?? '';
+    $nationalLogoRaw = $user?->nationalTeam?->logo ?? $user?->national_team_logo ?? '';
 
     $plyrCardImageUrl = $resolveMediaUrl(
         $getHeroFieldValue('hero_plyrcard_image', $user?->plyrcard_image),
@@ -198,7 +272,7 @@
     );
 
     $mobileHeroImageUrl = $resolveMediaUrl(
-        $user?->mobile_hero_image,
+        $getHeroFieldValue('hero_mobile_image', $user?->mobile_hero_image),
         ''
     );
 
@@ -219,7 +293,8 @@
                 ?? $website?->sport
                 ?? $website?->sports
                 ?? ''
-        )
+        ),
+        ' '
     );
 
     $sportKey = str($sportRaw)
@@ -254,19 +329,25 @@
         $defaultBallLogoUrl
     );
 
-    $bgJerseyNumber = $getHeroFieldValue('hero_bg_jersey_number', $user?->jersey_number ?? '');
+    $jerseyNumber = trim((string) $getHeroFieldValue('hero_jersey_number', $user?->jersey_number ?? ''));
+    $bgJerseyNumber = trim((string) $getHeroFieldValue('hero_bg_jersey_number', $jerseyNumber));
 
     $positionDisplay = $formatPositionDisplay($getHeroFieldValue('hero_stat_position', $user?->position ?? ''));
 
-    $hometown = $normalizeDisplayValue($getHeroFieldValue('hero_stat_hometown', ''));
+    $hometown = $normalizeDisplayValue($getHeroFieldValue('hero_stat_hometown', ''), ' ');
     if ($hometown === '') {
         $hometown = collect([
             $user?->city,
             $user?->state,
-        ])
-            ->filter(fn ($value) => filled($value))
-            ->implode(', ');
+        ])->filter(fn ($value) => filled($value))->implode(', ');
     }
+
+    $desktopInternational = $normalizeDisplayValue(
+        $getHeroFieldValue(
+            'hero_stat_international',
+            $user?->natl_team_exp ? $nationalTeamNameRaw : ''
+        )
+    );
 
     $stats = [
         'GPA' => $formatGpaDisplay($getHeroFieldValue('hero_stat_gpa', $user?->gpa ?? '')),
@@ -274,13 +355,8 @@
             ? \Carbon\Carbon::parse($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''))->format('F Y')
             : '',
         'Hometown' => $hometown,
-        'International' => $normalizeDisplayValue(
-            $getHeroFieldValue(
-                'hero_stat_international',
-                $user?->natl_team_exp ? ($user?->national_team_name ?? '') : ''
-            )
-        ),
-        'League' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_league', $user?->club->league?->name ?? '')),
+        'International' => $desktopInternational,
+        'League' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_league', $leagueNameRaw)),
         'High School' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_high_school', $user?->school?->name ?? '')),
         'Height' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_height', $user?->height ?? '')),
         'Weight' => $normalizeDisplayValue($getHeroFieldValue('hero_stat_weight', $user?->weight ?? '')),
@@ -291,47 +367,9 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Mobile-specific derived values
+    | Desktop accolades
     |--------------------------------------------------------------------------
     */
-    $mobileNameLine = trim($firstName . ' ' . (filled($bgJerseyNumber) ? '#' . $bgJerseyNumber : ''));
-
-    $mobileClass = $stats['Class'] ?? '';
-    $mobileGpa = $stats['GPA'] ?? '';
-    $mobileDob = $stats['DOB'] ?? '';
-    $mobileHeight = $stats['Height'] ?? '';
-    $mobileLeague = $stats['League'] ?? '';
-
-    $mobileInternational = $normalizeDisplayValue(
-        $getHeroFieldValue(
-            'hero_stat_international',
-            $user?->national_team_name ?? ''
-        )
-    );
-
-    $mobileClub = $normalizeDisplayValue(
-        $getHeroFieldValue('hero_stat_club', $user?->club?->name ?? '')
-    );
-
-    $mobileDominantFoot = $normalizeDisplayValue(
-        $getHeroFieldValue('hero_stat_dominant_foot', $user?->dominant_foot ?? '')
-    );
-
-    $mobileClubLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_club_logo', $user?->club?->logo ?? ''),
-        ''
-    );
-
-    $mobileLeagueLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_league_logo', $user?->club?->league?->logo ?? ''),
-        ''
-    );
-
-    $mobileNationalLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_national_logo', $user?->national_team_logo ?? ''),
-        ''
-    );
-
     $sportsAccoladesRaw = trim($normalizeDisplayValue(
         $getHeroFieldValue('hero_sports_accolades', $user?->sports_accolades ?? '')
     ));
@@ -353,12 +391,12 @@
 
     $desktopAccolades = collect();
 
-    $desktopNationalTeamName = trim((string) ($user?->national_team_name ?? ''));
+    $desktopNationalTeamName = trim((string) $nationalTeamNameRaw);
 
     if ($user?->natl_team_exp && $desktopNationalTeamName !== '') {
         $desktopAccolades->push([
             'text' => $desktopNationalTeamName,
-            'icon' => filled($mobileNationalLogoUrl) ? $mobileNationalLogoUrl : null,
+            'icon' => filled($resolveMediaUrl($nationalLogoRaw, '')) ? $resolveMediaUrl($nationalLogoRaw, '') : null,
             'is_national' => true,
         ]);
     }
@@ -389,79 +427,88 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Mobile accolades
-    |--------------------------------------------------------------------------
-    | Left panel  = priority accolade
-    | Right panel = next distinct accolade
-    */
-    $rightMobileAccoladeTitle = '';
-    $rightMobileAccoladeImageUrl = '';
-
-    $leftMobileAccoladeTitle = '';
-    $leftMobileAccoladeSubtitle = '';
-    $leftMobileAccoladeImageUrl = '';
-
-    $accoladeCandidates = collect([
-        [
-            'key' => 'national_team',
-            'title' => ($user?->natl_team_exp && filled($user?->national_team_name))
-                ? trim((string) $user->national_team_name)
-                : '',
-        ],
-        [
-            'key' => 'sports',
-            'title' => $fallbackSportsAccolade,
-        ],
-        [
-            'key' => 'academic',
-            'title' => $fallbackAcademicAccolade,
-        ],
-    ])->filter(fn ($item) => filled($item['title']))->values();
-
-    $primaryAccolade = $accoladeCandidates->get(0);
-    $secondaryAccolade = $accoladeCandidates->get(1);
-
-    /*
-    |--------------------------------------------------------------------------
-    | LEFT = priority accolade
+    | Mobile values copied from the other template
     |--------------------------------------------------------------------------
     */
-    if ($primaryAccolade) {
-        $leftMobileAccoladeTitle = $primaryAccolade['title'];
-    } elseif (filled($mobileInternational)) {
-        $leftMobileAccoladeTitle = $mobileInternational;
-    }
+    $mobileClass = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_class', $user?->year ?? ''), ' '));
+    $mobileGpa = strtoupper($formatGpaDisplay($getHeroFieldValue('hero_stat_gpa', $user?->gpa ?? '')));
+    $mobileDob = $formatDateDisplay($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''));
+    $mobileHeight = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_height', $user?->height ?? ''), ' '));
+    $mobileWeight = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_weight', $user?->weight ?? ''), ' '));
+    $mobileMaxSpeed = strtoupper($normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
+        ' '
+    ));
+    $mobileCoach = strtoupper(trim($normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_coach', $user?->club_coach ?? ''),
+        ' '
+    )));
 
-    if ($primaryAccolade && $primaryAccolade['key'] === 'national_team') {
-        $leftMobileAccoladeSubtitle = 'National Team';
-    }
+    $mobileInternational = $normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_international', $nationalTeamNameRaw)
+    );
 
-    if ($primaryAccolade && $primaryAccolade['key'] === 'national_team' && filled($mobileNationalLogoUrl)) {
-        $leftMobileAccoladeImageUrl = $mobileNationalLogoUrl;
-    } elseif (filled($mobileLeagueLogoUrl)) {
-        $leftMobileAccoladeImageUrl = $mobileLeagueLogoUrl;
-    }
+    $mobileClub = $normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_club', $clubNameRaw)
+    );
 
-    /*
-    |--------------------------------------------------------------------------
-    | RIGHT = next distinct accolade
-    |--------------------------------------------------------------------------
-    */
-    if ($secondaryAccolade) {
-        $rightMobileAccoladeTitle = $secondaryAccolade['title'];
-    }
+    $mobileLeague = $normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_league', $leagueNameRaw)
+    );
 
-    if ($secondaryAccolade && $secondaryAccolade['key'] === 'national_team' && filled($mobileNationalLogoUrl)) {
-        $rightMobileAccoladeImageUrl = $mobileNationalLogoUrl;
-    } elseif (filled($mobileLeagueLogoUrl)) {
-        $rightMobileAccoladeImageUrl = $mobileLeagueLogoUrl;
-    }
+    $mobileDominantFoot = $normalizeDisplayValue(
+        $getHeroFieldValue('hero_stat_dominant_foot', $user?->dominant_foot ?? '')
+    );
+
+    $mobileClubLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_club_logo', $clubLogoRaw),
+        ''
+    );
+
+    $mobileLeagueLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_league_logo', $leagueLogoRaw),
+        ''
+    );
+
+    $mobileNationalLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_national_logo', $nationalLogoRaw),
+        ''
+    );
+
+    $mobileTopLogoUrl = $mobileLeagueLogoUrl ?: $ballLogoUrl ?: $mobileClubLogoUrl ?: '';
 
     $mobileMainImage = $playerImageUrl ?: $backgroundImageUrl;
     $hasMobileHeroOverride = filled($mobileHeroImageUrl);
+
+    $displayPositionMobile = $abbreviatePositionDisplay($getHeroFieldValue('hero_display_position', $user?->position ?? ''));
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dynamic mobile name sizing
+    |--------------------------------------------------------------------------
+    */
+    $firstNameLength = mb_strlen(trim($firstName));
+    $lastNameLength = mb_strlen(trim($lastName));
+
+    $mobileFirstNameClass = '';
+    $mobileLastNameClass = '';
+
+    if ($firstNameLength > $lastNameLength) {
+        $mobileLastNameClass = ' mobile-hero-name-last--bigger';
+        $mobileFirstNameClass = ' mobile-hero-name-top--smaller';
+    } elseif ($lastNameLength > $firstNameLength) {
+        $mobileFirstNameClass = ' mobile-hero-name-top--bigger';
+        $mobileLastNameClass = ' mobile-hero-name-last--smaller';
+    }
+
+    $mobileJerseyDisplay = filled($jerseyNumber)
+        ? '#' . ltrim($jerseyNumber, '#')
+        : (filled($bgJerseyNumber) ? '#' . ltrim($bgJerseyNumber, '#') : '');
 @endphp
 
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Luxurious+Script&display=swap');
+
     .font-antonio {
         font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
     }
@@ -550,99 +597,99 @@
         row-gap: 0.45rem;
     }
 
-.hero-accolades-list {
-    margin-top: 20px;
-    display: grid;
-    gap: 0.6rem;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
-}
+    .hero-accolades-list {
+        margin-top: 20px;
+        display: grid;
+        gap: 0.6rem;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
 
-.hero-accolade-row {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
-}
+    .hero-accolade-row {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
 
-.hero-accolade-icon-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    flex: 0 0 auto;
-    padding-top: 0;
-}
-
-.hero-accolade-icon {
-    width: 52px;
-    height: 52px;
-    object-fit: contain;
-    display: block;
-    flex: 0 0 52px;
-}
-
-.hero-accolade-icon--trophy {
-    color: {{ $primary }};
-}
-
-.hero-accolade-text {
-    min-width: 0;
-    flex: 0 1 100%;
-    max-width: min(100%, 440px);
-    font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
-    font-weight: 300;
-    font-size: 18px;
-    line-height: 1.4;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    color: #fff;
-    overflow: hidden;
-    word-break: break-word;
-
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-clamp: 2;
-}
-@media (min-width: 768px) {
-    .hero-accolade-text {
-        font-size: 23px;
+    .hero-accolade-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        flex: 0 0 auto;
+        padding-top: 0;
     }
 
     .hero-accolade-icon {
-        width: 56px;
-        height: 56px;
-        flex-basis: 56px;
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        display: block;
+        flex: 0 0 52px;
     }
-}
 
-@media (min-width: 1024px) {
+    .hero-accolade-icon--trophy {
+        color: {{ $primary }};
+    }
+
     .hero-accolade-text {
-        font-size: 21px;
+        min-width: 0;
+        flex: 0 1 100%;
+        max-width: min(100%, 440px);
+        font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif !important;
+        font-weight: 300;
+        font-size: 18px;
+        line-height: 1.4;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+        color: #fff;
+        overflow: hidden;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
     }
 
-    .hero-accolade-icon {
-        width: 58px;
-        height: 58px;
-        flex-basis: 58px;
-    }
-}
+    @media (min-width: 768px) {
+        .hero-accolade-text {
+            font-size: 23px;
+        }
 
-@media (min-width: 1280px) {
-    .hero-accolade-text {
-        font-size: 23px;
+        .hero-accolade-icon {
+            width: 56px;
+            height: 56px;
+            flex-basis: 56px;
+        }
     }
 
-    .hero-accolade-icon {
-        width: 80px;
-        height: 80px;
-        flex-basis: 80px;
+    @media (min-width: 1024px) {
+        .hero-accolade-text {
+            font-size: 21px;
+        }
+
+        .hero-accolade-icon {
+            width: 58px;
+            height: 58px;
+            flex-basis: 58px;
+        }
     }
-}
+
+    @media (min-width: 1280px) {
+        .hero-accolade-text {
+            font-size: 23px;
+        }
+
+        .hero-accolade-icon {
+            width: 80px;
+            height: 80px;
+            flex-basis: 80px;
+        }
+    }
 
     .hero-main-player-wrap {
         position: absolute;
@@ -963,8 +1010,8 @@
             margin-right: calc(50% - 50vw);
             overflow: hidden;
             background: {{ $primary }};
-            --mobile-design-width: 339;
-            --mobile-design-height: 608;
+            --mobile-design-width: 390;
+            --mobile-design-height: 680;
         }
 
         .mobile-hero-override {
@@ -1014,111 +1061,134 @@
 
         .mobile-hero-bg-number {
             position: absolute;
-            left: 14px;
-            bottom: 350px;
+            left: 4px;
+            top: 170px;
             z-index: 1;
-            letter-spacing: -20px;
+            letter-spacing: -18px;
             font-family: "Iceberg", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 220px;
+            font-size: 250px;
             line-height: 0.8;
-            color: rgba(0, 0, 0, 0.08);
+            color: rgba(255,255,255,0.10);
             pointer-events: none;
         }
 
         .mobile-hero-top {
             position: relative;
             z-index: 4;
-            padding: 14px 14px 0;
+            padding: 12px 16px 0;
         }
 
         .mobile-hero-logo-row {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             justify-content: flex-end;
-            min-height: 26px;
+            min-height: 40px;
         }
 
         .mobile-hero-logo-row img {
-            max-height: 50px;
+            max-height: 38px;
             width: auto;
             object-fit: contain;
         }
 
         .mobile-hero-head {
             position: relative;
-            margin-top: 22px;
-            min-height: 388px;
+            margin-top: 18px;
+            min-height: 430px;
         }
 
         .mobile-hero-name-wrap {
             position: relative;
-            z-index: 1;
-            width: 64%;
+            z-index: 5;
+            width: 58%;
         }
 
         .mobile-hero-name-box {
+            margin-top: -30px;
             width: 100%;
-            border-radius: 14px;
-            padding: 10px 12px 10px;
-            z-index: 1;
             position: relative;
-            top: -50px;
+            z-index: 5;
+        }
+
+        .mobile-hero-jersey {
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            font-size: 38px;
+            line-height: 0.9;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #fff;
+            letter-spacing: -0.04em;
+            margin-bottom: 2px;
         }
 
         .mobile-hero-name-top {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 30px;
-            line-height: 0.95;
-            font-weight: 400;
+            font-size: 45px;
+            line-height: 1.0;
+            font-weight: 800;
             text-transform: uppercase;
-            color: rgba(255,255,255,.97);
+            color: #fff;
+            letter-spacing: -0.05em;
         }
 
         .mobile-hero-name-last {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 35px;
-            line-height: 0.84;
-            font-weight: 900;
+            font-size: 56px;
+            line-height: 0.86;
+            font-weight: 800;
             text-transform: uppercase;
             color: #fff;
-            letter-spacing: 0.01em;
-            padding-top: 3px;
+            letter-spacing: -0.05em;
+            margin-top: 2px;
+        }
+
+        .mobile-hero-name-top--bigger {
+            font-size: 50px;
+        }
+
+        .mobile-hero-name-top--smaller {
+            font-size: 50px;
+        }
+
+        .mobile-hero-name-last--bigger {
+            font-size: 60px;
+        }
+
+        .mobile-hero-name-last--smaller {
+            font-size: 52px;
         }
 
         .mobile-hero-position {
-            margin-top: 1px;
+            margin-top: 12px;
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 13px;
+            font-size: 22px;
             line-height: 0.95;
             font-weight: 700;
             text-transform: uppercase;
             color: #fff;
-            padding-top: 5px;
         }
 
         .mobile-signature {
-            display: none;
-            position: relative;
-            z-index: 2;
-            margin-top: 16px;
-            margin-left: 8px;
-            font-size: 48px;
+            position: absolute;
+            left: 8px;
+            top: 180px;
+            z-index: 1;
+            font-size: 110px;
             line-height: 1;
-            color: rgba(255,255,255,0.16);
-            font-family: cursive;
-            transform: rotate(-8deg);
+            color: rgba(255,255,255,0.14);
+            font-family: "Luxurious Script", cursive;
+            transform: rotate(-7deg);
             pointer-events: none;
             user-select: none;
         }
 
         .mobile-player-stage {
             position: absolute;
-            left: 57%;
-            transform: translateX(-50%);
-            bottom: -20px;
-            width: 92%;
-            height: 350px;
-            z-index: 4;
+            right: -10px;
+            bottom: 0;
+            width: 63%;
+            height: 440px;
+            z-index: 10;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -1127,10 +1197,9 @@
         }
 
         .mobile-player-main {
-            width: 120%;
-            margin-left: 50px;
-            max-width: 500px;
-            height: auto;
+            width: auto;
+            height: 100%;
+            max-width: none;
             display: block;
             object-fit: contain;
             object-position: bottom center;
@@ -1139,24 +1208,30 @@
 
         .mobile-info-grid {
             position: absolute;
-            left: 10px;
-            right: 10px;
-            bottom: 72px;
-            z-index: 6;
+            left: 6px;
+            right: 6px;
+            bottom: 70px;
+            z-index: 8;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 6px;
             align-items: stretch;
         }
 
         .mobile-stat-card {
-            min-height: 218px;
-            background: #f3f3f3;
+            min-height: 240px;
+            background: #f1f1f1;
             color: #111;
-            border-radius: 10px;
+            border-radius: 8px;
             padding: 10px 10px 12px;
             box-shadow: 0 8px 20px rgba(0,0,0,.08);
             overflow: hidden;
+            position: relative;
+        }
+
+        .mobile-stat-card:before,
+        .mobile-stat-card:after {
+            display: none;
         }
 
         .mobile-stat-card--left,
@@ -1169,207 +1244,133 @@
         .mobile-big-value-row {
             display: flex;
             align-items: flex-end;
-            gap: 4px;
-            margin-bottom: 8px;
+            gap: 6px;
+            margin-bottom: 12px;
             line-height: 0.8;
             flex-wrap: nowrap;
         }
 
         .mobile-big-value {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 58px;
+            font-size: 76px;
             line-height: 0.8;
-            font-weight: 700;
-            letter-spacing: -0.04em;
+            font-weight: 900;
+            letter-spacing: -0.05em;
             color: #000;
         }
 
         .mobile-big-label {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 16px;
+            font-size: 24px;
             line-height: 0.9;
-            font-weight: 700;
+            font-weight: 900;
             text-transform: uppercase;
             color: #000;
-            padding-bottom: 7px;
+            padding-bottom: 9px;
         }
 
-        .mobile-small-block {
-            padding-top: 10px;
-            display: flex;
+        .mobile-org-list {
+            display: grid;
+            gap: 12px;
+            margin-top: auto;
+        }
+
+        .mobile-org-row {
+            display: grid;
+            grid-template-columns: 42px 1fr;
+            gap: 10px;
             align-items: center;
-            justify-content: space-between;
-            gap: 3px;
-            margin-bottom: 10px;
         }
 
-        .mobile-small-logo {
-            width: 50px;
-            height: 50px;
+        .mobile-org-icon {
+            width: 42px;
+            height: 42px;
             object-fit: contain;
-            flex: 0 0 50px;
             color: {{ $primary }};
         }
 
-        .mobile-small-logo--empty {
-            width: 34px;
-            height: 34px;
-            flex: 0 0 34px;
-        }
-
-        .mobile-small-copy {
-            min-width: 0;
-        }
-
-        .mobile-small-copy-top {
+        .mobile-org-copy-title {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
-            line-height: 0.96;
+            font-size: 18px;
+            line-height: 0.95;
             font-weight: 900;
             text-transform: uppercase;
             color: #111;
         }
 
-        .mobile-small-copy-bottom {
+        .mobile-org-copy-value {
             margin-top: 2px;
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
-            line-height: 1.08;
-            font-weight: 400;
-            text-transform: uppercase;
-            color: rgba(17,17,17,.78);
-        }
-
-        .mobile-facts {
-            margin-top: auto;
-            display: grid;
-            gap: 5px;
-        }
-
-        .mobile-fact-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 8px;
-            align-items: start;
-        }
-
-        .mobile-fact-label,
-        .mobile-fact-value {
-            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
-            line-height: 1;
-            text-transform: uppercase;
+            font-size: 12px;
+            line-height: 1.05;
+            font-weight: 500;
             color: #111;
-        }
-
-        .mobile-fact-label {
-            font-weight: 400;
-        }
-
-        .mobile-fact-value {
-            font-weight: 700;
-            text-align: right;
+            text-transform: none;
         }
 
         .mobile-class-row {
             display: flex;
             align-items: flex-end;
-            gap: 3px;
+            justify-content: space-between;
+            gap: 4px;
             flex-wrap: nowrap;
-            margin-bottom: 10px;
+            margin-bottom: 14px;
+            min-width: 0;
         }
 
         .mobile-class-year {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 56px;
+            font-size: 64px;
             line-height: 0.8;
-            font-weight: 700;
-            letter-spacing: -0.04em;
+            font-weight: 900;
+            letter-spacing: -0.045em;
             color: #000;
+            flex: 0 1 auto;
+            min-width: 0;
         }
 
         .mobile-class-label {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 15px;
+            font-size: 24px;
             line-height: 0.9;
-            font-weight: 700;
+            font-weight: 900;
             text-transform: uppercase;
             color: #000;
-            padding-bottom: 7px;
+            padding-bottom: 8px;
+            white-space: nowrap;
+            flex: 0 0 auto;
         }
 
         .mobile-right-meta {
             display: grid;
-            gap: 8px;
-            padding-top: 10px;
+            gap: 10px;
+            padding-top: 2px;
         }
 
         .mobile-meta-row {
             display: grid;
-            grid-template-columns: 54px 1fr;
-            gap: 8px;
-            align-items: center;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: baseline;
         }
 
         .mobile-meta-label {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
+            font-size: 15px;
             line-height: 1;
-            font-weight: 400;
+            font-weight: 500;
             text-transform: uppercase;
             color: #111;
         }
 
         .mobile-meta-value {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 11px;
-            line-height: 1.05;
-            font-weight: 700;
+            font-size: 15px;
+            line-height: 1;
+            font-weight: 800;
             text-transform: uppercase;
             color: #111;
             text-align: right;
-        }
-
-        .mobile-meta-value img {
-            max-height: 100px;
-            object-fit: contain;
-            display: block;
-            margin-left: auto;
-        }
-
-        .mobile-accolade {
-            margin-top: auto;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 8px;
-            padding-top: 10px;
-        }
-
-        .mobile-accolade-icon {
-            width: 30px;
-            height: 30px;
-            flex: 0 0 30px;
-            opacity: 0.7;
-            object-fit: contain;
-        }
-
-        .mobile-accolade-text {
-            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
-            line-height: 1.1;
-            font-weight: 700;
-            text-transform: uppercase;
-            text-align: right;
-            color: #111;
-            flex: 1;
-        }
-
-        .mobile-small-block:empty,
-        .mobile-facts:empty,
-        .mobile-right-meta:empty,
-        .mobile-accolade:empty {
-            display: none;
         }
     }
 
@@ -1546,6 +1547,7 @@
                             </div>
                         @endif
                     </div>
+
                     @if ($bottomTeamImageUrl)
                         <div class="hero-team-bottom">
                             <img
@@ -1580,33 +1582,35 @@
 
                     <div class="mobile-hero-top">
                         <div class="mobile-hero-logo-row">
-                            @if ($mobileLeagueLogoUrl)
-                                <img src="{{ $mobileLeagueLogoUrl }}" alt="League logo">
-                            @elseif ($ballLogoUrl)
-                                <img src="{{ $ballLogoUrl }}" alt="Sport logo">
-                            @elseif ($mobileClubLogoUrl)
-                                <img src="{{ $mobileClubLogoUrl }}" alt="Club logo">
+                            @if ($mobileTopLogoUrl)
+                                <img src="{{ $mobileTopLogoUrl }}" alt="Top logo">
                             @endif
                         </div>
 
                         <div class="mobile-hero-head">
                             <div class="mobile-hero-name-wrap">
                                 <div class="mobile-hero-name-box">
-                                    <div class="mobile-hero-name-top">
-                                        {{ filled($mobileNameLine) ? $mobileNameLine : 'PLAYER NAME #00' }}
+                                    @if (filled($mobileJerseyDisplay))
+                                        <div class="mobile-hero-jersey">
+                                            {{ $mobileJerseyDisplay }}
+                                        </div>
+                                    @endif
+
+                                    <div class="mobile-hero-name-top{{ $mobileFirstNameClass }}">
+                                        {{ filled($firstName) ? $firstName : 'PLAYER' }}
                                     </div>
 
-                                    <div class="mobile-hero-name-last">
+                                    <div class="mobile-hero-name-last{{ $mobileLastNameClass }}">
                                         {{ filled($lastName) ? $lastName : 'LASTNAME' }}
                                     </div>
 
                                     <div class="mobile-hero-position">
-                                        {{ filled($positionDisplay) ? $positionDisplay : 'POSITION' }}
+                                        {{ filled($displayPositionMobile) ? $displayPositionMobile : 'POSITION' }}
                                     </div>
                                 </div>
 
                                 <div class="mobile-signature">
-                                    {{ filled($firstName) ? $firstName : 'Name' }}
+                                    {{ filled($firstName) ? ucfirst(strtolower($firstName)) : 'Name' }}
                                 </div>
                             </div>
 
@@ -1637,51 +1641,68 @@
                                 <div class="mobile-big-label">/GPA</div>
                             </div>
 
-                            <div class="mobile-small-block">
-                                @if (filled($leftMobileAccoladeImageUrl))
-                                    <img src="{{ $leftMobileAccoladeImageUrl }}" alt="Accolade" class="mobile-small-logo">
-                                @else
-                                    <svg
-                                        class="mobile-small-logo"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.8"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                        <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                        <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                        <path d="M12 9v7"/>
-                                        <path d="M8 21h8"/>
-                                        <path d="M9.5 16h5"/>
-                                    </svg>
-                                @endif
-
-                                <div class="mobile-small-copy">
-                                    <div class="mobile-small-copy-top">
-                                        {{ filled($leftMobileAccoladeTitle) ? $leftMobileAccoladeTitle : (filled($mobileInternational) ? $mobileInternational : 'NATIONAL TEAM / COUNTRY') }}
-                                    </div>
-                                    <div class="mobile-small-copy-bottom">
-                                        {{ filled($leftMobileAccoladeSubtitle) ? $leftMobileAccoladeSubtitle : '' }}
+                            <div class="mobile-org-list">
+                                <div class="mobile-org-row">
+                                    @if (filled($mobileNationalLogoUrl))
+                                        <img src="{{ $mobileNationalLogoUrl }}" alt="National logo" class="mobile-org-icon">
+                                    @else
+                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
+                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
+                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
+                                            <path d="M12 9v7"/>
+                                            <path d="M8 21h8"/>
+                                            <path d="M9.5 16h5"/>
+                                        </svg>
+                                    @endif
+                                    <div>
+                                        <div class="mobile-org-copy-title">NATIONAL TEAM</div>
+                                        <div class="mobile-org-copy-value">
+                                            {{ filled($mobileInternational) ? $mobileInternational : 'NATIONAL TEAM / COUNTRY' }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="mobile-facts">
-                                <div class="mobile-fact-row">
-                                    <div class="mobile-fact-label">HEIGHT:</div>
-                                    <div class="mobile-fact-value">{{ filled($mobileHeight) ? $mobileHeight : '--' }}</div>
+                                <div class="mobile-org-row">
+                                    @if (filled($mobileClubLogoUrl))
+                                        <img src="{{ $mobileClubLogoUrl }}" alt="Club logo" class="mobile-org-icon">
+                                    @else
+                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
+                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
+                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
+                                            <path d="M12 9v7"/>
+                                            <path d="M8 21h8"/>
+                                            <path d="M9.5 16h5"/>
+                                        </svg>
+                                    @endif
+                                    <div>
+                                        <div class="mobile-org-copy-title">CLUB</div>
+                                        <div class="mobile-org-copy-value">
+                                            {{ filled($mobileClub) ? $mobileClub : 'CLUB' }}
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="mobile-fact-row">
-                                    <div class="mobile-fact-label">DOMINANT FOOT:</div>
-                                    <div class="mobile-fact-value">{{ filled($mobileDominantFoot) ? $mobileDominantFoot : '--' }}</div>
-                                </div>
-
-                                <div class="mobile-fact-row">
-                                    <div class="mobile-fact-label">DOB:</div>
-                                    <div class="mobile-fact-value">{{ filled($mobileDob) ? $mobileDob : '-- ----' }}</div>
+                                <div class="mobile-org-row">
+                                    @if (filled($mobileLeagueLogoUrl))
+                                        <img src="{{ $mobileLeagueLogoUrl }}" alt="League logo" class="mobile-org-icon">
+                                    @else
+                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
+                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
+                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
+                                            <path d="M12 9v7"/>
+                                            <path d="M8 21h8"/>
+                                            <path d="M9.5 16h5"/>
+                                        </svg>
+                                    @endif
+                                    <div>
+                                        <div class="mobile-org-copy-title">LEAGUE</div>
+                                        <div class="mobile-org-copy-value">
+                                            {{ filled($mobileLeague) ? $mobileLeague : 'LEAGUE NAME' }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1696,44 +1717,35 @@
 
                             <div class="mobile-right-meta">
                                 <div class="mobile-meta-row">
-                                    <div class="mobile-meta-label">CLUB:</div>
-                                    <div class="mobile-meta-value">
-                                        @if (filled($mobileClubLogoUrl))
-                                            <img src="{{ $mobileClubLogoUrl }}" alt="Club logo">
-                                        @else
-                                            {{ filled($mobileClub) ? $mobileClub : 'CLUB' }}
-                                        @endif
-                                    </div>
+                                    <div class="mobile-meta-label">HEIGHT:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileHeight) ? $mobileHeight : '--' }}</div>
                                 </div>
 
                                 <div class="mobile-meta-row">
-                                    <div class="mobile-meta-label">LEAGUE:</div>
-                                    <div class="mobile-meta-value">
-                                        {{ filled($mobileLeague) ? $mobileLeague : 'LEAGUE NAME' }}
-                                    </div>
+                                    <div class="mobile-meta-label">WEIGHT:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileWeight) ? $mobileWeight : '--' }}</div>
+                                </div>
+
+                                <div class="mobile-meta-row">
+                                    <div class="mobile-meta-label">MAX SPEED:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileMaxSpeed) ? $mobileMaxSpeed : '--' }}</div>
+                                </div>
+
+                                <div class="mobile-meta-row">
+                                    <div class="mobile-meta-label">DOMINANT FOOT:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileDominantFoot) ? $mobileDominantFoot : '--' }}</div>
+                                </div>
+
+                                <div class="mobile-meta-row">
+                                    <div class="mobile-meta-label">DOB:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileDob) ? $mobileDob : '-- ----' }}</div>
+                                </div>
+
+                                <div class="mobile-meta-row">
+                                    <div class="mobile-meta-label">COACH:</div>
+                                    <div class="mobile-meta-value">{{ filled($mobileCoach) ? $mobileCoach : '--' }}</div>
                                 </div>
                             </div>
-
-                            @if (filled($rightMobileAccoladeTitle))
-                                <div class="mobile-accolade">
-                                    @if (filled($rightMobileAccoladeImageUrl))
-                                        <img src="{{ $rightMobileAccoladeImageUrl }}" alt="Accolade" class="mobile-accolade-icon">
-                                    @else
-                                        <svg class="mobile-accolade-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.0">
-                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                            <path d="M12 9v7"/>
-                                            <path d="M8 21h8"/>
-                                            <path d="M9.5 16h5"/>
-                                        </svg>
-                                    @endif
-
-                                    <div class="mobile-accolade-text">
-                                        {{ $rightMobileAccoladeTitle }}
-                                    </div>
-                                </div>
-                            @endif
                         </div>
                     </div>
                 </div>

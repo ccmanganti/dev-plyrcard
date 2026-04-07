@@ -356,10 +356,18 @@ HTML;
             asset('temp-thumbnail.png')
         );
 
-        $footerLogoUrl = $resolveMediaUrl(
-            filled($user?->logos_image)
-                ? $user->logos_image
-                : $getJsonFieldValue('logos', $getFieldValue('logos')),
+        $footerClubLogoUrl = $resolveMediaUrl(
+            $user?->club?->logo ?? '',
+            ''
+        );
+
+        $footerLeagueLogoUrl = $resolveMediaUrl(
+            $user?->league?->logo ?? $user?->club?->league?->logo ?? '',
+            ''
+        );
+
+        $footerNationalTeamLogoUrl = $resolveMediaUrl(
+            $user?->nationalTeam?->logo ?? '',
             ''
         );
 
@@ -1882,12 +1890,36 @@ HTML;
     <footer class="w-full">
         <div class="py-12 md:py-16 px-6 md:px-20" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-start">
-                <div class="flex items-center justify-start md:justify-start">
-                    <div class="h-40 md:h-60 w-full md:w-auto rounded flex items-center justify-center overflow-hidden">
-                        @if (!empty($footerLogoUrl))
-                            <img src="{{ $footerLogoUrl }}" alt="Footer logo" class="h-full w-full object-contain p-3" loading="lazy" decoding="async">
-                        @else
-                            <div class="h-full w-full"></div>
+                <div class="flex items-center justify-end md:justify-end">
+                    <div class="flex flex-wrap items-center gap-6 md:gap-8">
+                        @if (!empty($footerClubLogoUrl))
+                            <img
+                                src="{{ $footerClubLogoUrl }}"
+                                alt="Club logo"
+                                class="h-14 md:h-20 w-auto object-contain"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        @endif
+
+                        @if (!empty($footerLeagueLogoUrl))
+                            <img
+                                src="{{ $footerLeagueLogoUrl }}"
+                                alt="League logo"
+                                class="h-14 md:h-20 w-auto object-contain"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        @endif
+
+                        @if (!empty($footerNationalTeamLogoUrl))
+                            <img
+                                src="{{ $footerNationalTeamLogoUrl }}"
+                                alt="National team logo"
+                                class="h-14 md:h-20 w-auto object-contain"
+                                loading="lazy"
+                                decoding="async"
+                            >
                         @endif
                     </div>
                 </div>
