@@ -9,7 +9,16 @@ use Illuminate\Support\Facades\Log;
 class GhlWebhookController extends Controller
 {
     public function handle(Request $request)
-    {
+    {   
+        Log::info('Webhook headers', [
+        'x_webhook_secret' => $request->header('X-Webhook-Secret'),
+        'expected' => config('services.ghl.webhook_secret'),
+        ]);
+
+        if ($request->header('X-Webhook-Secret') !== config('services.ghl.webhook_secret')) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
         // 🔐 1. Verify secret
         if ($request->header('X-Webhook-Secret') !== config('services.ghl.webhook_secret')) {
             return response()->json(['message' => 'Unauthorized'], 401);
