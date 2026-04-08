@@ -39,4 +39,8 @@ return [
         'key' => env('YOUTUBE_API_KEY'),
     ],
 
+    'ghl' => [
+        'webhook_secret' => env('GHL_WEBHOOK_SECRET'),
+    ],
+
 ];
