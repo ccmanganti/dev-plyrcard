@@ -30,7 +30,7 @@
                 'tagline' => 'Level up your branded web presence',
                 'accent' => 'orange',
                 'popular' => true,
-                'button' => 'GET ROOKIE+',
+                'button' => 'GET PLYR',
                 'button_href' => '#',
                 'button_style' => 'orange',
                 'icon' => 'bolt',
