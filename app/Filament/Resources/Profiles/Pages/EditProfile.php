@@ -12,6 +12,7 @@ use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
+use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -49,6 +50,8 @@ class EditProfile extends Page implements HasForms
         abort_unless($this->user, 403);
 
         $this->user->loadMissing('roles', 'nationalTeam');
+
+        $this->handleExpiredTrialRole();
 
         $this->website = $this->user->websites()->first();
 
@@ -423,7 +426,7 @@ class EditProfile extends Page implements HasForms
 
                                         TextInput::make('state')
                                             ->prefixIcon('heroicon-m-map')
-                                            ->label('State')
+                                            ->label('State / Province')
                                             ->placeholder('State / Province')
                                             ->maxLength(255),
 
@@ -589,7 +592,7 @@ class EditProfile extends Page implements HasForms
                                             ->label('Team')
                                             ->placeholder('Enter team name')
                                             ->maxLength(255),
-                                        
+
                                         TextInput::make('national_team_period')
                                             ->prefixIcon('heroicon-m-calendar')
                                             ->label('National Team Period')
@@ -971,7 +974,6 @@ class EditProfile extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        // Only website fields that are actually editable in this profile page
         $websiteKeys = [
             'website_is_published',
         ];
@@ -999,6 +1001,8 @@ class EditProfile extends Page implements HasForms
 
         $this->user->refresh()->loadMissing('roles', 'nationalTeam');
 
+        $this->handleExpiredTrialRole();
+
         Notification::make()
             ->title('Profile saved successfully.')
             ->success()
@@ -1017,6 +1021,80 @@ class EditProfile extends Page implements HasForms
         return 'My Profile';
     }
 
+    protected function getTrialStartedAt(): ?Carbon
+    {
+        if (! $this->user || ! method_exists($this->user, 'roles')) {
+            return null;
+        }
+
+        $trialRole = $this->user->roles->firstWhere('name', 'Plyr Trial');
+
+        if (! $trialRole) {
+            return null;
+        }
+
+        $pivotCreatedAt = data_get($trialRole, 'pivot.created_at');
+
+        if ($pivotCreatedAt) {
+            return Carbon::parse($pivotCreatedAt);
+        }
+
+        if (filled($this->user->plyr_trial_started_at ?? null)) {
+            return Carbon::parse($this->user->plyr_trial_started_at);
+        }
+
+        return null;
+    }
+
+    protected function getTrialEndsAt(): ?Carbon
+    {
+        $startedAt = $this->getTrialStartedAt();
+
+        return $startedAt?->copy()->addDays(7);
+    }
+
+    public function getTrialDaysRemaining(): ?int
+    {
+        $endsAt = $this->getTrialEndsAt();
+
+        if (! $endsAt) {
+            return null;
+        }
+
+        if (now()->greaterThanOrEqualTo($endsAt)) {
+            return 0;
+        }
+
+        return (int) ceil(now()->diffInHours($endsAt) / 24);
+    }
+
+    protected function handleExpiredTrialRole(): void
+    {
+        if (! $this->user || ! method_exists($this->user, 'hasRole')) {
+            return;
+        }
+
+        if (! $this->user->hasRole('Plyr Trial')) {
+            return;
+        }
+
+        $endsAt = $this->getTrialEndsAt();
+
+        if (! $endsAt) {
+            return;
+        }
+
+        if (now()->greaterThanOrEqualTo($endsAt)) {
+            $this->user->removeRole('Plyr Trial');
+
+            if (! $this->user->hasRole('Rookie')) {
+                $this->user->assignRole('Rookie');
+            }
+
+            $this->user->refresh()->loadMissing('roles', 'nationalTeam');
+        }
+    }
+
     public function getCurrentPlanKey(): string
     {
         if (! $this->user) {
@@ -1028,8 +1106,12 @@ class EditProfile extends Page implements HasForms
                 return 'my_journey';
             }
 
-            if ($this->user->hasRole('Rookie Plus')) {
-                return 'rookie_plus';
+            if ($this->user->hasRole('Plyr')) {
+                return 'plyr';
+            }
+
+            if ($this->user->hasRole('Plyr Trial')) {
+                return 'plyr_trial';
             }
 
             if ($this->user->hasRole('Rookie')) {
@@ -1044,7 +1126,8 @@ class EditProfile extends Page implements HasForms
     {
         return match ($this->getCurrentPlanKey()) {
             'my_journey' => 'MY JOURNEY',
-            'rookie_plus' => 'ROOKIE PLUS',
+            'plyr' => 'PLYR',
+            'plyr_trial' => 'PLYR TRIAL',
             default => 'ROOKIE',
         };
     }
@@ -1053,7 +1136,8 @@ class EditProfile extends Page implements HasForms
     {
         return match ($this->getCurrentPlanKey()) {
             'my_journey' => "YOU'RE ON MY JOURNEY",
-            'rookie_plus' => "YOU'RE ON ROOKIE PLUS",
+            'plyr' => "YOU'RE ON PLYR",
+            'plyr_trial' => "YOU'RE ON PLYR TRIAL",
             default => "YOU'RE ON ROOKIE",
         };
     }
@@ -1061,26 +1145,53 @@ class EditProfile extends Page implements HasForms
     public function getPlanDescription(): string
     {
         return match ($this->getCurrentPlanKey()) {
-            'my_journey' => 'You are on the highest plan. Your full PLYRCard experience is unlocked.',
-            'rookie_plus' => 'You have expanded access and features. Upgrade to My Journey to unlock the full PLYRCard experience.',
-            default => 'Social links, YouTube highlights, and additional media slots are locked. Upgrade to unlock more of the PLYRCard experience.',
+            'plyr_trial' => $this->getTrialDescription(),
+            'plyr' => 'You are currently on Plyr. Upgrade to My Journey to unlock the next level of the PLYRCard experience.',
+            'my_journey' => 'You are currently on My Journey. Book a demo to get guided support and maximize your setup.',
+            default => 'You are currently on Rookie. Upgrade to Plyr or book a demo to unlock more of the PLYRCard experience.',
         };
+    }
+
+    protected function getTrialDescription(): string
+    {
+        $daysRemaining = $this->getTrialDaysRemaining();
+
+        if ($daysRemaining === null) {
+            return 'Your Plyr Trial is active for 7 days starting from the date the role was assigned.';
+        }
+
+        if ($daysRemaining <= 0) {
+            return 'Your Plyr Trial has ended and your account will return to Rookie.';
+        }
+
+        return "Your Plyr Trial is active. {$daysRemaining} day" . ($daysRemaining === 1 ? '' : 's') . " remaining before your account returns to Rookie.";
     }
 
     public function canUpgradePlan(): bool
     {
-        return $this->getCurrentPlanKey() !== 'my_journey';
+        return true;
     }
 
     public function getUpgradeButtonLabel(): string
     {
         return match ($this->getCurrentPlanKey()) {
-            'rookie_plus' => 'Upgrade to My Journey',
-            default => 'Upgrade Now',
+            'plyr' => 'Upgrade to My Journey',
+            'rookie', 'plyr_trial', 'my_journey' => 'Upgrade to Plyr',
+            default => 'Upgrade to Plyr',
         };
     }
 
     public function getUpgradeUrl(): string
+    {
+        return '#';
+    }
+
+    public function shouldShowBookDemoButton(): bool
+    {
+        return in_array($this->getCurrentPlanKey(), ['rookie', 'my_journey'], true);
+    }
+
+    public function getBookDemoUrl(): string
     {
         return '#';
     }

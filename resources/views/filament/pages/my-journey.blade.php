@@ -2,7 +2,7 @@
     @php
         $plans = [
             [
-                'name' => 'ROOKIE',
+                'name' => 'FREE',
                 'price' => '$0',
                 'suffix' => '/month',
                 'tagline' => 'Get your info online',

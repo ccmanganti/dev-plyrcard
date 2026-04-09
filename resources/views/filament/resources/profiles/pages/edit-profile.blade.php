@@ -117,6 +117,13 @@
             color: #98c6a6;
         }
 
+        .profile-plan-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
         .profile-upgrade-btn {
             display: inline-flex;
             align-items: center;
@@ -373,12 +380,21 @@
                 </div>
             </div>
 
-            @if ($this->canUpgradePlan())
-                <a href="{{ $this->getUpgradeUrl() }}" class="profile-upgrade-btn">
-                    <x-heroicon-m-paper-airplane />
-                    <span>{{ $this->getUpgradeButtonLabel() }}</span>
-                </a>
-            @endif
+            <div class="profile-plan-actions">
+                @if ($this->canUpgradePlan())
+                    <a href="{{ $this->getUpgradeUrl() }}" class="profile-upgrade-btn">
+                        <x-heroicon-m-paper-airplane />
+                        <span>{{ $this->getUpgradeButtonLabel() }}</span>
+                    </a>
+                @endif
+
+                @if ($this->shouldShowBookDemoButton())
+                    <a href="{{ $this->getBookDemoUrl() }}" class="profile-action-btn profile-action-btn--ghost">
+                        <x-heroicon-m-calendar-days />
+                        <span>Book a Demo</span>
+                    </a>
+                @endif
+            </div>
         </div>
 
         <div class="profile-overview-card">
