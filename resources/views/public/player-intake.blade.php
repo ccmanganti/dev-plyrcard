@@ -685,7 +685,7 @@
                             <div class="col-4">
                                 <label for="personal_email">Personal Email <span class="required">*</span></label>
                                 <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required>
-                                <div class="hint">The <span translate="no">PlyrCard</span> email will be generated automatically.</div>
+                                <div class="hint">This email will be used as your login and primary contact.</div>
                             </div>
 
                             <div class="col-4">
@@ -1216,7 +1216,6 @@
     const oldLeagueId = @json(old('league_id'));
     const oldClubId = @json(old('club_id'));
     const oldTeamId = @json(old('team_id'));
-    const oldGender = @json(old('gender'));
 
     const REGION_TEST_OVERRIDE = null;
     const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');

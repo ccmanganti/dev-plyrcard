@@ -531,29 +531,13 @@ class PublicPlayerIntakeController extends Controller
             [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
             $nationalTeam = $this->resolveNationalTeam($validated);
 
-            $fullNameNoSpaces = $this->fullNameNoSpaces(
-                $validated['first_name'],
-                $validated['middle_name'] ?? null,
-                $validated['last_name']
-            );
-
-            $firstNameSlug = Str::lower(Str::ascii($validated['first_name']));
-            $firstNameSlug = preg_replace('/[^a-z0-9]/', '', $firstNameSlug) ?: 'player';
-
-            $nameDomainStem = Str::lower(Str::ascii($fullNameNoSpaces));
-            $nameDomainStem = preg_replace('/[^a-z0-9]/', '', $nameDomainStem) ?: ('player' . time());
-
-            $generatedEmail = $firstNameSlug . '@' . $nameDomainStem . '.com';
-            $generatedDomain = $nameDomainStem . '.com';
-
             $user = User::withTrashed()
                 ->where('personal_email', $validated['personal_email'])
-                ->orWhere('email', $generatedEmail)
                 ->first();
 
             if (! $user) {
                 $user = new User();
-                $user->password = Hash::make(Str::random(40));
+                $user->password = Hash::make('WelcomePLYR');
             }
 
             if (method_exists($user, 'trashed') && $user->trashed()) {
@@ -566,7 +550,7 @@ class PublicPlayerIntakeController extends Controller
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
                 'personal_email' => $validated['personal_email'],
-                'email' => $generatedEmail,
+                'email' => $validated['personal_email'],
                 'phone' => $validated['phone'] ?? null,
                 'gender' => $validated['gender'],
                 'country' => $validated['country'] ?? null,
@@ -617,7 +601,7 @@ class PublicPlayerIntakeController extends Controller
                 'club_id' => $club?->id,
                 'league_id' => $league?->id,
                 'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
-                'domain' => $generatedDomain,
+                'domain' => null,
                 'player_bio' => $validated['player_bio'] ?? null,
                 'featured_video_url' => $validated['featured_video_url'] ?? null,
                 'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
@@ -633,7 +617,7 @@ class PublicPlayerIntakeController extends Controller
 
             $uploads = $this->storeHeroUploads($request);
 
-            $this->createWebsiteIfSupported($user, $validated, $uploads, $generatedDomain);
+            $this->createWebsiteIfSupported($user, $validated, $uploads, $user->email);
 
             return $user;
         });
