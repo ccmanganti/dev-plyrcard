@@ -7,8 +7,10 @@ use App\Filament\Resources\Clubs\Pages\EditClub;
 use App\Filament\Resources\Clubs\Pages\ListClubs;
 use App\Filament\Resources\Clubs\Pages\ViewClub;
 use App\Models\Club;
+use App\Models\League;
 use BackedEnum;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -16,6 +18,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +43,17 @@ class ClubResource extends Resource
                     TextInput::make('name')
                         ->required()
                         ->maxLength(255),
+
+                    Select::make('league_id')
+                        ->label('League')
+                        ->options(
+                            League::query()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->required(),
 
                     FileUpload::make('logo')
                         ->label('Logo')
@@ -67,11 +81,22 @@ class ClubResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('league.name')
+                    ->label('League')
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('updated_at')
                     ->since()
                     ->label('Updated'),
             ])
             ->filters([
+                SelectFilter::make('league_id')
+                    ->label('League')
+                    ->relationship('league', 'name')
+                    ->searchable()
+                    ->preload(),
+
                 TrashedFilter::make(),
             ])
             ->recordUrl(fn (Club $record): string => static::getUrl('edit', ['record' => $record]));
