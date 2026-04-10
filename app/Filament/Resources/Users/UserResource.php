@@ -10,6 +10,7 @@ use App\Models\Club;
 use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
+use App\Models\Team;
 use App\Models\User;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
@@ -31,9 +32,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use STS\FilamentImpersonate\Actions\Impersonate;
 use UnitEnum;
+use Filament\Forms\Components\Hidden;
 
 class UserResource extends Resource
 {
@@ -81,9 +82,31 @@ class UserResource extends Resource
         ];
     }
 
+    protected static function getTeamOptions(): array
+    {
+        return ['__new__' => 'Add New'] + Team::query()
+            ->with(['club.league'])
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(function (Team $team) {
+                $clubName = $team->club?->name;
+                $leagueName = $team->club?->league?->name;
+
+                $label = $team->name;
+
+                if ($clubName || $leagueName) {
+                    $suffix = collect([$clubName, $leagueName])->filter()->implode(' • ');
+                    $label .= ' (' . $suffix . ')';
+                }
+
+                return [(string) $team->id => $label];
+            })
+            ->all();
+    }
+
     protected static function getClubOptions(): array
     {
-        return ['__new__' => 'Add New'] + Club::query()
+        return Club::query()
             ->orderBy('name')
             ->pluck('name', 'id')
             ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
@@ -92,7 +115,7 @@ class UserResource extends Resource
 
     protected static function getLeagueOptions(): array
     {
-        return ['__new__' => 'Add New'] + League::query()
+        return League::query()
             ->orderBy('name')
             ->pluck('name', 'id')
             ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
@@ -231,7 +254,6 @@ class UserResource extends Resource
             default => [],
         };
     }
-
     public static function mutateUserFormData(array $data): array
     {
         if (filled($data['password'] ?? null)) {
@@ -240,26 +262,82 @@ class UserResource extends Resource
             unset($data['password']);
         }
 
-        if (($data['club_id'] ?? null) === '__new__' && filled($data['new_club_name'] ?? null)) {
-            $club = Club::create([
-                'name' => trim($data['new_club_name']),
-                'logo' => $data['new_club_logo'] ?? null,
-            ]);
+        if (($data['team_id'] ?? null) === '__new__') {
+            $newLeagueName = trim((string) ($data['new_league_name'] ?? ''));
+            $newClubName = trim((string) ($data['new_club_name'] ?? ''));
+            $newTeamName = trim((string) ($data['new_team_name'] ?? ''));
 
-            $data['club_id'] = $club->id;
-        } elseif (($data['club_id'] ?? null) === '__new__') {
-            $data['club_id'] = null;
-        }
+            $league = null;
+            $club = null;
+            $team = null;
 
-        if (($data['league_id'] ?? null) === '__new__' && filled($data['new_league_name'] ?? null)) {
-            $league = League::create([
-                'name' => trim($data['new_league_name']),
-                'logo' => $data['new_league_logo'] ?? null,
-            ]);
+            if ($newLeagueName !== '') {
+                $league = League::firstOrCreate(
+                    ['name' => $newLeagueName],
+                    ['logo' => $data['new_league_logo'] ?? null]
+                );
 
-            $data['league_id'] = $league->id;
-        } elseif (($data['league_id'] ?? null) === '__new__') {
-            $data['league_id'] = null;
+                if (blank($league->logo) && filled($data['new_league_logo'] ?? null)) {
+                    $league->logo = $data['new_league_logo'];
+                    $league->save();
+                }
+            }
+
+            if ($newClubName !== '') {
+                $club = Club::firstOrCreate(
+                    [
+                        'name' => $newClubName,
+                        'league_id' => $league?->id,
+                    ],
+                    [
+                        'logo' => $data['new_club_logo'] ?? null,
+                    ]
+                );
+
+                $clubNeedsSave = false;
+
+                if ($league && $club->league_id !== $league->id) {
+                    $club->league_id = $league->id;
+                    $clubNeedsSave = true;
+                }
+
+                if (blank($club->logo) && filled($data['new_club_logo'] ?? null)) {
+                    $club->logo = $data['new_club_logo'];
+                    $clubNeedsSave = true;
+                }
+
+                if ($clubNeedsSave) {
+                    $club->save();
+                }
+            }
+
+            if ($newTeamName !== '') {
+                $team = Team::firstOrCreate(
+                    [
+                        'name' => $newTeamName,
+                        'club_id' => $club?->id,
+                    ]
+                );
+
+                if ($club && $team->club_id !== $club->id) {
+                    $team->club_id = $club->id;
+                    $team->save();
+                }
+            }
+
+            $data['team_name'] = $team?->name ?? null;
+            $data['club_id'] = $club?->id;
+            $data['league_id'] = $league?->id;
+        } else {
+            $selectedTeam = null;
+
+            if (filled($data['team_id'] ?? null)) {
+                $selectedTeam = Team::with('club.league')->find($data['team_id']);
+            }
+
+            $data['team_name'] = $selectedTeam?->name ?? null;
+            $data['club_id'] = $selectedTeam?->club?->id ?? null;
+            $data['league_id'] = $selectedTeam?->club?->league?->id ?? null;
         }
 
         if (($data['national_team_id'] ?? null) === '__new__' && filled($data['new_national_team_name'] ?? null)) {
@@ -275,6 +353,8 @@ class UserResource extends Resource
 
         unset(
             $data['password_confirmation'],
+            $data['team_id'],
+            $data['new_team_name'],
             $data['new_club_name'],
             $data['new_club_logo'],
             $data['new_league_name'],
@@ -353,36 +433,87 @@ class UserResource extends Resource
             Section::make('Organization Details')
                 ->columns(2)
                 ->schema([
-                    Select::make('club_id')
-                        ->label('Club')
-                        ->options(fn () => static::getClubOptions())
+                    Select::make('team_id')
+                        ->label('Team')
+                        ->options(fn () => static::getTeamOptions())
                         ->searchable()
                         ->preload()
-                        ->live(),
+                        ->live()
+                        ->required(false)
+                        ->afterStateHydrated(function (Select $component, $state, $record) {
+                            if (! $record || blank($record->team_name)) {
+                                return;
+                            }
+
+                            $team = Team::query()
+                                ->with('club.league')
+                                ->where('name', $record->team_name)
+                                ->when($record->club_id, fn ($query) => $query->where('club_id', $record->club_id))
+                                ->first();
+
+                            if ($team) {
+                                $component->state((string) $team->id);
+                            }
+                        })
+                        ->afterStateUpdated(function (callable $set, $state) {
+                            if ($state === '__new__') {
+                                $set('club_id', null);
+                                $set('league_id', null);
+                                $set('team_name', null);
+                                return;
+                            }
+
+                            if (blank($state)) {
+                                $set('club_id', null);
+                                $set('league_id', null);
+                                $set('team_name', null);
+                                return;
+                            }
+
+                            $team = Team::with('club.league')->find($state);
+
+                            $set('team_name', $team?->name);
+                            $set('club_id', $team?->club?->id ? (string) $team->club->id : null);
+                            $set('league_id', $team?->club?->league?->id ? (string) $team->club->league->id : null);
+                        })
+                        ->helperText('Select a team to auto-fill club and league, or choose Add New.'),
 
                     Select::make('league_id')
                         ->label('League')
                         ->options(fn () => static::getLeagueOptions())
                         ->searchable()
                         ->preload()
-                        ->live(),
+                        ->disabled()
+                        ->dehydrated()
+                        ->helperText('Auto-filled from the selected team.'),
 
-                    Select::make('national_team_id')
-                        ->label('National Team')
-                        ->options(fn () => static::getNationalTeamOptions())
+                    Select::make('club_id')
+                        ->label('Club')
+                        ->options(fn () => static::getClubOptions())
                         ->searchable()
                         ->preload()
-                        ->live(),
+                        ->disabled()
+                        ->dehydrated()
+                        ->helperText('Auto-filled from the selected team.'),
 
                     TextInput::make('team_name')
-                        ->label('Team')
-                        ->maxLength(255),
+                        ->label('Team Name')
+                        ->disabled()
+                        ->dehydrated()
+                        ->visible(fn (callable $get) => $get('team_id') !== '__new__' && filled($get('team_id')))
+                        ->helperText('Auto-filled from the selected team.'),
+
+                    TextInput::make('new_team_name')
+                        ->label('New Team Name')
+                        ->maxLength(255)
+                        ->visible(fn (callable $get) => $get('team_id') === '__new__')
+                        ->required(fn (callable $get) => $get('team_id') === '__new__'),
 
                     TextInput::make('new_club_name')
                         ->label('New Club Name')
                         ->maxLength(255)
-                        ->visible(fn (callable $get) => $get('club_id') === '__new__')
-                        ->required(fn (callable $get) => $get('club_id') === '__new__'),
+                        ->visible(fn (callable $get) => $get('team_id') === '__new__')
+                        ->required(fn (callable $get) => $get('team_id') === '__new__'),
 
                     FileUpload::make('new_club_logo')
                         ->label('New Club Logo')
@@ -391,13 +522,13 @@ class UserResource extends Resource
                         ->disk('public')
                         ->directory('club-logos')
                         ->visibility('public')
-                        ->visible(fn (callable $get) => $get('club_id') === '__new__'),
+                        ->visible(fn (callable $get) => $get('team_id') === '__new__'),
 
                     TextInput::make('new_league_name')
                         ->label('New League Name')
                         ->maxLength(255)
-                        ->visible(fn (callable $get) => $get('league_id') === '__new__')
-                        ->required(fn (callable $get) => $get('league_id') === '__new__'),
+                        ->visible(fn (callable $get) => $get('team_id') === '__new__')
+                        ->required(fn (callable $get) => $get('team_id') === '__new__'),
 
                     FileUpload::make('new_league_logo')
                         ->label('New League Logo')
@@ -406,7 +537,14 @@ class UserResource extends Resource
                         ->disk('public')
                         ->directory('league-logos')
                         ->visibility('public')
-                        ->visible(fn (callable $get) => $get('league_id') === '__new__'),
+                        ->visible(fn (callable $get) => $get('team_id') === '__new__'),
+
+                    Select::make('national_team_id')
+                        ->label('National Team')
+                        ->options(fn () => static::getNationalTeamOptions())
+                        ->searchable()
+                        ->preload()
+                        ->live(),
 
                     TextInput::make('new_national_team_name')
                         ->label('New National Team Name')
@@ -642,6 +780,7 @@ class UserResource extends Resource
                 TextColumn::make('school.name')->label('School')->toggleable(),
                 TextColumn::make('league.name')->label('League')->toggleable(),
                 TextColumn::make('club.name')->label('Club')->toggleable(),
+                TextColumn::make('team_name')->label('Team')->toggleable(),
                 TextColumn::make('nationalTeam.name')->label('National Team')->toggleable(),
                 TextColumn::make('roles.name')->badge(),
                 TextColumn::make('updated_at')->since()->label('Updated'),

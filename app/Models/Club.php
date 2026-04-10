@@ -11,6 +11,7 @@ class Club extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'league_id',
         'name',
         'logo',
     ];

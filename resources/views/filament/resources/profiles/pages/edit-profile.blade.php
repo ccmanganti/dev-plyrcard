@@ -315,6 +315,15 @@
             flex: 0 0 auto !important;
         }
 
+        .profile-page-tabs .pc-locked-tab-trigger {
+            position: relative;
+        }
+
+        .profile-page-tabs .pc-locked-tab-trigger button,
+        .profile-page-tabs .pc-locked-tab-trigger [role="tab"] {
+            cursor: pointer !important;
+        }
+
         .profile-plan-icon svg,
         .profile-meta-item svg,
         .profile-pill svg,
@@ -338,6 +347,116 @@
             flex-shrink: 0 !important;
         }
 
+        .pc-lock-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: rgba(0, 0, 0, 0.78);
+            backdrop-filter: blur(6px);
+        }
+
+        .pc-lock-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .pc-lock-modal-card {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 1.8rem;
+            border: 1px solid rgba(255, 107, 74, 0.25);
+            background: #111214;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+            padding: 2.4rem 2rem 1.9rem;
+            text-align: center;
+        }
+
+        .pc-lock-modal-icon {
+            width: 92px;
+            height: 92px;
+            margin: 0 auto 1.5rem;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 107, 74, 0.12);
+            border: 3px solid var(--pc-orange);
+            color: var(--pc-orange);
+        }
+
+        .pc-lock-modal-icon svg {
+            width: 34px;
+            height: 34px;
+        }
+
+        .pc-lock-modal-title {
+            margin: 0;
+            color: #f5f5f5;
+            font-size: 2rem;
+            font-weight: 900;
+            line-height: 1.05;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .pc-lock-modal-title span {
+            color: var(--pc-orange);
+        }
+
+        .pc-lock-modal-copy {
+            max-width: 500px;
+            margin: 1.1rem auto 0;
+            color: #9f9fa6;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .pc-lock-modal-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .pc-lock-btn {
+            min-width: 190px;
+            height: 70px;
+            border-radius: 1rem;
+            padding: 0 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            transition: transform .15s ease, opacity .15s ease, background .15s ease;
+        }
+
+        .pc-lock-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .pc-lock-btn-secondary {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.10);
+            color: #8f8f95;
+        }
+
+        .pc-lock-btn-primary {
+            background: var(--pc-orange);
+            border: 1px solid var(--pc-orange);
+            color: #fff;
+        }
+
         @media (max-width: 900px) {
             .profile-plan-banner {
                 flex-direction: column;
@@ -359,6 +478,16 @@
 
             .profile-name {
                 font-size: 1rem;
+            }
+
+            .pc-lock-modal-title {
+                font-size: 1.45rem;
+            }
+
+            .pc-lock-btn {
+                width: 100%;
+                min-width: 0;
+                height: 58px;
             }
         }
     </style>
@@ -475,4 +604,73 @@
             {{ $this->form }}
         </div>
     </div>
+
+    @if ($showLockedFeatureModal)
+        <div class="pc-lock-modal-backdrop" wire:click="closeLockedFeatureModal"></div>
+
+        <div class="pc-lock-modal" aria-modal="true" role="dialog">
+            <div class="pc-lock-modal-card">
+                <div class="pc-lock-modal-icon">
+                    <x-heroicon-m-lock-closed />
+                </div>
+
+                <h2 class="pc-lock-modal-title">
+                    UNLOCK <span>SOCIAL &amp; VIDEO LINKS</span>
+                </h2>
+
+                <p class="pc-lock-modal-copy">
+                    {{ $lockedFeatureMessage }}
+                </p>
+
+                <div class="pc-lock-modal-actions">
+                    <button type="button" wire:click="closeLockedFeatureModal" class="pc-lock-btn pc-lock-btn-secondary">
+                        Maybe Later
+                    </button>
+
+                    <a href="{{ $this->getUpgradeUrl() }}" class="pc-lock-btn pc-lock-btn-primary">
+                        See Plans
+                    </a>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <script>
+        document.addEventListener('livewire:navigated', bindLockedTabs);
+        document.addEventListener('DOMContentLoaded', bindLockedTabs);
+
+        function bindLockedTabs() {
+            document.querySelectorAll('.pc-locked-tab-trigger').forEach((tabWrap) => {
+                if (tabWrap.dataset.lockBound === '1') {
+                    return;
+                }
+
+                tabWrap.dataset.lockBound = '1';
+
+                const clickable = tabWrap.querySelector('button, [role="tab"]');
+
+                if (!clickable) {
+                    return;
+                }
+
+                clickable.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    if (window.Livewire) {
+                        Livewire.dispatch('openLockedFeatureModalFromJs');
+                    }
+                }, true);
+            });
+        }
+
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('openLockedFeatureModalFromJs', () => {
+                @this.openLockedFeatureModal(
+                    'UNLOCK SOCIAL & VIDEO LINKS',
+                    'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.'
+                );
+            });
+        });
+    </script>
 </x-filament-panels::page>

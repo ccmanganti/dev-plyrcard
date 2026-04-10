@@ -12,22 +12,23 @@ use App\Models\School;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
-use Carbon\Carbon;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
-use Filament\Schemas\Components\Section;
+use Illuminate\Support\Facades\Storage;
+use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Storage;
+use Filament\Schemas\Components\Section;
 
 class EditProfile extends Page implements HasForms
 {
@@ -43,6 +44,12 @@ class EditProfile extends Page implements HasForms
 
     public array $data = [];
 
+    public bool $showLockedFeatureModal = false;
+
+    public string $lockedFeatureTitle = 'UNLOCK SOCIAL & VIDEO LINKS';
+
+    public string $lockedFeatureMessage = 'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.';
+
     public function mount(): void
     {
         $this->user = auth()->user();
@@ -50,8 +57,6 @@ class EditProfile extends Page implements HasForms
         abort_unless($this->user, 403);
 
         $this->user->loadMissing('roles', 'nationalTeam');
-
-        $this->handleExpiredTrialRole();
 
         $this->website = $this->user->websites()->first();
 
@@ -282,36 +287,6 @@ class EditProfile extends Page implements HasForms
         };
     }
 
-    protected static function resolvePreviewImageUrl($template): ?string
-    {
-        if (! $template) {
-            return null;
-        }
-
-        foreach ([
-            'preview_image_url',
-            'preview_image',
-            'image_url',
-            'image',
-            'thumbnail_url',
-            'thumbnail',
-        ] as $field) {
-            $value = data_get($template, $field);
-
-            if (blank($value)) {
-                continue;
-            }
-
-            if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
-                return $value;
-            }
-
-            return Storage::url($value);
-        }
-
-        return null;
-    }
-
     protected function mutateProfileData(array $data): array
     {
         if (($data['school_id'] ?? null) === '__new__' && filled($data['new_school_name'] ?? null)) {
@@ -332,643 +307,666 @@ class EditProfile extends Page implements HasForms
     }
 
     public function form(Schema $schema): Schema
-    {
-        return $schema
-            ->components([
-                Tabs::make('profile_tabs')
-                    ->tabs([
-                        Tab::make('Basic Info')
-                            ->icon('heroicon-m-user')
-                            ->schema([
-                                Section::make('Personal Information')
-                                    ->icon('heroicon-m-user')
-                                    ->columns(6)
-                                    ->schema([
-                                        TextInput::make('first_name')
-                                            ->label('First Name')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Enter first name')
-                                            ->required()
-                                            ->columnSpan(2)
-                                            ->maxLength(255),
-
-                                        TextInput::make('last_name')
-                                            ->label('Last Name')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Enter last name')
-                                            ->columnSpan(2)
-                                            ->required()
-                                            ->maxLength(255),
-
-                                        TextInput::make('personal_email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->label('Personal Email')
-                                            ->placeholder('name@example.com')
-                                            ->columnSpan(2)
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->label('PlyrCard Email')
-                                            ->placeholder('plyrcard login email')
-                                            ->email()
-                                            ->columnSpan(2)
-                                            ->required()
-                                            ->maxLength(255),
-
-                                        TextInput::make('phone')
-                                            ->label('Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->columnSpan(2)
-                                            ->tel()
-                                            ->maxLength(255),
-
-                                        TextInput::make('password')
-                                            ->label('Password')
-                                            ->prefixIcon('heroicon-m-lock-closed')
-                                            ->placeholder('Leave blank to keep current password')
-                                            ->columnSpan(1)
-                                            ->password()
-                                            ->revealable()
-                                            ->dehydrated(fn ($state) => filled($state))
-                                            ->same('password_confirmation')
-                                            ->nullable()
-                                            ->helperText('Leave blank to keep the current password.'),
-
-                                        TextInput::make('password_confirmation')
-                                            ->label('Confirm Password')
-                                            ->prefixIcon('heroicon-m-lock-closed')
-                                            ->placeholder('Re-enter new password')
-                                            ->columnSpan(1)
-                                            ->password()
-                                            ->revealable()
-                                            ->dehydrated(false)
-                                            ->nullable(),
-                                    ]),
-
-                                Section::make('Address')
-                                    ->icon('heroicon-m-map-pin')
-                                    ->columns(2)
-                                    ->schema([
-                                        TextInput::make('street')
-                                            ->prefixIcon('heroicon-m-map-pin')
-                                            ->label('Street Address')
-                                            ->placeholder('123 Main Street')
-                                            ->maxLength(255),
-
-                                        TextInput::make('city')
-                                            ->prefixIcon('heroicon-m-building-office-2')
-                                            ->label('City')
-                                            ->placeholder('City')
-                                            ->maxLength(255),
-
-                                        TextInput::make('state')
-                                            ->prefixIcon('heroicon-m-map')
-                                            ->label('State / Province')
-                                            ->placeholder('State / Province')
-                                            ->maxLength(255),
-
-                                        TextInput::make('country')
-                                            ->prefixIcon('heroicon-m-globe-alt')
-                                            ->label('Country')
-                                            ->placeholder('Country')
-                                            ->maxLength(255),
-                                    ]),
-                            ]),
-
-                        Tab::make('Athlete Info')
-                            ->icon('heroicon-m-user-circle')
-                            ->schema([
-                                Section::make('Sport Details')
-                                    ->icon('heroicon-m-cog-6-tooth')
-                                    ->columns(3)
-                                    ->schema([
-                                        Select::make('sport')
-                                            ->prefixIcon('heroicon-m-trophy')
-                                            ->label('Sport')
-                                            ->placeholder('Select sport')
-                                            ->options(UserResource::getSportOptions())
-                                            ->required()
-                                            ->searchable()
-                                            ->live(),
-
-                                        Select::make('position')
-                                            ->prefixIcon('heroicon-m-rectangle-group')
-                                            ->label('Position')
-                                            ->placeholder('Select position')
-                                            ->multiple()
-                                            ->searchable()
-                                            ->preload()
-                                            ->required()
-                                            ->options(fn (callable $get): array => static::getPositionOptions($get('sport')))
-                                            ->disabled(fn (callable $get): bool => blank($get('sport')))
-                                            ->helperText('Select one or more positions based on the chosen sport.'),
-
-                                        TextInput::make('jersey_number')
-                                            ->prefixIcon('heroicon-m-hashtag')
-                                            ->label('Roster Number')
-                                            ->placeholder('e.g. 19')
-                                            ->numeric(),
-
-                                        TextInput::make('year')
-                                            ->prefixIcon('heroicon-m-academic-cap')
-                                            ->label('Graduation Year')
-                                            ->placeholder('e.g. 2026')
-                                            ->numeric()
-                                            ->minValue(2000)
-                                            ->maxValue(2100),
-
-                                        Select::make('gender')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->label('Sex')
-                                            ->placeholder('Select sex')
-                                            ->options(UserResource::getGenderOptions())
-                                            ->searchable()
-                                            ->nullable(),
-
-                                        DatePicker::make('birth')
-                                            ->prefixIcon('heroicon-m-calendar-days')
-                                            ->label('Birth Date')
-                                            ->native(false)
-                                            ->closeOnDateSelection(),
-
-                                        TextInput::make('gpa')
-                                            ->prefixIcon('heroicon-m-calculator')
-                                            ->label('GPA')
-                                            ->placeholder('e.g. 3.8')
-                                            ->numeric()
-                                            ->step('0.01'),
-
-                                        Select::make('school_id')
-                                            ->prefixIcon('heroicon-m-building-library')
-                                            ->label('School')
-                                            ->placeholder('Select school')
-                                            ->options(fn () => static::getSchoolOptions())
-                                            ->searchable()
-                                            ->preload()
-                                            ->live()
-                                            ->nullable(),
-
-                                        TextInput::make('new_school_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New School Name')
-                                            ->placeholder('Enter school name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('school_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('school_id') === '__new__'),
-                                    ]),
-
-                                Section::make('Physical Stats')
-                                    ->columns(2)
-                                    ->icon('heroicon-m-chart-bar-square')
-                                    ->schema([
-                                        TextInput::make('height')
-                                            ->prefixIcon('heroicon-m-arrows-up-down')
-                                            ->label('Height')
-                                            ->maxLength(255)
-                                            ->placeholder('e.g. 6\'2" or 188 cm'),
-
-                                        TextInput::make('weight')
-                                            ->prefixIcon('heroicon-m-scale')
-                                            ->label('Weight')
-                                            ->maxLength(255)
-                                            ->placeholder('e.g. 185 lbs or 84 kg'),
-
-                                        Select::make('dominant_foot')
-                                            ->prefixIcon('heroicon-m-hand-raised')
-                                            ->label('Dominant Foot')
-                                            ->placeholder('Select dominant foot')
-                                            ->options([
-                                                'left' => 'Left',
-                                                'right' => 'Right',
-                                                'both' => 'Both',
-                                            ])
-                                            ->visible(fn (callable $get) => $get('sport') === 'soccer')
-                                            ->required(fn (callable $get) => $get('sport') === 'soccer'),
-
-                                        TextInput::make('max_speed')
-                                            ->prefixIcon('heroicon-m-bolt')
-                                            ->label('Max Speed')
-                                            ->placeholder('e.g. 19.00')
-                                            ->numeric()
-                                            ->step('0.01'),
-                                    ]),
-
-                                Section::make('Experience')
-                                    ->icon('heroicon-m-flag')
-                                    ->columns(2)
-                                    ->schema([
-                                        Select::make('club_id')
-                                            ->prefixIcon('heroicon-m-shield-check')
-                                            ->label('Club')
-                                            ->placeholder('Select club')
-                                            ->options(fn () => static::getClubOptions())
-                                            ->searchable()
-                                            ->preload()
-                                            ->live(),
-
-                                        Select::make('league_id')
-                                            ->prefixIcon('heroicon-m-squares-2x2')
-                                            ->label('League')
-                                            ->placeholder('Select league')
-                                            ->options(fn () => static::getLeagueOptions())
-                                            ->searchable()
-                                            ->preload()
-                                            ->live(),
-
-                                        Select::make('national_team_id')
-                                            ->prefixIcon('heroicon-m-flag')
-                                            ->label('National Team Experience')
-                                            ->placeholder('Select national team')
-                                            ->options(fn () => static::getNationalTeamOptions())
-                                            ->searchable()
-                                            ->preload()
-                                            ->live(),
-
-                                        TextInput::make('team_name')
-                                            ->prefixIcon('heroicon-m-users')
-                                            ->label('Team')
-                                            ->placeholder('Enter team name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('national_team_period')
-                                            ->prefixIcon('heroicon-m-calendar')
-                                            ->label('National Team Period')
-                                            ->placeholder('e.g. 2025-2026')
-                                            ->maxLength(255),
-
-                                        TextInput::make('new_club_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New Club Name')
-                                            ->placeholder('Enter club name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('club_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('club_id') === '__new__'),
-
-                                        FileUpload::make('new_club_logo')
-                                            ->label('New Club Logo')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('club-logos')
-                                            ->visibility('public')
-                                            ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('club_id') === '__new__'),
-
-                                        TextInput::make('new_league_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New League Name')
-                                            ->placeholder('Enter league name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('league_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('league_id') === '__new__'),
-
-                                        FileUpload::make('new_league_logo')
-                                            ->label('New League Logo')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('league-logos')
-                                            ->visibility('public')
-                                            ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('league_id') === '__new__'),
-
-                                        TextInput::make('new_national_team_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New National Team Name')
-                                            ->placeholder('Enter national team name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('national_team_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('national_team_id') === '__new__'),
-
-                                        FileUpload::make('new_national_team_logo')
-                                            ->label('New National Team Logo')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('national-team-logos')
-                                            ->visibility('public')
-                                            ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('national_team_id') === '__new__'),
-                                    ]),
-                            ]),
-
-                        Tab::make('Bio & Accolades')
-                            ->icon('heroicon-m-list-bullet')
-                            ->schema([
-                                Section::make('Player Bio')
-                                    ->icon('heroicon-m-pencil-square')
-                                    ->description('Write your athlete story — who you are, your playing style, and what drives you.')
-                                    ->schema([
-                                        Textarea::make('player_bio')
-                                            ->label('Player Bio')
-                                            ->placeholder('Write your athlete story here...')
-                                            ->rows(8)
-                                            ->columnSpanFull(),
-                                    ]),
-
-                                Section::make('Academic Accolades')
-                                    ->icon('heroicon-m-academic-cap')
-                                    ->description('Honors, dean’s list, certifications — anything that showcases your academic excellence.')
-                                    ->schema([
-                                        Textarea::make('academic_accolades')
-                                            ->label('Academic Accolades')
-                                            ->placeholder("Dean's List\nHonor Roll\nAP Scholar")
-                                            ->rows(6)
-                                            ->helperText('Enter one accolade per line.')
-                                            ->columnSpanFull(),
-                                    ]),
-
-                                Section::make('Sports Accolades')
-                                    ->icon('heroicon-m-trophy')
-                                    ->schema([
-                                        Textarea::make('sports_accolades')
-                                            ->label('Sports Accolades')
-                                            ->placeholder("Team Captain\nAll-State Selection\nTournament MVP")
-                                            ->rows(5)
-                                            ->helperText('Enter one accolade per line.')
-                                            ->columnSpanFull(),
-                                    ]),
-                            ]),
-
-                        Tab::make('Media')
-                            ->icon('heroicon-m-photo')
-                            ->schema([
-                                Section::make('Profile & Hero Images')
-                                    ->icon('heroicon-m-photo')
-                                    ->description('Shared player images used across your card and website.')
-                                    ->columns(3)
-                                    ->schema([
-                                        FileUpload::make('plyrcard_image')
-                                            ->label('PlyrCard')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('user-player-images')
-                                            ->visibility('public')
-                                            ->helperText('Upload the card-style PNG image used across templates.'),
-
-                                        FileUpload::make('player_image')
-                                            ->label('Player Image')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('user-player-images')
-                                            ->visibility('public')
-                                            ->helperText('Upload the half-body player PNG image used across templates.'),
-
-                                        FileUpload::make('mobile_hero_image')
-                                            ->label('Vertical Hero Image')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('user-player-images')
-                                            ->visibility('public')
-                                            ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
-
-                                        FileUpload::make('youtube_thumbnail')
-                                            ->label('YouTube Thumbnail')
-                                            ->columnSpan(3)
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('user-player-images')
-                                            ->visibility('public')
-                                            ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
-
-                                        FileUpload::make('raw_player_images')
-                                            ->label('Raw Player Images')
-                                            ->image()
-                                            ->multiple()
-                                            ->reorderable()
-                                            ->appendFiles()
-                                            ->maxFiles(20)
-                                            ->disk('public')
-                                            ->directory('user-player-images/raw')
-                                            ->visibility('public')
-                                            ->columnSpanFull()
-                                            ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
-                                    ]),
-
-                                Section::make('YouTube Highlights')
-                                    ->icon('heroicon-m-play-circle')
-                                    ->description('Embed your game highlights, recruiting videos, and performance reels directly on your PLYRCard.')
-                                    ->columns(2)
-                                    ->schema([
-                                        TextInput::make('featured_video_url')
-                                            ->prefixIcon('heroicon-m-link')
-                                            ->label('Featured Video URL')
-                                            ->placeholder('https://youtube.com/watch?v=...')
-                                            ->url()
-                                            ->columnSpanFull(),
-
-                                        Textarea::make('featured_video_urls')
-                                            ->label('Featured Video URLs')
-                                            ->placeholder("https://youtube.com/watch?v=...\nhttps://youtube.com/watch?v=...")
-                                            ->rows(5)
-                                            ->helperText('Enter one video URL per line.')
-                                            ->columnSpanFull(),
-                                    ]),
-                            ]),
-
-                        Tab::make('Social')
-                            ->icon('heroicon-m-share')
-                            ->schema([
-                                Section::make('Social Profiles')
-                                    ->icon('heroicon-m-share')
-                                    ->columns(2)
-                                    ->schema([
-                                        TextInput::make('ig_handle')
-                                            ->label('Instagram Handle')
-                                            ->prefixIcon('heroicon-m-camera')
-                                            ->prefix('@')
-                                            ->placeholder('yourhandle')
-                                            ->maxLength(255),
-
-                                        TextInput::make('x_handle')
-                                            ->label('X Handle')
-                                            ->prefixIcon('heroicon-m-chat-bubble-left-right')
-                                            ->prefix('@')
-                                            ->placeholder('yourhandle')
-                                            ->maxLength(255),
-
-                                        TextInput::make('yt_url')
-                                            ->label('YouTube URL')
-                                            ->prefixIcon('heroicon-m-link')
-                                            ->placeholder('https://youtube.com/@yourchannel')
-                                            ->url()
-                                            ->columnSpanFull(),
-                                    ]),
-                            ]),
-
-                        Tab::make('People')
-                            ->icon('heroicon-m-user-group')
-                            ->schema([
-                                Section::make('Parents / Guardians')
-                                    ->icon('heroicon-m-heart')
-                                    ->columns(3)
-                                    ->schema([
-                                        TextInput::make('parent')
-                                            ->label('Primary Parent')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Full name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('parent_email')
-                                            ->label('Primary Parent Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('parent@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('parent_phone')
-                                            ->label('Primary Parent Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-
-                                        TextInput::make('sec_parent')
-                                            ->label('Secondary Parent')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Full name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('sec_parent_email')
-                                            ->label('Secondary Parent Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('parent2@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('sec_parent_phone')
-                                            ->label('Secondary Parent Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-                                    ]),
-
-                                Section::make('Coaches')
-                                    ->icon('heroicon-m-megaphone')
-                                    ->columns(3)
-                                    ->schema([
-                                        TextInput::make('club_coach')
-                                            ->label('Club Coach')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Coach name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('club_coach_email')
-                                            ->label('Club Coach Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('coach@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('club_coach_phone')
-                                            ->label('Club Coach Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-
-                                        TextInput::make('natl_coach')
-                                            ->label('National Team Coach')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Coach name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('natl_coach_email')
-                                            ->label('National Team Coach Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('coach@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('natl_coach_phone')
-                                            ->label('National Team Coach Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-                                    ]),
-
-                                Section::make('Trainers')
-                                    ->icon('heroicon-m-bolt')
-                                    ->columns(3)
-                                    ->schema([
-                                        TextInput::make('tech_trainer')
-                                            ->label('Technical Trainer')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Trainer name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('tech_trainer_email')
-                                            ->label('Technical Trainer Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('trainer@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('tech_trainer_phone')
-                                            ->label('Technical Trainer Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-
-                                        TextInput::make('snc_trainer')
-                                            ->label('Strength & Conditioning Trainer')
-                                            ->prefixIcon('heroicon-m-user')
-                                            ->placeholder('Trainer name')
-                                            ->maxLength(255),
-
-                                        TextInput::make('snc_trainer_email')
-                                            ->label('Strength & Conditioning Trainer Email')
-                                            ->prefixIcon('heroicon-m-envelope')
-                                            ->placeholder('trainer@example.com')
-                                            ->email()
-                                            ->maxLength(255),
-
-                                        TextInput::make('snc_trainer_phone')
-                                            ->label('Strength & Conditioning Trainer Phone')
-                                            ->prefixIcon('heroicon-m-phone')
-                                            ->placeholder('+1 (555) 000-0000')
-                                            ->tel()
-                                            ->maxLength(255),
-                                    ]),
-                            ]),
-
-                        Tab::make('Website')
-                            ->icon('heroicon-m-globe-alt')
-                            ->schema([
-                                Section::make('Website Settings')
-                                    ->icon('heroicon-m-globe-alt')
-                                    ->description('Configure your personal athlete website.')
-                                    ->columns(2)
-                                    ->schema([
-                                        TextInput::make('domain')
-                                            ->label('Custom Domain')
-                                            ->prefixIcon('heroicon-m-link')
-                                            ->helperText('Enter without https://')
-                                            ->placeholder('yourdomain.com')
-                                            ->columnSpan(2)
-                                            ->maxLength(255)
-                                            ->nullable(),
-
-                                        Toggle::make('website_is_published')
-                                            ->label('Website Published')
-                                            ->default(false),
-                                    ]),
-                            ]),
-                    ])
-                    ->contained(true),
-            ])
-            ->statePath('data');
-    }
+{
+    return $schema
+        ->components([
+            Tabs::make('profile_tabs')
+                ->tabs([
+                    Tab::make('Basic Info')
+                        ->icon('heroicon-m-user')
+                        ->schema([
+                            Section::make('Personal Information')
+                                ->icon('heroicon-m-user')
+                                ->columns(6)
+                                ->schema([
+                                    TextInput::make('first_name')
+                                        ->label('First Name')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Enter first name')
+                                        ->required()
+                                        ->columnSpan(2)
+                                        ->maxLength(255),
+
+                                    TextInput::make('last_name')
+                                        ->label('Last Name')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Enter last name')
+                                        ->columnSpan(2)
+                                        ->required()
+                                        ->maxLength(255),
+
+                                    TextInput::make('personal_email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->label('Personal Email')
+                                        ->placeholder('name@example.com')
+                                        ->columnSpan(2)
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->label('PlyrCard Email')
+                                        ->placeholder('plyrcard login email')
+                                        ->email()
+                                        ->columnSpan(2)
+                                        ->required()
+                                        ->maxLength(255),
+
+                                    TextInput::make('phone')
+                                        ->label('Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->columnSpan(2)
+                                        ->tel()
+                                        ->maxLength(255),
+
+                                    TextInput::make('password')
+                                        ->label('Password')
+                                        ->prefixIcon('heroicon-m-lock-closed')
+                                        ->placeholder('Leave blank to keep current password')
+                                        ->columnSpan(1)
+                                        ->password()
+                                        ->revealable()
+                                        ->dehydrated(fn ($state) => filled($state))
+                                        ->same('password_confirmation')
+                                        ->nullable()
+                                        ->helperText('Leave blank to keep the current password.'),
+
+                                    TextInput::make('password_confirmation')
+                                        ->label('Confirm Password')
+                                        ->prefixIcon('heroicon-m-lock-closed')
+                                        ->placeholder('Re-enter new password')
+                                        ->columnSpan(1)
+                                        ->password()
+                                        ->revealable()
+                                        ->dehydrated(false)
+                                        ->nullable(),
+                                ]),
+
+                            Section::make('Address')
+                                ->icon('heroicon-m-map-pin')
+                                ->columns(2)
+                                ->schema([
+                                    TextInput::make('street')
+                                        ->prefixIcon('heroicon-m-map-pin')
+                                        ->label('Street Address')
+                                        ->placeholder('123 Main Street')
+                                        ->maxLength(255),
+
+                                    TextInput::make('city')
+                                        ->prefixIcon('heroicon-m-building-office-2')
+                                        ->label('City')
+                                        ->placeholder('City')
+                                        ->maxLength(255),
+
+                                    TextInput::make('state')
+                                        ->prefixIcon('heroicon-m-map')
+                                        ->label('State / Province')
+                                        ->placeholder('State / Province')
+                                        ->maxLength(255),
+
+                                    TextInput::make('country')
+                                        ->prefixIcon('heroicon-m-globe-alt')
+                                        ->label('Country')
+                                        ->placeholder('Country')
+                                        ->maxLength(255),
+                                ]),
+                        ]),
+
+                    Tab::make('Athlete Info')
+                        ->icon('heroicon-m-user-circle')
+                        ->schema([
+                            Section::make('Sport Details')
+                                ->icon('heroicon-m-cog-6-tooth')
+                                ->columns(3)
+                                ->schema([
+                                    Select::make('sport')
+                                        ->prefixIcon('heroicon-m-trophy')
+                                        ->label('Sport')
+                                        ->placeholder('Select sport')
+                                        ->options(UserResource::getSportOptions())
+                                        ->required()
+                                        ->searchable()
+                                        ->live(),
+
+                                    Select::make('position')
+                                        ->prefixIcon('heroicon-m-rectangle-group')
+                                        ->label('Position')
+                                        ->placeholder('Select position')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->preload()
+                                        ->required()
+                                        ->options(fn (callable $get): array => static::getPositionOptions($get('sport')))
+                                        ->disabled(fn (callable $get): bool => blank($get('sport')))
+                                        ->helperText('Select one or more positions based on the chosen sport.'),
+
+                                    TextInput::make('jersey_number')
+                                        ->prefixIcon('heroicon-m-hashtag')
+                                        ->label('Roster Number')
+                                        ->placeholder('e.g. 19')
+                                        ->numeric(),
+
+                                    TextInput::make('year')
+                                        ->prefixIcon('heroicon-m-academic-cap')
+                                        ->label('Graduation Year')
+                                        ->placeholder('e.g. 2026')
+                                        ->numeric()
+                                        ->minValue(2000)
+                                        ->maxValue(2100),
+
+                                    Select::make('gender')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->label('Sex')
+                                        ->placeholder('Select sex')
+                                        ->options(UserResource::getGenderOptions())
+                                        ->searchable()
+                                        ->nullable(),
+
+                                    DatePicker::make('birth')
+                                        ->prefixIcon('heroicon-m-calendar-days')
+                                        ->label('Birth Date')
+                                        ->native(false)
+                                        ->closeOnDateSelection(),
+
+                                    TextInput::make('gpa')
+                                        ->prefixIcon('heroicon-m-calculator')
+                                        ->label('GPA')
+                                        ->placeholder('e.g. 3.8')
+                                        ->numeric()
+                                        ->step('0.01'),
+
+                                    Select::make('school_id')
+                                        ->prefixIcon('heroicon-m-building-library')
+                                        ->label('School')
+                                        ->placeholder('Select school')
+                                        ->options(fn () => static::getSchoolOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->live()
+                                        ->nullable(),
+
+                                    TextInput::make('new_school_name')
+                                        ->prefixIcon('heroicon-m-plus-circle')
+                                        ->label('New School Name')
+                                        ->placeholder('Enter school name')
+                                        ->maxLength(255)
+                                        ->visible(fn (callable $get) => $get('school_id') === '__new__')
+                                        ->required(fn (callable $get) => $get('school_id') === '__new__'),
+                                ]),
+
+                            Section::make('Physical Stats')
+                                ->columns(2)
+                                ->icon('heroicon-m-chart-bar-square')
+                                ->schema([
+                                    TextInput::make('height')
+                                        ->prefixIcon('heroicon-m-arrows-up-down')
+                                        ->label('Height')
+                                        ->maxLength(255)
+                                        ->placeholder('e.g. 6\'2" or 188 cm'),
+
+                                    TextInput::make('weight')
+                                        ->prefixIcon('heroicon-m-scale')
+                                        ->label('Weight')
+                                        ->maxLength(255)
+                                        ->placeholder('e.g. 185 lbs or 84 kg'),
+
+                                    Select::make('dominant_foot')
+                                        ->prefixIcon('heroicon-m-hand-raised')
+                                        ->label('Dominant Foot')
+                                        ->placeholder('Select dominant foot')
+                                        ->options([
+                                            'left' => 'Left',
+                                            'right' => 'Right',
+                                            'both' => 'Both',
+                                        ])
+                                        ->visible(fn (callable $get) => $get('sport') === 'soccer')
+                                        ->required(fn (callable $get) => $get('sport') === 'soccer'),
+
+                                    TextInput::make('max_speed')
+                                        ->prefixIcon('heroicon-m-bolt')
+                                        ->label('Max Speed')
+                                        ->placeholder('e.g. 19.00')
+                                        ->numeric()
+                                        ->step('0.01'),
+                                ]),
+
+                            Section::make('Experience')
+                                ->icon('heroicon-m-flag')
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('club_id')
+                                        ->prefixIcon('heroicon-m-shield-check')
+                                        ->label('Club')
+                                        ->placeholder('Select club')
+                                        ->options(fn () => static::getClubOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->live(),
+
+                                    Select::make('league_id')
+                                        ->prefixIcon('heroicon-m-squares-2x2')
+                                        ->label('League')
+                                        ->placeholder('Select league')
+                                        ->options(fn () => static::getLeagueOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->live(),
+
+                                    Select::make('national_team_id')
+                                        ->prefixIcon('heroicon-m-flag')
+                                        ->label('National Team Experience')
+                                        ->placeholder('Select national team')
+                                        ->options(fn () => static::getNationalTeamOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->live(),
+
+                                    TextInput::make('team_name')
+                                        ->prefixIcon('heroicon-m-users')
+                                        ->label('Team')
+                                        ->placeholder('Enter team name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('national_team_period')
+                                        ->prefixIcon('heroicon-m-calendar')
+                                        ->label('National Team Period')
+                                        ->placeholder('e.g. 2025-2026')
+                                        ->maxLength(255),
+
+                                    TextInput::make('new_club_name')
+                                        ->prefixIcon('heroicon-m-plus-circle')
+                                        ->label('New Club Name')
+                                        ->placeholder('Enter club name')
+                                        ->maxLength(255)
+                                        ->visible(fn (callable $get) => $get('club_id') === '__new__')
+                                        ->required(fn (callable $get) => $get('club_id') === '__new__'),
+
+                                    FileUpload::make('new_club_logo')
+                                        ->label('New Club Logo')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('club-logos')
+                                        ->visibility('public')
+                                        ->helperText('Optional.')
+                                        ->visible(fn (callable $get) => $get('club_id') === '__new__'),
+
+                                    TextInput::make('new_league_name')
+                                        ->prefixIcon('heroicon-m-plus-circle')
+                                        ->label('New League Name')
+                                        ->placeholder('Enter league name')
+                                        ->maxLength(255)
+                                        ->visible(fn (callable $get) => $get('league_id') === '__new__')
+                                        ->required(fn (callable $get) => $get('league_id') === '__new__'),
+
+                                    FileUpload::make('new_league_logo')
+                                        ->label('New League Logo')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('league-logos')
+                                        ->visibility('public')
+                                        ->helperText('Optional.')
+                                        ->visible(fn (callable $get) => $get('league_id') === '__new__'),
+
+                                    TextInput::make('new_national_team_name')
+                                        ->prefixIcon('heroicon-m-plus-circle')
+                                        ->label('New National Team Name')
+                                        ->placeholder('Enter national team name')
+                                        ->maxLength(255)
+                                        ->visible(fn (callable $get) => $get('national_team_id') === '__new__')
+                                        ->required(fn (callable $get) => $get('national_team_id') === '__new__'),
+
+                                    FileUpload::make('new_national_team_logo')
+                                        ->label('New National Team Logo')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('national-team-logos')
+                                        ->visibility('public')
+                                        ->helperText('Optional.')
+                                        ->visible(fn (callable $get) => $get('national_team_id') === '__new__'),
+                                ]),
+                        ]),
+
+                    Tab::make('Bio & Accolades')
+                        ->icon('heroicon-m-list-bullet')
+                        ->schema([
+                            Section::make('Player Bio')
+                                ->icon('heroicon-m-pencil-square')
+                                ->description('Write your athlete story — who you are, your playing style, and what drives you.')
+                                ->schema([
+                                    Textarea::make('player_bio')
+                                        ->label('Player Bio')
+                                        ->placeholder('Write your athlete story here...')
+                                        ->rows(8)
+                                        ->columnSpanFull(),
+                                ]),
+
+                            Section::make('Academic Accolades')
+                                ->icon('heroicon-m-academic-cap')
+                                ->description('Honors, dean’s list, certifications — anything that showcases your academic excellence.')
+                                ->schema([
+                                    Textarea::make('academic_accolades')
+                                        ->label('Academic Accolades')
+                                        ->placeholder("Dean's List\nHonor Roll\nAP Scholar")
+                                        ->rows(6)
+                                        ->helperText('Enter one accolade per line.')
+                                        ->columnSpanFull(),
+                                ]),
+
+                            Section::make('Sports Accolades')
+                                ->icon('heroicon-m-trophy')
+                                ->schema([
+                                    Textarea::make('sports_accolades')
+                                        ->label('Sports Accolades')
+                                        ->placeholder("Team Captain\nAll-State Selection\nTournament MVP")
+                                        ->rows(5)
+                                        ->helperText('Enter one accolade per line.')
+                                        ->columnSpanFull(),
+                                ]),
+                        ]),
+
+                    Tab::make('Media')
+                        ->icon('heroicon-m-photo')
+                        ->schema([
+                            Section::make('Profile & Hero Images')
+                                ->icon('heroicon-m-photo')
+                                ->description('Shared player images used across your card and website.')
+                                ->columns(3)
+                                ->schema([
+                                    FileUpload::make('plyrcard_image')
+                                        ->label('PlyrCard')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('user-player-images')
+                                        ->visibility('public')
+                                        ->helperText('Upload the card-style PNG image used across templates.'),
+
+                                    FileUpload::make('player_image')
+                                        ->label('Player Image')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('user-player-images')
+                                        ->visibility('public')
+                                        ->helperText('Upload the half-body player PNG image used across templates.'),
+
+                                    FileUpload::make('mobile_hero_image')
+                                        ->label('Vertical Hero Image')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('user-player-images')
+                                        ->visibility('public')
+                                        ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+
+                                    FileUpload::make('youtube_thumbnail')
+                                        ->label('YouTube Thumbnail')
+                                        ->columnSpan(3)
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('user-player-images')
+                                        ->visibility('public')
+                                        ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
+
+                                    FileUpload::make('raw_player_images')
+                                        ->label('Raw Player Images')
+                                        ->image()
+                                        ->multiple()
+                                        ->reorderable()
+                                        ->appendFiles()
+                                        ->maxFiles(20)
+                                        ->disk('public')
+                                        ->directory('user-player-images/raw')
+                                        ->visibility('public')
+                                        ->columnSpanFull()
+                                        ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
+                                ]),
+
+                            Section::make('YouTube Highlights')
+                                ->icon($this->hasPremiumAccess() ? 'heroicon-m-play-circle' : 'heroicon-m-lock-closed')
+                                ->description(
+                                    $this->hasPremiumAccess()
+                                        ? 'Embed your game highlights, recruiting videos, and performance reels directly on your PLYRCard.'
+                                        : 'This feature is available on Plyr and My Journey.'
+                                )
+                                ->columns(2)
+                                ->schema([
+                                    TextInput::make('featured_video_url')
+                                        ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
+                                        ->label('Featured Video URL')
+                                        ->placeholder('https://youtube.com/watch?v=...')
+                                        ->url()
+                                        ->disabled(fn () => ! $this->hasPremiumAccess())
+                                        ->dehydrated(fn () => $this->hasPremiumAccess())
+                                        ->hint(fn () => ! $this->hasPremiumAccess() ? 'Available on Plyr and My Journey.' : null)
+                                        ->columnSpanFull(),
+
+                                    Textarea::make('featured_video_urls')
+                                        ->label('Featured Video URLs')
+                                        ->placeholder("https://youtube.com/watch?v=...\nhttps://youtube.com/watch?v=...")
+                                        ->rows(5)
+                                        ->disabled(fn () => ! $this->hasPremiumAccess())
+                                        ->dehydrated(fn () => $this->hasPremiumAccess())
+                                        ->helperText(fn () => ! $this->hasPremiumAccess()
+                                            ? 'This section is locked on Free.'
+                                            : 'Enter one video URL per line.')
+                                        ->columnSpanFull(),
+                                ]),
+                        ]),
+
+                    Tab::make('Social')
+                        ->icon($this->hasPremiumAccess() ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
+                        ->schema([
+                            Section::make('Social Profiles')
+                                ->icon($this->hasPremiumAccess() ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
+                                ->description(
+                                    $this->hasPremiumAccess()
+                                        ? 'Add your social links and YouTube channel to your PLYRCard.'
+                                        : 'This feature is available on Plyr and My Journey.'
+                                )
+                                ->columns(2)
+                                ->schema([
+                                    TextInput::make('ig_handle')
+                                        ->label('Instagram Handle')
+                                        ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-camera' : 'heroicon-m-lock-closed')
+                                        ->prefix('@')
+                                        ->placeholder('yourhandle')
+                                        ->maxLength(255)
+                                        ->disabled(fn () => ! $this->hasPremiumAccess())
+                                        ->dehydrated(fn () => $this->hasPremiumAccess()),
+
+                                    TextInput::make('x_handle')
+                                        ->label('X Handle')
+                                        ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-chat-bubble-left-right' : 'heroicon-m-lock-closed')
+                                        ->prefix('@')
+                                        ->placeholder('yourhandle')
+                                        ->maxLength(255)
+                                        ->disabled(fn () => ! $this->hasPremiumAccess())
+                                        ->dehydrated(fn () => $this->hasPremiumAccess()),
+
+                                    TextInput::make('yt_url')
+                                        ->label('YouTube URL')
+                                        ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
+                                        ->placeholder('https://youtube.com/@yourchannel')
+                                        ->url()
+                                        ->disabled(fn () => ! $this->hasPremiumAccess())
+                                        ->dehydrated(fn () => $this->hasPremiumAccess())
+                                        ->hint(fn () => ! $this->hasPremiumAccess() ? 'Available on Plyr and My Journey.' : null)
+                                        ->columnSpanFull(),
+                                ]),
+                        ]),
+
+                    Tab::make('People')
+                        ->icon('heroicon-m-user-group')
+                        ->schema([
+                            Section::make('Parents / Guardians')
+                                ->icon('heroicon-m-heart')
+                                ->columns(3)
+                                ->schema([
+                                    TextInput::make('parent')
+                                        ->label('Primary Parent')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Full name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('parent_email')
+                                        ->label('Primary Parent Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('parent@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('parent_phone')
+                                        ->label('Primary Parent Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+
+                                    TextInput::make('sec_parent')
+                                        ->label('Secondary Parent')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Full name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('sec_parent_email')
+                                        ->label('Secondary Parent Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('parent2@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('sec_parent_phone')
+                                        ->label('Secondary Parent Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+                                ]),
+
+                            Section::make('Coaches')
+                                ->icon('heroicon-m-megaphone')
+                                ->columns(3)
+                                ->schema([
+                                    TextInput::make('club_coach')
+                                        ->label('Club Coach')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Coach name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('club_coach_email')
+                                        ->label('Club Coach Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('coach@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('club_coach_phone')
+                                        ->label('Club Coach Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+
+                                    TextInput::make('natl_coach')
+                                        ->label('National Team Coach')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Coach name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('natl_coach_email')
+                                        ->label('National Team Coach Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('coach@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('natl_coach_phone')
+                                        ->label('National Team Coach Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+                                ]),
+
+                            Section::make('Trainers')
+                                ->icon('heroicon-m-bolt')
+                                ->columns(3)
+                                ->schema([
+                                    TextInput::make('tech_trainer')
+                                        ->label('Technical Trainer')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Trainer name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('tech_trainer_email')
+                                        ->label('Technical Trainer Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('trainer@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('tech_trainer_phone')
+                                        ->label('Technical Trainer Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+
+                                    TextInput::make('snc_trainer')
+                                        ->label('Strength & Conditioning Trainer')
+                                        ->prefixIcon('heroicon-m-user')
+                                        ->placeholder('Trainer name')
+                                        ->maxLength(255),
+
+                                    TextInput::make('snc_trainer_email')
+                                        ->label('Strength & Conditioning Trainer Email')
+                                        ->prefixIcon('heroicon-m-envelope')
+                                        ->placeholder('trainer@example.com')
+                                        ->email()
+                                        ->maxLength(255),
+
+                                    TextInput::make('snc_trainer_phone')
+                                        ->label('Strength & Conditioning Trainer Phone')
+                                        ->prefixIcon('heroicon-m-phone')
+                                        ->placeholder('+1 (555) 000-0000')
+                                        ->tel()
+                                        ->maxLength(255),
+                                ]),
+                        ]),
+
+                    Tab::make('Website')
+                        ->icon('heroicon-m-globe-alt')
+                        ->schema([
+                            Section::make('Website Settings')
+                                ->icon('heroicon-m-globe-alt')
+                                ->description('Configure your personal athlete website.')
+                                ->columns(2)
+                                ->schema([
+                                    TextInput::make('domain')
+                                        ->label('Custom Domain')
+                                        ->prefixIcon('heroicon-m-link')
+                                        ->helperText('Enter without https://')
+                                        ->placeholder('yourdomain.com')
+                                        ->columnSpan(2)
+                                        ->maxLength(255)
+                                        ->nullable(),
+
+                                    Toggle::make('website_is_published')
+                                        ->label('Website Published')
+                                        ->default(false),
+                                ]),
+                        ]),
+                ])
+                ->contained(true),
+        ])
+        ->statePath('data');
+}
 
     public function save(): void
     {
@@ -988,6 +986,16 @@ class EditProfile extends Page implements HasForms
             unset($userData[$key]);
         }
 
+        if (! $this->hasPremiumAccess()) {
+            unset(
+                $userData['ig_handle'],
+                $userData['x_handle'],
+                $userData['yt_url'],
+                $userData['featured_video_url'],
+                $userData['featured_video_urls']
+            );
+        }
+
         $userData = $this->mutateProfileData($userData);
 
         $this->user->update($userData);
@@ -1000,8 +1008,6 @@ class EditProfile extends Page implements HasForms
         }
 
         $this->user->refresh()->loadMissing('roles', 'nationalTeam');
-
-        $this->handleExpiredTrialRole();
 
         Notification::make()
             ->title('Profile saved successfully.')
@@ -1021,105 +1027,39 @@ class EditProfile extends Page implements HasForms
         return 'My Profile';
     }
 
-    protected function getTrialStartedAt(): ?Carbon
-    {
-        if (! $this->user || ! method_exists($this->user, 'roles')) {
-            return null;
-        }
-
-        $trialRole = $this->user->roles->firstWhere('name', 'Plyr Trial');
-
-        if (! $trialRole) {
-            return null;
-        }
-
-        $pivotCreatedAt = data_get($trialRole, 'pivot.created_at');
-
-        if ($pivotCreatedAt) {
-            return Carbon::parse($pivotCreatedAt);
-        }
-
-        if (filled($this->user->plyr_trial_started_at ?? null)) {
-            return Carbon::parse($this->user->plyr_trial_started_at);
-        }
-
-        return null;
-    }
-
-    protected function getTrialEndsAt(): ?Carbon
-    {
-        $startedAt = $this->getTrialStartedAt();
-
-        return $startedAt?->copy()->addDays(7);
-    }
-
-    public function getTrialDaysRemaining(): ?int
-    {
-        $endsAt = $this->getTrialEndsAt();
-
-        if (! $endsAt) {
-            return null;
-        }
-
-        if (now()->greaterThanOrEqualTo($endsAt)) {
-            return 0;
-        }
-
-        return (int) ceil(now()->diffInHours($endsAt) / 24);
-    }
-
-    protected function handleExpiredTrialRole(): void
+    public function hasPremiumAccess(): bool
     {
         if (! $this->user || ! method_exists($this->user, 'hasRole')) {
-            return;
+            return false;
         }
 
-        if (! $this->user->hasRole('Plyr Trial')) {
-            return;
+        return $this->user->hasRole('Plyr') || $this->user->hasRole('My Journey');
+    }
+
+    public function isFreePlan(): bool
+    {
+        if (! $this->user || ! method_exists($this->user, 'hasRole')) {
+            return true;
         }
 
-        $endsAt = $this->getTrialEndsAt();
-
-        if (! $endsAt) {
-            return;
-        }
-
-        if (now()->greaterThanOrEqualTo($endsAt)) {
-            $this->user->removeRole('Plyr Trial');
-
-            if (! $this->user->hasRole('Rookie')) {
-                $this->user->assignRole('Rookie');
-            }
-
-            $this->user->refresh()->loadMissing('roles', 'nationalTeam');
-        }
+        return $this->user->hasRole('Free') || ! $this->hasPremiumAccess();
     }
 
     public function getCurrentPlanKey(): string
     {
-        if (! $this->user) {
-            return 'rookie';
+        if (! $this->user || ! method_exists($this->user, 'hasRole')) {
+            return 'free';
         }
 
-        if (method_exists($this->user, 'hasRole')) {
-            if ($this->user->hasRole('My Journey')) {
-                return 'my_journey';
-            }
-
-            if ($this->user->hasRole('Plyr')) {
-                return 'plyr';
-            }
-
-            if ($this->user->hasRole('Plyr Trial')) {
-                return 'plyr_trial';
-            }
-
-            if ($this->user->hasRole('Rookie')) {
-                return 'rookie';
-            }
+        if ($this->user->hasRole('My Journey')) {
+            return 'my_journey';
         }
 
-        return 'rookie';
+        if ($this->user->hasRole('Plyr')) {
+            return 'plyr';
+        }
+
+        return 'free';
     }
 
     public function getPlanName(): string
@@ -1127,8 +1067,7 @@ class EditProfile extends Page implements HasForms
         return match ($this->getCurrentPlanKey()) {
             'my_journey' => 'MY JOURNEY',
             'plyr' => 'PLYR',
-            'plyr_trial' => 'PLYR TRIAL',
-            default => 'ROOKIE',
+            default => 'FREE',
         };
     }
 
@@ -1137,63 +1076,45 @@ class EditProfile extends Page implements HasForms
         return match ($this->getCurrentPlanKey()) {
             'my_journey' => "YOU'RE ON MY JOURNEY",
             'plyr' => "YOU'RE ON PLYR",
-            'plyr_trial' => "YOU'RE ON PLYR TRIAL",
-            default => "YOU'RE ON ROOKIE",
+            default => "YOU'RE ON FREE",
         };
     }
 
     public function getPlanDescription(): string
     {
         return match ($this->getCurrentPlanKey()) {
-            'plyr_trial' => $this->getTrialDescription(),
-            'plyr' => 'You are currently on Plyr. Upgrade to My Journey to unlock the next level of the PLYRCard experience.',
-            'my_journey' => 'You are currently on My Journey. Book a demo to get guided support and maximize your setup.',
-            default => 'You are currently on Rookie. Upgrade to Plyr or book a demo to unlock more of the PLYRCard experience.',
+            'plyr' => 'Your Social links and YouTube features are unlocked. Upgrade to My Journey for a more premium managed experience.',
+            'my_journey' => 'Everything is unlocked on My Journey. Your PLYRCard is fully equipped for the next level.',
+            default => 'Upgrade to Plyr or My Journey to unlock Social links, YouTube Highlights, and Featured Videos.',
         };
-    }
-
-    protected function getTrialDescription(): string
-    {
-        $daysRemaining = $this->getTrialDaysRemaining();
-
-        if ($daysRemaining === null) {
-            return 'Your Plyr Trial is active for 7 days starting from the date the role was assigned.';
-        }
-
-        if ($daysRemaining <= 0) {
-            return 'Your Plyr Trial has ended and your account will return to Rookie.';
-        }
-
-        return "Your Plyr Trial is active. {$daysRemaining} day" . ($daysRemaining === 1 ? '' : 's') . " remaining before your account returns to Rookie.";
     }
 
     public function canUpgradePlan(): bool
     {
-        return true;
+        return $this->getCurrentPlanKey() !== 'my_journey';
     }
 
     public function getUpgradeButtonLabel(): string
     {
         return match ($this->getCurrentPlanKey()) {
             'plyr' => 'Upgrade to My Journey',
-            'rookie', 'plyr_trial', 'my_journey' => 'Upgrade to Plyr',
-            default => 'Upgrade to Plyr',
+            default => 'See Plans',
         };
     }
 
     public function getUpgradeUrl(): string
     {
-        return '#';
+        return url('/pricing');
     }
 
     public function shouldShowBookDemoButton(): bool
     {
-        return in_array($this->getCurrentPlanKey(), ['rookie', 'my_journey'], true);
+        return in_array($this->getCurrentPlanKey(), ['free', 'my_journey'], true);
     }
 
     public function getBookDemoUrl(): string
     {
-        return '#';
+        return url('/demo');
     }
 
     public function getPlanTheme(): string
@@ -1300,5 +1221,19 @@ class EditProfile extends Page implements HasForms
         }
 
         return 'https://' . ltrim($domain, '/');
+    }
+
+    public function openLockedFeatureModal(
+        string $title = 'UNLOCK SOCIAL & VIDEO LINKS',
+        string $message = 'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.'
+    ): void {
+        $this->lockedFeatureTitle = $title;
+        $this->lockedFeatureMessage = $message;
+        $this->showLockedFeatureModal = true;
+    }
+
+    public function closeLockedFeatureModal(): void
+    {
+        $this->showLockedFeatureModal = false;
     }
 }
