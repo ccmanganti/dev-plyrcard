@@ -19,4 +19,14 @@ class Club extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function teams()
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    public function league()
+    {
+        return $this->belongsTo(League::class);
+    }
 }
