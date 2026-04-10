@@ -21,10 +21,6 @@
             --accent-2: #ff9a1f;
             --border: #2a2a2a;
             --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
-            --radius-xl: 24px;
-            --radius-lg: 20px;
-            --radius-md: 16px;
-            --radius-sm: 14px;
         }
 
         * {
@@ -113,32 +109,34 @@
             background: #0f0f0f;
         }
 
-        .steps-bar {
+        .tabs-bar {
             display: grid;
             grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 12px;
             margin-bottom: 20px;
         }
 
-        .step-pill {
-            padding: 12px 14px;
-            border-radius: 16px;
+        .tab-btn {
+            appearance: none;
             border: 1px solid var(--border);
             background: #151515;
             color: #d5d5d5;
+            padding: 12px 14px;
+            border-radius: 16px;
             font-size: 13px;
             font-weight: 700;
             text-align: center;
+            cursor: pointer;
             transition: .2s ease;
         }
 
-        .step-pill.active {
+        .tab-btn.active {
             border-color: rgba(255, 122, 0, 0.45);
             background: rgba(255, 122, 0, 0.12);
             color: #fff;
         }
 
-        .step-pill.done {
+        .tab-btn.done {
             border-color: rgba(255, 122, 0, 0.25);
             background: rgba(255, 122, 0, 0.08);
             color: #ffbf84;
@@ -241,9 +239,6 @@
             pointer-events: none;
             transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
             z-index: 40;
-            text-transform: none;
-            letter-spacing: normal;
-            white-space: normal;
         }
 
         .tooltip-box::after {
@@ -283,8 +278,8 @@
             min-height: 44px;
             padding: 11px 14px;
             border-radius: 14px;
-            border: 1px solid var(--field-border);
-            background: var(--field);
+            border: 1px solid #2c2c2c;
+            background: #141414;
             color: #f9fafb;
             font-size: 14px;
             line-height: 1.45;
@@ -304,6 +299,12 @@
             border-color: var(--accent);
             background: #1a1a1a;
             box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.12);
+        }
+
+        select:disabled,
+        input:disabled {
+            opacity: .55;
+            cursor: not-allowed;
         }
 
         textarea {
@@ -526,7 +527,7 @@
                 font-size: 17px;
             }
 
-            .steps-bar {
+            .tabs-bar {
                 grid-template-columns: 1fr;
             }
 
@@ -613,7 +614,7 @@
     <div class="card">
         <div class="header">
             <div class="eyebrow"><span translate="no">PlyrCard</span> Intake</div>
-            <h1 class="hero-title"><span translate="no">Player</span> <span class="accent">Intake</span> Form</h1>
+            <h1 class="hero-title"><span translate="no">Plyr</span> <span class="accent">Intake</span> Form</h1>
             <p class="header-copy">
                 Use this form to build your <span translate="no">PLYRCard</span> Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
             </p>
@@ -636,12 +637,12 @@
                 </div>
             @endif
 
-            <div class="steps-bar" id="stepsBar">
-                <div class="step-pill" data-step-pill="1">1. Athlete Details</div>
-                <div class="step-pill" data-step-pill="2">2. School & Team</div>
-                <div class="step-pill" data-step-pill="3">3. Media & Bio</div>
-                <div class="step-pill" data-step-pill="4">4. Contacts</div>
-                <div class="step-pill" data-step-pill="5">5. Images</div>
+            <div class="tabs-bar" id="stepsBar">
+                <button type="button" class="tab-btn" data-step-pill="1">1. Athlete Details</button>
+                <button type="button" class="tab-btn" data-step-pill="2">2. School & Team</button>
+                <button type="button" class="tab-btn" data-step-pill="3">3. Media & Bio</button>
+                <button type="button" class="tab-btn" data-step-pill="4">4. Contacts</button>
+                <button type="button" class="tab-btn" data-step-pill="5">5. Images</button>
             </div>
 
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
@@ -669,8 +670,8 @@
                             </div>
 
                             <div class="col-4">
-                                <label for="gender">Gender</label>
-                                <select id="gender" name="gender">
+                                <label for="gender">Gender <span class="required">*</span></label>
+                                <select id="gender" name="gender" required>
                                     <option value="">Select gender</option>
                                     @foreach ($genderOptions as $value => $label)
                                         <option value="{{ $value }}" {{ old('gender') === $value ? 'selected' : '' }}>
@@ -678,6 +679,7 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <div class="hint">Required. Your gender filters the available leagues in the next tab and is used if you create a new league.</div>
                             </div>
 
                             <div class="col-4">
@@ -798,7 +800,7 @@
                 <div class="step-panel" data-step="2">
                     <div class="section">
                         <h2>Location, School, League, Club & National Team</h2>
-                        <p class="section-copy">School, location, team selection, and national team details.</p>
+                        <p class="section-copy">Choose a league first, then club, then team. Club and team will unlock as you go.</p>
 
                         <div class="grid">
                             <div class="col-3">
@@ -815,14 +817,7 @@
 
                             <div id="country_other_wrap" class="col-3 other-wrap">
                                 <label for="country_other">Country Name</label>
-                                <input
-                                    type="text"
-                                    id="country_other"
-                                    name="country_other"
-                                    value="{{ old('country_other') }}"
-                                    maxlength="255"
-                                    placeholder="Enter country name"
-                                >
+                                <input type="text" id="country_other" name="country_other" value="{{ old('country_other') }}" maxlength="255" placeholder="Enter country name">
                             </div>
 
                             <div id="state_us_wrap" class="col-3">
@@ -840,13 +835,7 @@
 
                             <div id="state_international_wrap" class="col-3 other-wrap">
                                 <label for="state_international">State / Province / Region</label>
-                                <input
-                                    type="text"
-                                    id="state_international"
-                                    value="{{ old('state') }}"
-                                    maxlength="255"
-                                    placeholder="Enter state, province, or region"
-                                >
+                                <input type="text" id="state_international" value="{{ old('state') }}" maxlength="255" placeholder="Enter state, province, or region">
                                 <div class="hint">For non-U.S. countries, enter the region, province, or state if applicable.</div>
                             </div>
 
@@ -880,84 +869,42 @@
                             </div>
 
                             <div class="col-3">
-                                <label for="team_id">Team</label>
-                                <select id="team_id" name="team_id">
-                                    <option value="">Select team</option>
-                                    @foreach ($teams as $team)
-                                        <option
-                                            value="{{ $team->id }}"
-                                            data-club-id="{{ $team->club?->id }}"
-                                            data-league-id="{{ $team->club?->league?->id }}"
-                                            {{ (string) old('team_id') === (string) $team->id ? 'selected' : '' }}
-                                        >
-                                            {{ $team->name }}
-                                        </option>
-                                    @endforeach
-                                    <option value="__other__" {{ old('team_id') === '__other__' ? 'selected' : '' }}>Other</option>
-                                </select>
-                                <div class="hint">Selecting a team will auto-fill club and league.</div>
-                            </div>
-
-                            <div class="col-3" id="league_select_wrap">
-                                <label for="league_id_display">League</label>
-                                <select id="league_id_display" disabled>
+                                <label for="league_id">League</label>
+                                <select id="league_id" name="league_id">
                                     <option value="">Select league</option>
-                                    @foreach ($leagues as $league)
-                                        <option value="{{ $league->id }}">
-                                            {{ $league->name }}
-                                        </option>
-                                    @endforeach
                                 </select>
-                                <div class="hint">Auto-filled from the selected team.</div>
+                                <div class="hint">Filtered by athlete gender. Choose Other to create a new league, club, and team.</div>
                             </div>
 
-                            <div class="col-3" id="club_select_wrap">
-                                <label for="club_id_display">Club</label>
-                                <select id="club_id_display" disabled>
+                            <div class="col-3">
+                                <label for="club_id">Club</label>
+                                <select id="club_id" name="club_id" disabled>
                                     <option value="">Select club</option>
-                                    @foreach ($clubs as $club)
-                                        <option value="{{ $club->id }}">
-                                            {{ $club->name }}
-                                        </option>
-                                    @endforeach
                                 </select>
-                                <div class="hint">Auto-filled from the selected team.</div>
+                                <div class="hint">Enabled after league selection.</div>
+                            </div>
+
+                            <div class="col-3">
+                                <label for="team_id">Team</label>
+                                <select id="team_id" name="team_id" disabled>
+                                    <option value="">Select team</option>
+                                </select>
+                                <div class="hint">Enabled after club selection.</div>
                             </div>
 
                             <div class="col-3 other-wrap" id="league_other_wrap">
                                 <label for="league_other">League Name</label>
-                                <input
-                                    type="text"
-                                    id="league_other"
-                                    name="league_other"
-                                    value="{{ old('league_other') }}"
-                                    maxlength="255"
-                                    placeholder="Enter league name"
-                                >
+                                <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter league name">
                             </div>
 
                             <div class="col-3 other-wrap" id="club_other_wrap">
                                 <label for="club_other">Club Name</label>
-                                <input
-                                    type="text"
-                                    id="club_other"
-                                    name="club_other"
-                                    value="{{ old('club_other') }}"
-                                    maxlength="255"
-                                    placeholder="Enter club name"
-                                >
+                                <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" maxlength="255" placeholder="Enter club name">
                             </div>
 
                             <div class="col-3 other-wrap" id="team_other_wrap">
                                 <label for="team_other">Team Name</label>
-                                <input
-                                    type="text"
-                                    id="team_other"
-                                    name="team_other"
-                                    value="{{ old('team_other') }}"
-                                    maxlength="255"
-                                    placeholder="Enter team name"
-                                >
+                                <input type="text" id="team_other" name="team_other" value="{{ old('team_other') }}" maxlength="255" placeholder="Enter team name">
                             </div>
 
                             <div class="col-3" id="national_team_field_wrap">
@@ -978,14 +925,7 @@
                                 <div class="grid">
                                     <div class="col-6">
                                         <label for="national_team_other">New National Team Name</label>
-                                        <input
-                                            type="text"
-                                            id="national_team_other"
-                                            name="national_team_other"
-                                            value="{{ old('national_team_other') }}"
-                                            placeholder="Enter new national team name"
-                                            maxlength="255"
-                                        >
+                                        <input type="text" id="national_team_other" name="national_team_other" value="{{ old('national_team_other') }}" placeholder="Enter new national team name" maxlength="255">
                                     </div>
                                 </div>
                             </div>
@@ -1008,21 +948,12 @@
                                             <span class="tooltip-box">
                                                 Please paste your Instagram profile link (URL), not just your @handle.<br><br>
                                                 <strong>Example:</strong><br>
-                                                https://www.instagram.com/plyrcard/<br><br>
-                                                <strong>Not accepted:</strong><br>
-                                                @plyrcard or plyrcard
+                                                https://www.instagram.com/plyrcard/
                                             </span>
                                         </span>
                                     </span>
                                 </label>
-                                <input
-                                    type="url"
-                                    id="ig_handle"
-                                    name="ig_handle"
-                                    value="{{ old('ig_handle') }}"
-                                    maxlength="255"
-                                    placeholder="https://www.instagram.com/yourprofile/"
-                                >
+                                <input type="url" id="ig_handle" name="ig_handle" value="{{ old('ig_handle') }}" maxlength="255" placeholder="https://www.instagram.com/yourprofile/">
                             </div>
 
                             <div class="col-4">
@@ -1034,21 +965,12 @@
                                             <span class="tooltip-box">
                                                 Please paste your Twitter/X profile link (URL), not just your @handle.<br><br>
                                                 <strong>Example:</strong><br>
-                                                https://x.com/plyrcard<br><br>
-                                                <strong>Not accepted:</strong><br>
-                                                @plyrcard or plyrcard
+                                                https://x.com/plyrcard
                                             </span>
                                         </span>
                                     </span>
                                 </label>
-                                <input
-                                    type="url"
-                                    id="x_handle"
-                                    name="x_handle"
-                                    value="{{ old('x_handle') }}"
-                                    maxlength="255"
-                                    placeholder="https://x.com/yourprofile"
-                                >
+                                <input type="url" id="x_handle" name="x_handle" value="{{ old('x_handle') }}" maxlength="255" placeholder="https://x.com/yourprofile">
                             </div>
 
                             <div class="col-12">
@@ -1058,59 +980,18 @@
                                         <span class="tooltip-wrap" tabindex="0">
                                             <span class="info-icon">i</span>
                                             <span class="tooltip-box">
-                                                Please paste your YouTube channel link (URL), not just the channel name.<br><br>
-                                                We’ll use this to automatically pull highlights from your channel if you do not choose to manually pick your own videos.<br><br>
-                                                <strong>Examples:</strong>
-                                                <ul>
-                                                    <li>https://www.youtube.com/@YourChannelName</li>
-                                                    <li>https://www.youtube.com/channel/UCxxxxxxxxxxxxxxx</li>
-                                                    <li>https://www.youtube.com/c/YourCustomName</li>
-                                                </ul>
-                                                <strong>Not accepted:</strong><br>
-                                                Channel name only or handle only.
+                                                Paste your full YouTube channel URL, not just the name.
                                             </span>
                                         </span>
                                     </span>
                                 </label>
-                                <input
-                                    type="url"
-                                    id="yt_url"
-                                    name="yt_url"
-                                    value="{{ old('yt_url') }}"
-                                    maxlength="500"
-                                    placeholder="https://www.youtube.com/@YourChannelName"
-                                >
-                                <div class="hint">Optional. If you leave manual highlight selection off, the backend can use this channel URL to pull videos.</div>
+                                <input type="url" id="yt_url" name="yt_url" value="{{ old('yt_url') }}" maxlength="500" placeholder="https://www.youtube.com/@YourChannelName">
+                                <div class="hint">Optional. If manual highlight selection is off, this can be used to pull videos.</div>
                             </div>
 
                             <div class="col-6">
-                                <label for="featured_video_url">
-                                    <span class="field-label-inline">
-                                        <span>Featured Video URL</span>
-                                        <span class="tooltip-wrap" tabindex="0">
-                                            <span class="info-icon">i</span>
-                                            <span class="tooltip-box">
-                                                Paste the full URL to the one YouTube video you want featured on your <span translate="no">PLYR</span> Profile.<br><br>
-                                                This can be your personal intro video or your best highlight.<br><br>
-                                                <strong>Examples:</strong>
-                                                <ul>
-                                                    <li>https://www.youtube.com/watch?v=dQw4w9WgXcQ</li>
-                                                    <li>https://youtu.be/dQw4w9WgXcQ</li>
-                                                </ul>
-                                                <strong>Not accepted:</strong><br>
-                                                Video title only or channel link.
-                                            </span>
-                                        </span>
-                                    </span>
-                                </label>
-                                <input
-                                    type="url"
-                                    id="featured_video_url"
-                                    name="featured_video_url"
-                                    value="{{ old('featured_video_url') }}"
-                                    maxlength="500"
-                                    placeholder="https://www.youtube.com/watch?v=..."
-                                >
+                                <label for="featured_video_url">Featured Video URL</label>
+                                <input type="url" id="featured_video_url" name="featured_video_url" value="{{ old('featured_video_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
                                 <div class="hint">Optional. This is the main featured video for the website.</div>
                             </div>
 
@@ -1120,79 +1001,38 @@
                                     <div class="toggle-copy">
                                         <p class="toggle-title">Pick My Own Videos</p>
                                         <p class="toggle-description">
-                                            Turn this on if you want to manually add your highlight video URLs line by line. Leave it off to use the YouTube channel URL above.
+                                            Turn this on to manually add highlight video URLs. Leave it off to use the YouTube channel URL above.
                                         </p>
                                     </div>
 
                                     <label class="switch" for="use_custom_highlights">
-                                        <input
-                                            type="checkbox"
-                                            id="use_custom_highlights"
-                                            name="use_custom_highlights"
-                                            value="1"
-                                            {{ old('use_custom_highlights') ? 'checked' : '' }}
-                                        >
+                                        <input type="checkbox" id="use_custom_highlights" name="use_custom_highlights" value="1" {{ old('use_custom_highlights') ? 'checked' : '' }}>
                                         <span class="slider"></span>
                                     </label>
                                 </div>
                             </div>
 
                             <div id="custom_highlights_wrap" class="col-12 hidden-section">
-                                <label for="featured_video_urls">
-                                    <span class="field-label-inline">
-                                        <span>Highlight Video URLs</span>
-                                        <span class="tooltip-wrap" tabindex="0">
-                                            <span class="info-icon">i</span>
-                                            <span class="tooltip-box">
-                                                Use this only if you turned on <strong>Pick My Own Videos</strong>.<br><br>
-                                                Paste full video URLs here, one per line, in the order you want them displayed.<br><br>
-                                                <strong>Examples:</strong>
-                                                <ul>
-                                                    <li>https://www.youtube.com/watch?v=dQw4w9WgXcQ</li>
-                                                    <li>https://youtu.be/dQw4w9WgXcQ</li>
-                                                    <li>https://www.youtube.com/shorts/abcdeFGhijk</li>
-                                                </ul>
-                                                <strong>Not accepted:</strong><br>
-                                                Video titles only or channel links in this field.
-                                            </span>
-                                        </span>
-                                    </span>
-                                </label>
-                                <textarea
-                                    id="featured_video_urls"
-                                    name="featured_video_urls"
-                                    placeholder="Enter one video URL per line&#10;https://www.youtube.com/watch?v=abc123&#10;https://www.youtube.com/watch?v=def456"
-                                >{{ old('featured_video_urls') }}</textarea>
-                                <div class="hint">One full video URL per line. Leave this blank if you want the system to use your YouTube channel URL instead.</div>
+                                <label for="featured_video_urls">Highlight Video URLs</label>
+                                <textarea id="featured_video_urls" name="featured_video_urls" placeholder="Enter one video URL per line&#10;https://www.youtube.com/watch?v=abc123&#10;https://www.youtube.com/watch?v=def456">{{ old('featured_video_urls') }}</textarea>
+                                <div class="hint">One full video URL per line.</div>
                             </div>
 
                             <div class="col-12">
                                 <label for="player_bio">Player Bio</label>
-                                <textarea
-                                    id="player_bio"
-                                    name="player_bio"
-                                    placeholder="Write a short player bio for the website."
-                                >{{ old('player_bio') }}</textarea>
+                                <textarea id="player_bio" name="player_bio" placeholder="Write a short player bio for the website.">{{ old('player_bio') }}</textarea>
                                 <div class="hint">This will be used in the website bio/about section.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="academic_accolades">Academic Accolades</label>
-                                <textarea
-                                    id="academic_accolades"
-                                    name="academic_accolades"
-                                    placeholder="Enter one accolade per line&#10;Honor Roll&#10;National Honor Society&#10;AP Scholar"
-                                >{{ old('academic_accolades') }}</textarea>
+                                <textarea id="academic_accolades" name="academic_accolades" placeholder="Enter one accolade per line&#10;Honor Roll&#10;National Honor Society&#10;AP Scholar">{{ old('academic_accolades') }}</textarea>
                                 <div class="hint">Enter one accolade per line.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="sports_accolades">Sports Accolades</label>
-                                <textarea
-                                    id="sports_accolades"
-                                    name="sports_accolades"
-                                    placeholder="Enter one accolade per line&#10;All League First Team&#10;MVP&#10;Team Captain"
-                                >{{ old('sports_accolades') }}</textarea>
+                                <textarea id="sports_accolades" name="sports_accolades" placeholder="Enter one accolade per line&#10;All League First Team&#10;MVP&#10;Team Captain">{{ old('sports_accolades') }}</textarea>
                                 <div class="hint">Enter one accolade per line.</div>
                             </div>
 
@@ -1318,64 +1158,30 @@
                         <div class="grid">
                             <div class="col-6">
                                 <label for="action_images">Action Images</label>
-                                <input
-                                    type="file"
-                                    id="action_images"
-                                    name="action_images[]"
-                                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                                    multiple
-                                >
-                                <div class="hint">
-                                    Upload action shots of the athlete. These will still be stored under raw player images.
-                                </div>
+                                <input type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="hint">Upload action shots of the athlete.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="portrait_images">Portrait Images</label>
-                                <input
-                                    type="file"
-                                    id="portrait_images"
-                                    name="portrait_images[]"
-                                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                                    multiple
-                                >
-                                <div class="hint" id="portrait_images_hint">
-                                    Upload portrait or solo player images. These will still be stored under raw player images.
-                                </div>
+                                <input type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="hint" id="portrait_images_hint">Upload portrait or solo player images.</div>
                             </div>
 
                             <div class="col-6 other-wrap" id="national_team_images_wrap">
                                 <label for="national_team_images">National Team Images</label>
-                                <input
-                                    type="file"
-                                    id="national_team_images"
-                                    name="national_team_images[]"
-                                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                                    multiple
-                                >
-                                <div class="hint">
-                                    Upload images related to national team play. These will still be stored under raw player images.
-                                </div>
+                                <input type="file" id="national_team_images" name="national_team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="hint">Upload images related to national team play.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="team_images">Team Images</label>
-                                <input
-                                    type="file"
-                                    id="team_images"
-                                    name="team_images[]"
-                                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                                    multiple
-                                >
-                                <div class="hint">
-                                    Upload team-related images. These will still be stored under raw player images.
-                                </div>
+                                <input type="file" id="team_images" name="team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="hint">Upload team-related images.</div>
                             </div>
 
                             <div class="col-12">
-                                <div class="hint" id="raw_images_total_hint">
-                                    You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.
-                                </div>
+                                <div class="hint">You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.</div>
                             </div>
                         </div>
                     </div>
@@ -1402,6 +1208,15 @@
     const stepFieldMap = @json($stepFieldMap ?? []);
     const errorFields = @json(array_keys($errors->toArray()));
     const enabledSports = ['basketball', 'soccer'];
+
+    const leagueDirectory = @json($leagueDirectory);
+    const clubDirectory = @json($clubDirectory);
+    const teamDirectory = @json($teamDirectory);
+
+    const oldLeagueId = @json(old('league_id'));
+    const oldClubId = @json(old('club_id'));
+    const oldTeamId = @json(old('team_id'));
+    const oldGender = @json(old('gender'));
 
     const REGION_TEST_OVERRIDE = null;
     const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
@@ -1444,21 +1259,14 @@
 
     const phraseTranslations = {
         es: {
-            "Intake": "Ingreso",
-            "Form": "Formulario",
-            "Use this form to build your": "Use este formulario para crear su",
-            "Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.": "Portafolio: comparta sus datos clave, momentos destacados y enlaces para que podamos crear un portafolio preciso, pulido y listo para compartir.",
-            "This form will translate automatically based on detected region.": "Este formulario se traducirá automáticamente según la región detectada.",
             "Athlete Details": "Detalles del atleta",
-            "Location, School, League, Club & National Team": "Ubicación, escuela, liga, club y selección nacional",
-            "Media, Links & Bio": "Medios, enlaces y biografía",
-            "Parent / Guardian Information": "Información de padre / tutor",
-            "Coaches & Trainers": "Entrenadores y preparadores",
+            "School & Team": "Escuela y equipo",
+            "Media & Bio": "Medios y biografía",
+            "Contacts": "Contactos",
             "Images": "Imágenes",
             "Next": "Siguiente",
             "Back": "Atrás",
-            "Submit Intake Form": "Enviar formulario de ingreso",
-            "Please fix the following:": "Corrige lo siguiente:"
+            "Submit Intake Form": "Enviar formulario de ingreso"
         }
     };
 
@@ -1500,12 +1308,7 @@
 
         document.documentElement.setAttribute('lang', lang);
 
-        const walker = document.createTreeWalker(
-            document.body,
-            NodeFilter.SHOW_TEXT,
-            null
-        );
-
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
         const textNodes = [];
 
         while (walker.nextNode()) {
@@ -1520,18 +1323,6 @@
 
             if (translated !== original) {
                 node.nodeValue = translated;
-            }
-        });
-
-        document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach((el) => {
-            if (el.closest('[translate="no"]')) return;
-
-            const original = el.getAttribute('placeholder');
-            if (!original) return;
-
-            const translated = translateExactText(original, lang);
-            if (translated !== original) {
-                el.setAttribute('placeholder', translated);
             }
         });
     }
@@ -1577,62 +1368,159 @@
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
     }
 
-    function setSelectValue(selectId, value) {
-        const select = document.getElementById(selectId);
-        if (!select) return;
+    function isLeagueGenderCompatible(leagueGender, userGender) {
+        const lg = (leagueGender || '').toLowerCase().trim();
+        const ug = (userGender || '').toLowerCase().trim();
 
-        const exists = Array.from(select.options).some(option => String(option.value) === String(value));
-        select.value = exists ? String(value) : '';
+        if (!lg || !ug) {
+            return true;
+        }
+
+        if (ug === 'coed') {
+            return lg === 'coed';
+        }
+
+        return lg === ug || lg === 'coed';
     }
 
-    function toggleTeamSelection() {
+    function resetSelect(select, placeholder) {
+        select.innerHTML = '';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = placeholder;
+        select.appendChild(option);
+    }
+
+    function populateLeagueOptions(preserveValue = null) {
+        const genderSelect = document.getElementById('gender');
+        const leagueSelect = document.getElementById('league_id');
+        const selectedGender = genderSelect.value || '';
+
+        resetSelect(leagueSelect, 'Select league');
+
+        leagueDirectory
+            .filter((league) => isLeagueGenderCompatible(league.gender, selectedGender))
+            .forEach((league) => {
+                const option = document.createElement('option');
+                option.value = String(league.id);
+                option.textContent = league.name;
+                leagueSelect.appendChild(option);
+            });
+
+        const otherOption = document.createElement('option');
+        otherOption.value = '__other__';
+        otherOption.textContent = 'Other';
+        leagueSelect.appendChild(otherOption);
+
+        if (preserveValue) {
+            const exists = Array.from(leagueSelect.options).some((option) => option.value === String(preserveValue));
+            leagueSelect.value = exists ? String(preserveValue) : '';
+        }
+    }
+
+    function populateClubOptions(preserveValue = null) {
+        const leagueSelect = document.getElementById('league_id');
+        const clubSelect = document.getElementById('club_id');
+        const selectedLeague = leagueSelect.value;
+
+        resetSelect(clubSelect, 'Select club');
+
+        if (!selectedLeague || selectedLeague === '__other__') {
+            clubSelect.disabled = true;
+            clubSelect.value = '';
+            return;
+        }
+
+        clubDirectory
+            .filter((club) => String(club.league_id) === String(selectedLeague))
+            .forEach((club) => {
+                const option = document.createElement('option');
+                option.value = String(club.id);
+                option.textContent = club.name;
+                clubSelect.appendChild(option);
+            });
+
+        clubSelect.disabled = false;
+
+        if (preserveValue) {
+            const exists = Array.from(clubSelect.options).some((option) => option.value === String(preserveValue));
+            clubSelect.value = exists ? String(preserveValue) : '';
+        }
+    }
+
+    function populateTeamOptions(preserveValue = null) {
+        const clubSelect = document.getElementById('club_id');
         const teamSelect = document.getElementById('team_id');
-        const leagueSelectWrap = document.getElementById('league_select_wrap');
-        const clubSelectWrap = document.getElementById('club_select_wrap');
+        const selectedClub = clubSelect.value;
+
+        resetSelect(teamSelect, 'Select team');
+
+        if (!selectedClub) {
+            teamSelect.disabled = true;
+            teamSelect.value = '';
+            return;
+        }
+
+        teamDirectory
+            .filter((team) => String(team.club_id) === String(selectedClub))
+            .forEach((team) => {
+                const option = document.createElement('option');
+                option.value = String(team.id);
+                option.textContent = team.name;
+                teamSelect.appendChild(option);
+            });
+
+        teamSelect.disabled = false;
+
+        if (preserveValue) {
+            const exists = Array.from(teamSelect.options).some((option) => option.value === String(preserveValue));
+            teamSelect.value = exists ? String(preserveValue) : '';
+        }
+    }
+
+    function toggleOrganizationMode() {
+        const leagueSelect = document.getElementById('league_id');
+        const clubSelect = document.getElementById('club_id');
+        const teamSelect = document.getElementById('team_id');
+
         const leagueOtherWrap = document.getElementById('league_other_wrap');
         const clubOtherWrap = document.getElementById('club_other_wrap');
         const teamOtherWrap = document.getElementById('team_other_wrap');
 
-        const leagueDisplay = document.getElementById('league_id_display');
-        const clubDisplay = document.getElementById('club_id_display');
+        const isOther = leagueSelect.value === '__other__';
 
-        if (!teamSelect || !leagueDisplay || !clubDisplay) return;
-
-        const selectedValue = teamSelect.value;
-
-        if (selectedValue === '__other__') {
-            if (leagueSelectWrap) leagueSelectWrap.style.display = 'none';
-            if (clubSelectWrap) clubSelectWrap.style.display = 'none';
-
-            if (leagueOtherWrap) leagueOtherWrap.style.display = 'block';
-            if (clubOtherWrap) clubOtherWrap.style.display = 'block';
-            if (teamOtherWrap) teamOtherWrap.style.display = 'block';
-
-            leagueDisplay.value = '';
-            clubDisplay.value = '';
-
+        if (isOther) {
+            clubSelect.disabled = true;
+            teamSelect.disabled = true;
+            clubSelect.value = '';
+            teamSelect.value = '';
+            leagueOtherWrap.style.display = 'block';
+            clubOtherWrap.style.display = 'block';
+            teamOtherWrap.style.display = 'block';
             return;
         }
 
-        if (leagueSelectWrap) leagueSelectWrap.style.display = 'block';
-        if (clubSelectWrap) clubSelectWrap.style.display = 'block';
+        leagueOtherWrap.style.display = 'none';
+        clubOtherWrap.style.display = 'none';
+        teamOtherWrap.style.display = 'none';
+    }
 
-        if (leagueOtherWrap) leagueOtherWrap.style.display = 'none';
-        if (clubOtherWrap) clubOtherWrap.style.display = 'none';
-        if (teamOtherWrap) teamOtherWrap.style.display = 'none';
+    function syncOrganizationFlow({ preserveLeague = null, preserveClub = null, preserveTeam = null } = {}) {
+        populateLeagueOptions(preserveLeague);
+        toggleOrganizationMode();
 
-        if (!selectedValue) {
-            leagueDisplay.value = '';
-            clubDisplay.value = '';
+        const leagueSelect = document.getElementById('league_id');
+
+        if (leagueSelect.value === '__other__') {
+            resetSelect(document.getElementById('club_id'), 'Select club');
+            resetSelect(document.getElementById('team_id'), 'Select team');
+            document.getElementById('club_id').disabled = true;
+            document.getElementById('team_id').disabled = true;
             return;
         }
 
-        const selectedOption = teamSelect.options[teamSelect.selectedIndex];
-        const clubId = selectedOption.getAttribute('data-club-id');
-        const leagueId = selectedOption.getAttribute('data-league-id');
-
-        setSelectValue('club_id_display', clubId);
-        setSelectValue('league_id_display', leagueId);
+        populateClubOptions(preserveClub);
+        populateTeamOptions(preserveTeam);
     }
 
     function toggleNationalTeamOther() {
@@ -1650,42 +1538,17 @@
         const hasExperience = natlTeamExp.value === '1';
 
         nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
-
-        if (nationalTeamPeriodWrap) {
-            nationalTeamPeriodWrap.style.display = hasExperience ? 'block' : 'none';
-        }
-
-        if (nationalTeamImagesWrap) {
-            nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'none';
-        }
+        nationalTeamPeriodWrap.style.display = hasExperience ? 'block' : 'none';
+        nationalTeamImagesWrap.style.display = hasExperience ? 'block' : 'none';
 
         if (!hasExperience) {
-            nationalTeamFieldWrap.style.display = 'none';
-
-            if (nationalTeamPeriodWrap) {
-                nationalTeamPeriodWrap.style.display = 'none';
-            }
-
-            if (nationalTeamImagesWrap) {
-                nationalTeamImagesWrap.style.display = 'none';
-            }
-
             nationalTeamSelect.value = '';
             nationalTeamOtherSection.style.display = 'none';
 
             const otherInput = document.getElementById('national_team_other');
-            if (otherInput) {
-                otherInput.value = '';
-            }
-
-            if (nationalTeamPeriodInput) {
-                nationalTeamPeriodInput.value = '';
-            }
-
-            if (nationalTeamImagesInput) {
-                nationalTeamImagesInput.value = '';
-            }
-
+            if (otherInput) otherInput.value = '';
+            if (nationalTeamPeriodInput) nationalTeamPeriodInput.value = '';
+            if (nationalTeamImagesInput) nationalTeamImagesInput.value = '';
             return;
         }
 
@@ -1719,7 +1582,6 @@
         if (!sportSelect || !dominantFootWrap || !dominantFootSelect) return;
 
         const isSoccer = sportSelect.value === 'soccer';
-
         dominantFootWrap.style.display = isSoccer ? 'block' : 'none';
 
         if (!isSoccer) {
@@ -1732,7 +1594,6 @@
         const wrap = document.getElementById('custom_highlights_wrap');
 
         if (!toggle || !wrap) return;
-        wrap.style.display = toggle.checked ? 'block' : 'block' === false ? 'block' : 'none';
         wrap.style.display = toggle.checked ? 'block' : 'none';
     }
 
@@ -1759,12 +1620,7 @@
             return;
         }
 
-        if (selectedCountry === '__other__') {
-            countryOtherWrap.style.display = 'block';
-        } else {
-            countryOtherWrap.style.display = 'none';
-        }
-
+        countryOtherWrap.style.display = selectedCountry === '__other__' ? 'block' : 'none';
         stateUsWrap.style.display = 'none';
         stateInternationalWrap.style.display = 'block';
         stateHidden.value = stateInternational.value || '';
@@ -1778,11 +1634,7 @@
 
         if (!stateUs || !stateInternational || !stateHidden) return;
 
-        if (country === 'USA' || country === '') {
-            stateHidden.value = stateUs.value || '';
-        } else {
-            stateHidden.value = stateInternational.value || '';
-        }
+        stateHidden.value = (country === 'USA' || country === '') ? (stateUs.value || '') : (stateInternational.value || '');
     }
 
     function getStepFromErrors() {
@@ -1791,8 +1643,8 @@
         }
 
         for (const [step, fields] of Object.entries(stepFieldMap)) {
-            const hasMatch = errorFields.some(errorField => {
-                return fields.includes(errorField) || fields.some(field => {
+            const hasMatch = errorFields.some((errorField) => {
+                return fields.includes(errorField) || fields.some((field) => {
                     if (!field.includes('*')) return false;
                     const base = field.replace('.*', '');
                     return errorField.startsWith(base);
@@ -1848,15 +1700,19 @@
 
         renderPositions();
         toggleSchoolOther();
-        toggleTeamSelection();
         toggleNationalTeamOther();
         toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
         toggleDominantFoot();
         updateImageInstructions();
-
         translateTextNodes(lang);
+
+        syncOrganizationFlow({
+            preserveLeague: oldLeagueId,
+            preserveClub: oldClubId,
+            preserveTeam: oldTeamId,
+        });
 
         const initialStep = {{ $errors->any() ? 'getStepFromErrors()' : '1' }};
         showStep(initialStep);
@@ -1865,24 +1721,52 @@
             renderPositions();
             toggleDominantFoot();
             updateImageInstructions();
-            translateTextNodes(lang);
+        });
+
+        document.getElementById('gender').addEventListener('change', () => {
+            syncOrganizationFlow();
+        });
+
+        document.getElementById('league_id').addEventListener('change', () => {
+            toggleOrganizationMode();
+
+            if (document.getElementById('league_id').value === '__other__') {
+                resetSelect(document.getElementById('club_id'), 'Select club');
+                resetSelect(document.getElementById('team_id'), 'Select team');
+                document.getElementById('club_id').disabled = true;
+                document.getElementById('team_id').disabled = true;
+                return;
+            }
+
+            populateClubOptions();
+            populateTeamOptions();
+        });
+
+        document.getElementById('club_id').addEventListener('change', () => {
+            populateTeamOptions();
         });
 
         document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
-        document.getElementById('team_id')?.addEventListener('change', toggleTeamSelection);
-        document.getElementById('national_team_id')?.addEventListener('change', toggleNationalTeamOther);
-        document.getElementById('natl_team_exp')?.addEventListener('change', toggleNationalTeamOther);
+        document.getElementById('national_team_id').addEventListener('change', toggleNationalTeamOther);
+        document.getElementById('natl_team_exp').addEventListener('change', toggleNationalTeamOther);
         document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
+
         document.getElementById('country').addEventListener('change', () => {
             toggleCountryFields();
             syncStateValue();
-            translateTextNodes(lang);
         });
+
         document.getElementById('state_us').addEventListener('change', syncStateValue);
         document.getElementById('state_international').addEventListener('input', syncStateValue);
 
         document.getElementById('nextStepBtn').addEventListener('click', goNextStep);
         document.getElementById('prevStepBtn').addEventListener('click', goPrevStep);
+
+        document.querySelectorAll('[data-step-pill]').forEach((button) => {
+            button.addEventListener('click', () => {
+                showStep(Number(button.dataset.stepPill));
+            });
+        });
     });
 </script>
 </body>
