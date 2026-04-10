@@ -9,6 +9,7 @@ use App\Filament\Resources\Teams\Pages\ViewTeam;
 use App\Models\Club;
 use App\Models\Team;
 use BackedEnum;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -16,7 +17,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
-// use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -37,7 +38,6 @@ class TeamResource extends Resource
             Section::make('Team')
                 ->columns(2)
                 ->schema([
-
                     TextInput::make('name')
                         ->required()
                         ->maxLength(255),
@@ -46,13 +46,41 @@ class TeamResource extends Resource
                         ->label('Club')
                         ->options(
                             Club::query()
+                                ->with('league')
                                 ->orderBy('name')
-                                ->pluck('name', 'id')
+                                ->get()
+                                ->mapWithKeys(function (Club $club) {
+                                    $label = $club->name;
+
+                                    if ($club->league?->name) {
+                                        $label .= ' (' . $club->league->name . ')';
+                                    }
+
+                                    return [$club->id => $label];
+                                })
+                                ->all()
                         )
                         ->searchable()
                         ->preload()
-                        ->required(),
+                        ->required()
+                        ->live(),
 
+                    Placeholder::make('league_preview')
+                        ->label('League')
+                        ->content(function (callable $get, $record) {
+                            $clubId = $get('club_id');
+
+                            if ($clubId) {
+                                $club = Club::with('league')->find($clubId);
+                                return $club?->league?->name ?: '—';
+                            }
+
+                            if ($record?->club?->league?->name) {
+                                return $record->club->league->name;
+                            }
+
+                            return '—';
+                        }),
                 ]),
         ]);
     }
@@ -61,7 +89,6 @@ class TeamResource extends Resource
     {
         return $table
             ->columns([
-
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
@@ -79,10 +106,17 @@ class TeamResource extends Resource
                 TextColumn::make('updated_at')
                     ->since()
                     ->label('Updated'),
-
             ])
             ->filters([
-                // TrashedFilter::make(),
+                SelectFilter::make('club_id')
+                    ->label('Club')
+                    ->relationship('club', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('league')
+                    ->label('League')
+                    ->relationship('club.league', 'name'),
             ])
             ->recordUrl(fn (Team $record): string => static::getUrl('edit', ['record' => $record]));
     }
