@@ -23,16 +23,6 @@
             color: var(--pc-text);
         }
 
-        .profile-top-title {
-            margin-bottom: 0.9rem;
-            font-size: 1.25rem;
-            line-height: 1;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #f3f3f3;
-        }
-
         .profile-plan-banner {
             display: flex;
             align-items: center;
@@ -315,15 +305,6 @@
             flex: 0 0 auto !important;
         }
 
-        .profile-page-tabs .pc-locked-tab-trigger {
-            position: relative;
-        }
-
-        .profile-page-tabs .pc-locked-tab-trigger button,
-        .profile-page-tabs .pc-locked-tab-trigger [role="tab"] {
-            cursor: pointer !important;
-        }
-
         .profile-plan-icon svg,
         .profile-meta-item svg,
         .profile-pill svg,
@@ -345,6 +326,69 @@
             max-width: 11px !important;
             max-height: 11px !important;
             flex-shrink: 0 !important;
+        }
+
+        .pc-inline-lock {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border: 1px solid rgba(255, 107, 74, 0.28);
+            background: rgba(255, 107, 74, 0.08);
+            border-radius: 1rem;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .pc-inline-lock__icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            background: rgba(255, 107, 74, 0.14);
+            color: #ff6b4a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .pc-inline-lock__icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .pc-inline-lock__content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pc-inline-lock__content h4 {
+            margin: 0;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .pc-inline-lock__content p {
+            margin: 0.25rem 0 0;
+            color: #b8a39b;
+            font-size: 0.8rem;
+            line-height: 1.45;
+        }
+
+        .pc-inline-lock__button {
+            border: 0;
+            background: #ff6b4a;
+            color: #fff;
+            border-radius: 0.8rem;
+            padding: 0.8rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            white-space: nowrap;
         }
 
         .pc-lock-modal-backdrop {
@@ -488,6 +532,15 @@
                 width: 100%;
                 min-width: 0;
                 height: 58px;
+            }
+
+            .pc-inline-lock {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .pc-inline-lock__button {
+                width: 100%;
             }
         }
     </style>
@@ -634,43 +687,4 @@
             </div>
         </div>
     @endif
-
-    <script>
-        document.addEventListener('livewire:navigated', bindLockedTabs);
-        document.addEventListener('DOMContentLoaded', bindLockedTabs);
-
-        function bindLockedTabs() {
-            document.querySelectorAll('.pc-locked-tab-trigger').forEach((tabWrap) => {
-                if (tabWrap.dataset.lockBound === '1') {
-                    return;
-                }
-
-                tabWrap.dataset.lockBound = '1';
-
-                const clickable = tabWrap.querySelector('button, [role="tab"]');
-
-                if (!clickable) {
-                    return;
-                }
-
-                clickable.addEventListener('click', function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    if (window.Livewire) {
-                        Livewire.dispatch('openLockedFeatureModalFromJs');
-                    }
-                }, true);
-            });
-        }
-
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('openLockedFeatureModalFromJs', () => {
-                @this.openLockedFeatureModal(
-                    'UNLOCK SOCIAL & VIDEO LINKS',
-                    'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.'
-                );
-            });
-        });
-    </script>
 </x-filament-panels::page>
