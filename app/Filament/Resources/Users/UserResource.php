@@ -35,6 +35,10 @@ use Illuminate\Support\Facades\Hash;
 use STS\FilamentImpersonate\Actions\Impersonate;
 use UnitEnum;
 use Filament\Forms\Components\Hidden;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Actions\Action;
+use Filament\Forms\Components\Toggle;
+use Spatie\Permission\Models\Role;
 
 class UserResource extends Resource
 {
@@ -773,8 +777,8 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                TextColumn::make('first_name')->searchable()->sortable(),
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['roles', 'websites']))
+            ->columns([                TextColumn::make('first_name')->searchable()->sortable(),
                 TextColumn::make('last_name')->searchable()->sortable(),
                 TextColumn::make('email')->searchable(),
 
@@ -790,7 +794,10 @@ class UserResource extends Resource
                 TextColumn::make('club.name')->label('Club')->toggleable(),
                 TextColumn::make('team_name')->label('Team')->toggleable(),
                 TextColumn::make('nationalTeam.name')->label('National Team')->toggleable(),
-                TextColumn::make('roles.name')->badge(),
+                TextColumn::make('roles.name')
+                    ->label('Roles')
+                    ->badge()
+                    ->separator(','),
                 TextColumn::make('updated_at')->since()->label('Updated'),
 
                 TextColumn::make('sport')
