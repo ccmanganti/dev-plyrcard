@@ -41,6 +41,116 @@
 
         body.embed-mode { padding: 14px; }
 
+        .search-select-control *,
+        .search-select-value,
+        .search-select-placeholder,
+        .search-select-meta,
+        .search-select-caret,
+        .search-select-logo {
+            pointer-events: none;
+        }
+
+        .search-select-value {
+            flex: 1 1 auto;
+            width: 100%;
+        }
+
+        .thank-you-wrap {
+            min-height: 440px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 12px;
+        }
+
+        .thank-you-card {
+            width: 100%;
+            max-width: 760px;
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            background:
+                linear-gradient(135deg, rgba(255, 122, 0, 0.16) 0%, rgba(255, 122, 0, 0.05) 30%, rgba(255, 255, 255, 0.01) 100%),
+                #111111;
+            box-shadow: var(--shadow);
+            padding: 42px 28px;
+            text-align: center;
+        }
+
+        .thank-you-icon {
+            width: 74px;
+            height: 74px;
+            margin: 0 auto 18px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 122, 0, 0.12);
+            border: 1px solid rgba(255, 122, 0, 0.24);
+            color: var(--accent);
+        }
+
+        .thank-you-icon svg {
+            width: 34px;
+            height: 34px;
+            stroke-width: 2.2;
+        }
+
+        .thank-you-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 122, 0, 0.28);
+            background: rgba(255, 122, 0, 0.10);
+            color: var(--accent-2);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .thank-you-title {
+            margin: 0;
+            font-family: "Bebas Neue", ui-sans-serif, system-ui;
+            font-size: 58px;
+            line-height: .95;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .thank-you-copy {
+            margin: 16px auto 0;
+            max-width: 620px;
+            font-size: 20px;
+            line-height: 1.45;
+            color: #dfdfdf;
+        }
+
+        .thank-you-subcopy {
+            margin: 16px 0 0;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        @media (max-width: 640px) {
+            .thank-you-card {
+                padding: 32px 18px;
+                border-radius: 22px;
+            }
+
+            .thank-you-title {
+                font-size: 42px;
+            }
+
+            .thank-you-copy {
+                font-size: 16px;
+            }
+        }
+
         .wrapper {
             width: 100%;
             max-width: 1220px;
@@ -732,43 +842,64 @@
 
         <div class="content">
             @if (session('success'))
-                <div class="success-box">{{ session('success') }}</div>
-            @endif
+                <div class="thank-you-wrap" id="thankYouWrap">
+                    <div class="thank-you-card">
+                        <div class="thank-you-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="m8.5 12 2.3 2.3L15.8 9.5"></path>
+                            </svg>
+                        </div>
 
-            @if ($errors->any())
-                <div class="error-list">
-                    <strong>Please fix the following:</strong>
-                    <ul style="margin: 10px 0 0 18px;">
-                        @foreach ($errors->all() as $error)
-                            <li style="margin-bottom: 4px;">{{ $error }}</li>
-                        @endforeach
-                    </ul>
+                        <div class="thank-you-eyebrow">Submission Received</div>
+
+                        <h2 class="thank-you-title">Thank You!</h2>
+
+                        <p class="thank-you-copy">
+                            Your intake form has been submitted successfully.
+                            Please watch out for your email for further details as we get your website ready.
+                        </p>
+
+                        <p class="thank-you-subcopy">
+                            This page will refresh automatically in <span id="thankYouCountdown">2</span> seconds.
+                        </p>
+                    </div>
+                </div>
+            @else
+                @if ($errors->any())
+                    <div class="error-list">
+                        <strong>Please fix the following:</strong>
+                        <ul style="margin: 10px 0 0 18px;">
+                            @foreach ($errors->all() as $error)
+                                <li style="margin-bottom: 4px;">{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <div class="tabs-bar" id="stepsBar">
+                    <button type="button" class="tab-btn" data-step-pill="1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Athlete Details</span>
+                    </button>
+                    <button type="button" class="tab-btn" data-step-pill="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-3.272-2.182"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
+                        <span>School & Organization</span>
+                    </button>
+                    <button type="button" class="tab-btn" data-step-pill="3">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></svg>
+                        <span>Media & Bio</span>
+                    </button>
+                    <button type="button" class="tab-btn" data-step-pill="4">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/><path d="M9 7h6"/><path d="M9 12h6"/><path d="M9 17h4"/></svg>
+                        <span>Contacts</span>
+                    </button>
+                    <button type="button" class="tab-btn" data-step-pill="5">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                        <span>Images</span>
+                    </button>
                 </div>
             @endif
-
-            <div class="tabs-bar" id="stepsBar">
-                <button type="button" class="tab-btn" data-step-pill="1">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span>Athlete Details</span>
-                </button>
-                <button type="button" class="tab-btn" data-step-pill="2">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-3.272-2.182"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
-                    <span>School & Organization</span>
-                </button>
-                <button type="button" class="tab-btn" data-step-pill="3">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></svg>
-                    <span>Media & Bio</span>
-                </button>
-                <button type="button" class="tab-btn" data-step-pill="4">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/><path d="M9 7h6"/><path d="M9 12h6"/><path d="M9 17h4"/></svg>
-                    <span>Contacts</span>
-                </button>
-                <button type="button" class="tab-btn" data-step-pill="5">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                    <span>Images</span>
-                </button>
-            </div>
-
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
 
@@ -808,7 +939,7 @@
 
                             <div class="col-4">
                                 <label for="phone">Phone</label>
-                                <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1146,7 +1277,7 @@
 
                             <div class="col-4">
                                 <label for="parent_phone">Primary Parent Phone</label>
-                                <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1161,7 +1292,7 @@
 
                             <div class="col-4">
                                 <label for="sec_parent_phone">Secondary Parent Phone</label>
-                                <input type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
                         </div>
                     </div>
@@ -1190,7 +1321,7 @@
 
                             <div class="col-4">
                                 <label for="club_coach_phone">Club Coach Phone</label>
-                                <input type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1205,7 +1336,7 @@
 
                             <div class="col-4">
                                 <label for="natl_coach_phone">National Coach Phone</label>
-                                <input type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1220,7 +1351,7 @@
 
                             <div class="col-4">
                                 <label for="tech_trainer_phone">Technical Trainer Phone</label>
-                                <input type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1235,7 +1366,7 @@
 
                             <div class="col-4">
                                 <label for="snc_trainer_phone">S&amp;C Trainer Phone</label>
-                                <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
                         </div>
                     </div>
@@ -1854,7 +1985,10 @@
             setDisplay(selected || null);
         }
 
-        control.addEventListener('click', () => {
+        control.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
             if (wrapper.classList.contains('open')) {
                 close();
             } else {
@@ -2072,6 +2206,40 @@
         });
     }
 
+function formatPhoneInputValue(value) {
+    let raw = String(value || '');
+    raw = raw.replace(/[^\d+]/g, '');
+
+    const hasPlus = raw.startsWith('+');
+    let digits = raw.replace(/\D/g, '');
+
+    if (!digits) {
+        return hasPlus ? '+' : '';
+    }
+
+    digits = digits.slice(0, 15);
+
+    return hasPlus
+        ? ('+' + groupInternationalDigits(digits)).trim()
+        : groupLocalDigits(digits).trim();
+}
+
+function groupInternationalDigits(digits) {
+    if (digits.length <= 1) return digits;
+    if (digits.length <= 4) return digits.slice(0, 1) + ' ' + digits.slice(1);
+    if (digits.length <= 7) return digits.slice(0, 2) + ' ' + digits.slice(2, 5) + ' ' + digits.slice(5);
+    if (digits.length <= 11) return digits.slice(0, 2) + ' ' + digits.slice(2, 5) + ' ' + digits.slice(5, 8) + ' ' + digits.slice(8);
+    return digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6, 9) + ' ' + digits.slice(9, 12) + ' ' + digits.slice(12);
+}
+
+function groupLocalDigits(digits) {
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return digits.slice(0, 4) + ' ' + digits.slice(4);
+    if (digits.length <= 10) return digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6);
+    if (digits.length <= 12) return digits.slice(0, 4) + ' ' + digits.slice(4, 7) + ' ' + digits.slice(7);
+    return digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6, 9) + ' ' + digits.slice(9, 12) + ' ' + digits.slice(12);
+}
+
     document.addEventListener('DOMContentLoaded', () => {
         renderPositions();
         toggleDominantFoot();
@@ -2090,6 +2258,80 @@
 
         const initialStep = {{ $errors->any() ? 'getStepFromErrors()' : '1' }};
         showStep(initialStep);
+
+        document.querySelectorAll('.phone-input').forEach((input) => {
+    input.addEventListener('input', () => {
+        const start = input.selectionStart || 0;
+        const oldValue = input.value;
+        const oldLength = oldValue.length;
+
+        input.value = formatPhoneInputValue(oldValue);
+
+        const newLength = input.value.length;
+        const diff = newLength - oldLength;
+        const newPos = Math.max(0, start + diff);
+
+        requestAnimationFrame(() => {
+            try {
+                input.setSelectionRange(newPos, newPos);
+            } catch (e) {}
+        });
+
+        updateNextButtonState();
+    });
+
+    input.addEventListener('blur', () => {
+        input.value = formatPhoneInputValue(input.value);
+    });
+});
+
+const thankYouWrap = document.getElementById('thankYouWrap');
+
+if (thankYouWrap) {
+    let seconds = 2;
+    const countdownEl = document.getElementById('thankYouCountdown');
+
+    const timer = setInterval(() => {
+        seconds -= 1;
+
+        if (countdownEl && seconds >= 0) {
+            countdownEl.textContent = String(seconds);
+        }
+
+        if (seconds <= 0) {
+            clearInterval(timer);
+            window.location.href = "{{ route('public.player-intake.create') }}";
+        }
+    }, 1000);
+
+    return;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const thankYouWrap = document.getElementById('thankYouWrap');
+
+    if (thankYouWrap) {
+        let seconds = 2;
+        const countdownEl = document.getElementById('thankYouCountdown');
+
+        const timer = setInterval(() => {
+            seconds -= 1;
+
+            if (countdownEl && seconds >= 0) {
+                countdownEl.textContent = String(seconds);
+            }
+
+            if (seconds <= 0) {
+                clearInterval(timer);
+                window.location.href = "{{ route('public.player-intake.create') }}";
+            }
+        }, 1000);
+
+        return;
+    }
+
+    // your existing DOMContentLoaded code continues below this line
+});
 
         document.getElementById('positionOptions').addEventListener('change', function (event) {
             if (event.target && event.target.matches('input[name="position[]"]')) {
