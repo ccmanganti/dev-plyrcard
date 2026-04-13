@@ -240,21 +240,8 @@ class WebsiteResource extends Resource
                 IconColumn::make('is_active')->boolean(),
                 ToggleColumn::make('is_published')
                     ->label('Website Published')
-                    ->getStateUsing(fn (User $record): bool => (bool) $record->websites->first()?->is_published)
-                    ->updateStateUsing(function (User $record, bool $state): void {
-                        $website = $record->websites->first();
-
-                        if (! $website) {
-                            $website = $record->websites()->create([
-                                'name' => trim($record->first_name . ' ' . $record->last_name),
-                                'is_active' => true,
-                                'is_published' => $state,
-                            ]);
-
-                            return;
-                        }
-
-                        $website->update([
+                    ->updateStateUsing(function (Website $record, bool $state): void {
+                        $record->update([
                             'is_published' => $state,
                         ]);
                     }),
