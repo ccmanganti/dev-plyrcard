@@ -36,9 +36,11 @@ use STS\FilamentImpersonate\Actions\Impersonate;
 use UnitEnum;
 use Filament\Forms\Components\Hidden;
 use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Actions\Action;
+// use Filament\Tables\Actions\Action;
 use Filament\Forms\Components\Toggle;
 use Spatie\Permission\Models\Role;
+use Filament\Actions\Action;
+
 
 class UserResource extends Resource
 {
