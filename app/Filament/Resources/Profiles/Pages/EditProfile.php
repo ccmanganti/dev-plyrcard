@@ -336,54 +336,55 @@ class EditProfile extends Page implements HasForms
     }
 
     protected static function getClubOptions(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
-    {
-        $query = Club::query();
+{
+    $query = Club::query();
 
-        if (filled($leagueId)) {
-            $query->where('league_id', $leagueId);
-        } else {
-            static::applyGenderAndSportFilter($query, $gender, $sport);
-        }
-
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
-
-        return $query
-            ->orderBy('name')
-            ->limit(50)
-            ->get(['id', 'name', 'logo'])
-            ->mapWithKeys(function (Club $club) {
-                return [
-                    (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
-                ];
-            })
-            ->all();
+    if (filled($leagueId)) {
+        $query->where('league_id', $leagueId);
+    } else {
+        // No league selected yet = do not query all clubs blindly.
+        return [];
     }
 
-    protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
-    {
-        $query = Club::query();
+    $query->when(
+        filled($search),
+        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+    );
 
-        if (filled($leagueId)) {
-            $query->where('league_id', $leagueId);
-        } else {
-            static::applyGenderAndSportFilter($query, $gender, $sport);
-        }
+    return $query
+        ->orderBy('name')
+        ->limit(50)
+        ->get(['id', 'name', 'logo'])
+        ->mapWithKeys(function (Club $club) {
+            return [
+                (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
+            ];
+        })
+        ->all();
+}
 
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
+protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
+{
+    $query = Club::query();
 
-        return $query
-            ->orderBy('name')
-            ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-            ->all();
+    if (filled($leagueId)) {
+        $query->where('league_id', $leagueId);
+    } else {
+        return [];
     }
+
+    $query->when(
+        filled($search),
+        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+    );
+
+    return $query
+        ->orderBy('name')
+        ->limit(50)
+        ->pluck('name', 'id')
+        ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+        ->all();
+}
 
     protected static function getSingleClubOptionLabel(?string $clubId): ?string
     {
