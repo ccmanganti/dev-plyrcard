@@ -402,27 +402,26 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
     }
 
     protected static function getTeamOptions(?string $clubId, ?string $gender, ?string $sport, ?string $search = null): array
-    {
-        $query = Team::query();
-
-        if (filled($clubId)) {
-            $query->where('club_id', $clubId);
-        }
-
-        static::applyGenderAndSportFilter($query, $gender, $sport);
-
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
-
-        return $query
-            ->orderBy('name')
-            ->limit(50)
-            ->pluck('name', 'name')
-            ->mapWithKeys(fn ($name, $value) => [(string) $value => $name])
-            ->all();
+{
+    if (blank($clubId)) {
+        return [];
     }
+
+    $query = Team::query()
+        ->where('club_id', $clubId);
+
+    $query->when(
+        filled($search),
+        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+    );
+
+    return $query
+        ->orderBy('name')
+        ->limit(50)
+        ->pluck('name', 'name')
+        ->mapWithKeys(fn ($name, $value) => [(string) $value => $name])
+        ->all();
+}
 
     protected function mutateProfileData(array $data): array
     {
