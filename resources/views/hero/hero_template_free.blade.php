@@ -291,46 +291,6 @@
     $mobileDob = $stats['DOB'] ?? '';
     $mobileHeight = $stats['HEIGHT'] ?? '';
     $mobileWeight = $stats['WEIGHT'] ?? '';
-    $mobileLeagueLogoUrl = $resolveMediaUrl(
-    $getHeroFieldValue('hero_league_logo', $user?->club?->league?->logo ?? ''),
-        ''
-    );
-
-    $mobileNationalLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_national_logo', $user?->national_team_logo ?? ''),
-        ''
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADD THIS BLOCK HERE 👇
-    |--------------------------------------------------------------------------
-    */
-    $mobileOrgRows = [];
-
-    if (filled($mobileInternational)) {
-        $mobileOrgRows[] = [
-            'title' => 'NATIONAL TEAM',
-            'value' => $mobileInternational,
-            'logo' => $mobileNationalLogoUrl,
-        ];
-    }
-
-    if (filled($mobileClub)) {
-        $mobileOrgRows[] = [
-            'title' => 'CLUB',
-            'value' => $mobileClub,
-            'logo' => $mobileClubLogoUrl,
-        ];
-    }
-
-    if (filled($mobileLeague)) {
-        $mobileOrgRows[] = [
-            'title' => 'LEAGUE',
-            'value' => $mobileLeague,
-            'logo' => $mobileLeagueLogoUrl,
-        ];
-    };
     $mobileMaxSpeed = strtoupper($normalizeDisplayValue(
         $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
         ' '
@@ -367,6 +327,32 @@
         $getHeroFieldValue('hero_national_logo', $user?->national_team_logo ?? ''),
         ''
     );
+
+    $mobileOrgRows = [];
+
+    if (filled($mobileInternational)) {
+        $mobileOrgRows[] = [
+            'title' => 'NATIONAL TEAM',
+            'value' => $mobileInternational,
+            'logo' => $mobileNationalLogoUrl,
+        ];
+    }
+
+    if (filled($mobileClub)) {
+        $mobileOrgRows[] = [
+            'title' => 'CLUB',
+            'value' => $mobileClub,
+            'logo' => $mobileClubLogoUrl,
+        ];
+    }
+
+    if (filled($mobileLeague)) {
+        $mobileOrgRows[] = [
+            'title' => 'LEAGUE',
+            'value' => $mobileLeague,
+            'logo' => $mobileLeagueLogoUrl,
+        ];
+    }
 
     $mobileTopLogoUrl = $mobileLeagueLogoUrl ?: $ballLogoUrl ?: $mobileClubLogoUrl ?: '';
 
