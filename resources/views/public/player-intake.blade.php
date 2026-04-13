@@ -21,6 +21,7 @@
             --accent-2: #ff9a1f;
             --border: #2a2a2a;
             --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
+            --danger: #ef4444;
         }
 
         * {
@@ -110,10 +111,16 @@
         }
 
         .tabs-bar {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 12px;
+            display: flex;
+            gap: 10px;
             margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+
+        .tabs-bar::-webkit-scrollbar {
+            display: none;
         }
 
         .tab-btn {
@@ -121,13 +128,18 @@
             border: 1px solid var(--border);
             background: #151515;
             color: #d5d5d5;
-            padding: 12px 14px;
-            border-radius: 16px;
+            padding: 12px 16px;
+            border-radius: 999px;
             font-size: 13px;
             font-weight: 700;
             text-align: center;
             cursor: pointer;
             transition: .2s ease;
+            white-space: nowrap;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .tab-btn.active {
@@ -140,6 +152,11 @@
             border-color: rgba(255, 122, 0, 0.25);
             background: rgba(255, 122, 0, 0.08);
             color: #ffbf84;
+        }
+
+        .tab-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
         }
 
         .section {
@@ -302,7 +319,8 @@
         }
 
         select:disabled,
-        input:disabled {
+        input:disabled,
+        textarea:disabled {
             opacity: .55;
             cursor: not-allowed;
         }
@@ -510,12 +528,25 @@
             box-shadow: none;
         }
 
+        .btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+            background: #3a3a3a;
+        }
+
         .submit-wrap {
             display: none;
         }
 
         .submit-wrap.visible {
             display: inline-flex;
+        }
+
+        .field-error {
+            border-color: var(--danger) !important;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10) !important;
         }
 
         @media (max-width: 980px) {
@@ -525,10 +556,6 @@
 
             .header-copy {
                 font-size: 17px;
-            }
-
-            .tabs-bar {
-                grid-template-columns: 1fr;
             }
 
             .col-8,
@@ -606,6 +633,17 @@
             .header-copy {
                 font-size: 15px;
             }
+
+            .tabs-bar {
+                margin: 0 -2px 18px;
+                padding: 0 2px 4px;
+            }
+
+            .tab-btn {
+                min-height: 42px;
+                font-size: 12px;
+                padding: 10px 14px;
+            }
         }
     </style>
 </head>
@@ -613,10 +651,11 @@
 <div class="wrapper">
     <div class="card">
         <div class="header">
-            <div class="eyebrow"><span translate="no">PlyrCard</span> Intake</div>
+            <div class="eyebrow">{{ $packageLabel ?? 'PLYRCard Package' }}</div>
             <h1 class="hero-title"><span translate="no">Plyr</span> <span class="accent">Intake</span> Form</h1>
             <p class="header-copy">
-                Use this form to build your <span translate="no">PLYRCard</span> Portfolio: share your key details, highlights, and links so we can create a portfolio that’s accurate, polished, and ready to share.
+                Complete this form for your <span translate="no">{{ $packageLabel ?? 'PLYRCard Package' }}</span> purchase.
+                Share your athlete details, team information, highlights, and images so we can build everything accurately.
             </p>
             <p class="hint">This form will translate automatically based on detected region.</p>
         </div>
@@ -638,11 +677,11 @@
             @endif
 
             <div class="tabs-bar" id="stepsBar">
-                <button type="button" class="tab-btn" data-step-pill="1">1. Athlete Details</button>
-                <button type="button" class="tab-btn" data-step-pill="2">2. School & Team</button>
-                <button type="button" class="tab-btn" data-step-pill="3">3. Media & Bio</button>
-                <button type="button" class="tab-btn" data-step-pill="4">4. Contacts</button>
-                <button type="button" class="tab-btn" data-step-pill="5">5. Images</button>
+                <button type="button" class="tab-btn" data-step-pill="1"><span>👤</span><span>Athlete Details</span></button>
+                <button type="button" class="tab-btn" data-step-pill="2"><span>🏫</span><span>School, Team & Sport</span></button>
+                <button type="button" class="tab-btn" data-step-pill="3"><span>🎥</span><span>Media & Bio</span></button>
+                <button type="button" class="tab-btn" data-step-pill="4"><span>📇</span><span>Contacts</span></button>
+                <button type="button" class="tab-btn" data-step-pill="5"><span>🖼️</span><span>Images</span></button>
             </div>
 
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
@@ -651,22 +690,22 @@
                 <div class="step-panel" data-step="1">
                     <div class="section">
                         <h2>Athlete Details</h2>
-                        <p class="section-copy">Basic player information, sport details, and athletic profile.</p>
+                        <p class="section-copy">Basic player information and athletic profile.</p>
 
                         <div class="grid">
                             <div class="col-4">
                                 <label for="first_name">First Name <span class="required">*</span></label>
-                                <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" maxlength="255" required>
+                                <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" maxlength="255" required placeholder="Enter first name">
                             </div>
 
                             <div class="col-4">
                                 <label for="middle_name">Middle Name</label>
-                                <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name') }}" maxlength="255">
+                                <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name') }}" maxlength="255" placeholder="Enter middle name">
                             </div>
 
                             <div class="col-4">
                                 <label for="last_name">Last Name <span class="required">*</span></label>
-                                <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" maxlength="255" required>
+                                <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" maxlength="255" required placeholder="Enter last name">
                             </div>
 
                             <div class="col-4">
@@ -684,13 +723,13 @@
 
                             <div class="col-4">
                                 <label for="personal_email">Personal Email <span class="required">*</span></label>
-                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required>
+                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required placeholder="name@example.com">
                                 <div class="hint">This email will be used as your login and primary contact.</div>
                             </div>
 
                             <div class="col-4">
                                 <label for="phone">Phone</label>
-                                <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                                 <div class="hint">Use the athlete’s direct phone if available.</div>
                             </div>
 
@@ -701,75 +740,37 @@
 
                             <div class="col-4">
                                 <label for="year">Graduation Year</label>
-                                <input type="text" id="year" name="year" value="{{ old('year') }}" maxlength="50" inputmode="numeric">
-                            </div>
-
-                            <div class="col-4">
-                                <label for="sport">Sport <span class="required">*</span></label>
-                                <select id="sport" name="sport" required>
-                                    <option value="">Select sport</option>
-                                    @foreach ($sportPositions as $sportKey => $positions)
-                                        @php
-                                            $enabledSports = ['basketball', 'soccer'];
-                                            $isEnabled = in_array($sportKey, $enabledSports, true);
-                                        @endphp
-                                        <option
-                                            value="{{ $sportKey }}"
-                                            {{ old('sport') === $sportKey ? 'selected' : '' }}
-                                            {{ $isEnabled ? '' : 'disabled' }}
-                                        >
-                                            {{ str($sportKey)->replace('_', ' ')->title() }}{{ $isEnabled ? '' : ' (Coming Soon)' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="hint">Currently available: Basketball and Soccer only.</div>
+                                <input type="text" id="year" name="year" value="{{ old('year') }}" maxlength="50" inputmode="numeric" placeholder="2027">
                             </div>
 
                             <div class="col-4">
                                 <label for="jersey_number">Jersey Number</label>
-                                <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50">
+                                <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50" placeholder="12">
                             </div>
 
                             <div class="col-4">
                                 <label for="vertical_jump">Vertical Jump</label>
-                                <input type="text" id="vertical_jump" name="vertical_jump" value="{{ old('vertical_jump') }}" maxlength="50">
+                                <input type="text" id="vertical_jump" name="vertical_jump" value="{{ old('vertical_jump') }}" maxlength="50" placeholder="32 in">
                             </div>
 
                             <div class="col-4">
                                 <label for="gpa">GPA</label>
-                                <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}" maxlength="50">
+                                <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}" maxlength="50" placeholder="3.8">
                             </div>
 
                             <div class="col-4">
                                 <label for="height">Height</label>
-                                <input type="text" id="height" name="height" value="{{ old('height') }}" maxlength="50">
+                                <input type="text" id="height" name="height" value="{{ old('height') }}" maxlength="50" placeholder="6'2&quot;">
                             </div>
 
                             <div class="col-4">
                                 <label for="weight">Weight</label>
-                                <input type="text" id="weight" name="weight" value="{{ old('weight') }}" maxlength="50">
+                                <input type="text" id="weight" name="weight" value="{{ old('weight') }}" maxlength="50" placeholder="185 lbs">
                             </div>
 
                             <div class="col-4">
                                 <label for="max_speed">Max Speed</label>
-                                <input type="text" id="max_speed" name="max_speed" value="{{ old('max_speed') }}" maxlength="50">
-                            </div>
-
-                            <div class="col-4 other-wrap" id="dominant_foot_wrap">
-                                <label for="dominant_foot">Dominant Foot</label>
-                                <select id="dominant_foot" name="dominant_foot">
-                                    <option value="">Select dominant foot</option>
-                                    <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
-                                    <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
-                                    <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
-                                </select>
-                                <div class="hint">Only shown for soccer players.</div>
-                            </div>
-
-                            <div class="col-12">
-                                <label>Position</label>
-                                <div id="positionOptions" class="checkbox-group"></div>
-                                <div class="hint">Only positions for the selected sport will be shown.</div>
+                                <input type="text" id="max_speed" name="max_speed" value="{{ old('max_speed') }}" maxlength="50" placeholder="21 mph">
                             </div>
 
                             <div class="col-4">
@@ -799,10 +800,48 @@
 
                 <div class="step-panel" data-step="2">
                     <div class="section">
-                        <h2>Location, School, League, Club & National Team</h2>
-                        <p class="section-copy">Choose a league first, then club, then team. Club and team will unlock as you go.</p>
+                        <h2>Location, School, Team & Sport</h2>
+                        <p class="section-copy">Choose the athlete’s sport, then complete school, league, club, team, and national team details.</p>
 
                         <div class="grid">
+                            <div class="col-4">
+                                <label for="sport">Sport <span class="required">*</span></label>
+                                <select id="sport" name="sport" required>
+                                    <option value="">Select sport</option>
+                                    @foreach ($sportPositions as $sportKey => $positions)
+                                        @php
+                                            $enabledSports = ['basketball', 'soccer'];
+                                            $isEnabled = in_array($sportKey, $enabledSports, true);
+                                        @endphp
+                                        <option
+                                            value="{{ $sportKey }}"
+                                            {{ old('sport') === $sportKey ? 'selected' : '' }}
+                                            {{ $isEnabled ? '' : 'disabled' }}
+                                        >
+                                            {{ str($sportKey)->replace('_', ' ')->title() }}{{ $isEnabled ? '' : ' (Coming Soon)' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="hint">Currently available: Basketball and Soccer only.</div>
+                            </div>
+
+                            <div class="col-4 other-wrap" id="dominant_foot_wrap">
+                                <label for="dominant_foot">Dominant Foot</label>
+                                <select id="dominant_foot" name="dominant_foot">
+                                    <option value="">Select dominant foot</option>
+                                    <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
+                                    <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
+                                    <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
+                                </select>
+                                <div class="hint">Required for soccer players.</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label>Position <span class="required">*</span></label>
+                                <div id="positionOptions" class="checkbox-group"></div>
+                                <div class="hint">Only positions for the selected sport will be shown.</div>
+                            </div>
+
                             <div class="col-3">
                                 <label for="country">Country</label>
                                 <select id="country" name="country">
@@ -843,12 +882,12 @@
 
                             <div class="col-3">
                                 <label for="city">City</label>
-                                <input type="text" id="city" name="city" value="{{ old('city') }}" maxlength="255">
+                                <input type="text" id="city" name="city" value="{{ old('city') }}" maxlength="255" placeholder="Enter city">
                             </div>
 
                             <div class="col-3">
                                 <label for="street">Street</label>
-                                <input type="text" id="street" name="street" value="{{ old('street') }}" maxlength="255">
+                                <input type="text" id="street" name="street" value="{{ old('street') }}" maxlength="255" placeholder="Enter street address">
                             </div>
 
                             <div class="col-3">
@@ -1038,7 +1077,7 @@
 
                             <div class="col-12">
                                 <label for="press">Press / Notes</label>
-                                <textarea id="press" name="press">{{ old('press') }}</textarea>
+                                <textarea id="press" name="press" placeholder="Add articles, press mentions, or important notes.">{{ old('press') }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -1052,32 +1091,32 @@
                         <div class="grid">
                             <div class="col-4">
                                 <label for="parent">Primary Parent / Guardian</label>
-                                <input type="text" id="parent" name="parent" value="{{ old('parent') }}" maxlength="255">
+                                <input type="text" id="parent" name="parent" value="{{ old('parent') }}" maxlength="255" placeholder="Enter full name">
                             </div>
 
                             <div class="col-4">
                                 <label for="parent_email">Primary Parent Email</label>
-                                <input type="email" id="parent_email" name="parent_email" value="{{ old('parent_email') }}" maxlength="255">
+                                <input type="email" id="parent_email" name="parent_email" value="{{ old('parent_email') }}" maxlength="255" placeholder="parent@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="parent_phone">Primary Parent Phone</label>
-                                <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
                                 <label for="sec_parent">Secondary Parent / Guardian</label>
-                                <input type="text" id="sec_parent" name="sec_parent" value="{{ old('sec_parent') }}" maxlength="255">
+                                <input type="text" id="sec_parent" name="sec_parent" value="{{ old('sec_parent') }}" maxlength="255" placeholder="Enter full name">
                             </div>
 
                             <div class="col-4">
                                 <label for="sec_parent_email">Secondary Parent Email</label>
-                                <input type="email" id="sec_parent_email" name="sec_parent_email" value="{{ old('sec_parent_email') }}" maxlength="255">
+                                <input type="email" id="sec_parent_email" name="sec_parent_email" value="{{ old('sec_parent_email') }}" maxlength="255" placeholder="parent2@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="sec_parent_phone">Secondary Parent Phone</label>
-                                <input type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="sec_parent_phone" name="sec_parent_phone" value="{{ old('sec_parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
                         </div>
                     </div>
@@ -1089,62 +1128,62 @@
                         <div class="grid">
                             <div class="col-4">
                                 <label for="club_coach">Club Coach</label>
-                                <input type="text" id="club_coach" name="club_coach" value="{{ old('club_coach') }}" maxlength="255">
+                                <input type="text" id="club_coach" name="club_coach" value="{{ old('club_coach') }}" maxlength="255" placeholder="Enter club coach name">
                             </div>
 
                             <div class="col-4">
                                 <label for="club_coach_email">Club Coach Email</label>
-                                <input type="email" id="club_coach_email" name="club_coach_email" value="{{ old('club_coach_email') }}" maxlength="255">
+                                <input type="email" id="club_coach_email" name="club_coach_email" value="{{ old('club_coach_email') }}" maxlength="255" placeholder="coach@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="club_coach_phone">Club Coach Phone</label>
-                                <input type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="club_coach_phone" name="club_coach_phone" value="{{ old('club_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
                                 <label for="natl_coach">National Coach</label>
-                                <input type="text" id="natl_coach" name="natl_coach" value="{{ old('natl_coach') }}" maxlength="255">
+                                <input type="text" id="natl_coach" name="natl_coach" value="{{ old('natl_coach') }}" maxlength="255" placeholder="Enter national coach name">
                             </div>
 
                             <div class="col-4">
                                 <label for="natl_coach_email">National Coach Email</label>
-                                <input type="email" id="natl_coach_email" name="natl_coach_email" value="{{ old('natl_coach_email') }}" maxlength="255">
+                                <input type="email" id="natl_coach_email" name="natl_coach_email" value="{{ old('natl_coach_email') }}" maxlength="255" placeholder="coach@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="natl_coach_phone">National Coach Phone</label>
-                                <input type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="natl_coach_phone" name="natl_coach_phone" value="{{ old('natl_coach_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
                                 <label for="tech_trainer">Technical Trainer</label>
-                                <input type="text" id="tech_trainer" name="tech_trainer" value="{{ old('tech_trainer') }}" maxlength="255">
+                                <input type="text" id="tech_trainer" name="tech_trainer" value="{{ old('tech_trainer') }}" maxlength="255" placeholder="Enter technical trainer name">
                             </div>
 
                             <div class="col-4">
                                 <label for="tech_trainer_email">Technical Trainer Email</label>
-                                <input type="email" id="tech_trainer_email" name="tech_trainer_email" value="{{ old('tech_trainer_email') }}" maxlength="255">
+                                <input type="email" id="tech_trainer_email" name="tech_trainer_email" value="{{ old('tech_trainer_email') }}" maxlength="255" placeholder="trainer@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="tech_trainer_phone">Technical Trainer Phone</label>
-                                <input type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="tech_trainer_phone" name="tech_trainer_phone" value="{{ old('tech_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
                                 <label for="snc_trainer">Strength & Conditioning Trainer</label>
-                                <input type="text" id="snc_trainer" name="snc_trainer" value="{{ old('snc_trainer') }}" maxlength="255">
+                                <input type="text" id="snc_trainer" name="snc_trainer" value="{{ old('snc_trainer') }}" maxlength="255" placeholder="Enter S&C trainer name">
                             </div>
 
                             <div class="col-4">
                                 <label for="snc_trainer_email">S&amp;C Trainer Email</label>
-                                <input type="email" id="snc_trainer_email" name="snc_trainer_email" value="{{ old('snc_trainer_email') }}" maxlength="255">
+                                <input type="email" id="snc_trainer_email" name="snc_trainer_email" value="{{ old('snc_trainer_email') }}" maxlength="255" placeholder="trainer@example.com">
                             </div>
 
                             <div class="col-4">
                                 <label for="snc_trainer_phone">S&amp;C Trainer Phone</label>
-                                <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel">
+                                <input type="text" id="snc_trainer_phone" name="snc_trainer_phone" value="{{ old('snc_trainer_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
                         </div>
                     </div>
@@ -1193,7 +1232,7 @@
                     <div class="actions-right">
                         <button type="button" class="btn" id="nextStepBtn">Next</button>
                         <div class="submit-wrap" id="submitWrap">
-                            <button type="submit" class="btn">Submit Intake Form</button>
+                            <button type="submit" class="btn" id="submitBtn">Submit Intake Form</button>
                         </div>
                     </div>
                 </div>
@@ -1259,7 +1298,7 @@
     const phraseTranslations = {
         es: {
             "Athlete Details": "Detalles del atleta",
-            "School & Team": "Escuela y equipo",
+            "School, Team & Sport": "Escuela, equipo y deporte",
             "Media & Bio": "Medios y biografía",
             "Contacts": "Contactos",
             "Images": "Imágenes",
@@ -1593,6 +1632,8 @@
         const wrap = document.getElementById('custom_highlights_wrap');
 
         if (!toggle || !wrap) return;
+        wrap.style.display = toggle.checked ? 'block' : 'block';
+        wrap.classList.toggle('hidden-section', !toggle.checked);
         wrap.style.display = toggle.checked ? 'block' : 'none';
     }
 
@@ -1658,6 +1699,187 @@
         return 1;
     }
 
+    function getVisibleStepPanel(step) {
+        return document.querySelector(`.step-panel[data-step="${step}"]`);
+    }
+
+    function isVisible(el) {
+        return !!(el && el.offsetParent !== null);
+    }
+
+    function validateEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+
+    function validateUrl(value) {
+        try {
+            new URL(value);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function getStepValidationErrors(step) {
+        const errors = [];
+
+        if (step === 1) {
+            const firstName = document.getElementById('first_name');
+            const lastName = document.getElementById('last_name');
+            const personalEmail = document.getElementById('personal_email');
+            const gender = document.getElementById('gender');
+
+            if (!firstName.value.trim()) errors.push('First Name is required.');
+            if (!lastName.value.trim()) errors.push('Last Name is required.');
+
+            if (!personalEmail.value.trim()) {
+                errors.push('Personal Email is required.');
+            } else if (!validateEmail(personalEmail.value.trim())) {
+                errors.push('Personal Email must be valid.');
+            }
+
+            if (!gender.value.trim()) errors.push('Gender is required.');
+
+            const natlTeamExp = document.getElementById('natl_team_exp');
+            const natlTeamPeriod = document.getElementById('national_team_period');
+
+            if (natlTeamExp && natlTeamExp.value === '1' && natlTeamPeriod && !natlTeamPeriod.value.trim()) {
+                errors.push('National Team Period is required.');
+            }
+        }
+
+        if (step === 2) {
+            const sport = document.getElementById('sport');
+            if (!sport.value.trim()) errors.push('Sport is required.');
+
+            const checkedPositions = document.querySelectorAll('input[name="position[]"]:checked');
+            if (!checkedPositions.length) errors.push('Select at least one position.');
+
+            const dominantFoot = document.getElementById('dominant_foot');
+            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) {
+                errors.push('Dominant Foot is required for soccer.');
+            }
+
+            const country = document.getElementById('country');
+            const countryOther = document.getElementById('country_other');
+            if (country && country.value === '__other__' && countryOther && !countryOther.value.trim()) {
+                errors.push('Country Name is required.');
+            }
+
+            const school = document.getElementById('school_id');
+            const schoolOther = document.querySelector('input[name="school_other"]');
+            if (school && school.value === '__other__' && schoolOther && !schoolOther.value.trim()) {
+                errors.push('School Name is required.');
+            }
+
+            const league = document.getElementById('league_id');
+            if (league && league.value === '__other__') {
+                const leagueOther = document.getElementById('league_other');
+                const clubOther = document.getElementById('club_other');
+                const teamOther = document.getElementById('team_other');
+
+                if (!leagueOther.value.trim()) errors.push('League Name is required.');
+                if (!clubOther.value.trim()) errors.push('Club Name is required.');
+                if (!teamOther.value.trim()) errors.push('Team Name is required.');
+            }
+
+            const natlTeamExp = document.getElementById('natl_team_exp');
+            const natlTeamId = document.getElementById('national_team_id');
+            const natlTeamOther = document.getElementById('national_team_other');
+
+            if (natlTeamExp && natlTeamExp.value === '1' && natlTeamId && natlTeamId.value === '__other__' && natlTeamOther && !natlTeamOther.value.trim()) {
+                errors.push('New National Team Name is required.');
+            }
+        }
+
+        if (step === 3) {
+            ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el && el.value.trim() && !validateUrl(el.value.trim())) {
+                    errors.push(`${el.previousElementSibling?.innerText?.trim() || id} must be a valid URL.`);
+                }
+            });
+
+            const useCustom = document.getElementById('use_custom_highlights');
+            const manualUrls = document.getElementById('featured_video_urls');
+
+            if (useCustom && useCustom.checked) {
+                const lines = (manualUrls?.value || '')
+                    .split(/\r?\n/)
+                    .map(v => v.trim())
+                    .filter(Boolean);
+
+                if (!lines.length) {
+                    errors.push('Add at least one Highlight Video URL.');
+                } else if (lines.some(url => !validateUrl(url))) {
+                    errors.push('All Highlight Video URLs must be valid.');
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    function clearFieldErrors() {
+        document.querySelectorAll('.field-error').forEach((el) => el.classList.remove('field-error'));
+    }
+
+    function markFieldState() {
+        clearFieldErrors();
+
+        if (currentStep === 1) {
+            const firstName = document.getElementById('first_name');
+            const lastName = document.getElementById('last_name');
+            const personalEmail = document.getElementById('personal_email');
+            const gender = document.getElementById('gender');
+
+            if (!firstName.value.trim()) firstName.classList.add('field-error');
+            if (!lastName.value.trim()) lastName.classList.add('field-error');
+            if (!personalEmail.value.trim() || !validateEmail(personalEmail.value.trim())) personalEmail.classList.add('field-error');
+            if (!gender.value.trim()) gender.classList.add('field-error');
+        }
+
+        if (currentStep === 2) {
+            const sport = document.getElementById('sport');
+            const dominantFoot = document.getElementById('dominant_foot');
+
+            if (!sport.value.trim()) sport.classList.add('field-error');
+            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) {
+                dominantFoot.classList.add('field-error');
+            }
+        }
+
+        if (currentStep === 3) {
+            ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el && el.value.trim() && !validateUrl(el.value.trim())) {
+                    el.classList.add('field-error');
+                }
+            });
+        }
+    }
+
+    function isStepComplete(step) {
+        return getStepValidationErrors(step).length === 0;
+    }
+
+    function updateNextButtonState() {
+        const nextBtn = document.getElementById('nextStepBtn');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (currentStep < totalSteps) {
+            nextBtn.disabled = !isStepComplete(currentStep);
+        } else {
+            nextBtn.disabled = true;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = !isStepComplete(totalSteps);
+        }
+
+        markFieldState();
+    }
+
     function showStep(step) {
         currentStep = Math.max(1, Math.min(totalSteps, Number(step)));
 
@@ -1667,8 +1889,11 @@
 
         document.querySelectorAll('[data-step-pill]').forEach((pill) => {
             const pillStep = Number(pill.dataset.stepPill);
+            const accessible = pillStep <= currentStep || isStepComplete(pillStep - 1);
+
             pill.classList.toggle('active', pillStep === currentStep);
-            pill.classList.toggle('done', pillStep < currentStep);
+            pill.classList.toggle('done', pillStep < currentStep && isStepComplete(pillStep));
+            pill.disabled = pillStep > currentStep && !accessible;
         });
 
         const prevBtn = document.getElementById('prevStepBtn');
@@ -1679,10 +1904,19 @@
         nextBtn.style.display = currentStep === totalSteps ? 'none' : 'inline-flex';
         submitWrap.classList.toggle('visible', currentStep === totalSteps);
 
+        updateNextButtonState();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function goNextStep() {
+        const errors = getStepValidationErrors(currentStep);
+
+        if (errors.length) {
+            alert(errors[0]);
+            updateNextButtonState();
+            return;
+        }
+
         if (currentStep < totalSteps) {
             showStep(currentStep + 1);
         }
@@ -1692,6 +1926,22 @@
         if (currentStep > 1) {
             showStep(currentStep - 1);
         }
+    }
+
+    function bindValidationListeners() {
+        document.querySelectorAll('#playerIntakeForm input, #playerIntakeForm select, #playerIntakeForm textarea').forEach((el) => {
+            ['input', 'change', 'blur'].forEach((evt) => {
+                el.addEventListener(evt, updateNextButtonState);
+            });
+        });
+
+        document.querySelectorAll('[data-step-pill]').forEach((button) => {
+            button.addEventListener('click', () => {
+                if (!button.disabled) {
+                    showStep(Number(button.dataset.stepPill));
+                }
+            });
+        });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1720,10 +1970,12 @@
             renderPositions();
             toggleDominantFoot();
             updateImageInstructions();
+            updateNextButtonState();
         });
 
         document.getElementById('gender').addEventListener('change', () => {
             syncOrganizationFlow();
+            updateNextButtonState();
         });
 
         document.getElementById('league_id').addEventListener('change', () => {
@@ -1734,38 +1986,61 @@
                 resetSelect(document.getElementById('team_id'), 'Select team');
                 document.getElementById('club_id').disabled = true;
                 document.getElementById('team_id').disabled = true;
+                updateNextButtonState();
                 return;
             }
 
             populateClubOptions();
             populateTeamOptions();
+            updateNextButtonState();
         });
 
         document.getElementById('club_id').addEventListener('change', () => {
             populateTeamOptions();
+            updateNextButtonState();
         });
 
-        document.getElementById('school_id').addEventListener('change', toggleSchoolOther);
-        document.getElementById('national_team_id').addEventListener('change', toggleNationalTeamOther);
-        document.getElementById('natl_team_exp').addEventListener('change', toggleNationalTeamOther);
-        document.getElementById('use_custom_highlights').addEventListener('change', toggleCustomHighlights);
+        document.getElementById('school_id').addEventListener('change', () => {
+            toggleSchoolOther();
+            updateNextButtonState();
+        });
+
+        document.getElementById('national_team_id').addEventListener('change', () => {
+            toggleNationalTeamOther();
+            updateNextButtonState();
+        });
+
+        document.getElementById('natl_team_exp').addEventListener('change', () => {
+            toggleNationalTeamOther();
+            updateNextButtonState();
+        });
+
+        document.getElementById('use_custom_highlights').addEventListener('change', () => {
+            toggleCustomHighlights();
+            updateNextButtonState();
+        });
 
         document.getElementById('country').addEventListener('change', () => {
             toggleCountryFields();
             syncStateValue();
+            updateNextButtonState();
         });
 
-        document.getElementById('state_us').addEventListener('change', syncStateValue);
-        document.getElementById('state_international').addEventListener('input', syncStateValue);
+        document.getElementById('state_us').addEventListener('change', () => {
+            syncStateValue();
+            updateNextButtonState();
+        });
+
+        document.getElementById('state_international').addEventListener('input', () => {
+            syncStateValue();
+            updateNextButtonState();
+        });
 
         document.getElementById('nextStepBtn').addEventListener('click', goNextStep);
         document.getElementById('prevStepBtn').addEventListener('click', goPrevStep);
 
-        document.querySelectorAll('[data-step-pill]').forEach((button) => {
-            button.addEventListener('click', () => {
-                showStep(Number(button.dataset.stepPill));
-            });
-        });
+        bindValidationListeners();
+        updateNextButtonState();
     });
 </script>
 </body>

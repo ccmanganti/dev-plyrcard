@@ -249,6 +249,13 @@ class PublicPlayerIntakeController extends Controller
 
         $detectedCountry = $this->detectCountryCode($request);
 
+        $packageLabel = trim((string) (
+            $request->query('package')
+            ?? $request->query('plan')
+            ?? $request->query('package_name')
+            ?? 'PLYRCard Package'
+        ));
+
         return view('public.player-intake', [
             'schools' => $schools,
             'leagues' => $leagues,
@@ -260,6 +267,7 @@ class PublicPlayerIntakeController extends Controller
             'sportPositions' => $this->sportPositions,
             'genderOptions' => $this->genderOptions,
             'detectedCountry' => $detectedCountry,
+            'packageLabel' => $packageLabel,
             'stepFieldMap' => $this->stepFieldMap(),
             'leagueDirectory' => $leagues->map(fn (League $league) => [
                 'id' => (string) $league->id,
@@ -440,6 +448,12 @@ class PublicPlayerIntakeController extends Controller
                     ->withErrors(['position' => 'One or more selected positions do not match the chosen sport.'])
                     ->withInput();
             }
+        }
+
+        if (empty($submittedPositions)) {
+            return back()
+                ->withErrors(['position' => 'Please select at least one position.'])
+                ->withInput();
         }
 
         if ($sport === 'soccer' && blank($validated['dominant_foot'] ?? null)) {
@@ -632,11 +646,11 @@ class PublicPlayerIntakeController extends Controller
         return [
             1 => [
                 'first_name', 'middle_name', 'last_name', 'personal_email', 'phone', 'gender',
-                'birth', 'year', 'sport', 'jersey_number', 'vertical_jump', 'gpa', 'height',
-                'weight', 'max_speed', 'dominant_foot', 'position', 'position.*',
-                'natl_team_exp', 'national_team_period',
+                'birth', 'year', 'jersey_number', 'vertical_jump', 'gpa', 'height',
+                'weight', 'max_speed', 'natl_team_exp', 'national_team_period',
             ],
             2 => [
+                'sport', 'position', 'position.*', 'dominant_foot',
                 'country', 'country_other', 'state', 'city', 'street',
                 'school_id', 'school_other', 'league_id', 'club_id', 'team_id',
                 'league_other', 'club_other', 'team_other',
@@ -722,19 +736,15 @@ class PublicPlayerIntakeController extends Controller
                 $league->save();
             }
 
-            $club = Club::firstOrCreate(
-                [
-                    'name' => trim($validated['club_other']),
-                    'league_id' => $league->id,
-                ]
-            );
+            $club = Club::firstOrCreate([
+                'name' => trim($validated['club_other']),
+                'league_id' => $league->id,
+            ]);
 
-            $team = Team::firstOrCreate(
-                [
-                    'name' => trim($validated['team_other']),
-                    'club_id' => $club->id,
-                ]
-            );
+            $team = Team::firstOrCreate([
+                'name' => trim($validated['team_other']),
+                'club_id' => $club->id,
+            ]);
 
             return [$league, $club, $team];
         }

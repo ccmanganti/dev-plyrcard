@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -12,8 +13,13 @@ class Club extends Model
 
     protected $fillable = [
         'league_id',
+        'conference_id',
         'name',
         'logo',
+        'primary_color',
+        'secondary_color',
+        'city',
+        'state',
     ];
 
     public function users(): HasMany
@@ -21,13 +27,18 @@ class Club extends Model
         return $this->hasMany(User::class);
     }
 
-    public function teams()
+    public function teams(): HasMany
     {
         return $this->hasMany(Team::class);
     }
 
-    public function league()
+    public function league(): BelongsTo
     {
         return $this->belongsTo(League::class);
+    }
+
+    public function conference(): BelongsTo
+    {
+        return $this->belongsTo(Conference::class);
     }
 }

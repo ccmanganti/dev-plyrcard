@@ -7,8 +7,10 @@ use App\Filament\Resources\Clubs\Pages\EditClub;
 use App\Filament\Resources\Clubs\Pages\ListClubs;
 use App\Filament\Resources\Clubs\Pages\ViewClub;
 use App\Models\Club;
+use App\Models\Conference;
 use App\Models\League;
 use BackedEnum;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -38,7 +40,8 @@ class ClubResource extends Resource
     {
         return $schema->components([
             Section::make('Club')
-                ->columns(2)
+                ->columnSpanFull()
+                ->columns(1)
                 ->schema([
                     TextInput::make('name')
                         ->required()
@@ -55,6 +58,31 @@ class ClubResource extends Resource
                         ->preload()
                         ->required(),
 
+                    Select::make('conference_id')
+                        ->label('Conference')
+                        ->options(
+                            Conference::query()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
+
+                    TextInput::make('city')
+                        ->label('City')
+                        ->maxLength(255),
+
+                    TextInput::make('state')
+                        ->label('State')
+                        ->maxLength(255),
+
+                    ColorPicker::make('primary_color')
+                        ->label('Primary Color'),
+
+                    ColorPicker::make('secondary_color')
+                        ->label('Secondary Color'),
+
                     FileUpload::make('logo')
                         ->label('Logo')
                         ->image()
@@ -62,8 +90,10 @@ class ClubResource extends Resource
                         ->disk('public')
                         ->directory('club-logos')
                         ->visibility('public')
-                        ->helperText('Upload the club logo.'),
-                ]),
+                        ->helperText('Upload the club logo.')
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
         ]);
     }
 
@@ -86,6 +116,22 @@ class ClubResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('conference.name')
+                    ->label('Conference')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('city')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('state')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+
                 TextColumn::make('updated_at')
                     ->since()
                     ->label('Updated'),
@@ -94,6 +140,12 @@ class ClubResource extends Resource
                 SelectFilter::make('league_id')
                     ->label('League')
                     ->relationship('league', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('conference_id')
+                    ->label('Conference')
+                    ->relationship('conference', 'name')
                     ->searchable()
                     ->preload(),
 
