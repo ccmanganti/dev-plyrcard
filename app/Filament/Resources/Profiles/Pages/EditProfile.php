@@ -747,7 +747,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                                 $set('team_name', null);
                                             }),
 
-                                        Select::make('team_name')
+                                        Select::make('team_id')
                                             ->prefixIcon('heroicon-m-users')
                                             ->label('Team')
                                             ->placeholder(fn (Get $get) => blank($get('club_id'))
@@ -767,7 +767,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                                 $get('sport'),
                                                 $search,
                                             ))
-                                            ->getOptionLabelUsing(fn ($value): ?string => $value)
+                                            ->getOptionLabelUsing(fn ($value): ?string => Team::query()->whereKey($value)->value('name'))
                                             ->disabled(fn (Get $get): bool => blank($get('club_id')))
                                             ->helperText('Filtered by the selected club.'),
 
