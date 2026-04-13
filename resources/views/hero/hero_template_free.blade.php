@@ -507,6 +507,25 @@
         background: transparent;
     }
 
+    .plyrcard-logo-text {
+    font-family: "Antonio", ui-sans-serif, system-ui;
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 0.9;
+    letter-spacing: -0.05em;
+
+    /* tuned size */
+    font-size: clamp(4.5rem, 5.5vw, 6.5rem);
+}
+
+.plyrcard-logo-text span:first-child {
+    color: #111111;
+}
+
+.plyrcard-logo-text span:last-child {
+    color: #ffffff;
+}
+
     @media (max-width: 1023px){
         .hero-template-basic-desktop{
             display:none;
@@ -982,8 +1001,8 @@
             </div>
 
             <div class="mt-auto pb-4">
-                <div class="font-antonio font-black uppercase leading-none tracking-[-0.06em] text-[clamp(7rem,9vw,11rem)]">
-                    <span style="color:#111111;">PLYR</span><span style="color:#ffffff;">CARD</span>
+                <div class="plyrcard-logo-text">
+                    <span>PLYR</span><span>CARD</span>
                 </div>
             </div>
         </div>
