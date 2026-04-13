@@ -59,6 +59,8 @@ class PublicWebsiteController extends Controller
                 'fieldValues.templateField',
                 'heroFieldValues.templateField',
             ])
+            ->where('is_active', true)
+            ->where('is_published', true)
             ->first();
 
         if (! $website) {
