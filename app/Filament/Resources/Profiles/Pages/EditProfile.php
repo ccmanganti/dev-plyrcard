@@ -1232,19 +1232,31 @@ class EditProfile extends Page implements HasForms
     }
 
     protected function getPreviewUrl(): ?string
-    {
-        $domain = trim((string) ($this->user?->domain ?? ''));
-
-        if (blank($domain)) {
-            return null;
-        }
-
-        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-            return $domain;
-        }
-
-        return 'https://' . ltrim($domain, '/');
+{
+    if (! $this->user) {
+        return null;
     }
+
+    // If FREE → use firstname-lastname URL
+    if ($this->user->hasRole('Free')) {
+        return url(
+            Str::slug($this->user->first_name . '-' . $this->user->last_name)
+        );
+    }
+
+    // Otherwise (Plyr / My Journey) → use custom domain
+    $domain = trim((string) ($this->user->domain ?? ''));
+
+    if (blank($domain)) {
+        return null;
+    }
+
+    if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
+        return $domain;
+    }
+
+    return 'https://' . ltrim($domain, '/');
+}
 
     public function openLockedFeatureModal(): void
     {
