@@ -10,10 +10,12 @@ use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\SiteTemplate;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\Website;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -21,12 +23,15 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -83,24 +88,6 @@ class EditProfile extends Page implements HasForms
     protected static function getSchoolOptions(): array
     {
         return ['__new__' => 'Add New'] + School::query()
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-            ->all();
-    }
-
-    protected static function getClubOptions(): array
-    {
-        return ['__new__' => 'Add New'] + Club::query()
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-            ->all();
-    }
-
-    protected static function getLeagueOptions(): array
-    {
-        return ['__new__' => 'Add New'] + League::query()
             ->orderBy('name')
             ->pluck('name', 'id')
             ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
@@ -288,6 +275,154 @@ class EditProfile extends Page implements HasForms
         };
     }
 
+    protected static function applyGenderAndSportFilter(
+        Builder $query,
+        ?string $gender,
+        ?string $sport,
+        string $genderColumn = 'gender',
+        string $sportColumn = 'sport',
+    ): Builder {
+        return $query
+            ->when(filled($gender), fn (Builder $q) => $q->where($genderColumn, $gender))
+            ->when(filled($sport), fn (Builder $q) => $q->where($sportColumn, $sport));
+    }
+
+    protected static function buildLogoOptionLabel(string $name, ?string $logoPath): string
+    {
+        $safeName = e($name);
+
+        if (blank($logoPath)) {
+            return <<<HTML
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:28px;height:28px;border-radius:9999px;background:#f3f4f6;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;">
+                        C
+                    </div>
+                    <span>{$safeName}</span>
+                </div>
+            HTML;
+        }
+
+        $logoUrl = Str::startsWith($logoPath, ['http://', 'https://'])
+            ? $logoPath
+            : Storage::disk('public')->url($logoPath);
+
+        $safeUrl = e($logoUrl);
+
+        return <<<HTML
+            <div style="display:flex;align-items:center;gap:10px;">
+                <img src="{$safeUrl}" alt="{$safeName}" style="width:28px;height:28px;border-radius:9999px;object-fit:cover;border:1px solid #e5e7eb;">
+                <span>{$safeName}</span>
+            </div>
+        HTML;
+    }
+
+    protected static function getLeagueOptions(?string $gender, ?string $sport, ?string $search = null): array
+    {
+        $query = League::query();
+
+        static::applyGenderAndSportFilter($query, $gender, $sport);
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    protected static function getClubOptions(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
+    {
+        $query = Club::query();
+
+        if (filled($leagueId)) {
+            $query->where('league_id', $leagueId);
+        } else {
+            static::applyGenderAndSportFilter($query, $gender, $sport);
+        }
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'logo'])
+            ->mapWithKeys(function (Club $club) {
+                return [
+                    (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
+                ];
+            })
+            ->all();
+    }
+
+    protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
+    {
+        $query = Club::query();
+
+        if (filled($leagueId)) {
+            $query->where('league_id', $leagueId);
+        } else {
+            static::applyGenderAndSportFilter($query, $gender, $sport);
+        }
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    protected static function getSingleClubOptionLabel(?string $clubId): ?string
+    {
+        if (blank($clubId)) {
+            return null;
+        }
+
+        $club = Club::query()->find($clubId);
+
+        if (! $club) {
+            return null;
+        }
+
+        return static::buildLogoOptionLabel($club->name, $club->logo);
+    }
+
+    protected static function getTeamOptions(?string $clubId, ?string $gender, ?string $sport, ?string $search = null): array
+    {
+        $query = Team::query();
+
+        if (filled($clubId)) {
+            $query->where('club_id', $clubId);
+        }
+
+        static::applyGenderAndSportFilter($query, $gender, $sport);
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'name')
+            ->mapWithKeys(fn ($name, $value) => [(string) $value => $name])
+            ->all();
+    }
+
     protected function mutateProfileData(array $data): array
     {
         if (($data['school_id'] ?? null) === '__new__' && filled($data['new_school_name'] ?? null)) {
@@ -302,7 +437,9 @@ class EditProfile extends Page implements HasForms
 
         $data = UserResource::mutateUserFormData($data);
 
-        unset($data['new_school_name']);
+        unset(
+            $data['new_school_name']
+        );
 
         return $data;
     }
@@ -428,7 +565,12 @@ class EditProfile extends Page implements HasForms
                                             ->options(UserResource::getSportOptions())
                                             ->required()
                                             ->searchable()
-                                            ->live(),
+                                            ->live()
+                                            ->afterStateUpdated(function (Set $set) {
+                                                $set('league_id', null);
+                                                $set('club_id', null);
+                                                $set('team_name', null);
+                                            }),
 
                                         Select::make('position')
                                             ->prefixIcon('heroicon-m-rectangle-group')
@@ -438,8 +580,8 @@ class EditProfile extends Page implements HasForms
                                             ->searchable()
                                             ->preload()
                                             ->required()
-                                            ->options(fn (callable $get): array => static::getPositionOptions($get('sport')))
-                                            ->disabled(fn (callable $get): bool => blank($get('sport')))
+                                            ->options(fn (Get $get): array => static::getPositionOptions($get('sport')))
+                                            ->disabled(fn (Get $get): bool => blank($get('sport')))
                                             ->helperText('Select one or more positions based on the chosen sport.'),
 
                                         TextInput::make('jersey_number')
@@ -462,7 +604,13 @@ class EditProfile extends Page implements HasForms
                                             ->placeholder('Select sex')
                                             ->options(UserResource::getGenderOptions())
                                             ->searchable()
-                                            ->nullable(),
+                                            ->nullable()
+                                            ->live()
+                                            ->afterStateUpdated(function (Set $set) {
+                                                $set('league_id', null);
+                                                $set('club_id', null);
+                                                $set('team_name', null);
+                                            }),
 
                                         DatePicker::make('birth')
                                             ->prefixIcon('heroicon-m-calendar-days')
@@ -492,8 +640,8 @@ class EditProfile extends Page implements HasForms
                                             ->label('New School Name')
                                             ->placeholder('Enter school name')
                                             ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('school_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('school_id') === '__new__'),
+                                            ->visible(fn (Get $get) => $get('school_id') === '__new__')
+                                            ->required(fn (Get $get) => $get('school_id') === '__new__'),
                                     ]),
 
                                 Section::make('Physical Stats')
@@ -521,8 +669,8 @@ class EditProfile extends Page implements HasForms
                                                 'right' => 'Right',
                                                 'both' => 'Both',
                                             ])
-                                            ->visible(fn (callable $get) => $get('sport') === 'soccer')
-                                            ->required(fn (callable $get) => $get('sport') === 'soccer'),
+                                            ->visible(fn (Get $get) => $get('sport') === 'soccer')
+                                            ->required(fn (Get $get) => $get('sport') === 'soccer'),
 
                                         TextInput::make('max_speed')
                                             ->prefixIcon('heroicon-m-bolt')
@@ -536,23 +684,92 @@ class EditProfile extends Page implements HasForms
                                     ->icon('heroicon-m-flag')
                                     ->columns(2)
                                     ->schema([
-                                        Select::make('club_id')
-                                            ->prefixIcon('heroicon-m-shield-check')
-                                            ->label('Club')
-                                            ->placeholder('Select club')
-                                            ->options(fn () => static::getClubOptions())
-                                            ->searchable()
-                                            ->preload()
-                                            ->live(),
-
                                         Select::make('league_id')
                                             ->prefixIcon('heroicon-m-squares-2x2')
                                             ->label('League')
-                                            ->placeholder('Select league')
-                                            ->options(fn () => static::getLeagueOptions())
+                                            ->placeholder(fn (Get $get) => blank($get('sport')) || blank($get('gender'))
+                                                ? 'Select sport and sex first'
+                                                : 'Search league')
                                             ->searchable()
-                                            ->preload()
-                                            ->live(),
+                                            ->live()
+                                            ->preload(false)
+                                            ->options(fn (Get $get): array => static::getLeagueOptions(
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ))
+                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getLeagueOptions(
+                                                $get('gender'),
+                                                $get('sport'),
+                                                $search,
+                                            ))
+                                            ->getOptionLabelUsing(function ($value): ?string {
+                                                if (blank($value)) {
+                                                    return null;
+                                                }
+
+                                                return League::query()->whereKey($value)->value('name');
+                                            })
+                                            ->disabled(fn (Get $get): bool => blank($get('sport')) || blank($get('gender')))
+                                            ->helperText('Filtered by the selected sport and sex.')
+                                            ->afterStateUpdated(function (Set $set) {
+                                                $set('club_id', null);
+                                                $set('team_name', null);
+                                            }),
+
+                                        Select::make('club_id')
+                                            ->prefixIcon('heroicon-m-shield-check')
+                                            ->label('Club')
+                                            ->placeholder(fn (Get $get) => blank($get('league_id'))
+                                                ? 'Select league first'
+                                                : 'Search club')
+                                            ->searchable()
+                                            ->live()
+                                            ->allowHtml()
+                                            ->preload(false)
+                                            ->options(fn (Get $get): array => static::getClubOptions(
+                                                $get('league_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ))
+                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getClubOptions(
+                                                $get('league_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                                $search,
+                                            ))
+                                            ->getOptionLabelUsing(fn ($value): ?string => static::getSingleClubOptionLabel($value))
+                                            ->getOptionLabelsUsing(fn (array $values): array => collect($values)
+                                                ->mapWithKeys(fn ($value) => [$value => static::getSingleClubOptionLabel($value)])
+                                                ->all())
+                                            ->disabled(fn (Get $get): bool => blank($get('league_id')))
+                                            ->helperText('Filtered by the selected league. Club logo is shown when available.')
+                                            ->afterStateUpdated(function (Set $set) {
+                                                $set('team_name', null);
+                                            }),
+
+                                        Select::make('team_name')
+                                            ->prefixIcon('heroicon-m-users')
+                                            ->label('Team')
+                                            ->placeholder(fn (Get $get) => blank($get('club_id'))
+                                                ? 'Select club first'
+                                                : 'Search team')
+                                            ->searchable()
+                                            ->live()
+                                            ->preload(false)
+                                            ->options(fn (Get $get): array => static::getTeamOptions(
+                                                $get('club_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ))
+                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
+                                                $get('club_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                                $search,
+                                            ))
+                                            ->getOptionLabelUsing(fn ($value): ?string => $value)
+                                            ->disabled(fn (Get $get): bool => blank($get('club_id')))
+                                            ->helperText('Filtered by the selected club.'),
 
                                         Select::make('national_team_id')
                                             ->prefixIcon('heroicon-m-flag')
@@ -563,61 +780,19 @@ class EditProfile extends Page implements HasForms
                                             ->preload()
                                             ->live(),
 
-                                        TextInput::make('team_name')
-                                            ->prefixIcon('heroicon-m-users')
-                                            ->label('Team')
-                                            ->placeholder('Enter team name')
-                                            ->maxLength(255),
-
                                         TextInput::make('national_team_period')
                                             ->prefixIcon('heroicon-m-calendar')
                                             ->label('National Team Period')
                                             ->placeholder('e.g. 2025-2026')
                                             ->maxLength(255),
 
-                                        TextInput::make('new_club_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New Club Name')
-                                            ->placeholder('Enter club name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('club_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('club_id') === '__new__'),
-
-                                        FileUpload::make('new_club_logo')
-                                            ->label('New Club Logo')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('club-logos')
-                                            ->visibility('public')
-                                            ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('club_id') === '__new__'),
-
-                                        TextInput::make('new_league_name')
-                                            ->prefixIcon('heroicon-m-plus-circle')
-                                            ->label('New League Name')
-                                            ->placeholder('Enter league name')
-                                            ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('league_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('league_id') === '__new__'),
-
-                                        FileUpload::make('new_league_logo')
-                                            ->label('New League Logo')
-                                            ->image()
-                                            ->imageEditor()
-                                            ->disk('public')
-                                            ->directory('league-logos')
-                                            ->visibility('public')
-                                            ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('league_id') === '__new__'),
-
                                         TextInput::make('new_national_team_name')
                                             ->prefixIcon('heroicon-m-plus-circle')
                                             ->label('New National Team Name')
                                             ->placeholder('Enter national team name')
                                             ->maxLength(255)
-                                            ->visible(fn (callable $get) => $get('national_team_id') === '__new__')
-                                            ->required(fn (callable $get) => $get('national_team_id') === '__new__'),
+                                            ->visible(fn (Get $get) => $get('national_team_id') === '__new__')
+                                            ->required(fn (Get $get) => $get('national_team_id') === '__new__'),
 
                                         FileUpload::make('new_national_team_logo')
                                             ->label('New National Team Logo')
@@ -627,7 +802,7 @@ class EditProfile extends Page implements HasForms
                                             ->directory('national-team-logos')
                                             ->visibility('public')
                                             ->helperText('Optional.')
-                                            ->visible(fn (callable $get) => $get('national_team_id') === '__new__'),
+                                            ->visible(fn (Get $get) => $get('national_team_id') === '__new__'),
                                     ]),
                             ]),
 
@@ -1233,31 +1408,29 @@ class EditProfile extends Page implements HasForms
     }
 
     protected function getPreviewUrl(): ?string
-{
-    if (! $this->user) {
-        return null;
+    {
+        if (! $this->user) {
+            return null;
+        }
+
+        if ($this->user->hasRole('Free')) {
+            return url(
+                Str::slug($this->user->first_name . '-' . $this->user->last_name)
+            );
+        }
+
+        $domain = trim((string) ($this->user->domain ?? ''));
+
+        if (blank($domain)) {
+            return null;
+        }
+
+        if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
+            return $domain;
+        }
+
+        return 'https://' . ltrim($domain, '/');
     }
-
-    // If FREE → use firstname-lastname URL
-    if ($this->user->hasRole('Free')) {
-        return url(
-            Str::slug($this->user->first_name . '-' . $this->user->last_name)
-        );
-    }
-
-    // Otherwise (Plyr / My Journey) → use custom domain
-    $domain = trim((string) ($this->user->domain ?? ''));
-
-    if (blank($domain)) {
-        return null;
-    }
-
-    if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-        return $domain;
-    }
-
-    return 'https://' . ltrim($domain, '/');
-}
 
     public function openLockedFeatureModal(): void
     {

@@ -17,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,6 +32,25 @@ class LeagueResource extends Resource
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::Trophy;
     protected static string|UnitEnum|null $navigationGroup = 'Organizations';
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getSportOptions(): array
+    {
+        return [
+            'basketball' => 'Basketball',
+            'volleyball' => 'Volleyball',
+            'football' => 'Football',
+            'baseball' => 'Baseball',
+            'softball' => 'Softball',
+            'soccer' => 'Soccer',
+            'tennis' => 'Tennis',
+            'badminton' => 'Badminton',
+            'table_tennis' => 'Table Tennis',
+            'track_and_field' => 'Track and Field',
+            'swimming' => 'Swimming',
+            'boxing' => 'Boxing',
+            'martial_arts' => 'Martial Arts',
+        ];
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -48,6 +68,12 @@ class LeagueResource extends Resource
                             'Male' => 'Male',
                             'Female' => 'Female',
                         ]),
+
+                    Select::make('sport')
+                        ->label('Sport')
+                        ->options(static::getSportOptions())
+                        ->searchable()
+                        ->required(),
 
                     FileUpload::make('logo')
                         ->label('Logo')
@@ -80,11 +106,26 @@ class LeagueResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('sport')
+                    ->badge()
+                    ->formatStateUsing(
+                        fn (?string $state): string => filled($state)
+                            ? str($state)->replace('_', ' ')->title()
+                            : '-'
+                    )
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('updated_at')
                     ->since()
                     ->label('Updated'),
             ])
             ->filters([
+                SelectFilter::make('sport')
+                    ->label('Sport')
+                    ->options(static::getSportOptions())
+                    ->multiple(),
+
                 TrashedFilter::make(),
             ])
             ->recordUrl(fn (League $record): string => static::getUrl('edit', ['record' => $record]));

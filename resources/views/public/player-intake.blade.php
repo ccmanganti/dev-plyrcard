@@ -16,17 +16,16 @@
             --field: #141414;
             --field-border: #2c2c2c;
             --text: #f5f5f5;
-            --muted: #b0b0b0;
+            --muted: #a3a3a3;
             --accent: #ff7a00;
             --accent-2: #ff9a1f;
             --border: #2a2a2a;
-            --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
             --danger: #ef4444;
+            --success: #22c55e;
+            --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         html, body {
             margin: 0;
@@ -40,13 +39,11 @@
             background-size: auto, 18px 18px;
         }
 
-        body.embed-mode {
-            padding: 14px;
-        }
+        body.embed-mode { padding: 14px; }
 
         .wrapper {
             width: 100%;
-            max-width: 1180px;
+            max-width: 1220px;
             margin: 0 auto;
         }
 
@@ -93,9 +90,7 @@
             color: #ffffff;
         }
 
-        .hero-title .accent {
-            color: var(--accent);
-        }
+        .hero-title .accent { color: var(--accent); }
 
         .header-copy {
             margin: 8px 0 0;
@@ -119,9 +114,7 @@
             scrollbar-width: none;
         }
 
-        .tabs-bar::-webkit-scrollbar {
-            display: none;
-        }
+        .tabs-bar::-webkit-scrollbar { display: none; }
 
         .tab-btn {
             appearance: none;
@@ -139,7 +132,13 @@
             flex: 0 0 auto;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 9px;
+        }
+
+        .tab-btn svg {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
         }
 
         .tab-btn.active {
@@ -159,6 +158,9 @@
             cursor: not-allowed;
         }
 
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+
         .section {
             margin-bottom: 20px;
             padding: 20px;
@@ -167,8 +169,34 @@
             background: linear-gradient(180deg, #151515 0%, #111111 100%);
         }
 
+        .section-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .section-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: rgba(255, 122, 0, 0.10);
+            border: 1px solid rgba(255, 122, 0, 0.16);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-2);
+            flex: 0 0 auto;
+        }
+
+        .section-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+        }
+
         .section h2 {
-            margin: 0 0 14px;
+            margin: 0;
             font-size: 22px;
             line-height: 1.1;
             font-weight: 700;
@@ -176,7 +204,7 @@
         }
 
         .section-copy {
-            margin: 0 0 18px;
+            margin: 6px 0 0;
             font-size: 13px;
             color: var(--muted);
         }
@@ -201,9 +229,7 @@
             color: #f3f4f6;
         }
 
-        .required {
-            color: var(--accent-2);
-        }
+        .required { color: var(--accent-2); }
 
         .field-label-inline {
             display: inline-flex;
@@ -212,77 +238,17 @@
             flex-wrap: wrap;
         }
 
-        .tooltip-wrap {
-            position: relative;
+        .field-icon {
             display: inline-flex;
-            align-items: center;
+            width: 15px;
+            height: 15px;
+            opacity: .85;
         }
 
-        .info-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 122, 0, 0.55);
-            background: #1b1b1b;
-            color: var(--accent-2);
-            font-size: 11px;
-            font-weight: 700;
-            line-height: 1;
-            cursor: help;
-            font-family: Arial, sans-serif;
-        }
-
-        .tooltip-box {
-            position: absolute;
-            left: 50%;
-            bottom: calc(100% + 10px);
-            transform: translateX(-50%);
-            min-width: 280px;
-            max-width: 360px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: #111111;
-            border: 1px solid rgba(255, 122, 0, 0.25);
-            color: #ffffff;
-            font-size: 12px;
-            line-height: 1.5;
-            font-weight: 400;
-            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
-            z-index: 40;
-        }
-
-        .tooltip-box::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 6px;
-            border-style: solid;
-            border-color: #111111 transparent transparent transparent;
-        }
-
-        .tooltip-wrap:hover .tooltip-box,
-        .tooltip-wrap:focus-within .tooltip-box {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(-2px);
-        }
-
-        .tooltip-box ul {
-            margin: 6px 0 0 18px;
-            padding: 0;
-        }
-
-        .tooltip-box li {
-            margin-bottom: 4px;
+        .field-icon svg {
+            width: 15px;
+            height: 15px;
+            stroke-width: 2;
         }
 
         input[type="text"],
@@ -292,7 +258,7 @@
         select,
         textarea {
             width: 100%;
-            min-height: 44px;
+            min-height: 46px;
             padding: 11px 14px;
             border-radius: 14px;
             border: 1px solid #2c2c2c;
@@ -318,8 +284,8 @@
             box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.12);
         }
 
-        select:disabled,
         input:disabled,
+        select:disabled,
         textarea:disabled {
             opacity: .55;
             cursor: not-allowed;
@@ -347,6 +313,26 @@
             color: var(--muted);
         }
 
+        .error-list,
+        .success-box {
+            margin-bottom: 18px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+        }
+
+        .error-list {
+            color: #fecaca;
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            background: rgba(127, 29, 29, 0.22);
+        }
+
+        .success-box {
+            color: #fdba74;
+            border: 1px solid rgba(255, 122, 0, 0.28);
+            background: rgba(255, 122, 0, 0.10);
+        }
+
         .checkbox-group {
             display: flex;
             flex-wrap: wrap;
@@ -368,11 +354,6 @@
 
         .check-pill input {
             accent-color: var(--accent);
-        }
-
-        .other-wrap,
-        .hidden-section {
-            display: none;
         }
 
         .toggle-card {
@@ -443,40 +424,17 @@
             transition: .2s ease;
         }
 
-        .switch input:checked + .slider {
-            background: var(--accent);
+        .switch input:checked + .slider { background: var(--accent); }
+        .switch input:checked + .slider::before { transform: translateX(24px); }
+
+        .field-error {
+            border-color: var(--danger) !important;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10) !important;
         }
 
-        .switch input:checked + .slider::before {
-            transform: translateX(24px);
-        }
-
-        .error-list,
-        .success-box {
-            margin-bottom: 18px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            font-size: 14px;
-        }
-
-        .error-list {
-            color: #fecaca;
-            border: 1px solid rgba(239, 68, 68, 0.28);
-            background: rgba(127, 29, 29, 0.22);
-        }
-
-        .success-box {
-            color: #fdba74;
-            border: 1px solid rgba(255, 122, 0, 0.28);
-            background: rgba(255, 122, 0, 0.10);
-        }
-
-        .step-panel {
+        .hidden-section,
+        .other-wrap {
             display: none;
-        }
-
-        .step-panel.active {
-            display: block;
         }
 
         .actions {
@@ -512,9 +470,7 @@
             box-shadow: 0 14px 28px rgba(255, 122, 0, 0.32);
         }
 
-        .btn:active {
-            transform: translateY(1px);
-        }
+        .btn:active { transform: translateY(1px); }
 
         .btn-secondary {
             background: #1b1b1b;
@@ -536,34 +492,180 @@
             background: #3a3a3a;
         }
 
-        .submit-wrap {
-            display: none;
+        .submit-wrap { display: none; }
+        .submit-wrap.visible { display: inline-flex; }
+
+        .search-select {
+            position: relative;
         }
 
-        .submit-wrap.visible {
+        .search-select.is-disabled {
+            opacity: .55;
+            pointer-events: none;
+        }
+
+        .search-select-control {
+            width: 100%;
+            min-height: 46px;
+            padding: 11px 14px;
+            border-radius: 14px;
+            border: 1px solid #2c2c2c;
+            background: #141414;
+            color: #f9fafb;
+            font-size: 14px;
+            line-height: 1.45;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            cursor: pointer;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        .search-select-control:hover {
+            border-color: rgba(255, 122, 0, 0.35);
+        }
+
+        .search-select.open .search-select-control {
+            border-color: var(--accent);
+            background: #1a1a1a;
+            box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.12);
+        }
+
+        .search-select-placeholder {
+            color: #7b7b7b;
+        }
+
+        .search-select-value {
             display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
         }
 
-        .field-error {
-            border-color: var(--danger) !important;
-            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10) !important;
+        .search-select-logo {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            object-fit: cover;
+            background: #1e1e1e;
+            border: 1px solid rgba(255,255,255,.08);
+            flex: 0 0 auto;
+        }
+
+        .search-select-meta {
+            display: inline-flex;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .search-select-caret,
+        .search-select-search-icon {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 auto;
+            opacity: .8;
+        }
+
+        .search-select-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            z-index: 35;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 122, 0, 0.18);
+            background: #101010;
+            box-shadow: 0 16px 40px rgba(0,0,0,.35);
+            display: none;
+            overflow: hidden;
+        }
+
+        .search-select.open .search-select-dropdown {
+            display: block;
+        }
+
+        .search-select-search {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #121212;
+        }
+
+        .search-select-search input {
+            min-height: 40px;
+            padding: 9px 12px;
+        }
+
+        .search-select-list {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .search-select-option {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: #f3f4f6;
+            text-align: left;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background .15s ease;
+        }
+
+        .search-select-option:hover,
+        .search-select-option.is-active {
+            background: rgba(255, 122, 0, 0.08);
+        }
+
+        .search-select-option-copy {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .search-select-option-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .search-select-option-subtitle {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .search-select-empty {
+            padding: 14px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .org-lock-note {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--muted);
         }
 
         @media (max-width: 980px) {
-            .hero-title {
-                font-size: 52px;
-            }
+            .hero-title { font-size: 52px; }
+            .header-copy { font-size: 17px; }
 
-            .header-copy {
-                font-size: 17px;
-            }
-
-            .col-8,
-            .col-6,
-            .col-4,
-            .col-3 {
-                grid-column: span 12;
-            }
+            .col-8, .col-6, .col-4, .col-3 { grid-column: span 12; }
 
             .actions {
                 flex-direction: column;
@@ -576,35 +678,12 @@
                 flex-direction: column;
             }
 
-            .btn {
-                width: 100%;
-            }
-
-            .tooltip-box {
-                left: 0;
-                transform: translateX(0);
-                max-width: min(320px, calc(100vw - 48px));
-            }
-
-            .tooltip-box::after {
-                left: 18px;
-                transform: none;
-            }
-
-            .tooltip-wrap:hover .tooltip-box,
-            .tooltip-wrap:focus-within .tooltip-box {
-                transform: translateX(0) translateY(-2px);
-            }
+            .btn { width: 100%; }
         }
 
         @media (max-width: 640px) {
-            body.embed-mode {
-                padding: 0;
-            }
-
-            .wrapper {
-                max-width: 100%;
-            }
+            body.embed-mode { padding: 0; }
+            .wrapper { max-width: 100%; }
 
             .card {
                 border-radius: 0;
@@ -626,13 +705,8 @@
                 border-radius: 18px;
             }
 
-            .hero-title {
-                font-size: 42px;
-            }
-
-            .header-copy {
-                font-size: 15px;
-            }
+            .hero-title { font-size: 42px; }
+            .header-copy { font-size: 15px; }
 
             .tabs-bar {
                 margin: 0 -2px 18px;
@@ -655,9 +729,9 @@
             <h1 class="hero-title"><span translate="no">Plyr</span> <span class="accent">Intake</span> Form</h1>
             <p class="header-copy">
                 Complete this form for your <span translate="no">{{ $packageLabel ?? 'PLYRCard Package' }}</span> purchase.
-                Share your athlete details, team information, highlights, and images so we can build everything accurately.
+                Share your athlete details, school and organization details, media, contacts, and images.
             </p>
-            <p class="hint">This form will translate automatically based on detected region.</p>
+            <p class="hint">Sections unlock progressively once the current section is complete.</p>
         </div>
 
         <div class="content">
@@ -677,20 +751,43 @@
             @endif
 
             <div class="tabs-bar" id="stepsBar">
-                <button type="button" class="tab-btn" data-step-pill="1"><span>👤</span><span>Athlete Details</span></button>
-                <button type="button" class="tab-btn" data-step-pill="2"><span>🏫</span><span>School, Team & Sport</span></button>
-                <button type="button" class="tab-btn" data-step-pill="3"><span>🎥</span><span>Media & Bio</span></button>
-                <button type="button" class="tab-btn" data-step-pill="4"><span>📇</span><span>Contacts</span></button>
-                <button type="button" class="tab-btn" data-step-pill="5"><span>🖼️</span><span>Images</span></button>
+                <button type="button" class="tab-btn" data-step-pill="1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Athlete Details</span>
+                </button>
+                <button type="button" class="tab-btn" data-step-pill="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-9-6Z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
+                    <span>School & Organization</span>
+                </button>
+                <button type="button" class="tab-btn" data-step-pill="3">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></svg>
+                    <span>Media & Bio</span>
+                </button>
+                <button type="button" class="tab-btn" data-step-pill="4">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/><path d="M9 7h6"/><path d="M9 12h6"/><path d="M9 17h4"/></svg>
+                    <span>Contacts</span>
+                </button>
+                <button type="button" class="tab-btn" data-step-pill="5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                    <span>Images</span>
+                </button>
             </div>
 
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
 
+                {{-- STEP 1 --}}
                 <div class="step-panel" data-step="1">
                     <div class="section">
-                        <h2>Athlete Details</h2>
-                        <p class="section-copy">Basic player information and athletic profile.</p>
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                            </div>
+                            <div>
+                                <h2>Athlete Details</h2>
+                                <p class="section-copy">Player identity, sport profile, athletic metrics, address, and national team experience.</p>
+                            </div>
+                        </div>
 
                         <div class="grid">
                             <div class="col-4">
@@ -709,6 +806,17 @@
                             </div>
 
                             <div class="col-4">
+                                <label for="personal_email">Personal Email <span class="required">*</span></label>
+                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required placeholder="name@example.com">
+                                <div class="hint">Only the personal email should be used here.</div>
+                            </div>
+
+                            <div class="col-4">
+                                <label for="phone">Phone</label>
+                                <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                            </div>
+
+                            <div class="col-4">
                                 <label for="gender">Gender <span class="required">*</span></label>
                                 <select id="gender" name="gender" required>
                                     <option value="">Select gender</option>
@@ -718,19 +826,35 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="hint">Required. Your gender filters the available leagues in the next tab and is used if you create a new league.</div>
+                                <div class="hint">Used to filter leagues, clubs, and teams dynamically.</div>
                             </div>
 
                             <div class="col-4">
-                                <label for="personal_email">Personal Email <span class="required">*</span></label>
-                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required placeholder="name@example.com">
-                                <div class="hint">This email will be used as your login and primary contact.</div>
+                                <label for="sport">Sport <span class="required">*</span></label>
+                                <select id="sport" name="sport" required>
+                                    <option value="">Select sport</option>
+                                    @foreach ($sportPositions as $sportKey => $positions)
+                                        <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
+                                            {{ str($sportKey)->replace('_', ' ')->title() }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
 
-                            <div class="col-4">
-                                <label for="phone">Phone</label>
-                                <input type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
-                                <div class="hint">Use the athlete’s direct phone if available.</div>
+                            <div class="col-8">
+                                <label>Position <span class="required">*</span></label>
+                                <div id="positionOptions" class="checkbox-group"></div>
+                                <div class="hint">Positions update automatically based on selected sport.</div>
+                            </div>
+
+                            <div class="col-4" id="dominant_foot_wrap" style="display:none;">
+                                <label for="dominant_foot">Dominant Foot <span class="required">*</span></label>
+                                <select id="dominant_foot" name="dominant_foot">
+                                    <option value="">Select dominant foot</option>
+                                    <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
+                                    <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
+                                    <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
+                                </select>
                             </div>
 
                             <div class="col-4">
@@ -744,102 +868,33 @@
                             </div>
 
                             <div class="col-4">
-                                <label for="jersey_number">Jersey Number</label>
-                                <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50" placeholder="12">
-                            </div>
-
-                            <div class="col-4">
-                                <label for="vertical_jump">Vertical Jump</label>
-                                <input type="text" id="vertical_jump" name="vertical_jump" value="{{ old('vertical_jump') }}" maxlength="50" placeholder="32 in">
-                            </div>
-
-                            <div class="col-4">
                                 <label for="gpa">GPA</label>
                                 <input type="text" id="gpa" name="gpa" value="{{ old('gpa') }}" maxlength="50" placeholder="3.8">
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-3">
                                 <label for="height">Height</label>
                                 <input type="text" id="height" name="height" value="{{ old('height') }}" maxlength="50" placeholder="6'2&quot;">
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-3">
                                 <label for="weight">Weight</label>
                                 <input type="text" id="weight" name="weight" value="{{ old('weight') }}" maxlength="50" placeholder="185 lbs">
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-3">
+                                <label for="jersey_number">Jersey Number</label>
+                                <input type="text" id="jersey_number" name="jersey_number" value="{{ old('jersey_number') }}" maxlength="50" placeholder="12">
+                            </div>
+
+                            <div class="col-3">
+                                <label for="vertical_jump">Vertical Jump</label>
+                                <input type="text" id="vertical_jump" name="vertical_jump" value="{{ old('vertical_jump') }}" maxlength="50" placeholder="32 in">
+                            </div>
+
+                            <div class="col-3">
                                 <label for="max_speed">Max Speed</label>
                                 <input type="text" id="max_speed" name="max_speed" value="{{ old('max_speed') }}" maxlength="50" placeholder="21 mph">
-                            </div>
-
-                            <div class="col-4">
-                                <label for="natl_team_exp">National Team Experience</label>
-                                <select id="natl_team_exp" name="natl_team_exp">
-                                    <option value="">Select one</option>
-                                    <option value="1" {{ old('natl_team_exp') === '1' ? 'selected' : '' }}>Yes</option>
-                                    <option value="0" {{ old('natl_team_exp') === '0' ? 'selected' : '' }}>No</option>
-                                </select>
-                            </div>
-
-                            <div class="col-4 other-wrap" id="national_team_period_wrap">
-                                <label for="national_team_period">National Team Period</label>
-                                <input
-                                    type="text"
-                                    id="national_team_period"
-                                    name="national_team_period"
-                                    value="{{ old('national_team_period') }}"
-                                    maxlength="255"
-                                    placeholder="Example: 2022-2024"
-                                >
-                                <div class="hint">Enter the year range or period played for the national team.</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="step-panel" data-step="2">
-                    <div class="section">
-                        <h2>Location, School, Team & Sport</h2>
-                        <p class="section-copy">Choose the athlete’s sport, then complete school, league, club, team, and national team details.</p>
-
-                        <div class="grid">
-                            <div class="col-4">
-                                <label for="sport">Sport <span class="required">*</span></label>
-                                <select id="sport" name="sport" required>
-                                    <option value="">Select sport</option>
-                                    @foreach ($sportPositions as $sportKey => $positions)
-                                        @php
-                                            $enabledSports = ['basketball', 'soccer'];
-                                            $isEnabled = in_array($sportKey, $enabledSports, true);
-                                        @endphp
-                                        <option
-                                            value="{{ $sportKey }}"
-                                            {{ old('sport') === $sportKey ? 'selected' : '' }}
-                                            {{ $isEnabled ? '' : 'disabled' }}
-                                        >
-                                            {{ str($sportKey)->replace('_', ' ')->title() }}{{ $isEnabled ? '' : ' (Coming Soon)' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="hint">Currently available: Basketball and Soccer only.</div>
-                            </div>
-
-                            <div class="col-4 other-wrap" id="dominant_foot_wrap">
-                                <label for="dominant_foot">Dominant Foot</label>
-                                <select id="dominant_foot" name="dominant_foot">
-                                    <option value="">Select dominant foot</option>
-                                    <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
-                                    <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
-                                    <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
-                                </select>
-                                <div class="hint">Required for soccer players.</div>
-                            </div>
-
-                            <div class="col-12">
-                                <label>Position <span class="required">*</span></label>
-                                <div id="positionOptions" class="checkbox-group"></div>
-                                <div class="hint">Only positions for the selected sport will be shown.</div>
                             </div>
 
                             <div class="col-3">
@@ -869,13 +924,11 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="hint">State will be saved as its abbreviation.</div>
                             </div>
 
                             <div id="state_international_wrap" class="col-3 other-wrap">
                                 <label for="state_international">State / Province / Region</label>
                                 <input type="text" id="state_international" value="{{ old('state') }}" maxlength="255" placeholder="Enter state, province, or region">
-                                <div class="hint">For non-U.S. countries, enter the region, province, or state if applicable.</div>
                             </div>
 
                             <input type="hidden" id="state_hidden" name="state" value="{{ old('state') }}">
@@ -890,7 +943,38 @@
                                 <input type="text" id="street" name="street" value="{{ old('street') }}" maxlength="255" placeholder="Enter street address">
                             </div>
 
-                            <div class="col-3">
+                            <div class="col-4">
+                                <label for="natl_team_exp">National Team Experience</label>
+                                <select id="natl_team_exp" name="natl_team_exp">
+                                    <option value="">Select one</option>
+                                    <option value="1" {{ old('natl_team_exp') === '1' ? 'selected' : '' }}>Yes</option>
+                                    <option value="0" {{ old('natl_team_exp') === '0' ? 'selected' : '' }}>No</option>
+                                </select>
+                            </div>
+
+                            <div class="col-4 other-wrap" id="national_team_period_wrap">
+                                <label for="national_team_period">National Team Period</label>
+                                <input type="text" id="national_team_period" name="national_team_period" value="{{ old('national_team_period') }}" maxlength="255" placeholder="Example: 2022-2024">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- STEP 2 --}}
+                <div class="step-panel" data-step="2">
+                    <div class="section">
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-3.272-2.182"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
+                            </div>
+                            <div>
+                                <h2>School & Organization</h2>
+                                <p class="section-copy">School, league, club, team, and national team details. League, club, and team are filtered by gender and sport.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid">
+                            <div class="col-4">
                                 <label for="school_id">School</label>
                                 <select id="school_id" name="school_id">
                                     <option value="">Select school</option>
@@ -901,52 +985,51 @@
                                     @endforeach
                                     <option value="__other__" {{ old('school_id') === '__other__' ? 'selected' : '' }}>Other</option>
                                 </select>
-                                <div class="hint">Choose Other to manually enter a school not listed.</div>
-                                <div id="school_other_wrap" class="other-wrap">
-                                    <input type="text" name="school_other" placeholder="Enter school name" value="{{ old('school_other') }}" maxlength="255">
-                                </div>
+                                <div class="hint">Choose Other if the school is not listed.</div>
                             </div>
 
-                            <div class="col-3">
-                                <label for="league_id">League</label>
-                                <select id="league_id" name="league_id">
-                                    <option value="">Select league</option>
-                                </select>
-                                <div class="hint">Filtered by athlete gender. Choose Other to create a new league, club, and team.</div>
+                            <div class="col-4 other-wrap" id="school_other_wrap">
+                                <label for="school_other">School Name</label>
+                                <input type="text" id="school_other" name="school_other" value="{{ old('school_other') }}" maxlength="255" placeholder="Enter school name">
                             </div>
 
-                            <div class="col-3">
-                                <label for="club_id">Club</label>
-                                <select id="club_id" name="club_id" disabled>
-                                    <option value="">Select club</option>
-                                </select>
-                                <div class="hint">Enabled after league selection.</div>
+                            <div class="col-4">
+                                <label for="league_id_display">League</label>
+                                <div id="leagueSelectRoot"></div>
+                                <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
+                                <div class="hint">Search leagues. When gender is not selected yet, league labels show the gender in parentheses.</div>
                             </div>
 
-                            <div class="col-3">
-                                <label for="team_id">Team</label>
-                                <select id="team_id" name="team_id" disabled>
-                                    <option value="">Select team</option>
-                                </select>
-                                <div class="hint">Enabled after club selection.</div>
+                            <div class="col-4">
+                                <label for="club_id_display">Club</label>
+                                <div id="clubSelectRoot"></div>
+                                <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
+                                <div class="hint">Filtered by selected sport, gender, and league. Club logos are shown in the options.</div>
                             </div>
 
-                            <div class="col-3 other-wrap" id="league_other_wrap">
+                            <div class="col-4">
+                                <label for="team_id_display">Team</label>
+                                <div id="teamSelectRoot"></div>
+                                <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
+                                <div class="hint">Filtered by selected sport, gender, and club.</div>
+                            </div>
+
+                            <div class="col-4 other-wrap" id="league_other_wrap">
                                 <label for="league_other">League Name</label>
                                 <input type="text" id="league_other" name="league_other" value="{{ old('league_other') }}" maxlength="255" placeholder="Enter league name">
                             </div>
 
-                            <div class="col-3 other-wrap" id="club_other_wrap">
+                            <div class="col-4 other-wrap" id="club_other_wrap">
                                 <label for="club_other">Club Name</label>
                                 <input type="text" id="club_other" name="club_other" value="{{ old('club_other') }}" maxlength="255" placeholder="Enter club name">
                             </div>
 
-                            <div class="col-3 other-wrap" id="team_other_wrap">
+                            <div class="col-4 other-wrap" id="team_other_wrap">
                                 <label for="team_other">Team Name</label>
                                 <input type="text" id="team_other" name="team_other" value="{{ old('team_other') }}" maxlength="255" placeholder="Enter team name">
                             </div>
 
-                            <div class="col-3" id="national_team_field_wrap">
+                            <div class="col-4" id="national_team_field_wrap">
                                 <label for="national_team_id">National Team</label>
                                 <select id="national_team_id" name="national_team_id">
                                     <option value="">Select national team</option>
@@ -957,81 +1040,48 @@
                                     @endforeach
                                     <option value="__other__" {{ old('national_team_id') === '__other__' ? 'selected' : '' }}>Other</option>
                                 </select>
-                                <div class="hint">Choose Other to manually enter a national team not listed.</div>
                             </div>
 
-                            <div id="national_team_other_section" class="col-12 other-wrap">
-                                <div class="grid">
-                                    <div class="col-6">
-                                        <label for="national_team_other">New National Team Name</label>
-                                        <input type="text" id="national_team_other" name="national_team_other" value="{{ old('national_team_other') }}" placeholder="Enter new national team name" maxlength="255">
-                                    </div>
-                                </div>
+                            <div id="national_team_other_section" class="col-4 other-wrap">
+                                <label for="national_team_other">New National Team Name</label>
+                                <input type="text" id="national_team_other" name="national_team_other" value="{{ old('national_team_other') }}" placeholder="Enter new national team name" maxlength="255">
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {{-- STEP 3 --}}
                 <div class="step-panel" data-step="3">
                     <div class="section">
-                        <h2>Media, Links & Bio</h2>
-                        <p class="section-copy">Social links, YouTube content, highlights, bio, and accolades.</p>
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></svg>
+                            </div>
+                            <div>
+                                <h2>Media, Links & Bio</h2>
+                                <p class="section-copy">Social links, YouTube content, highlights, bio, accolades, and press notes.</p>
+                            </div>
+                        </div>
 
                         <div class="grid">
                             <div class="col-4">
-                                <label for="ig_handle">
-                                    <span class="field-label-inline">
-                                        <span>Instagram Profile URL</span>
-                                        <span class="tooltip-wrap" tabindex="0">
-                                            <span class="info-icon">i</span>
-                                            <span class="tooltip-box">
-                                                Please paste your Instagram profile link (URL), not just your @handle.<br><br>
-                                                <strong>Example:</strong><br>
-                                                https://www.instagram.com/plyrcard/
-                                            </span>
-                                        </span>
-                                    </span>
-                                </label>
+                                <label for="ig_handle">Instagram Profile URL</label>
                                 <input type="url" id="ig_handle" name="ig_handle" value="{{ old('ig_handle') }}" maxlength="255" placeholder="https://www.instagram.com/yourprofile/">
                             </div>
 
                             <div class="col-4">
-                                <label for="x_handle">
-                                    <span class="field-label-inline">
-                                        <span>X Profile URL</span>
-                                        <span class="tooltip-wrap" tabindex="0">
-                                            <span class="info-icon">i</span>
-                                            <span class="tooltip-box">
-                                                Please paste your Twitter/X profile link (URL), not just your @handle.<br><br>
-                                                <strong>Example:</strong><br>
-                                                https://x.com/plyrcard
-                                            </span>
-                                        </span>
-                                    </span>
-                                </label>
+                                <label for="x_handle">X Profile URL</label>
                                 <input type="url" id="x_handle" name="x_handle" value="{{ old('x_handle') }}" maxlength="255" placeholder="https://x.com/yourprofile">
                             </div>
 
-                            <div class="col-12">
-                                <label for="yt_url">
-                                    <span class="field-label-inline">
-                                        <span>YouTube Channel URL</span>
-                                        <span class="tooltip-wrap" tabindex="0">
-                                            <span class="info-icon">i</span>
-                                            <span class="tooltip-box">
-                                                Paste your full YouTube channel URL, not just the name.
-                                            </span>
-                                        </span>
-                                    </span>
-                                </label>
+                            <div class="col-4">
+                                <label for="yt_url">YouTube Channel URL</label>
                                 <input type="url" id="yt_url" name="yt_url" value="{{ old('yt_url') }}" maxlength="500" placeholder="https://www.youtube.com/@YourChannelName">
-                                <div class="hint">Optional. If manual highlight selection is off, this can be used to pull videos.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="featured_video_url">Featured Video URL</label>
                                 <input type="url" id="featured_video_url" name="featured_video_url" value="{{ old('featured_video_url') }}" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
-                                <div class="hint">Optional. This is the main featured video for the website.</div>
                             </div>
 
                             <div class="col-6">
@@ -1039,9 +1089,7 @@
                                 <div class="toggle-card">
                                     <div class="toggle-copy">
                                         <p class="toggle-title">Pick My Own Videos</p>
-                                        <p class="toggle-description">
-                                            Turn this on to manually add highlight video URLs. Leave it off to use the YouTube channel URL above.
-                                        </p>
+                                        <p class="toggle-description">Turn this on to manually add highlight video URLs.</p>
                                     </div>
 
                                     <label class="switch" for="use_custom_highlights">
@@ -1054,25 +1102,21 @@
                             <div id="custom_highlights_wrap" class="col-12 hidden-section">
                                 <label for="featured_video_urls">Highlight Video URLs</label>
                                 <textarea id="featured_video_urls" name="featured_video_urls" placeholder="Enter one video URL per line&#10;https://www.youtube.com/watch?v=abc123&#10;https://www.youtube.com/watch?v=def456">{{ old('featured_video_urls') }}</textarea>
-                                <div class="hint">One full video URL per line.</div>
                             </div>
 
                             <div class="col-12">
                                 <label for="player_bio">Player Bio</label>
                                 <textarea id="player_bio" name="player_bio" placeholder="Write a short player bio for the website.">{{ old('player_bio') }}</textarea>
-                                <div class="hint">This will be used in the website bio/about section.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="academic_accolades">Academic Accolades</label>
-                                <textarea id="academic_accolades" name="academic_accolades" placeholder="Enter one accolade per line&#10;Honor Roll&#10;National Honor Society&#10;AP Scholar">{{ old('academic_accolades') }}</textarea>
-                                <div class="hint">Enter one accolade per line.</div>
+                                <textarea id="academic_accolades" name="academic_accolades" placeholder="Enter one accolade per line">{{ old('academic_accolades') }}</textarea>
                             </div>
 
                             <div class="col-6">
                                 <label for="sports_accolades">Sports Accolades</label>
-                                <textarea id="sports_accolades" name="sports_accolades" placeholder="Enter one accolade per line&#10;All League First Team&#10;MVP&#10;Team Captain">{{ old('sports_accolades') }}</textarea>
-                                <div class="hint">Enter one accolade per line.</div>
+                                <textarea id="sports_accolades" name="sports_accolades" placeholder="Enter one accolade per line">{{ old('sports_accolades') }}</textarea>
                             </div>
 
                             <div class="col-12">
@@ -1083,10 +1127,18 @@
                     </div>
                 </div>
 
+                {{-- STEP 4 --}}
                 <div class="step-panel" data-step="4">
                     <div class="section">
-                        <h2>Parent / Guardian Information</h2>
-                        <p class="section-copy">Primary and secondary parent or guardian contact details.</p>
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/><path d="M9 7h6"/><path d="M9 12h6"/><path d="M9 17h4"/></svg>
+                            </div>
+                            <div>
+                                <h2>Parent / Guardian Information</h2>
+                                <p class="section-copy">Primary and secondary parent or guardian details.</p>
+                            </div>
+                        </div>
 
                         <div class="grid">
                             <div class="col-4">
@@ -1102,6 +1154,7 @@
                             <div class="col-4">
                                 <label for="parent_phone">Primary Parent Phone</label>
                                 <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+
                             </div>
 
                             <div class="col-4">
@@ -1122,8 +1175,15 @@
                     </div>
 
                     <div class="section">
-                        <h2>Coaches & Trainers</h2>
-                        <p class="section-copy">Add coaches and trainers connected to the athlete.</p>
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a4 4 0 1 0-4-4"/><path d="M20 21a8 8 0 0 0-16 0"/><path d="M17 11h4"/><path d="M19 9v4"/></svg>
+                            </div>
+                            <div>
+                                <h2>Coaches & Trainers</h2>
+                                <p class="section-copy">Add coaches and trainers connected to the athlete.</p>
+                            </div>
+                        </div>
 
                         <div class="grid">
                             <div class="col-4">
@@ -1189,38 +1249,42 @@
                     </div>
                 </div>
 
+                {{-- STEP 5 --}}
                 <div class="step-panel" data-step="5">
                     <div class="section">
-                        <h2>Images</h2>
-                        <p class="section-copy">Upload action, portrait, team, and national team images.</p>
+                        <div class="section-header">
+                            <div class="section-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            </div>
+                            <div>
+                                <h2>Images</h2>
+                                <p class="section-copy">Upload action, portrait, team, and national team images.</p>
+                            </div>
+                        </div>
 
                         <div class="grid">
                             <div class="col-6">
                                 <label for="action_images">Action Images</label>
                                 <input type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                                <div class="hint">Upload action shots of the athlete.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="portrait_images">Portrait Images</label>
                                 <input type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                                <div class="hint" id="portrait_images_hint">Upload portrait or solo player images.</div>
                             </div>
 
                             <div class="col-6 other-wrap" id="national_team_images_wrap">
                                 <label for="national_team_images">National Team Images</label>
                                 <input type="file" id="national_team_images" name="national_team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                                <div class="hint">Upload images related to national team play.</div>
                             </div>
 
                             <div class="col-6">
                                 <label for="team_images">Team Images</label>
                                 <input type="file" id="team_images" name="team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                                <div class="hint">Upload team-related images.</div>
                             </div>
 
                             <div class="col-12">
-                                <div class="hint">You can upload a combined maximum of 20 images across all four image groups. Max 5MB per image.</div>
+                                <div class="hint">Combined maximum: 20 images total across all image fields. Max 5MB each.</div>
                             </div>
                         </div>
                     </div>
@@ -1246,123 +1310,59 @@
     const oldPositions = @json(old('position', []));
     const stepFieldMap = @json($stepFieldMap ?? []);
     const errorFields = @json(array_keys($errors->toArray()));
-    const enabledSports = ['basketball', 'soccer'];
 
-    const leagueDirectory = @json($leagueDirectory);
-    const clubDirectory = @json($clubDirectory);
-    const teamDirectory = @json($teamDirectory);
+    const leagueDirectory = @json($leagueDirectory ?? []);
+    const clubDirectory = @json($clubDirectory ?? []);
+    const teamDirectory = @json($teamDirectory ?? []);
 
     const oldLeagueId = @json(old('league_id'));
     const oldClubId = @json(old('club_id'));
     const oldTeamId = @json(old('team_id'));
 
-    const REGION_TEST_OVERRIDE = null;
-    const DETECTED_COUNTRY_FROM_SERVER = @json($detectedCountry ?? '');
-
     let currentStep = 1;
     const totalSteps = 5;
 
-    function getCountryCode() {
-        if (REGION_TEST_OVERRIDE) {
-            return String(REGION_TEST_OVERRIDE).toUpperCase();
-        }
-
-        if (DETECTED_COUNTRY_FROM_SERVER) {
-            return String(DETECTED_COUNTRY_FROM_SERVER).toUpperCase();
-        }
-
-        return '';
+    function iconSearch() {
+        return `
+            <svg class="search-select-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.5-3.5"></path>
+            </svg>
+        `;
     }
 
-    function mapCountryToLanguage(countryCode) {
-        const countryToLanguage = {
-            FR: 'fr',
-            BE: 'fr',
-            CH: 'fr',
-            DE: 'de',
-            AT: 'de',
-            ES: 'es',
-            IT: 'it',
-            NL: 'nl',
-            PT: 'pt',
-        };
-
-        return countryToLanguage[countryCode] || 'en';
+    function iconCaret() {
+        return `
+            <svg class="search-select-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="m6 9 6 6 6-6"></path>
+            </svg>
+        `;
     }
 
-    function getTargetLanguage() {
-        const countryCode = getCountryCode();
-        return mapCountryToLanguage(countryCode);
+    function safeString(value) {
+        return String(value ?? '').trim();
     }
 
-    const phraseTranslations = {
-        es: {
-            "Athlete Details": "Detalles del atleta",
-            "School, Team & Sport": "Escuela, equipo y deporte",
-            "Media & Bio": "Medios y biografía",
-            "Contacts": "Contactos",
-            "Images": "Imágenes",
-            "Next": "Siguiente",
-            "Back": "Atrás",
-            "Submit Intake Form": "Enviar formulario de ingreso"
-        }
-    };
-
-    function translateExactText(text, lang) {
-        const dict = phraseTranslations[lang];
-        if (!dict) return text;
-
-        const trimmed = text.trim().replace(/\s+/g, ' ');
-        if (!trimmed) return text;
-
-        if (dict[trimmed]) {
-            return text.replace(text.trim(), dict[trimmed]);
-        }
-
-        return text;
+    function titleize(value) {
+        return safeString(value)
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
     }
 
-    function shouldSkipNode(node) {
-        if (!node || !node.parentElement) return true;
+    function isLeagueGenderCompatible(leagueGender, userGender) {
+        const lg = safeString(leagueGender).toLowerCase();
+        const ug = safeString(userGender).toLowerCase();
 
-        const parent = node.parentElement;
-
-        if (
-            parent.closest('[translate="no"]') ||
-            parent.closest('script') ||
-            parent.closest('style')
-        ) {
-            return true;
-        }
-
-        return false;
+        if (!lg || !ug) return true;
+        if (ug === 'coed') return lg === 'coed';
+        return lg === ug || lg === 'coed';
     }
 
-    function translateTextNodes(lang) {
-        if (!lang || lang === 'en' || !phraseTranslations[lang]) {
-            document.documentElement.setAttribute('lang', 'en');
-            return;
-        }
-
-        document.documentElement.setAttribute('lang', lang);
-
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-        const textNodes = [];
-
-        while (walker.nextNode()) {
-            textNodes.push(walker.currentNode);
-        }
-
-        textNodes.forEach((node) => {
-            if (shouldSkipNode(node)) return;
-
-            const original = node.nodeValue;
-            const translated = translateExactText(original, lang);
-
-            if (translated !== original) {
-                node.nodeValue = translated;
-            }
-        });
+    function isLeagueSportCompatible(leagueSport, userSport) {
+        const ls = safeString(leagueSport).toLowerCase();
+        const us = safeString(userSport).toLowerCase();
+        if (!ls || !us) return true;
+        return ls === us;
     }
 
     function renderPositions() {
@@ -1372,9 +1372,7 @@
 
         container.innerHTML = '';
 
-        if (!selectedSport || !sportPositions[selectedSport] || !enabledSports.includes(selectedSport)) {
-            return;
-        }
+        if (!selectedSport || !sportPositions[selectedSport]) return;
 
         Object.entries(sportPositions[selectedSport]).forEach(([key, label]) => {
             const wrapper = document.createElement('label');
@@ -1398,167 +1396,21 @@
         });
     }
 
+    function toggleDominantFoot() {
+        const sportSelect = document.getElementById('sport');
+        const wrap = document.getElementById('dominant_foot_wrap');
+        const input = document.getElementById('dominant_foot');
+
+        const isSoccer = sportSelect.value === 'soccer';
+        wrap.style.display = isSoccer ? 'block' : 'none';
+
+        if (!isSoccer) input.value = '';
+    }
+
     function toggleSchoolOther() {
         const select = document.getElementById('school_id');
         const wrap = document.getElementById('school_other_wrap');
-
-        if (!select || !wrap) return;
         wrap.style.display = select.value === '__other__' ? 'block' : 'none';
-    }
-
-    function isLeagueGenderCompatible(leagueGender, userGender) {
-        const lg = (leagueGender || '').toLowerCase().trim();
-        const ug = (userGender || '').toLowerCase().trim();
-
-        if (!lg || !ug) {
-            return true;
-        }
-
-        if (ug === 'coed') {
-            return lg === 'coed';
-        }
-
-        return lg === ug || lg === 'coed';
-    }
-
-    function resetSelect(select, placeholder) {
-        select.innerHTML = '';
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = placeholder;
-        select.appendChild(option);
-    }
-
-    function populateLeagueOptions(preserveValue = null) {
-        const genderSelect = document.getElementById('gender');
-        const leagueSelect = document.getElementById('league_id');
-        const selectedGender = genderSelect.value || '';
-
-        resetSelect(leagueSelect, 'Select league');
-
-        leagueDirectory
-            .filter((league) => isLeagueGenderCompatible(league.gender, selectedGender))
-            .forEach((league) => {
-                const option = document.createElement('option');
-                option.value = String(league.id);
-                option.textContent = league.name;
-                leagueSelect.appendChild(option);
-            });
-
-        const otherOption = document.createElement('option');
-        otherOption.value = '__other__';
-        otherOption.textContent = 'Other';
-        leagueSelect.appendChild(otherOption);
-
-        if (preserveValue) {
-            const exists = Array.from(leagueSelect.options).some((option) => option.value === String(preserveValue));
-            leagueSelect.value = exists ? String(preserveValue) : '';
-        }
-    }
-
-    function populateClubOptions(preserveValue = null) {
-        const leagueSelect = document.getElementById('league_id');
-        const clubSelect = document.getElementById('club_id');
-        const selectedLeague = leagueSelect.value;
-
-        resetSelect(clubSelect, 'Select club');
-
-        if (!selectedLeague || selectedLeague === '__other__') {
-            clubSelect.disabled = true;
-            clubSelect.value = '';
-            return;
-        }
-
-        clubDirectory
-            .filter((club) => String(club.league_id) === String(selectedLeague))
-            .forEach((club) => {
-                const option = document.createElement('option');
-                option.value = String(club.id);
-                option.textContent = club.name;
-                clubSelect.appendChild(option);
-            });
-
-        clubSelect.disabled = false;
-
-        if (preserveValue) {
-            const exists = Array.from(clubSelect.options).some((option) => option.value === String(preserveValue));
-            clubSelect.value = exists ? String(preserveValue) : '';
-        }
-    }
-
-    function populateTeamOptions(preserveValue = null) {
-        const clubSelect = document.getElementById('club_id');
-        const teamSelect = document.getElementById('team_id');
-        const selectedClub = clubSelect.value;
-
-        resetSelect(teamSelect, 'Select team');
-
-        if (!selectedClub) {
-            teamSelect.disabled = true;
-            teamSelect.value = '';
-            return;
-        }
-
-        teamDirectory
-            .filter((team) => String(team.club_id) === String(selectedClub))
-            .forEach((team) => {
-                const option = document.createElement('option');
-                option.value = String(team.id);
-                option.textContent = team.name;
-                teamSelect.appendChild(option);
-            });
-
-        teamSelect.disabled = false;
-
-        if (preserveValue) {
-            const exists = Array.from(teamSelect.options).some((option) => option.value === String(preserveValue));
-            teamSelect.value = exists ? String(preserveValue) : '';
-        }
-    }
-
-    function toggleOrganizationMode() {
-        const leagueSelect = document.getElementById('league_id');
-        const clubSelect = document.getElementById('club_id');
-        const teamSelect = document.getElementById('team_id');
-
-        const leagueOtherWrap = document.getElementById('league_other_wrap');
-        const clubOtherWrap = document.getElementById('club_other_wrap');
-        const teamOtherWrap = document.getElementById('team_other_wrap');
-
-        const isOther = leagueSelect.value === '__other__';
-
-        if (isOther) {
-            clubSelect.disabled = true;
-            teamSelect.disabled = true;
-            clubSelect.value = '';
-            teamSelect.value = '';
-            leagueOtherWrap.style.display = 'block';
-            clubOtherWrap.style.display = 'block';
-            teamOtherWrap.style.display = 'block';
-            return;
-        }
-
-        leagueOtherWrap.style.display = 'none';
-        clubOtherWrap.style.display = 'none';
-        teamOtherWrap.style.display = 'none';
-    }
-
-    function syncOrganizationFlow({ preserveLeague = null, preserveClub = null, preserveTeam = null } = {}) {
-        populateLeagueOptions(preserveLeague);
-        toggleOrganizationMode();
-
-        const leagueSelect = document.getElementById('league_id');
-
-        if (leagueSelect.value === '__other__') {
-            resetSelect(document.getElementById('club_id'), 'Select club');
-            resetSelect(document.getElementById('team_id'), 'Select team');
-            document.getElementById('club_id').disabled = true;
-            document.getElementById('team_id').disabled = true;
-            return;
-        }
-
-        populateClubOptions(preserveClub);
-        populateTeamOptions(preserveTeam);
     }
 
     function toggleNationalTeamOther() {
@@ -1571,8 +1423,6 @@
         const nationalTeamPeriodWrap = document.getElementById('national_team_period_wrap');
         const nationalTeamPeriodInput = document.getElementById('national_team_period');
 
-        if (!natlTeamExp || !nationalTeamFieldWrap || !nationalTeamSelect || !nationalTeamOtherSection) return;
-
         const hasExperience = natlTeamExp.value === '1';
 
         nationalTeamFieldWrap.style.display = hasExperience ? 'block' : 'none';
@@ -1582,7 +1432,6 @@
         if (!hasExperience) {
             nationalTeamSelect.value = '';
             nationalTeamOtherSection.style.display = 'none';
-
             const otherInput = document.getElementById('national_team_other');
             if (otherInput) otherInput.value = '';
             if (nationalTeamPeriodInput) nationalTeamPeriodInput.value = '';
@@ -1593,46 +1442,9 @@
         nationalTeamOtherSection.style.display = nationalTeamSelect.value === '__other__' ? 'block' : 'none';
     }
 
-    function updateImageInstructions() {
-        const sport = document.getElementById('sport').value;
-        const portraitHint = document.getElementById('portrait_images_hint');
-
-        if (!portraitHint) return;
-
-        if (sport === 'soccer') {
-            portraitHint.textContent = 'Upload portrait or solo soccer player images. These will still be stored under raw player images.';
-            return;
-        }
-
-        if (sport === 'basketball') {
-            portraitHint.textContent = 'Upload portrait or solo basketball player images. These will still be stored under raw player images.';
-            return;
-        }
-
-        portraitHint.textContent = 'Upload portrait or solo player images. These will still be stored under raw player images.';
-    }
-
-    function toggleDominantFoot() {
-        const sportSelect = document.getElementById('sport');
-        const dominantFootWrap = document.getElementById('dominant_foot_wrap');
-        const dominantFootSelect = document.getElementById('dominant_foot');
-
-        if (!sportSelect || !dominantFootWrap || !dominantFootSelect) return;
-
-        const isSoccer = sportSelect.value === 'soccer';
-        dominantFootWrap.style.display = isSoccer ? 'block' : 'none';
-
-        if (!isSoccer) {
-            dominantFootSelect.value = '';
-        }
-    }
-
     function toggleCustomHighlights() {
         const toggle = document.getElementById('use_custom_highlights');
         const wrap = document.getElementById('custom_highlights_wrap');
-
-        if (!toggle || !wrap) return;
-        wrap.style.display = toggle.checked ? 'block' : 'block';
         wrap.classList.toggle('hidden-section', !toggle.checked);
         wrap.style.display = toggle.checked ? 'block' : 'none';
     }
@@ -1645,10 +1457,6 @@
         const stateUs = document.getElementById('state_us');
         const stateInternational = document.getElementById('state_international');
         const stateHidden = document.getElementById('state_hidden');
-
-        if (!countrySelect || !countryOtherWrap || !stateUsWrap || !stateInternationalWrap || !stateUs || !stateInternational || !stateHidden) {
-            return;
-        }
 
         const selectedCountry = countrySelect.value;
 
@@ -1671,40 +1479,7 @@
         const stateUs = document.getElementById('state_us');
         const stateInternational = document.getElementById('state_international');
         const stateHidden = document.getElementById('state_hidden');
-
-        if (!stateUs || !stateInternational || !stateHidden) return;
-
         stateHidden.value = (country === 'USA' || country === '') ? (stateUs.value || '') : (stateInternational.value || '');
-    }
-
-    function getStepFromErrors() {
-        if (!Array.isArray(errorFields) || errorFields.length === 0) {
-            return 1;
-        }
-
-        for (const [step, fields] of Object.entries(stepFieldMap)) {
-            const hasMatch = errorFields.some((errorField) => {
-                return fields.includes(errorField) || fields.some((field) => {
-                    if (!field.includes('*')) return false;
-                    const base = field.replace('.*', '');
-                    return errorField.startsWith(base);
-                });
-            });
-
-            if (hasMatch) {
-                return Number(step);
-            }
-        }
-
-        return 1;
-    }
-
-    function getVisibleStepPanel(step) {
-        return document.querySelector(`.step-panel[data-step="${step}"]`);
-    }
-
-    function isVisible(el) {
-        return !!(el && el.offsetParent !== null);
     }
 
     function validateEmail(value) {
@@ -1720,6 +1495,28 @@
         }
     }
 
+    function isVisible(el) {
+        return !!(el && el.offsetParent !== null);
+    }
+
+    function getStepFromErrors() {
+        if (!Array.isArray(errorFields) || errorFields.length === 0) return 1;
+
+        for (const [step, fields] of Object.entries(stepFieldMap)) {
+            const hasMatch = errorFields.some((errorField) => {
+                return fields.includes(errorField) || fields.some((field) => {
+                    if (!field.includes('*')) return false;
+                    const base = field.replace('.*', '');
+                    return errorField.startsWith(base);
+                });
+            });
+
+            if (hasMatch) return Number(step);
+        }
+
+        return 1;
+    }
+
     function getStepValidationErrors(step) {
         const errors = [];
 
@@ -1728,6 +1525,8 @@
             const lastName = document.getElementById('last_name');
             const personalEmail = document.getElementById('personal_email');
             const gender = document.getElementById('gender');
+            const sport = document.getElementById('sport');
+            const dominantFoot = document.getElementById('dominant_foot');
 
             if (!firstName.value.trim()) errors.push('First Name is required.');
             if (!lastName.value.trim()) errors.push('Last Name is required.');
@@ -1739,55 +1538,50 @@
             }
 
             if (!gender.value.trim()) errors.push('Gender is required.');
-
-            const natlTeamExp = document.getElementById('natl_team_exp');
-            const natlTeamPeriod = document.getElementById('national_team_period');
-
-            if (natlTeamExp && natlTeamExp.value === '1' && natlTeamPeriod && !natlTeamPeriod.value.trim()) {
-                errors.push('National Team Period is required.');
-            }
-        }
-
-        if (step === 2) {
-            const sport = document.getElementById('sport');
             if (!sport.value.trim()) errors.push('Sport is required.');
 
             const checkedPositions = document.querySelectorAll('input[name="position[]"]:checked');
             if (!checkedPositions.length) errors.push('Select at least one position.');
 
-            const dominantFoot = document.getElementById('dominant_foot');
             if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) {
                 errors.push('Dominant Foot is required for soccer.');
             }
 
             const country = document.getElementById('country');
             const countryOther = document.getElementById('country_other');
-            if (country && country.value === '__other__' && countryOther && !countryOther.value.trim()) {
+            if (country.value === '__other__' && !countryOther.value.trim()) {
                 errors.push('Country Name is required.');
             }
 
+            const natlTeamExp = document.getElementById('natl_team_exp');
+            const natlTeamPeriod = document.getElementById('national_team_period');
+            if (natlTeamExp.value === '1' && !natlTeamPeriod.value.trim()) {
+                errors.push('National Team Period is required.');
+            }
+        }
+
+        if (step === 2) {
             const school = document.getElementById('school_id');
-            const schoolOther = document.querySelector('input[name="school_other"]');
-            if (school && school.value === '__other__' && schoolOther && !schoolOther.value.trim()) {
+            const schoolOther = document.getElementById('school_other');
+            const leagueId = document.getElementById('league_id').value;
+            const leagueOther = document.getElementById('league_other');
+            const clubOther = document.getElementById('club_other');
+            const teamOther = document.getElementById('team_other');
+            const natlTeamExp = document.getElementById('natl_team_exp');
+            const natlTeamId = document.getElementById('national_team_id');
+            const natlTeamOther = document.getElementById('national_team_other');
+
+            if (school.value === '__other__' && !schoolOther.value.trim()) {
                 errors.push('School Name is required.');
             }
 
-            const league = document.getElementById('league_id');
-            if (league && league.value === '__other__') {
-                const leagueOther = document.getElementById('league_other');
-                const clubOther = document.getElementById('club_other');
-                const teamOther = document.getElementById('team_other');
-
+            if (leagueId === '__other__') {
                 if (!leagueOther.value.trim()) errors.push('League Name is required.');
                 if (!clubOther.value.trim()) errors.push('Club Name is required.');
                 if (!teamOther.value.trim()) errors.push('Team Name is required.');
             }
 
-            const natlTeamExp = document.getElementById('natl_team_exp');
-            const natlTeamId = document.getElementById('national_team_id');
-            const natlTeamOther = document.getElementById('national_team_other');
-
-            if (natlTeamExp && natlTeamExp.value === '1' && natlTeamId && natlTeamId.value === '__other__' && natlTeamOther && !natlTeamOther.value.trim()) {
+            if (natlTeamExp.value === '1' && natlTeamId.value === '__other__' && !natlTeamOther.value.trim()) {
                 errors.push('New National Team Name is required.');
             }
         }
@@ -1795,16 +1589,16 @@
         if (step === 3) {
             ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
                 const el = document.getElementById(id);
-                if (el && el.value.trim() && !validateUrl(el.value.trim())) {
-                    errors.push(`${el.previousElementSibling?.innerText?.trim() || id} must be a valid URL.`);
+                if (el.value.trim() && !validateUrl(el.value.trim())) {
+                    errors.push(`${id.replace(/_/g, ' ')} must be a valid URL.`);
                 }
             });
 
             const useCustom = document.getElementById('use_custom_highlights');
             const manualUrls = document.getElementById('featured_video_urls');
 
-            if (useCustom && useCustom.checked) {
-                const lines = (manualUrls?.value || '')
+            if (useCustom.checked) {
+                const lines = (manualUrls.value || '')
                     .split(/\r?\n/)
                     .map(v => v.trim())
                     .filter(Boolean);
@@ -1832,27 +1626,21 @@
             const lastName = document.getElementById('last_name');
             const personalEmail = document.getElementById('personal_email');
             const gender = document.getElementById('gender');
+            const sport = document.getElementById('sport');
+            const dominantFoot = document.getElementById('dominant_foot');
 
             if (!firstName.value.trim()) firstName.classList.add('field-error');
             if (!lastName.value.trim()) lastName.classList.add('field-error');
             if (!personalEmail.value.trim() || !validateEmail(personalEmail.value.trim())) personalEmail.classList.add('field-error');
             if (!gender.value.trim()) gender.classList.add('field-error');
-        }
-
-        if (currentStep === 2) {
-            const sport = document.getElementById('sport');
-            const dominantFoot = document.getElementById('dominant_foot');
-
             if (!sport.value.trim()) sport.classList.add('field-error');
-            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) {
-                dominantFoot.classList.add('field-error');
-            }
+            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) dominantFoot.classList.add('field-error');
         }
 
         if (currentStep === 3) {
             ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
                 const el = document.getElementById(id);
-                if (el && el.value.trim() && !validateUrl(el.value.trim())) {
+                if (el.value.trim() && !validateUrl(el.value.trim())) {
                     el.classList.add('field-error');
                 }
             });
@@ -1878,6 +1666,26 @@
         }
 
         markFieldState();
+        refreshStepPills();
+    }
+
+    function refreshStepPills() {
+        document.querySelectorAll('[data-step-pill]').forEach((pill) => {
+            const pillStep = Number(pill.dataset.stepPill);
+
+            let accessible = false;
+            if (pillStep === 1) {
+                accessible = true;
+            } else if (pillStep <= currentStep) {
+                accessible = true;
+            } else {
+                accessible = isStepComplete(pillStep - 1) && pillStep === currentStep + 1;
+            }
+
+            pill.classList.toggle('active', pillStep === currentStep);
+            pill.classList.toggle('done', pillStep < currentStep && isStepComplete(pillStep));
+            pill.disabled = !accessible;
+        });
     }
 
     function showStep(step) {
@@ -1885,15 +1693,6 @@
 
         document.querySelectorAll('.step-panel').forEach((panel) => {
             panel.classList.toggle('active', Number(panel.dataset.step) === currentStep);
-        });
-
-        document.querySelectorAll('[data-step-pill]').forEach((pill) => {
-            const pillStep = Number(pill.dataset.stepPill);
-            const accessible = pillStep <= currentStep || isStepComplete(pillStep - 1);
-
-            pill.classList.toggle('active', pillStep === currentStep);
-            pill.classList.toggle('done', pillStep < currentStep && isStepComplete(pillStep));
-            pill.disabled = pillStep > currentStep && !accessible;
         });
 
         const prevBtn = document.getElementById('prevStepBtn');
@@ -1910,22 +1709,351 @@
 
     function goNextStep() {
         const errors = getStepValidationErrors(currentStep);
-
         if (errors.length) {
             alert(errors[0]);
             updateNextButtonState();
             return;
         }
 
-        if (currentStep < totalSteps) {
-            showStep(currentStep + 1);
-        }
+        if (currentStep < totalSteps) showStep(currentStep + 1);
     }
 
     function goPrevStep() {
-        if (currentStep > 1) {
-            showStep(currentStep - 1);
+        if (currentStep > 1) showStep(currentStep - 1);
+    }
+
+    function buildSearchSelect({
+        rootId,
+        hiddenInputId,
+        placeholder,
+        getOptions,
+        getDisplayValue,
+        onChange,
+        allowOther = true,
+        disabledWhen = null,
+        emptyMessage = 'No results found.',
+    }) {
+        const root = document.getElementById(rootId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+
+        root.innerHTML = `
+            <div class="search-select" data-search-select="${rootId}">
+                <button type="button" class="search-select-control">
+                    <span class="search-select-value">
+                        <span class="search-select-placeholder">${placeholder}</span>
+                    </span>
+                    ${iconCaret()}
+                </button>
+                <div class="search-select-dropdown">
+                    <div class="search-select-search">
+                        ${iconSearch()}
+                        <input type="text" placeholder="Search..." autocomplete="off">
+                    </div>
+                    <div class="search-select-list"></div>
+                </div>
+            </div>
+        `;
+
+        const wrapper = root.querySelector('.search-select');
+        const control = root.querySelector('.search-select-control');
+        const searchInput = root.querySelector('.search-select-search input');
+        const list = root.querySelector('.search-select-list');
+
+        function isDisabled() {
+            return typeof disabledWhen === 'function' ? !!disabledWhen() : false;
         }
+
+        function close() {
+            wrapper.classList.remove('open');
+            searchInput.value = '';
+            render();
+        }
+
+        function open() {
+            if (isDisabled()) return;
+            document.querySelectorAll('.search-select.open').forEach(el => {
+                if (el !== wrapper) el.classList.remove('open');
+            });
+            wrapper.classList.add('open');
+            searchInput.focus();
+            render();
+        }
+
+        function setDisplay(item) {
+            const valueEl = control.querySelector('.search-select-value');
+
+            if (!item) {
+                valueEl.innerHTML = `<span class="search-select-placeholder">${placeholder}</span>`;
+                return;
+            }
+
+            const logo = item.logo_url
+                ? `<img src="${item.logo_url}" class="search-select-logo" alt="">`
+                : '';
+
+            valueEl.innerHTML = `
+                ${logo}
+                <span class="search-select-meta">${item.label}</span>
+            `;
+        }
+
+        function getAllOptions() {
+            let options = getOptions() || [];
+            if (allowOther) {
+                options = [...options, {
+                    id: '__other__',
+                    label: 'Other',
+                    subtitle: 'Create a new entry manually',
+                    logo_url: null,
+                }];
+            }
+            return options;
+        }
+
+        function render() {
+            wrapper.classList.toggle('is-disabled', isDisabled());
+
+            const options = getAllOptions();
+            const query = safeString(searchInput.value).toLowerCase();
+
+            const filtered = options.filter(item => {
+                const haystack = `${safeString(item.label)} ${safeString(item.subtitle)}`.toLowerCase();
+                return haystack.includes(query);
+            });
+
+            list.innerHTML = '';
+
+            if (!filtered.length) {
+                list.innerHTML = `<div class="search-select-empty">${emptyMessage}</div>`;
+            } else {
+                filtered.forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'search-select-option';
+                    btn.innerHTML = `
+                        ${item.logo_url ? `<img src="${item.logo_url}" class="search-select-logo" alt="">` : `<span class="search-select-logo" style="display:inline-flex;align-items:center;justify-content:center;">•</span>`}
+                        <span class="search-select-option-copy">
+                            <span class="search-select-option-title">${item.label}</span>
+                            ${item.subtitle ? `<span class="search-select-option-subtitle">${item.subtitle}</span>` : ''}
+                        </span>
+                    `;
+                    btn.addEventListener('click', () => {
+                        hiddenInput.value = item.id;
+                        setDisplay(item);
+                        close();
+                        if (typeof onChange === 'function') onChange(item);
+                        updateNextButtonState();
+                    });
+                    list.appendChild(btn);
+                });
+            }
+
+            const selected = options.find(item => String(item.id) === String(hiddenInput.value));
+            setDisplay(selected || null);
+        }
+
+        control.addEventListener('click', () => {
+            if (wrapper.classList.contains('open')) {
+                close();
+            } else {
+                open();
+            }
+        });
+
+        searchInput.addEventListener('input', render);
+
+        document.addEventListener('click', (event) => {
+            if (!wrapper.contains(event.target)) {
+                close();
+            }
+        });
+
+        return {
+            render,
+            close,
+            setValue(value) {
+                hiddenInput.value = value ?? '';
+                render();
+            },
+            getValue() {
+                return hiddenInput.value;
+            }
+        };
+    }
+
+    function getSelectedGender() {
+        return safeString(document.getElementById('gender').value).toLowerCase();
+    }
+
+    function getSelectedSport() {
+        return safeString(document.getElementById('sport').value).toLowerCase();
+    }
+
+    function getSelectedLeagueId() {
+        return safeString(document.getElementById('league_id').value);
+    }
+
+    function getSelectedClubId() {
+        return safeString(document.getElementById('club_id').value);
+    }
+
+    function mapLeagueOptions() {
+        const selectedGender = getSelectedGender();
+        const selectedSport = getSelectedSport();
+
+        return leagueDirectory
+            .filter(league =>
+                isLeagueGenderCompatible(league.gender, selectedGender) &&
+                isLeagueSportCompatible(league.sport, selectedSport)
+            )
+            .map(league => {
+                const showGenderSuffix = !selectedGender && safeString(league.gender);
+                const genderLabel = showGenderSuffix ? ` (${titleize(league.gender)})` : '';
+                return {
+                    id: String(league.id),
+                    label: `${league.name}${genderLabel}`,
+                    subtitle: safeString(league.sport) ? titleize(league.sport) : '',
+                    logo_url: null,
+                    raw: league,
+                };
+            });
+    }
+
+    function mapClubOptions() {
+        const selectedGender = getSelectedGender();
+        const selectedSport = getSelectedSport();
+        const selectedLeagueId = getSelectedLeagueId();
+
+        return clubDirectory
+            .filter(club =>
+                (!selectedLeagueId || selectedLeagueId === '__other__' ? true : String(club.league_id) === String(selectedLeagueId)) &&
+                isLeagueGenderCompatible(club.gender, selectedGender) &&
+                isLeagueSportCompatible(club.sport, selectedSport)
+            )
+            .map(club => ({
+                id: String(club.id),
+                label: club.name,
+                subtitle: '',
+                logo_url: club.logo_url || null,
+                raw: club,
+            }));
+    }
+
+    function mapTeamOptions() {
+        const selectedGender = getSelectedGender();
+        const selectedSport = getSelectedSport();
+        const selectedClubId = getSelectedClubId();
+
+        return teamDirectory
+            .filter(team =>
+                (!selectedClubId ? true : String(team.club_id) === String(selectedClubId)) &&
+                isLeagueGenderCompatible(team.gender, selectedGender) &&
+                isLeagueSportCompatible(team.sport, selectedSport)
+            )
+            .map(team => ({
+                id: String(team.id),
+                label: team.name,
+                subtitle: safeString(team.club_name) ? `Club: ${team.club_name}` : '',
+                logo_url: team.club_logo_url || null,
+                raw: team,
+            }));
+    }
+
+    function toggleOrganizationMode() {
+        const leagueId = getSelectedLeagueId();
+        const isOther = leagueId === '__other__';
+
+        document.getElementById('league_other_wrap').style.display = isOther ? 'block' : 'none';
+        document.getElementById('club_other_wrap').style.display = isOther ? 'block' : 'none';
+        document.getElementById('team_other_wrap').style.display = isOther ? 'block' : 'none';
+
+        if (isOther) {
+            document.getElementById('club_id').value = '';
+            document.getElementById('team_id').value = '';
+        }
+    }
+
+    let leagueSelectApi;
+    let clubSelectApi;
+    let teamSelectApi;
+
+    function initializeOrganizationSelectors() {
+        leagueSelectApi = buildSearchSelect({
+            rootId: 'leagueSelectRoot',
+            hiddenInputId: 'league_id',
+            placeholder: 'Select or search league',
+            getOptions: mapLeagueOptions,
+            onChange: () => {
+                document.getElementById('club_id').value = '';
+                document.getElementById('team_id').value = '';
+                toggleOrganizationMode();
+                clubSelectApi.render();
+                teamSelectApi.render();
+            },
+        });
+
+        clubSelectApi = buildSearchSelect({
+            rootId: 'clubSelectRoot',
+            hiddenInputId: 'club_id',
+            placeholder: 'Select or search club',
+            getOptions: mapClubOptions,
+            disabledWhen: () => {
+                const leagueId = getSelectedLeagueId();
+                return !leagueId || leagueId === '__other__';
+            },
+            onChange: () => {
+                document.getElementById('team_id').value = '';
+                teamSelectApi.render();
+            },
+        });
+
+        teamSelectApi = buildSearchSelect({
+            rootId: 'teamSelectRoot',
+            hiddenInputId: 'team_id',
+            placeholder: 'Select or search team',
+            getOptions: mapTeamOptions,
+            disabledWhen: () => {
+                const leagueId = getSelectedLeagueId();
+                const clubId = getSelectedClubId();
+                return !leagueId || leagueId === '__other__' || !clubId || clubId === '__other__';
+            },
+            onChange: () => {},
+        });
+
+        toggleOrganizationMode();
+        leagueSelectApi.render();
+        clubSelectApi.render();
+        teamSelectApi.render();
+    }
+
+    function refreshOrganizationSelectors() {
+        toggleOrganizationMode();
+
+        const leagueId = getSelectedLeagueId();
+        const clubId = getSelectedClubId();
+        const teamId = document.getElementById('team_id').value;
+
+        const validLeagueIds = mapLeagueOptions().map(item => String(item.id));
+        if (leagueId && leagueId !== '__other__' && !validLeagueIds.includes(String(leagueId))) {
+            document.getElementById('league_id').value = '';
+            document.getElementById('club_id').value = '';
+            document.getElementById('team_id').value = '';
+        }
+
+        const validClubIds = mapClubOptions().map(item => String(item.id));
+        if (clubId && clubId !== '__other__' && !validClubIds.includes(String(clubId))) {
+            document.getElementById('club_id').value = '';
+            document.getElementById('team_id').value = '';
+        }
+
+        const validTeamIds = mapTeamOptions().map(item => String(item.id));
+        if (teamId && teamId !== '__other__' && !validTeamIds.includes(String(teamId))) {
+            document.getElementById('team_id').value = '';
+        }
+
+        leagueSelectApi.render();
+        clubSelectApi.render();
+        teamSelectApi.render();
     }
 
     function bindValidationListeners() {
@@ -1937,31 +2065,26 @@
 
         document.querySelectorAll('[data-step-pill]').forEach((button) => {
             button.addEventListener('click', () => {
-                if (!button.disabled) {
-                    showStep(Number(button.dataset.stepPill));
-                }
+                if (!button.disabled) showStep(Number(button.dataset.stepPill));
             });
         });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const lang = getTargetLanguage();
-
         renderPositions();
+        toggleDominantFoot();
         toggleSchoolOther();
         toggleNationalTeamOther();
         toggleCustomHighlights();
         toggleCountryFields();
         syncStateValue();
-        toggleDominantFoot();
-        updateImageInstructions();
-        translateTextNodes(lang);
 
-        syncOrganizationFlow({
-            preserveLeague: oldLeagueId,
-            preserveClub: oldClubId,
-            preserveTeam: oldTeamId,
-        });
+        initializeOrganizationSelectors();
+
+        if (oldLeagueId) document.getElementById('league_id').value = oldLeagueId;
+        if (oldClubId) document.getElementById('club_id').value = oldClubId;
+        if (oldTeamId) document.getElementById('team_id').value = oldTeamId;
+        refreshOrganizationSelectors();
 
         const initialStep = {{ $errors->any() ? 'getStepFromErrors()' : '1' }};
         showStep(initialStep);
@@ -1969,34 +2092,12 @@
         document.getElementById('sport').addEventListener('change', () => {
             renderPositions();
             toggleDominantFoot();
-            updateImageInstructions();
+            refreshOrganizationSelectors();
             updateNextButtonState();
         });
 
         document.getElementById('gender').addEventListener('change', () => {
-            syncOrganizationFlow();
-            updateNextButtonState();
-        });
-
-        document.getElementById('league_id').addEventListener('change', () => {
-            toggleOrganizationMode();
-
-            if (document.getElementById('league_id').value === '__other__') {
-                resetSelect(document.getElementById('club_id'), 'Select club');
-                resetSelect(document.getElementById('team_id'), 'Select team');
-                document.getElementById('club_id').disabled = true;
-                document.getElementById('team_id').disabled = true;
-                updateNextButtonState();
-                return;
-            }
-
-            populateClubOptions();
-            populateTeamOptions();
-            updateNextButtonState();
-        });
-
-        document.getElementById('club_id').addEventListener('change', () => {
-            populateTeamOptions();
+            refreshOrganizationSelectors();
             updateNextButtonState();
         });
 

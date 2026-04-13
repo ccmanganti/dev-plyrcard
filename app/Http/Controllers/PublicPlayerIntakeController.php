@@ -17,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -258,9 +259,6 @@ class PublicPlayerIntakeController extends Controller
 
         return view('public.player-intake', [
             'schools' => $schools,
-            'leagues' => $leagues,
-            'clubs' => $clubs,
-            'teams' => $teams,
             'nationalTeams' => $nationalTeams,
             'states' => $states,
             'countryOptions' => $countryOptions,
@@ -269,22 +267,56 @@ class PublicPlayerIntakeController extends Controller
             'detectedCountry' => $detectedCountry,
             'packageLabel' => $packageLabel,
             'stepFieldMap' => $this->stepFieldMap(),
-            'leagueDirectory' => $leagues->map(fn (League $league) => [
-                'id' => (string) $league->id,
-                'name' => $league->name,
-                'gender' => $league->gender,
-            ])->values(),
-            'clubDirectory' => $clubs->map(fn (Club $club) => [
-                'id' => (string) $club->id,
-                'name' => $club->name,
-                'league_id' => (string) $club->league_id,
-            ])->values(),
-            'teamDirectory' => $teams->map(fn (Team $team) => [
-                'id' => (string) $team->id,
-                'name' => $team->name,
-                'club_id' => (string) $team->club_id,
-                'league_id' => (string) ($team->club?->league_id),
-            ])->values(),
+
+            'leagueDirectory' => $leagues->map(function (League $league) {
+                $gender = filled($league->gender) ? strtolower((string) $league->gender) : null;
+                $sport = filled($league->sport) ? strtolower((string) $league->sport) : null;
+
+                return [
+                    'id' => (string) $league->id,
+                    'name' => $league->name,
+                    'gender' => $gender,
+                    'gender_label' => $this->genderOptions[$gender] ?? null,
+                    'sport' => $sport,
+                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
+                ];
+            })->values(),
+
+            'clubDirectory' => $clubs->map(function (Club $club) {
+                $gender = filled($club->league?->gender) ? strtolower((string) $club->league->gender) : null;
+                $sport = filled($club->league?->sport) ? strtolower((string) $club->league->sport) : null;
+
+                return [
+                    'id' => (string) $club->id,
+                    'name' => $club->name,
+                    'league_id' => (string) $club->league_id,
+                    'league_name' => $club->league?->name,
+                    'logo_url' => filled($club->logo) ? Storage::disk('public')->url($club->logo) : null,
+                    'sport' => $sport,
+                    'gender' => $gender,
+                    'gender_label' => $this->genderOptions[$gender] ?? null,
+                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
+                ];
+            })->values(),
+
+            'teamDirectory' => $teams->map(function (Team $team) {
+                $gender = filled($team->club?->league?->gender) ? strtolower((string) $team->club->league->gender) : null;
+                $sport = filled($team->club?->league?->sport) ? strtolower((string) $team->club->league->sport) : null;
+
+                return [
+                    'id' => (string) $team->id,
+                    'name' => $team->name,
+                    'club_id' => (string) $team->club_id,
+                    'league_id' => (string) ($team->club?->league_id),
+                    'league_name' => $team->club?->league?->name,
+                    'club_name' => $team->club?->name,
+                    'club_logo_url' => filled($team->club?->logo) ? Storage::disk('public')->url($team->club->logo) : null,
+                    'sport' => $sport,
+                    'gender' => $gender,
+                    'gender_label' => $this->genderOptions[$gender] ?? null,
+                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
+                ];
+            })->values(),
         ]);
     }
 
@@ -315,7 +347,7 @@ class PublicPlayerIntakeController extends Controller
                 return $countryCode;
             }
         } catch (\Throwable $e) {
-            // Fail silently.
+            // Silent fail.
         }
 
         return '';
@@ -329,7 +361,21 @@ class PublicPlayerIntakeController extends Controller
             'last_name' => ['required', 'string', 'max:255'],
             'personal_email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
+
             'gender' => ['required', 'in:' . implode(',', array_keys($this->genderOptions))],
+            'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
+            'position' => ['nullable', 'array'],
+            'position.*' => ['string', 'max:255'],
+
+            'birth' => ['nullable', 'date'],
+            'year' => ['nullable', 'string', 'max:50'],
+            'gpa' => ['nullable', 'string', 'max:50'],
+            'height' => ['nullable', 'string', 'max:50'],
+            'weight' => ['nullable', 'string', 'max:50'],
+            'jersey_number' => ['nullable', 'string', 'max:50'],
+            'vertical_jump' => ['nullable', 'string', 'max:50'],
+            'max_speed' => ['nullable', 'string', 'max:50'],
+            'dominant_foot' => ['nullable', 'in:left,right,both'],
 
             'country' => ['nullable', 'string', 'max:255'],
             'country_other' => ['nullable', 'string', 'max:255'],
@@ -337,24 +383,8 @@ class PublicPlayerIntakeController extends Controller
             'city' => ['nullable', 'string', 'max:255'],
             'street' => ['nullable', 'string', 'max:255'],
 
-            'gpa' => ['nullable', 'string', 'max:50'],
-            'year' => ['nullable', 'string', 'max:50'],
-            'birth' => ['nullable', 'date'],
-            'height' => ['nullable', 'string', 'max:50'],
-            'weight' => ['nullable', 'string', 'max:50'],
-            'jersey_number' => ['nullable', 'string', 'max:50'],
-            'vertical_jump' => ['nullable', 'string', 'max:50'],
-            'dominant_foot' => ['nullable', 'in:left,right,both'],
-            'max_speed' => ['nullable', 'string', 'max:50'],
-
-            'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
-            'position' => ['nullable', 'array'],
-            'position.*' => ['string', 'max:255'],
-
-            'academic_accolades' => ['nullable', 'string'],
-            'sports_accolades' => ['nullable', 'string'],
-            'natl_team_exp' => ['nullable', 'in:0,1'],
-            'national_team_period' => ['nullable', 'string', 'max:255'],
+            'school_id' => ['nullable', 'string'],
+            'school_other' => ['nullable', 'string', 'max:255'],
 
             'league_id' => ['nullable', 'string'],
             'club_id' => ['nullable', 'string'],
@@ -363,9 +393,20 @@ class PublicPlayerIntakeController extends Controller
             'club_other' => ['nullable', 'string', 'max:255'],
             'team_other' => ['nullable', 'string', 'max:255'],
 
+            'natl_team_exp' => ['nullable', 'in:0,1'],
+            'national_team_period' => ['nullable', 'string', 'max:255'],
+            'national_team_id' => ['nullable', 'string'],
+            'national_team_other' => ['nullable', 'string', 'max:255'],
+
             'ig_handle' => ['nullable', 'url', 'max:255'],
             'x_handle' => ['nullable', 'url', 'max:255'],
             'yt_url' => ['nullable', 'url', 'max:500'],
+            'featured_video_url' => ['nullable', 'url', 'max:500'],
+            'use_custom_highlights' => ['nullable', 'boolean'],
+            'featured_video_urls' => ['nullable', 'string'],
+            'player_bio' => ['nullable', 'string'],
+            'academic_accolades' => ['nullable', 'string'],
+            'sports_accolades' => ['nullable', 'string'],
             'press' => ['nullable', 'string'],
 
             'parent' => ['nullable', 'string', 'max:255'],
@@ -388,28 +429,14 @@ class PublicPlayerIntakeController extends Controller
             'snc_trainer_email' => ['nullable', 'email', 'max:255'],
             'snc_trainer_phone' => ['nullable', 'string', 'max:50'],
 
-            'school_id' => ['nullable', 'string'],
-            'school_other' => ['nullable', 'string', 'max:255'],
-
-            'national_team_id' => ['nullable', 'string'],
-            'national_team_other' => ['nullable', 'string', 'max:255'],
-
             'action_images' => ['nullable', 'array'],
             'action_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-
             'portrait_images' => ['nullable', 'array'],
             'portrait_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-
             'national_team_images' => ['nullable', 'array'],
             'national_team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-
             'team_images' => ['nullable', 'array'],
             'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-
-            'player_bio' => ['nullable', 'string'],
-            'featured_video_url' => ['nullable', 'url', 'max:500'],
-            'use_custom_highlights' => ['nullable', 'boolean'],
-            'featured_video_urls' => ['nullable', 'string'],
         ]);
 
         $totalRawImages =
@@ -424,21 +451,21 @@ class PublicPlayerIntakeController extends Controller
             ]);
         }
 
-        if (($validated['country'] ?? null) === '__other__' && filled($validated['country_other'] ?? null)) {
-            $validated['country'] = trim($validated['country_other']);
-        }
+        if (($validated['country'] ?? null) === '__other__') {
+            if (blank($validated['country_other'] ?? null)) {
+                return back()->withErrors(['country_other' => 'Please enter a country name.'])->withInput();
+            }
 
-        if (($validated['country'] ?? null) === '__other__' && blank($validated['country_other'] ?? null)) {
-            return back()
-                ->withErrors(['country_other' => 'Please enter a country name.'])
-                ->withInput();
+            $validated['country'] = trim((string) $validated['country_other']);
         }
 
         if (($validated['country'] ?? null) === 'USA' && filled($validated['state'] ?? null)) {
-            $validated['state'] = strtoupper(trim($validated['state']));
+            $validated['state'] = strtoupper(trim((string) $validated['state']));
         }
 
-        $sport = $validated['sport'];
+        $sport = strtolower((string) ($validated['sport'] ?? ''));
+        $selectedGender = strtolower((string) ($validated['gender'] ?? ''));
+
         $allowedPositions = array_keys($this->sportPositions[$sport] ?? []);
         $submittedPositions = $validated['position'] ?? [];
 
@@ -469,7 +496,6 @@ class PublicPlayerIntakeController extends Controller
         $selectedLeagueId = $validated['league_id'] ?? null;
         $selectedClubId = $validated['club_id'] ?? null;
         $selectedTeamId = $validated['team_id'] ?? null;
-        $selectedGender = $validated['gender'];
 
         if ($selectedLeagueId === '__other__') {
             if (blank($validated['league_other'] ?? null)) {
@@ -498,14 +524,19 @@ class PublicPlayerIntakeController extends Controller
                 if (! $this->isLeagueGenderCompatible($league->gender, $selectedGender)) {
                     return back()->withErrors(['league_id' => 'The selected league does not match the athlete gender.'])->withInput();
                 }
+
+                if (! $this->isLeagueSportCompatible($league->sport, $sport)) {
+                    return back()->withErrors(['league_id' => 'The selected league does not match the athlete sport.'])->withInput();
+                }
             }
 
             if (filled($selectedClubId)) {
                 if (! $league) {
-                    return back()->withErrors(['club_id' => 'Please select a league first.'])->withInput();
+                    return back()->withErrors(['club_id' => 'Please select a valid league first.'])->withInput();
                 }
 
                 $club = Club::query()
+                    ->with('league')
                     ->where('id', $selectedClubId)
                     ->where('league_id', $league->id)
                     ->first();
@@ -513,20 +544,37 @@ class PublicPlayerIntakeController extends Controller
                 if (! $club) {
                     return back()->withErrors(['club_id' => 'The selected club does not belong to the selected league.'])->withInput();
                 }
+
+                if (! $this->isLeagueGenderCompatible($club->league?->gender, $selectedGender)) {
+                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete gender.'])->withInput();
+                }
+
+                if (! $this->isLeagueSportCompatible($club->league?->sport, $sport)) {
+                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete sport.'])->withInput();
+                }
             }
 
             if (filled($selectedTeamId)) {
                 if (! $club) {
-                    return back()->withErrors(['team_id' => 'Please select a club first.'])->withInput();
+                    return back()->withErrors(['team_id' => 'Please select a valid club first.'])->withInput();
                 }
 
                 $team = Team::query()
+                    ->with('club.league')
                     ->where('id', $selectedTeamId)
                     ->where('club_id', $club->id)
                     ->first();
 
                 if (! $team) {
                     return back()->withErrors(['team_id' => 'The selected team does not belong to the selected club.'])->withInput();
+                }
+
+                if (! $this->isLeagueGenderCompatible($team->club?->league?->gender, $selectedGender)) {
+                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete gender.'])->withInput();
+                }
+
+                if (! $this->isLeagueSportCompatible($team->club?->league?->sport, $sport)) {
+                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete sport.'])->withInput();
                 }
             }
         }
@@ -540,7 +588,7 @@ class PublicPlayerIntakeController extends Controller
             ]);
         }
 
-        $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls) {
+        $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls, $sport) {
             $school = $this->resolveSchool($validated);
             [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
             $nationalTeam = $this->resolveNationalTeam($validated);
@@ -562,43 +610,57 @@ class PublicPlayerIntakeController extends Controller
 
             $user->fill([
                 'first_name' => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
                 'last_name' => $validated['last_name'],
                 'personal_email' => $validated['personal_email'],
-                'email' => $validated['personal_email'],
                 'phone' => $validated['phone'] ?? null,
+
                 'gender' => $validated['gender'],
-                'country' => $validated['country'] ?? null,
-                'state' => $validated['state'] ?? null,
-                'city' => $validated['city'] ?? null,
-                'street' => $validated['street'] ?? null,
-                'gpa' => $validated['gpa'] ?? null,
-                'year' => $validated['year'] ?? null,
+                'sport' => $validated['sport'],
+                'position' => $validated['position'] ?? [],
+
                 'birth' => $validated['birth'] ?? null,
+                'year' => $validated['year'] ?? null,
+                'gpa' => $validated['gpa'] ?? null,
                 'height' => $validated['height'] ?? null,
                 'weight' => $validated['weight'] ?? null,
                 'jersey_number' => $validated['jersey_number'] ?? null,
                 'vertical_jump' => $validated['vertical_jump'] ?? null,
-                'dominant_foot' => ($validated['sport'] ?? null) === 'soccer'
-                    ? ($validated['dominant_foot'] ?? null)
-                    : null,
                 'max_speed' => $validated['max_speed'] ?? null,
-                'sport' => $validated['sport'],
-                'position' => $validated['position'] ?? [],
-                'academic_accolades' => $validated['academic_accolades'] ?? null,
-                'sports_accolades' => $validated['sports_accolades'] ?? null,
+                'dominant_foot' => $sport === 'soccer' ? ($validated['dominant_foot'] ?? null) : null,
+
+                'country' => $validated['country'] ?? null,
+                'state' => $validated['state'] ?? null,
+                'city' => $validated['city'] ?? null,
+                'street' => $validated['street'] ?? null,
+
                 'natl_team_exp' => $hasNationalTeamExperience,
                 'national_team_period' => $hasNationalTeamExperience ? ($validated['national_team_period'] ?? null) : null,
+
+                'school_id' => $school?->id,
+                'league_id' => $league?->id,
+                'club_id' => $club?->id,
                 'team_name' => $team?->name,
+                'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
+
                 'ig_handle' => $validated['ig_handle'] ?? null,
                 'x_handle' => $validated['x_handle'] ?? null,
                 'yt_url' => $validated['yt_url'] ?? null,
+                'featured_video_url' => $validated['featured_video_url'] ?? null,
+                'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
+
+                'player_bio' => $validated['player_bio'] ?? null,
+                'academic_accolades' => $validated['academic_accolades'] ?? null,
+                'sports_accolades' => $validated['sports_accolades'] ?? null,
                 'press' => $validated['press'] ?? null,
+
                 'parent' => $validated['parent'] ?? null,
                 'parent_email' => $validated['parent_email'] ?? null,
                 'parent_phone' => $validated['parent_phone'] ?? null,
                 'sec_parent' => $validated['sec_parent'] ?? null,
                 'sec_parent_email' => $validated['sec_parent_email'] ?? null,
                 'sec_parent_phone' => $validated['sec_parent_phone'] ?? null,
+
                 'club_coach' => $validated['club_coach'] ?? null,
                 'club_coach_email' => $validated['club_coach_email'] ?? null,
                 'club_coach_phone' => $validated['club_coach_phone'] ?? null,
@@ -611,14 +673,8 @@ class PublicPlayerIntakeController extends Controller
                 'snc_trainer' => $validated['snc_trainer'] ?? null,
                 'snc_trainer_email' => $validated['snc_trainer_email'] ?? null,
                 'snc_trainer_phone' => $validated['snc_trainer_phone'] ?? null,
-                'school_id' => $school?->id,
-                'club_id' => $club?->id,
-                'league_id' => $league?->id,
-                'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
+
                 'domain' => null,
-                'player_bio' => $validated['player_bio'] ?? null,
-                'featured_video_url' => $validated['featured_video_url'] ?? null,
-                'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
             ]);
 
             $userImageUploads = $this->storeUserImageUploads($request);
@@ -631,7 +687,7 @@ class PublicPlayerIntakeController extends Controller
 
             $uploads = $this->storeHeroUploads($request);
 
-            $this->createWebsiteIfSupported($user, $validated, $uploads, $user->email);
+            $this->createWebsiteIfSupported($user, $validated, $uploads);
 
             return $user;
         });
@@ -646,20 +702,21 @@ class PublicPlayerIntakeController extends Controller
         return [
             1 => [
                 'first_name', 'middle_name', 'last_name', 'personal_email', 'phone', 'gender',
-                'birth', 'year', 'jersey_number', 'vertical_jump', 'gpa', 'height',
-                'weight', 'max_speed', 'natl_team_exp', 'national_team_period',
+                'sport', 'position', 'position.*', 'birth', 'year', 'gpa', 'height', 'weight',
+                'jersey_number', 'vertical_jump', 'max_speed', 'dominant_foot',
+                'country', 'country_other', 'state', 'city', 'street',
+                'natl_team_exp', 'national_team_period',
             ],
             2 => [
-                'sport', 'position', 'position.*', 'dominant_foot',
-                'country', 'country_other', 'state', 'city', 'street',
-                'school_id', 'school_other', 'league_id', 'club_id', 'team_id',
+                'school_id', 'school_other',
+                'league_id', 'club_id', 'team_id',
                 'league_other', 'club_other', 'team_other',
                 'national_team_id', 'national_team_other',
             ],
             3 => [
-                'ig_handle', 'x_handle', 'yt_url', 'featured_video_url',
-                'use_custom_highlights', 'featured_video_urls', 'player_bio',
-                'academic_accolades', 'sports_accolades', 'press',
+                'ig_handle', 'x_handle', 'yt_url',
+                'featured_video_url', 'use_custom_highlights', 'featured_video_urls',
+                'player_bio', 'academic_accolades', 'sports_accolades', 'press',
             ],
             4 => [
                 'parent', 'parent_email', 'parent_phone',
@@ -698,7 +755,7 @@ class PublicPlayerIntakeController extends Controller
     {
         if (($validated['school_id'] ?? null) === '__other__' && filled($validated['school_other'] ?? null)) {
             return School::firstOrCreate(
-                ['name' => trim($validated['school_other'])],
+                ['name' => trim((string) $validated['school_other'])],
                 [
                     'state' => $validated['state'] ?? null,
                     'city' => $validated['city'] ?? null,
@@ -724,25 +781,23 @@ class PublicPlayerIntakeController extends Controller
         $leagueId = $validated['league_id'] ?? null;
         $clubId = $validated['club_id'] ?? null;
         $teamId = $validated['team_id'] ?? null;
+        $gender = strtolower((string) ($validated['gender'] ?? ''));
+        $sport = strtolower((string) ($validated['sport'] ?? ''));
 
         if ($leagueId === '__other__') {
-            $league = League::firstOrCreate(
-                ['name' => trim($validated['league_other'])],
-                ['gender' => $validated['gender']]
-            );
-
-            if ($league->gender !== $validated['gender']) {
-                $league->gender = $validated['gender'];
-                $league->save();
-            }
+            $league = League::firstOrCreate([
+                'name' => trim((string) $validated['league_other']),
+                'gender' => $gender,
+                'sport' => $sport,
+            ]);
 
             $club = Club::firstOrCreate([
-                'name' => trim($validated['club_other']),
+                'name' => trim((string) $validated['club_other']),
                 'league_id' => $league->id,
             ]);
 
             $team = Team::firstOrCreate([
-                'name' => trim($validated['team_other']),
+                'name' => trim((string) $validated['team_other']),
                 'club_id' => $club->id,
             ]);
 
@@ -755,6 +810,7 @@ class PublicPlayerIntakeController extends Controller
 
         if (filled($clubId)) {
             $club = Club::query()
+                ->with('league')
                 ->when($league, fn ($query) => $query->where('league_id', $league->id))
                 ->find($clubId);
         }
@@ -784,7 +840,7 @@ class PublicPlayerIntakeController extends Controller
         if ($nationalTeamId === '__other__') {
             if (filled($validated['national_team_other'] ?? null)) {
                 return NationalTeam::firstOrCreate([
-                    'name' => trim($validated['national_team_other']),
+                    'name' => trim((string) $validated['national_team_other']),
                 ]);
             }
 
@@ -800,18 +856,30 @@ class PublicPlayerIntakeController extends Controller
 
     protected function isLeagueGenderCompatible(?string $leagueGender, ?string $userGender): bool
     {
-        $leagueGender = filled($leagueGender) ? strtolower(trim($leagueGender)) : null;
-        $userGender = filled($userGender) ? strtolower(trim($userGender)) : null;
+        $leagueGender = filled($leagueGender) ? strtolower(trim((string) $leagueGender)) : null;
+        $userGender = filled($userGender) ? strtolower(trim((string) $userGender)) : null;
 
         if (! $leagueGender || ! $userGender) {
             return true;
         }
 
         if ($userGender === 'coed') {
-            return in_array($leagueGender, ['coed'], true);
+            return $leagueGender === 'coed';
         }
 
         return in_array($leagueGender, [$userGender, 'coed'], true);
+    }
+
+    protected function isLeagueSportCompatible(?string $leagueSport, ?string $userSport): bool
+    {
+        $leagueSport = filled($leagueSport) ? strtolower(trim((string) $leagueSport)) : null;
+        $userSport = filled($userSport) ? strtolower(trim((string) $userSport)) : null;
+
+        if (! $leagueSport || ! $userSport) {
+            return true;
+        }
+
+        return $leagueSport === $userSport;
     }
 
     protected function storeHeroUploads(Request $request): array
@@ -819,7 +887,7 @@ class PublicPlayerIntakeController extends Controller
         return [];
     }
 
-    protected function createWebsiteIfSupported(User $user, array $validated, array $uploads, string $generatedDomain): ?Website
+    protected function createWebsiteIfSupported(User $user, array $validated, array $uploads): ?Website
     {
         $siteTemplate = $this->resolveSiteTemplate($validated['sport']);
         $heroTemplate = $this->resolveHeroTemplate($validated['sport']);
@@ -840,7 +908,7 @@ class PublicPlayerIntakeController extends Controller
                 'site_template_id' => $siteTemplate->id,
                 'hero_template_id' => $heroTemplate->id,
                 'name' => $websiteName,
-                'domain' => $generatedDomain,
+                'domain' => null,
                 'is_active' => true,
                 'is_published' => false,
                 'project_json' => ! empty($uploads) ? json_encode(['hero_uploads' => $uploads]) : $existingWebsite->project_json,
@@ -865,7 +933,7 @@ class PublicPlayerIntakeController extends Controller
             'hero_template_id' => $heroTemplate->id,
             'name' => $websiteName,
             'slug' => $slug,
-            'domain' => $generatedDomain,
+            'domain' => null,
             'is_active' => true,
             'is_published' => false,
             'project_json' => ! empty($uploads) ? json_encode(['hero_uploads' => $uploads]) : null,
@@ -972,14 +1040,6 @@ class PublicPlayerIntakeController extends Controller
         }
 
         return $slug;
-    }
-
-    protected function fullNameNoSpaces(string $firstName, ?string $middleName, string $lastName): string
-    {
-        return collect([$firstName, $middleName, $lastName])
-            ->filter()
-            ->map(fn ($value) => trim($value))
-            ->implode('');
     }
 
     protected function storeUserImageUploads(Request $request): array

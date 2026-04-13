@@ -5,305 +5,352 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     @php
-        $user = $website->user;
+    $user = $website->user;
+    $club = $user?->club;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Theme Colors
-        |--------------------------------------------------------------------------
-        */
-        $primary   = $website->primary_color ?: '#d8180aff';
-        $secondary = $website->secondary_color ?: '#0f172a';
-        $accent    = $website->accent_color ?: '#e34b18ff';
-        $bg        = $website->background_color ?: '#f8fafc';
-        $surface   = $website->surface_color ?: '#ffffff';
-        $text1     = $website->text_primary_color ?: '#0f172a';
-        $text2     = $website->text_secondary_color ?: '#475569';
+    /*
+    |--------------------------------------------------------------------------
+    | Field Value Helpers
+    |--------------------------------------------------------------------------
+    */
+    $fieldValues = $website->relationLoaded('fieldValues')
+        ? $website->fieldValues
+        : $website->fieldValues()->with('templateField')->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Field Value Helpers
-        |--------------------------------------------------------------------------
-        */
-        $fieldValues = $website->relationLoaded('fieldValues')
-            ? $website->fieldValues
-            : $website->fieldValues()->with('templateField')->get();
+    $getFieldRecord = function (string $fieldName) use ($fieldValues) {
+        return $fieldValues->first(function ($item) use ($fieldName) {
+            return optional($item->templateField)->name === $fieldName;
+        });
+    };
 
-        $getFieldRecord = function (string $fieldName) use ($fieldValues) {
-            return $fieldValues->first(function ($item) use ($fieldName) {
-                return optional($item->templateField)->name === $fieldName;
-            });
-        };
+    $getFieldValue = function (string $fieldName, $default = null) use ($getFieldRecord) {
+        $record = $getFieldRecord($fieldName);
+        return filled($record?->value) ? $record->value : $default;
+    };
 
-        $getFieldValue = function (string $fieldName, $default = null) use ($getFieldRecord) {
-            $record = $getFieldRecord($fieldName);
-            return $record?->value ?? $default;
-        };
+    $getJsonFieldValue = function (string $fieldName, $default = null) use ($getFieldValue) {
+        $raw = $getFieldValue($fieldName);
 
-        $getJsonFieldValue = function (string $fieldName, $default = null) use ($getFieldValue) {
-            $raw = $getFieldValue($fieldName);
+        if (blank($raw)) {
+            return $default;
+        }
 
-            if (blank($raw)) {
-                return $default;
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $default;
+    };
+
+    $hideIfDefault = function ($value) {
+        if (! is_string($value) || $value === '') {
+            return $value;
+        }
+
+        return str_starts_with(trim($value), '[DEFAULT PLACEHOLDER:') ? '' : $value;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Theme Colors
+    |--------------------------------------------------------------------------
+    | Priority:
+    | 1. Site template value
+    | 2. Club model value
+    | 3. Website value
+    | 4. Hardcoded default
+    */
+    $primary = $getFieldValue(
+        'primary_color',
+        $club?->primary_color
+            ?: $website->primary_color
+            ?: '#d8180aff'
+    );
+
+    $secondary = $getFieldValue(
+        'secondary_color',
+        $club?->secondary_color
+            ?: $website->secondary_color
+            ?: '#0f172a'
+    );
+
+    $accent = $getFieldValue(
+        'accent_color',
+        $club?->accent_color
+            ?: $website->accent_color
+            ?: '#e34b18ff'
+    );
+
+    $bg = $getFieldValue(
+        'background_color',
+        $club?->background_color
+            ?: $website->background_color
+            ?: '#f8fafc'
+    );
+
+    $surface = $getFieldValue(
+        'surface_color',
+        $club?->surface_color
+            ?: $website->surface_color
+            ?: '#ffffff'
+    );
+
+    $text1 = $getFieldValue(
+        'text_primary_color',
+        $club?->text_primary_color
+            ?: $website->text_primary_color
+            ?: '#0f172a'
+    );
+
+    $text2 = $getFieldValue(
+        'text_secondary_color',
+        $club?->text_secondary_color
+            ?: $website->text_secondary_color
+            ?: '#475569'
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hero Field Helpers
+    |--------------------------------------------------------------------------
+    */
+    $heroFieldValues = $website->relationLoaded('heroFieldValues')
+        ? $website->heroFieldValues
+        : $website->heroFieldValues()->with('templateField')->get();
+
+    $getHeroFieldRecord = function (string $fieldName) use ($heroFieldValues) {
+        return $heroFieldValues->first(function ($item) use ($fieldName) {
+            return optional($item->templateField)->name === $fieldName;
+        });
+    };
+
+    $getHeroFieldValue = function (string $fieldName, $default = null) use ($getHeroFieldRecord) {
+        $record = $getHeroFieldRecord($fieldName);
+        return filled($record?->value) ? $record->value : $default;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | YouTube Helpers
+    |--------------------------------------------------------------------------
+    */
+    $toYoutubeEmbed = function (string $url) {
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+
+        $videoId = null;
+
+        if (preg_match('~youtu\.be/([^?&/]+)~', $url, $m)) {
+            $videoId = $m[1];
+        }
+
+        if (! $videoId && preg_match('~v=([^&]+)~', $url, $m)) {
+            $videoId = $m[1];
+        }
+
+        if (! $videoId && preg_match('~youtube\.com/shorts/([^?&/]+)~', $url, $m)) {
+            $videoId = $m[1];
+        }
+
+        if (! $videoId && preg_match('~youtube\.com/embed/([^?&/]+)~', $url, $m)) {
+            $videoId = $m[1];
+        }
+
+        if (! $videoId) {
+            return null;
+        }
+
+        $params = http_build_query([
+            'rel' => 0,
+            'modestbranding' => 1,
+            'playsinline' => 1,
+        ]);
+
+        return "https://www.youtube.com/embed/{$videoId}?{$params}";
+    };
+
+    $parseUrlList = function ($raw) use ($toYoutubeEmbed) {
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $raw = str_replace(["\r\n", "\r"], "\n", $raw);
+        $parts = preg_split('/\n|,/', $raw);
+
+        $out = [];
+        foreach ($parts as $p) {
+            $embed = $toYoutubeEmbed(trim($p));
+            if ($embed) {
+                $out[] = $embed;
             }
+        }
 
-            if (is_array($raw)) {
-                return $raw;
-            }
+        return array_values(array_unique($out));
+    };
 
-            $decoded = json_decode($raw, true);
-
-            return json_last_error() === JSON_ERROR_NONE ? $decoded : $default;
-        };
-
-        $hideIfDefault = function ($value) {
-            if (! is_string($value) || $value === '') {
-                return $value;
-            }
-
-            return str_starts_with(trim($value), '[DEFAULT PLACEHOLDER:') ? '' : $value;
-        };
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hero Field Helpers
-        |--------------------------------------------------------------------------
-        */
-        $heroFieldValues = $website->relationLoaded('heroFieldValues')
-            ? $website->heroFieldValues
-            : $website->heroFieldValues()->with('templateField')->get();
-
-        $getHeroFieldRecord = function (string $fieldName) use ($heroFieldValues) {
-            return $heroFieldValues->first(function ($item) use ($fieldName) {
-                return optional($item->templateField)->name === $fieldName;
-            });
-        };
-
-        $getHeroFieldValue = function (string $fieldName, $default = null) use ($getHeroFieldRecord) {
-            $record = $getHeroFieldRecord($fieldName);
-            return $record?->value ?? $default;
-        };
-
-        /*
-        |--------------------------------------------------------------------------
-        | YouTube Helpers
-        |--------------------------------------------------------------------------
-        */
-        $toYoutubeEmbed = function (string $url) {
-            $url = trim($url);
-            if ($url === '') {
-                return null;
-            }
-
-            $videoId = null;
-
-            if (preg_match('~youtu\.be/([^?&/]+)~', $url, $m)) {
-                $videoId = $m[1];
-            }
-
-            if (! $videoId && preg_match('~v=([^&]+)~', $url, $m)) {
-                $videoId = $m[1];
-            }
-
-            if (! $videoId && preg_match('~youtube\.com/shorts/([^?&/]+)~', $url, $m)) {
-                $videoId = $m[1];
-            }
-
-            if (! $videoId && preg_match('~youtube\.com/embed/([^?&/]+)~', $url, $m)) {
-                $videoId = $m[1];
-            }
-
-            if (! $videoId) {
-                return null;
-            }
-
-            $params = http_build_query([
-                'rel' => 0,
-                'modestbranding' => 1,
-                'playsinline' => 1,
-            ]);
-
-            return "https://www.youtube.com/embed/{$videoId}?{$params}";
-        };
-
-        $parseUrlList = function ($raw) use ($toYoutubeEmbed) {
-            if (! is_string($raw) || trim($raw) === '') {
-                return [];
-            }
-
-            $raw = str_replace(["\r\n", "\r"], "\n", $raw);
-            $parts = preg_split('/\n|,/', $raw);
-
-            $out = [];
-            foreach ($parts as $p) {
-                $embed = $toYoutubeEmbed(trim($p));
-                if ($embed) {
-                    $out[] = $embed;
-                }
-            }
-
-            return array_values(array_unique($out));
-        };
-
-        /*
-        |--------------------------------------------------------------------------
-        | Media Helpers
-        |--------------------------------------------------------------------------
-        */
-        $resolveMediaUrl = function ($raw, $fallback = '') {
-            if (blank($raw)) {
-                return $fallback;
-            }
-
-            if (is_string($raw)) {
-                $trimmed = trim($raw);
-
-                if (filter_var($trimmed, FILTER_VALIDATE_URL)) {
-                    return $trimmed;
-                }
-
-                $decoded = json_decode($trimmed, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $raw = $decoded;
-                } else {
-                    return asset('storage/' . ltrim($trimmed, '/'));
-                }
-            }
-
-            if (is_array($raw)) {
-                if (isset($raw[0])) {
-                    $first = $raw[0];
-
-                    if (is_string($first)) {
-                        return filter_var($first, FILTER_VALIDATE_URL)
-                            ? $first
-                            : asset('storage/' . ltrim($first, '/'));
-                    }
-
-                    if (is_array($first)) {
-                        $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? null;
-
-                        if ($path) {
-                            return filter_var($path, FILTER_VALIDATE_URL)
-                                ? $path
-                                : asset('storage/' . ltrim($path, '/'));
-                        }
-                    }
-                }
-
-                $path = $raw['url'] ?? $raw['path'] ?? $raw['image_url'] ?? null;
-
-                if ($path) {
-                    return filter_var($path, FILTER_VALIDATE_URL)
-                        ? $path
-                        : asset('storage/' . ltrim($path, '/'));
-                }
-            }
-
+    /*
+    |--------------------------------------------------------------------------
+    | Media Helpers
+    |--------------------------------------------------------------------------
+    */
+    $resolveMediaUrl = function ($raw, $fallback = '') {
+        if (blank($raw)) {
             return $fallback;
-        };
+        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Content Fields
-        |--------------------------------------------------------------------------
-        */
-        $listifyText = function ($value) {
-            if (blank($value)) {
-                return '';
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+
+            if (filter_var($trimmed, FILTER_VALIDATE_URL)) {
+                return $trimmed;
             }
 
-            $text = is_string($value) ? $value : (string) $value;
-            $text = str_replace(["\r\n", "\r"], "\n", $text);
+            $decoded = json_decode($trimmed, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $raw = $decoded;
+            } else {
+                return asset('storage/' . ltrim($trimmed, '/'));
+            }
+        }
 
-            $lines = collect(explode("\n", $text))
-                ->map(fn ($line) => trim(strip_tags($line)))
-                ->filter()
-                ->values();
+        if (is_array($raw)) {
+            if (isset($raw[0])) {
+                $first = $raw[0];
 
-            if ($lines->isEmpty()) {
-                return '';
+                if (is_string($first)) {
+                    return filter_var($first, FILTER_VALIDATE_URL)
+                        ? $first
+                        : asset('storage/' . ltrim($first, '/'));
+                }
+
+                if (is_array($first)) {
+                    $path = $first['url'] ?? $first['path'] ?? $first['image_url'] ?? null;
+
+                    if ($path) {
+                        return filter_var($path, FILTER_VALIDATE_URL)
+                            ? $path
+                            : asset('storage/' . ltrim($path, '/'));
+                    }
+                }
             }
 
-            return '<ul>' . $lines->map(fn ($line) => '<li>' . e($line) . '</li>')->implode('') . '</ul>';
-        };
+            $path = $raw['url'] ?? $raw['path'] ?? $raw['image_url'] ?? null;
 
-        $playerDisplayName = trim(
-            ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')
-        );
+            if ($path) {
+                return filter_var($path, FILTER_VALIDATE_URL)
+                    ? $path
+                    : asset('storage/' . ltrim($path, '/'));
+            }
+        }
 
-        $leagueOrClub = $user?->club?->league?->name
-            ?? $user?->club?->name
-            ?? $user?->team_name
-            ?? '';
+        return $fallback;
+    };
 
-        $gradYearText = filled($user?->year) ? "CLASS OF " . $user->year : '';
+    /*
+    |--------------------------------------------------------------------------
+    | Content Fields
+    |--------------------------------------------------------------------------
+    */
+    $listifyText = function ($value) {
+        if (blank($value)) {
+            return '';
+        }
 
-        $defaultPlayerTagline = collect([
-            filled($playerDisplayName) ? strtoupper($playerDisplayName) : null,
-            filled($leagueOrClub) ? strtoupper($leagueOrClub) : null,
-            filled($gradYearText) ? strtoupper($gradYearText) : null,
-        ])->filter(fn ($value) => filled($value))->implode(' | ');
+        $text = is_string($value) ? $value : (string) $value;
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
 
-        $aboutHeadline = $hideIfDefault($getFieldValue('aboutme_headline', ''))
-            ?: 'About Me in 60 Seconds';
+        $lines = collect(explode("\n", $text))
+            ->map(fn ($line) => trim(strip_tags($line)))
+            ->filter()
+            ->values();
 
-        $aboutTagline = $hideIfDefault($getFieldValue('player_tagline', ''))
-            ?: $defaultPlayerTagline;
+        if ($lines->isEmpty()) {
+            return '';
+        }
 
-        $aboutBio = $hideIfDefault(
-            filled($user?->player_bio)
-                ? $user->player_bio
-                : $getFieldValue('player_bio', '')
-        );
+        return '<ul>' . $lines->map(fn ($line) => '<li>' . e($line) . '</li>')->implode('') . '</ul>';
+    };
 
-        $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''))
-            ?: 'Games Schedule';
+    $playerDisplayName = trim(
+        ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')
+    );
 
-        $scheduleTagline = $hideIfDefault($getFieldValue('schedules_tagline', ''))
-            ?: 'Upcoming games and key dates.';
+    $leagueOrClub = $user?->club?->league?->name
+        ?? $user?->club?->name
+        ?? $user?->team_name
+        ?? '';
 
-        $highHeadline = $hideIfDefault($getFieldValue('highlights_headline', ''))
-            ?: 'Game Highlights';
+    $gradYearText = filled($user?->year) ? "CLASS OF " . $user->year : '';
 
-        $highTagline = $hideIfDefault($getFieldValue('highlights_tagline', ''))
-            ?: 'Top plays and standout moments.';
+    $defaultPlayerTagline = collect([
+        filled($playerDisplayName) ? strtoupper($playerDisplayName) : null,
+        filled($leagueOrClub) ? strtoupper($leagueOrClub) : null,
+        filled($gradYearText) ? strtoupper($gradYearText) : null,
+    ])->filter(fn ($value) => filled($value))->implode(' | ');
 
-        $websiteAcademicAccolades = $getFieldValue('academic_accolades', '');
-        $websiteSportsAccolades = $getFieldValue('sports_accolades', '');
+    $aboutHeadline = $hideIfDefault($getFieldValue('aboutme_headline', ''))
+        ?: 'About Me in 60 Seconds';
 
-        $acadRaw = filled($websiteAcademicAccolades)
-            ? $websiteAcademicAccolades
-            : ($user?->academic_accolades ?? '');
+    $aboutTagline = $hideIfDefault($getFieldValue('player_tagline', ''))
+        ?: $defaultPlayerTagline;
 
-        $sportRaw = filled($websiteSportsAccolades)
-            ? $websiteSportsAccolades
-            : ($user?->sports_accolades ?? '');
+    $aboutBio = $hideIfDefault(
+        filled($user?->player_bio)
+            ? $user->player_bio
+            : $getFieldValue('player_bio', '')
+    );
 
-        $acadHeadline = $hideIfDefault($getFieldValue('acad_accolades_headline', ''))
-            ?: 'Academic Accolades';
+    $scheduleHeadline = $hideIfDefault($getFieldValue('schedules_headline', ''))
+        ?: 'Games Schedule';
 
-        $acadTagline = $hideIfDefault($getFieldValue('acad_accolades_tagline', ''))
-            ?: 'A collection of awards & accomplishments';
+    $scheduleTagline = $hideIfDefault($getFieldValue('schedules_tagline', ''))
+        ?: 'Upcoming games and key dates.';
 
-        $acadBody = $listifyText($hideIfDefault($acadRaw));
+    $highHeadline = $hideIfDefault($getFieldValue('highlights_headline', ''))
+        ?: 'Game Highlights';
 
-        $sportHeadline = $hideIfDefault($getFieldValue('sport_accolades_headline', ''))
-            ?: 'Sports Accolades';
+    $highTagline = $hideIfDefault($getFieldValue('highlights_tagline', ''))
+        ?: 'Top plays and standout moments.';
 
-        $sportTagline = $hideIfDefault($getFieldValue('sport_accolades_tagline', ''))
-            ?: 'A collection of awards & accomplishments';
+    $websiteAcademicAccolades = $getFieldValue('academic_accolades', '');
+    $websiteSportsAccolades = $getFieldValue('sports_accolades', '');
 
-        $sportBody = $listifyText($hideIfDefault($sportRaw));
+    $acadRaw = filled($websiteAcademicAccolades)
+        ? $websiteAcademicAccolades
+        : ($user?->academic_accolades ?? '');
 
-        $hasAcademicAccolades = filled(trim(strip_tags($acadBody)));
-        $hasSportsAccolades = filled(trim(strip_tags($sportBody)));
-        $hasAnyAccolades = $hasAcademicAccolades || $hasSportsAccolades;
+    $sportRaw = filled($websiteSportsAccolades)
+        ? $websiteSportsAccolades
+        : ($user?->sports_accolades ?? '');
 
-        $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
+    $acadHeadline = $hideIfDefault($getFieldValue('acad_accolades_headline', ''))
+        ?: 'Academic Accolades';
 
-        if (blank($contactFormEmbed)) {
-            $contactFormEmbed = <<<'HTML'
+    $acadTagline = $hideIfDefault($getFieldValue('acad_accolades_tagline', ''))
+        ?: 'A collection of awards & accomplishments';
+
+    $acadBody = $listifyText($hideIfDefault($acadRaw));
+
+    $sportHeadline = $hideIfDefault($getFieldValue('sport_accolades_headline', ''))
+        ?: 'Sports Accolades';
+
+    $sportTagline = $hideIfDefault($getFieldValue('sport_accolades_tagline', ''))
+        ?: 'A collection of awards & accomplishments';
+
+    $sportBody = $listifyText($hideIfDefault($sportRaw));
+
+    $hasAcademicAccolades = filled(trim(strip_tags($acadBody)));
+    $hasSportsAccolades = filled(trim(strip_tags($sportBody)));
+    $hasAnyAccolades = $hasAcademicAccolades || $hasSportsAccolades;
+
+    $contactFormEmbed = $hideIfDefault($getFieldValue('contact_form_embed', ''));
+
+    if (blank($contactFormEmbed)) {
+        $contactFormEmbed = <<<'HTML'
 <iframe
     src="https://systems.plyrcard.com/widget/form/fNo3I29CD8EJ0N4bzMuA"
     style="width:100%;height:100%;border:none;border-radius:4px"
@@ -324,502 +371,553 @@
 </iframe>
 <script src="https://systems.plyrcard.com/js/form_embed.js"></script>
 HTML;
+    }
+
+    $aboutVideoUrls = filled($user?->featured_video_url)
+        ? $user->featured_video_url
+        : $getFieldValue('yt_embed', '');
+
+    $aboutVideos = $parseUrlList($aboutVideoUrls);
+    $manualVideoSource = filled($user?->featured_video_urls)
+        ? $user->featured_video_urls
+        : $getFieldValue('yt_playlist_embed', '');
+
+    $manualHighlightVideos = $parseUrlList($manualVideoSource);
+
+    $highlightVideos = !empty($manualHighlightVideos)
+        ? collect($manualHighlightVideos)->map(fn ($url) => [
+            'embed_url' => $url,
+            'title' => 'YouTube video',
+        ])->values()->all()
+        : ($autoHighlightVideos ?? []);
+
+    if (empty($aboutVideos) && !empty($highlightVideos)) {
+        $firstEmbed = $highlightVideos[0]['embed_url'] ?? null;
+        $aboutVideos = $firstEmbed ? [$firstEmbed] : [];
+    }
+
+    $aboutThumbnailUrl = $resolveMediaUrl(
+        filled($user?->youtube_thumbnail)
+            ? $user->youtube_thumbnail
+            : $getJsonFieldValue('highlights_thumbnail', $getFieldValue('highlights_thumbnail')),
+        asset('temp-thumbnail.png')
+    );
+
+    $footerClubLogoUrl = $resolveMediaUrl(
+        $user?->club?->logo ?? '',
+        ''
+    );
+
+    $footerLeagueLogoUrl = $resolveMediaUrl(
+        $user?->league?->logo ?? $user?->club?->league?->logo ?? '',
+        ''
+    );
+
+    $footerNationalTeamLogoUrl = $resolveMediaUrl(
+        $user?->nationalTeam?->logo ?? '',
+        ''
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Player Card Media
+    |--------------------------------------------------------------------------
+    */
+    $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hero Media
+    |--------------------------------------------------------------------------
+    | Priority:
+    | 1. Hero field value
+    | 2. Club model value
+    | 3. Current website/user value
+    | 4. Default/fallback
+    */
+    $heroPlyrCardUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_plyrcard_image',
+            $club?->plyrcard_image
+                ?? $website->plyrcard_image
+                ?? $user?->plyrcard_image
+                ?? ''
+        ),
+        ''
+    );
+
+    $heroBallLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_ball_logo',
+            $club?->ball_logo
+                ?? $website->ball_logo
+                ?? ''
+        ),
+        ''
+    );
+
+    $heroCompositeImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_composite_image',
+            $club?->hero_composite_image
+                ?? $website->hero_composite_image
+                ?? ''
+        ),
+        ''
+    );
+
+    $heroBackgroundImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_background_image',
+            $club?->hero_background_image
+                ?? $website->hero_background_image
+                ?? ''
+        ),
+        ''
+    );
+
+    $heroMobileImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_mobile_image',
+            $club?->mobile_hero_image
+                ?? $website->mobile_hero_image
+                ?? $user?->mobile_hero_image
+                ?? ''
+        ),
+        ''
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Schedules
+    |--------------------------------------------------------------------------
+    */
+    $playerSchedules = collect(
+        $user?->createdSchedules
+            ? $user->createdSchedules
+                ->sortBy([
+                    ['game_date', 'asc'],
+                    ['game_time', 'asc'],
+                ])
+                ->values()
+                ->all()
+            : []
+    );
+
+    $formatScheduleTitle = function ($schedule) {
+        $opponent = trim((string) ($schedule->opponent ?? ''));
+        $title = trim((string) ($schedule->title ?? ''));
+
+        if ($opponent !== '') {
+            return ($schedule->is_home ? 'Home vs ' : 'Away @ ') . $opponent;
         }
 
-        $aboutVideoUrls = filled($user?->featured_video_url)
-            ? $user->featured_video_url
-            : $getFieldValue('yt_embed', '');
+        return $title !== '' ? $title : 'Game Day';
+    };
 
-        $aboutVideos = $parseUrlList($aboutVideoUrls);
-        $manualVideoSource = filled($user?->featured_video_urls)
-            ? $user->featured_video_urls
-            : $getFieldValue('yt_playlist_embed', '');
+    $schedulePayload = $playerSchedules
+        ->filter(fn ($schedule) => ! blank($schedule->game_date))
+        ->map(function ($schedule) use ($formatScheduleTitle) {
+            $date = optional($schedule->game_date);
 
-        $manualHighlightVideos = $parseUrlList($manualVideoSource);
+            $timeDisplay = 'Time TBD';
+            $timeSortable = null;
 
-        $highlightVideos = !empty($manualHighlightVideos)
-            ? collect($manualHighlightVideos)->map(fn ($url) => [
-                'embed_url' => $url,
-                'title' => 'YouTube video',
-            ])->values()->all()
-            : ($autoHighlightVideos ?? []);
+            if (! blank($schedule->game_time)) {
+                try {
+                    $parsedTime = $schedule->game_time instanceof \Carbon\CarbonInterface
+                        ? $schedule->game_time
+                        : \Carbon\Carbon::parse($schedule->game_time);
 
-        if (empty($aboutVideos) && !empty($highlightVideos)) {
-            $firstEmbed = $highlightVideos[0]['embed_url'] ?? null;
-            $aboutVideos = $firstEmbed ? [$firstEmbed] : [];
-        }
-
-        $aboutThumbnailUrl = $resolveMediaUrl(
-            filled($user?->youtube_thumbnail)
-                ? $user->youtube_thumbnail
-                : $getJsonFieldValue('highlights_thumbnail', $getFieldValue('highlights_thumbnail')),
-            asset('temp-thumbnail.png')
-        );
-
-        $footerClubLogoUrl = $resolveMediaUrl(
-            $user?->club?->logo ?? '',
-            ''
-        );
-
-        $footerLeagueLogoUrl = $resolveMediaUrl(
-            $user?->league?->logo ?? $user?->club?->league?->logo ?? '',
-            ''
-        );
-
-        $footerNationalTeamLogoUrl = $resolveMediaUrl(
-            $user?->nationalTeam?->logo ?? '',
-            ''
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Player Card Media
-        |--------------------------------------------------------------------------
-        */
-        $playerCardImageUrl = $resolveMediaUrl($user?->plyrcard_image, '');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hero Media
-        |--------------------------------------------------------------------------
-        */
-        $heroPlyrCardUrl = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image'), '');
-        $heroBallLogoUrl = $resolveMediaUrl($getHeroFieldValue('hero_ball_logo'), '');
-        $heroCompositeImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_composite_image'), '');
-        $heroBackgroundImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_background_image'), '');
-        $heroMobileImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image'), '');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Schedules
-        |--------------------------------------------------------------------------
-        */
-        $playerSchedules = collect(
-            $user?->createdSchedules
-                ? $user->createdSchedules
-                    ->sortBy([
-                        ['game_date', 'asc'],
-                        ['game_time', 'asc'],
-                    ])
-                    ->values()
-                    ->all()
-                : []
-        );
-
-        $formatScheduleTitle = function ($schedule) {
-            $opponent = trim((string) ($schedule->opponent ?? ''));
-            $title = trim((string) ($schedule->title ?? ''));
-
-            if ($opponent !== '') {
-                return ($schedule->is_home ? 'Home vs ' : 'Away @ ') . $opponent;
-            }
-
-            return $title !== '' ? $title : 'Game Day';
-        };
-
-        $schedulePayload = $playerSchedules
-            ->filter(fn ($schedule) => ! blank($schedule->game_date))
-            ->map(function ($schedule) use ($formatScheduleTitle) {
-                $date = optional($schedule->game_date);
-
-                $timeDisplay = 'Time TBD';
-                $timeSortable = null;
-
-                if (! blank($schedule->game_time)) {
-                    try {
-                        $parsedTime = $schedule->game_time instanceof \Carbon\CarbonInterface
-                            ? $schedule->game_time
-                            : \Carbon\Carbon::parse($schedule->game_time);
-
-                        $timeDisplay = $parsedTime->format('g:i A');
-                        $timeSortable = $parsedTime->format('H:i:s');
-                    } catch (\Throwable $e) {
-                        $timeDisplay = 'Time TBD';
-                        $timeSortable = null;
-                    }
+                    $timeDisplay = $parsedTime->format('g:i A');
+                    $timeSortable = $parsedTime->format('H:i:s');
+                } catch (\Throwable $e) {
+                    $timeDisplay = 'Time TBD';
+                    $timeSortable = null;
                 }
-
-                $locationLine = collect([
-                    $schedule->location,
-                    $schedule->venue,
-                ])->filter(fn ($value) => filled($value))->implode(' ');
-
-                return [
-                    'id' => $schedule->id,
-                    'title' => $formatScheduleTitle($schedule),
-                    'date' => $date?->format('Y-m-d'),
-                    'year' => $date?->format('Y'),
-                    'month' => $date?->format('m'),
-                    'month_label' => $date?->format('F'),
-                    'month_year' => $date?->format('F Y'),
-                    'day_name' => $date?->format('D'),
-                    'day_number' => $date?->format('d'),
-                    'month_short' => $date?->format('M'),
-                    'full_date_label' => $date?->format('M d, Y'),
-                    'time' => $timeDisplay,
-                    'time_sortable' => $timeSortable,
-                    'location' => $schedule->location ?? '',
-                    'venue' => $schedule->venue ?? '',
-                    'location_line' => $locationLine,
-                    'notes' => $schedule->notes ?? '',
-                    'opponent' => $schedule->opponent ?? '',
-                    'is_home' => (bool) $schedule->is_home,
-                    'status' => $schedule->status ?? '',
-                    'result' => $schedule->result ?? '',
-                    'score' => $schedule->score ?? '',
-                    'search_blob' => strtolower(trim(collect([
-                        $formatScheduleTitle($schedule),
-                        $schedule->opponent,
-                        $schedule->location,
-                        $schedule->venue,
-                        $schedule->notes,
-                        $date?->format('F Y'),
-                        $date?->format('M d, Y'),
-                    ])->filter(fn ($value) => filled($value))->implode(' '))),
-                ];
-            })
-            ->values()
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Contrast Helpers
-        |--------------------------------------------------------------------------
-        */
-        $hexToRgb = function (string $hex) {
-            $hex = ltrim(trim($hex), '#');
-
-            if (strlen($hex) === 3) {
-                $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
             }
 
-            if (strlen($hex) !== 6) {
-                return [15, 23, 42];
-            }
+            $locationLine = collect([
+                $schedule->location,
+                $schedule->venue,
+            ])->filter(fn ($value) => filled($value))->implode(' ');
 
             return [
-                hexdec(substr($hex, 0, 2)),
-                hexdec(substr($hex, 2, 2)),
-                hexdec(substr($hex, 4, 2)),
+                'id' => $schedule->id,
+                'title' => $formatScheduleTitle($schedule),
+                'date' => $date?->format('Y-m-d'),
+                'year' => $date?->format('Y'),
+                'month' => $date?->format('m'),
+                'month_label' => $date?->format('F'),
+                'month_year' => $date?->format('F Y'),
+                'day_name' => $date?->format('D'),
+                'day_number' => $date?->format('d'),
+                'month_short' => $date?->format('M'),
+                'full_date_label' => $date?->format('M d, Y'),
+                'time' => $timeDisplay,
+                'time_sortable' => $timeSortable,
+                'location' => $schedule->location ?? '',
+                'venue' => $schedule->venue ?? '',
+                'location_line' => $locationLine,
+                'notes' => $schedule->notes ?? '',
+                'opponent' => $schedule->opponent ?? '',
+                'is_home' => (bool) $schedule->is_home,
+                'status' => $schedule->status ?? '',
+                'result' => $schedule->result ?? '',
+                'score' => $schedule->score ?? '',
+                'search_blob' => strtolower(trim(collect([
+                    $formatScheduleTitle($schedule),
+                    $schedule->opponent,
+                    $schedule->location,
+                    $schedule->venue,
+                    $schedule->notes,
+                    $date?->format('F Y'),
+                    $date?->format('M d, Y'),
+                ])->filter(fn ($value) => filled($value))->implode(' '))),
             ];
-        };
+        })
+        ->values()
+        ->all();
 
-        $relativeLuminance = function (array $rgb) {
-            $toLinear = function ($v) {
-                $v = $v / 255;
-                return ($v <= 0.03928) ? ($v / 12.92) : pow((($v + 0.055) / 1.055), 2.4);
-            };
+    /*
+    |--------------------------------------------------------------------------
+    | Contrast Helpers
+    |--------------------------------------------------------------------------
+    */
+    $hexToRgb = function (string $hex) {
+        $hex = ltrim(trim($hex), '#');
 
-            $r = $toLinear($rgb[0]);
-            $g = $toLinear($rgb[1]);
-            $b = $toLinear($rgb[2]);
-
-            return 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
-        };
-
-        $contrastText = function (string $bgHex) use ($hexToRgb, $relativeLuminance) {
-            $lum = $relativeLuminance($hexToRgb($bgHex));
-            return ($lum < 0.55) ? '#ffffff' : '#0f172a';
-        };
-
-        $onPrimary   = $contrastText($primary);
-        $onSecondary = $contrastText($secondary);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Coaching Staff
-        |--------------------------------------------------------------------------
-        */
-        $playerEmail = $user->email ?? '';
-
-        $coachRows = collect([
-            [
-                'name'  => $user->club_coach ?? '',
-                'label' => 'HEAD COACH',
-                'title' => $user->club?->name ?? ($user->team_name ?? ''),
-                'email' => $user->club_coach_email ?? $playerEmail,
-            ],
-            [
-                'name'  => $user->tech_trainer ?? '',
-                'label' => 'TECHNICAL TRAINING & MENTORSHIP',
-                'email' => $user->tech_trainer_email ?? $playerEmail,
-            ],
-            [
-                'name'  => $user->snc_trainer ?? '',
-                'label' => 'AGILITY AND STRENGTH TRAINING',
-                'email' => $user->snc_trainer_email ?? $playerEmail,
-            ],
-            [
-                'name'  => $user->natl_coach ?? '',
-                'label' => 'NATIONAL TEAM COACH',
-                'email' => $user->natl_coach_email ?? $playerEmail,
-            ],
-        ])->filter(fn ($c) => trim((string) ($c['name'] ?? '')) !== '')->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Footer / Social
-        |--------------------------------------------------------------------------
-        */
-        $igUrl = '';
-        if (! empty($user->ig_handle)) {
-            $handle = ltrim(trim($user->ig_handle), '@');
-            $igUrl = 'https://instagram.com/' . $handle;
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
         }
 
-        $xUrl = '';
-        if (! empty($user->x_handle)) {
-            $handle = ltrim(trim($user->x_handle), '@');
-            $xUrl = 'https://x.com/' . $handle;
+        if (strlen($hex) !== 6) {
+            return [15, 23, 42];
         }
 
-        $ytUrl = $user->yt_url ?? '';
-        $footerPhone = $user->phone ?? '';
-        $footerEmail = $user->email ?? '';
-        $copyright   = 'Plyr Card 2026 © All Rights Reserved';
+        return [
+            hexdec(substr($hex, 0, 2)),
+            hexdec(substr($hex, 2, 2)),
+            hexdec(substr($hex, 4, 2)),
+        ];
+    };
 
-        $smsPhone = !empty($user->club_coach_phone) ? preg_replace('/\D+/', '', $user->club_coach_phone) : '';
-        $textCoachUrl = $smsPhone ? 'sms:' . $smsPhone : ($playerEmail ? 'mailto:' . $playerEmail : '#');
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEO Helpers
-        |--------------------------------------------------------------------------
-        */
-        $normalizePlainText = function ($value) {
-            if (blank($value)) {
-                return '';
-            }
-
-            $text = is_string($value) ? $value : json_encode($value);
-            $text = strip_tags($text);
-            $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $text = preg_replace('/\s+/u', ' ', $text);
-
-            return trim((string) $text);
+    $relativeLuminance = function (array $rgb) {
+        $toLinear = function ($v) {
+            $v = $v / 255;
+            return ($v <= 0.03928) ? ($v / 12.92) : pow((($v + 0.055) / 1.055), 2.4);
         };
 
-        $truncate = function (?string $text, int $limit = 160) {
-            $text = trim((string) $text);
+        $r = $toLinear($rgb[0]);
+        $g = $toLinear($rgb[1]);
+        $b = $toLinear($rgb[2]);
 
-            if ($text === '') {
-                return '';
+        return 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
+    };
+
+    $contrastText = function (string $bgHex) use ($hexToRgb, $relativeLuminance) {
+        $lum = $relativeLuminance($hexToRgb($bgHex));
+        return ($lum < 0.55) ? '#ffffff' : '#0f172a';
+    };
+
+    $onPrimary   = $contrastText($primary);
+    $onSecondary = $contrastText($secondary);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Coaching Staff
+    |--------------------------------------------------------------------------
+    */
+    $playerEmail = $user->email ?? '';
+
+    $coachRows = collect([
+        [
+            'name'  => $user->club_coach ?? '',
+            'label' => 'HEAD COACH',
+            'title' => $user->club?->name ?? ($user->team_name ?? ''),
+            'email' => $user->club_coach_email ?? $playerEmail,
+        ],
+        [
+            'name'  => $user->tech_trainer ?? '',
+            'label' => 'TECHNICAL TRAINING & MENTORSHIP',
+            'email' => $user->tech_trainer_email ?? $playerEmail,
+        ],
+        [
+            'name'  => $user->snc_trainer ?? '',
+            'label' => 'AGILITY AND STRENGTH TRAINING',
+            'email' => $user->snc_trainer_email ?? $playerEmail,
+        ],
+        [
+            'name'  => $user->natl_coach ?? '',
+            'label' => 'NATIONAL TEAM COACH',
+            'email' => $user->natl_coach_email ?? $playerEmail,
+        ],
+    ])->filter(fn ($c) => trim((string) ($c['name'] ?? '')) !== '')->values();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Footer / Social
+    |--------------------------------------------------------------------------
+    */
+    $igUrl = '';
+    if (! empty($user->ig_handle)) {
+        $handle = ltrim(trim($user->ig_handle), '@');
+        $igUrl = 'https://instagram.com/' . $handle;
+    }
+
+    $xUrl = '';
+    if (! empty($user->x_handle)) {
+        $handle = ltrim(trim($user->x_handle), '@');
+        $xUrl = 'https://x.com/' . $handle;
+    }
+
+    $ytUrl = $user->yt_url ?? '';
+    $footerPhone = $user->phone ?? '';
+    $footerEmail = $user->email ?? '';
+    $copyright   = 'Plyr Card 2026 © All Rights Reserved';
+
+    $smsPhone = !empty($user->club_coach_phone) ? preg_replace('/\D+/', '', $user->club_coach_phone) : '';
+    $textCoachUrl = $smsPhone ? 'sms:' . $smsPhone : ($playerEmail ? 'mailto:' . $playerEmail : '#');
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEO Helpers
+    |--------------------------------------------------------------------------
+    */
+    $normalizePlainText = function ($value) {
+        if (blank($value)) {
+            return '';
+        }
+
+        $text = is_string($value) ? $value : json_encode($value);
+        $text = strip_tags($text);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/\s+/u', ' ', $text);
+
+        return trim((string) $text);
+    };
+
+    $truncate = function (?string $text, int $limit = 160) {
+        $text = trim((string) $text);
+
+        if ($text === '') {
+            return '';
+        }
+
+        return \Illuminate\Support\Str::limit($text, $limit, '...');
+    };
+
+    $normalizeDisplayValue = function ($value, $separator = ' / ') {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
             }
+        }
 
-            return \Illuminate\Support\Str::limit($text, $limit, '...');
-        };
+        if (is_array($value)) {
+            return implode($separator, array_filter(array_map(function ($item) {
+                return is_scalar($item) ? (string) $item : '';
+            }, $value)));
+        }
 
-        $normalizeDisplayValue = function ($value, $separator = ' / ') {
-            if (is_string($value)) {
-                $decoded = json_decode($value, true);
+        return filled($value) ? (string) $value : '';
+    };
 
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $value = $decoded;
-                }
-            }
+    $formatPositionDisplay = function ($value) use ($normalizeDisplayValue) {
+        $position = $normalizeDisplayValue($value);
 
-            if (is_array($value)) {
-                return implode($separator, array_filter(array_map(function ($item) {
-                    return is_scalar($item) ? (string) $item : '';
-                }, $value)));
-            }
+        if ($position === '') {
+            return '';
+        }
 
-            return filled($value) ? (string) $value : '';
-        };
+        return collect(explode(' / ', $position))
+            ->map(fn ($item) => str($item)->replace('_', ' ')->title()->toString())
+            ->implode(' / ');
+    };
 
-        $formatPositionDisplay = function ($value) use ($normalizeDisplayValue) {
-            $position = $normalizeDisplayValue($value);
+    /*
+    |--------------------------------------------------------------------------
+    | SEO Template Fields (overrides)
+    |--------------------------------------------------------------------------
+    */
+    $seoTitleField = $normalizePlainText($getFieldValue('seo_title', ''));
+    $seoDescriptionField = $normalizePlainText($getFieldValue('seo_description', ''));
+    $seoKeywordsField = $normalizePlainText($getFieldValue('seo_keywords', ''));
+    $seoRobotsField = $normalizePlainText($getFieldValue('seo_robots', ''));
+    $seoCanonicalField = $normalizePlainText($getFieldValue('seo_canonical_url', ''));
 
-            if ($position === '') {
-                return '';
-            }
+    $ogTitleField = $normalizePlainText($getFieldValue('og_title', ''));
+    $ogDescriptionField = $normalizePlainText($getFieldValue('og_description', ''));
+    $ogImageField = $resolveMediaUrl($getFieldValue('og_image'), '');
 
-            return collect(explode(' / ', $position))
-                ->map(fn ($item) => str($item)->replace('_', ' ')->title()->toString())
-                ->implode(' / ');
-        };
+    $twitterTitleField = $normalizePlainText($getFieldValue('twitter_title', ''));
+    $twitterDescriptionField = $normalizePlainText($getFieldValue('twitter_description', ''));
+    $twitterImageField = $resolveMediaUrl($getFieldValue('twitter_image'), '');
 
-        /*
-        |--------------------------------------------------------------------------
-        | SEO Template Fields (overrides)
-        |--------------------------------------------------------------------------
-        */
-        $seoTitleField = $normalizePlainText($getFieldValue('seo_title', ''));
-        $seoDescriptionField = $normalizePlainText($getFieldValue('seo_description', ''));
-        $seoKeywordsField = $normalizePlainText($getFieldValue('seo_keywords', ''));
-        $seoRobotsField = $normalizePlainText($getFieldValue('seo_robots', ''));
-        $seoCanonicalField = $normalizePlainText($getFieldValue('seo_canonical_url', ''));
+    $faviconField = $resolveMediaUrl($getFieldValue('favicon'), '');
+    $schemaNameOverride = $normalizePlainText($getFieldValue('schema_override_name', ''));
+    $schemaDescriptionOverride = $normalizePlainText($getFieldValue('schema_override_description', ''));
 
-        $ogTitleField = $normalizePlainText($getFieldValue('og_title', ''));
-        $ogDescriptionField = $normalizePlainText($getFieldValue('og_description', ''));
-        $ogImageField = $resolveMediaUrl($getFieldValue('og_image'), '');
+    /*
+    |--------------------------------------------------------------------------
+    | SEO Defaults
+    |--------------------------------------------------------------------------
+    */
+    $playerName = trim(
+        $website->name ?: (($user?->first_name ?? '') . ' ' . ($user?->last_name ?? ''))
+    );
 
-        $twitterTitleField = $normalizePlainText($getFieldValue('twitter_title', ''));
-        $twitterDescriptionField = $normalizePlainText($getFieldValue('twitter_description', ''));
-        $twitterImageField = $resolveMediaUrl($getFieldValue('twitter_image'), '');
+    $sportText = filled($user?->sport)
+        ? str($user->sport)->replace('_', ' ')->title()->toString()
+        : '';
 
-        $faviconField = $resolveMediaUrl($getFieldValue('favicon'), '');
-        $schemaNameOverride = $normalizePlainText($getFieldValue('schema_override_name', ''));
-        $schemaDescriptionOverride = $normalizePlainText($getFieldValue('schema_override_description', ''));
+    $positionText = $formatPositionDisplay($user?->position ?? '');
 
-        /*
-        |--------------------------------------------------------------------------
-        | SEO Defaults
-        |--------------------------------------------------------------------------
-        */
-        $playerName = trim(
-            $website->name ?: (($user?->first_name ?? '') . ' ' . ($user?->last_name ?? ''))
-        );
+    $schoolName = $user?->school?->name ?? '';
+    $clubName = $user?->club?->name ?? ($user?->team_name ?? '');
+    $leagueName = $user?->club?->league?->name ?? '';
 
-        $sportText = filled($user?->sport)
-            ? str($user->sport)->replace('_', ' ')->title()->toString()
-            : '';
+    $locationText = collect([$user?->city, $user?->state])
+        ->filter(fn ($v) => filled($v))
+        ->implode(', ');
 
-        $positionText = $formatPositionDisplay($user?->position ?? '');
+    $coachNamesForSeo = $coachRows->pluck('name')->filter()->implode(', ');
 
-        $schoolName = $user?->school?->name ?? '';
-        $clubName = $user?->club?->name ?? ($user?->team_name ?? '');
-        $leagueName = $user?->club?->league?->name ?? '';
+    $canonicalUrl = filled($seoCanonicalField) ? $seoCanonicalField : url()->current();
 
-        $locationText = collect([$user?->city, $user?->state])
-            ->filter(fn ($v) => filled($v))
-            ->implode(', ');
+    $defaultSeoTitle = collect([
+        $playerName,
+        $positionText,
+        $sportText,
+        filled($schoolName) ? $schoolName : null,
+        'PlyrCard',
+    ])->filter(fn ($v) => filled($v))->implode(' | ');
 
-        $coachNamesForSeo = $coachRows->pluck('name')->filter()->implode(', ');
+    $defaultLongDescription = collect([
+        filled($playerName) ? "{$playerName} athlete profile." : null,
+        filled($positionText) ? "Position: {$positionText}." : null,
+        filled($sportText) ? "Sport: {$sportText}." : null,
+        filled($schoolName) ? "School: {$schoolName}." : null,
+        filled($clubName) ? "Club/Team: {$clubName}." : null,
+        filled($leagueName) ? "League: {$leagueName}." : null,
+        filled($locationText) ? "Location: {$locationText}." : null,
+        filled($aboutTagline) ? $aboutTagline : null,
+        filled($aboutHeadline) ? $aboutHeadline . '.' : null,
+        filled($aboutBio) ? $truncate($normalizePlainText($aboutBio), 220) : null,
+        filled($sportBody) ? $truncate($normalizePlainText($sportBody), 180) : null,
+        filled($acadBody) ? $truncate($normalizePlainText($acadBody), 180) : null,
+        filled($coachNamesForSeo) ? "Coaching staff includes {$coachNamesForSeo}." : null,
+    ])->filter(fn ($v) => filled($v))->implode(' ');
 
-        $canonicalUrl = filled($seoCanonicalField) ? $seoCanonicalField : url()->current();
+    $defaultSeoDescription = $truncate($defaultLongDescription, 160);
 
-        $defaultSeoTitle = collect([
-            $playerName,
-            $positionText,
-            $sportText,
-            filled($schoolName) ? $schoolName : null,
-            'PlyrCard',
-        ])->filter(fn ($v) => filled($v))->implode(' | ');
+    $defaultKeywords = collect([
+        $playerName,
+        $sportText,
+        $positionText,
+        $schoolName,
+        $clubName,
+        $leagueName,
+        $locationText,
+        'athlete profile',
+        'player profile',
+        'student athlete',
+        'recruiting profile',
+        'PlyrCard',
+    ])->filter(fn ($v) => filled($v))->implode(', ');
 
-        $defaultLongDescription = collect([
-            filled($playerName) ? "{$playerName} athlete profile." : null,
-            filled($positionText) ? "Position: {$positionText}." : null,
-            filled($sportText) ? "Sport: {$sportText}." : null,
-            filled($schoolName) ? "School: {$schoolName}." : null,
-            filled($clubName) ? "Club/Team: {$clubName}." : null,
-            filled($leagueName) ? "League: {$leagueName}." : null,
-            filled($locationText) ? "Location: {$locationText}." : null,
-            filled($aboutTagline) ? $aboutTagline : null,
-            filled($aboutHeadline) ? $aboutHeadline . '.' : null,
-            filled($aboutBio) ? $truncate($normalizePlainText($aboutBio), 220) : null,
-            filled($sportBody) ? $truncate($normalizePlainText($sportBody), 180) : null,
-            filled($acadBody) ? $truncate($normalizePlainText($acadBody), 180) : null,
-            filled($coachNamesForSeo) ? "Coaching staff includes {$coachNamesForSeo}." : null,
-        ])->filter(fn ($v) => filled($v))->implode(' ');
+    $seoTitle = filled($seoTitleField) ? $seoTitleField : $defaultSeoTitle;
+    $seoDescription = filled($seoDescriptionField)
+        ? $truncate($seoDescriptionField, 160)
+        : $defaultSeoDescription;
+    $seoKeywords = filled($seoKeywordsField) ? $seoKeywordsField : $defaultKeywords;
+    $seoRobots = filled($seoRobotsField) ? $seoRobotsField : 'index,follow';
 
-        $defaultSeoDescription = $truncate($defaultLongDescription, 160);
+    $shareImage = $ogImageField
+        ?: $twitterImageField
+        ?: $aboutThumbnailUrl
+        ?: $heroCompositeImageUrl
+        ?: $heroBackgroundImageUrl
+        ?: $heroMobileImageUrl
+        ?: ($footerLogoUrl ?? null)
+        ?: $heroPlyrCardUrl
+        ?: $playerCardImageUrl
+        ?: asset('temp-thumbnail.png');
 
-        $defaultKeywords = collect([
-            $playerName,
-            $sportText,
-            $positionText,
-            $schoolName,
-            $clubName,
-            $leagueName,
-            $locationText,
-            'athlete profile',
-            'player profile',
-            'student athlete',
-            'recruiting profile',
-            'PlyrCard',
-        ])->filter(fn ($v) => filled($v))->implode(', ');
+    $faviconUrl = $faviconField
+        ?: $playerCardImageUrl
+        ?: $heroPlyrCardUrl
+        ?: asset('favicon.ico');
 
-        $seoTitle = filled($seoTitleField) ? $seoTitleField : $defaultSeoTitle;
-        $seoDescription = filled($seoDescriptionField)
-            ? $truncate($seoDescriptionField, 160)
-            : $defaultSeoDescription;
-        $seoKeywords = filled($seoKeywordsField) ? $seoKeywordsField : $defaultKeywords;
-        $seoRobots = filled($seoRobotsField) ? $seoRobotsField : 'index,follow';
+    $ogTitle = filled($ogTitleField) ? $ogTitleField : $seoTitle;
+    $ogDescription = filled($ogDescriptionField)
+        ? $truncate($ogDescriptionField, 200)
+        : $seoDescription;
 
-        $shareImage = $ogImageField
-            ?: $twitterImageField
-            ?: $aboutThumbnailUrl
-            ?: $heroCompositeImageUrl
-            ?: $heroBackgroundImageUrl
-            ?: $heroMobileImageUrl
-            ?: $footerLogoUrl
-            ?: $heroPlyrCardUrl
-            ?: $playerCardImageUrl
-            ?: asset('temp-thumbnail.png');
+    $twitterTitle = filled($twitterTitleField) ? $twitterTitleField : $ogTitle;
+    $twitterDescription = filled($twitterDescriptionField)
+        ? $truncate($twitterDescriptionField, 200)
+        : $ogDescription;
 
-        $faviconUrl = $faviconField
-            ?: $playerCardImageUrl
-            ?: $heroPlyrCardUrl
-            ?: asset('favicon.ico');
+    $igHandle = filled($user?->ig_handle) ? '@' . ltrim(trim($user->ig_handle), '@') : '';
+    $xHandle = filled($user?->x_handle) ? '@' . ltrim(trim($user->x_handle), '@') : '';
 
-        $ogTitle = filled($ogTitleField) ? $ogTitleField : $seoTitle;
-        $ogDescription = filled($ogDescriptionField)
-            ? $truncate($ogDescriptionField, 200)
-            : $seoDescription;
+    $schemaName = filled($schemaNameOverride) ? $schemaNameOverride : ($playerName ?: 'PlyrCard Athlete');
+    $schemaDescription = filled($schemaDescriptionOverride)
+        ? $truncate($schemaDescriptionOverride, 220)
+        : $truncate($defaultLongDescription, 220);
 
-        $twitterTitle = filled($twitterTitleField) ? $twitterTitleField : $ogTitle;
-        $twitterDescription = filled($twitterDescriptionField)
-            ? $truncate($twitterDescriptionField, 200)
-            : $ogDescription;
+    $sameAs = collect([
+        $igUrl ?: null,
+        $xUrl ?: null,
+        $ytUrl ?: null,
+    ])->filter(fn ($v) => filled($v))->values()->all();
 
-        $igHandle = filled($user?->ig_handle) ? '@' . ltrim(trim($user->ig_handle), '@') : '';
-        $xHandle = filled($user?->x_handle) ? '@' . ltrim(trim($user->x_handle), '@') : '';
+    $personSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Person',
+        'name' => $schemaName,
+        'url' => $canonicalUrl,
+        'description' => $schemaDescription,
+        'image' => $shareImage,
+    ];
 
-        $schemaName = filled($schemaNameOverride) ? $schemaNameOverride : ($playerName ?: 'PlyrCard Athlete');
-        $schemaDescription = filled($schemaDescriptionOverride)
-            ? $truncate($schemaDescriptionOverride, 220)
-            : $truncate($defaultLongDescription, 220);
+    if (filled($schoolName)) {
+        $personSchema['alumniOf'] = [
+            '@type' => 'EducationalOrganization',
+            'name' => $schoolName,
+        ];
+    }
 
-        $sameAs = collect([
-            $igUrl ?: null,
-            $xUrl ?: null,
-            $ytUrl ?: null,
-        ])->filter(fn ($v) => filled($v))->values()->all();
+    if (filled($clubName)) {
+        $personSchema['memberOf'] = [
+            '@type' => 'SportsOrganization',
+            'name' => $clubName,
+        ];
+    }
 
-        $personSchema = [
-            '@context' => 'https://schema.org',
+    if (filled($sportText)) {
+        $personSchema['sport'] = $sportText;
+    }
+
+    if (! empty($sameAs)) {
+        $personSchema['sameAs'] = $sameAs;
+    }
+
+    $webPageSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'ProfilePage',
+        'name' => $seoTitle,
+        'url' => $canonicalUrl,
+        'description' => $seoDescription,
+        'mainEntity' => [
             '@type' => 'Person',
             'name' => $schemaName,
-            'url' => $canonicalUrl,
-            'description' => $schemaDescription,
-            'image' => $shareImage,
-        ];
-
-        if (filled($schoolName)) {
-            $personSchema['alumniOf'] = [
-                '@type' => 'EducationalOrganization',
-                'name' => $schoolName,
-            ];
-        }
-
-        if (filled($clubName)) {
-            $personSchema['memberOf'] = [
-                '@type' => 'SportsOrganization',
-                'name' => $clubName,
-            ];
-        }
-
-        if (filled($sportText)) {
-            $personSchema['sport'] = $sportText;
-        }
-
-        if (! empty($sameAs)) {
-            $personSchema['sameAs'] = $sameAs;
-        }
-
-        $webPageSchema = [
-            '@context' => 'https://schema.org',
-            '@type' => 'ProfilePage',
-            'name' => $seoTitle,
-            'url' => $canonicalUrl,
-            'description' => $seoDescription,
-            'mainEntity' => [
-                '@type' => 'Person',
-                'name' => $schemaName,
-            ],
-        ];
-    @endphp
+        ],
+    ];
+@endphp
 
     <title>{{ $seoTitle }}</title>
 

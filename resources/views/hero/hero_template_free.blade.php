@@ -1,14 +1,17 @@
 @php
     $user = $website->user;
+    $club = $user?->club;
 
-    $primary   = $website->primary_color ?: '#cf4446';
-    $secondary = $website->secondary_color ?: '#111111';
-    $accent    = $website->accent_color ?: '#ffffff';
-    $bg        = $website->background_color ?: '#0b0b0b';
-    $surface   = $website->surface_color ?: '#171717';
-    $text1     = $website->text_primary_color ?: '#ffffff';
-    $text2     = $website->text_secondary_color ?: '#ffe5e5';
-
+    /*
+    |--------------------------------------------------------------------------
+    | Theme Colors
+    |--------------------------------------------------------------------------
+    | Priority:
+    | 1. Hero field value
+    | 2. Club model value
+    | 3. Website value
+    | 4. Hardcoded default
+    */
     $heroFieldValues = $website->relationLoaded('heroFieldValues')
         ? $website->heroFieldValues
         : $website->heroFieldValues()->with('templateField')->get();
@@ -21,8 +24,57 @@
 
     $getHeroFieldValue = function (string $fieldName, $default = null) use ($getHeroFieldRecord) {
         $record = $getHeroFieldRecord($fieldName);
-        return $record?->value ?? $default;
+        return filled($record?->value) ? $record->value : $default;
     };
+
+    $primary = $getHeroFieldValue(
+        'primary_color',
+        $club?->primary_color
+            ?: $website->primary_color
+            ?: '#cf4446'
+    );
+
+    $secondary = $getHeroFieldValue(
+        'secondary_color',
+        $club?->secondary_color
+            ?: $website->secondary_color
+            ?: '#111111'
+    );
+
+    $accent = $getHeroFieldValue(
+        'accent_color',
+        $club?->accent_color
+            ?: $website->accent_color
+            ?: '#ffffff'
+    );
+
+    $bg = $getHeroFieldValue(
+        'background_color',
+        $club?->background_color
+            ?: $website->background_color
+            ?: '#0b0b0b'
+    );
+
+    $surface = $getHeroFieldValue(
+        'surface_color',
+        $club?->surface_color
+            ?: $website->surface_color
+            ?: '#171717'
+    );
+
+    $text1 = $getHeroFieldValue(
+        'text_primary_color',
+        $club?->text_primary_color
+            ?: $website->text_primary_color
+            ?: '#ffffff'
+    );
+
+    $text2 = $getHeroFieldValue(
+        'text_secondary_color',
+        $club?->text_secondary_color
+            ?: $website->text_secondary_color
+            ?: '#ffe5e5'
+    );
 
     $resolveMediaUrl = function ($raw, $fallback = '') {
         if (blank($raw)) {
@@ -185,12 +237,65 @@
     $playerFullName = trim($getHeroFieldValue('hero_player_name', ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')));
     $statsTitle = strtoupper($getHeroFieldValue('hero_stats_title', 'STATISTICS'));
 
-    $plyrCardImageUrl   = $resolveMediaUrl($getHeroFieldValue('hero_plyrcard_image', $user?->plyrcard_image), '');
-    $playerImageUrl     = $resolveMediaUrl($getHeroFieldValue('hero_player_image', $user?->player_image), '');
-    $mobileHeroImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_mobile_image', $user?->mobile_hero_image), '');
-    $backgroundImageUrl = $resolveMediaUrl($getHeroFieldValue('hero_background_image'), '');
-    $ballLogoUrl        = $resolveMediaUrl($getHeroFieldValue('hero_ball_logo'), '');
-    $brandLogoUrl       = $resolveMediaUrl($getHeroFieldValue('hero_brand_logo'), '');
+    $plyrCardImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_plyrcard_image',
+            $club?->plyrcard_image
+                ?? $website->plyrcard_image
+                ?? $user?->plyrcard_image
+        ),
+        ''
+    );
+
+    $playerImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_player_image',
+            $club?->player_image
+                ?? $website->player_image
+                ?? $user?->player_image
+        ),
+        ''
+    );
+
+    $mobileHeroImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_mobile_image',
+            $club?->mobile_hero_image
+                ?? $website->mobile_hero_image
+                ?? $user?->mobile_hero_image
+        ),
+        ''
+    );
+
+    $backgroundImageUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_background_image',
+            $club?->hero_background_image
+                ?? $website->hero_background_image
+                ?? ''
+        ),
+        ''
+    );
+
+    $ballLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_ball_logo',
+            $club?->ball_logo
+                ?? $website->ball_logo
+                ?? ''
+        ),
+        ''
+    );
+
+    $brandLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue(
+            'hero_brand_logo',
+            $club?->logo
+                ?? $website->logo
+                ?? ''
+        ),
+        ''
+    );
 
     $sportRaw = $normalizeDisplayValue(
         $getHeroFieldValue(
