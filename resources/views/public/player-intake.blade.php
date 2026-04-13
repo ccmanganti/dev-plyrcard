@@ -45,12 +45,13 @@
             width: 100%;
             max-width: 1220px;
             margin: 0 auto;
+            padding-bottom: 260px;
         }
 
         .card {
             border: 1px solid var(--border);
             border-radius: 26px;
-            overflow: hidden;
+            overflow: visible;
             background: #101010;
             box-shadow: var(--shadow);
         }
@@ -103,6 +104,7 @@
         .content {
             padding: 20px;
             background: #0f0f0f;
+            overflow: visible;
         }
 
         .tabs-bar {
@@ -167,6 +169,7 @@
             border: 1px solid var(--border);
             border-radius: 22px;
             background: linear-gradient(180deg, #151515 0%, #111111 100%);
+            overflow: visible;
         }
 
         .section-header {
@@ -213,6 +216,7 @@
             display: grid;
             grid-template-columns: repeat(12, minmax(0, 1fr));
             gap: 16px;
+            overflow: visible;
         }
 
         .col-12 { grid-column: span 12; }
@@ -230,26 +234,6 @@
         }
 
         .required { color: var(--accent-2); }
-
-        .field-label-inline {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-
-        .field-icon {
-            display: inline-flex;
-            width: 15px;
-            height: 15px;
-            opacity: .85;
-        }
-
-        .field-icon svg {
-            width: 15px;
-            height: 15px;
-            stroke-width: 2;
-        }
 
         input[type="text"],
         input[type="email"],
@@ -497,6 +481,11 @@
 
         .search-select {
             position: relative;
+            z-index: 10;
+        }
+
+        .search-select.open {
+            z-index: 60;
         }
 
         .search-select.is-disabled {
@@ -574,13 +563,14 @@
             top: calc(100% + 8px);
             left: 0;
             right: 0;
-            z-index: 35;
+            z-index: 70;
             border-radius: 16px;
             border: 1px solid rgba(255, 122, 0, 0.18);
             background: #101010;
             box-shadow: 0 16px 40px rgba(0,0,0,.35);
             display: none;
             overflow: hidden;
+            margin-bottom: 24px;
         }
 
         .search-select.open .search-select-dropdown {
@@ -602,8 +592,9 @@
         }
 
         .search-select-list {
-            max-height: 280px;
+            max-height: 320px;
             overflow-y: auto;
+            padding-bottom: 10px;
         }
 
         .search-select-option {
@@ -655,12 +646,6 @@
             color: var(--muted);
         }
 
-        .org-lock-note {
-            margin-top: 8px;
-            font-size: 12px;
-            color: var(--muted);
-        }
-
         @media (max-width: 980px) {
             .hero-title { font-size: 52px; }
             .header-copy { font-size: 17px; }
@@ -683,7 +668,10 @@
 
         @media (max-width: 640px) {
             body.embed-mode { padding: 0; }
-            .wrapper { max-width: 100%; }
+            .wrapper {
+                max-width: 100%;
+                padding-bottom: 300px;
+            }
 
             .card {
                 border-radius: 0;
@@ -717,6 +705,14 @@
                 min-height: 42px;
                 font-size: 12px;
                 padding: 10px 14px;
+            }
+
+            .search-select-dropdown {
+                max-height: min(60vh, 360px);
+            }
+
+            .search-select-list {
+                max-height: min(48vh, 260px);
             }
         }
     </style>
@@ -756,7 +752,7 @@
                     <span>Athlete Details</span>
                 </button>
                 <button type="button" class="tab-btn" data-step-pill="2">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-9-6Z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10l9-6 9 6-9 6-3.272-2.182"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>
                     <span>School & Organization</span>
                 </button>
                 <button type="button" class="tab-btn" data-step-pill="3">
@@ -776,7 +772,6 @@
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
 
-                {{-- STEP 1 --}}
                 <div class="step-panel" data-step="1">
                     <div class="section">
                         <div class="section-header">
@@ -848,13 +843,14 @@
                             </div>
 
                             <div class="col-4" id="dominant_foot_wrap" style="display:none;">
-                                <label for="dominant_foot">Dominant Foot <span class="required">*</span></label>
+                                <label for="dominant_foot">Dominant Foot</label>
                                 <select id="dominant_foot" name="dominant_foot">
                                     <option value="">Select dominant foot</option>
                                     <option value="left" {{ old('dominant_foot') === 'left' ? 'selected' : '' }}>Left</option>
                                     <option value="right" {{ old('dominant_foot') === 'right' ? 'selected' : '' }}>Right</option>
                                     <option value="both" {{ old('dominant_foot') === 'both' ? 'selected' : '' }}>Both</option>
                                 </select>
+                                <div class="hint">Optional. Only shown for soccer.</div>
                             </div>
 
                             <div class="col-4">
@@ -960,7 +956,6 @@
                     </div>
                 </div>
 
-                {{-- STEP 2 --}}
                 <div class="step-panel" data-step="2">
                     <div class="section">
                         <div class="section-header">
@@ -994,24 +989,24 @@
                             </div>
 
                             <div class="col-4">
-                                <label for="league_id_display">League</label>
+                                <label>League</label>
                                 <div id="leagueSelectRoot"></div>
                                 <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
-                                <div class="hint">Search leagues. When gender is not selected yet, league labels show the gender in parentheses.</div>
+                                <div class="hint">Filtered by selected gender and sport.</div>
                             </div>
 
                             <div class="col-4">
-                                <label for="club_id_display">Club</label>
+                                <label>Club</label>
                                 <div id="clubSelectRoot"></div>
                                 <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
-                                <div class="hint">Filtered by selected sport, gender, and league. Club logos are shown in the options.</div>
+                                <div class="hint">Filtered by selected league, gender, and sport. Logos are shown where available.</div>
                             </div>
 
                             <div class="col-4">
-                                <label for="team_id_display">Team</label>
+                                <label>Team</label>
                                 <div id="teamSelectRoot"></div>
                                 <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
-                                <div class="hint">Filtered by selected sport, gender, and club.</div>
+                                <div class="hint">Filtered by selected club, gender, and sport.</div>
                             </div>
 
                             <div class="col-4 other-wrap" id="league_other_wrap">
@@ -1050,7 +1045,6 @@
                     </div>
                 </div>
 
-                {{-- STEP 3 --}}
                 <div class="step-panel" data-step="3">
                     <div class="section">
                         <div class="section-header">
@@ -1127,7 +1121,6 @@
                     </div>
                 </div>
 
-                {{-- STEP 4 --}}
                 <div class="step-panel" data-step="4">
                     <div class="section">
                         <div class="section-header">
@@ -1154,7 +1147,6 @@
                             <div class="col-4">
                                 <label for="parent_phone">Primary Parent Phone</label>
                                 <input type="text" id="parent_phone" name="parent_phone" value="{{ old('parent_phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
-
                             </div>
 
                             <div class="col-4">
@@ -1249,7 +1241,6 @@
                     </div>
                 </div>
 
-                {{-- STEP 5 --}}
                 <div class="step-panel" data-step="5">
                     <div class="section">
                         <div class="section-header">
@@ -1366,35 +1357,38 @@
     }
 
     function renderPositions() {
-        const sportSelect = document.getElementById('sport');
-        const container = document.getElementById('positionOptions');
-        const selectedSport = sportSelect.value;
+    const sportSelect = document.getElementById('sport');
+    const container = document.getElementById('positionOptions');
+    const selectedSport = sportSelect.value;
 
-        container.innerHTML = '';
+    const currentChecked = Array.from(document.querySelectorAll('input[name="position[]"]:checked'))
+        .map(input => input.value);
 
-        if (!selectedSport || !sportPositions[selectedSport]) return;
+    container.innerHTML = '';
 
-        Object.entries(sportPositions[selectedSport]).forEach(([key, label]) => {
-            const wrapper = document.createElement('label');
-            wrapper.className = 'check-pill';
+    if (!selectedSport || !sportPositions[selectedSport]) return;
 
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.name = 'position[]';
-            input.value = key;
+    Object.entries(sportPositions[selectedSport]).forEach(([key, label]) => {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'check-pill';
 
-            if (Array.isArray(oldPositions) && oldPositions.includes(key)) {
-                input.checked = true;
-            }
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = 'position[]';
+        input.value = key;
 
-            const span = document.createElement('span');
-            span.textContent = label;
+        if (currentChecked.includes(key) || (Array.isArray(oldPositions) && oldPositions.includes(key))) {
+            input.checked = true;
+        }
 
-            wrapper.appendChild(input);
-            wrapper.appendChild(span);
-            container.appendChild(wrapper);
-        });
-    }
+        const span = document.createElement('span');
+        span.textContent = label;
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(span);
+        container.appendChild(wrapper);
+    });
+}
 
     function toggleDominantFoot() {
         const sportSelect = document.getElementById('sport');
@@ -1468,7 +1462,7 @@
             return;
         }
 
-        countryOtherWrap.style.display = selectedCountry === '__other__' ? 'block' : 'none';
+        countryOtherWrap.style.display = selectedCountry === '__other__' ? 'block' : 'block';
         stateUsWrap.style.display = 'none';
         stateInternationalWrap.style.display = 'block';
         stateHidden.value = stateInternational.value || '';
@@ -1518,134 +1512,135 @@
     }
 
     function getStepValidationErrors(step) {
-        const errors = [];
+    const errors = [];
 
-        if (step === 1) {
-            const firstName = document.getElementById('first_name');
-            const lastName = document.getElementById('last_name');
-            const personalEmail = document.getElementById('personal_email');
-            const gender = document.getElementById('gender');
-            const sport = document.getElementById('sport');
-            const dominantFoot = document.getElementById('dominant_foot');
+    if (step === 1) {
+        const firstName = document.getElementById('first_name');
+        const lastName = document.getElementById('last_name');
+        const personalEmail = document.getElementById('personal_email');
+        const gender = document.getElementById('gender');
+        const sport = document.getElementById('sport');
 
-            if (!firstName.value.trim()) errors.push('First Name is required.');
-            if (!lastName.value.trim()) errors.push('Last Name is required.');
+        if (!firstName.value.trim()) errors.push('First Name is required.');
+        if (!lastName.value.trim()) errors.push('Last Name is required.');
 
-            if (!personalEmail.value.trim()) {
-                errors.push('Personal Email is required.');
-            } else if (!validateEmail(personalEmail.value.trim())) {
-                errors.push('Personal Email must be valid.');
-            }
-
-            if (!gender.value.trim()) errors.push('Gender is required.');
-            if (!sport.value.trim()) errors.push('Sport is required.');
-
-            const checkedPositions = document.querySelectorAll('input[name="position[]"]:checked');
-            if (!checkedPositions.length) errors.push('Select at least one position.');
-
-            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) {
-                errors.push('Dominant Foot is required for soccer.');
-            }
-
-            const country = document.getElementById('country');
-            const countryOther = document.getElementById('country_other');
-            if (country.value === '__other__' && !countryOther.value.trim()) {
-                errors.push('Country Name is required.');
-            }
-
-            const natlTeamExp = document.getElementById('natl_team_exp');
-            const natlTeamPeriod = document.getElementById('national_team_period');
-            if (natlTeamExp.value === '1' && !natlTeamPeriod.value.trim()) {
-                errors.push('National Team Period is required.');
-            }
+        if (!personalEmail.value.trim()) {
+            errors.push('Personal Email is required.');
+        } else if (!validateEmail(personalEmail.value.trim())) {
+            errors.push('Personal Email must be valid.');
         }
 
-        if (step === 2) {
-            const school = document.getElementById('school_id');
-            const schoolOther = document.getElementById('school_other');
-            const leagueId = document.getElementById('league_id').value;
-            const leagueOther = document.getElementById('league_other');
-            const clubOther = document.getElementById('club_other');
-            const teamOther = document.getElementById('team_other');
-            const natlTeamExp = document.getElementById('natl_team_exp');
-            const natlTeamId = document.getElementById('national_team_id');
-            const natlTeamOther = document.getElementById('national_team_other');
+        if (!gender.value.trim()) errors.push('Gender is required.');
+        if (!sport.value.trim()) errors.push('Sport is required.');
 
-            if (school.value === '__other__' && !schoolOther.value.trim()) {
-                errors.push('School Name is required.');
-            }
+        const checkedPositions = document.querySelectorAll('input[name="position[]"]:checked');
+        if (!checkedPositions.length) errors.push('Select at least one position.');
 
-            if (leagueId === '__other__') {
-                if (!leagueOther.value.trim()) errors.push('League Name is required.');
-                if (!clubOther.value.trim()) errors.push('Club Name is required.');
-                if (!teamOther.value.trim()) errors.push('Team Name is required.');
-            }
-
-            if (natlTeamExp.value === '1' && natlTeamId.value === '__other__' && !natlTeamOther.value.trim()) {
-                errors.push('New National Team Name is required.');
-            }
+        const country = document.getElementById('country');
+        const countryOther = document.getElementById('country_other');
+        if (country && country.value === '__other__' && countryOther && !countryOther.value.trim()) {
+            errors.push('Country Name is required.');
         }
 
-        if (step === 3) {
-            ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
-                const el = document.getElementById(id);
-                if (el.value.trim() && !validateUrl(el.value.trim())) {
-                    errors.push(`${id.replace(/_/g, ' ')} must be a valid URL.`);
-                }
-            });
-
-            const useCustom = document.getElementById('use_custom_highlights');
-            const manualUrls = document.getElementById('featured_video_urls');
-
-            if (useCustom.checked) {
-                const lines = (manualUrls.value || '')
-                    .split(/\r?\n/)
-                    .map(v => v.trim())
-                    .filter(Boolean);
-
-                if (!lines.length) {
-                    errors.push('Add at least one Highlight Video URL.');
-                } else if (lines.some(url => !validateUrl(url))) {
-                    errors.push('All Highlight Video URLs must be valid.');
-                }
-            }
+        const natlTeamExp = document.getElementById('natl_team_exp');
+        const natlTeamPeriod = document.getElementById('national_team_period');
+        if (natlTeamExp && natlTeamExp.value === '1' && natlTeamPeriod && !natlTeamPeriod.value.trim()) {
+            errors.push('National Team Period is required.');
         }
 
-        return errors;
+        // dominant_foot intentionally NOT required
+        // max_speed intentionally NOT required
+        // jersey_number intentionally NOT required
+        // vertical_jump intentionally NOT required
+        // height / weight / gpa intentionally NOT required
     }
+
+    if (step === 2) {
+        const school = document.getElementById('school_id');
+        const schoolOther = document.getElementById('school_other');
+        const leagueId = document.getElementById('league_id').value;
+        const leagueOther = document.getElementById('league_other');
+        const clubOther = document.getElementById('club_other');
+        const teamOther = document.getElementById('team_other');
+        const natlTeamExp = document.getElementById('natl_team_exp');
+        const natlTeamId = document.getElementById('national_team_id');
+        const natlTeamOther = document.getElementById('national_team_other');
+
+        if (school && school.value === '__other__' && schoolOther && !schoolOther.value.trim()) {
+            errors.push('School Name is required.');
+        }
+
+        if (leagueId === '__other__') {
+            if (leagueOther && !leagueOther.value.trim()) errors.push('League Name is required.');
+            if (clubOther && !clubOther.value.trim()) errors.push('Club Name is required.');
+            if (teamOther && !teamOther.value.trim()) errors.push('Team Name is required.');
+        }
+
+        if (natlTeamExp && natlTeamExp.value === '1' && natlTeamId && natlTeamId.value === '__other__' && natlTeamOther && !natlTeamOther.value.trim()) {
+            errors.push('New National Team Name is required.');
+        }
+    }
+
+    if (step === 3) {
+        ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && el.value.trim() && !validateUrl(el.value.trim())) {
+                errors.push(`${id.replace(/_/g, ' ')} must be a valid URL.`);
+            }
+        });
+
+        const useCustom = document.getElementById('use_custom_highlights');
+        const manualUrls = document.getElementById('featured_video_urls');
+
+        if (useCustom && useCustom.checked) {
+            const lines = (manualUrls?.value || '')
+                .split(/\r?\n/)
+                .map(v => v.trim())
+                .filter(Boolean);
+
+            if (!lines.length) {
+                errors.push('Add at least one Highlight Video URL.');
+            } else if (lines.some(url => !validateUrl(url))) {
+                errors.push('All Highlight Video URLs must be valid.');
+            }
+        }
+    }
+
+    return errors;
+}
 
     function clearFieldErrors() {
         document.querySelectorAll('.field-error').forEach((el) => el.classList.remove('field-error'));
     }
 
     function markFieldState() {
-        clearFieldErrors();
+    clearFieldErrors();
 
-        if (currentStep === 1) {
-            const firstName = document.getElementById('first_name');
-            const lastName = document.getElementById('last_name');
-            const personalEmail = document.getElementById('personal_email');
-            const gender = document.getElementById('gender');
-            const sport = document.getElementById('sport');
-            const dominantFoot = document.getElementById('dominant_foot');
+    if (currentStep === 1) {
+        const firstName = document.getElementById('first_name');
+        const lastName = document.getElementById('last_name');
+        const personalEmail = document.getElementById('personal_email');
+        const gender = document.getElementById('gender');
+        const sport = document.getElementById('sport');
 
-            if (!firstName.value.trim()) firstName.classList.add('field-error');
-            if (!lastName.value.trim()) lastName.classList.add('field-error');
-            if (!personalEmail.value.trim() || !validateEmail(personalEmail.value.trim())) personalEmail.classList.add('field-error');
-            if (!gender.value.trim()) gender.classList.add('field-error');
-            if (!sport.value.trim()) sport.classList.add('field-error');
-            if (sport.value === 'soccer' && isVisible(dominantFoot) && !dominantFoot.value.trim()) dominantFoot.classList.add('field-error');
-        }
+        if (!firstName.value.trim()) firstName.classList.add('field-error');
+        if (!lastName.value.trim()) lastName.classList.add('field-error');
+        if (!personalEmail.value.trim() || !validateEmail(personalEmail.value.trim())) personalEmail.classList.add('field-error');
+        if (!gender.value.trim()) gender.classList.add('field-error');
+        if (!sport.value.trim()) sport.classList.add('field-error');
 
-        if (currentStep === 3) {
-            ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
-                const el = document.getElementById(id);
-                if (el.value.trim() && !validateUrl(el.value.trim())) {
-                    el.classList.add('field-error');
-                }
-            });
-        }
+        // No sport-specific optional fields should be marked as error
     }
+
+    if (currentStep === 3) {
+        ['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && el.value.trim() && !validateUrl(el.value.trim())) {
+                el.classList.add('field-error');
+            }
+        });
+    }
+}
 
     function isStepComplete(step) {
         return getStepValidationErrors(step).length === 0;
@@ -1727,7 +1722,6 @@
         hiddenInputId,
         placeholder,
         getOptions,
-        getDisplayValue,
         onChange,
         allowOther = true,
         disabledWhen = null,
@@ -1907,12 +1901,12 @@
                 isLeagueSportCompatible(league.sport, selectedSport)
             )
             .map(league => {
-                const showGenderSuffix = !selectedGender && safeString(league.gender);
-                const genderLabel = showGenderSuffix ? ` (${titleize(league.gender)})` : '';
+                const showGenderSuffix = !selectedGender && safeString(league.gender_label);
+                const suffix = showGenderSuffix ? ` (${league.gender_label})` : '';
                 return {
                     id: String(league.id),
-                    label: `${league.name}${genderLabel}`,
-                    subtitle: safeString(league.sport) ? titleize(league.sport) : '',
+                    label: `${league.name}${suffix}`,
+                    subtitle: [league.sport_label].filter(Boolean).join(' • '),
                     logo_url: null,
                     raw: league,
                 };
@@ -1933,7 +1927,7 @@
             .map(club => ({
                 id: String(club.id),
                 label: club.name,
-                subtitle: '',
+                subtitle: [club.league_name, club.gender_label, club.sport_label].filter(Boolean).join(' • '),
                 logo_url: club.logo_url || null,
                 raw: club,
             }));
@@ -1953,7 +1947,7 @@
             .map(team => ({
                 id: String(team.id),
                 label: team.name,
-                subtitle: safeString(team.club_name) ? `Club: ${team.club_name}` : '',
+                subtitle: [team.club_name, team.league_name, team.gender_label, team.sport_label].filter(Boolean).join(' • '),
                 logo_url: team.club_logo_url || null,
                 raw: team,
             }));
