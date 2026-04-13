@@ -1366,7 +1366,10 @@
 
     container.innerHTML = '';
 
-    if (!selectedSport || !sportPositions[selectedSport]) return;
+    if (!selectedSport || !sportPositions[selectedSport]) {
+        updateNextButtonState();
+        return;
+    }
 
     Object.entries(sportPositions[selectedSport]).forEach(([key, label]) => {
         const wrapper = document.createElement('label');
@@ -1381,6 +1384,9 @@
             input.checked = true;
         }
 
+        input.addEventListener('change', updateNextButtonState);
+        input.addEventListener('input', updateNextButtonState);
+
         const span = document.createElement('span');
         span.textContent = label;
 
@@ -1388,6 +1394,8 @@
         wrapper.appendChild(span);
         container.appendChild(wrapper);
     });
+
+    updateNextButtonState();
 }
 
     function toggleDominantFoot() {
@@ -2082,6 +2090,12 @@
 
         const initialStep = {{ $errors->any() ? 'getStepFromErrors()' : '1' }};
         showStep(initialStep);
+
+        document.getElementById('positionOptions').addEventListener('change', function (event) {
+            if (event.target && event.target.matches('input[name="position[]"]')) {
+                updateNextButtonState();
+            }
+        });
 
         document.getElementById('sport').addEventListener('change', () => {
             renderPositions();

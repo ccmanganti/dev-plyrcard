@@ -483,12 +483,6 @@ class PublicPlayerIntakeController extends Controller
                 ->withInput();
         }
 
-        if ($sport === 'soccer' && blank($validated['dominant_foot'] ?? null)) {
-            return back()
-                ->withErrors(['dominant_foot' => 'Dominant foot is required for soccer.'])
-                ->withInput();
-        }
-
         if ($sport !== 'soccer') {
             $validated['dominant_foot'] = null;
         }
@@ -612,6 +606,7 @@ class PublicPlayerIntakeController extends Controller
                 'first_name' => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name' => $validated['last_name'],
+                'email' => $validated['personal_email'],
                 'personal_email' => $validated['personal_email'],
                 'phone' => $validated['phone'] ?? null,
 
