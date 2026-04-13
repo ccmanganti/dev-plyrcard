@@ -684,7 +684,6 @@
         .mobile-org-list {
             display: grid;
             gap: 12px;
-            margin-top: auto;
         }
 
         .mobile-org-row {
