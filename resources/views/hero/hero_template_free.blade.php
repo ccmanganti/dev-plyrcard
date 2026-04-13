@@ -955,26 +955,28 @@
                             </div>
 
                             <div class="mobile-org-list">
-                                <div class="mobile-org-row">
-                                    @if (filled($mobileNationalLogoUrl))
-                                        <img src="{{ $mobileNationalLogoUrl }}" alt="National logo" class="mobile-org-icon">
-                                    @else
-                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                            <path d="M12 9v7"/>
-                                            <path d="M8 21h8"/>
-                                            <path d="M9.5 16h5"/>
-                                        </svg>
-                                    @endif
-                                    <div>
-                                        <div class="mobile-org-copy-title">NATIONAL TEAM</div>
-                                        <div class="mobile-org-copy-value">
-                                            {{ filled($mobileInternational) ? $mobileInternational : 'NATIONAL TEAM / COUNTRY' }}
+                                @if (filled($mobileInternational))
+                                    <div class="mobile-org-row">
+                                        @if (filled($mobileNationalLogoUrl))
+                                            <img src="{{ $mobileNationalLogoUrl }}" alt="National logo" class="mobile-org-icon">
+                                        @else
+                                            <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
+                                                <path d="M6 5H4a3 3 0 0 0 3 3"/>
+                                                <path d="M18 5h2a3 3 0 0 1-3 3"/>
+                                                <path d="M12 9v7"/>
+                                                <path d="M8 21h8"/>
+                                                <path d="M9.5 16h5"/>
+                                            </svg>
+                                        @endif
+                                        <div>
+                                            <div class="mobile-org-copy-title">NATIONAL TEAM</div>
+                                            <div class="mobile-org-copy-value">
+                                                {{ $mobileInternational }}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                @endif
 
                                 <div class="mobile-org-row">
                                     @if (filled($mobileClubLogoUrl))
