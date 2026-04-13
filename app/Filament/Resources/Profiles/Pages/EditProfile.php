@@ -29,6 +29,7 @@ use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class EditProfile extends Page implements HasForms
 {
