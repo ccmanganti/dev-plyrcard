@@ -57,33 +57,43 @@ class EditProfile extends Page implements HasForms
     public string $lockedFeatureMessage = 'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.';
 
     public function mount(): void
-    {
-        $this->user = auth()->user();
+{
+    $this->user = auth()->user();
 
-        abort_unless($this->user, 403);
+    abort_unless($this->user, 403);
 
-        $this->user->loadMissing('roles', 'nationalTeam');
+    $this->user->loadMissing('roles', 'nationalTeam');
 
-        $this->website = $this->user->websites()->first();
+    $this->website = $this->user->websites()->first();
 
-        $this->form->fill([
-            ...$this->user->toArray(),
+    $teamId = $this->user->team_id ?? null;
 
-            'website_name' => $this->website?->name,
-            'site_template_id' => $this->website?->site_template_id,
-            'hero_template_id' => $this->website?->hero_template_id,
-            'website_is_active' => $this->website?->is_active ?? true,
-            'website_is_published' => $this->website?->is_published ?? false,
-
-            'primary_color' => $this->website?->primary_color,
-            'secondary_color' => $this->website?->secondary_color,
-            'accent_color' => $this->website?->accent_color,
-            'background_color' => $this->website?->background_color,
-            'surface_color' => $this->website?->surface_color,
-            'text_primary_color' => $this->website?->text_primary_color,
-            'text_secondary_color' => $this->website?->text_secondary_color,
-        ]);
+    if (blank($teamId) && filled($this->user->team_name ?? null) && filled($this->user->club_id ?? null)) {
+        $teamId = Team::query()
+            ->where('club_id', $this->user->club_id)
+            ->where('name', $this->user->team_name)
+            ->value('id');
     }
+
+    $this->form->fill([
+        ...$this->user->toArray(),
+        'team_id' => $teamId,
+
+        'website_name' => $this->website?->name,
+        'site_template_id' => $this->website?->site_template_id,
+        'hero_template_id' => $this->website?->hero_template_id,
+        'website_is_active' => $this->website?->is_active ?? true,
+        'website_is_published' => $this->website?->is_published ?? false,
+
+        'primary_color' => $this->website?->primary_color,
+        'secondary_color' => $this->website?->secondary_color,
+        'accent_color' => $this->website?->accent_color,
+        'background_color' => $this->website?->background_color,
+        'surface_color' => $this->website?->surface_color,
+        'text_primary_color' => $this->website?->text_primary_color,
+        'text_secondary_color' => $this->website?->text_secondary_color,
+    ]);
+}
 
     protected static function getSchoolOptions(): array
     {
@@ -418,8 +428,8 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
     return $query
         ->orderBy('name')
         ->limit(50)
-        ->pluck('name', 'name')
-        ->mapWithKeys(fn ($name, $value) => [(string) $value => $name])
+        ->pluck('name', 'id')
+        ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
         ->all();
 }
 
@@ -569,7 +579,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('league_id', null);
                                                 $set('club_id', null);
-                                                $set('team_name', null);
+                                                $set('team_id', null);
                                             }),
 
                                         Select::make('position')
@@ -609,7 +619,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('league_id', null);
                                                 $set('club_id', null);
-                                                $set('team_name', null);
+                                                $set('team_id', null);
                                             }),
 
                                         DatePicker::make('birth')
@@ -713,7 +723,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ->helperText('Filtered by the selected sport and sex.')
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('club_id', null);
-                                                $set('team_name', null);
+                                                $set('team_id', null);
                                             }),
 
                                         Select::make('club_id')
@@ -744,32 +754,74 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ->disabled(fn (Get $get): bool => blank($get('league_id')))
                                             ->helperText('Filtered by the selected league. Club logo is shown when available.')
                                             ->afterStateUpdated(function (Set $set) {
-                                                $set('team_name', null);
+                                                $set('team_id', null);
                                             }),
 
                                         Select::make('team_id')
-                                            ->prefixIcon('heroicon-m-users')
-                                            ->label('Team')
-                                            ->placeholder(fn (Get $get) => blank($get('club_id'))
-                                                ? 'Select club first'
-                                                : 'Search team')
-                                            ->searchable()
-                                            ->live()
-                                            ->preload(false)
-                                            ->options(fn (Get $get): array => static::getTeamOptions(
-                                                $get('club_id'),
-                                                $get('gender'),
-                                                $get('sport'),
-                                            ))
-                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
-                                                $get('club_id'),
-                                                $get('gender'),
-                                                $get('sport'),
-                                                $search,
-                                            ))
-                                            ->getOptionLabelUsing(fn ($value): ?string => Team::query()->whereKey($value)->value('name'))
-                                            ->disabled(fn (Get $get): bool => blank($get('club_id')))
-                                            ->helperText('Filtered by the selected club.'),
+                                        ->prefixIcon('heroicon-m-users')
+                                        ->label('Team')
+                                        ->placeholder(fn (Get $get) => blank($get('club_id'))
+                                            ? 'Select club first'
+                                            : 'Search team')
+                                        ->searchable()
+                                        ->live()
+                                        ->preload(false)
+                                        ->options(fn (Get $get): array => static::getTeamOptions(
+                                            $get('club_id'),
+                                            $get('gender'),
+                                            $get('sport'),
+                                        ))
+                                        ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
+                                            $get('club_id'),
+                                            $get('gender'),
+                                            $get('sport'),
+                                            $search,
+                                        ))
+                                        ->getOptionLabelUsing(function ($value): ?string {
+                                            if (blank($value)) {
+                                                return null;
+                                            }
+
+                                            return Team::query()->whereKey($value)->value('name');
+                                        })
+                                        ->disabled(fn (Get $get): bool => blank($get('club_id')))
+                                        ->helperText('Filtered by the selected club.')
+                                        ->afterStateHydrated(function ($state, Set $set, Get $get) {
+                                            if (blank($state)) {
+                                                return;
+                                            }
+
+                                            $team = Team::query()->find($state);
+
+                                            if (! $team) {
+                                                $set('team_id', null);
+
+                                                return;
+                                            }
+
+                                            if (blank($get('club_id'))) {
+                                                $set('club_id', $team->club_id);
+                                            }
+                                        })
+                                        ->rule(function (Get $get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                if (blank($value)) {
+                                                    return;
+                                                }
+
+                                                $exists = Team::query()
+                                                    ->whereKey($value)
+                                                    ->when(
+                                                        filled($get('club_id')),
+                                                        fn ($query) => $query->where('club_id', $get('club_id'))
+                                                    )
+                                                    ->exists();
+
+                                                if (! $exists) {
+                                                    $fail('The selected team is invalid.');
+                                                }
+                                            };
+                                        }),
 
                                         Select::make('national_team_id')
                                             ->prefixIcon('heroicon-m-flag')
