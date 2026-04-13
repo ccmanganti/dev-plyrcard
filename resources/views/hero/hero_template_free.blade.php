@@ -291,6 +291,46 @@
     $mobileDob = $stats['DOB'] ?? '';
     $mobileHeight = $stats['HEIGHT'] ?? '';
     $mobileWeight = $stats['WEIGHT'] ?? '';
+    $mobileLeagueLogoUrl = $resolveMediaUrl(
+    $getHeroFieldValue('hero_league_logo', $user?->club?->league?->logo ?? ''),
+        ''
+    );
+
+    $mobileNationalLogoUrl = $resolveMediaUrl(
+        $getHeroFieldValue('hero_national_logo', $user?->national_team_logo ?? ''),
+        ''
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD THIS BLOCK HERE 👇
+    |--------------------------------------------------------------------------
+    */
+    $mobileOrgRows = [];
+
+    if (filled($mobileInternational)) {
+        $mobileOrgRows[] = [
+            'title' => 'NATIONAL TEAM',
+            'value' => $mobileInternational,
+            'logo' => $mobileNationalLogoUrl,
+        ];
+    }
+
+    if (filled($mobileClub)) {
+        $mobileOrgRows[] = [
+            'title' => 'CLUB',
+            'value' => $mobileClub,
+            'logo' => $mobileClubLogoUrl,
+        ];
+    }
+
+    if (filled($mobileLeague)) {
+        $mobileOrgRows[] = [
+            'title' => 'LEAGUE',
+            'value' => $mobileLeague,
+            'logo' => $mobileLeagueLogoUrl,
+        ];
+    };
     $mobileMaxSpeed = strtoupper($normalizeDisplayValue(
         $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
         ' '
@@ -955,12 +995,12 @@
                             </div>
 
                             <div class="mobile-org-list">
-                                @if (filled($mobileInternational))
+                                @foreach ($mobileOrgRows as $row)
                                     <div class="mobile-org-row">
-                                        @if (filled($mobileNationalLogoUrl))
-                                            <img src="{{ $mobileNationalLogoUrl }}" alt="National logo" class="mobile-org-icon">
+                                        @if (filled($row['logo']))
+                                            <img src="{{ $row['logo'] }}" alt="{{ $row['title'] }} logo" class="mobile-org-icon">
                                         @else
-                                            <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                                                 <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
                                                 <path d="M6 5H4a3 3 0 0 0 3 3"/>
                                                 <path d="M18 5h2a3 3 0 0 1-3 3"/>
@@ -969,56 +1009,13 @@
                                                 <path d="M9.5 16h5"/>
                                             </svg>
                                         @endif
+
                                         <div>
-                                            <div class="mobile-org-copy-title">NATIONAL TEAM</div>
-                                            <div class="mobile-org-copy-value">
-                                                {{ $mobileInternational }}
-                                            </div>
+                                            <div class="mobile-org-copy-title">{{ $row['title'] }}</div>
+                                            <div class="mobile-org-copy-value">{{ $row['value'] }}</div>
                                         </div>
                                     </div>
-                                @endif
-
-                                <div class="mobile-org-row">
-                                    @if (filled($mobileClubLogoUrl))
-                                        <img src="{{ $mobileClubLogoUrl }}" alt="Club logo" class="mobile-org-icon">
-                                    @else
-                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                            <path d="M12 9v7"/>
-                                            <path d="M8 21h8"/>
-                                            <path d="M9.5 16h5"/>
-                                        </svg>
-                                    @endif
-                                    <div>
-                                        <div class="mobile-org-copy-title">CLUB</div>
-                                        <div class="mobile-org-copy-value">
-                                            {{ filled($mobileClub) ? $mobileClub : 'CLUB' }}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mobile-org-row">
-                                    @if (filled($mobileLeagueLogoUrl))
-                                        <img src="{{ $mobileLeagueLogoUrl }}" alt="League logo" class="mobile-org-icon">
-                                    @else
-                                        <svg class="mobile-org-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                            <path d="M8 3h8v3a4 4 0 0 1-8 0V3Z"/>
-                                            <path d="M6 5H4a3 3 0 0 0 3 3"/>
-                                            <path d="M18 5h2a3 3 0 0 1-3 3"/>
-                                            <path d="M12 9v7"/>
-                                            <path d="M8 21h8"/>
-                                            <path d="M9.5 16h5"/>
-                                        </svg>
-                                    @endif
-                                    <div>
-                                        <div class="mobile-org-copy-title">LEAGUE</div>
-                                        <div class="mobile-org-copy-value">
-                                            {{ filled($mobileLeague) ? $mobileLeague : 'LEAGUE NAME' }}
-                                        </div>
-                                    </div>
-                                </div>
+                                @endforeach
                             </div>
                         </div>
 
