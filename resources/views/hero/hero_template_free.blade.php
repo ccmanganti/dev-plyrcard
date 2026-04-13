@@ -287,15 +287,7 @@
         ''
     );
 
-    $brandLogoUrl = $resolveMediaUrl(
-        $getHeroFieldValue(
-            'hero_brand_logo',
-            $club?->logo
-                ?? $website->logo
-                ?? ''
-        ),
-        ''
-    );
+    
 
     $sportRaw = $normalizeDisplayValue(
         $getHeroFieldValue(
@@ -990,17 +982,9 @@
             </div>
 
             <div class="mt-auto pb-4">
-                @if($brandLogoUrl)
-                    <img
-                        src="{{ $brandLogoUrl }}"
-                        alt="Brand logo"
-                        class="w-[clamp(13.5rem,16vw,19rem)] h-auto object-contain"
-                    >
-                @else
-                    <div class="font-antonio font-bold uppercase leading-none tracking-[-0.06em] text-[clamp(4.3rem,5.5vw,6.3rem)] text-white">
-                        <span style="color:#111111;">PLYR</span><span style="color:#ffffff;">CARD</span>
-                    </div>
-                @endif
+                <div class="font-antonio font-black uppercase leading-none tracking-[-0.08em] text-[clamp(4.8rem,6vw,7rem)]">
+                    <span style="color:#111111;">PLYR</span><span style="color:#ffffff;">CARD</span>
+                </div>
             </div>
         </div>
     </div>
