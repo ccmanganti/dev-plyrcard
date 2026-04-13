@@ -823,6 +823,41 @@ class UserResource extends Resource
                     ->badge(),
             ])
             ->recordActions([
+    Action::make('editAccess')
+        ->label('Edit Access')
+        ->icon('heroicon-m-pencil-square')
+        ->modalHeading('Edit Roles & Website Publishing')
+        ->fillForm(function (User $record): array {
+            return [
+                'roles' => $record->roles->pluck('name')->all(),
+                'website_is_published' => (bool) $record->websites->first()?->is_published,
+            ];
+        })
+        ->form([
+            Select::make('roles')
+                ->label('Roles')
+                ->multiple()
+                ->options(Role::query()->orderBy('name')->pluck('name', 'name')->toArray())
+                ->searchable()
+                ->preload()
+                ->required(),
+
+            Toggle::make('website_is_published')
+                ->label('Website Published'),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $record->syncRoles($data['roles'] ?? []);
+
+                        $website = $record->websites()->first();
+
+                        if ($website) {
+                            $website->update([
+                                'is_published' => (bool) ($data['website_is_published'] ?? false),
+                            ]);
+                        }
+                    })
+                    ->successNotificationTitle('User access updated.'),
+
                 Impersonate::make()
                     ->visible(fn (User $record) => auth()->id() !== $record->id
                         && auth()->user()?->hasRole('Superadmin'))
