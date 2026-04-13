@@ -238,7 +238,7 @@ class WebsiteResource extends Resource
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),
                 IconColumn::make('is_active')->boolean(),
-                ToggleColumn::make('website_published')
+                ToggleColumn::make('is_published')
                     ->label('Website Published')
                     ->getStateUsing(fn (User $record): bool => (bool) $record->websites->first()?->is_published)
                     ->updateStateUsing(function (User $record, bool $state): void {
