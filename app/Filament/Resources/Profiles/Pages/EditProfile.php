@@ -1465,16 +1465,17 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
             return null;
         }
 
+        $slugUrl = url(Str::slug($this->user->first_name . '-' . $this->user->last_name));
+
         if ($this->user->hasRole('Free')) {
-            return url(
-                Str::slug($this->user->first_name . '-' . $this->user->last_name)
-            );
+            return $slugUrl;
         }
 
         $domain = trim((string) ($this->user->domain ?? ''));
 
         if (blank($domain)) {
-            return null;
+            // 👇 fallback instead of null
+            return $slugUrl;
         }
 
         if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
