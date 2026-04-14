@@ -524,7 +524,7 @@
 
 .plyrcard-logo-text span:last-child {
     color: #ffffff;
-}
+} 
 
     @media (max-width: 1023px){
         .hero-template-basic-desktop{

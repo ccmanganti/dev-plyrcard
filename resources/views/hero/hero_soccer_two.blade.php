@@ -332,7 +332,7 @@
     $jerseyNumber = trim((string) $getHeroFieldValue('hero_jersey_number', $user?->jersey_number ?? ''));
     $bgJerseyNumber = trim((string) $getHeroFieldValue('hero_bg_jersey_number', $jerseyNumber));
 
-    $positionDisplay = $formatPositionDisplay($getHeroFieldValue('hero_stat_position', $user?->position ?? ''));
+    $positionDisplay = $abbreviatePositionDisplay($getHeroFieldValue('hero_stat_position', $user?->position ?? ''));
 
     $hometown = $normalizeDisplayValue($getHeroFieldValue('hero_stat_hometown', ''), ' ');
     if ($hometown === '') {
