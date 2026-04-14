@@ -899,6 +899,7 @@
                         <span>Images</span>
                     </button>
                 </div>
+            @endif
             <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
 
