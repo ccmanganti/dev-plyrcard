@@ -2307,31 +2307,6 @@ if (thankYouWrap) {
     return;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const thankYouWrap = document.getElementById('thankYouWrap');
-
-    if (thankYouWrap) {
-        let seconds = 2;
-        const countdownEl = document.getElementById('thankYouCountdown');
-
-        const timer = setInterval(() => {
-            seconds -= 1;
-
-            if (countdownEl && seconds >= 0) {
-                countdownEl.textContent = String(seconds);
-            }
-
-            if (seconds <= 0) {
-                clearInterval(timer);
-                window.location.href = "{{ route('public.player-intake.create') }}";
-            }
-        }, 1000);
-
-        return;
-    }
-
-    // your existing DOMContentLoaded code continues below this line
-});
 
         document.getElementById('positionOptions').addEventListener('change', function (event) {
             if (event.target && event.target.matches('input[name="position[]"]')) {
