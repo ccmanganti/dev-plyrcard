@@ -899,8 +899,7 @@
                         <span>Images</span>
                     </button>
                 </div>
-            @endif
-            <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
+                <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
 
                 <div class="step-panel" data-step="1">
@@ -1424,6 +1423,7 @@
                 </div>
             </form>
         </div>
+            @endif
     </div>
 </div>
 
@@ -2285,27 +2285,27 @@ function groupLocalDigits(digits) {
     });
 });
 
-const thankYouWrap = document.getElementById('thankYouWrap');
+// const thankYouWrap = document.getElementById('thankYouWrap');
 
-if (thankYouWrap) {
-    let seconds = 2;
-    const countdownEl = document.getElementById('thankYouCountdown');
+// if (thankYouWrap) {
+//     let seconds = 2;
+//     const countdownEl = document.getElementById('thankYouCountdown');
 
-    const timer = setInterval(() => {
-        seconds -= 1;
+//     const timer = setInterval(() => {
+//         seconds -= 1;
 
-        if (countdownEl && seconds >= 0) {
-            countdownEl.textContent = String(seconds);
-        }
+//         if (countdownEl && seconds >= 0) {
+//             countdownEl.textContent = String(seconds);
+//         }
 
-        if (seconds <= 0) {
-            clearInterval(timer);
-            window.location.href = "{{ route('public.player-intake.create') }}";
-        }
-    }, 1000);
+//         if (seconds <= 0) {
+//             clearInterval(timer);
+//             // window.location.href = "{{ route('public.player-intake.create') }}";
+//         }
+//     }, 1000);
 
-    return;
-}
+//     return;
+// }
 
 
         document.getElementById('positionOptions').addEventListener('change', function (event) {
