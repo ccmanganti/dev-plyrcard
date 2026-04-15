@@ -1,24 +1,50 @@
 <x-filament-panels::page>
     <style>
-        .profile-trial-badge {
+        .profile-plan-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.6rem;
+}
+
+.profile-trial-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    margin-top: 0.45rem;
-    padding: 0.42rem 0.7rem;
+    gap: 0.45rem;
+    min-height: 32px;
+    padding: 0.45rem 0.75rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 107, 74, 0.35);
-    background: rgba(255, 107, 74, 0.12);
-    color: #fff1ec;
+    border: 1px solid rgba(255, 107, 74, 0.28);
+    background: rgba(255, 107, 74, 0.10);
+    color: #fff4ef;
     font-size: 0.68rem;
-    font-weight: 900;
-    letter-spacing: 0.08em;
+    font-weight: 800;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.profile-trial-badge svg {
+    width: 13px !important;
+    height: 13px !important;
+    min-width: 13px !important;
+    min-height: 13px !important;
+    max-width: 13px !important;
+    max-height: 13px !important;
+    color: #ff7e5f;
+    flex-shrink: 0 !important;
 }
 
 .profile-trial-badge strong {
-    color: #ffb39f;
+    color: #ffb199;
     font-weight: 900;
+}
+
+.profile-trial-note {
+    font-size: 0.72rem;
+    color: #d8a395;
+    line-height: 1.35;
 }
 
 .profile-bottom-save {
