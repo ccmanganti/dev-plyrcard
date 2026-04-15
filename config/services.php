@@ -40,6 +40,8 @@ return [
     ],
 
     'ghl' => [
+        'token' => env('GHL_API_TOKEN'),
+        'location_id' => env('GHL_LOCATION_ID'),
         'webhook_secret' => env('GHL_WEBHOOK_SECRET'),
     ],
 
