@@ -786,7 +786,7 @@ class PublicPlayerIntakeController extends Controller
 
             $this->applyUserPlanRole($user, $selectedPlan);
 
-            $ghlResult = $this->upsertGhlContact(
+            $ghlResult = $this->syncGhlContactAndPlan(
                 $user,
                 $validated,
                 $selectedPlan,
