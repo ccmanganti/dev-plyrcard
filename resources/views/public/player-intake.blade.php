@@ -831,10 +831,10 @@
 <div class="wrapper">
     <div class="card">
         <div class="header">
-            <div class="eyebrow">{{ $packageLabel ?? 'PLYRCard Package' }}</div>
+            <div class="eyebrow">{{ $selectedPlan ?? 'Free' }}</div>
             <h1 class="hero-title"><span translate="no">Plyr</span> <span class="accent">Intake</span> Form</h1>
             <p class="header-copy">
-                Complete this form for your <span translate="no">{{ $packageLabel ?? 'PLYRCard Package' }}</span> purchase.
+                Complete this form for your <span translate="no">{{ $selectedPlan ?? 'Free' }}</span> plan.
                 Share your athlete details, school and organization details, media, contacts, and images.
             </p>
             <p class="hint">Sections unlock progressively once the current section is complete.</p>
@@ -901,7 +901,7 @@
                 </div>
                 <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
-
+                <input type="hidden" name="selected_plan" value="{{ old('selected_plan', $selectedPlan ?? 'Free') }}">
                 <div class="step-panel" data-step="1">
                     <div class="section">
                         <div class="section-header">

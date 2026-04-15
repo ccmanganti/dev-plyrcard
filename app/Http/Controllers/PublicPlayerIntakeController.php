@@ -251,12 +251,7 @@ class PublicPlayerIntakeController extends Controller
 
         $detectedCountry = $this->detectCountryCode($request);
 
-        $packageLabel = trim((string) (
-            $request->query('package')
-            ?? $request->query('plan')
-            ?? $request->query('package_name')
-            ?? 'PLYRCard Package'
-        ));
+        $resolvedPlan = $this->resolvePlanFromRequest($request);
 
         return view('public.player-intake', [
             'schools' => $schools,
@@ -266,7 +261,8 @@ class PublicPlayerIntakeController extends Controller
             'sportPositions' => $this->sportPositions,
             'genderOptions' => $this->genderOptions,
             'detectedCountry' => $detectedCountry,
-            'packageLabel' => $packageLabel,
+            'packageLabel' => $resolvedPlan,
+            'selectedPlan' => $resolvedPlan,
             'stepFieldMap' => $this->stepFieldMap(),
 
             'leagueDirectory' => $leagues->map(function (League $league) {
@@ -321,6 +317,54 @@ class PublicPlayerIntakeController extends Controller
         ]);
     }
 
+    protected function resolvePlanFromRequest(Request $request): string
+    {
+        $rawPlan = trim((string) (
+            $request->input('selected_plan')
+            ?? $request->query('utm_plan')
+            ?? $request->query('plan')
+            ?? $request->query('package')
+            ?? $request->query('package_name')
+            ?? ''
+        ));
+
+        $normalized = Str::lower(str_replace(['-', '_'], ' ', $rawPlan));
+        $normalized = preg_replace('/\s+/', ' ', $normalized);
+
+        return match ($normalized) {
+            'my journey', 'myjourney' => 'My Journey',
+            'plyr' => 'Plyr',
+            'free' => 'Free',
+            default => 'Free',
+        };
+    }
+
+    protected function applyUserPlanRole(User $user, string $plan): void
+    {
+        $plan = in_array($plan, ['Free', 'Plyr', 'My Journey'], true) ? $plan : 'Free';
+
+        if (method_exists($user, 'syncRoles')) {
+            $user->syncRoles([$plan]);
+            return;
+        }
+
+        if (method_exists($user, 'assignRole')) {
+            if (method_exists($user, 'getRoleNames') && ! $user->getRoleNames()->contains($plan)) {
+                if (method_exists($user, 'syncRoles')) {
+                    $user->syncRoles([$plan]);
+                } else {
+                    $user->assignRole($plan);
+                }
+            }
+            return;
+        }
+
+        if (\Schema::hasColumn($user->getTable(), 'role')) {
+            $user->role = $plan;
+            $user->save();
+        }
+    }
+
     protected function detectCountryCode(Request $request): string
     {
         $headerCandidates = [
@@ -355,27 +399,27 @@ class PublicPlayerIntakeController extends Controller
     }
 
     protected function normalizePhone(?string $value): ?string
-{
-    $value = trim((string) $value);
+    {
+        $value = trim((string) $value);
 
-    if ($value === '') {
-        return null;
+        if ($value === '') {
+            return null;
+        }
+
+        $hasPlus = str_starts_with($value, '+');
+        $digits = preg_replace('/\D+/', '', $value);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        return $hasPlus ? '+' . $digits : $digits;
     }
-
-    // Keep leading + if present, strip everything else non-numeric.
-    $hasPlus = str_starts_with($value, '+');
-    $digits = preg_replace('/\D+/', '', $value);
-
-    if ($digits === '') {
-        return null;
-    }
-
-    return $hasPlus ? '+' . $digits : $digits;
-}
 
     public function store(Request $request): RedirectResponse
     {
         $request->merge([
+            'selected_plan' => $this->resolvePlanFromRequest($request),
             'phone' => $this->normalizePhone($request->input('phone')),
             'parent_phone' => $this->normalizePhone($request->input('parent_phone')),
             'sec_parent_phone' => $this->normalizePhone($request->input('sec_parent_phone')),
@@ -384,7 +428,9 @@ class PublicPlayerIntakeController extends Controller
             'tech_trainer_phone' => $this->normalizePhone($request->input('tech_trainer_phone')),
             'snc_trainer_phone' => $this->normalizePhone($request->input('snc_trainer_phone')),
         ]);
+
         $validated = $request->validate([
+            'selected_plan' => ['nullable', 'in:Free,Plyr,My Journey'],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -473,6 +519,8 @@ class PublicPlayerIntakeController extends Controller
         ], [
             'phone.unique' => 'This phone number is already being used by another account.',
         ]);
+
+        $selectedPlan = $validated['selected_plan'] ?? 'Free';
 
         $totalRawImages =
             count($request->file('action_images', [])) +
@@ -616,8 +664,9 @@ class PublicPlayerIntakeController extends Controller
                 'featured_video_urls' => 'Please add at least one highlight video URL or turn off "Pick My Own Videos".',
             ]);
         }
+
         try {
-            $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls, $sport) {
+            $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls, $sport, $selectedPlan) {
                 $school = $this->resolveSchool($validated);
                 [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
                 $nationalTeam = $this->resolveNationalTeam($validated);
@@ -715,6 +764,8 @@ class PublicPlayerIntakeController extends Controller
 
                 $user->save();
 
+                $this->applyUserPlanRole($user, $selectedPlan);
+
                 $uploads = $this->storeHeroUploads($request);
 
                 $this->createWebsiteIfSupported($user, $validated, $uploads);
@@ -736,7 +787,7 @@ class PublicPlayerIntakeController extends Controller
         }
 
         return redirect()
-            ->route('public.player-intake.create')
+            ->route('public.player-intake.create', ['utm_plan' => $selectedPlan])
             ->with('success', 'Player intake submitted successfully for ' . $user->first_name . '.');
     }
 
