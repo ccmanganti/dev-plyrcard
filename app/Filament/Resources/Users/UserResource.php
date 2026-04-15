@@ -42,6 +42,7 @@ use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use STS\FilamentImpersonate\Actions\Impersonate;
 use UnitEnum;
+use Filament\Actions\EditAction;
 
 class UserResource extends Resource
 {
@@ -1360,10 +1361,20 @@ class UserResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->recordActions([
+            ->recordAction('edit')
+            ->recordUrl(null)
+            ->actions([
+                EditAction::make()
+                    ->label('Edit')
+                    ->icon('heroicon-m-pencil-square')
+                    ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
+                    ->modalSubmitActionLabel('Save changes')
+                    ->modalWidth('7xl')
+                    ->slideOver(),
+
                 Action::make('editAccess')
                     ->label('Edit Access')
-                    ->icon('heroicon-m-pencil-square')
+                    ->icon('heroicon-m-shield-check')
                     ->modalHeading('Edit Roles & Website Publishing')
                     ->fillForm(function (User $record): array {
                         return [
@@ -1400,186 +1411,7 @@ class UserResource extends Resource
                     ->visible(fn (User $record) => auth()->id() !== $record->id
                         && auth()->user()?->hasRole('Superadmin'))
                     ->redirectTo('/admin'),
-            ])
-            ->filtersFormColumns(3)
-            ->filters([
-                SelectFilter::make('school_id')
-                    ->label('School')
-                    ->relationship('school', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('club_id')
-                    ->label('Club')
-                    ->relationship('club', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('league_id')
-                    ->label('League')
-                    ->relationship('league', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('national_team_id')
-                    ->label('National Team')
-                    ->relationship('nationalTeam', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('roles')
-                    ->label('Roles')
-                    ->relationship('roles', 'name')
-                    ->multiple()
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('sport')
-                    ->label('Sport')
-                    ->options(static::getSportOptions())
-                    ->multiple(),
-
-                SelectFilter::make('gender')
-                    ->label('Gender')
-                    ->options(static::getGenderOptions())
-                    ->multiple(),
-
-                SelectFilter::make('year')
-                    ->label('Graduation Year')
-                    ->options(
-                        User::query()
-                            ->whereNotNull('year')
-                            ->distinct()
-                            ->orderBy('year')
-                            ->pluck('year', 'year')
-                            ->mapWithKeys(fn ($year) => [$year => (string) $year])
-                            ->all()
-                    )
-                    ->multiple(),
-
-                TernaryFilter::make('has_website')
-                    ->label('Has Website')
-                    ->placeholder('All users')
-                    ->trueLabel('With website')
-                    ->falseLabel('Without website')
-                    ->queries(
-                        true: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNotNull('domain')
-                                ->where('domain', '!=', '')
-                                ->orWhereHas('websites');
-                        }),
-                        false: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNull('domain')
-                                ->orWhere('domain', '=', '');
-                        })->whereDoesntHave('websites'),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_school')
-                    ->label('Assigned School')
-                    ->placeholder('All users')
-                    ->trueLabel('With school')
-                    ->falseLabel('Without school')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('school_id'),
-                        false: fn (Builder $query) => $query->whereNull('school_id'),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_club')
-                    ->label('Assigned Club')
-                    ->placeholder('All users')
-                    ->trueLabel('With club')
-                    ->falseLabel('Without club')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('club_id'),
-                        false: fn (Builder $query) => $query->whereNull('club_id'),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_league')
-                    ->label('Assigned League')
-                    ->placeholder('All users')
-                    ->trueLabel('With league')
-                    ->falseLabel('Without league')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('league_id'),
-                        false: fn (Builder $query) => $query->whereNull('league_id'),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_national_team')
-                    ->label('Assigned National Team')
-                    ->placeholder('All users')
-                    ->trueLabel('With national team')
-                    ->falseLabel('Without national team')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('national_team_id'),
-                        false: fn (Builder $query) => $query->whereNull('national_team_id'),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_phone')
-                    ->label('Has Phone')
-                    ->placeholder('All users')
-                    ->trueLabel('With phone')
-                    ->falseLabel('Without phone')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('phone')->where('phone', '!=', ''),
-                        false: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNull('phone')->orWhere('phone', '=', '');
-                        }),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_parent_email')
-                    ->label('Has Parent Email')
-                    ->placeholder('All users')
-                    ->trueLabel('With parent email')
-                    ->falseLabel('Without parent email')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNotNull('parent_email')->where('parent_email', '!=', ''),
-                        false: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNull('parent_email')->orWhere('parent_email', '=', '');
-                        }),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                TernaryFilter::make('has_socials')
-                    ->label('Has Social Profiles')
-                    ->placeholder('All users')
-                    ->trueLabel('With socials')
-                    ->falseLabel('Without socials')
-                    ->queries(
-                        true: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNotNull('ig_handle')->where('ig_handle', '!=', '')
-                                ->orWhereNotNull('x_handle')->where('x_handle', '!=', '')
-                                ->orWhereNotNull('yt_url')->where('yt_url', '!=', '');
-                        }),
-                        false: fn (Builder $query) => $query->where(function (Builder $q) {
-                            $q->whereNull('ig_handle')->orWhere('ig_handle', '=', '');
-                        })->where(function (Builder $q) {
-                            $q->whereNull('x_handle')->orWhere('x_handle', '=', '');
-                        })->where(function (Builder $q) {
-                            $q->whereNull('yt_url')->orWhere('yt_url', '=', '');
-                        }),
-                        blank: fn (Builder $query) => $query,
-                    ),
-
-                Filter::make('missing_core_profile')
-                    ->label('Missing Core Profile Info')
-                    ->query(fn (Builder $query): Builder => $query->where(function (Builder $q) {
-                        $q->whereNull('school_id')
-                            ->orWhereNull('club_id')
-                            ->orWhereNull('sport')
-                            ->orWhere(function (Builder $inner) {
-                                $inner->whereNull('phone')->orWhere('phone', '=', '');
-                            });
-                    })),
-
-                TrashedFilter::make(),
-            ])
-            ->recordUrl(fn (User $record): string => static::getUrl('edit', ['record' => $record]));
+                ]);
     }
 
     public static function getRelations(): array
