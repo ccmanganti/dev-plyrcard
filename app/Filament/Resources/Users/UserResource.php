@@ -1230,189 +1230,391 @@ class UserResource extends Resource
     }
 
     public static function table(Table $table): Table
-    {
-        return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['roles', 'websites']))
-            ->columns([
-                TextColumn::make('first_name')
-                    ->label('First Name')
-                    ->searchable()
-                    ->sortable(),
+{
+    return $table
+        ->modifyQueryUsing(fn (Builder $query) => $query->with([
+            'roles',
+            'websites',
+            'school',
+            'league',
+            'club',
+            'nationalTeam',
+        ]))
+        ->columns([
+            TextColumn::make('first_name')
+                ->label('First Name')
+                ->searchable()
+                ->sortable(),
 
-                TextColumn::make('last_name')
-                    ->label('Last Name')
-                    ->searchable()
-                    ->sortable(),
+            TextColumn::make('last_name')
+                ->label('Last Name')
+                ->searchable()
+                ->sortable(),
 
-                TextColumn::make('email')
-                    ->label('PlyrCard Email')
-                    ->searchable()
-                    ->copyable(),
+            TextColumn::make('email')
+                ->label('PlyrCard Email')
+                ->searchable()
+                ->copyable(),
 
-                TextColumn::make('roles.name')
-                    ->label('Roles')
-                    ->badge()
-                    ->separator(',')
-                    ->searchable(),
+            TextColumn::make('roles.name')
+                ->label('Roles')
+                ->badge()
+                ->separator(',')
+                ->searchable(),
 
-                TextColumn::make('updated_at')
-                    ->label('Updated')
-                    ->since()
-                    ->sortable(),
+            TextColumn::make('sport')
+                ->label('Sport')
+                ->badge()
+                ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title() : '-')
+                ->sortable()
+                ->searchable(),
 
-                TextColumn::make('personal_email')
-                    ->label('Personal Email')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('gender')
+                ->label('Gender')
+                ->badge()
+                ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
+                ->sortable()
+                ->toggleable(),
 
-                TextColumn::make('phone')
-                    ->label('Phone')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('team_name')
+                ->label('Team')
+                ->searchable()
+                ->toggleable(),
 
-                TextColumn::make('gender')
-                    ->label('Gender')
-                    ->badge()
-                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('club.name')
+                ->label('Club')
+                ->searchable()
+                ->toggleable(),
 
-                TextColumn::make('school.name')
-                    ->label('School')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('league.name')
+                ->label('League')
+                ->searchable()
+                ->toggleable(),
 
-                TextColumn::make('league.name')
-                    ->label('League')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('school.name')
+                ->label('School')
+                ->searchable()
+                ->toggleable(),
 
-                TextColumn::make('club.name')
-                    ->label('Club')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('updated_at')
+                ->label('Updated')
+                ->since()
+                ->sortable(),
 
-                TextColumn::make('team_name')
-                    ->label('Team')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('personal_email')
+                ->label('Personal Email')
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('nationalTeam.name')
-                    ->label('National Team')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('phone')
+                ->label('Phone')
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('sport')
-                    ->label('Sport')
-                    ->badge()
-                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title() : '-')
-                    ->sortable()
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('nationalTeam.name')
+                ->label('National Team')
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('dominant_foot')
-                    ->label('Dominant Foot')
-                    ->badge()
-                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('dominant_foot')
+                ->label('Dominant Foot')
+                ->badge()
+                ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->title() : '-')
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('position')
-                    ->label('Positions')
-                    ->state(function ($record): array {
-                        return collect($record->position ?? [])
-                            ->map(fn ($item) => str($item)->replace('_', ' ')->title())
-                            ->values()
-                            ->all();
-                    })
-                    ->badge()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('position')
+                ->label('Positions')
+                ->state(function ($record): array {
+                    return collect($record->position ?? [])
+                        ->map(fn ($item) => str($item)->replace('_', ' ')->title())
+                        ->values()
+                        ->all();
+                })
+                ->badge()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('year')
-                    ->label('Graduation Year')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('year')
+                ->label('Graduation Year')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('gpa')
-                    ->label('GPA')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('gpa')
+                ->label('GPA')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('jersey_number')
-                    ->label('Jersey #')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('jersey_number')
+                ->label('Jersey #')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('height')
-                    ->label('Height')
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('height')
+                ->label('Height')
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('weight')
-                    ->label('Weight')
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('weight')
+                ->label('Weight')
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('domain')
-                    ->label('Custom Domain')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('domain')
+                ->label('Custom Domain')
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('created_at')
-                    ->label('Created')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->recordAction('edit')
-            ->recordUrl(null)
-            ->actions([
-                EditAction::make()
-                    ->label('Edit')
-                    ->icon('heroicon-m-pencil-square')
-                    ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
-                    ->modalSubmitActionLabel('Save changes')
-                    ->modalWidth('7xl')
-                    ->slideOver(),
+            TextColumn::make('created_at')
+                ->label('Created')
+                ->dateTime()
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+        ])
+        ->filters([
+            SelectFilter::make('sport')
+                ->label('Sport')
+                ->options(static::getSportOptions())
+                ->multiple()
+                ->searchable()
+                ->preload(),
 
-                Action::make('editAccess')
-                    ->label('Edit Access')
-                    ->icon('heroicon-m-shield-check')
-                    ->modalHeading('Edit Roles & Website Publishing')
-                    ->fillForm(function (User $record): array {
-                        return [
-                            'roles' => $record->roles->pluck('name')->all(),
-                            'website_is_published' => (bool) $record->websites->first()?->is_published,
-                        ];
-                    })
-                    ->form([
-                        Select::make('roles')
-                            ->label('Roles')
-                            ->multiple()
-                            ->options(Role::query()->orderBy('name')->pluck('name', 'name')->toArray())
-                            ->searchable()
-                            ->preload()
-                            ->required(),
+            SelectFilter::make('gender')
+                ->label('Gender')
+                ->options(static::getGenderOptions())
+                ->multiple()
+                ->searchable(),
 
-                        Toggle::make('website_is_published')
-                            ->label('Website Published'),
-                    ])
-                    ->action(function (User $record, array $data): void {
-                        $record->syncRoles($data['roles'] ?? []);
+            SelectFilter::make('roles')
+                ->label('Role')
+                ->relationship('roles', 'name')
+                ->multiple()
+                ->searchable()
+                ->preload(),
 
-                        $website = $record->websites()->first();
+            SelectFilter::make('school_id')
+                ->label('School')
+                ->relationship('school', 'name')
+                ->searchable()
+                ->preload(),
 
-                        if ($website) {
-                            $website->update([
-                                'is_published' => (bool) ($data['website_is_published'] ?? false),
-                            ]);
-                        }
-                    })
-                    ->successNotificationTitle('User access updated.'),
+            SelectFilter::make('league_id')
+                ->label('League')
+                ->relationship('league', 'name')
+                ->searchable()
+                ->preload(),
 
-                Impersonate::make()
-                    ->visible(fn (User $record) => auth()->id() !== $record->id
-                        && auth()->user()?->hasRole('Superadmin'))
-                    ->redirectTo('/admin'),
-                ]);
-    }
+            SelectFilter::make('club_id')
+                ->label('Club')
+                ->relationship('club', 'name')
+                ->searchable()
+                ->preload(),
+
+            SelectFilter::make('national_team_id')
+                ->label('National Team')
+                ->relationship('nationalTeam', 'name')
+                ->searchable()
+                ->preload(),
+
+            SelectFilter::make('year')
+                ->label('Graduation Year')
+                ->options(
+                    User::query()
+                        ->whereNotNull('year')
+                        ->orderBy('year')
+                        ->pluck('year', 'year')
+                        ->mapWithKeys(fn ($year) => [(string) $year => (string) $year])
+                        ->all()
+                )
+                ->searchable(),
+
+            TernaryFilter::make('website_published')
+                ->label('Website Published')
+                ->queries(
+                    true: fn (Builder $query) => $query->whereHas('websites', fn (Builder $q) => $q->where('is_published', true)),
+                    false: fn (Builder $query) => $query->whereDoesntHave('websites')
+                        ->orWhereHas('websites', fn (Builder $q) => $q->where('is_published', false)),
+                    blank: fn (Builder $query) => $query,
+                ),
+
+            TernaryFilter::make('has_domain')
+                ->label('Has Custom Domain')
+                ->queries(
+                    true: fn (Builder $query) => $query->whereNotNull('domain')->where('domain', '!=', ''),
+                    false: fn (Builder $query) => $query->where(function (Builder $q) {
+                        $q->whereNull('domain')->orWhere('domain', '');
+                    }),
+                    blank: fn (Builder $query) => $query,
+                ),
+
+            TernaryFilter::make('has_personal_email')
+                ->label('Has Personal Email')
+                ->queries(
+                    true: fn (Builder $query) => $query->whereNotNull('personal_email')->where('personal_email', '!=', ''),
+                    false: fn (Builder $query) => $query->where(function (Builder $q) {
+                        $q->whereNull('personal_email')->orWhere('personal_email', '');
+                    }),
+                    blank: fn (Builder $query) => $query,
+                ),
+
+            TernaryFilter::make('has_phone')
+                ->label('Has Phone')
+                ->queries(
+                    true: fn (Builder $query) => $query->whereNotNull('phone')->where('phone', '!=', ''),
+                    false: fn (Builder $query) => $query->where(function (Builder $q) {
+                        $q->whereNull('phone')->orWhere('phone', '');
+                    }),
+                    blank: fn (Builder $query) => $query,
+                ),
+
+            Filter::make('created_at')
+                ->label('Created Date')
+                ->form([
+                    DatePicker::make('created_from')->label('Created From'),
+                    DatePicker::make('created_until')->label('Created Until'),
+                ])
+                ->query(function (Builder $query, array $data): Builder {
+                    return $query
+                        ->when(
+                            $data['created_from'] ?? null,
+                            fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date)
+                        )
+                        ->when(
+                            $data['created_until'] ?? null,
+                            fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date)
+                        );
+                })
+                ->indicateUsing(function (array $data): array {
+                    $indicators = [];
+
+                    if ($data['created_from'] ?? null) {
+                        $indicators[] = 'Created from ' . $data['created_from'];
+                    }
+
+                    if ($data['created_until'] ?? null) {
+                        $indicators[] = 'Created until ' . $data['created_until'];
+                    }
+
+                    return $indicators;
+                }),
+
+            Filter::make('updated_at')
+                ->label('Updated Date')
+                ->form([
+                    DatePicker::make('updated_from')->label('Updated From'),
+                    DatePicker::make('updated_until')->label('Updated Until'),
+                ])
+                ->query(function (Builder $query, array $data): Builder {
+                    return $query
+                        ->when(
+                            $data['updated_from'] ?? null,
+                            fn (Builder $q, $date) => $q->whereDate('updated_at', '>=', $date)
+                        )
+                        ->when(
+                            $data['updated_until'] ?? null,
+                            fn (Builder $q, $date) => $q->whereDate('updated_at', '<=', $date)
+                        );
+                })
+                ->indicateUsing(function (array $data): array {
+                    $indicators = [];
+
+                    if ($data['updated_from'] ?? null) {
+                        $indicators[] = 'Updated from ' . $data['updated_from'];
+                    }
+
+                    if ($data['updated_until'] ?? null) {
+                        $indicators[] = 'Updated until ' . $data['updated_until'];
+                    }
+
+                    return $indicators;
+                }),
+
+            Filter::make('gpa_range')
+                ->label('GPA Range')
+                ->form([
+                    TextInput::make('gpa_min')
+                        ->label('Min GPA')
+                        ->numeric()
+                        ->step('0.01'),
+                    TextInput::make('gpa_max')
+                        ->label('Max GPA')
+                        ->numeric()
+                        ->step('0.01'),
+                ])
+                ->query(function (Builder $query, array $data): Builder {
+                    return $query
+                        ->when(
+                            filled($data['gpa_min'] ?? null),
+                            fn (Builder $q) => $q->where('gpa', '>=', $data['gpa_min'])
+                        )
+                        ->when(
+                            filled($data['gpa_max'] ?? null),
+                            fn (Builder $q) => $q->where('gpa', '<=', $data['gpa_max'])
+                        );
+                })
+                ->indicateUsing(function (array $data): array {
+                    $indicators = [];
+
+                    if (filled($data['gpa_min'] ?? null)) {
+                        $indicators[] = 'GPA ≥ ' . $data['gpa_min'];
+                    }
+
+                    if (filled($data['gpa_max'] ?? null)) {
+                        $indicators[] = 'GPA ≤ ' . $data['gpa_max'];
+                    }
+
+                    return $indicators;
+                }),
+        ], layout: \Filament\Tables\Enums\FiltersLayout::AboveContentCollapsible)
+        ->filtersFormColumns(3)
+        ->recordAction('edit')
+        ->recordUrl(null)
+        ->actions([
+            EditAction::make()
+                ->label('Edit')
+                ->icon('heroicon-m-pencil-square')
+                ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
+                ->modalSubmitActionLabel('Save changes')
+                ->modalWidth('7xl')
+                ->slideOver(),
+
+            Action::make('editAccess')
+                ->label('Edit Access')
+                ->icon('heroicon-m-shield-check')
+                ->modalHeading('Edit Roles & Website Publishing')
+                ->fillForm(function (User $record): array {
+                    return [
+                        'roles' => $record->roles->pluck('name')->all(),
+                        'website_is_published' => (bool) $record->websites->first()?->is_published,
+                    ];
+                })
+                ->form([
+                    Select::make('roles')
+                        ->label('Roles')
+                        ->multiple()
+                        ->options(Role::query()->orderBy('name')->pluck('name', 'name')->toArray())
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+
+                    Toggle::make('website_is_published')
+                        ->label('Website Published'),
+                ])
+                ->action(function (User $record, array $data): void {
+                    $record->syncRoles($data['roles'] ?? []);
+
+                    $website = $record->websites()->first();
+
+                    if ($website) {
+                        $website->update([
+                            'is_published' => (bool) ($data['website_is_published'] ?? false),
+                        ]);
+                    }
+                })
+                ->successNotificationTitle('User access updated.'),
+
+            Impersonate::make()
+                ->visible(fn (User $record) => auth()->id() !== $record->id
+                    && auth()->user()?->hasRole('Superadmin'))
+                ->redirectTo('/admin'),
+        ]);
+}
 
     public static function getRelations(): array
     {

@@ -167,7 +167,7 @@ public function getPlans(): array
                 default => 'GET PLYR',
             },
             'button_href' => match ($currentPlan) {
-                'free', 'my_journey' => url('/checkout/plyr'),
+                'free', 'my_journey' => url('https://systems.plyrcard.com/widget/survey/rY9lpkKJxgH844GoXuYf?plan=rookie-plus'),
                 default => '#',
             },
             'button_style' => $currentPlan === 'plyr' ? 'disabled' : 'orange',
@@ -198,7 +198,7 @@ public function getPlans(): array
                 : 'START MY JOURNEY',
             'button_href' => $currentPlan === 'my_journey'
                 ? '#'
-                : url('/checkout/my-journey'),
+                : url('https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?plan=my-journey'),
             'button_style' => $currentPlan === 'my_journey' ? 'disabled' : 'blue',
             'icon' => 'crown',
             'current' => $currentPlan === 'my_journey',
