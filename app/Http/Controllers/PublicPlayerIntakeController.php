@@ -1274,20 +1274,56 @@ class PublicPlayerIntakeController extends Controller
             $hasSubscription = is_array($subscriptions) && count($subscriptions) > 0;
 
             if ($hasSubscription) {
+                $planSlug = Str::slug($selectedPlan);
+
+                $planUpdatePayload = [
+                    'locationId' => $locationId,
+                    'email' => $email,
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'name' => trim($firstName . ' ' . $lastName),
+                    'tags' => array_values(array_filter([
+                        'player-intake',
+                        $planSlug,
+                        'plan-' . $planSlug,
+                    ])),
+                    'customFields' => [
+                        [
+                            'key' => 'selected_plan',
+                            'field_value' => $selectedPlan,
+                        ],
+                    ],
+                ];
+
+                $planUpdateResponse = $client->post(
+                    'https://services.leadconnectorhq.com/contacts/upsert',
+                    $planUpdatePayload
+                );
+
+                $planUpdateBody = $planUpdateResponse->json();
+                if (! is_array($planUpdateBody)) {
+                    $planUpdateBody = ['raw' => $planUpdateResponse->body()];
+                }
+
                 return [
-                    'success' => true,
-                    'status' => $subscriptionResponse->status(),
-                    'message' => 'GHL contact synced. Existing subscription found; no free plan fallback applied.',
+                    'success' => $planUpdateResponse->successful(),
+                    'status' => $planUpdateResponse->status(),
+                    'message' => $planUpdateResponse->successful()
+                        ? 'GHL contact synced and selected plan was updated on the contact.'
+                        : 'GHL contact exists, but selected plan update failed.',
                     'contact_id' => $contactId,
                     'subscription_found' => true,
-                    'plan_applied' => null,
+                    'plan_applied' => $selectedPlan,
                     'response' => [
                         'upsert' => $upsertBody,
                         'subscriptions' => $subscriptionBody,
+                        'plan_update' => $planUpdateBody,
                     ],
                 ];
             }
 
+            $planSlug = Str::slug($selectedPlan);
+            
             // 5) No subscription found: mark as Free and let GHL workflows handle the rest
             $fallbackPayload = [
                 'locationId' => $locationId,
@@ -1297,13 +1333,13 @@ class PublicPlayerIntakeController extends Controller
                 'name' => trim($firstName . ' ' . $lastName),
                 'tags' => array_values(array_filter([
                     'player-intake',
-                    'free',
-                    'plan-free',
+                    $planSlug,
+                    'plan-' . $planSlug,
                 ])),
                 'customFields' => [
                     [
                         'key' => 'selected_plan',
-                        'field_value' => 'Free',
+                        'field_value' => $selectedPlan,
                     ],
                 ],
             ];
