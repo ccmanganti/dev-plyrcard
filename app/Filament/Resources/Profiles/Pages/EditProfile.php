@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Filament\Pages\MyJourney;
 
 class EditProfile extends Page implements HasForms
 {
@@ -1287,94 +1288,89 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
         return 'My Profile';
     }
 
-    public function hasPremiumAccess(): bool
-    {
-        if (! $this->user || ! method_exists($this->user, 'hasRole')) {
-            return false;
-        }
+public function hasPremiumAccess(): bool
+{
+    return in_array($this->getCurrentPlanKey(), ['plyr', 'my_journey'], true);
+}
 
-        return $this->user->hasRole('Plyr') || $this->user->hasRole('My Journey');
-    }
-
-    public function getCurrentPlanKey(): string
-    {
-        if (! $this->user || ! method_exists($this->user, 'hasRole')) {
-            return 'free';
-        }
-
-        if ($this->user->hasRole('My Journey')) {
-            return 'my_journey';
-        }
-
-        if ($this->user->hasRole('Plyr')) {
-            return 'plyr';
-        }
-
+public function getCurrentPlanKey(): string
+{
+    if (! $this->user || ! method_exists($this->user, 'hasRole')) {
         return 'free';
     }
 
-    public function getPlanName(): string
-    {
-        return match ($this->getCurrentPlanKey()) {
-            'my_journey' => 'MY JOURNEY',
-            'plyr' => 'PLYR',
-            default => 'FREE',
-        };
+    if ($this->user->hasRole('My Journey')) {
+        return 'my_journey';
     }
 
-    public function getPlanHeadline(): string
-    {
-        return match ($this->getCurrentPlanKey()) {
-            'my_journey' => "YOU'RE ON MY JOURNEY",
-            'plyr' => "YOU'RE ON PLYR",
-            default => "YOU'RE ON FREE",
-        };
+    if ($this->user->hasRole('Plyr')) {
+        return 'plyr';
     }
 
-    public function getPlanDescription(): string
-    {
-        return match ($this->getCurrentPlanKey()) {
-            'plyr' => 'Your Social links and YouTube features are unlocked. Upgrade to My Journey for a more premium managed experience.',
-            'my_journey' => 'Everything is unlocked on My Journey. Your PLYRCard is fully equipped for the next level.',
-            default => 'Upgrade to Plyr or My Journey to unlock Social links, YouTube Highlights, and Featured Videos.',
-        };
-    }
+    return 'free';
+}
 
-    public function canUpgradePlan(): bool
-    {
-        return $this->getCurrentPlanKey() !== 'my_journey';
-    }
+public function getPlanName(): string
+{
+    return match ($this->getCurrentPlanKey()) {
+        'my_journey' => 'MY JOURNEY',
+        'plyr' => 'PLYR',
+        default => 'FREE',
+    };
+}
 
-    public function getUpgradeButtonLabel(): string
-    {
-        return match ($this->getCurrentPlanKey()) {
-            'plyr' => 'Upgrade to My Journey',
-            default => 'See Plans',
-        };
-    }
+public function getPlanHeadline(): string
+{
+    return match ($this->getCurrentPlanKey()) {
+        'my_journey' => "YOU'RE ON MY JOURNEY",
+        'plyr' => "YOU'RE ON PLYR",
+        default => "YOU'RE ON FREE",
+    };
+}
 
-    public function getUpgradeUrl(): string
-    {
-        return url('/pricing');
-    }
+public function getPlanDescription(): string
+{
+    return match ($this->getCurrentPlanKey()) {
+        'my_journey' => 'Everything is unlocked on My Journey. Your PLYRCard is fully equipped for the next level.',
+        'plyr' => 'Your Social links and YouTube features are unlocked. Move to My Journey for the most premium experience.',
+        default => 'Upgrade to unlock Social links, YouTube Highlights, Featured Videos, and more premium tools.',
+    };
+}
 
-    public function shouldShowBookDemoButton(): bool
-    {
-        return in_array($this->getCurrentPlanKey(), ['free', 'my_journey'], true);
-    }
+public function canUpgradePlan(): bool
+{
+    return $this->getCurrentPlanKey() !== 'my_journey';
+}
 
-    public function getBookDemoUrl(): string
-    {
-        return url('/demo');
-    }
+public function getUpgradeButtonLabel(): string
+{
+    return match ($this->getCurrentPlanKey()) {
+        'plyr' => 'Go to My Journey',
+        default => 'Upgrade Now',
+    };
+}
 
-    public function getPlanTheme(): string
-    {
-        return $this->getCurrentPlanKey() === 'my_journey'
-            ? 'success'
-            : 'warning';
-    }
+public function getUpgradeUrl(): string
+{
+    return MyJourney::getUrl();
+}
 
+public function shouldShowBookDemoButton(): bool
+{
+    return $this->getCurrentPlanKey() !== 'my_journey';
+}
+
+public function getBookDemoUrl(): string
+{
+    return url('/demo');
+}
+
+public function getPlanTheme(): string
+{
+    return $this->getCurrentPlanKey() === 'my_journey'
+        ? 'success'
+        : 'warning';
+}
     public function getProfileInitials(): string
     {
         $first = strtoupper(substr((string) ($this->user?->first_name ?? ''), 0, 1));

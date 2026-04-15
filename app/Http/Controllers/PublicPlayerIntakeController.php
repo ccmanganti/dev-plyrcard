@@ -667,15 +667,15 @@ class PublicPlayerIntakeController extends Controller
         ]);
     }
 
-    $ghlResult = $this->syncGhlContactAndPlan(
-        $user,
-        $validated,
-        $selectedPlan,
-        $league ?? null,
-        $club ?? null,
-        $team ?? null,
-        $nationalTeam ?? null
-    );
+    $useCustomHighlights = $request->boolean('use_custom_highlights');
+    $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
+    $ghlResult = null;
+
+    if ($useCustomHighlights && empty($manualVideoUrls)) {
+        throw ValidationException::withMessages([
+            'featured_video_urls' => 'Please add at least one highlight video URL or turn off "Pick My Own Videos".',
+        ]);
+    }
 
     try {
         $user = DB::transaction(function () use (

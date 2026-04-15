@@ -1,102 +1,7 @@
 <x-filament-panels::page>
     @php
-        $plans = [
-            [
-                'name' => 'FREE',
-                'price' => '$0',
-                'suffix' => '/month',
-                'tagline' => 'Get your info online',
-                'accent' => 'gray',
-                'popular' => false,
-                'button' => 'CURRENT PLAN',
-                'button_href' => '#',
-                'button_style' => 'disabled',
-                'icon' => 'user',
-                'features' => [
-                    ['text' => 'Basic profile site with athlete info', 'included' => true],
-                    ['text' => 'Basic templates', 'included' => true],
-                    ['text' => 'PLYR Card graphic not included', 'included' => false],
-                    ['text' => 'Personal domain', 'included' => false],
-                    ['text' => 'Professional email', 'included' => false],
-                    ['text' => 'Member status & perks', 'included' => false],
-                    ['text' => 'Graphics ordering', 'included' => false],
-                ],
-                'note' => 'Best for athletes who want a simple online presence without design assets.',
-            ],
-            [
-                'name' => 'PLYR',
-                'price' => '$10.99',
-                'suffix' => '/month',
-                'tagline' => 'Level up your branded web presence',
-                'accent' => 'orange',
-                'popular' => true,
-                'button' => 'GET PLYR',
-                'button_href' => '#',
-                'button_style' => 'orange',
-                'icon' => 'bolt',
-                'features' => [
-                    ['text' => 'Personal athlete website', 'included' => true],
-                    ['text' => 'Your own domain included', 'included' => true],
-                    ['text' => 'Professional email tied to domain', 'included' => true],
-                    ['text' => 'Member status & member-only perks', 'included' => true],
-                    ['text' => 'Order graphics at member rate: $35/graphic', 'included' => true],
-                    ['text' => 'Included in select PLYR Card promotions', 'included' => true],
-                    ['text' => 'Graphics not included in plan', 'included' => false],
-                ],
-                'note' => 'Best for athletes who want a professional look and access to graphics & promotions.',
-            ],
-            [
-                'name' => 'MY JOURNEY',
-                'price' => '$45',
-                'suffix' => '/month',
-                'tagline' => 'Recruiting-ready, always on',
-                'accent' => 'blue',
-                'popular' => false,
-                'button' => 'START MY JOURNEY',
-                'button_href' => '#',
-                'button_style' => 'blue',
-                'icon' => 'crown',
-                'features' => [
-                    ['text' => 'Athlete website on your own domain', 'included' => true],
-                    ['text' => 'Ongoing monthly service & updates', 'included' => true],
-                    ['text' => 'Maintained & upgraded web presence', 'included' => true],
-                    ['text' => 'À la carte graphics available', 'included' => true],
-                    ['text' => 'Graphics not included in plan', 'included' => false],
-                ],
-                'note' => 'Best for athletes who want a maintained website and will order graphics as needed.',
-            ],
-        ];
-
-        $addons = [
-            [
-                'title' => 'Upgraded Site Design',
-                'desc' => 'A full redesign of your athlete website',
-                'price' => '$150',
-                'unit' => 'ONE-TIME',
-                'icon' => 'sparkles',
-            ],
-            [
-                'title' => 'Starting Graphics Bundle',
-                'desc' => 'Starting graphic • Showcase graphic • Thank You graphic',
-                'price' => '$70',
-                'unit' => 'BUNDLE',
-                'icon' => 'photo',
-            ],
-            [
-                'title' => 'Individual Graphic',
-                'desc' => 'Single custom athlete graphic',
-                'price' => '$35',
-                'unit' => 'EACH',
-                'icon' => 'photo',
-            ],
-            [
-                'title' => 'Domain',
-                'desc' => 'Custom domain registration for your athlete site',
-                'price' => '$45',
-                'unit' => '/YEAR',
-                'icon' => 'globe-alt',
-            ],
-        ];
+        $plans = $this->getPlans();
+        $addons = $this->getAddons();
 
         function mjIcon($name) {
             return match ($name) {
@@ -126,9 +31,7 @@
             color: var(--text);
         }
 
-        .mj-wrap * {
-            box-sizing: border-box;
-        }
+        .mj-wrap * { box-sizing: border-box; }
 
         .mj-hero {
             position: relative;
@@ -222,6 +125,10 @@
             overflow: hidden;
         }
 
+        .mj-card.current {
+            box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.28);
+        }
+
         .mj-card.orange {
             border-color: rgba(255,100,61,.7);
             background:
@@ -234,6 +141,22 @@
             background:
                 radial-gradient(circle at top left, rgba(25,167,255,.08), transparent 28%),
                 linear-gradient(180deg, #08111a 0%, #0a0f16 100%);
+        }
+
+        .mj-card.current::after {
+            content: "Current";
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: .68rem;
+            font-weight: 900;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: #d9dee5;
+            padding: .35rem .65rem;
+            border-radius: 999px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.10);
         }
 
         .mj-popular {
@@ -335,13 +258,8 @@
             line-height: 1.45;
         }
 
-        .mj-feature.included {
-            color: #eff4f8;
-        }
-
-        .mj-feature.excluded {
-            color: #717986;
-        }
+        .mj-feature.included { color: #eff4f8; }
+        .mj-feature.excluded { color: #717986; }
 
         .mj-feature svg {
             width: 16px;
@@ -350,13 +268,8 @@
             margin-top: .18rem;
         }
 
-        .mj-feature.included svg {
-            color: #22c55e;
-        }
-
-        .mj-feature.excluded svg {
-            color: #6b7280;
-        }
+        .mj-feature.included svg { color: #22c55e; }
+        .mj-feature.excluded svg { color: #6b7280; }
 
         .mj-note {
             margin-top: 1rem;
@@ -399,9 +312,7 @@
             box-shadow: 0 8px 24px rgba(255,100,61,.25);
         }
 
-        .mj-btn.orange:hover {
-            filter: brightness(1.05);
-        }
+        .mj-btn.orange:hover { filter: brightness(1.05); }
 
         .mj-btn.blue {
             background: rgba(25,167,255,.12);
@@ -411,6 +322,16 @@
 
         .mj-btn.blue:hover {
             background: rgba(25,167,255,.18);
+        }
+
+        .mj-btn.ghost {
+            background: rgba(255,255,255,.03);
+            border-color: rgba(255,255,255,.10);
+            color: #dde4eb;
+        }
+
+        .mj-btn.ghost:hover {
+            background: rgba(255,255,255,.06);
         }
 
         .mj-addon-wrap {
@@ -593,16 +514,15 @@
         <section class="mj-hero">
             <div class="mj-eyebrow">
                 <span>🚀</span>
-                <span>Unlock MyJourney</span>
+                <span>{{ $this->getHeroEyebrow() }}</span>
             </div>
 
             <h1 class="mj-hero-title">
-                Choose Your <span>Path</span>
+                {!! $this->getHeroTitle() !!}
             </h1>
 
             <p class="mj-hero-text">
-                From a simple online presence to a full recruiting-ready website — PLYRCard has a plan
-                built for every athlete at every stage of their journey.
+                {{ $this->getHeroDescription() }}
             </p>
 
             <div class="mj-hero-badge">
@@ -610,14 +530,14 @@
                     {!! mjIcon('crown') !!}
                 </div>
                 <div>
-                    <div style="font-weight: 800;">Built for athletes</div>
+                    <div style="font-weight: 800;">{{ $this->getHeroBadgeLabel() }}</div>
                 </div>
             </div>
         </section>
 
         <section class="mj-grid">
             @foreach ($plans as $plan)
-                <article class="mj-card {{ $plan['accent'] }}">
+                <article class="mj-card {{ $plan['accent'] }} {{ $plan['current'] ? 'current' : '' }}">
                     @if ($plan['popular'])
                         <div class="mj-popular">Most Popular</div>
                     @endif
@@ -664,49 +584,51 @@
             @endforeach
         </section>
 
-        <section class="mj-addon-wrap">
-            <div class="mj-addon-header">
-                <div class="mj-addon-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-1.5 3h12M10 21a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>
-                    </svg>
-                </div>
+        @if ($this->shouldShowAddons())
+            <section class="mj-addon-wrap">
+                <div class="mj-addon-header">
+                    <div class="mj-addon-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-1.5 3h12M10 21a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>
+                        </svg>
+                    </div>
 
-                <div>
-                    <div class="mj-addon-title">A La Carte</div>
-                    <div class="mj-addon-subtitle">
-                        For My Journey Subscribers<br>
-                        Order exactly what you need, when you need it. All add-ons available exclusively for My Journey subscribers.
+                    <div>
+                        <div class="mj-addon-title">A La Carte</div>
+                        <div class="mj-addon-subtitle">
+                            For My Journey Subscribers<br>
+                            Order exactly what you need, when you need it. All add-ons available exclusively for My Journey subscribers.
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="mj-addon-list">
-                @foreach ($addons as $addon)
-                    <a href="#" class="mj-addon-item" style="text-decoration:none;">
-                        <div class="mj-addon-left">
-                            <div class="mj-addon-badge">
-                                {!! mjIcon($addon['icon']) !!}
+                <div class="mj-addon-list">
+                    @foreach ($addons as $addon)
+                        <a href="#" class="mj-addon-item" style="text-decoration:none;">
+                            <div class="mj-addon-left">
+                                <div class="mj-addon-badge">
+                                    {!! mjIcon($addon['icon']) !!}
+                                </div>
+
+                                <div>
+                                    <div class="mj-addon-name">{{ $addon['title'] }}</div>
+                                    <div class="mj-addon-desc">{{ $addon['desc'] }}</div>
+                                </div>
                             </div>
 
-                            <div>
-                                <div class="mj-addon-name">{{ $addon['title'] }}</div>
-                                <div class="mj-addon-desc">{{ $addon['desc'] }}</div>
+                            <div class="mj-addon-right">
+                                <div class="mj-addon-price">{{ $addon['price'] }}</div>
+                                <div class="mj-addon-unit">{{ $addon['unit'] }}</div>
                             </div>
-                        </div>
-
-                        <div class="mj-addon-right">
-                            <div class="mj-addon-price">{{ $addon['price'] }}</div>
-                            <div class="mj-addon-unit">{{ $addon['unit'] }}</div>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
-        </section>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
 
         <section class="mj-footer-note">
-            <strong>No Hidden Fees. No Surprises.</strong>
-            <span>Cancel anytime. Graphics and add-ons are ordered separately and billed once.</span>
+            <strong>{{ $this->getFooterHeadline() }}</strong>
+            <span>{{ $this->getFooterCopy() }}</span>
         </section>
     </div>
 </x-filament-panels::page>
