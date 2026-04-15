@@ -1224,7 +1224,7 @@ class UserResource extends Resource
                                         ->dehydrated(false),
                                 ]),
                         ]),
-                ]),
+                ])->columnSpan(2),
         ]);
     }
 
