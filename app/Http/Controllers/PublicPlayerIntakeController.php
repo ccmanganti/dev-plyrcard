@@ -419,381 +419,405 @@ class PublicPlayerIntakeController extends Controller
     }
 
     public function store(Request $request): RedirectResponse
-    {
-        $request->merge([
-            'selected_plan' => $this->resolvePlanFromRequest($request),
-            'phone' => $this->normalizePhone($request->input('phone')),
-            'parent_phone' => $this->normalizePhone($request->input('parent_phone')),
-            'sec_parent_phone' => $this->normalizePhone($request->input('sec_parent_phone')),
-            'club_coach_phone' => $this->normalizePhone($request->input('club_coach_phone')),
-            'natl_coach_phone' => $this->normalizePhone($request->input('natl_coach_phone')),
-            'tech_trainer_phone' => $this->normalizePhone($request->input('tech_trainer_phone')),
-            'snc_trainer_phone' => $this->normalizePhone($request->input('snc_trainer_phone')),
+{
+    $request->merge([
+        'selected_plan' => $this->resolvePlanFromRequest($request),
+        'phone' => $this->normalizePhone($request->input('phone')),
+        'parent_phone' => $this->normalizePhone($request->input('parent_phone')),
+        'sec_parent_phone' => $this->normalizePhone($request->input('sec_parent_phone')),
+        'club_coach_phone' => $this->normalizePhone($request->input('club_coach_phone')),
+        'natl_coach_phone' => $this->normalizePhone($request->input('natl_coach_phone')),
+        'tech_trainer_phone' => $this->normalizePhone($request->input('tech_trainer_phone')),
+        'snc_trainer_phone' => $this->normalizePhone($request->input('snc_trainer_phone')),
+    ]);
+
+    $validated = $request->validate([
+        'selected_plan' => ['nullable', 'in:Free,Plyr,My Journey'],
+        'first_name' => ['required', 'string', 'max:255'],
+        'middle_name' => ['nullable', 'string', 'max:255'],
+        'last_name' => ['required', 'string', 'max:255'],
+        'personal_email' => ['required', 'email', 'max:255'],
+        'phone' => [
+            'nullable',
+            'string',
+            'max:50',
+            Rule::unique('users', 'phone'),
+        ],
+        'gender' => ['required', 'in:' . implode(',', array_keys($this->genderOptions))],
+        'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
+        'position' => ['nullable', 'array'],
+        'position.*' => ['string', 'max:255'],
+
+        'birth' => ['nullable', 'date'],
+        'year' => ['nullable', 'string', 'max:50'],
+        'gpa' => ['nullable', 'string', 'max:50'],
+        'height' => ['nullable', 'string', 'max:50'],
+        'weight' => ['nullable', 'string', 'max:50'],
+        'jersey_number' => ['nullable', 'string', 'max:50'],
+        'vertical_jump' => ['nullable', 'string', 'max:50'],
+        'max_speed' => ['nullable', 'string', 'max:50'],
+        'dominant_foot' => ['nullable', 'in:left,right,both'],
+
+        'country' => ['nullable', 'string', 'max:255'],
+        'country_other' => ['nullable', 'string', 'max:255'],
+        'state' => ['nullable', 'string', 'max:255'],
+        'city' => ['nullable', 'string', 'max:255'],
+        'street' => ['nullable', 'string', 'max:255'],
+
+        'school_id' => ['nullable', 'string'],
+        'school_other' => ['nullable', 'string', 'max:255'],
+
+        'league_id' => ['nullable', 'string'],
+        'club_id' => ['nullable', 'string'],
+        'team_id' => ['nullable', 'string'],
+        'league_other' => ['nullable', 'string', 'max:255'],
+        'club_other' => ['nullable', 'string', 'max:255'],
+        'team_other' => ['nullable', 'string', 'max:255'],
+
+        'natl_team_exp' => ['nullable', 'in:0,1'],
+        'national_team_period' => ['nullable', 'string', 'max:255'],
+        'national_team_id' => ['nullable', 'string'],
+        'national_team_other' => ['nullable', 'string', 'max:255'],
+
+        'ig_handle' => ['nullable', 'url', 'max:255'],
+        'x_handle' => ['nullable', 'url', 'max:255'],
+        'yt_url' => ['nullable', 'url', 'max:500'],
+        'featured_video_url' => ['nullable', 'url', 'max:500'],
+        'use_custom_highlights' => ['nullable', 'boolean'],
+        'featured_video_urls' => ['nullable', 'string'],
+        'player_bio' => ['nullable', 'string'],
+        'academic_accolades' => ['nullable', 'string'],
+        'sports_accolades' => ['nullable', 'string'],
+        'press' => ['nullable', 'string'],
+
+        'parent' => ['nullable', 'string', 'max:255'],
+        'parent_email' => ['nullable', 'email', 'max:255'],
+        'parent_phone' => ['nullable', 'string', 'max:50'],
+        'sec_parent' => ['nullable', 'string', 'max:255'],
+        'sec_parent_email' => ['nullable', 'email', 'max:255'],
+        'sec_parent_phone' => ['nullable', 'string', 'max:50'],
+
+        'club_coach' => ['nullable', 'string', 'max:255'],
+        'club_coach_email' => ['nullable', 'email', 'max:255'],
+        'club_coach_phone' => ['nullable', 'string', 'max:50'],
+        'natl_coach' => ['nullable', 'string', 'max:255'],
+        'natl_coach_email' => ['nullable', 'email', 'max:255'],
+        'natl_coach_phone' => ['nullable', 'string', 'max:50'],
+        'tech_trainer' => ['nullable', 'string', 'max:255'],
+        'tech_trainer_email' => ['nullable', 'email', 'max:255'],
+        'tech_trainer_phone' => ['nullable', 'string', 'max:50'],
+        'snc_trainer' => ['nullable', 'string', 'max:255'],
+        'snc_trainer_email' => ['nullable', 'email', 'max:255'],
+        'snc_trainer_phone' => ['nullable', 'string', 'max:50'],
+
+        'action_images' => ['nullable', 'array'],
+        'action_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+        'portrait_images' => ['nullable', 'array'],
+        'portrait_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+        'national_team_images' => ['nullable', 'array'],
+        'national_team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+        'team_images' => ['nullable', 'array'],
+        'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+    ], [
+        'phone.unique' => 'This phone number is already being used by another account.',
+    ]);
+
+    $selectedPlan = $validated['selected_plan'] ?? 'Free';
+
+    $totalRawImages =
+        count($request->file('action_images', [])) +
+        count($request->file('portrait_images', [])) +
+        count($request->file('national_team_images', [])) +
+        count($request->file('team_images', []));
+
+    if ($totalRawImages > 20) {
+        throw ValidationException::withMessages([
+            'action_images' => 'You may upload a combined maximum of 20 raw images across Action, Portrait, National Team, and Team images.',
         ]);
-
-        $validated = $request->validate([
-            'selected_plan' => ['nullable', 'in:Free,Plyr,My Journey'],
-            'first_name' => ['required', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'personal_email' => ['required', 'email', 'max:255'],
-            'phone' => [
-                'nullable',
-                'string',
-                'max:50',
-                Rule::unique('users', 'phone'),
-            ],
-            'gender' => ['required', 'in:' . implode(',', array_keys($this->genderOptions))],
-            'sport' => ['required', 'string', 'in:' . implode(',', array_keys($this->sportPositions))],
-            'position' => ['nullable', 'array'],
-            'position.*' => ['string', 'max:255'],
-
-            'birth' => ['nullable', 'date'],
-            'year' => ['nullable', 'string', 'max:50'],
-            'gpa' => ['nullable', 'string', 'max:50'],
-            'height' => ['nullable', 'string', 'max:50'],
-            'weight' => ['nullable', 'string', 'max:50'],
-            'jersey_number' => ['nullable', 'string', 'max:50'],
-            'vertical_jump' => ['nullable', 'string', 'max:50'],
-            'max_speed' => ['nullable', 'string', 'max:50'],
-            'dominant_foot' => ['nullable', 'in:left,right,both'],
-
-            'country' => ['nullable', 'string', 'max:255'],
-            'country_other' => ['nullable', 'string', 'max:255'],
-            'state' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'street' => ['nullable', 'string', 'max:255'],
-
-            'school_id' => ['nullable', 'string'],
-            'school_other' => ['nullable', 'string', 'max:255'],
-
-            'league_id' => ['nullable', 'string'],
-            'club_id' => ['nullable', 'string'],
-            'team_id' => ['nullable', 'string'],
-            'league_other' => ['nullable', 'string', 'max:255'],
-            'club_other' => ['nullable', 'string', 'max:255'],
-            'team_other' => ['nullable', 'string', 'max:255'],
-
-            'natl_team_exp' => ['nullable', 'in:0,1'],
-            'national_team_period' => ['nullable', 'string', 'max:255'],
-            'national_team_id' => ['nullable', 'string'],
-            'national_team_other' => ['nullable', 'string', 'max:255'],
-
-            'ig_handle' => ['nullable', 'url', 'max:255'],
-            'x_handle' => ['nullable', 'url', 'max:255'],
-            'yt_url' => ['nullable', 'url', 'max:500'],
-            'featured_video_url' => ['nullable', 'url', 'max:500'],
-            'use_custom_highlights' => ['nullable', 'boolean'],
-            'featured_video_urls' => ['nullable', 'string'],
-            'player_bio' => ['nullable', 'string'],
-            'academic_accolades' => ['nullable', 'string'],
-            'sports_accolades' => ['nullable', 'string'],
-            'press' => ['nullable', 'string'],
-
-            'parent' => ['nullable', 'string', 'max:255'],
-            'parent_email' => ['nullable', 'email', 'max:255'],
-            'parent_phone' => ['nullable', 'string', 'max:50'],
-            'sec_parent' => ['nullable', 'string', 'max:255'],
-            'sec_parent_email' => ['nullable', 'email', 'max:255'],
-            'sec_parent_phone' => ['nullable', 'string', 'max:50'],
-
-            'club_coach' => ['nullable', 'string', 'max:255'],
-            'club_coach_email' => ['nullable', 'email', 'max:255'],
-            'club_coach_phone' => ['nullable', 'string', 'max:50'],
-            'natl_coach' => ['nullable', 'string', 'max:255'],
-            'natl_coach_email' => ['nullable', 'email', 'max:255'],
-            'natl_coach_phone' => ['nullable', 'string', 'max:50'],
-            'tech_trainer' => ['nullable', 'string', 'max:255'],
-            'tech_trainer_email' => ['nullable', 'email', 'max:255'],
-            'tech_trainer_phone' => ['nullable', 'string', 'max:50'],
-            'snc_trainer' => ['nullable', 'string', 'max:255'],
-            'snc_trainer_email' => ['nullable', 'email', 'max:255'],
-            'snc_trainer_phone' => ['nullable', 'string', 'max:50'],
-
-            'action_images' => ['nullable', 'array'],
-            'action_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-            'portrait_images' => ['nullable', 'array'],
-            'portrait_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-            'national_team_images' => ['nullable', 'array'],
-            'national_team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-            'team_images' => ['nullable', 'array'],
-            'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-        ], [
-            'phone.unique' => 'This phone number is already being used by another account.',
-        ]);
-
-        $selectedPlan = $validated['selected_plan'] ?? 'Free';
-
-        $totalRawImages =
-            count($request->file('action_images', [])) +
-            count($request->file('portrait_images', [])) +
-            count($request->file('national_team_images', [])) +
-            count($request->file('team_images', []));
-
-        if ($totalRawImages > 20) {
-            throw ValidationException::withMessages([
-                'action_images' => 'You may upload a combined maximum of 20 raw images across Action, Portrait, National Team, and Team images.',
-            ]);
-        }
-
-        if (($validated['country'] ?? null) === '__other__') {
-            if (blank($validated['country_other'] ?? null)) {
-                return back()->withErrors(['country_other' => 'Please enter a country name.'])->withInput();
-            }
-
-            $validated['country'] = trim((string) $validated['country_other']);
-        }
-
-        if (($validated['country'] ?? null) === 'USA' && filled($validated['state'] ?? null)) {
-            $validated['state'] = strtoupper(trim((string) $validated['state']));
-        }
-
-        $sport = strtolower((string) ($validated['sport'] ?? ''));
-        $selectedGender = strtolower((string) ($validated['gender'] ?? ''));
-
-        $allowedPositions = array_keys($this->sportPositions[$sport] ?? []);
-        $submittedPositions = $validated['position'] ?? [];
-
-        foreach ($submittedPositions as $position) {
-            if (! in_array($position, $allowedPositions, true)) {
-                return back()
-                    ->withErrors(['position' => 'One or more selected positions do not match the chosen sport.'])
-                    ->withInput();
-            }
-        }
-
-        if (empty($submittedPositions)) {
-            return back()
-                ->withErrors(['position' => 'Please select at least one position.'])
-                ->withInput();
-        }
-
-        if ($sport !== 'soccer') {
-            $validated['dominant_foot'] = null;
-        }
-
-        $selectedLeagueId = $validated['league_id'] ?? null;
-        $selectedClubId = $validated['club_id'] ?? null;
-        $selectedTeamId = $validated['team_id'] ?? null;
-
-        if ($selectedLeagueId === '__other__') {
-            if (blank($validated['league_other'] ?? null)) {
-                return back()->withErrors(['league_other' => 'Please enter the new league name.'])->withInput();
-            }
-
-            if (blank($validated['club_other'] ?? null)) {
-                return back()->withErrors(['club_other' => 'Please enter the new club name.'])->withInput();
-            }
-
-            if (blank($validated['team_other'] ?? null)) {
-                return back()->withErrors(['team_other' => 'Please enter the new team name.'])->withInput();
-            }
-        } else {
-            $league = null;
-            $club = null;
-            $team = null;
-
-            if (filled($selectedLeagueId)) {
-                $league = League::query()->find($selectedLeagueId);
-
-                if (! $league) {
-                    return back()->withErrors(['league_id' => 'The selected league is invalid.'])->withInput();
-                }
-
-                if (! $this->isLeagueGenderCompatible($league->gender, $selectedGender)) {
-                    return back()->withErrors(['league_id' => 'The selected league does not match the athlete gender.'])->withInput();
-                }
-
-                if (! $this->isLeagueSportCompatible($league->sport, $sport)) {
-                    return back()->withErrors(['league_id' => 'The selected league does not match the athlete sport.'])->withInput();
-                }
-            }
-
-            if (filled($selectedClubId)) {
-                if (! $league) {
-                    return back()->withErrors(['club_id' => 'Please select a valid league first.'])->withInput();
-                }
-
-                $club = Club::query()
-                    ->with('league')
-                    ->where('id', $selectedClubId)
-                    ->where('league_id', $league->id)
-                    ->first();
-
-                if (! $club) {
-                    return back()->withErrors(['club_id' => 'The selected club does not belong to the selected league.'])->withInput();
-                }
-
-                if (! $this->isLeagueGenderCompatible($club->league?->gender, $selectedGender)) {
-                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete gender.'])->withInput();
-                }
-
-                if (! $this->isLeagueSportCompatible($club->league?->sport, $sport)) {
-                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete sport.'])->withInput();
-                }
-            }
-
-            if (filled($selectedTeamId)) {
-                if (! $club) {
-                    return back()->withErrors(['team_id' => 'Please select a valid club first.'])->withInput();
-                }
-
-                $team = Team::query()
-                    ->with('club.league')
-                    ->where('id', $selectedTeamId)
-                    ->where('club_id', $club->id)
-                    ->first();
-
-                if (! $team) {
-                    return back()->withErrors(['team_id' => 'The selected team does not belong to the selected club.'])->withInput();
-                }
-
-                if (! $this->isLeagueGenderCompatible($team->club?->league?->gender, $selectedGender)) {
-                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete gender.'])->withInput();
-                }
-
-                if (! $this->isLeagueSportCompatible($team->club?->league?->sport, $sport)) {
-                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete sport.'])->withInput();
-                }
-            }
-        }
-
-        $useCustomHighlights = $request->boolean('use_custom_highlights');
-        $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
-
-        if ($useCustomHighlights && empty($manualVideoUrls)) {
-            throw ValidationException::withMessages([
-                'featured_video_urls' => 'Please add at least one highlight video URL or turn off "Pick My Own Videos".',
-            ]);
-        }
-
-        try {
-            $user = DB::transaction(function () use ($request, $validated, $useCustomHighlights, $manualVideoUrls, $sport, $selectedPlan) {
-                $school = $this->resolveSchool($validated);
-                [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
-                $nationalTeam = $this->resolveNationalTeam($validated);
-
-                $user = User::withTrashed()
-                    ->where('personal_email', $validated['personal_email'])
-                    ->first();
-
-                if (! $user) {
-                    $user = new User();
-                    $user->password = Hash::make('WelcomePLYR');
-                }
-
-                if (method_exists($user, 'trashed') && $user->trashed()) {
-                    $user->restore();
-                }
-
-                $hasNationalTeamExperience = isset($validated['natl_team_exp']) ? (bool) $validated['natl_team_exp'] : false;
-
-                $user->fill([
-                    'first_name' => $validated['first_name'],
-                    'middle_name' => $validated['middle_name'] ?? null,
-                    'last_name' => $validated['last_name'],
-                    'email' => $validated['personal_email'],
-                    'personal_email' => $validated['personal_email'],
-                    'phone' => $validated['phone'] ?? null,
-
-                    'gender' => $validated['gender'],
-                    'sport' => $validated['sport'],
-                    'position' => $validated['position'] ?? [],
-
-                    'birth' => $validated['birth'] ?? null,
-                    'year' => $validated['year'] ?? null,
-                    'gpa' => $validated['gpa'] ?? null,
-                    'height' => $validated['height'] ?? null,
-                    'weight' => $validated['weight'] ?? null,
-                    'jersey_number' => $validated['jersey_number'] ?? null,
-                    'vertical_jump' => $validated['vertical_jump'] ?? null,
-                    'max_speed' => $validated['max_speed'] ?? null,
-                    'dominant_foot' => $sport === 'soccer' ? ($validated['dominant_foot'] ?? null) : null,
-
-                    'country' => $validated['country'] ?? null,
-                    'state' => $validated['state'] ?? null,
-                    'city' => $validated['city'] ?? null,
-                    'street' => $validated['street'] ?? null,
-
-                    'natl_team_exp' => $hasNationalTeamExperience,
-                    'national_team_period' => $hasNationalTeamExperience ? ($validated['national_team_period'] ?? null) : null,
-
-                    'school_id' => $school?->id,
-                    'league_id' => $league?->id,
-                    'club_id' => $club?->id,
-                    'team_name' => $team?->name,
-                    'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
-
-                    'ig_handle' => $validated['ig_handle'] ?? null,
-                    'x_handle' => $validated['x_handle'] ?? null,
-                    'yt_url' => $validated['yt_url'] ?? null,
-                    'featured_video_url' => $validated['featured_video_url'] ?? null,
-                    'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
-
-                    'player_bio' => $validated['player_bio'] ?? null,
-                    'academic_accolades' => $validated['academic_accolades'] ?? null,
-                    'sports_accolades' => $validated['sports_accolades'] ?? null,
-                    'press' => $validated['press'] ?? null,
-
-                    'parent' => $validated['parent'] ?? null,
-                    'parent_email' => $validated['parent_email'] ?? null,
-                    'parent_phone' => $validated['parent_phone'] ?? null,
-                    'sec_parent' => $validated['sec_parent'] ?? null,
-                    'sec_parent_email' => $validated['sec_parent_email'] ?? null,
-                    'sec_parent_phone' => $validated['sec_parent_phone'] ?? null,
-
-                    'club_coach' => $validated['club_coach'] ?? null,
-                    'club_coach_email' => $validated['club_coach_email'] ?? null,
-                    'club_coach_phone' => $validated['club_coach_phone'] ?? null,
-                    'natl_coach' => $validated['natl_coach'] ?? null,
-                    'natl_coach_email' => $validated['natl_coach_email'] ?? null,
-                    'natl_coach_phone' => $validated['natl_coach_phone'] ?? null,
-                    'tech_trainer' => $validated['tech_trainer'] ?? null,
-                    'tech_trainer_email' => $validated['tech_trainer_email'] ?? null,
-                    'tech_trainer_phone' => $validated['tech_trainer_phone'] ?? null,
-                    'snc_trainer' => $validated['snc_trainer'] ?? null,
-                    'snc_trainer_email' => $validated['snc_trainer_email'] ?? null,
-                    'snc_trainer_phone' => $validated['snc_trainer_phone'] ?? null,
-
-                    'domain' => null,
-                ]);
-
-                $userImageUploads = $this->storeUserImageUploads($request);
-
-                if (! empty($userImageUploads['raw_player_images'])) {
-                    $user->raw_player_images = $userImageUploads['raw_player_images'];
-                }
-
-                $user->save();
-
-                $this->applyUserPlanRole($user, $selectedPlan);
-
-                $this->upsertGhlContact($user, $validated, $selectedPlan);
-
-                $uploads = $this->storeHeroUploads($request);
-
-                $this->createWebsiteIfSupported($user, $validated, $uploads);
-
-                return $user;
-            });
-        } catch (\Illuminate\Database\QueryException $e) {
-            if (str_contains(strtolower($e->getMessage()), 'users.phone')) {
-                return back()
-                    ->withErrors(['phone' => 'This phone number is already being used by another account.'])
-                    ->withInput();
-            }
-
-            report($e);
-
-            return back()
-                ->withErrors(['form' => 'We could not submit the intake form right now. Please review the form and try again.'])
-                ->withInput();
-        }
-
-        return redirect()
-            ->route('public.player-intake.create', ['utm_plan' => $selectedPlan])
-            ->with('success', 'Player intake submitted successfully for ' . $user->first_name . '.');
     }
+
+    if (($validated['country'] ?? null) === '__other__') {
+        if (blank($validated['country_other'] ?? null)) {
+            return back()->withErrors(['country_other' => 'Please enter a country name.'])->withInput();
+        }
+
+        $validated['country'] = trim((string) $validated['country_other']);
+    }
+
+    if (($validated['country'] ?? null) === 'USA' && filled($validated['state'] ?? null)) {
+        $validated['state'] = strtoupper(trim((string) $validated['state']));
+    }
+
+    $sport = strtolower((string) ($validated['sport'] ?? ''));
+    $selectedGender = strtolower((string) ($validated['gender'] ?? ''));
+
+    $allowedPositions = array_keys($this->sportPositions[$sport] ?? []);
+    $submittedPositions = $validated['position'] ?? [];
+
+    foreach ($submittedPositions as $position) {
+        if (! in_array($position, $allowedPositions, true)) {
+            return back()
+                ->withErrors(['position' => 'One or more selected positions do not match the chosen sport.'])
+                ->withInput();
+        }
+    }
+
+    if (empty($submittedPositions)) {
+        return back()
+            ->withErrors(['position' => 'Please select at least one position.'])
+            ->withInput();
+    }
+
+    if ($sport !== 'soccer') {
+        $validated['dominant_foot'] = null;
+    }
+
+    $selectedLeagueId = $validated['league_id'] ?? null;
+    $selectedClubId = $validated['club_id'] ?? null;
+    $selectedTeamId = $validated['team_id'] ?? null;
+
+    if ($selectedLeagueId === '__other__') {
+        if (blank($validated['league_other'] ?? null)) {
+            return back()->withErrors(['league_other' => 'Please enter the new league name.'])->withInput();
+        }
+
+        if (blank($validated['club_other'] ?? null)) {
+            return back()->withErrors(['club_other' => 'Please enter the new club name.'])->withInput();
+        }
+
+        if (blank($validated['team_other'] ?? null)) {
+            return back()->withErrors(['team_other' => 'Please enter the new team name.'])->withInput();
+        }
+    } else {
+        $league = null;
+        $club = null;
+        $team = null;
+
+        if (filled($selectedLeagueId)) {
+            $league = League::query()->find($selectedLeagueId);
+
+            if (! $league) {
+                return back()->withErrors(['league_id' => 'The selected league is invalid.'])->withInput();
+            }
+
+            if (! $this->isLeagueGenderCompatible($league->gender, $selectedGender)) {
+                return back()->withErrors(['league_id' => 'The selected league does not match the athlete gender.'])->withInput();
+            }
+
+            if (! $this->isLeagueSportCompatible($league->sport, $sport)) {
+                return back()->withErrors(['league_id' => 'The selected league does not match the athlete sport.'])->withInput();
+            }
+        }
+
+        if (filled($selectedClubId)) {
+            if (! $league) {
+                return back()->withErrors(['club_id' => 'Please select a valid league first.'])->withInput();
+            }
+
+            $club = Club::query()
+                ->with('league')
+                ->where('id', $selectedClubId)
+                ->where('league_id', $league->id)
+                ->first();
+
+            if (! $club) {
+                return back()->withErrors(['club_id' => 'The selected club does not belong to the selected league.'])->withInput();
+            }
+
+            if (! $this->isLeagueGenderCompatible($club->league?->gender, $selectedGender)) {
+                return back()->withErrors(['club_id' => 'The selected club does not match the athlete gender.'])->withInput();
+            }
+
+            if (! $this->isLeagueSportCompatible($club->league?->sport, $sport)) {
+                return back()->withErrors(['club_id' => 'The selected club does not match the athlete sport.'])->withInput();
+            }
+        }
+
+        if (filled($selectedTeamId)) {
+            if (! $club) {
+                return back()->withErrors(['team_id' => 'Please select a valid club first.'])->withInput();
+            }
+
+            $team = Team::query()
+                ->with('club.league')
+                ->where('id', $selectedTeamId)
+                ->where('club_id', $club->id)
+                ->first();
+
+            if (! $team) {
+                return back()->withErrors(['team_id' => 'The selected team does not belong to the selected club.'])->withInput();
+            }
+
+            if (! $this->isLeagueGenderCompatible($team->club?->league?->gender, $selectedGender)) {
+                return back()->withErrors(['team_id' => 'The selected team does not match the athlete gender.'])->withInput();
+            }
+
+            if (! $this->isLeagueSportCompatible($team->club?->league?->sport, $sport)) {
+                return back()->withErrors(['team_id' => 'The selected team does not match the athlete sport.'])->withInput();
+            }
+        }
+    }
+
+    $useCustomHighlights = $request->boolean('use_custom_highlights');
+    $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
+
+    if ($useCustomHighlights && empty($manualVideoUrls)) {
+        throw ValidationException::withMessages([
+            'featured_video_urls' => 'Please add at least one highlight video URL or turn off "Pick My Own Videos".',
+        ]);
+    }
+
+    $ghlResult = [
+        'success' => false,
+        'status' => null,
+        'message' => 'GHL was not attempted.',
+        'response' => null,
+    ];
+
+    try {
+        $user = DB::transaction(function () use (
+            $request,
+            $validated,
+            $useCustomHighlights,
+            $manualVideoUrls,
+            $sport,
+            $selectedPlan,
+            &$ghlResult
+        ) {
+            $school = $this->resolveSchool($validated);
+            [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
+            $nationalTeam = $this->resolveNationalTeam($validated);
+
+            $user = User::withTrashed()
+                ->where('personal_email', $validated['personal_email'])
+                ->first();
+
+            if (! $user) {
+                $user = new User();
+                $user->password = Hash::make('WelcomePLYR');
+            }
+
+            if (method_exists($user, 'trashed') && $user->trashed()) {
+                $user->restore();
+            }
+
+            $hasNationalTeamExperience = isset($validated['natl_team_exp']) ? (bool) $validated['natl_team_exp'] : false;
+
+            $user->fill([
+                'first_name' => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name' => $validated['last_name'],
+                'email' => $validated['personal_email'],
+                'personal_email' => $validated['personal_email'],
+                'phone' => $validated['phone'] ?? null,
+
+                'gender' => $validated['gender'],
+                'sport' => $validated['sport'],
+                'position' => $validated['position'] ?? [],
+
+                'birth' => $validated['birth'] ?? null,
+                'year' => $validated['year'] ?? null,
+                'gpa' => $validated['gpa'] ?? null,
+                'height' => $validated['height'] ?? null,
+                'weight' => $validated['weight'] ?? null,
+                'jersey_number' => $validated['jersey_number'] ?? null,
+                'vertical_jump' => $validated['vertical_jump'] ?? null,
+                'max_speed' => $validated['max_speed'] ?? null,
+                'dominant_foot' => $sport === 'soccer' ? ($validated['dominant_foot'] ?? null) : null,
+
+                'country' => $validated['country'] ?? null,
+                'state' => $validated['state'] ?? null,
+                'city' => $validated['city'] ?? null,
+                'street' => $validated['street'] ?? null,
+
+                'natl_team_exp' => $hasNationalTeamExperience,
+                'national_team_period' => $hasNationalTeamExperience ? ($validated['national_team_period'] ?? null) : null,
+
+                'school_id' => $school?->id,
+                'league_id' => $league?->id,
+                'club_id' => $club?->id,
+                'team_name' => $team?->name,
+                'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
+
+                'ig_handle' => $validated['ig_handle'] ?? null,
+                'x_handle' => $validated['x_handle'] ?? null,
+                'yt_url' => $validated['yt_url'] ?? null,
+                'featured_video_url' => $validated['featured_video_url'] ?? null,
+                'featured_video_urls' => $useCustomHighlights ? implode("\n", $manualVideoUrls) : null,
+
+                'player_bio' => $validated['player_bio'] ?? null,
+                'academic_accolades' => $validated['academic_accolades'] ?? null,
+                'sports_accolades' => $validated['sports_accolades'] ?? null,
+                'press' => $validated['press'] ?? null,
+
+                'parent' => $validated['parent'] ?? null,
+                'parent_email' => $validated['parent_email'] ?? null,
+                'parent_phone' => $validated['parent_phone'] ?? null,
+                'sec_parent' => $validated['sec_parent'] ?? null,
+                'sec_parent_email' => $validated['sec_parent_email'] ?? null,
+                'sec_parent_phone' => $validated['sec_parent_phone'] ?? null,
+
+                'club_coach' => $validated['club_coach'] ?? null,
+                'club_coach_email' => $validated['club_coach_email'] ?? null,
+                'club_coach_phone' => $validated['club_coach_phone'] ?? null,
+                'natl_coach' => $validated['natl_coach'] ?? null,
+                'natl_coach_email' => $validated['natl_coach_email'] ?? null,
+                'natl_coach_phone' => $validated['natl_coach_phone'] ?? null,
+                'tech_trainer' => $validated['tech_trainer'] ?? null,
+                'tech_trainer_email' => $validated['tech_trainer_email'] ?? null,
+                'tech_trainer_phone' => $validated['tech_trainer_phone'] ?? null,
+                'snc_trainer' => $validated['snc_trainer'] ?? null,
+                'snc_trainer_email' => $validated['snc_trainer_email'] ?? null,
+                'snc_trainer_phone' => $validated['snc_trainer_phone'] ?? null,
+
+                'domain' => null,
+            ]);
+
+            $userImageUploads = $this->storeUserImageUploads($request);
+
+            if (! empty($userImageUploads['raw_player_images'])) {
+                $user->raw_player_images = $userImageUploads['raw_player_images'];
+            }
+
+            $user->save();
+
+            $this->applyUserPlanRole($user, $selectedPlan);
+
+            $ghlResult = $this->upsertGhlContact(
+                $user,
+                $validated,
+                $selectedPlan,
+                $league ?? null,
+                $club ?? null,
+                $team ?? null,
+                $nationalTeam ?? null
+            );
+
+            $uploads = $this->storeHeroUploads($request);
+
+            $this->createWebsiteIfSupported($user, $validated, $uploads);
+
+            return $user;
+        });
+    } catch (\Illuminate\Database\QueryException $e) {
+        if (str_contains(strtolower($e->getMessage()), 'users.phone')) {
+            return back()
+                ->withErrors(['phone' => 'This phone number is already being used by another account.'])
+                ->withInput();
+        }
+
+        report($e);
+
+        return back()
+            ->withErrors(['form' => 'We could not submit the intake form right now. Please review the form and try again.'])
+            ->withInput();
+    }
+
+    return redirect()
+        ->route('public.player-intake.create', ['utm_plan' => $selectedPlan])
+        ->with('success', 'Player intake submitted successfully for ' . $user->first_name . '.')
+        ->with('ghl_result', $ghlResult);
+}
 
     protected function stepFieldMap(): array
     {
@@ -1052,244 +1076,293 @@ class PublicPlayerIntakeController extends Controller
     }
 
     protected function upsertGhlContact(
-    User $user,
-    array $validated,
-    string $selectedPlan = 'Free',
-    ?League $league = null,
-    ?Club $club = null,
-    ?Team $team = null,
-    ?NationalTeam $nationalTeam = null
-): void
-{
-    $token = config('services.ghl.token');
-    $locationId = config('services.ghl.location_id');
+        User $user,
+        array $validated,
+        string $selectedPlan = 'Free',
+        ?League $league = null,
+        ?Club $club = null,
+        ?Team $team = null,
+        ?NationalTeam $nationalTeam = null
+    ): array
+    {
+        $token = config('services.ghl.token');
+        $locationId = config('services.ghl.location_id');
 
-    if (blank($token) || blank($locationId)) {
-        \Log::warning('GHL upsert skipped: missing token or location ID.');
-        return;
-    }
+        if (blank($token) || blank($locationId)) {
+            $result = [
+                'success' => false,
+                'status' => null,
+                'message' => 'GHL skipped: missing token or location ID.',
+                'response' => null,
+            ];
 
-    $firstName = trim((string) ($validated['first_name'] ?? $user->first_name ?? ''));
-    $lastName = trim((string) ($validated['last_name'] ?? $user->last_name ?? ''));
-    $email = trim((string) ($validated['personal_email'] ?? $user->personal_email ?? $user->email ?? ''));
-
-    if ($email === '') {
-        \Log::warning('GHL upsert skipped: missing email.', [
-            'user_id' => $user->id,
-        ]);
-        return;
-    }
-
-    $sport = strtolower((string) ($validated['sport'] ?? $user->sport ?? ''));
-
-    $positions = collect($validated['position'] ?? [])
-        ->map(function ($position) use ($sport) {
-            return $this->sportPositions[$sport][$position] ?? $position;
-        })
-        ->filter()
-        ->values()
-        ->all();
-
-    $customFields = [
-        [
-            'key' => 'selected_plan',
-            'field_value' => $selectedPlan,
-        ],
-        [
-            'key' => 'sport',
-            'field_value' => $validated['sport'] ?? $user->sport ?? null,
-        ],
-        [
-            'key' => 'gender',
-            'field_value' => $validated['gender'] ?? $user->gender ?? null,
-        ],
-        [
-            'key' => 'positions',
-            'field_value' => ! empty($positions) ? implode(', ', $positions) : null,
-        ],
-        [
-            'key' => 'birth',
-            'field_value' => $validated['birth'] ?? null,
-        ],
-        [
-            'key' => 'year',
-            'field_value' => $validated['year'] ?? null,
-        ],
-        [
-            'key' => 'gpa',
-            'field_value' => $validated['gpa'] ?? null,
-        ],
-        [
-            'key' => 'height',
-            'field_value' => $validated['height'] ?? null,
-        ],
-        [
-            'key' => 'weight',
-            'field_value' => $validated['weight'] ?? null,
-        ],
-        [
-            'key' => 'jersey_number',
-            'field_value' => $validated['jersey_number'] ?? null,
-        ],
-        [
-            'key' => 'vertical_jump',
-            'field_value' => $validated['vertical_jump'] ?? null,
-        ],
-        [
-            'key' => 'max_speed',
-            'field_value' => $validated['max_speed'] ?? null,
-        ],
-        [
-            'key' => 'dominant_foot',
-            'field_value' => $validated['dominant_foot'] ?? null,
-        ],
-        [
-            'key' => 'country',
-            'field_value' => $validated['country'] ?? $user->country ?? null,
-        ],
-        [
-            'key' => 'state',
-            'field_value' => $validated['state'] ?? $user->state ?? null,
-        ],
-        [
-            'key' => 'city',
-            'field_value' => $validated['city'] ?? $user->city ?? null,
-        ],
-        [
-            'key' => 'street',
-            'field_value' => $validated['street'] ?? $user->street ?? null,
-        ],
-        [
-            'key' => 'school',
-            'field_value' => $validated['school_other'] ?? null,
-        ],
-        [
-            'key' => 'league',
-            'field_value' => $league?->name,
-        ],
-        [
-            'key' => 'club',
-            'field_value' => $club?->name,
-        ],
-        [
-            'key' => 'team',
-            'field_value' => $team?->name,
-        ],
-        [
-            'key' => 'national_team',
-            'field_value' => $nationalTeam?->name,
-        ],
-        [
-            'key' => 'national_team_period',
-            'field_value' => $validated['national_team_period'] ?? null,
-        ],
-        [
-            'key' => 'instagram_url',
-            'field_value' => $validated['ig_handle'] ?? null,
-        ],
-        [
-            'key' => 'x_url',
-            'field_value' => $validated['x_handle'] ?? null,
-        ],
-        [
-            'key' => 'youtube_url',
-            'field_value' => $validated['yt_url'] ?? null,
-        ],
-        [
-            'key' => 'featured_video_url',
-            'field_value' => $validated['featured_video_url'] ?? null,
-        ],
-        [
-            'key' => 'player_bio',
-            'field_value' => $validated['player_bio'] ?? null,
-        ],
-        [
-            'key' => 'academic_accolades',
-            'field_value' => $validated['academic_accolades'] ?? null,
-        ],
-        [
-            'key' => 'sports_accolades',
-            'field_value' => $validated['sports_accolades'] ?? null,
-        ],
-        [
-            'key' => 'press',
-            'field_value' => $validated['press'] ?? null,
-        ],
-        [
-            'key' => 'parent_name',
-            'field_value' => $validated['parent'] ?? null,
-        ],
-        [
-            'key' => 'parent_email',
-            'field_value' => $validated['parent_email'] ?? null,
-        ],
-        [
-            'key' => 'parent_phone',
-            'field_value' => $validated['parent_phone'] ?? null,
-        ],
-        [
-            'key' => 'secondary_parent_name',
-            'field_value' => $validated['sec_parent'] ?? null,
-        ],
-        [
-            'key' => 'secondary_parent_email',
-            'field_value' => $validated['sec_parent_email'] ?? null,
-        ],
-        [
-            'key' => 'secondary_parent_phone',
-            'field_value' => $validated['sec_parent_phone'] ?? null,
-        ],
-    ];
-
-    $payload = [
-        'locationId' => $locationId,
-        'firstName' => $firstName,
-        'lastName' => $lastName,
-        'name' => trim($firstName . ' ' . $lastName),
-        'email' => $email,
-        'phone' => $validated['phone'] ?? $user->phone ?? null,
-        'address1' => $validated['street'] ?? $user->street ?? null,
-        'city' => $validated['city'] ?? $user->city ?? null,
-        'state' => $validated['state'] ?? $user->state ?? null,
-        'country' => $validated['country'] ?? $user->country ?? null,
-        'tags' => array_values(array_filter([
-            'player-intake',
-            'plan-' . \Illuminate\Support\Str::slug($selectedPlan),
-            filled($sport) ? 'sport-' . \Illuminate\Support\Str::slug($sport) : null,
-            filled($validated['gender'] ?? null) ? 'gender-' . \Illuminate\Support\Str::slug((string) $validated['gender']) : null,
-        ])),
-        'customFields' => array_values(array_filter(
-            $customFields,
-            fn ($field) => filled($field['field_value'] ?? null)
-        )),
-    ];
-
-    try {
-        $response = \Illuminate\Support\Facades\Http::withToken($token)
-            ->acceptJson()
-            ->contentType('application/json')
-            ->withHeaders([
-                'Version' => '2021-07-28',
-            ])
-            ->post('https://services.leadconnectorhq.com/contacts/upsert', $payload);
-
-        if ($response->failed()) {
-            \Log::error('GHL contact upsert failed.', [
+            \Log::warning('GHL upsert skipped: missing token or location ID.', [
                 'user_id' => $user->id,
-                'email' => $email,
-                'status' => $response->status(),
-                'response' => $response->json() ?: $response->body(),
+                'has_token' => filled($token),
+                'has_location_id' => filled($locationId),
+            ]);
+
+            return $result;
+        }
+
+        $firstName = trim((string) ($validated['first_name'] ?? $user->first_name ?? ''));
+        $lastName = trim((string) ($validated['last_name'] ?? $user->last_name ?? ''));
+        $email = trim((string) ($validated['personal_email'] ?? $user->personal_email ?? $user->email ?? ''));
+
+        if ($email === '') {
+            $result = [
+                'success' => false,
+                'status' => null,
+                'message' => 'GHL skipped: missing email.',
+                'response' => null,
+            ];
+
+            \Log::warning('GHL upsert skipped: missing email.', [
+                'user_id' => $user->id,
+            ]);
+
+            return $result;
+        }
+
+        $sport = strtolower((string) ($validated['sport'] ?? $user->sport ?? ''));
+
+        $positions = collect($validated['position'] ?? [])
+            ->map(fn ($position) => $this->sportPositions[$sport][$position] ?? $position)
+            ->filter()
+            ->values()
+            ->all();
+
+        $customFields = array_values(array_filter([
+            [
+                'key' => 'selected_plan',
+                'field_value' => $selectedPlan,
+            ],
+            [
+                'key' => 'sport',
+                'field_value' => $validated['sport'] ?? $user->sport ?? null,
+            ],
+            [
+                'key' => 'gender',
+                'field_value' => $validated['gender'] ?? $user->gender ?? null,
+            ],
+            [
+                'key' => 'positions',
+                'field_value' => ! empty($positions) ? implode(', ', $positions) : null,
+            ],
+            [
+                'key' => 'birth',
+                'field_value' => $validated['birth'] ?? null,
+            ],
+            [
+                'key' => 'year',
+                'field_value' => $validated['year'] ?? null,
+            ],
+            [
+                'key' => 'gpa',
+                'field_value' => $validated['gpa'] ?? null,
+            ],
+            [
+                'key' => 'height',
+                'field_value' => $validated['height'] ?? null,
+            ],
+            [
+                'key' => 'weight',
+                'field_value' => $validated['weight'] ?? null,
+            ],
+            [
+                'key' => 'jersey_number',
+                'field_value' => $validated['jersey_number'] ?? null,
+            ],
+            [
+                'key' => 'vertical_jump',
+                'field_value' => $validated['vertical_jump'] ?? null,
+            ],
+            [
+                'key' => 'max_speed',
+                'field_value' => $validated['max_speed'] ?? null,
+            ],
+            [
+                'key' => 'dominant_foot',
+                'field_value' => $validated['dominant_foot'] ?? null,
+            ],
+            [
+                'key' => 'country',
+                'field_value' => $validated['country'] ?? $user->country ?? null,
+            ],
+            [
+                'key' => 'state',
+                'field_value' => $validated['state'] ?? $user->state ?? null,
+            ],
+            [
+                'key' => 'city',
+                'field_value' => $validated['city'] ?? $user->city ?? null,
+            ],
+            [
+                'key' => 'street',
+                'field_value' => $validated['street'] ?? $user->street ?? null,
+            ],
+            [
+                'key' => 'league',
+                'field_value' => $league?->name,
+            ],
+            [
+                'key' => 'club',
+                'field_value' => $club?->name,
+            ],
+            [
+                'key' => 'team',
+                'field_value' => $team?->name,
+            ],
+            [
+                'key' => 'national_team',
+                'field_value' => $nationalTeam?->name,
+            ],
+            [
+                'key' => 'national_team_period',
+                'field_value' => $validated['national_team_period'] ?? null,
+            ],
+            [
+                'key' => 'instagram_url',
+                'field_value' => $validated['ig_handle'] ?? null,
+            ],
+            [
+                'key' => 'x_url',
+                'field_value' => $validated['x_handle'] ?? null,
+            ],
+            [
+                'key' => 'youtube_url',
+                'field_value' => $validated['yt_url'] ?? null,
+            ],
+            [
+                'key' => 'featured_video_url',
+                'field_value' => $validated['featured_video_url'] ?? null,
+            ],
+            [
+                'key' => 'player_bio',
+                'field_value' => $validated['player_bio'] ?? null,
+            ],
+            [
+                'key' => 'academic_accolades',
+                'field_value' => $validated['academic_accolades'] ?? null,
+            ],
+            [
+                'key' => 'sports_accolades',
+                'field_value' => $validated['sports_accolades'] ?? null,
+            ],
+            [
+                'key' => 'press',
+                'field_value' => $validated['press'] ?? null,
+            ],
+            [
+                'key' => 'parent_name',
+                'field_value' => $validated['parent'] ?? null,
+            ],
+            [
+                'key' => 'parent_email',
+                'field_value' => $validated['parent_email'] ?? null,
+            ],
+            [
+                'key' => 'parent_phone',
+                'field_value' => $validated['parent_phone'] ?? null,
+            ],
+            [
+                'key' => 'secondary_parent_name',
+                'field_value' => $validated['sec_parent'] ?? null,
+            ],
+            [
+                'key' => 'secondary_parent_email',
+                'field_value' => $validated['sec_parent_email'] ?? null,
+            ],
+            [
+                'key' => 'secondary_parent_phone',
+                'field_value' => $validated['sec_parent_phone'] ?? null,
+            ],
+        ], fn ($field) => filled($field['field_value'] ?? null)));
+
+        $payload = [
+            'locationId' => $locationId,
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'name' => trim($firstName . ' ' . $lastName),
+            'email' => $email,
+            'phone' => $validated['phone'] ?? $user->phone ?? null,
+            'address1' => $validated['street'] ?? $user->street ?? null,
+            'city' => $validated['city'] ?? $user->city ?? null,
+            'state' => $validated['state'] ?? $user->state ?? null,
+            'country' => ($validated['country'] ?? null) === 'USA'
+                ? 'US'
+                : ($validated['country'] ?? $user->country ?? null),
+            'tags' => array_values(array_filter([
+                'player-intake',
+                'plan-' . \Illuminate\Support\Str::slug($selectedPlan),
+                filled($sport) ? 'sport-' . \Illuminate\Support\Str::slug($sport) : null,
+                filled($validated['gender'] ?? null) ? 'gender-' . \Illuminate\Support\Str::slug((string) $validated['gender']) : null,
+            ])),
+            'customFields' => $customFields,
+        ];
+
+        try {
+            \Log::info('GHL upsert request', [
+                'user_id' => $user->id,
                 'payload' => $payload,
             ]);
+
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->acceptJson()
+                ->contentType('application/json')
+                ->withHeaders([
+                    'Version' => '2021-07-28',
+                ])
+                ->post('https://services.leadconnectorhq.com/contacts/upsert', $payload);
+
+            $responseBody = $response->json();
+
+            if (! is_array($responseBody)) {
+                $responseBody = [
+                    'raw' => $response->body(),
+                ];
+            }
+
+            $result = [
+                'success' => $response->successful(),
+                'status' => $response->status(),
+                'message' => $response->successful()
+                    ? 'GHL contact upsert successful.'
+                    : 'GHL contact upsert failed.',
+                'response' => $responseBody,
+            ];
+
+            \Log::info('GHL upsert response', [
+                'user_id' => $user->id,
+                'status' => $result['status'],
+                'response' => $result['response'],
+            ]);
+
+            if ($response->failed()) {
+                \Log::error('GHL contact upsert failed.', [
+                    'user_id' => $user->id,
+                    'status' => $result['status'],
+                    'response' => $result['response'],
+                ]);
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            $result = [
+                'success' => false,
+                'status' => null,
+                'message' => 'GHL contact upsert exception: ' . $e->getMessage(),
+                'response' => null,
+            ];
+
+            \Log::error('GHL contact upsert exception.', [
+                'user_id' => $user->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $result;
         }
-    } catch (\Throwable $e) {
-        \Log::error('GHL contact upsert exception.', [
-            'user_id' => $user->id,
-            'email' => $email,
-            'message' => $e->getMessage(),
-        ]);
     }
-}
 
     protected function resolveSiteTemplate(string $sport): ?SiteTemplate
     {
