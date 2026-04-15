@@ -58,8 +58,8 @@
 |--------------------------------------------------------------------------
 | Priority:
 | 1. Site/template field value
-| 2. Club color
-| 3. Website color (primary + secondary only)
+| 2. Website custom color
+| 3. Club color
 | 4. Hardcoded default
 */
 $defaultPrimary   = '#d8180aff';
@@ -72,41 +72,46 @@ $defaultText2     = '#475569';
 
 $primary = $getFieldValue(
     'primary_color',
-    $club?->primary_color
-        ?: $website->primary_color
+    $website->primary_color
+        ?: $club?->primary_color
         ?: $defaultPrimary
 );
 
 $secondary = $getFieldValue(
     'secondary_color',
-    $club?->secondary_color
-        ?: $website->secondary_color
+    $website->secondary_color
+        ?: $club?->secondary_color
         ?: $defaultSecondary
 );
 
 $accent = $getFieldValue(
     'accent_color',
-    $defaultAccent
+    $website->accent_color
+        ?? $defaultAccent
 );
 
 $bg = $getFieldValue(
     'background_color',
-    $defaultBg
+    $website->background_color
+        ?? $defaultBg
 );
 
 $surface = $getFieldValue(
     'surface_color',
-    $defaultSurface
+    $website->surface_color
+        ?? $defaultSurface
 );
 
 $text1 = $getFieldValue(
     'text_primary_color',
-    $defaultText1
+    $website->text_primary_color
+        ?? $defaultText1
 );
 
 $text2 = $getFieldValue(
     'text_secondary_color',
-    $defaultText2
+    $website->text_secondary_color
+        ?? $defaultText2
 );
 
     /*

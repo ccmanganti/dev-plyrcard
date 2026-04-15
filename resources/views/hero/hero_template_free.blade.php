@@ -8,8 +8,8 @@
 |--------------------------------------------------------------------------
 | Priority:
 | 1. Hero field value
-| 2. Club color
-| 3. Website color (primary + secondary only)
+| 2. Website custom color
+| 3. Club color
 | 4. Hardcoded default
 */
 $defaultPrimary   = '#cf4446';
@@ -22,41 +22,46 @@ $defaultText2     = '#ffe5e5';
 
 $primary = $getHeroFieldValue(
     'primary_color',
-    $club?->primary_color
-        ?: $website->primary_color
+    $website->primary_color
+        ?: $club?->primary_color
         ?: $defaultPrimary
 );
 
 $secondary = $getHeroFieldValue(
     'secondary_color',
-    $club?->secondary_color
-        ?: $website->secondary_color
+    $website->secondary_color
+        ?: $club?->secondary_color
         ?: $defaultSecondary
 );
 
 $accent = $getHeroFieldValue(
     'accent_color',
-    $defaultAccent
+    $website->accent_color
+        ?? $defaultAccent
 );
 
 $bg = $getHeroFieldValue(
     'background_color',
-    $defaultBg
+    $website->background_color
+        ?? $defaultBg
 );
 
 $surface = $getHeroFieldValue(
     'surface_color',
-    $defaultSurface
+    $website->surface_color
+        ?? $defaultSurface
 );
 
 $text1 = $getHeroFieldValue(
     'text_primary_color',
-    $defaultText1
+    $website->text_primary_color
+        ?? $defaultText1
 );
 
 $text2 = $getHeroFieldValue(
     'text_secondary_color',
-    $defaultText2
+    $website->text_secondary_color
+        ?? $defaultText2
 );
 
     $resolveMediaUrl = function ($raw, $fallback = '') {
