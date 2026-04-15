@@ -1052,160 +1052,220 @@ class PublicPlayerIntakeController extends Controller
     }
 
     protected function upsertGhlContact(
-        User $user,
-        array $validated,
-        ?League $league = null,
-        ?Club $club = null,
-        ?Team $team = null,
-        ?NationalTeam $nationalTeam = null,
-        string $selectedPlan = 'Free'
-    ): void
-    {
-        $locationId = config('services.ghl.location_id');
-        $token = config('services.ghl.token');
+    User $user,
+    array $validated,
+    string $selectedPlan = 'Free',
+    ?League $league = null,
+    ?Club $club = null,
+    ?Team $team = null,
+    ?NationalTeam $nationalTeam = null
+): void
+{
+    $token = config('services.ghl.token');
+    $locationId = config('services.ghl.location_id');
 
-        if (blank($locationId) || blank($token)) {
-            Log::warning('GHL upsert skipped: missing config.');
-            return;
-        }
+    if (blank($token) || blank($locationId)) {
+        \Log::warning('GHL upsert skipped: missing token or location ID.');
+        return;
+    }
 
-        $firstName = $validated['first_name'] ?? $user->first_name;
-        $lastName = $validated['last_name'] ?? $user->last_name;
-        $email = $validated['personal_email'] ?? $user->personal_email ?? $user->email;
+    $firstName = trim((string) ($validated['first_name'] ?? $user->first_name ?? ''));
+    $lastName = trim((string) ($validated['last_name'] ?? $user->last_name ?? ''));
+    $email = trim((string) ($validated['personal_email'] ?? $user->personal_email ?? $user->email ?? ''));
 
-        if (blank($email)) {
-            Log::warning('GHL upsert skipped: missing email.', [
-                'user_id' => $user->id,
-            ]);
-            return;
-        }
+    if ($email === '') {
+        \Log::warning('GHL upsert skipped: missing email.', [
+            'user_id' => $user->id,
+        ]);
+        return;
+    }
 
-        $positions = collect($validated['position'] ?? [])
-            ->map(function ($position) use ($validated, $user) {
-                $sport = strtolower((string) ($validated['sport'] ?? $user->sport ?? ''));
-                return $this->sportPositions[$sport][$position] ?? $position;
-            })
-            ->values()
-            ->all();
+    $sport = strtolower((string) ($validated['sport'] ?? $user->sport ?? ''));
 
-        $payload = [
-            'locationId' => $locationId,
-            'firstName' => $firstName,
-            'lastName' => $lastName,
-            'name' => trim($firstName . ' ' . $lastName),
-            'email' => $email,
-            'phone' => $validated['phone'] ?? $user->phone,
-            'address1' => $validated['street'] ?? null,
-            'city' => $validated['city'] ?? null,
-            'state' => $validated['state'] ?? null,
-            'country' => $validated['country'] ?? null,
-            'tags' => array_values(array_filter([
-                'player-intake',
-                'plan-' . Str::slug($selectedPlan),
-                filled($validated['sport'] ?? null) ? 'sport-' . Str::slug((string) $validated['sport']) : null,
-                filled($validated['gender'] ?? null) ? 'gender-' . Str::slug((string) $validated['gender']) : null,
-            ])),
-            'customFields' => array_values(array_filter([
-                [
-                    'key' => 'selected_plan',
-                    'field_value' => $selectedPlan,
-                ],
-                [
-                    'key' => 'sport',
-                    'field_value' => $validated['sport'] ?? null,
-                ],
-                [
-                    'key' => 'positions',
-                    'field_value' => !empty($positions) ? implode(', ', $positions) : null,
-                ],
-                [
-                    'key' => 'birth',
-                    'field_value' => $validated['birth'] ?? null,
-                ],
-                [
-                    'key' => 'year',
-                    'field_value' => $validated['year'] ?? null,
-                ],
-                [
-                    'key' => 'gpa',
-                    'field_value' => $validated['gpa'] ?? null,
-                ],
-                [
-                    'key' => 'height',
-                    'field_value' => $validated['height'] ?? null,
-                ],
-                [
-                    'key' => 'weight',
-                    'field_value' => $validated['weight'] ?? null,
-                ],
-                [
-                    'key' => 'jersey_number',
-                    'field_value' => $validated['jersey_number'] ?? null,
-                ],
-                [
-                    'key' => 'vertical_jump',
-                    'field_value' => $validated['vertical_jump'] ?? null,
-                ],
-                [
-                    'key' => 'max_speed',
-                    'field_value' => $validated['max_speed'] ?? null,
-                ],
-                [
-                    'key' => 'dominant_foot',
-                    'field_value' => $validated['dominant_foot'] ?? null,
-                ],
-                [
-                    'key' => 'school',
-                    'field_value' => $validated['school_other'] ?? null,
-                ],
-                [
-                    'key' => 'league',
-                    'field_value' => $league?->name ?? ($validated['league_other'] ?? null),
-                ],
-                [
-                    'key' => 'club',
-                    'field_value' => $club?->name ?? ($validated['club_other'] ?? null),
-                ],
-                [
-                    'key' => 'team',
-                    'field_value' => $team?->name ?? ($validated['team_other'] ?? null),
-                ],
-                [
-                    'key' => 'national_team',
-                    'field_value' => $nationalTeam?->name ?? ($validated['national_team_other'] ?? null),
-                ],
-                [
-                    'key' => 'instagram_url',
-                    'field_value' => $validated['ig_handle'] ?? null,
-                ],
-                [
-                    'key' => 'x_url',
-                    'field_value' => $validated['x_handle'] ?? null,
-                ],
-                [
-                    'key' => 'youtube_url',
-                    'field_value' => $validated['yt_url'] ?? null,
-                ],
-                [
-                    'key' => 'featured_video_url',
-                    'field_value' => $validated['featured_video_url'] ?? null,
-                ],
-                [
-                    'key' => 'parent_name',
-                    'field_value' => $validated['parent'] ?? null,
-                ],
-                [
-                    'key' => 'parent_email',
-                    'field_value' => $validated['parent_email'] ?? null,
-                ],
-                [
-                    'key' => 'parent_phone',
-                    'field_value' => $validated['parent_phone'] ?? null,
-                ],
-            ]), fn ($field) => filled($field['field_value'] ?? null)),
-        ];
+    $positions = collect($validated['position'] ?? [])
+        ->map(function ($position) use ($sport) {
+            return $this->sportPositions[$sport][$position] ?? $position;
+        })
+        ->filter()
+        ->values()
+        ->all();
 
-        $response = Http::withToken($token)
+    $customFields = [
+        [
+            'key' => 'selected_plan',
+            'field_value' => $selectedPlan,
+        ],
+        [
+            'key' => 'sport',
+            'field_value' => $validated['sport'] ?? $user->sport ?? null,
+        ],
+        [
+            'key' => 'gender',
+            'field_value' => $validated['gender'] ?? $user->gender ?? null,
+        ],
+        [
+            'key' => 'positions',
+            'field_value' => ! empty($positions) ? implode(', ', $positions) : null,
+        ],
+        [
+            'key' => 'birth',
+            'field_value' => $validated['birth'] ?? null,
+        ],
+        [
+            'key' => 'year',
+            'field_value' => $validated['year'] ?? null,
+        ],
+        [
+            'key' => 'gpa',
+            'field_value' => $validated['gpa'] ?? null,
+        ],
+        [
+            'key' => 'height',
+            'field_value' => $validated['height'] ?? null,
+        ],
+        [
+            'key' => 'weight',
+            'field_value' => $validated['weight'] ?? null,
+        ],
+        [
+            'key' => 'jersey_number',
+            'field_value' => $validated['jersey_number'] ?? null,
+        ],
+        [
+            'key' => 'vertical_jump',
+            'field_value' => $validated['vertical_jump'] ?? null,
+        ],
+        [
+            'key' => 'max_speed',
+            'field_value' => $validated['max_speed'] ?? null,
+        ],
+        [
+            'key' => 'dominant_foot',
+            'field_value' => $validated['dominant_foot'] ?? null,
+        ],
+        [
+            'key' => 'country',
+            'field_value' => $validated['country'] ?? $user->country ?? null,
+        ],
+        [
+            'key' => 'state',
+            'field_value' => $validated['state'] ?? $user->state ?? null,
+        ],
+        [
+            'key' => 'city',
+            'field_value' => $validated['city'] ?? $user->city ?? null,
+        ],
+        [
+            'key' => 'street',
+            'field_value' => $validated['street'] ?? $user->street ?? null,
+        ],
+        [
+            'key' => 'school',
+            'field_value' => $validated['school_other'] ?? null,
+        ],
+        [
+            'key' => 'league',
+            'field_value' => $league?->name,
+        ],
+        [
+            'key' => 'club',
+            'field_value' => $club?->name,
+        ],
+        [
+            'key' => 'team',
+            'field_value' => $team?->name,
+        ],
+        [
+            'key' => 'national_team',
+            'field_value' => $nationalTeam?->name,
+        ],
+        [
+            'key' => 'national_team_period',
+            'field_value' => $validated['national_team_period'] ?? null,
+        ],
+        [
+            'key' => 'instagram_url',
+            'field_value' => $validated['ig_handle'] ?? null,
+        ],
+        [
+            'key' => 'x_url',
+            'field_value' => $validated['x_handle'] ?? null,
+        ],
+        [
+            'key' => 'youtube_url',
+            'field_value' => $validated['yt_url'] ?? null,
+        ],
+        [
+            'key' => 'featured_video_url',
+            'field_value' => $validated['featured_video_url'] ?? null,
+        ],
+        [
+            'key' => 'player_bio',
+            'field_value' => $validated['player_bio'] ?? null,
+        ],
+        [
+            'key' => 'academic_accolades',
+            'field_value' => $validated['academic_accolades'] ?? null,
+        ],
+        [
+            'key' => 'sports_accolades',
+            'field_value' => $validated['sports_accolades'] ?? null,
+        ],
+        [
+            'key' => 'press',
+            'field_value' => $validated['press'] ?? null,
+        ],
+        [
+            'key' => 'parent_name',
+            'field_value' => $validated['parent'] ?? null,
+        ],
+        [
+            'key' => 'parent_email',
+            'field_value' => $validated['parent_email'] ?? null,
+        ],
+        [
+            'key' => 'parent_phone',
+            'field_value' => $validated['parent_phone'] ?? null,
+        ],
+        [
+            'key' => 'secondary_parent_name',
+            'field_value' => $validated['sec_parent'] ?? null,
+        ],
+        [
+            'key' => 'secondary_parent_email',
+            'field_value' => $validated['sec_parent_email'] ?? null,
+        ],
+        [
+            'key' => 'secondary_parent_phone',
+            'field_value' => $validated['sec_parent_phone'] ?? null,
+        ],
+    ];
+
+    $payload = [
+        'locationId' => $locationId,
+        'firstName' => $firstName,
+        'lastName' => $lastName,
+        'name' => trim($firstName . ' ' . $lastName),
+        'email' => $email,
+        'phone' => $validated['phone'] ?? $user->phone ?? null,
+        'address1' => $validated['street'] ?? $user->street ?? null,
+        'city' => $validated['city'] ?? $user->city ?? null,
+        'state' => $validated['state'] ?? $user->state ?? null,
+        'country' => $validated['country'] ?? $user->country ?? null,
+        'tags' => array_values(array_filter([
+            'player-intake',
+            'plan-' . \Illuminate\Support\Str::slug($selectedPlan),
+            filled($sport) ? 'sport-' . \Illuminate\Support\Str::slug($sport) : null,
+            filled($validated['gender'] ?? null) ? 'gender-' . \Illuminate\Support\Str::slug((string) $validated['gender']) : null,
+        ])),
+        'customFields' => array_values(array_filter(
+            $customFields,
+            fn ($field) => filled($field['field_value'] ?? null)
+        )),
+    ];
+
+    try {
+        $response = \Illuminate\Support\Facades\Http::withToken($token)
             ->acceptJson()
             ->contentType('application/json')
             ->withHeaders([
@@ -1214,14 +1274,22 @@ class PublicPlayerIntakeController extends Controller
             ->post('https://services.leadconnectorhq.com/contacts/upsert', $payload);
 
         if ($response->failed()) {
-            Log::error('GHL contact upsert failed.', [
+            \Log::error('GHL contact upsert failed.', [
                 'user_id' => $user->id,
                 'email' => $email,
                 'status' => $response->status(),
                 'response' => $response->json() ?: $response->body(),
+                'payload' => $payload,
             ]);
         }
+    } catch (\Throwable $e) {
+        \Log::error('GHL contact upsert exception.', [
+            'user_id' => $user->id,
+            'email' => $email,
+            'message' => $e->getMessage(),
+        ]);
     }
+}
 
     protected function resolveSiteTemplate(string $sport): ?SiteTemplate
     {
