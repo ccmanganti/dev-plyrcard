@@ -57,58 +57,54 @@
     | Theme Colors
     |--------------------------------------------------------------------------
     | Priority:
-    | 1. Site template value
-    | 2. Club model value
-    | 3. Website value
-    | 4. Hardcoded default
+    | 1. Site/template field value
+    | 2. Club primary color (main color only)
+    | 3. Hardcoded default
+    |
+    | Note:
+    | Keep non-primary colors on defaults unless explicitly set in template fields.
     */
+    $defaultPrimary   = '#d8180aff';
+    $defaultSecondary = '#0f172a';
+    $defaultAccent    = '#e34b18ff';
+    $defaultBg        = '#f8fafc';
+    $defaultSurface   = '#ffffff';
+    $defaultText1     = '#0f172a';
+    $defaultText2     = '#475569';
+
     $primary = $getFieldValue(
         'primary_color',
-        $club?->primary_color
-            ?: $website->primary_color
-            ?: '#d8180aff'
+        $club?->primary_color ?: $defaultPrimary
     );
 
     $secondary = $getFieldValue(
         'secondary_color',
-        $club?->secondary_color
-            ?: $website->secondary_color
-            ?: '#0f172a'
+        $defaultSecondary
     );
 
     $accent = $getFieldValue(
         'accent_color',
-        $club?->accent_color
-            ?: $website->accent_color
-            ?: '#e34b18ff'
+        $defaultAccent
     );
 
     $bg = $getFieldValue(
         'background_color',
-        $club?->background_color
-            ?: $website->background_color
-            ?: '#f8fafc'
+        $defaultBg
     );
 
     $surface = $getFieldValue(
         'surface_color',
-        $club?->surface_color
-            ?: $website->surface_color
-            ?: '#ffffff'
+        $defaultSurface
     );
 
     $text1 = $getFieldValue(
         'text_primary_color',
-        $club?->text_primary_color
-            ?: $website->text_primary_color
-            ?: '#0f172a'
+        $defaultText1
     );
 
     $text2 = $getFieldValue(
         'text_secondary_color',
-        $club?->text_secondary_color
-            ?: $website->text_secondary_color
-            ?: '#475569'
+        $defaultText2
     );
 
     /*
