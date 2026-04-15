@@ -1,5 +1,35 @@
 <x-filament-panels::page>
     <style>
+        .profile-trial-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 107, 74, 0.35);
+    background: rgba(255, 107, 74, 0.12);
+    color: #fff1ec;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.profile-trial-badge strong {
+    color: #ffb39f;
+    font-weight: 900;
+}
+
+.profile-bottom-save {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.profile-bottom-save .profile-action-btn {
+    min-width: 180px;
+}
         .profile-shell {
             --pc-bg: #050505;
             --pc-panel: #0b0b0d;
@@ -559,6 +589,14 @@
                 <div class="profile-plan-copy">
                     <p class="profile-plan-headline">{{ $this->getPlanHeadline() }}</p>
                     <p class="profile-plan-description">{{ $this->getPlanDescription() }}</p>
+
+                    @if ($this->isFreeTrialActive())
+                        <div class="profile-trial-badge">
+                            <x-heroicon-m-bolt />
+                            <span>Trial Active</span>
+                            <strong>{{ $this->getFreeTrialDaysLeft() }} {{ $this->getFreeTrialDaysLeft() === 1 ? 'day' : 'days' }} left</strong>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -655,6 +693,17 @@
 
         <div class="profile-page-tabs">
             {{ $this->form }}
+        </div>
+
+        <div class="profile-bottom-save">
+            <button
+                type="button"
+                wire:click="save"
+                class="profile-action-btn profile-action-btn--primary"
+            >
+                <x-heroicon-m-bookmark-square />
+                <span>Save Profile</span>
+            </button>
         </div>
     </div>
 

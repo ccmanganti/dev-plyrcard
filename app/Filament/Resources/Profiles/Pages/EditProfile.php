@@ -36,6 +36,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Filament\Pages\MyJourney;
+use Illuminate\Support\Carbon;
 
 class EditProfile extends Page implements HasForms
 {
@@ -57,45 +58,47 @@ class EditProfile extends Page implements HasForms
 
     public string $lockedFeatureMessage = 'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.';
 
+
     public function mount(): void
-{
-    $this->user = auth()->user();
+    {
+        $this->user = auth()->user();
 
-    abort_unless($this->user, 403);
+        abort_unless($this->user, 403);
 
-    $this->user->loadMissing('roles', 'nationalTeam');
+        $this->user->loadMissing('roles', 'nationalTeam');
 
-    $this->website = $this->user->websites()->first();
+        $this->website = $this->user->websites()->first();
 
-    $teamId = $this->user->team_id ?? null;
+        $teamId = $this->user->team_id ?? null;
 
-    if (blank($teamId) && filled($this->user->team_name ?? null) && filled($this->user->club_id ?? null)) {
-        $teamId = Team::query()
-            ->where('club_id', $this->user->club_id)
-            ->where('name', $this->user->team_name)
-            ->value('id');
+        if (blank($teamId) && filled($this->user->team_name ?? null) && filled($this->user->club_id ?? null)) {
+            $teamId = Team::query()
+                ->where('club_id', $this->user->club_id)
+                ->where('name', $this->user->team_name)
+                ->value('id');
+        }
+
+        $this->form->fill([
+            ...$this->user->toArray(),
+            'team_id' => $teamId,
+
+            'website_name' => $this->website?->name,
+            'site_template_id' => $this->website?->site_template_id,
+            'hero_template_id' => $this->website?->hero_template_id,
+            'website_is_active' => $this->website?->is_active ?? true,
+            'website_is_published' => $this->website?->is_published ?? false,
+
+            'primary_color' => $this->website?->primary_color,
+            'secondary_color' => $this->website?->secondary_color,
+            'accent_color' => $this->website?->accent_color,
+            'background_color' => $this->website?->background_color,
+            'surface_color' => $this->website?->surface_color,
+            'text_primary_color' => $this->website?->text_primary_color,
+            'text_secondary_color' => $this->website?->text_secondary_color,
+        ]);
     }
 
-    $this->form->fill([
-        ...$this->user->toArray(),
-        'team_id' => $teamId,
-
-        'website_name' => $this->website?->name,
-        'site_template_id' => $this->website?->site_template_id,
-        'hero_template_id' => $this->website?->hero_template_id,
-        'website_is_active' => $this->website?->is_active ?? true,
-        'website_is_published' => $this->website?->is_published ?? false,
-
-        'primary_color' => $this->website?->primary_color,
-        'secondary_color' => $this->website?->secondary_color,
-        'accent_color' => $this->website?->accent_color,
-        'background_color' => $this->website?->background_color,
-        'surface_color' => $this->website?->surface_color,
-        'text_primary_color' => $this->website?->text_primary_color,
-        'text_secondary_color' => $this->website?->text_secondary_color,
-    ]);
-}
-
+    
     protected static function getSchoolOptions(): array
     {
         return ['__new__' => 'Add New'] + School::query()
@@ -454,6 +457,8 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
 
         return $data;
     }
+
+    
 
     public function form(Schema $schema): Schema
     {
@@ -1288,9 +1293,64 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
         return 'My Profile';
     }
 
+public function isFreeTrialActive(): bool
+{
+    if (! $this->user || ! method_exists($this->user, 'hasRole')) {
+        return false;
+    }
+
+    if (! $this->user->hasRole('Free')) {
+        return false;
+    }
+
+    if (! $this->user->created_at) {
+        return false;
+    }
+
+    return $this->user->created_at->copy()->addDays(7)->isFuture();
+}
+
+public function getFreeTrialEndsAt(): ?Carbon
+{
+    if (! $this->user?->created_at) {
+        return null;
+    }
+
+    return $this->user->created_at->copy()->addDays(7);
+}
+
+public function getFreeTrialDaysLeft(): int
+{
+    if (! $this->isFreeTrialActive()) {
+        return 0;
+    }
+
+    $endsAt = $this->getFreeTrialEndsAt();
+
+    if (! $endsAt) {
+        return 0;
+    }
+
+    return max(1, now()->startOfDay()->diffInDays($endsAt->copy()->startOfDay(), false));
+}
+
+public function getFreeTrialLabel(): ?string
+{
+    if (! $this->isFreeTrialActive()) {
+        return null;
+    }
+
+    $daysLeft = $this->getFreeTrialDaysLeft();
+
+    return $daysLeft === 1
+        ? '1 day left in free trial'
+        : "{$daysLeft} days left in free trial";
+}
+
 public function hasPremiumAccess(): bool
 {
-    return in_array($this->getCurrentPlanKey(), ['plyr', 'my_journey'], true);
+    return $this->isFreeTrialActive()
+        || in_array($this->getCurrentPlanKey(), ['plyr', 'my_journey'], true);
 }
 
 public function getCurrentPlanKey(): string
@@ -1312,6 +1372,10 @@ public function getCurrentPlanKey(): string
 
 public function getPlanName(): string
 {
+    if ($this->isFreeTrialActive()) {
+        return 'FREE TRIAL';
+    }
+
     return match ($this->getCurrentPlanKey()) {
         'my_journey' => 'MY JOURNEY',
         'plyr' => 'PLYR',
@@ -1321,6 +1385,10 @@ public function getPlanName(): string
 
 public function getPlanHeadline(): string
 {
+    if ($this->isFreeTrialActive()) {
+        return "YOU'RE ON FREE TRIAL";
+    }
+
     return match ($this->getCurrentPlanKey()) {
         'my_journey' => "YOU'RE ON MY JOURNEY",
         'plyr' => "YOU'RE ON PLYR",
@@ -1330,6 +1398,10 @@ public function getPlanHeadline(): string
 
 public function getPlanDescription(): string
 {
+    if ($this->isFreeTrialActive()) {
+        return 'Your free trial is active. You currently have access to all tabs and premium features during the 7-day trial window.';
+    }
+
     return match ($this->getCurrentPlanKey()) {
         'my_journey' => 'Everything is unlocked on My Journey. Your PLYRCard is fully equipped for the next level.',
         'plyr' => 'Your Social links and YouTube features are unlocked. Move to My Journey for the most premium experience.',
@@ -1344,6 +1416,10 @@ public function canUpgradePlan(): bool
 
 public function getUpgradeButtonLabel(): string
 {
+    if ($this->isFreeTrialActive()) {
+        return 'Choose a Plan';
+    }
+
     return match ($this->getCurrentPlanKey()) {
         'plyr' => 'Go to My Journey',
         default => 'Upgrade Now',
@@ -1367,6 +1443,10 @@ public function getBookDemoUrl(): string
 
 public function getPlanTheme(): string
 {
+    if ($this->isFreeTrialActive()) {
+        return 'warning';
+    }
+
     return $this->getCurrentPlanKey() === 'my_journey'
         ? 'success'
         : 'warning';
