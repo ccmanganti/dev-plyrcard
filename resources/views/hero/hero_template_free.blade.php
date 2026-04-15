@@ -2,61 +2,62 @@
     $user = $website->user;
     $club = $user?->club;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Theme Colors
-    |--------------------------------------------------------------------------
-    | Priority:
-    | 1. Hero field value
-    | 2. Club primary color (main color only)
-    | 3. Hardcoded default
-    |
-    | Note:
-    | Club model only has primary_color and secondary_color.
-    | Do not try to read accent/background/text colors from club.
-    */
-    $defaultPrimary   = '#cf4446';
-    $defaultSecondary = '#111111';
-    $defaultAccent    = '#ffffff';
-    $defaultBg        = '#0b0b0b';
-    $defaultSurface   = '#171717';
-    $defaultText1     = '#ffffff';
-    $defaultText2     = '#ffe5e5';
+/*
+|--------------------------------------------------------------------------
+| Theme Colors
+|--------------------------------------------------------------------------
+| Priority:
+| 1. Hero field value
+| 2. Club color
+| 3. Website color (primary + secondary only)
+| 4. Hardcoded default
+*/
+$defaultPrimary   = '#cf4446';
+$defaultSecondary = '#111111';
+$defaultAccent    = '#ffffff';
+$defaultBg        = '#0b0b0b';
+$defaultSurface   = '#171717';
+$defaultText1     = '#ffffff';
+$defaultText2     = '#ffe5e5';
 
-    $primary = $getHeroFieldValue(
-        'primary_color',
-        $club?->primary_color ?: $defaultPrimary
-    );
+$primary = $getHeroFieldValue(
+    'primary_color',
+    $club?->primary_color
+        ?: $website->primary_color
+        ?: $defaultPrimary
+);
 
-    $secondary = $getHeroFieldValue(
-        'secondary_color',
-        $defaultSecondary
-    );
+$secondary = $getHeroFieldValue(
+    'secondary_color',
+    $club?->secondary_color
+        ?: $website->secondary_color
+        ?: $defaultSecondary
+);
 
-    $accent = $getHeroFieldValue(
-        'accent_color',
-        $defaultAccent
-    );
+$accent = $getHeroFieldValue(
+    'accent_color',
+    $defaultAccent
+);
 
-    $bg = $getHeroFieldValue(
-        'background_color',
-        $defaultBg
-    );
+$bg = $getHeroFieldValue(
+    'background_color',
+    $defaultBg
+);
 
-    $surface = $getHeroFieldValue(
-        'surface_color',
-        $defaultSurface
-    );
+$surface = $getHeroFieldValue(
+    'surface_color',
+    $defaultSurface
+);
 
-    $text1 = $getHeroFieldValue(
-        'text_primary_color',
-        $defaultText1
-    );
+$text1 = $getHeroFieldValue(
+    'text_primary_color',
+    $defaultText1
+);
 
-    $text2 = $getHeroFieldValue(
-        'text_secondary_color',
-        $defaultText2
-    );
+$text2 = $getHeroFieldValue(
+    'text_secondary_color',
+    $defaultText2
+);
 
     $resolveMediaUrl = function ($raw, $fallback = '') {
         if (blank($raw)) {

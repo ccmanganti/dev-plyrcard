@@ -52,60 +52,62 @@
         return str_starts_with(trim($value), '[DEFAULT PLACEHOLDER:') ? '' : $value;
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | Theme Colors
-    |--------------------------------------------------------------------------
-    | Priority:
-    | 1. Site/template field value
-    | 2. Club primary color (main color only)
-    | 3. Hardcoded default
-    |
-    | Note:
-    | Keep non-primary colors on defaults unless explicitly set in template fields.
-    */
-    $defaultPrimary   = '#d8180aff';
-    $defaultSecondary = '#0f172a';
-    $defaultAccent    = '#e34b18ff';
-    $defaultBg        = '#f8fafc';
-    $defaultSurface   = '#ffffff';
-    $defaultText1     = '#0f172a';
-    $defaultText2     = '#475569';
+/*
+|--------------------------------------------------------------------------
+| Theme Colors
+|--------------------------------------------------------------------------
+| Priority:
+| 1. Site/template field value
+| 2. Club color
+| 3. Website color (primary + secondary only)
+| 4. Hardcoded default
+*/
+$defaultPrimary   = '#d8180aff';
+$defaultSecondary = '#0f172a';
+$defaultAccent    = '#e34b18ff';
+$defaultBg        = '#f8fafc';
+$defaultSurface   = '#ffffff';
+$defaultText1     = '#0f172a';
+$defaultText2     = '#475569';
 
-    $primary = $getFieldValue(
-        'primary_color',
-        $club?->primary_color ?: $defaultPrimary
-    );
+$primary = $getFieldValue(
+    'primary_color',
+    $club?->primary_color
+        ?: $website->primary_color
+        ?: $defaultPrimary
+);
 
-    $secondary = $getFieldValue(
-        'secondary_color',
-        $defaultSecondary
-    );
+$secondary = $getFieldValue(
+    'secondary_color',
+    $club?->secondary_color
+        ?: $website->secondary_color
+        ?: $defaultSecondary
+);
 
-    $accent = $getFieldValue(
-        'accent_color',
-        $defaultAccent
-    );
+$accent = $getFieldValue(
+    'accent_color',
+    $defaultAccent
+);
 
-    $bg = $getFieldValue(
-        'background_color',
-        $defaultBg
-    );
+$bg = $getFieldValue(
+    'background_color',
+    $defaultBg
+);
 
-    $surface = $getFieldValue(
-        'surface_color',
-        $defaultSurface
-    );
+$surface = $getFieldValue(
+    'surface_color',
+    $defaultSurface
+);
 
-    $text1 = $getFieldValue(
-        'text_primary_color',
-        $defaultText1
-    );
+$text1 = $getFieldValue(
+    'text_primary_color',
+    $defaultText1
+);
 
-    $text2 = $getFieldValue(
-        'text_secondary_color',
-        $defaultText2
-    );
+$text2 = $getFieldValue(
+    'text_secondary_color',
+    $defaultText2
+);
 
     /*
     |--------------------------------------------------------------------------
