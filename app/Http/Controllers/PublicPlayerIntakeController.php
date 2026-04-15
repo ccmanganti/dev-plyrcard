@@ -1051,7 +1051,15 @@ class PublicPlayerIntakeController extends Controller
         return $website;
     }
 
-    protected function upsertGhlContact(User $user, array $validated, ?League $league = null, ?Club $club = null, ?Team $team = null, ?NationalTeam $nationalTeam = null, string $selectedPlan = 'Free'): void
+    protected function upsertGhlContact(
+        User $user,
+        array $validated,
+        ?League $league = null,
+        ?Club $club = null,
+        ?Team $team = null,
+        ?NationalTeam $nationalTeam = null,
+        string $selectedPlan = 'Free'
+    ): void
     {
         $locationId = config('services.ghl.location_id');
         $token = config('services.ghl.token');
