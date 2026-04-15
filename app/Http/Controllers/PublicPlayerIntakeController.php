@@ -667,12 +667,15 @@ class PublicPlayerIntakeController extends Controller
         ]);
     }
 
-    $ghlResult = [
-        'success' => false,
-        'status' => null,
-        'message' => 'GHL was not attempted.',
-        'response' => null,
-    ];
+    $ghlResult = $this->syncGhlContactAndPlan(
+        $user,
+        $validated,
+        $selectedPlan,
+        $league ?? null,
+        $club ?? null,
+        $team ?? null,
+        $nationalTeam ?? null
+    );
 
     try {
         $user = DB::transaction(function () use (
@@ -1075,7 +1078,7 @@ class PublicPlayerIntakeController extends Controller
         return $website;
     }
 
-    protected function upsertGhlContact(
+    protected function syncGhlContactAndPlan(
         User $user,
         array $validated,
         string $selectedPlan = 'Free',
@@ -1089,20 +1092,15 @@ class PublicPlayerIntakeController extends Controller
         $locationId = config('services.ghl.location_id');
 
         if (blank($token) || blank($locationId)) {
-            $result = [
+            return [
                 'success' => false,
                 'status' => null,
                 'message' => 'GHL skipped: missing token or location ID.',
+                'contact_id' => null,
+                'subscription_found' => false,
+                'plan_applied' => null,
                 'response' => null,
             ];
-
-            \Log::warning('GHL upsert skipped: missing token or location ID.', [
-                'user_id' => $user->id,
-                'has_token' => filled($token),
-                'has_location_id' => filled($locationId),
-            ]);
-
-            return $result;
         }
 
         $firstName = trim((string) ($validated['first_name'] ?? $user->first_name ?? ''));
@@ -1110,18 +1108,15 @@ class PublicPlayerIntakeController extends Controller
         $email = trim((string) ($validated['personal_email'] ?? $user->personal_email ?? $user->email ?? ''));
 
         if ($email === '') {
-            $result = [
+            return [
                 'success' => false,
                 'status' => null,
                 'message' => 'GHL skipped: missing email.',
+                'contact_id' => null,
+                'subscription_found' => false,
+                'plan_applied' => null,
                 'response' => null,
             ];
-
-            \Log::warning('GHL upsert skipped: missing email.', [
-                'user_id' => $user->id,
-            ]);
-
-            return $result;
         }
 
         $sport = strtolower((string) ($validated['sport'] ?? $user->sport ?? ''));
@@ -1150,58 +1145,6 @@ class PublicPlayerIntakeController extends Controller
                 'field_value' => ! empty($positions) ? implode(', ', $positions) : null,
             ],
             [
-                'key' => 'birth',
-                'field_value' => $validated['birth'] ?? null,
-            ],
-            [
-                'key' => 'year',
-                'field_value' => $validated['year'] ?? null,
-            ],
-            [
-                'key' => 'gpa',
-                'field_value' => $validated['gpa'] ?? null,
-            ],
-            [
-                'key' => 'height',
-                'field_value' => $validated['height'] ?? null,
-            ],
-            [
-                'key' => 'weight',
-                'field_value' => $validated['weight'] ?? null,
-            ],
-            [
-                'key' => 'jersey_number',
-                'field_value' => $validated['jersey_number'] ?? null,
-            ],
-            [
-                'key' => 'vertical_jump',
-                'field_value' => $validated['vertical_jump'] ?? null,
-            ],
-            [
-                'key' => 'max_speed',
-                'field_value' => $validated['max_speed'] ?? null,
-            ],
-            [
-                'key' => 'dominant_foot',
-                'field_value' => $validated['dominant_foot'] ?? null,
-            ],
-            [
-                'key' => 'country',
-                'field_value' => $validated['country'] ?? $user->country ?? null,
-            ],
-            [
-                'key' => 'state',
-                'field_value' => $validated['state'] ?? $user->state ?? null,
-            ],
-            [
-                'key' => 'city',
-                'field_value' => $validated['city'] ?? $user->city ?? null,
-            ],
-            [
-                'key' => 'street',
-                'field_value' => $validated['street'] ?? $user->street ?? null,
-            ],
-            [
                 'key' => 'league',
                 'field_value' => $league?->name,
             ],
@@ -1216,66 +1159,6 @@ class PublicPlayerIntakeController extends Controller
             [
                 'key' => 'national_team',
                 'field_value' => $nationalTeam?->name,
-            ],
-            [
-                'key' => 'national_team_period',
-                'field_value' => $validated['national_team_period'] ?? null,
-            ],
-            [
-                'key' => 'instagram_url',
-                'field_value' => $validated['ig_handle'] ?? null,
-            ],
-            [
-                'key' => 'x_url',
-                'field_value' => $validated['x_handle'] ?? null,
-            ],
-            [
-                'key' => 'youtube_url',
-                'field_value' => $validated['yt_url'] ?? null,
-            ],
-            [
-                'key' => 'featured_video_url',
-                'field_value' => $validated['featured_video_url'] ?? null,
-            ],
-            [
-                'key' => 'player_bio',
-                'field_value' => $validated['player_bio'] ?? null,
-            ],
-            [
-                'key' => 'academic_accolades',
-                'field_value' => $validated['academic_accolades'] ?? null,
-            ],
-            [
-                'key' => 'sports_accolades',
-                'field_value' => $validated['sports_accolades'] ?? null,
-            ],
-            [
-                'key' => 'press',
-                'field_value' => $validated['press'] ?? null,
-            ],
-            [
-                'key' => 'parent_name',
-                'field_value' => $validated['parent'] ?? null,
-            ],
-            [
-                'key' => 'parent_email',
-                'field_value' => $validated['parent_email'] ?? null,
-            ],
-            [
-                'key' => 'parent_phone',
-                'field_value' => $validated['parent_phone'] ?? null,
-            ],
-            [
-                'key' => 'secondary_parent_name',
-                'field_value' => $validated['sec_parent'] ?? null,
-            ],
-            [
-                'key' => 'secondary_parent_email',
-                'field_value' => $validated['sec_parent_email'] ?? null,
-            ],
-            [
-                'key' => 'secondary_parent_phone',
-                'field_value' => $validated['sec_parent_phone'] ?? null,
             ],
         ], fn ($field) => filled($field['field_value'] ?? null)));
 
@@ -1294,73 +1177,178 @@ class PublicPlayerIntakeController extends Controller
                 : ($validated['country'] ?? $user->country ?? null),
             'tags' => array_values(array_filter([
                 'player-intake',
-                'plan-' . \Illuminate\Support\Str::slug($selectedPlan),
                 filled($sport) ? 'sport-' . \Illuminate\Support\Str::slug($sport) : null,
-                filled($validated['gender'] ?? null) ? 'gender-' . \Illuminate\Support\Str::slug((string) $validated['gender']) : null,
             ])),
             'customFields' => $customFields,
         ];
 
         try {
-            \Log::info('GHL upsert request', [
-                'user_id' => $user->id,
-                'payload' => $payload,
-            ]);
-
-            $response = \Illuminate\Support\Facades\Http::withToken($token)
+            $client = \Illuminate\Support\Facades\Http::withToken($token)
                 ->acceptJson()
                 ->contentType('application/json')
                 ->withHeaders([
                     'Version' => '2021-07-28',
-                ])
-                ->post('https://services.leadconnectorhq.com/contacts/upsert', $payload);
+                ]);
 
-            $responseBody = $response->json();
+            // 1) Upsert or update contact
+            $upsertResponse = $client->post(
+                'https://services.leadconnectorhq.com/contacts/upsert',
+                $payload
+            );
 
-            if (! is_array($responseBody)) {
-                $responseBody = [
-                    'raw' => $response->body(),
+            $upsertBody = $upsertResponse->json();
+            if (! is_array($upsertBody)) {
+                $upsertBody = ['raw' => $upsertResponse->body()];
+            }
+
+            if ($upsertResponse->failed()) {
+                return [
+                    'success' => false,
+                    'status' => $upsertResponse->status(),
+                    'message' => 'GHL contact upsert failed.',
+                    'contact_id' => null,
+                    'subscription_found' => false,
+                    'plan_applied' => null,
+                    'response' => $upsertBody,
                 ];
             }
 
-            $result = [
-                'success' => $response->successful(),
-                'status' => $response->status(),
-                'message' => $response->successful()
-                    ? 'GHL contact upsert successful.'
-                    : 'GHL contact upsert failed.',
-                'response' => $responseBody,
-            ];
+            // 2) Try to get contact ID from upsert response
+            $contactId = data_get($upsertBody, 'contact.id')
+                ?? data_get($upsertBody, 'contactId')
+                ?? data_get($upsertBody, 'id');
 
-            \Log::info('GHL upsert response', [
-                'user_id' => $user->id,
-                'status' => $result['status'],
-                'response' => $result['response'],
-            ]);
+            // 3) Fallback: search duplicate by email if contact ID was not returned
+            if (blank($contactId)) {
+                $duplicateResponse = $client->get(
+                    'https://services.leadconnectorhq.com/contacts/search/duplicate',
+                    [
+                        'locationId' => $locationId,
+                        'email' => $email,
+                    ]
+                );
 
-            if ($response->failed()) {
-                \Log::error('GHL contact upsert failed.', [
-                    'user_id' => $user->id,
-                    'status' => $result['status'],
-                    'response' => $result['response'],
-                ]);
+                $duplicateBody = $duplicateResponse->json();
+                if (! is_array($duplicateBody)) {
+                    $duplicateBody = ['raw' => $duplicateResponse->body()];
+                }
+
+                if ($duplicateResponse->successful()) {
+                    $contactId = data_get($duplicateBody, 'contact.id')
+                        ?? data_get($duplicateBody, 'contactId')
+                        ?? data_get($duplicateBody, 'id');
+                }
             }
 
-            return $result;
-        } catch (\Throwable $e) {
-            $result = [
-                'success' => false,
-                'status' => null,
-                'message' => 'GHL contact upsert exception: ' . $e->getMessage(),
-                'response' => null,
+            if (blank($contactId)) {
+                return [
+                    'success' => true,
+                    'status' => $upsertResponse->status(),
+                    'message' => 'GHL contact upsert succeeded, but contact ID could not be resolved.',
+                    'contact_id' => null,
+                    'subscription_found' => false,
+                    'plan_applied' => null,
+                    'response' => $upsertBody,
+                ];
+            }
+
+            // 4) Check if the contact already has any subscription
+            $subscriptionResponse = $client->get(
+                'https://services.leadconnectorhq.com/payments/subscriptions',
+                [
+                    'locationId' => $locationId,
+                    'contact' => $contactId,
+                    'limit' => 20,
+                ]
+            );
+
+            $subscriptionBody = $subscriptionResponse->json();
+            if (! is_array($subscriptionBody)) {
+                $subscriptionBody = ['raw' => $subscriptionResponse->body()];
+            }
+
+            $subscriptions = data_get($subscriptionBody, 'data')
+                ?? data_get($subscriptionBody, 'subscriptions')
+                ?? [];
+
+            $hasSubscription = is_array($subscriptions) && count($subscriptions) > 0;
+
+            if ($hasSubscription) {
+                return [
+                    'success' => true,
+                    'status' => $subscriptionResponse->status(),
+                    'message' => 'GHL contact synced. Existing subscription found; no free plan fallback applied.',
+                    'contact_id' => $contactId,
+                    'subscription_found' => true,
+                    'plan_applied' => null,
+                    'response' => [
+                        'upsert' => $upsertBody,
+                        'subscriptions' => $subscriptionBody,
+                    ],
+                ];
+            }
+
+            // 5) No subscription found: mark as Free and let GHL workflows handle the rest
+            $fallbackPayload = [
+                'locationId' => $locationId,
+                'email' => $email,
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'name' => trim($firstName . ' ' . $lastName),
+                'tags' => array_values(array_filter([
+                    'player-intake',
+                    'free',
+                    'plan-free',
+                ])),
+                'customFields' => [
+                    [
+                        'key' => 'selected_plan',
+                        'field_value' => 'Free',
+                    ],
+                ],
             ];
 
-            \Log::error('GHL contact upsert exception.', [
+            $fallbackResponse = $client->post(
+                'https://services.leadconnectorhq.com/contacts/upsert',
+                $fallbackPayload
+            );
+
+            $fallbackBody = $fallbackResponse->json();
+            if (! is_array($fallbackBody)) {
+                $fallbackBody = ['raw' => $fallbackResponse->body()];
+            }
+
+            return [
+                'success' => $fallbackResponse->successful(),
+                'status' => $fallbackResponse->status(),
+                'message' => $fallbackResponse->successful()
+                    ? 'GHL contact synced. No subscription found, so Free plan fallback was applied.'
+                    : 'GHL contact synced, but Free plan fallback failed.',
+                'contact_id' => $contactId,
+                'subscription_found' => false,
+                'plan_applied' => 'Free',
+                'response' => [
+                    'upsert' => $upsertBody,
+                    'subscriptions' => $subscriptionBody,
+                    'fallback' => $fallbackBody,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            \Log::error('GHL sync exception.', [
                 'user_id' => $user->id,
+                'email' => $email,
                 'message' => $e->getMessage(),
             ]);
 
-            return $result;
+            return [
+                'success' => false,
+                'status' => null,
+                'message' => 'GHL sync exception: ' . $e->getMessage(),
+                'contact_id' => null,
+                'subscription_found' => false,
+                'plan_applied' => null,
+                'response' => null,
+            ];
         }
     }
 

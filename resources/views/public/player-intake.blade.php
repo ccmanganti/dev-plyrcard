@@ -841,18 +841,21 @@
         </div>
 
         <div class="content">
-            @if (session('ghl_result'))
+            <!-- @if (session('ghl_result'))
                 <div style="margin-top:16px; padding:12px; border:1px solid #ccc; border-radius:8px;">
                     <strong>GHL Debug</strong><br>
                     Success: {{ session('ghl_result.success') ? 'Yes' : 'No' }}<br>
                     Status: {{ session('ghl_result.status') ?? 'N/A' }}<br>
+                    Contact ID: {{ session('ghl_result.contact_id') ?? 'N/A' }}<br>
+                    Subscription Found: {{ session('ghl_result.subscription_found') ? 'Yes' : 'No' }}<br>
+                    Plan Applied: {{ session('ghl_result.plan_applied') ?? 'None' }}<br>
                     Message: {{ session('ghl_result.message') }}<br>
 
                     @if (session('ghl_result.response'))
-                        <pre style="white-space: pre-wrap; margin-top: 8px;">{{ json_encode(session('ghl_result.response'), JSON_PRETTY_PRINT) }}</pre>
+                        <pre style="white-space: pre-wrap; margin-top:8px;">{{ json_encode(session('ghl_result.response'), JSON_PRETTY_PRINT) }}</pre>
                     @endif
                 </div>
-            @endif
+            @endif -->
             @if (session('success'))
                 <div class="thank-you-wrap" id="thankYouWrap">
                     <div class="thank-you-card">
