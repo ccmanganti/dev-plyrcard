@@ -24,6 +24,7 @@ use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class PublicPlayerIntakeController extends Controller
 {
@@ -255,6 +256,14 @@ class PublicPlayerIntakeController extends Controller
 
         $resolvedPlan = $this->resolvePlanFromRequest($request);
 
+        $prefill = [
+            'first_name' => trim((string) $request->query('first_name', '')),
+            'middle_name' => trim((string) $request->query('middle_name', '')),
+            'last_name' => trim((string) $request->query('last_name', '')),
+            'personal_email' => trim((string) $request->query('personal_email', '')),
+            'phone' => trim((string) $request->query('phone', '')),
+        ];
+
         return view('public.player-intake', [
             'schools' => $schools,
             'nationalTeams' => $nationalTeams,
@@ -265,6 +274,7 @@ class PublicPlayerIntakeController extends Controller
             'detectedCountry' => $detectedCountry,
             'packageLabel' => $resolvedPlan,
             'selectedPlan' => $resolvedPlan,
+            'prefill' => $prefill,
             'stepFieldMap' => $this->stepFieldMap(),
 
             'leagueDirectory' => $leagues->map(function (League $league) {
@@ -431,7 +441,7 @@ class PublicPlayerIntakeController extends Controller
         'snc_trainer_phone' => $this->normalizePhone($request->input('snc_trainer_phone')),
     ]);
 
-    $validated = $request->validate([
+    $validator = Validator::make($request->all(), [
         'selected_plan' => ['nullable', 'in:Free,Plyr,My Journey'],
         'first_name' => ['required', 'string', 'max:255'],
         'middle_name' => ['nullable', 'string', 'max:255'],
@@ -518,9 +528,11 @@ class PublicPlayerIntakeController extends Controller
         'national_team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
         'team_images' => ['nullable', 'array'],
         'team_images.*' => ['image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
-    ], [
-        'phone.unique' => 'This phone number is already being used by another account.',
-    ]);
+    ], $this->validationMessages(), $this->validationAttributes());
+
+    $this->addImageValidationErrors($validator, $request);
+
+    $validated = $validator->validate();
 
     $selectedPlan = $validated['selected_plan'] ?? 'Free';
 
@@ -821,6 +833,129 @@ class PublicPlayerIntakeController extends Controller
         ->with('success', 'Player intake submitted successfully for ' . $user->first_name . '.')
         ->with('ghl_result', $ghlResult);
 }
+
+
+    protected function validationMessages(): array
+    {
+        return [
+            'phone.unique' => 'This phone number is already being used by another account.',
+            'personal_email.email' => 'Please enter a valid personal email address.',
+            'parent_email.email' => 'Please enter a valid primary parent email address.',
+            'sec_parent_email.email' => 'Please enter a valid secondary parent email address.',
+            'club_coach_email.email' => 'Please enter a valid club coach email address.',
+            'natl_coach_email.email' => 'Please enter a valid national coach email address.',
+            'tech_trainer_email.email' => 'Please enter a valid technical trainer email address.',
+            'snc_trainer_email.email' => 'Please enter a valid strength and conditioning trainer email address.',
+            'ig_handle.url' => 'Please enter a valid Instagram profile URL.',
+            'x_handle.url' => 'Please enter a valid X profile URL.',
+            'yt_url.url' => 'Please enter a valid YouTube channel URL.',
+            'featured_video_url.url' => 'Please enter a valid featured video URL.',
+            'action_images.array' => 'Action Images must be uploaded as a valid image list.',
+            'portrait_images.array' => 'Portrait Images must be uploaded as a valid image list.',
+            'national_team_images.array' => 'National Team Images must be uploaded as a valid image list.',
+            'team_images.array' => 'Team Images must be uploaded as a valid image list.',
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'first_name' => 'First Name',
+            'middle_name' => 'Middle Name',
+            'last_name' => 'Last Name',
+            'personal_email' => 'Personal Email',
+            'phone' => 'Phone',
+            'gender' => 'Gender',
+            'sport' => 'Sport',
+            'position' => 'Position',
+            'birth' => 'Birth Date',
+            'year' => 'Graduation Year',
+            'gpa' => 'GPA',
+            'height' => 'Height',
+            'weight' => 'Weight',
+            'jersey_number' => 'Jersey Number',
+            'vertical_jump' => 'Vertical Jump',
+            'max_speed' => 'Max Speed',
+            'dominant_foot' => 'Dominant Foot',
+            'country' => 'Country',
+            'country_other' => 'Country Name',
+            'state' => 'State / Province / Region',
+            'city' => 'City',
+            'street' => 'Street',
+            'school_id' => 'School',
+            'school_other' => 'School Name',
+            'league_id' => 'League',
+            'club_id' => 'Club',
+            'team_id' => 'Team',
+            'league_other' => 'League Name',
+            'club_other' => 'Club Name',
+            'team_other' => 'Team Name',
+            'natl_team_exp' => 'National Team Experience',
+            'national_team_period' => 'National Team Period',
+            'national_team_id' => 'National Team',
+            'national_team_other' => 'New National Team Name',
+            'ig_handle' => 'Instagram Profile URL',
+            'x_handle' => 'X Profile URL',
+            'yt_url' => 'YouTube Channel URL',
+            'featured_video_url' => 'Featured Video URL',
+            'featured_video_urls' => 'Highlight Video URLs',
+            'player_bio' => 'Player Bio',
+            'academic_accolades' => 'Academic Accolades',
+            'sports_accolades' => 'Sports Accolades',
+            'press' => 'Press / Notes',
+            'parent' => 'Primary Parent / Guardian',
+            'parent_email' => 'Primary Parent Email',
+            'parent_phone' => 'Primary Parent Phone',
+            'sec_parent' => 'Secondary Parent / Guardian',
+            'sec_parent_email' => 'Secondary Parent Email',
+            'sec_parent_phone' => 'Secondary Parent Phone',
+            'club_coach' => 'Club Coach',
+            'club_coach_email' => 'Club Coach Email',
+            'club_coach_phone' => 'Club Coach Phone',
+            'natl_coach' => 'National Coach',
+            'natl_coach_email' => 'National Coach Email',
+            'natl_coach_phone' => 'National Coach Phone',
+            'tech_trainer' => 'Technical Trainer',
+            'tech_trainer_email' => 'Technical Trainer Email',
+            'tech_trainer_phone' => 'Technical Trainer Phone',
+            'snc_trainer' => 'Strength and Conditioning Trainer',
+            'snc_trainer_email' => 'Strength and Conditioning Trainer Email',
+            'snc_trainer_phone' => 'Strength and Conditioning Trainer Phone',
+            'action_images' => 'Action Images',
+            'portrait_images' => 'Portrait Images',
+            'national_team_images' => 'National Team Images',
+            'team_images' => 'Team Images',
+        ];
+    }
+
+    protected function addImageValidationErrors($validator, Request $request): void
+    {
+        $validator->after(function ($validator) use ($request) {
+            $imageFields = [
+                'action_images' => 'Action Images',
+                'portrait_images' => 'Portrait Images',
+                'national_team_images' => 'National Team Images',
+                'team_images' => 'Team Images',
+            ];
+
+            foreach ($imageFields as $field => $label) {
+                foreach ($request->file($field, []) as $index => $file) {
+                    if (! $file) {
+                        continue;
+                    }
+
+                    if (! $file->isValid()) {
+                        $validator->errors()->add($field, $label . ' contains an invalid upload. Please remove it and upload the image again.');
+                        continue;
+                    }
+
+                    if ($file->getSize() > 5 * 1024 * 1024) {
+                        $validator->errors()->add($field, sprintf('%s: "%s" is larger than 5MB. Please upload an image that is 5MB or smaller.', $label, $file->getClientOriginalName()));
+                    }
+                }
+            }
+        });
+    }
 
     protected function stepFieldMap(): array
     {

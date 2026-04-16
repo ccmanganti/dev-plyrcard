@@ -526,6 +526,40 @@
             box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10) !important;
         }
 
+
+        .field-message {
+            margin-top: 7px;
+            font-size: 12px;
+            line-height: 1.45;
+            display: none;
+        }
+
+        .field-message.error {
+            display: block;
+            color: #fca5a5;
+        }
+
+        .field-message.success {
+            display: block;
+            color: #86efac;
+        }
+
+        .file-warning-list {
+            margin-top: 8px;
+            display: none;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            background: rgba(127, 29, 29, 0.16);
+            color: #fecaca;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .file-warning-list.visible {
+            display: block;
+        }
+
         .hidden-section,
         .other-wrap {
             display: none;
@@ -932,28 +966,28 @@
                         <div class="grid">
                             <div class="col-4">
                                 <label for="first_name">First Name <span class="required">*</span></label>
-                                <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" maxlength="255" required placeholder="Enter first name">
+                                <input type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" maxlength="255" required placeholder="Enter first name">
                             </div>
 
                             <div class="col-4">
                                 <label for="middle_name">Middle Name</label>
-                                <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name') }}" maxlength="255" placeholder="Enter middle name">
+                                <input type="text" id="middle_name" name="middle_name" value="{{ old('middle_name', $prefill['middle_name'] ?? '') }}" maxlength="255" placeholder="Enter middle name">
                             </div>
 
                             <div class="col-4">
                                 <label for="last_name">Last Name <span class="required">*</span></label>
-                                <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" maxlength="255" required placeholder="Enter last name">
+                                <input type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" maxlength="255" required placeholder="Enter last name">
                             </div>
 
                             <div class="col-4">
                                 <label for="personal_email">Personal Email <span class="required">*</span></label>
-                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" maxlength="255" required placeholder="name@example.com">
+                                <input type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" maxlength="255" required placeholder="name@example.com">
                                 <div class="hint">Only the personal email should be used here.</div>
                             </div>
 
                             <div class="col-4">
                                 <label for="phone">Phone</label>
-                                <input class="phone-input" type="text" id="phone" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
+                                <input class="phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" maxlength="50" inputmode="tel" placeholder="+1 (555) 123-4567">
                             </div>
 
                             <div class="col-4">
@@ -1400,23 +1434,27 @@
 
                         <div class="grid">
                             <div class="col-6">
-                                <label for="action_images">Action Images</label>
+                                <label for="action_images">Action Images <span class="required">(Max 5MB each)</span></label>
                                 <input type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="file-warning-list" id="action_images_feedback"></div>
                             </div>
 
                             <div class="col-6">
-                                <label for="portrait_images">Portrait Images</label>
+                                <label for="portrait_images">Portrait Images <span class="required">(Max 5MB each)</span></label>
                                 <input type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="file-warning-list" id="portrait_images_feedback"></div>
                             </div>
 
                             <div class="col-6 other-wrap" id="national_team_images_wrap">
-                                <label for="national_team_images">National Team Images</label>
+                                <label for="national_team_images">National Team Images <span class="required">(Max 5MB each)</span></label>
                                 <input type="file" id="national_team_images" name="national_team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="file-warning-list" id="national_team_images_feedback"></div>
                             </div>
 
                             <div class="col-6">
-                                <label for="team_images">Team Images</label>
+                                <label for="team_images">Team Images <span class="required">(Max 5MB each)</span></label>
                                 <input type="file" id="team_images" name="team_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="file-warning-list" id="team_images_feedback"></div>
                             </div>
 
                             <div class="col-12">
@@ -1458,6 +1496,16 @@
 
     let currentStep = 1;
     const totalSteps = 5;
+    const intakeDraftStorageKey = 'plyrcard_player_intake_draft_v1';
+
+    function hasQueryPrefill() {
+        const searchParams = new URLSearchParams(window.location.search);
+        return ['first_name', 'middle_name', 'last_name', 'personal_email', 'phone']
+            .some((key) => {
+                const value = searchParams.get(key);
+                return value !== null && String(value).trim() !== '';
+            });
+    }
 
     function iconSearch() {
         return `
@@ -1502,6 +1550,287 @@
         return ls === us;
     }
 
+
+    function getFriendlyFieldLabel(fieldId) {
+        const map = {
+            first_name: 'First Name',
+            last_name: 'Last Name',
+            personal_email: 'Personal Email',
+            phone: 'Phone',
+            gender: 'Gender',
+            sport: 'Sport',
+            school_other: 'School Name',
+            league_other: 'League Name',
+            club_other: 'Club Name',
+            team_other: 'Team Name',
+            national_team_period: 'National Team Period',
+            national_team_other: 'New National Team Name',
+            ig_handle: 'Instagram Profile URL',
+            x_handle: 'X Profile URL',
+            yt_url: 'YouTube Channel URL',
+            featured_video_url: 'Featured Video URL',
+            featured_video_urls: 'Highlight Video URLs',
+        };
+
+        return map[fieldId] || titleize(fieldId);
+    }
+
+    function ensureFieldMessageEl(field) {
+        if (!field || !field.parentNode) return null;
+
+        let messageEl = field.parentNode.querySelector(`.field-message[data-for="${field.id}"]`);
+
+        if (!messageEl) {
+            messageEl = document.createElement('div');
+            messageEl.className = 'field-message';
+            messageEl.dataset.for = field.id;
+            field.insertAdjacentElement('afterend', messageEl);
+        }
+
+        return messageEl;
+    }
+
+    function setFieldMessage(field, message, type = 'error') {
+        const messageEl = ensureFieldMessageEl(field);
+        if (!messageEl) return;
+
+        messageEl.className = `field-message ${type}`;
+        messageEl.textContent = message || '';
+        messageEl.style.display = message ? 'block' : 'none';
+    }
+
+    function clearFieldMessage(field) {
+        const messageEl = ensureFieldMessageEl(field);
+        if (!messageEl) return;
+        messageEl.textContent = '';
+        messageEl.className = 'field-message';
+        messageEl.style.display = 'none';
+    }
+
+    function validateSingleField(field) {
+        if (!field || !field.id || !isVisible(field)) return true;
+
+        let message = '';
+        const value = (field.value || '').trim();
+
+        if (field.id === 'first_name' && !value) message = 'First Name is required.';
+        if (field.id === 'last_name' && !value) message = 'Last Name is required.';
+        if (field.id === 'personal_email') {
+            if (!value) message = 'Personal Email is required.';
+            else if (!validateEmail(value)) message = 'Please enter a valid personal email address.';
+        }
+        if (field.id === 'parent_email' && value && !validateEmail(value)) message = 'Please enter a valid primary parent email address.';
+        if (field.id === 'sec_parent_email' && value && !validateEmail(value)) message = 'Please enter a valid secondary parent email address.';
+        if (field.id === 'club_coach_email' && value && !validateEmail(value)) message = 'Please enter a valid club coach email address.';
+        if (field.id === 'natl_coach_email' && value && !validateEmail(value)) message = 'Please enter a valid national coach email address.';
+        if (field.id === 'tech_trainer_email' && value && !validateEmail(value)) message = 'Please enter a valid technical trainer email address.';
+        if (field.id === 'snc_trainer_email' && value && !validateEmail(value)) message = 'Please enter a valid strength and conditioning trainer email address.';
+        if (field.id === 'gender' && !value) message = 'Gender is required.';
+        if (field.id === 'sport' && !value) message = 'Sport is required.';
+        if (['ig_handle', 'x_handle', 'yt_url', 'featured_video_url'].includes(field.id) && value && !validateUrl(value)) {
+            message = `${getFriendlyFieldLabel(field.id)} must be a valid URL.`;
+        }
+        if (field.id === 'school_other' && document.getElementById('school_id')?.value === '__other__' && !value) message = 'School Name is required.';
+        if (field.id === 'country_other' && document.getElementById('country')?.value === '__other__' && !value) message = 'Country Name is required.';
+        if (field.id === 'national_team_period' && document.getElementById('natl_team_exp')?.value === '1' && !value) message = 'National Team Period is required.';
+        if (field.id === 'national_team_other' && document.getElementById('natl_team_exp')?.value === '1' && document.getElementById('national_team_id')?.value === '__other__' && !value) message = 'New National Team Name is required.';
+        if (field.id === 'league_other' && document.getElementById('league_id')?.value === '__other__' && !value) message = 'League Name is required.';
+        if (field.id === 'club_other' && document.getElementById('league_id')?.value === '__other__' && !value) message = 'Club Name is required.';
+        if (field.id === 'team_other' && document.getElementById('league_id')?.value === '__other__' && !value) message = 'Team Name is required.';
+        if (field.id === 'featured_video_urls' && document.getElementById('use_custom_highlights')?.checked) {
+            const lines = value.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+            if (!lines.length) message = 'Add at least one Highlight Video URL.';
+            else if (lines.some(url => !validateUrl(url))) message = 'All Highlight Video URLs must be valid.';
+        }
+
+        if (message) {
+            field.classList.add('field-error');
+            setFieldMessage(field, message, 'error');
+            return false;
+        }
+
+        field.classList.remove('field-error');
+        clearFieldMessage(field);
+        return true;
+    }
+
+    function validatePositionField() {
+        const checkedPositions = document.querySelectorAll('input[name="position[]"]:checked');
+        const container = document.getElementById('positionOptions');
+        if (!container || !isVisible(container)) return true;
+
+        const existing = container.parentNode.querySelector('.field-message[data-for="positionOptions"]') || (() => {
+            const el = document.createElement('div');
+            el.className = 'field-message';
+            el.dataset.for = 'positionOptions';
+            container.insertAdjacentElement('afterend', el);
+            return el;
+        })();
+
+        if (!checkedPositions.length) {
+            existing.className = 'field-message error';
+            existing.textContent = 'Select at least one position.';
+            existing.style.display = 'block';
+            return false;
+        }
+
+        existing.textContent = '';
+        existing.className = 'field-message';
+        existing.style.display = 'none';
+        return true;
+    }
+
+    function validateFilesLive(fieldId) {
+        const input = document.getElementById(fieldId);
+        const feedback = document.getElementById(`${fieldId}_feedback`);
+        if (!input || !feedback) return true;
+
+        const files = Array.from(input.files || []);
+        const errors = [];
+
+        files.forEach((file) => {
+            if (file.size > 5 * 1024 * 1024) {
+                errors.push(`${file.name} is larger than 5MB. Remove it from ${getFriendlyFieldLabel(fieldId)} and upload a smaller file.`);
+            }
+        });
+
+        if (errors.length) {
+            input.classList.add('field-error');
+            feedback.innerHTML = errors.map(error => `<div>${error}</div>`).join('');
+            feedback.classList.add('visible');
+            return false;
+        }
+
+        input.classList.remove('field-error');
+        feedback.innerHTML = '';
+        feedback.classList.remove('visible');
+        return true;
+    }
+
+    function validateCurrentStepLive() {
+        let valid = true;
+        const panel = document.querySelector(`.step-panel[data-step="${currentStep}"]`);
+        if (!panel) return true;
+
+        panel.querySelectorAll('input, select, textarea').forEach((field) => {
+            if (field.type === 'file') {
+                if (!validateFilesLive(field.id)) valid = false;
+                return;
+            }
+            if (!validateSingleField(field)) valid = false;
+        });
+
+        if (currentStep === 1 && !validatePositionField()) valid = false;
+        return valid;
+    }
+
+    function buildDraftPayload() {
+        const form = document.getElementById('playerIntakeForm');
+        const payload = { currentStep };
+        if (!form) return payload;
+
+        form.querySelectorAll('input, select, textarea').forEach((field) => {
+            if (!field.name || field.type === 'file') return;
+            if (field.name === '_token') return;
+
+            if (field.type === 'checkbox') {
+                if (field.name === 'position[]') {
+                    payload[field.name] = payload[field.name] || [];
+                    if (field.checked) payload[field.name].push(field.value);
+                } else {
+                    payload[field.name] = field.checked ? field.value : '';
+                }
+                return;
+            }
+
+            if (field.type === 'radio') {
+                if (field.checked) payload[field.name] = field.value;
+                return;
+            }
+
+            payload[field.name] = field.value;
+        });
+
+        return payload;
+    }
+
+    function saveDraftToCache() {
+        try {
+            localStorage.setItem(intakeDraftStorageKey, JSON.stringify(buildDraftPayload()));
+        } catch (error) {
+            console.warn('Unable to save intake draft.', error);
+        }
+    }
+
+    function restoreDraftFromCache() {
+        try {
+            const raw = localStorage.getItem(intakeDraftStorageKey);
+            if (!raw) return null;
+            const payload = JSON.parse(raw);
+            const form = document.getElementById('playerIntakeForm');
+            if (!form || !payload || typeof payload !== 'object') return null;
+
+            const searchParams = new URLSearchParams(window.location.search);
+            const queryPrefillMap = {
+                first_name: 'first_name',
+                middle_name: 'middle_name',
+                last_name: 'last_name',
+                personal_email: 'personal_email',
+                phone: 'phone',
+            };
+
+            Object.entries(payload).forEach(([name, value]) => {
+                if (name === 'currentStep') return;
+
+                if (queryPrefillMap[name] && searchParams.get(queryPrefillMap[name])) {
+                    return;
+                }
+
+                const fields = form.querySelectorAll(`[name="${CSS.escape(name)}"]`);
+                if (!fields.length) return;
+
+                fields.forEach((field) => {
+                    if (field.type === 'checkbox') {
+                        if (Array.isArray(value)) {
+                            field.checked = value.includes(field.value);
+                        } else {
+                            field.checked = String(value) === String(field.value);
+                        }
+                        return;
+                    }
+
+                    if (field.type === 'radio') {
+                        field.checked = String(field.value) === String(value);
+                        return;
+                    }
+
+                    if (queryPrefillMap[name] && searchParams.get(queryPrefillMap[name])) {
+                        return;
+                    }
+
+                    field.value = value ?? '';
+                });
+            });
+
+            if (hasQueryPrefill()) {
+                payload.currentStep = 1;
+            }
+
+            return payload;
+        } catch (error) {
+            console.warn('Unable to restore intake draft.', error);
+            return null;
+        }
+    }
+
+    function clearDraftCache() {
+        try {
+            localStorage.removeItem(intakeDraftStorageKey);
+        } catch (error) {
+            console.warn('Unable to clear intake draft.', error);
+        }
+    }
+
     function renderPositions() {
     const sportSelect = document.getElementById('sport');
     const container = document.getElementById('positionOptions');
@@ -1509,6 +1838,20 @@
 
     const currentChecked = Array.from(document.querySelectorAll('input[name="position[]"]:checked'))
         .map(input => input.value);
+
+    let cachedPositions = [];
+    try {
+        const draft = JSON.parse(localStorage.getItem(intakeDraftStorageKey) || '{}');
+        if (Array.isArray(draft['position[]'])) {
+            cachedPositions = draft['position[]'];
+        }
+    } catch (error) {
+        cachedPositions = [];
+    }
+
+    const selectedPositions = currentChecked.length
+        ? currentChecked
+        : (cachedPositions.length ? cachedPositions : (Array.isArray(oldPositions) ? oldPositions : []));
 
     container.innerHTML = '';
 
@@ -1525,13 +1868,17 @@
         input.type = 'checkbox';
         input.name = 'position[]';
         input.value = key;
+        input.checked = selectedPositions.includes(key);
 
-        if (currentChecked.includes(key) || (Array.isArray(oldPositions) && oldPositions.includes(key))) {
-            input.checked = true;
-        }
+        input.addEventListener('change', () => {
+            saveDraftToCache();
+            updateNextButtonState();
+        });
 
-        input.addEventListener('change', updateNextButtonState);
-        input.addEventListener('input', updateNextButtonState);
+        input.addEventListener('input', () => {
+            saveDraftToCache();
+            updateNextButtonState();
+        });
 
         const span = document.createElement('span');
         span.textContent = label;
@@ -1803,19 +2150,21 @@
     function updateNextButtonState() {
         const nextBtn = document.getElementById('nextStepBtn');
         const submitBtn = document.getElementById('submitBtn');
+        const currentStepIsValid = isStepComplete(currentStep) && validateCurrentStepLive();
 
         if (currentStep < totalSteps) {
-            nextBtn.disabled = !isStepComplete(currentStep);
+            nextBtn.disabled = !currentStepIsValid;
         } else {
             nextBtn.disabled = true;
         }
 
         if (submitBtn) {
-            submitBtn.disabled = !isStepComplete(totalSteps);
+            submitBtn.disabled = !(isStepComplete(totalSteps) && validateCurrentStepLive());
         }
 
         markFieldState();
         refreshStepPills();
+        saveDraftToCache();
     }
 
     function refreshStepPills() {
@@ -2210,7 +2559,14 @@
     function bindValidationListeners() {
         document.querySelectorAll('#playerIntakeForm input, #playerIntakeForm select, #playerIntakeForm textarea').forEach((el) => {
             ['input', 'change', 'blur'].forEach((evt) => {
-                el.addEventListener(evt, updateNextButtonState);
+                el.addEventListener(evt, () => {
+                    if (el.type === 'file') {
+                        validateFilesLive(el.id);
+                    } else {
+                        validateSingleField(el);
+                    }
+                    updateNextButtonState();
+                });
             });
         });
 
@@ -2256,6 +2612,9 @@ function groupLocalDigits(digits) {
 }
 
     document.addEventListener('DOMContentLoaded', () => {
+        const restoredDraft = restoreDraftFromCache();
+        const shouldStartFromPrefill = hasQueryPrefill();
+
         renderPositions();
         toggleDominantFoot();
         toggleSchoolOther();
@@ -2270,9 +2629,16 @@ function groupLocalDigits(digits) {
         if (oldClubId) document.getElementById('club_id').value = oldClubId;
         if (oldTeamId) document.getElementById('team_id').value = oldTeamId;
         refreshOrganizationSelectors();
+        renderPositions();
+        toggleDominantFoot();
+        toggleSchoolOther();
+        toggleNationalTeamOther();
+        toggleCustomHighlights();
+        toggleCountryFields();
+        syncStateValue();
 
         const initialStep = {{ $errors->any() ? 'getStepFromErrors()' : '1' }};
-        showStep(initialStep);
+        showStep(shouldStartFromPrefill ? 1 : (restoredDraft?.currentStep || initialStep));
 
         document.querySelectorAll('.phone-input').forEach((input) => {
     input.addEventListener('input', () => {
@@ -2325,11 +2691,13 @@ function groupLocalDigits(digits) {
 
         document.getElementById('positionOptions').addEventListener('change', function (event) {
             if (event.target && event.target.matches('input[name="position[]"]')) {
+                saveDraftToCache();
                 updateNextButtonState();
             }
         });
 
         document.getElementById('sport').addEventListener('change', () => {
+            saveDraftToCache();
             renderPositions();
             toggleDominantFoot();
             refreshOrganizationSelectors();
