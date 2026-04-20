@@ -34,6 +34,14 @@ Route::post('/player-intake', [PublicPlayerIntakeController::class, 'store'])
 
 /*
 |--------------------------------------------------------------------------
+| NEW: App-style intake (mobile-first UI)
+|--------------------------------------------------------------------------
+*/
+Route::get('/player-intake-app', [PublicPlayerIntakeController::class, 'createApp'])
+    ->name('public.player-intake.app');
+
+/*
+|--------------------------------------------------------------------------
 | Website editor routes
 |--------------------------------------------------------------------------
 */
@@ -67,25 +75,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 |--------------------------------------------------------------------------
 | Public website-by-name route
 |--------------------------------------------------------------------------
-|
-| This must stay LAST so it does not override:
-| - /admin
-| - /preview/{website}
-| - /player-intake
-|
 */
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
     ->where('websiteName', '[A-Za-z0-9\-]+')
     ->name('website.show-by-name');
-
-// Route::get('/ssl-debug', function () {
-//     return response()->json([
-//         'loaded_php_ini' => php_ini_loaded_file(),
-//         'curl.cainfo' => ini_get('curl.cainfo'),
-//         'openssl.cafile' => ini_get('openssl.cafile'),
-//         'cacert_exists' => file_exists(ini_get('curl.cainfo')),
-//         'cacert_readable' => is_readable(ini_get('curl.cainfo')),
-//         'php_sapi' => php_sapi_name(),
-//         'curl_version' => function_exists('curl_version') ? curl_version() : null,
-//     ]);
-// });

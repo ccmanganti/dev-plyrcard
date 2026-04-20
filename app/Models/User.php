@@ -86,6 +86,10 @@ class User extends Authenticatable implements HasName, FilamentUser
         'national_team_period',
         'max_speed',
         'ghl_contact_id',
+
+        // First-login / onboarding fields
+        'must_change_password',
+        'onboarding_completed_at',
     ];
 
     protected $hidden = [
@@ -118,6 +122,10 @@ class User extends Authenticatable implements HasName, FilamentUser
             'youtube_cached_videos' => 'array',
             'youtube_cache_refreshed_at' => 'datetime',
             'raw_player_images' => 'array',
+
+            // First-login / onboarding casts
+            'must_change_password' => 'boolean',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 
