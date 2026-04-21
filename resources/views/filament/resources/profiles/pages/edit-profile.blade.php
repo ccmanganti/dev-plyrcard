@@ -1,61 +1,15 @@
 <x-filament-panels::page>
     <style>
-        .profile-plan-meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.55rem;
-    margin-top: 0.6rem;
-}
+        .profile-bottom-save {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+        }
 
-.profile-trial-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    min-height: 32px;
-    padding: 0.45rem 0.75rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 107, 74, 0.28);
-    background: rgba(255, 107, 74, 0.10);
-    color: #fff4ef;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
+        .profile-bottom-save .profile-action-btn {
+            min-width: 180px;
+        }
 
-.profile-trial-badge svg {
-    width: 13px !important;
-    height: 13px !important;
-    min-width: 13px !important;
-    min-height: 13px !important;
-    max-width: 13px !important;
-    max-height: 13px !important;
-    color: #ff7e5f;
-    flex-shrink: 0 !important;
-}
-
-.profile-trial-badge strong {
-    color: #ffb199;
-    font-weight: 900;
-}
-
-.profile-trial-note {
-    font-size: 0.72rem;
-    color: #d8a395;
-    line-height: 1.35;
-}
-
-.profile-bottom-save {
-    margin-top: 1rem;
-    display: flex;
-    justify-content: flex-end;
-}
-
-.profile-bottom-save .profile-action-btn {
-    min-width: 180px;
-}
         .profile-shell {
             --pc-bg: #050505;
             --pc-panel: #0b0b0d;
@@ -79,118 +33,35 @@
             color: var(--pc-text);
         }
 
-        .profile-plan-banner {
+        .profile-header-layout {
+            display: flex;
+            align-items: stretch;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            width: 100%;
+        }
+
+        .profile-header-title {
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 0.9rem;
-            border-radius: 0.85rem;
-            padding: 0.8rem 1rem;
-            margin-bottom: 0.95rem;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-        }
-
-        .profile-plan-banner--warning {
-            border: 1px solid var(--pc-red-border);
-            background:
-                linear-gradient(90deg, rgba(255,107,74,0.10) 0%, rgba(255,107,74,0.04) 45%, rgba(255,107,74,0.02) 100%),
-                #180c0a;
-        }
-
-        .profile-plan-banner--success {
-            border: 1px solid var(--pc-green-border);
-            background:
-                linear-gradient(90deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.05) 45%, rgba(34,197,94,0.02) 100%),
-                #0d1b12;
-        }
-
-        .profile-plan-banner-left {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.7rem;
             min-width: 0;
         }
 
-        .profile-plan-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1rem;
-            height: 1rem;
-            flex-shrink: 0;
-            margin-top: 0.1rem;
-        }
-
-        .profile-plan-banner--warning .profile-plan-icon {
-            color: var(--pc-orange);
-        }
-
-        .profile-plan-banner--success .profile-plan-icon {
-            color: var(--pc-green);
-        }
-
-        .profile-plan-copy {
-            min-width: 0;
-        }
-
-        .profile-plan-headline {
+        .profile-header-title h1 {
             margin: 0;
-            font-size: 0.8rem;
-            font-weight: 800;
-            letter-spacing: 0.05em;
+            font-size: 2.35rem;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: 0.03em;
             text-transform: uppercase;
-        }
-
-        .profile-plan-banner--warning .profile-plan-headline {
-            color: #fff1ec;
-        }
-
-        .profile-plan-banner--success .profile-plan-headline {
-            color: #ecfdf3;
-        }
-
-        .profile-plan-description {
-            margin: 0.18rem 0 0;
-            font-size: 0.72rem;
-            line-height: 1.35;
-        }
-
-        .profile-plan-banner--warning .profile-plan-description {
-            color: #b9948b;
-        }
-
-        .profile-plan-banner--success .profile-plan-description {
-            color: #98c6a6;
-        }
-
-        .profile-plan-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            flex-wrap: wrap;
-        }
-
-        .profile-upgrade-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.35rem;
-            padding: 0.65rem 0.95rem;
-            border-radius: 0.75rem;
-            background: var(--pc-orange);
-            color: white;
-            font-size: 0.75rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            text-decoration: none;
+            color: #fff;
             white-space: nowrap;
-            transition: transform .15s ease, opacity .15s ease;
         }
 
-        .profile-upgrade-btn:hover {
-            opacity: 0.94;
-            transform: translateY(-1px);
+        .profile-header-card {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .profile-overview-card {
@@ -201,8 +72,9 @@
                 linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
                 #0b0b0d;
             border: 1px solid var(--pc-border);
-            margin-bottom: 1rem;
+            margin-bottom: 0;
             padding: 1rem 1.1rem;
+            height: 100%;
         }
 
         .profile-overview-card::before {
@@ -218,7 +90,8 @@
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            min-width: 0;
         }
 
         .profile-overview-left {
@@ -254,6 +127,7 @@
 
         .profile-meta-wrap {
             min-width: 0;
+            flex: 1 1 auto;
         }
 
         .profile-name {
@@ -313,25 +187,36 @@
 
         .profile-overview-actions {
             display: flex;
-            flex-direction: column;
-            gap: 0.55rem;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
             flex: 0 0 auto;
+            flex-wrap: wrap;
         }
 
         .profile-action-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.4rem;
-            min-width: 128px;
-            padding: 0.7rem 0.85rem;
-            border-radius: 0.75rem;
+            gap: 0.45rem;
+            min-width: 170px;
+            height: 50px;
+            padding: 0 1rem;
+            border-radius: 0.85rem;
             text-decoration: none;
-            font-size: 0.74rem;
+            font-size: 0.78rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             transition: transform .15s ease, opacity .15s ease, border-color .15s ease;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+
+        button.profile-action-btn {
+            appearance: none;
         }
 
         .profile-action-btn:hover {
@@ -361,26 +246,15 @@
             flex: 0 0 auto !important;
         }
 
-        .profile-plan-icon svg,
         .profile-meta-item svg,
         .profile-pill svg,
         .profile-action-btn svg {
-            width: 12px !important;
-            height: 12px !important;
-            min-width: 12px !important;
-            min-height: 12px !important;
-            max-width: 12px !important;
-            max-height: 12px !important;
-            flex-shrink: 0 !important;
-        }
-
-        .profile-upgrade-btn svg {
-            width: 11px !important;
-            height: 11px !important;
-            min-width: 11px !important;
-            min-height: 11px !important;
-            max-width: 11px !important;
-            max-height: 11px !important;
+            width: 14px !important;
+            height: 14px !important;
+            min-width: 14px !important;
+            min-height: 14px !important;
+            max-width: 14px !important;
+            max-height: 14px !important;
             flex-shrink: 0 !important;
         }
 
@@ -557,23 +431,33 @@
             color: #fff;
         }
 
-        @media (max-width: 900px) {
-            .profile-plan-banner {
+        @media (max-width: 1200px) {
+            .profile-header-layout {
                 flex-direction: column;
-                align-items: stretch;
             }
 
+            .profile-header-title h1 {
+                white-space: normal;
+            }
+        }
+
+        @media (max-width: 900px) {
             .profile-overview-grid {
                 flex-direction: column;
                 align-items: stretch;
+                flex-wrap: wrap;
             }
 
             .profile-overview-actions {
                 width: 100%;
+                justify-content: stretch;
+                gap: 0.65rem;
             }
 
             .profile-action-btn {
-                width: 100%;
+                flex: 1 1 0;
+                width: auto;
+                min-width: 0;
             }
 
             .profile-name {
@@ -602,117 +486,95 @@
     </style>
 
     <div class="profile-shell">
-        <div class="profile-plan-banner profile-plan-banner--{{ $this->getPlanTheme() }}">
-            <div class="profile-plan-banner-left">
-                <div class="profile-plan-icon">
-                    @if ($this->getPlanTheme() === 'success')
-                        <x-heroicon-m-check-circle />
-                    @else
-                        <x-heroicon-m-lock-closed />
-                    @endif
-                </div>
-
-                <div class="profile-plan-copy">
-                    <p class="profile-plan-headline">{{ $this->getPlanHeadline() }}</p>
-                    <p class="profile-plan-description">{{ $this->getPlanDescription() }}</p>
-
-                    @if ($this->isFreeTrialActive())
-                        <div class="profile-trial-badge">
-                            <x-heroicon-m-bolt />
-                            <span>Trial Active</span>
-                            <strong>{{ $this->getFreeTrialDaysLeft() }} {{ $this->getFreeTrialDaysLeft() === 1 ? 'day' : 'days' }} left</strong>
-                        </div>
-                    @endif
-                </div>
+        <div class="profile-header-layout">
+            <div class="profile-header-title">
+                <h1>My Profile</h1>
             </div>
 
-            <div class="profile-plan-actions">
-                @if ($this->canUpgradePlan())
-                    <a href="{{ $this->getUpgradeUrl() }}" class="profile-upgrade-btn">
-                        <x-heroicon-m-paper-airplane />
-                        <span>{{ $this->getUpgradeButtonLabel() }}</span>
-                    </a>
-                @endif
+            <div class="profile-header-card">
+                <div class="profile-overview-card">
+                    <div class="profile-overview-grid">
+                        <div class="profile-overview-left">
+                            <div class="profile-avatar">
+                                @if ($this->getProfileImageUrl())
+                                    <img src="{{ $this->getProfileImageUrl() }}" alt="{{ $this->getProfileFullName() }}">
+                                @else
+                                    <span>{{ $this->getProfileInitials() }}</span>
+                                @endif
+                            </div>
 
-                @if ($this->shouldShowBookDemoButton())
-                    <a href="{{ $this->getBookDemoUrl() }}" class="profile-action-btn profile-action-btn--ghost">
-                        <x-heroicon-m-calendar-days />
-                        <span>Book a Demo</span>
-                    </a>
-                @endif
-            </div>
-        </div>
+                            <div class="profile-meta-wrap">
+                                <h2 class="profile-name">{{ $this->getProfileFullName() ?: 'Your Profile' }}</h2>
 
-        <div class="profile-overview-card">
-            <div class="profile-overview-grid">
-                <div class="profile-overview-left">
-                    <div class="profile-avatar">
-                        @if ($this->getProfileImageUrl())
-                            <img src="{{ $this->getProfileImageUrl() }}" alt="{{ $this->getProfileFullName() }}">
-                        @else
-                            <span>{{ $this->getProfileInitials() }}</span>
-                        @endif
-                    </div>
+                                <div class="profile-meta-row">
+                                    @if ($this->getProfileSportLabel())
+                                        <span class="profile-meta-item">
+                                            <x-heroicon-m-trophy />
+                                            <span>{{ $this->getProfileSportLabel() }}</span>
+                                        </span>
+                                    @endif
 
-                    <div class="profile-meta-wrap">
-                        <h2 class="profile-name">{{ $this->getProfileFullName() ?: 'Your Profile' }}</h2>
+                                    @if ($this->getProfileLocationLabel())
+                                        <span class="profile-meta-item">
+                                            <x-heroicon-m-map-pin />
+                                            <span>{{ $this->getProfileLocationLabel() }}</span>
+                                        </span>
+                                    @endif
 
-                        <div class="profile-meta-row">
-                            @if ($this->getProfileSportLabel())
-                                <span class="profile-meta-item">
-                                    <x-heroicon-m-trophy />
-                                    <span>{{ $this->getProfileSportLabel() }}</span>
-                                </span>
-                            @endif
+                                    @if ($this->getProfileGraduationLabel())
+                                        <span class="profile-meta-item">
+                                            <x-heroicon-m-academic-cap />
+                                            <span>{{ $this->getProfileGraduationLabel() }}</span>
+                                        </span>
+                                    @endif
+                                </div>
 
-                            @if ($this->getProfileLocationLabel())
-                                <span class="profile-meta-item">
-                                    <x-heroicon-m-map-pin />
-                                    <span>{{ $this->getProfileLocationLabel() }}</span>
-                                </span>
-                            @endif
+                                <div class="profile-badge-row">
+                                    @if ($this->getNationalTeamBadgeLabel())
+                                        <span class="profile-pill">
+                                            <x-heroicon-m-flag />
+                                            <span>{{ $this->getNationalTeamBadgeLabel() }}</span>
+                                        </span>
+                                    @endif
 
-                            @if ($this->getProfileGraduationLabel())
-                                <span class="profile-meta-item">
-                                    <x-heroicon-m-academic-cap />
-                                    <span>{{ $this->getProfileGraduationLabel() }}</span>
-                                </span>
-                            @endif
+                                    @if ($this->getJerseyBadgeLabel())
+                                        <span class="profile-pill profile-pill--accent">
+                                            <span>{{ $this->getJerseyBadgeLabel() }}</span>
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="profile-badge-row">
-                            @if ($this->getNationalTeamBadgeLabel())
-                                <span class="profile-pill">
-                                    <x-heroicon-m-flag />
-                                    <span>{{ $this->getNationalTeamBadgeLabel() }}</span>
-                                </span>
+                        <div class="profile-overview-actions">
+                            @if ($this->getPreviewUrl())
+                                @if ($this->canOpenPreviewCard())
+                                    <a href="{{ $this->getPreviewUrl() }}" target="_blank" class="profile-action-btn profile-action-btn--ghost">
+                                        <x-heroicon-m-eye />
+                                        <span>Preview Card</span>
+                                    </a>
+                                @else
+                                    <button
+                                        type="button"
+                                        wire:click="handlePreviewCardClick"
+                                        class="profile-action-btn profile-action-btn--ghost"
+                                    >
+                                        <x-heroicon-m-eye />
+                                        <span>Preview Card</span>
+                                    </button>
+                                @endif
                             @endif
 
-                            @if ($this->getJerseyBadgeLabel())
-                                <span class="profile-pill profile-pill--accent">
-                                    <span>{{ $this->getJerseyBadgeLabel() }}</span>
-                                </span>
-                            @endif
+                            <button
+                                type="button"
+                                wire:click="save"
+                                class="profile-action-btn profile-action-btn--primary"
+                            >
+                                <x-heroicon-m-bookmark-square />
+                                <span>Save All</span>
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                <div class="profile-overview-actions">
-                    @if ($this->getPreviewUrl())
-                        <a href="{{ $this->getPreviewUrl() }}" target="_blank" class="profile-action-btn profile-action-btn--ghost">
-                            <x-heroicon-m-eye />
-                            <span>Preview Card</span>
-                        </a>
-                    @endif
-
-                    <button
-                        type="button"
-                        wire:click="save"
-                        class="profile-action-btn profile-action-btn--primary"
-                    >
-                        <x-heroicon-m-bookmark-square />
-                        <span>Save All</span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -755,9 +617,47 @@
                         Maybe Later
                     </button>
 
-                    <a href="{{ $this->getUpgradeUrl() }}" class="pc-lock-btn pc-lock-btn-primary">
-                        See Plans
-                    </a>
+                    @if ($this->getPlanInfo())
+                        <a href="{{ $this->getPlanInfo()->getUpgradeUrl() }}" class="pc-lock-btn pc-lock-btn-primary">
+                            See Plans
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($showPreviewAccessModal)
+        <div class="pc-lock-modal-backdrop" wire:click="closePreviewAccessModal"></div>
+
+        <div class="pc-lock-modal" aria-modal="true" role="dialog">
+            <div class="pc-lock-modal-card">
+                <div class="pc-lock-modal-icon">
+                    @if ($previewAccessModalType === 'complete_profile')
+                        <x-heroicon-m-clipboard-document-check />
+                    @else
+                        <x-heroicon-m-clock />
+                    @endif
+                </div>
+
+                <h2 class="pc-lock-modal-title">
+                    {!! $previewAccessModalTitle !!}
+                </h2>
+
+                <p class="pc-lock-modal-copy">
+                    {{ $previewAccessModalMessage }}
+                </p>
+
+                <div class="pc-lock-modal-actions">
+                    <button type="button" wire:click="closePreviewAccessModal" class="pc-lock-btn pc-lock-btn-secondary">
+                        Maybe Later
+                    </button>
+
+                    @if ($previewAccessModalActionUrl)
+                        <a href="{{ $previewAccessModalActionUrl }}" class="pc-lock-btn pc-lock-btn-primary">
+                            {{ $previewAccessModalActionLabel }}
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>

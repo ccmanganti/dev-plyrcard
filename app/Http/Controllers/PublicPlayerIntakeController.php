@@ -15,14 +15,15 @@ use App\Models\Website;
 use App\Models\WebsiteHeroFieldValue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -156,6 +157,16 @@ class PublicPlayerIntakeController extends Controller
 
     public function create(Request $request): View
     {
+        return $this->buildCreateView($request, 'public.player-intake');
+    }
+
+    public function createApp(Request $request): View
+    {
+        return $this->buildCreateView($request, 'public.player-intake-app');
+    }
+
+    protected function buildCreateView(Request $request, string $view): View
+    {
         $schools = School::query()->orderBy('name')->get();
         $leagues = League::query()->orderBy('name')->get();
         $clubs = Club::query()->with('league')->orderBy('name')->get();
@@ -263,7 +274,7 @@ class PublicPlayerIntakeController extends Controller
             'phone' => trim((string) $request->query('phone', '')),
         ];
 
-        return view('public.player-intake', [
+        return view($view, [
             'schools' => $schools,
             'nationalTeams' => $nationalTeams,
             'states' => $states,
@@ -403,7 +414,7 @@ class PublicPlayerIntakeController extends Controller
                 return $countryCode;
             }
         } catch (\Throwable $e) {
-            // Silent fail.
+            //
         }
 
         return '';
@@ -428,6 +439,16 @@ class PublicPlayerIntakeController extends Controller
     }
 
     public function store(Request $request): RedirectResponse
+    {
+        return $this->handleStore($request, false);
+    }
+
+    public function storeApp(Request $request): RedirectResponse
+    {
+        return $this->handleStore($request, true);
+    }
+
+    protected function handleStore(Request $request, bool $isAppFlow = false): RedirectResponse
     {
         $request->merge([
             'selected_plan' => $this->resolvePlanFromRequest($request),
@@ -483,6 +504,10 @@ class PublicPlayerIntakeController extends Controller
             'club_other' => ['nullable', 'string', 'max:255'],
             'team_other' => ['nullable', 'string', 'max:255'],
 
+            'league_name_manual' => ['nullable', 'string', 'max:255'],
+            'club_name_manual' => ['nullable', 'string', 'max:255'],
+            'team_name_manual' => ['nullable', 'string', 'max:255'],
+
             'natl_team_exp' => ['nullable', 'in:0,1'],
             'national_team_period' => ['nullable', 'string', 'max:255'],
             'national_team_id' => ['nullable', 'string'],
@@ -534,6 +559,25 @@ class PublicPlayerIntakeController extends Controller
         $validated = $validator->validate();
         $selectedPlan = $validated['selected_plan'] ?? 'Free';
 
+        if (($validated['league_id'] ?? null) === '__add_new__') {
+            $validated['league_id'] = '__other__';
+            $validated['club_id'] = '__other__';
+            $validated['team_id'] = '__other__';
+            $validated['league_other'] = trim((string) ($validated['league_name_manual'] ?? ''));
+            $validated['club_other'] = trim((string) ($validated['club_name_manual'] ?? ''));
+            $validated['team_other'] = trim((string) ($validated['team_name_manual'] ?? ''));
+        } else {
+            if (($validated['club_id'] ?? null) === '__add_new__') {
+                $validated['club_id'] = '__other__';
+                $validated['club_other'] = trim((string) ($validated['club_name_manual'] ?? ''));
+            }
+
+            if (($validated['team_id'] ?? null) === '__add_new__') {
+                $validated['team_id'] = '__other__';
+                $validated['team_other'] = trim((string) ($validated['team_name_manual'] ?? ''));
+            }
+        }
+
         $totalRawImages =
             count($request->file('action_images', [])) +
             count($request->file('portrait_images', [])) +
@@ -563,6 +607,11 @@ class PublicPlayerIntakeController extends Controller
 
         $allowedPositions = array_keys($this->sportPositions[$sport] ?? []);
         $submittedPositions = $validated['position'] ?? [];
+
+        if (count($submittedPositions) === 1 && is_string($submittedPositions[0]) && str_contains($submittedPositions[0], '|')) {
+            $submittedPositions = array_values(array_filter(explode('|', $submittedPositions[0])));
+            $validated['position'] = $submittedPositions;
+        }
 
         foreach ($submittedPositions as $position) {
             if (! in_array($position, $allowedPositions, true)) {
@@ -816,15 +865,40 @@ class PublicPlayerIntakeController extends Controller
                 ->withInput();
         }
 
+        $redirectRoute = $isAppFlow
+            ? 'public.player-intake-app.create'
+            : 'public.player-intake.create';
+
+        $autoLoginUrl = URL::temporarySignedRoute(
+            'public.player-intake-app.auto-login',
+            now()->addDays(7),
+            ['user' => $user->id]
+        );
+
         return redirect()
-            ->route('public.player-intake.create', ['utm_plan' => $selectedPlan])
+            ->route($redirectRoute, ['utm_plan' => $selectedPlan])
             ->with('success', true)
             ->with('ghl_result', $ghlResult)
+            ->with('auto_login_url', $autoLoginUrl)
             ->with('intake_submitted', [
                 'first_name' => $user->first_name,
                 'email' => $user->personal_email,
                 'selected_plan' => $selectedPlan,
             ]);
+    }
+
+    public function autoLogin(Request $request, User $user): RedirectResponse
+    {
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
+        // dd($request);
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        return redirect('/admin');
     }
 
     protected function validationMessages(): array
@@ -882,6 +956,9 @@ class PublicPlayerIntakeController extends Controller
             'league_other' => 'League Name',
             'club_other' => 'Club Name',
             'team_other' => 'Team Name',
+            'league_name_manual' => 'League Name',
+            'club_name_manual' => 'Club Name',
+            'team_name_manual' => 'Team Name',
             'natl_team_exp' => 'National Team Experience',
             'national_team_period' => 'National Team Period',
             'national_team_id' => 'National Team',
@@ -963,6 +1040,7 @@ class PublicPlayerIntakeController extends Controller
                 'school_id', 'school_other',
                 'league_id', 'club_id', 'team_id',
                 'league_other', 'club_other', 'team_other',
+                'league_name_manual', 'club_name_manual', 'team_name_manual',
                 'national_team_id', 'national_team_other',
             ],
             3 => [
@@ -1213,8 +1291,7 @@ class PublicPlayerIntakeController extends Controller
         ?Club $club = null,
         ?Team $team = null,
         ?NationalTeam $nationalTeam = null
-    ): array
-    {
+    ): array {
         $token = config('services.ghl.token');
         $locationId = config('services.ghl.location_id');
 
@@ -1280,7 +1357,7 @@ class PublicPlayerIntakeController extends Controller
                 : ($validated['country'] ?? $user->country ?? null),
             'tags' => array_values(array_filter([
                 'player-intake',
-                filled($sport) ? 'sport-' . \Illuminate\Support\Str::slug($sport) : null,
+                filled($sport) ? 'sport-' . Str::slug($sport) : null,
             ])),
             'customFields' => $customFields,
         ];
@@ -1468,7 +1545,7 @@ class PublicPlayerIntakeController extends Controller
                 ],
             ];
         } catch (\Throwable $e) {
-            \Log::error('GHL sync exception.', [
+            Log::error('GHL sync exception.', [
                 'user_id' => $user->id,
                 'email' => $email,
                 'message' => $e->getMessage(),
@@ -1594,178 +1671,5 @@ class PublicPlayerIntakeController extends Controller
         }
 
         return $paths;
-    }
-
-    public function createApp(Request $request): View
-    {
-        $schools = School::query()->orderBy('name')->get();
-        $leagues = League::query()->orderBy('name')->get();
-        $clubs = Club::query()->with('league')->orderBy('name')->get();
-        $teams = Team::query()->with(['club.league'])->orderBy('name')->get();
-        $nationalTeams = NationalTeam::query()->orderBy('name')->get();
-
-        $states = [
-            'AL' => 'Alabama',
-            'AK' => 'Alaska',
-            'AZ' => 'Arizona',
-            'AR' => 'Arkansas',
-            'CA' => 'California',
-            'CO' => 'Colorado',
-            'CT' => 'Connecticut',
-            'DE' => 'Delaware',
-            'FL' => 'Florida',
-            'GA' => 'Georgia',
-            'HI' => 'Hawaii',
-            'ID' => 'Idaho',
-            'IL' => 'Illinois',
-            'IN' => 'Indiana',
-            'IA' => 'Iowa',
-            'KS' => 'Kansas',
-            'KY' => 'Kentucky',
-            'LA' => 'Louisiana',
-            'ME' => 'Maine',
-            'MD' => 'Maryland',
-            'MA' => 'Massachusetts',
-            'MI' => 'Michigan',
-            'MN' => 'Minnesota',
-            'MS' => 'Mississippi',
-            'MO' => 'Missouri',
-            'MT' => 'Montana',
-            'NE' => 'Nebraska',
-            'NV' => 'Nevada',
-            'NH' => 'New Hampshire',
-            'NJ' => 'New Jersey',
-            'NM' => 'New Mexico',
-            'NY' => 'New York',
-            'NC' => 'North Carolina',
-            'ND' => 'North Dakota',
-            'OH' => 'Ohio',
-            'OK' => 'Oklahoma',
-            'OR' => 'Oregon',
-            'PA' => 'Pennsylvania',
-            'RI' => 'Rhode Island',
-            'SC' => 'South Carolina',
-            'SD' => 'South Dakota',
-            'TN' => 'Tennessee',
-            'TX' => 'Texas',
-            'UT' => 'Utah',
-            'VT' => 'Vermont',
-            'VA' => 'Virginia',
-            'WA' => 'Washington',
-            'WV' => 'West Virginia',
-            'WI' => 'Wisconsin',
-            'WY' => 'Wyoming',
-            'DC' => 'District of Columbia',
-        ];
-
-        $countryOptions = [
-            'USA' => 'United States',
-            'Austria' => 'Austria',
-            'Belgium' => 'Belgium',
-            'Bulgaria' => 'Bulgaria',
-            'Croatia' => 'Croatia',
-            'Cyprus' => 'Cyprus',
-            'Czech Republic' => 'Czech Republic',
-            'Denmark' => 'Denmark',
-            'Estonia' => 'Estonia',
-            'Finland' => 'Finland',
-            'France' => 'France',
-            'Germany' => 'Germany',
-            'Greece' => 'Greece',
-            'Hungary' => 'Hungary',
-            'Iceland' => 'Iceland',
-            'Ireland' => 'Ireland',
-            'Italy' => 'Italy',
-            'Latvia' => 'Latvia',
-            'Lithuania' => 'Lithuania',
-            'Luxembourg' => 'Luxembourg',
-            'Malta' => 'Malta',
-            'Netherlands' => 'Netherlands',
-            'Norway' => 'Norway',
-            'Poland' => 'Poland',
-            'Portugal' => 'Portugal',
-            'Romania' => 'Romania',
-            'Slovakia' => 'Slovakia',
-            'Slovenia' => 'Slovenia',
-            'Spain' => 'Spain',
-            'Sweden' => 'Sweden',
-            'Switzerland' => 'Switzerland',
-            'United Kingdom' => 'United Kingdom',
-            '__other__' => 'Other',
-        ];
-
-        $detectedCountry = $this->detectCountryCode($request);
-        $resolvedPlan = $this->resolvePlanFromRequest($request);
-
-        $prefill = [
-            'first_name' => trim((string) $request->query('first_name', '')),
-            'middle_name' => trim((string) $request->query('middle_name', '')),
-            'last_name' => trim((string) $request->query('last_name', '')),
-            'personal_email' => trim((string) $request->query('personal_email', '')),
-            'phone' => trim((string) $request->query('phone', '')),
-        ];
-
-        return view('public.player-intake-app', [
-            'schools' => $schools,
-            'nationalTeams' => $nationalTeams,
-            'states' => $states,
-            'countryOptions' => $countryOptions,
-            'sportPositions' => $this->sportPositions,
-            'genderOptions' => $this->genderOptions,
-            'detectedCountry' => $detectedCountry,
-            'packageLabel' => $resolvedPlan,
-            'selectedPlan' => $resolvedPlan,
-            'prefill' => $prefill,
-            'stepFieldMap' => $this->stepFieldMap(),
-
-            'leagueDirectory' => $leagues->map(function (League $league) {
-                $gender = filled($league->gender) ? strtolower((string) $league->gender) : null;
-                $sport = filled($league->sport) ? strtolower((string) $league->sport) : null;
-
-                return [
-                    'id' => (string) $league->id,
-                    'name' => $league->name,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
-                    'sport' => $sport,
-                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
-                ];
-            })->values(),
-
-            'clubDirectory' => $clubs->map(function (Club $club) {
-                $gender = filled($club->league?->gender) ? strtolower((string) $club->league->gender) : null;
-                $sport = filled($club->league?->sport) ? strtolower((string) $club->league->sport) : null;
-
-                return [
-                    'id' => (string) $club->id,
-                    'name' => $club->name,
-                    'league_id' => (string) $club->league_id,
-                    'league_name' => $club->league?->name,
-                    'logo_url' => filled($club->logo) ? Storage::disk('public')->url($club->logo) : null,
-                    'sport' => $sport,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
-                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
-                ];
-            })->values(),
-
-            'teamDirectory' => $teams->map(function (Team $team) {
-                $gender = filled($team->club?->league?->gender) ? strtolower((string) $team->club->league->gender) : null;
-                $sport = filled($team->club?->league?->sport) ? strtolower((string) $team->club->league->sport) : null;
-
-                return [
-                    'id' => (string) $team->id,
-                    'name' => $team->name,
-                    'club_id' => (string) $team->club_id,
-                    'club_name' => $team->club?->name,
-                    'league_name' => $team->club?->league?->name,
-                    'club_logo_url' => filled($team->club?->logo) ? Storage::disk('public')->url($team->club->logo) : null,
-                    'sport' => $sport,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
-                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
-                ];
-            })->values(),
-        ]);
     }
 }

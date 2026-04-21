@@ -24,8 +24,8 @@
             --muted: #7f8896;
             --text: #f7f8fa;
             --border: rgba(255,255,255,.08);
-            --orange: #ff643d;
-            --orange-2: #ff7c58;
+            --orange: #ff6347;
+            --orange-2: #ff6347;
             --blue: #19a7ff;
             --green: #19cf7a;
             color: var(--text);

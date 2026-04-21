@@ -13,9 +13,9 @@ use App\Models\SiteTemplate;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Website;
+use App\Support\ProfilePlanInfo;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -23,20 +23,18 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
-use App\Filament\Pages\MyJourney;
-use Illuminate\Support\Carbon;
 
 class EditProfile extends Page implements HasForms
 {
@@ -58,6 +56,19 @@ class EditProfile extends Page implements HasForms
 
     public string $lockedFeatureMessage = 'This feature is available on Plyr and My Journey. Upgrade now to take your PLYRCard to the next level.';
 
+    public bool $showPreviewAccessModal = false;
+
+    public string $previewAccessModalType = 'complete_profile';
+
+    public string $previewAccessModalTitle = 'COMPLETE <span>YOUR PROFILE</span>';
+
+    public string $previewAccessModalMessage = 'Complete at least 75% of your profile before previewing your card.';
+
+    public ?string $previewAccessModalActionUrl = null;
+
+    public string $previewAccessModalActionLabel = 'Complete Profile';
+
+    protected ?ProfilePlanInfo $planInfoCache = null;
 
     public function mount(): void
     {
@@ -81,13 +92,11 @@ class EditProfile extends Page implements HasForms
         $this->form->fill([
             ...$this->user->toArray(),
             'team_id' => $teamId,
-
             'website_name' => $this->website?->name,
             'site_template_id' => $this->website?->site_template_id,
             'hero_template_id' => $this->website?->hero_template_id,
             'website_is_active' => $this->website?->is_active ?? true,
             'website_is_published' => $this->website?->is_published ?? false,
-
             'primary_color' => $this->website?->primary_color,
             'secondary_color' => $this->website?->secondary_color,
             'accent_color' => $this->website?->accent_color,
@@ -98,7 +107,15 @@ class EditProfile extends Page implements HasForms
         ]);
     }
 
-    
+    public function getPlanInfo(): ?ProfilePlanInfo
+    {
+        if (! $this->user) {
+            return null;
+        }
+
+        return $this->planInfoCache ??= ProfilePlanInfo::for($this->user);
+    }
+
     protected static function getSchoolOptions(): array
     {
         return ['__new__' => 'Add New'] + School::query()
@@ -350,55 +367,54 @@ class EditProfile extends Page implements HasForms
     }
 
     protected static function getClubOptions(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
-{
-    $query = Club::query();
+    {
+        $query = Club::query();
 
-    if (filled($leagueId)) {
-        $query->where('league_id', $leagueId);
-    } else {
-        // No league selected yet = do not query all clubs blindly.
-        return [];
+        if (filled($leagueId)) {
+            $query->where('league_id', $leagueId);
+        } else {
+            return [];
+        }
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'logo'])
+            ->mapWithKeys(function (Club $club) {
+                return [
+                    (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
+                ];
+            })
+            ->all();
     }
 
-    $query->when(
-        filled($search),
-        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-    );
+    protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
+    {
+        $query = Club::query();
 
-    return $query
-        ->orderBy('name')
-        ->limit(50)
-        ->get(['id', 'name', 'logo'])
-        ->mapWithKeys(function (Club $club) {
-            return [
-                (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
-            ];
-        })
-        ->all();
-}
+        if (filled($leagueId)) {
+            $query->where('league_id', $leagueId);
+        } else {
+            return [];
+        }
 
-protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
-{
-    $query = Club::query();
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
 
-    if (filled($leagueId)) {
-        $query->where('league_id', $leagueId);
-    } else {
-        return [];
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
     }
-
-    $query->when(
-        filled($search),
-        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-    );
-
-    return $query
-        ->orderBy('name')
-        ->limit(50)
-        ->pluck('name', 'id')
-        ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-        ->all();
-}
 
     protected static function getSingleClubOptionLabel(?string $clubId): ?string
     {
@@ -416,26 +432,26 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
     }
 
     protected static function getTeamOptions(?string $clubId, ?string $gender, ?string $sport, ?string $search = null): array
-{
-    if (blank($clubId)) {
-        return [];
+    {
+        if (blank($clubId)) {
+            return [];
+        }
+
+        $query = Team::query()
+            ->where('club_id', $clubId);
+
+        $query->when(
+            filled($search),
+            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
+        );
+
+        return $query
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
     }
-
-    $query = Team::query()
-        ->where('club_id', $clubId);
-
-    $query->when(
-        filled($search),
-        fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-    );
-
-    return $query
-        ->orderBy('name')
-        ->limit(50)
-        ->pluck('name', 'id')
-        ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-        ->all();
-}
 
     protected function mutateProfileData(array $data): array
     {
@@ -451,14 +467,10 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
 
         $data = UserResource::mutateUserFormData($data);
 
-        unset(
-            $data['new_school_name']
-        );
+        unset($data['new_school_name']);
 
         return $data;
     }
-
-    
 
     public function form(Schema $schema): Schema
     {
@@ -764,70 +776,70 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             }),
 
                                         Select::make('team_id')
-                                        ->prefixIcon('heroicon-m-users')
-                                        ->label('Team')
-                                        ->placeholder(fn (Get $get) => blank($get('club_id'))
-                                            ? 'Select club first'
-                                            : 'Search team')
-                                        ->searchable()
-                                        ->live()
-                                        ->preload(false)
-                                        ->options(fn (Get $get): array => static::getTeamOptions(
-                                            $get('club_id'),
-                                            $get('gender'),
-                                            $get('sport'),
-                                        ))
-                                        ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
-                                            $get('club_id'),
-                                            $get('gender'),
-                                            $get('sport'),
-                                            $search,
-                                        ))
-                                        ->getOptionLabelUsing(function ($value): ?string {
-                                            if (blank($value)) {
-                                                return null;
-                                            }
-
-                                            return Team::query()->whereKey($value)->value('name');
-                                        })
-                                        ->disabled(fn (Get $get): bool => blank($get('club_id')))
-                                        ->helperText('Filtered by the selected club.')
-                                        ->afterStateHydrated(function ($state, Set $set, Get $get) {
-                                            if (blank($state)) {
-                                                return;
-                                            }
-
-                                            $team = Team::query()->find($state);
-
-                                            if (! $team) {
-                                                $set('team_id', null);
-
-                                                return;
-                                            }
-
-                                            if (blank($get('club_id'))) {
-                                                $set('club_id', $team->club_id);
-                                            }
-                                        })
-                                        ->rule(function (Get $get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            ->prefixIcon('heroicon-m-users')
+                                            ->label('Team')
+                                            ->placeholder(fn (Get $get) => blank($get('club_id'))
+                                                ? 'Select club first'
+                                                : 'Search team')
+                                            ->searchable()
+                                            ->live()
+                                            ->preload(false)
+                                            ->options(fn (Get $get): array => static::getTeamOptions(
+                                                $get('club_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ))
+                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
+                                                $get('club_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                                $search,
+                                            ))
+                                            ->getOptionLabelUsing(function ($value): ?string {
                                                 if (blank($value)) {
+                                                    return null;
+                                                }
+
+                                                return Team::query()->whereKey($value)->value('name');
+                                            })
+                                            ->disabled(fn (Get $get): bool => blank($get('club_id')))
+                                            ->helperText('Filtered by the selected club.')
+                                            ->afterStateHydrated(function ($state, Set $set, Get $get) {
+                                                if (blank($state)) {
                                                     return;
                                                 }
 
-                                                $exists = Team::query()
-                                                    ->whereKey($value)
-                                                    ->when(
-                                                        filled($get('club_id')),
-                                                        fn ($query) => $query->where('club_id', $get('club_id'))
-                                                    )
-                                                    ->exists();
+                                                $team = Team::query()->find($state);
 
-                                                if (! $exists) {
-                                                    $fail('The selected team is invalid.');
+                                                if (! $team) {
+                                                    $set('team_id', null);
+
+                                                    return;
                                                 }
-                                            };
-                                        }),
+
+                                                if (blank($get('club_id'))) {
+                                                    $set('club_id', $team->club_id);
+                                                }
+                                            })
+                                            ->rule(function (Get $get) {
+                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    if (blank($value)) {
+                                                        return;
+                                                    }
+
+                                                    $exists = Team::query()
+                                                        ->whereKey($value)
+                                                        ->when(
+                                                            filled($get('club_id')),
+                                                            fn ($query) => $query->where('club_id', $get('club_id'))
+                                                        )
+                                                        ->exists();
+
+                                                    if (! $exists) {
+                                                        $fail('The selected team is invalid.');
+                                                    }
+                                                };
+                                            }),
 
                                         Select::make('national_team_id')
                                             ->prefixIcon('heroicon-m-flag')
@@ -962,15 +974,15 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                     ]),
 
                                 Section::make('YouTube Highlights')
-                                    ->icon($this->hasPremiumAccess() ? 'heroicon-m-play-circle' : 'heroicon-m-lock-closed')
+                                    ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-play-circle' : 'heroicon-m-lock-closed')
                                     ->description(
-                                        $this->hasPremiumAccess()
+                                        ($this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ? 'Embed your game highlights, recruiting videos, and performance reels directly on your PLYRCard.'
                                             : 'Locked on Free. Upgrade to Plyr or My Journey to unlock this feature.'
                                     )
                                     ->schema([
                                         Placeholder::make('youtube_lock_overlay')
-                                            ->hidden(fn () => $this->hasPremiumAccess())
+                                            ->hidden(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ->content(new HtmlString('
                                                 <div class="pc-inline-lock">
                                                     <div class="pc-inline-lock__icon">
@@ -987,21 +999,21 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ')),
 
                                         TextInput::make('featured_video_url')
-                                            ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
+                                            ->prefixIcon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
                                             ->label('Featured Video URL')
                                             ->placeholder('https://youtube.com/watch?v=...')
                                             ->url()
-                                            ->disabled(fn () => ! $this->hasPremiumAccess())
-                                            ->dehydrated(fn () => $this->hasPremiumAccess())
+                                            ->disabled(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false))
+                                            ->dehydrated(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ->columnSpanFull(),
 
                                         Textarea::make('featured_video_urls')
                                             ->label('Featured Video URLs')
                                             ->placeholder("https://youtube.com/watch?v=...\nhttps://youtube.com/watch?v=...")
                                             ->rows(5)
-                                            ->disabled(fn () => ! $this->hasPremiumAccess())
-                                            ->dehydrated(fn () => $this->hasPremiumAccess())
-                                            ->helperText(fn () => ! $this->hasPremiumAccess()
+                                            ->disabled(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false))
+                                            ->dehydrated(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false)
+                                            ->helperText(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                                 ? 'This section is locked on Free.'
                                                 : 'Enter one video URL per line.')
                                             ->columnSpanFull(),
@@ -1009,19 +1021,19 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                             ]),
 
                         Tab::make('Social')
-                            ->icon($this->hasPremiumAccess() ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
+                            ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
                             ->schema([
                                 Section::make('Social Profiles')
-                                    ->icon($this->hasPremiumAccess() ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
+                                    ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
                                     ->description(
-                                        $this->hasPremiumAccess()
+                                        ($this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ? 'Add your social links and YouTube channel to your PLYRCard.'
                                             : 'Locked on Free. Upgrade to Plyr or My Journey to unlock this feature.'
                                     )
                                     ->columns(2)
                                     ->schema([
                                         Placeholder::make('social_lock_overlay')
-                                            ->hidden(fn () => $this->hasPremiumAccess())
+                                            ->hidden(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ->columnSpanFull()
                                             ->content(new HtmlString('
                                                 <div class="pc-inline-lock">
@@ -1040,29 +1052,29 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
 
                                         TextInput::make('ig_handle')
                                             ->label('Instagram Handle')
-                                            ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-camera' : 'heroicon-m-lock-closed')
+                                            ->prefixIcon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-camera' : 'heroicon-m-lock-closed')
                                             ->prefix('@')
                                             ->placeholder('yourhandle')
                                             ->maxLength(255)
-                                            ->disabled(fn () => ! $this->hasPremiumAccess())
-                                            ->dehydrated(fn () => $this->hasPremiumAccess()),
+                                            ->disabled(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false))
+                                            ->dehydrated(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false),
 
                                         TextInput::make('x_handle')
                                             ->label('X Handle')
-                                            ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-chat-bubble-left-right' : 'heroicon-m-lock-closed')
+                                            ->prefixIcon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-chat-bubble-left-right' : 'heroicon-m-lock-closed')
                                             ->prefix('@')
                                             ->placeholder('yourhandle')
                                             ->maxLength(255)
-                                            ->disabled(fn () => ! $this->hasPremiumAccess())
-                                            ->dehydrated(fn () => $this->hasPremiumAccess()),
+                                            ->disabled(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false))
+                                            ->dehydrated(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false),
 
                                         TextInput::make('yt_url')
                                             ->label('YouTube URL')
-                                            ->prefixIcon($this->hasPremiumAccess() ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
+                                            ->prefixIcon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-link' : 'heroicon-m-lock-closed')
                                             ->placeholder('https://youtube.com/@yourchannel')
                                             ->url()
-                                            ->disabled(fn () => ! $this->hasPremiumAccess())
-                                            ->dehydrated(fn () => $this->hasPremiumAccess())
+                                            ->disabled(fn () => ! ($this->getPlanInfo()?->hasPremiumAccess() ?? false))
+                                            ->dehydrated(fn () => $this->getPlanInfo()?->hasPremiumAccess() ?? false)
                                             ->columnSpanFull(),
                                     ]),
                             ]),
@@ -1220,11 +1232,13 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
                                             ->helperText('Enter without https://')
                                             ->placeholder('yourdomain.com')
                                             ->columnSpan(2)
+                                            ->disabled()
                                             ->maxLength(255)
                                             ->nullable(),
 
                                         Toggle::make('website_is_published')
                                             ->label('Website Published')
+                                            ->disabled()
                                             ->default(false),
                                     ]),
                             ]),
@@ -1252,7 +1266,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
             unset($userData[$key]);
         }
 
-        if (! $this->hasPremiumAccess()) {
+        if (! ($this->getPlanInfo()?->hasPremiumAccess() ?? false)) {
             unset(
                 $userData['ig_handle'],
                 $userData['x_handle'],
@@ -1274,6 +1288,7 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
         }
 
         $this->user->refresh()->loadMissing('roles', 'nationalTeam');
+        $this->planInfoCache = null;
 
         Notification::make()
             ->title('Profile saved successfully.')
@@ -1290,167 +1305,102 @@ protected static function getClubSearchLabels(?string $leagueId, ?string $gender
 
     public function getTitle(): string
     {
-        return 'My Profile';
+        return '';
     }
 
-public function isFreeTrialActive(): bool
-{
-    if (! $this->user || ! method_exists($this->user, 'hasRole')) {
-        return false;
+    public function getProfileProgressPercentage(): int
+    {
+        if (! $this->user) {
+            return 0;
+        }
+
+        $checks = [
+            filled($this->user->first_name),
+            filled($this->user->last_name),
+            filled($this->user->email),
+            filled($this->user->personal_email),
+            filled($this->user->phone),
+            filled($this->user->sport),
+            filled($this->user->position),
+            filled($this->user->gender),
+            filled($this->user->year),
+            filled($this->user->birth),
+            filled($this->user->school_id),
+            filled($this->user->height),
+            filled($this->user->weight),
+            filled($this->user->player_bio),
+            filled($this->user->city),
+            filled($this->user->state),
+            filled($this->user->country),
+            filled($this->user->player_image) || filled($this->user->plyrcard_image),
+            filled($this->user->league_id),
+            filled($this->user->club_id),
+            filled($this->user->team_id ?? $this->user->team_name),
+        ];
+
+        $total = count($checks);
+        $completed = collect($checks)->filter()->count();
+
+        return (int) round(($completed / max($total, 1)) * 100);
     }
 
-    if (! $this->user->hasRole('Free')) {
-        return false;
+    public function isWebsitePublished(): bool
+    {
+        if ($this->website) {
+            return (bool) $this->website->is_published;
+        }
+
+        return (bool) data_get($this->data, 'website_is_published', false);
     }
 
-    if (! $this->user->created_at) {
-        return false;
+    public function canOpenPreviewCard(): bool
+    {
+        return $this->getProfileProgressPercentage() >= 75
+            && $this->isWebsitePublished()
+            && filled($this->getPreviewUrl());
     }
 
-    return $this->user->created_at->copy()->addDays(7)->isFuture();
-}
+    public function handlePreviewCardClick(): void
+    {
+        if ($this->canOpenPreviewCard()) {
+            return;
+        }
 
-public function getFreeTrialEndsAt(): ?Carbon
-{
-    if (! $this->user?->created_at) {
-        return null;
+        $progress = $this->getProfileProgressPercentage();
+        $published = $this->isWebsitePublished();
+
+        if ($progress < 75 && ! $published) {
+            $this->previewAccessModalType = 'complete_profile';
+            $this->previewAccessModalTitle = 'COMPLETE <span>YOUR PROFILE</span>';
+            $this->previewAccessModalMessage = 'Your profile is currently ' . $progress . '% complete. Complete at least 75% of your profile before previewing your card.';
+            $this->previewAccessModalActionUrl = url('/admin/profile');
+            $this->previewAccessModalActionLabel = 'Complete Profile';
+            $this->showPreviewAccessModal = true;
+
+            return;
+        }
+
+        if ($progress >= 75 && ! $published) {
+            $this->previewAccessModalType = 'under_review';
+            $this->previewAccessModalTitle = 'SITE <span>UNDER REVIEW</span>';
+            $this->previewAccessModalMessage = 'Your profile is complete enough for launch, and your website is currently under review. We\'ll make it available once it has been approved and published.';
+            $this->previewAccessModalActionUrl = url('/admin/profile');
+            $this->previewAccessModalActionLabel = 'Back to Profile';
+            $this->showPreviewAccessModal = true;
+
+            return;
+        }
+
+        if ($progress < 75) {
+            $this->previewAccessModalType = 'complete_profile';
+            $this->previewAccessModalTitle = 'COMPLETE <span>YOUR PROFILE</span>';
+            $this->previewAccessModalMessage = 'Your profile is currently ' . $progress . '% complete. Complete at least 75% of your profile before previewing your card.';
+            $this->previewAccessModalActionUrl = url('/profile');
+            $this->previewAccessModalActionLabel = 'Complete Profile';
+            $this->showPreviewAccessModal = true;
+        }
     }
 
-    return $this->user->created_at->copy()->addDays(7);
-}
-
-public function getFreeTrialDaysLeft(): int
-{
-    if (! $this->isFreeTrialActive()) {
-        return 0;
-    }
-
-    $endsAt = $this->getFreeTrialEndsAt();
-
-    if (! $endsAt) {
-        return 0;
-    }
-
-    return max(1, now()->startOfDay()->diffInDays($endsAt->copy()->startOfDay(), false));
-}
-
-public function getFreeTrialLabel(): ?string
-{
-    if (! $this->isFreeTrialActive()) {
-        return null;
-    }
-
-    $daysLeft = $this->getFreeTrialDaysLeft();
-
-    return $daysLeft === 1
-        ? '1 day left in free trial'
-        : "{$daysLeft} days left in free trial";
-}
-
-public function hasPremiumAccess(): bool
-{
-    return $this->isFreeTrialActive()
-        || in_array($this->getCurrentPlanKey(), ['plyr', 'my_journey'], true);
-}
-
-public function getCurrentPlanKey(): string
-{
-    if (! $this->user || ! method_exists($this->user, 'hasRole')) {
-        return 'free';
-    }
-
-    if ($this->user->hasRole('My Journey')) {
-        return 'my_journey';
-    }
-
-    if ($this->user->hasRole('Plyr')) {
-        return 'plyr';
-    }
-
-    return 'free';
-}
-
-public function getPlanName(): string
-{
-    if ($this->isFreeTrialActive()) {
-        return 'FREE TRIAL';
-    }
-
-    return match ($this->getCurrentPlanKey()) {
-        'my_journey' => 'MY JOURNEY',
-        'plyr' => 'PLYR',
-        default => 'FREE',
-    };
-}
-
-public function getPlanHeadline(): string
-{
-    if ($this->isFreeTrialActive()) {
-        return "YOU'RE ON FREE TRIAL";
-    }
-
-    return match ($this->getCurrentPlanKey()) {
-        'my_journey' => "YOU'RE ON MY JOURNEY",
-        'plyr' => "YOU'RE ON PLYR",
-        default => "YOU'RE ON FREE",
-    };
-}
-
-public function getPlanDescription(): string
-{
-    if ($this->isFreeTrialActive()) {
-        return 'Your free trial is active. You currently have access to all tabs and premium features during the 7-day trial window.';
-    }
-
-    return match ($this->getCurrentPlanKey()) {
-        'my_journey' => 'Everything is unlocked on My Journey. Your PLYRCard is fully equipped for the next level.',
-        'plyr' => 'Your Social links and YouTube features are unlocked. Move to My Journey for the most premium experience.',
-        default => 'Upgrade to unlock Social links, YouTube Highlights, Featured Videos, and more premium tools.',
-    };
-}
-
-public function canUpgradePlan(): bool
-{
-    return $this->getCurrentPlanKey() !== 'my_journey';
-}
-
-public function getUpgradeButtonLabel(): string
-{
-    if ($this->isFreeTrialActive()) {
-        return 'Choose a Plan';
-    }
-
-    return match ($this->getCurrentPlanKey()) {
-        'plyr' => 'Go to My Journey',
-        default => 'Upgrade Now',
-    };
-}
-
-public function getUpgradeUrl(): string
-{
-    return MyJourney::getUrl();
-}
-
-public function shouldShowBookDemoButton(): bool
-{
-    return $this->getCurrentPlanKey() !== 'my_journey';
-}
-
-public function getBookDemoUrl(): string
-{
-    return url('/demo');
-}
-
-public function getPlanTheme(): string
-{
-    if ($this->isFreeTrialActive()) {
-        return 'warning';
-    }
-
-    return $this->getCurrentPlanKey() === 'my_journey'
-        ? 'success'
-        : 'warning';
-}
     public function getProfileInitials(): string
     {
         $first = strtoupper(substr((string) ($this->user?->first_name ?? ''), 0, 1));
@@ -1550,7 +1500,6 @@ public function getPlanTheme(): string
         $domain = trim((string) ($this->user->domain ?? ''));
 
         if (blank($domain)) {
-            // 👇 fallback instead of null
             return $slugUrl;
         }
 
@@ -1571,5 +1520,10 @@ public function getPlanTheme(): string
     public function closeLockedFeatureModal(): void
     {
         $this->showLockedFeatureModal = false;
+    }
+
+    public function closePreviewAccessModal(): void
+    {
+        $this->showPreviewAccessModal = false;
     }
 }

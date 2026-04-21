@@ -49,7 +49,8 @@ class ForcePasswordChange extends Page
             ->success()
             ->send();
 
-        $this->redirect(filament()->getUrl(), navigate: true);
+        // Force a real page reload so onboarding hook runs reliably.
+        $this->redirect(filament()->getUrl(), navigate: false);
     }
 
     public function getTitle(): string | Htmlable

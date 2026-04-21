@@ -10,7 +10,7 @@
 
     <style>
         :root{
-            --pc-orange:#e77659;
+            --pc-orange:#ff6347;
             --pc-white:#f2f1ec;
             --pc-black:#111111;
             --pc-blue:#1f84d8;
@@ -20,11 +20,42 @@
         }
 
         *{box-sizing:border-box}
-        html,body{height:100%;margin:0;padding:0}
+        html,body{margin:0;padding:0}
         body{
             min-height:100vh;
             background:#e8e8e8;
             font-family:"Antonio", system-ui, sans-serif;
+        }
+
+        html{
+            scrollbar-width:thin;
+            scrollbar-color:rgba(17,17,17,.38) rgba(242,241,236,.2);
+        }
+
+        body::-webkit-scrollbar,
+        .search-select-list::-webkit-scrollbar{
+            width:10px;
+            height:10px;
+        }
+
+        body::-webkit-scrollbar-track,
+        .search-select-list::-webkit-scrollbar-track{
+            background:rgba(242,241,236,.18);
+            border-radius:999px;
+        }
+
+        body::-webkit-scrollbar-thumb,
+        .search-select-list::-webkit-scrollbar-thumb{
+            background:rgba(17,17,17,.38);
+            border-radius:999px;
+            border:2px solid transparent;
+            background-clip:padding-box;
+        }
+
+        body::-webkit-scrollbar-thumb:hover,
+        .search-select-list::-webkit-scrollbar-thumb:hover{
+            background:rgba(17,17,17,.54);
+            background-clip:padding-box;
         }
 
         .page{
@@ -38,11 +69,10 @@
         .app{
             width:100%;
             max-width:var(--pc-app-width);
-            height:100vh;
-            max-height:100vh;
+            min-height:100vh;
             background:var(--pc-orange);
             position:relative;
-            overflow:hidden;
+            overflow:visible;
             box-shadow:0 18px 50px rgba(0,0,0,.14);
         }
 
@@ -68,40 +98,26 @@
 
         .screen{
             position:relative;
-            height:100%;
+            min-height:100vh;
             background:var(--pc-orange);
             z-index:1;
         }
 
-        .logo-main{
-            width:98px;
-            display:block;
-            margin:0 auto;
-            opacity:.92;
-        }
+        .logo-main{width:98px;display:block;margin:0 auto;opacity:.92}
 
-        .hero-screen,
-        .thanks-screen{
+        .hero-screen{
             padding:34px 28px calc(28px + env(safe-area-inset-bottom));
             display:flex;
             flex-direction:column;
             color:#fff;
-            height:100%;
-            overflow-y:auto;
+            min-height:100vh;
         }
 
-        .hero-logo-wrap{
-            text-align:center;
-            padding-top:104px;
-        }
-
-        .hero-copy{
-            margin-top:auto;
-        }
+        .hero-logo-wrap{text-align:center;padding-top:104px}
+        .hero-copy{margin-top:auto}
 
         .hero-title,
-        .final-title,
-        .thanks-title{
+        .final-title{
             margin:0 0 16px;
             font-size:56px;
             line-height:.9;
@@ -112,30 +128,13 @@
         }
 
         .hero-text,
-        .final-text,
-        .thanks-text{
+        .final-text{
             margin:0 0 18px;
             font-size:14px;
             line-height:1.22;
             color:#fff;
             opacity:.96;
             max-width:310px;
-        }
-
-        .thanks-text{
-            max-width:332px;
-        }
-
-        .thanks-email{
-            margin:0 0 18px;
-            font-size:12px;
-            line-height:1.25;
-            color:#fff;
-            opacity:.90;
-            max-width:320px;
-            word-break:break-word;
-            text-transform:uppercase;
-            letter-spacing:.03em;
         }
 
         .btn{
@@ -159,6 +158,8 @@
         .btn:hover{transform:translateY(-1px)}
         .btn:active{transform:translateY(0)}
         .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+        .btn-link{display:block;text-decoration:none}
+        .bottom-cta{margin-top:10px}
 
         .topbar{
             height:var(--topbar-h);
@@ -219,7 +220,7 @@
             color:#fff;
             display:flex;
             flex-direction:column;
-            height:100%;
+            min-height:100vh;
         }
 
         .step-panel,
@@ -228,10 +229,22 @@
             position:relative;
             flex:1 1 auto;
             min-height:0;
-            padding:18px 22px calc(86px + env(safe-area-inset-bottom));
-            overflow-y:auto;
-            overflow-x:hidden;
+            padding:18px 22px calc(18px + env(safe-area-inset-bottom));
+            overflow:visible;
             animation:fadeSlide .22s ease;
+        }
+
+        .panel-scroll{
+            height:auto;
+            overflow:visible;
+            padding-bottom:8px;
+        }
+
+        .panel-scroll.with-sticky-cta{
+            height:auto;
+            min-height:0;
+            padding-bottom:120px;
+            overflow:visible;
         }
 
         .step-panel.active,
@@ -273,7 +286,6 @@
         .search-select-control:focus{box-shadow:0 0 0 2px rgba(255,255,255,.22)}
 
         .watermark,
-        .thanks-watermark,
         .final-logo{
             position:absolute;
             pointer-events:none;
@@ -287,14 +299,7 @@
             width:192px;
         }
 
-        .thanks-watermark{
-            right:-8px;
-            top:148px;
-            width:192px;
-            opacity:.24;
-        }
-
-        .gender-list{display:flex;flex-direction:column;gap:10px;padding-left:1px}
+        .gender-list{display:flex;flex-direction:row;gap:10px;padding-left:1px}
         .gender-item{display:flex;align-items:center;gap:12px;color:#fff;font-size:15px;line-height:1}
         .gender-item input{width:16px;height:16px;accent-color:#111;transform:scale(1.65);margin:0}
 
@@ -363,11 +368,15 @@
         .sample-copy{margin:0 0 16px;font-size:13px;line-height:1.18;color:#fff;opacity:.95}
 
         .step-cta{
-            position:absolute;
-            left:22px;
-            right:22px;
-            bottom:calc(20px + env(safe-area-inset-bottom));
+            position:sticky;
+            left:0;
+            right:0;
+            bottom:0;
             z-index:4;
+            margin-top:18px;
+            padding-top:14px;
+            padding-bottom:calc(2px + env(safe-area-inset-bottom));
+            background:linear-gradient(to bottom, rgba(231,118,89,0), rgba(231,118,89,.92) 34%, rgba(231,118,89,1) 100%);
         }
 
         .final-screen{padding-top:14px}
@@ -375,55 +384,41 @@
         .final-text{max-width:336px;font-size:16px;line-height:1.18;margin-top:18px}
         .final-logo{right:16px;bottom:146px;width:170px}
 
-        .thanks-kicker{
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            min-height:30px;
-            padding:6px 14px;
-            margin:0 0 18px;
-            border-radius:999px;
-            background:rgba(255,255,255,.16);
-            border:1px solid rgba(255,255,255,.22);
-            color:#fff;
-            font-size:12px;
-            line-height:1;
-            letter-spacing:.08em;
-            text-transform:uppercase;
-            font-weight:700;
-            width:max-content;
-            max-width:100%;
-        }
-
-        .thanks-actions{
-            display:flex;
-            flex-direction:column;
-            gap:12px;
-            margin-top:18px;
-        }
-
         .field-message,
-        .file-warning-list{display:none;margin-top:8px;font-size:11px;line-height:1.3;color:#fff2f2}
-        .field.is-invalid .input,.field.is-invalid .select,.field.is-invalid .search-select-control,.field.is-invalid .manual-input,.field.is-invalid .file-input{box-shadow:0 0 0 2px rgba(120,0,0,.30);}
+        .file-warning-list{
+            display:none;
+            margin-top:8px;
+            font-size:11px;
+            line-height:1.3;
+            color:#fff2f2;
+        }
+
+        .field.is-invalid .input,
+        .field.is-invalid .select,
+        .field.is-invalid .search-select-control,
+        .field.is-invalid .manual-input,
+        .field.is-invalid .file-input{
+            box-shadow:0 0 0 2px rgba(120,0,0,.30);
+        }
+
         .field-message.error,
-        .file-warning-list.visible{display:block}
-        .global-errors{position:absolute;top:10px;left:10px;right:10px;z-index:100;background:rgba(120,0,0,.22);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;color:#fff4f4;font-size:12px;line-height:1.35}
-        .global-errors ul{margin:8px 0 0 16px}
+        .file-warning-list.visible{
+            display:block;
+        }
 
         @media (max-width: 400px){
-            .hero-title,.final-title,.thanks-title{font-size:52px}
+            .hero-title,.final-title{font-size:52px}
             .progress-title{font-size:20px}
             .step1-grid{grid-template-columns:minmax(0, 1fr) 158px}
             .step1-logo-col .watermark{width:188px;top:62px;right:-16px}
             .field.narrow{max-width:160px}
-            .thanks-watermark{width:182px;right:-14px}
         }
 
         @media (max-width: 350px){
-            .hero-title,.final-title,.thanks-title{font-size:46px}
+            .hero-title,.final-title{font-size:46px}
             .progress-title{font-size:18px}
             .label{font-size:16px}
-            .hero-text,.final-text,.thanks-text,.sample-copy{font-size:12px}
+            .hero-text,.final-text,.sample-copy{font-size:12px}
             .step1-grid{grid-template-columns:1fr 144px}
             .step1-logo-col .watermark{width:170px;right:-18px}
         }
@@ -432,44 +427,27 @@
 <body>
 <div class="page">
     <div class="app">
-        @if ($errors->any())
-            <div class="global-errors">
-                <strong>Please fix the following:</strong>
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
         @php
             $submitted = session('intake_submitted', []);
             $submittedFirstName = $submitted['first_name'] ?? 'Athlete';
             $submittedEmail = $submitted['email'] ?? null;
-            $submittedPlan = $submitted['selected_plan'] ?? ($selectedPlan ?? 'Free');
+            $autoLoginUrl = session('auto_login_url');
         @endphp
 
         @if (session('success'))
-            <section class="screen thanks-screen" id="thanksScreen">
+            <section class="screen hero-screen" id="thanksScreen">
                 <div class="hero-logo-wrap">
                     <img src="{{ asset('images/plyrcardlogo.png') }}" alt="PLYRCARD" class="logo-main">
                 </div>
 
-                <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="thanks-watermark">
-
                 <div class="hero-copy">
-                    <div class="thanks-kicker">{{ $submittedPlan }} Plan</div>
-                    <h1 class="thanks-title">Thank You</h1>
-                    <p class="thanks-text">Your intake has been submitted successfully, {{ $submittedFirstName }}.</p>
-                    <p class="thanks-text">An email has been sent to your inbox with your login information so you can access your account and continue building your PLYRCARD.</p>
+                    <h1 class="hero-title">Thank You</h1>
+                    <p class="hero-text">Your intake has been submitted successfully, {{ $submittedFirstName }}.</p>
+                    <p class="hero-text">Please check your email{{ $submittedEmail ? ' at ' . $submittedEmail : '' }} for confirmation of your login and account access details.</p>
+                    <p class="hero-text">When you are ready, tap below to go straight into the app.</p>
 
-                    @if ($submittedEmail)
-                        <p class="thanks-email">Sent to: {{ $submittedEmail }}</p>
-                    @endif
-
-                    <div class="thanks-actions">
-                        <a href="{{ url('/login') }}">
+                    <div class="bottom-cta">
+                        <a href="{{ $autoLoginUrl ?: url('admin/login') }}" class="btn-link">
                             <button type="button" class="btn">Login</button>
                         </a>
                     </div>
@@ -492,7 +470,7 @@
                 </div>
             </section>
 
-            <form method="POST" action="{{ route('public.player-intake.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
+            <form method="POST" action="{{ route('public.player-intake-app.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
                 <input type="hidden" name="selected_plan" value="{{ old('selected_plan', $selectedPlan ?? 'Free') }}">
 
@@ -516,55 +494,59 @@
                     </div>
 
                     <div class="step-panel active" data-step="1">
-                        <div class="step1-grid">
-                            <div class="step1-left">
-                                <div class="field two">
-                                    <div>
-                                        <label class="label" for="first_name">First Name</label>
-                                        <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" placeholder="Enter first name" required>
-                                        <div class="field-message" id="first_name_error"></div>
+                        <div class="panel-scroll">
+                            <div class="field two">
+                                        <div>
+                                            <label class="label" for="first_name">First Name</label>
+                                            <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" placeholder="Enter first name" required>
+                                            <div class="field-message" id="first_name_error"></div>
+                                        </div>
+                                        <div>
+                                            <label class="label" for="last_name">Last Name</label>
+                                            <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" placeholder="Enter last name" required>
+                                            <div class="field-message" id="last_name_error"></div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label class="label" for="last_name">Last Name</label>
-                                        <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" placeholder="Enter last name" required>
-                                        <div class="field-message" id="last_name_error"></div>
+                            <div class="step1-grid">
+                                <div class="step1-left">
+                                    
+
+                                    <div class="field" id="gender_field">
+                                        <label class="label">Gender</label>
+                                        <div class="gender-list">
+                                            @php
+                                                $oldGender = old('gender');
+                                                $isFemale = in_array($oldGender, ['female', 'girls'], true);
+                                                $isMale = ! $isFemale;
+                                            @endphp
+                                            <label class="gender-item">
+                                                <input type="radio" name="gender" value="male" {{ $isMale ? 'checked' : '' }}>
+                                                <span>Boys</span>
+                                            </label>
+                                            <label class="gender-item">
+                                                <input type="radio" name="gender" value="female" {{ $isFemale ? 'checked' : '' }}>
+                                                <span>Girls</span>
+                                            </label>
+                                        </div>
+                                        <div class="field-message" id="gender_error"></div>
+                                    </div>
+
+                                    <div class="field narrow">
+                                        <label class="label" for="personal_email">Email</label>
+                                        <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" placeholder="Enter email address" required>
+                                        <div class="field-message" id="personal_email_error"></div>
+                                    </div>
+
+                                    <div class="field narrow">
+                                        <label class="label" for="phone">Cell Phone</label>
+                                        <input class="input phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" inputmode="tel" placeholder="Enter mobile number">
+                                        <div class="field-message" id="phone_error"></div>
                                     </div>
                                 </div>
 
-                                <div class="field">
-                                    <label class="label">Gender</label>
-                                    <div class="gender-list">
-                                        @php
-                                            $oldGender = old('gender');
-                                            $isFemale = in_array($oldGender, ['female', 'girls'], true);
-                                            $isMale = !$isFemale;
-                                        @endphp
-                                        <label class="gender-item">
-                                            <input type="radio" name="gender" value="male" {{ $isMale ? 'checked' : '' }}>
-                                            <span>Boys</span>
-                                        </label>
-                                        <label class="gender-item">
-                                            <input type="radio" name="gender" value="female" {{ $isFemale ? 'checked' : '' }}>
-                                            <span>Girls</span>
-                                        </label>
-                                    </div>
+                                <div class="step1-logo-col">
+                                    <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="watermark">
                                 </div>
-
-                                <div class="field narrow">
-                                    <label class="label" for="personal_email">Email</label>
-                                    <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" placeholder="Enter email address" required>
-                                    <div class="field-message" id="personal_email_error"></div>
-                                </div>
-
-                                <div class="field narrow">
-                                    <label class="label" for="phone">Cell Phone</label>
-                                    <input class="input phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" inputmode="tel" placeholder="Enter mobile number">
-                                    <div class="field-message" id="phone_error"></div>
-                                </div>
-                            </div>
-
-                            <div class="step1-logo-col">
-                                <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="watermark">
                             </div>
                         </div>
 
@@ -574,55 +556,58 @@
                     </div>
 
                     <div class="step-panel" data-step="2">
-                        <div class="field">
-                            <label class="label" for="sport">Sport</label>
-                            <select class="select" id="sport" name="sport" required>
-                                <option value="">Select One</option>
-                                @foreach ($sportPositions as $sportKey => $positions)
-                                    <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
-                                        {{ str($sportKey)->replace('_', ' ')->title() }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label class="label" for="position_select">Position</label>
-                            <select class="select" id="position_select" aria-label="Position"></select>
-                            <div class="field-message" id="position_error"></div>
-                            <div class="chips-wrap" id="positionChips"></div>
-                            <input type="hidden" name="position[]" id="position_values" value="">
-                        </div>
-
-                        <div class="field">
-                            <label class="label">League</label>
-                            <div id="leagueSelectRoot"></div>
-                            <div class="field-message" id="league_error"></div>
-                            <div class="manual-input-wrap" id="leagueManualWrap">
-                                <input class="manual-input" type="text" id="league_name_manual" name="league_name_manual" value="{{ old('league_name_manual') }}" placeholder="Enter league name">
-                                <div class="manual-input-actions"><button type="button" class="manual-toggle-back" data-restore-select="league">Use dropdown instead</button></div>
+                        <div class="panel-scroll">
+                            <div class="field">
+                                <label class="label" for="sport">Sport</label>
+                                <select class="select" id="sport" name="sport" required>
+                                    <option value="">Select One</option>
+                                    @foreach ($sportPositions as $sportKey => $positions)
+                                        <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
+                                            {{ str($sportKey)->replace('_', ' ')->title() }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="field-message" id="sport_error"></div>
                             </div>
-                            <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
-                        </div>
 
-                        <div class="field">
-                            <label class="label">Club</label>
-                            <div id="clubSelectRoot"></div>
-                            <div class="field-message" id="club_error"></div>
-                            <div class="manual-input-wrap" id="clubManualWrap">
-                                <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club name">
+                            <div class="field" id="position_field">
+                                <label class="label" for="position_select">Position</label>
+                                <select class="select" id="position_select" aria-label="Position"></select>
+                                <div class="field-message" id="position_error"></div>
+                                <div class="chips-wrap" id="positionChips"></div>
+                                <input type="hidden" name="position[]" id="position_values" value="">
                             </div>
-                            <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
-                        </div>
 
-                        <div class="field">
-                            <label class="label">Team</label>
-                            <div id="teamSelectRoot"></div>
-                            <div class="field-message" id="team_error"></div>
-                            <div class="manual-input-wrap" id="teamManualWrap">
-                                <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter team name">
+                            <div class="field" id="league_field">
+                                <label class="label">League</label>
+                                <div id="leagueSelectRoot"></div>
+                                <div class="field-message" id="league_error"></div>
+                                <div class="manual-input-wrap" id="leagueManualWrap">
+                                    <input class="manual-input" type="text" id="league_name_manual" name="league_name_manual" value="{{ old('league_name_manual') }}" placeholder="Enter league name">
+                                    <div class="manual-input-actions"><button type="button" class="manual-toggle-back" data-restore-select="league">Use dropdown instead</button></div>
+                                </div>
+                                <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
                             </div>
-                            <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
+
+                            <div class="field" id="club_field">
+                                <label class="label">Club</label>
+                                <div id="clubSelectRoot"></div>
+                                <div class="field-message" id="club_error"></div>
+                                <div class="manual-input-wrap" id="clubManualWrap">
+                                    <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club name">
+                                </div>
+                                <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
+                            </div>
+
+                            <div class="field" id="team_field">
+                                <label class="label">Team</label>
+                                <div id="teamSelectRoot"></div>
+                                <div class="field-message" id="team_error"></div>
+                                <div class="manual-input-wrap" id="teamManualWrap">
+                                    <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter team name">
+                                </div>
+                                <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
+                            </div>
                         </div>
 
                         <div class="step-cta">
@@ -631,36 +616,40 @@
                     </div>
 
                     <div class="step-panel" data-step="3">
-                        <div class="field">
-                            <label class="label" for="portrait_images">Profile Image</label>
-                            <input class="file-input" type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                            <div class="image-preview-grid" id="portrait_images_preview"></div>
-                            <div class="file-warning-list" id="portrait_images_feedback"></div>
+                        <div class="panel-scroll with-sticky-cta" id="imageStepScroll">
+                            <div class="field" id="portrait_images_field">
+                                <label class="label" for="portrait_images">Profile Image</label>
+                                <input class="file-input" type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="image-preview-grid" id="portrait_images_preview"></div>
+                                <div class="file-warning-list" id="portrait_images_feedback"></div>
+                            </div>
+
+                            <div class="field" id="action_images_field">
+                                <label class="label" for="action_images">Action Image</label>
+                                <input class="file-input" type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <div class="image-preview-grid" id="action_images_preview"></div>
+                                <div class="file-warning-list" id="action_images_feedback"></div>
+                            </div>
+
+                            <div class="sample-block">
+                                <h3 class="sample-title">Sample (Click Here)</h3>
+                                <p class="sample-copy">Start with a strong headshot, then add a few action shots so we have options for a more custom image if needed.</p>
+                                <p class="sample-copy">Please upload a clear profile headshot and a few action shots to help us build the best visual version of your PLYRCARD.</p>
+                                <p class="sample-copy">Add a quality headshot for your main profile image, plus a few action shots for possible custom image creation.</p>
+                            </div>
                         </div>
 
-                        <div class="field">
-                            <label class="label" for="action_images">Action Image</label>
-                            <input class="file-input" type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
-                            <div class="image-preview-grid" id="action_images_preview"></div>
-                            <div class="file-warning-list" id="action_images_feedback"></div>
-                        </div>
-
-                        <div class="sample-block">
-                            <h3 class="sample-title">Sample (Click Here)</h3>
-                            <p class="sample-copy">Start with a strong headshot, then add a few action shots so we have options for a more custom image if needed.</p>
-                            <p class="sample-copy">Please upload a clear profile headshot and a few action shots to help us build the best visual version of your PLYRCARD.</p>
-                            <p class="sample-copy">Add a quality headshot for your main profile image, plus a few action shots for possible custom image creation.</p>
-                        </div>
-
-                        <div class="step-cta">
+                        <div class="step-cta sticky">
                             <button type="button" class="btn" id="nextBtn3">Next</button>
                         </div>
                     </div>
 
                     <div class="final-screen" data-step="4">
-                        <h1 class="final-title">Now Make It Unforgettable</h1>
-                        <p class="final-text">You’ve built the foundation, now add the final touches that make your PLYRCARD stand out. Finish it now or come back later, but don’t skip the step that brings it all together.</p>
-                        <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="final-logo">
+                        <div class="panel-scroll">
+                            <h1 class="final-title">Now Make It Unforgettable</h1>
+                            <p class="final-text">You’ve built the foundation, now add the final touches that make your PLYRCARD stand out. Finish it now or come back later, but don’t skip the step that brings it all together.</p>
+                            <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="final-logo">
+                        </div>
 
                         <div class="step-cta">
                             <button type="submit" class="btn" id="submitBtn">Submit</button>
@@ -685,6 +674,8 @@ window.plyrIntakeData = {
     oldManualLeague: @json(old('league_name_manual')),
     oldManualClub: @json(old('club_name_manual')),
     oldManualTeam: @json(old('team_name_manual')),
+    stepFieldMap: @json($stepFieldMap ?? []),
+    serverErrors: @json($errors->getMessages()),
 };
 </script>
 <script>
@@ -698,7 +689,9 @@ window.plyrIntakeData = {
     const oldClubId = data.oldClubId || '';
     const oldTeamId = data.oldTeamId || '';
     const oldPositions = Array.isArray(data.oldPositions) ? data.oldPositions : [];
-    const draftKey = 'plyrcard_intake_exact_mobile_v9';
+    const stepFieldMap = data.stepFieldMap || {};
+    const serverErrors = data.serverErrors || {};
+    const draftKey = 'plyrcard_intake_exact_mobile_v12';
     const ADD_NEW_VALUE = '__add_new__';
     let currentStep = 0;
     let selectedPositions = [];
@@ -711,6 +704,25 @@ window.plyrIntakeData = {
         2: { topbar: 'In Your Element', title: 'Set the stage for your profile by entering the sport you play and the team you represent.' },
         3: { topbar: 'Show Your Story', title: 'Add your images so your PLYRCARD feels complete, personal, and ready to share.' },
         4: { topbar: 'Show Your Story', title: 'Now make it unforgettable.' }
+    };
+
+    const fieldAliases = {
+        league_other: 'league',
+        league_name_manual: 'league',
+        league_id: 'league',
+        club_other: 'club',
+        club_name_manual: 'club',
+        club_id: 'club',
+        team_other: 'team',
+        team_name_manual: 'team',
+        team_id: 'team',
+        action_images: 'action_images',
+        'action_images.0': 'action_images',
+        portrait_images: 'portrait_images',
+        'portrait_images.0': 'portrait_images',
+        position: 'position',
+        sport: 'sport',
+        gender: 'gender',
     };
 
     function $(selector, scope){ return (scope || document).querySelector(selector); }
@@ -787,7 +799,49 @@ window.plyrIntakeData = {
     function validateEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safe(v)); }
     function digitsOnly(v){ return safe(v).replace(/\D/g, ''); }
     function validatePhone(v){ const len = digitsOnly(v).length; return !safe(v) || (len >= 7 && len <= 15); }
-    function setFieldError(fieldId, message){ const el = document.getElementById(fieldId + '_error'); const input = document.getElementById(fieldId); if (el){ el.textContent = message || ''; el.classList.toggle('error', !!message); } if (input){ const wrap = input.closest('.field'); if (wrap) wrap.classList.toggle('is-invalid', !!message); } }
+
+    function getFieldContainer(fieldId){
+        if (fieldId === 'gender') return document.getElementById('gender_field');
+        if (fieldId === 'position') return document.getElementById('position_field');
+        if (fieldId === 'league') return document.getElementById('league_field');
+        if (fieldId === 'club') return document.getElementById('club_field');
+        if (fieldId === 'team') return document.getElementById('team_field');
+        if (fieldId === 'portrait_images') return document.getElementById('portrait_images_field');
+        if (fieldId === 'action_images') return document.getElementById('action_images_field');
+        const input = document.getElementById(fieldId);
+        return input ? input.closest('.field') : null;
+    }
+
+    function setFieldError(fieldId, message){
+        const canonical = fieldAliases[fieldId] || fieldId;
+        const container = getFieldContainer(canonical);
+        const el = document.getElementById(canonical + '_error') || document.getElementById(canonical + '_feedback');
+        if (el){
+            el.textContent = message || '';
+            el.classList.toggle('error', !!message);
+            el.classList.toggle('visible', !!message);
+        }
+        if (container) container.classList.toggle('is-invalid', !!message);
+    }
+
+    function appendFieldError(fieldId, message){
+        const canonical = fieldAliases[fieldId] || fieldId;
+        const el = document.getElementById(canonical + '_error') || document.getElementById(canonical + '_feedback');
+        const container = getFieldContainer(canonical);
+        if (el){
+            const existing = safe(el.textContent);
+            el.textContent = existing ? (existing + ' ' + message) : message;
+            el.classList.add('error');
+            el.classList.add('visible');
+        }
+        if (container) container.classList.add('is-invalid');
+    }
+
+    function clearKnownErrors(){
+        ['first_name','last_name','personal_email','phone','gender','sport','position','league','club','team','portrait_images','action_images'].forEach(function(key){
+            setFieldError(key, '');
+        });
+    }
 
     function getSelectedGender(){ return safe(document.querySelector('input[name="gender"]:checked') && document.querySelector('input[name="gender"]:checked').value).toLowerCase(); }
     function getSelectedSport(){ return safe($('#sport') && $('#sport').value).toLowerCase(); }
@@ -1063,12 +1117,12 @@ window.plyrIntakeData = {
         renderImagePreviews(fieldId);
         const wrap = input.closest('.field');
         if (errors.length){
-            feedback.innerHTML = errors.map(function(e){ return '<div>' + e + '</div>'; }).join('');
+            feedback.textContent = errors.join(' ');
             feedback.classList.add('visible');
             if (wrap) wrap.classList.add('is-invalid');
             return false;
         }
-        feedback.innerHTML = '';
+        feedback.textContent = '';
         feedback.classList.remove('visible');
         if (wrap) wrap.classList.remove('is-invalid');
         return true;
@@ -1098,6 +1152,7 @@ window.plyrIntakeData = {
             const phone = safe($('#phone') && $('#phone').value);
             setFieldError('first_name', first ? '' : 'First name is required.');
             setFieldError('last_name', last ? '' : 'Last name is required.');
+            setFieldError('gender', gender ? '' : 'Select a gender.');
             setFieldError('personal_email', !email ? 'Email is required.' : (validateEmail(email) ? '' : 'Enter a valid email address.'));
             setFieldError('phone', !phone ? '' : (validatePhone(phone) ? '' : 'Enter a valid phone number.'));
             return !!(first && last && gender && email && validateEmail(email) && validatePhone(phone));
@@ -1113,13 +1168,11 @@ window.plyrIntakeData = {
             const teamOk = manualMode ? safe($('#team_name_manual') && $('#team_name_manual').value) : !!teamVal;
             const sportOk = !!safe($('#sport') && $('#sport').value);
             const posOk = !!selectedPositions.length;
+            setFieldError('sport', sportOk ? '' : 'Select a sport.');
             setFieldError('position', posOk ? '' : 'Select at least one position.');
-            document.getElementById('league_error').textContent = leagueOk ? '' : (manualMode ? 'Enter a league name.' : 'Select a league.');
-            document.getElementById('league_error').classList.toggle('error', !leagueOk);
-            document.getElementById('club_error').textContent = clubOk ? '' : (manualMode ? 'Enter a club name.' : 'Select a club.');
-            document.getElementById('club_error').classList.toggle('error', !clubOk);
-            document.getElementById('team_error').textContent = teamOk ? '' : (manualMode ? 'Enter a team name.' : 'Select a team.');
-            document.getElementById('team_error').classList.toggle('error', !teamOk);
+            setFieldError('league', leagueOk ? '' : (manualMode ? 'Enter a league name.' : 'Select a league.'));
+            setFieldError('club', clubOk ? '' : (manualMode ? 'Enter a club name.' : 'Select a club.'));
+            setFieldError('team', teamOk ? '' : (manualMode ? 'Enter a team name.' : 'Select a team.'));
             return sportOk && posOk && leagueOk && clubOk && teamOk;
         }
 
@@ -1171,19 +1224,66 @@ window.plyrIntakeData = {
 
     function updateLiveProgress(){ animateProgress(getCurrentProgressPercent()); }
 
+    function firstErrorStep(){
+        const keys = Object.keys(serverErrors || {});
+        if (!keys.length) return null;
+        for (let i = 0; i < keys.length; i++){
+            const field = keys[i];
+            for (const step in stepFieldMap){
+                const list = stepFieldMap[step] || [];
+                if (list.indexOf(field) !== -1 || list.indexOf((field.split('.')[0] + '.*')) !== -1 || list.indexOf(field.split('.')[0]) !== -1) {
+                    return Number(step);
+                }
+            }
+            const canonical = fieldAliases[field] || field.split('.')[0];
+            if (['first_name','last_name','personal_email','phone','gender'].indexOf(canonical) !== -1) return 1;
+            if (['sport','position','league','club','team'].indexOf(canonical) !== -1) return 2;
+            if (['portrait_images','action_images'].indexOf(canonical) !== -1) return 3;
+        }
+        return 1;
+    }
+
+    function applyServerErrors(){
+        clearKnownErrors();
+        const keys = Object.keys(serverErrors || {});
+        keys.forEach(function(field){
+            const messages = serverErrors[field] || [];
+            if (!messages.length) return;
+            appendFieldError(field, messages[0]);
+        });
+    }
+
+    function scrollToFirstServerError(){
+        const keys = Object.keys(serverErrors || {});
+        if (!keys.length) return;
+        const first = fieldAliases[keys[0]] || keys[0].split('.')[0];
+        const container = getFieldContainer(first);
+        if (container) {
+            requestAnimationFrame(function(){
+                container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
+    }
+
     function saveDraft(){
         try{
             const payload = { currentStep: currentStep, selectedPositions: selectedPositions };
             $all('#playerIntakeForm input, #playerIntakeForm select').forEach(function(field){
                 if (!field.name || field.type === 'file' || field.name === '_token') return;
-                if (field.type === 'radio'){ if (field.checked) payload[field.name] = field.value; return; }
+                if (field.type === 'radio'){
+                    if (field.checked) payload[field.name] = field.value;
+                    return;
+                }
                 payload[field.name] = field.value;
             });
             localStorage.setItem(draftKey, JSON.stringify(payload));
         } catch (e){}
     }
 
-    function readDraft(){ try{ return JSON.parse(localStorage.getItem(draftKey) || '{}'); } catch (e){ return {}; } }
+    function readDraft(){
+        try{ return JSON.parse(localStorage.getItem(draftKey) || '{}'); }
+        catch (e){ return {}; }
+    }
 
     function restoreDraft(){
         const payload = readDraft();
@@ -1193,8 +1293,11 @@ window.plyrIntakeData = {
             const fields = document.querySelectorAll(selector);
             if (!fields.length) return;
             Array.prototype.slice.call(fields).forEach(function(field){
-                if (field.type === 'radio') field.checked = String(field.value) === String(payload[name]);
-                else field.value = payload[name] == null ? '' : payload[name];
+                if (field.type === 'radio'){
+                    field.checked = String(field.value) === String(payload[name]);
+                } else {
+                    field.value = payload[name] == null ? '' : payload[name];
+                }
             });
         });
         if (Array.isArray(payload.selectedPositions)) selectedPositions = payload.selectedPositions.slice();
@@ -1311,9 +1414,20 @@ window.plyrIntakeData = {
             else showStep(currentStep - 1);
         });
 
-        $('#nextBtn1') && $('#nextBtn1').addEventListener('click', function(){ if (!validateStep(1)) return; showStep(2); });
-        $('#nextBtn2') && $('#nextBtn2').addEventListener('click', function(){ if (!validateStep(2)) return; showStep(3); });
-        $('#nextBtn3') && $('#nextBtn3').addEventListener('click', function(){ if (!validateStep(3)) return; showStep(4); });
+        $('#nextBtn1') && $('#nextBtn1').addEventListener('click', function(){
+            if (!validateStep(1)) return;
+            showStep(2);
+        });
+
+        $('#nextBtn2') && $('#nextBtn2').addEventListener('click', function(){
+            if (!validateStep(2)) return;
+            showStep(3);
+        });
+
+        $('#nextBtn3') && $('#nextBtn3').addEventListener('click', function(){
+            if (!validateStep(3)) return;
+            showStep(4);
+        });
 
         $('#sport') && $('#sport').addEventListener('change', function(){
             selectedPositions = [];
@@ -1406,8 +1520,17 @@ window.plyrIntakeData = {
 
         $('#playerIntakeForm') && $('#playerIntakeForm').addEventListener('submit', function(){ clearDraft(); });
 
-        if (draft.currentStep) showStep(Math.min(Number(draft.currentStep), 4));
-        else showIntro();
+        applyServerErrors();
+
+        const errorStep = firstErrorStep();
+        if (errorStep) {
+            showStep(Math.min(Number(errorStep), 4));
+            scrollToFirstServerError();
+        } else if (draft.currentStep) {
+            showStep(Math.min(Number(draft.currentStep), 4));
+        } else {
+            showIntro();
+        }
     });
 })();
 </script>

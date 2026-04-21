@@ -27,7 +27,7 @@
             background:
                 radial-gradient(circle at top left, rgba(255,255,255,.10), transparent 35%),
                 radial-gradient(circle at bottom right, rgba(255,255,255,.08), transparent 35%),
-                linear-gradient(135deg, #ea580c 0%, #c2410c 45%, #be123c 100%);
+                linear-gradient(135deg, #ff6347 0%, #ff6347 45%, #ff6347 100%);
         }
 
         .fpw-badge-icon {
@@ -113,7 +113,7 @@
             padding: 8px 12px;
             font-size: 12px;
             font-weight: 700;
-            color: #fdba74;
+            color: #ff6347;
             background: rgba(249, 115, 22, 0.12);
             border: 1px solid rgba(249, 115, 22, 0.24);
             border-radius: 999px;
@@ -272,7 +272,7 @@
             border-radius: 18px;
             background: rgba(249, 115, 22, 0.10);
             border: 1px solid rgba(249, 115, 22, 0.22);
-            color: #fdba74;
+            color: #ff6347;
             font-size: 14px;
             line-height: 1.7;
         }
@@ -287,7 +287,7 @@
             font-weight: 700;
             color: #fff;
             cursor: pointer;
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 55%, #e11d48 100%);
+            background: linear-gradient(135deg, #ff6347 0%, #ff6347 55%, #ff6347 100%);
             box-shadow: 0 14px 30px rgba(234, 88, 12, 0.28);
             transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
         }

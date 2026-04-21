@@ -3,6 +3,7 @@
 use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,13 +33,15 @@ Route::get('/player-intake', [PublicPlayerIntakeController::class, 'create'])
 Route::post('/player-intake', [PublicPlayerIntakeController::class, 'store'])
     ->name('public.player-intake.store');
 
-/*
-|--------------------------------------------------------------------------
-| NEW: App-style intake (mobile-first UI)
-|--------------------------------------------------------------------------
-*/
 Route::get('/player-intake-app', [PublicPlayerIntakeController::class, 'createApp'])
-    ->name('public.player-intake.app');
+    ->name('public.player-intake-app.create');
+
+Route::post('/player-intake-app', [PublicPlayerIntakeController::class, 'storeApp'])
+    ->name('public.player-intake-app.store');
+
+Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController::class, 'autoLogin'])
+    ->middleware('signed')
+    ->name('public.player-intake-app.auto-login');
 
 /*
 |--------------------------------------------------------------------------
@@ -70,6 +73,29 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::delete('/websites/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
         ->name('websites.assets.delete');
 });
+
+Route::middleware(['auth'])->post('/onboarding/complete', function (Request $request) {
+    $user = $request->user();
+
+    if (! $user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No authenticated user.',
+        ], 401);
+    }
+
+    if (is_null($user->onboarding_completed_at)) {
+        $user->onboarding_completed_at = now();
+        $user->save();
+        $user->refresh();
+    }
+
+    return response()->json([
+        'success' => true,
+        'user_id' => $user->id,
+        'onboarding_completed_at' => optional($user->onboarding_completed_at)->toDateTimeString(),
+    ]);
+})->name('onboarding.complete');
 
 /*
 |--------------------------------------------------------------------------
