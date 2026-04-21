@@ -79,30 +79,31 @@
 
     @media (max-width: 768px) {
         .driver-popover.plyrcard-driver-theme {
-            max-width: min(300px, calc(100vw - 24px)) !important;
+            max-width: min(280px, calc(100vw - 20px)) !important;
             border-radius: 14px !important;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.30) !important;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28) !important;
+            padding: 8px !important;
         }
 
         .driver-popover.plyrcard-driver-theme .driver-popover-title {
-            font-size: 16px !important;
-            line-height: 1.2 !important;
+            font-size: 15px !important;
+            line-height: 1.15 !important;
         }
 
         .driver-popover.plyrcard-driver-theme .driver-popover-description {
             font-size: 12px !important;
-            line-height: 1.5 !important;
+            line-height: 1.45 !important;
         }
 
         .driver-popover.plyrcard-driver-theme .driver-popover-footer {
-            margin-top: 10px !important;
-            padding-top: 10px !important;
+            margin-top: 8px !important;
+            padding-top: 8px !important;
         }
 
         .driver-popover.plyrcard-driver-theme .driver-popover-prev-btn,
         .driver-popover.plyrcard-driver-theme .driver-popover-next-btn,
         .driver-popover.plyrcard-driver-theme .driver-popover-close-btn {
-            padding: 8px 10px !important;
+            padding: 7px 10px !important;
             font-size: 12px !important;
             border-radius: 10px !important;
         }
@@ -130,7 +131,7 @@
 
     (function () {
         const USER_ID = window.PLYRCARD_CURRENT_USER_ID ?? 'guest';
-        const TOUR_VERSION = 'v9';
+        const TOUR_VERSION = 'v10-mobile-fix';
         const KEY_PREFIX = `${TOUR_VERSION}-user-${USER_ID}`;
 
         const TOUR_KEYS = {
@@ -279,38 +280,119 @@
             return rect.width > 0 && rect.height > 0;
         }
 
-        function makeStep(selector, title, description, side = 'bottom', align = 'start') {
-            if (!selector) return null;
-
-            const el = document.querySelector(selector);
-            if (!visible(el)) return null;
-
-            return {
-                element: selector,
-                popover: {
-                    title,
-                    description,
-                    side,
-                    align,
-                },
-            };
-        }
-
-        function detectPage() {
-            const path = window.location.pathname;
-
-            console.log('Current path:', path);
-
-            if (/^\/admin\/?$/.test(path)) return 'dashboard';
-            if (path.includes('/admin/profile')) return 'profile';
-            if (path.includes('/admin/schedules')) return 'schedules';
-            if (path.includes('/admin/my-journey') || path.includes('/admin/upgrade')) return 'upgrade';
-
-            return null;
-        }
-
         function isMobileViewport() {
             return window.matchMedia('(max-width: 768px)').matches;
+        }
+
+        function isSidebarTourSelector(selector) {
+            return !!selector && (
+                selector.includes('profile-link') ||
+                selector.includes('schedules-link') ||
+                selector.includes('upgrade-link')
+            );
+        }
+
+        function findMobileSidebarButton() {
+            const direct =
+                document.querySelector('[aria-label*="open sidebar" i]') ||
+                document.querySelector('[aria-label*="toggle sidebar" i]') ||
+                document.querySelector('[aria-label*="sidebar" i]') ||
+                document.querySelector('[aria-label*="menu" i]') ||
+                document.querySelector('[title*="sidebar" i]') ||
+                document.querySelector('[title*="menu" i]') ||
+                document.querySelector('.fi-topbar-open-sidebar-btn') ||
+                document.querySelector('button.fi-icon-btn');
+
+            if (direct) return direct;
+
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const topLeftButtons = buttons
+                .map((button) => {
+                    const rect = button.getBoundingClientRect();
+                    return { button, rect };
+                })
+                .filter(({ rect }) =>
+                    rect.width > 20 &&
+                    rect.height > 20 &&
+                    rect.left < 110 &&
+                    rect.top < 130
+                )
+                .sort((a, b) => (a.rect.left + a.rect.top) - (b.rect.left + b.rect.top));
+
+            return topLeftButtons[0]?.button || null;
+        }
+
+        function findSidebarElement() {
+            return (
+                document.querySelector('.fi-sidebar') ||
+                document.querySelector('aside.fi-sidebar') ||
+                document.querySelector('aside') ||
+                document.querySelector('nav')
+            );
+        }
+
+        function sidebarLooksVisible() {
+            const sidebar = findSidebarElement();
+            if (!sidebar) return false;
+
+            const rect = sidebar.getBoundingClientRect();
+            const style = window.getComputedStyle(sidebar);
+
+            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
+                return false;
+            }
+
+            return rect.width > 120 && rect.right > 40;
+        }
+
+        function triggerClick(el) {
+            if (!el) return;
+
+            try {
+                el.click();
+            } catch (e) {}
+
+            try {
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            } catch (e) {}
+        }
+
+        async function openMobileSidebar() {
+            if (!isMobileViewport()) return;
+
+            if (sidebarLooksVisible()) return;
+
+            const btn = findMobileSidebarButton();
+            if (!btn) {
+                console.warn('Mobile sidebar button not found.');
+                return;
+            }
+
+            triggerClick(btn);
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            if (!sidebarLooksVisible()) {
+                triggerClick(btn);
+                await new Promise((resolve) => setTimeout(resolve, 400));
+            }
+        }
+
+        async function ensureMobileSidebarOpenForSelector(selector) {
+            if (!isMobileViewport()) return;
+            if (!isSidebarTourSelector(selector)) return;
+
+            for (let i = 0; i < 4; i++) {
+                await openMobileSidebar();
+
+                const el = document.querySelector(selector);
+                if (el && visible(el)) {
+                    return;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+
+            console.warn('Sidebar target still not visible after retries:', selector);
         }
 
         function getScrollableTabsContainer(el) {
@@ -327,11 +409,23 @@
         function scrollElementIntoViewSmart(el) {
             if (!el) return;
 
-            const topOffset = isMobileViewport() ? 92 : 72;
-
             try {
                 const rect = el.getBoundingClientRect();
-                const absoluteTop = window.scrollY + rect.top - topOffset;
+
+                if (isMobileViewport()) {
+                    // Put the target lower on the screen so the popover can live near the top.
+                    const desiredTopInViewport = window.innerHeight * 0.46;
+                    const absoluteTop = window.scrollY + rect.top - desiredTopInViewport;
+
+                    window.scrollTo({
+                        top: Math.max(0, absoluteTop),
+                        behavior: 'smooth',
+                    });
+
+                    return;
+                }
+
+                const absoluteTop = window.scrollY + rect.top - 72;
 
                 window.scrollTo({
                     top: Math.max(0, absoluteTop),
@@ -381,16 +475,51 @@
             }
         }
 
-        function prepareElementForStep(selector) {
+        async function prepareElementForStep(selector) {
+            await ensureMobileSidebarOpenForSelector(selector);
+
             const el = document.querySelector(selector);
-            if (!el) return Promise.resolve();
+            if (!el) return;
 
             ensureHorizontalVisibility(el);
             scrollElementIntoViewSmart(el);
 
-            return new Promise((resolve) => {
-                setTimeout(resolve, isMobileViewport() ? 450 : 250);
+            await new Promise((resolve) => {
+                setTimeout(resolve, isMobileViewport() ? 500 : 250);
             });
+        }
+
+        function makeStep(selector, title, description, side = 'bottom', align = 'start') {
+            if (!selector) return null;
+
+            const el = document.querySelector(selector);
+            if (!visible(el)) return null;
+
+            const mobileSide = isMobileViewport() ? 'top' : side;
+            const mobileAlign = isMobileViewport() ? 'center' : align;
+
+            return {
+                element: selector,
+                popover: {
+                    title,
+                    description,
+                    side: mobileSide,
+                    align: mobileAlign,
+                },
+            };
+        }
+
+        function detectPage() {
+            const path = window.location.pathname;
+
+            console.log('Current path:', path);
+
+            if (/^\/admin\/?$/.test(path)) return 'dashboard';
+            if (path.includes('/admin/profile')) return 'profile';
+            if (path.includes('/admin/schedules')) return 'schedules';
+            if (path.includes('/admin/my-journey') || path.includes('/admin/upgrade')) return 'upgrade';
+
+            return null;
         }
 
         function buildDashboardSteps() {
@@ -400,12 +529,14 @@
             const progressSection = mark('progress-section', closestCard(findHeading('Profile progress')));
             const completeProfile = mark('complete-profile', findButton('Complete profile'));
             const profileLink = mark('profile-link', findSidebarLink('Profile'));
+            const schedulesLink = mark('schedules-link', findSidebarLink('Schedules'));
 
             const steps = [
                 makeStep(viewsCard, 'Card activity', 'This card shows your current views and visibility stats.'),
                 makeStep(progressSection, 'Profile progress', 'This section shows how complete your profile is and what is still missing.'),
                 makeStep(completeProfile, 'Complete profile', 'Use this button to jump into finishing your profile.'),
-                makeStep(profileLink, 'Profile section', 'Next, you will continue in the Profile section.', 'right'),
+                makeStep(profileLink, 'Profile section', 'This is where you edit your athlete profile.', 'right'),
+                makeStep(schedulesLink, 'Schedules section', 'This is where you manage games and schedules.', 'right'),
             ].filter(Boolean);
 
             console.log('Dashboard steps:', steps);
@@ -486,7 +617,7 @@
                 showProgress: true,
                 allowClose: false,
                 animate: true,
-                overlayOpacity: isMobileViewport() ? 0.22 : 0.35,
+                overlayOpacity: isMobileViewport() ? 0.20 : 0.35,
                 stagePadding: isMobileViewport() ? 6 : 8,
                 stageRadius: isMobileViewport() ? 12 : 16,
                 disableActiveInteraction: true,
