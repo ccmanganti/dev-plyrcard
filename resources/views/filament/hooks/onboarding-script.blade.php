@@ -76,6 +76,41 @@
     .driver-overlay {
         background: rgba(2, 6, 23, 0.35) !important;
     }
+
+    @media (max-width: 768px) {
+        .driver-popover.plyrcard-driver-theme {
+            max-width: min(300px, calc(100vw - 24px)) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.30) !important;
+        }
+
+        .driver-popover.plyrcard-driver-theme .driver-popover-title {
+            font-size: 16px !important;
+            line-height: 1.2 !important;
+        }
+
+        .driver-popover.plyrcard-driver-theme .driver-popover-description {
+            font-size: 12px !important;
+            line-height: 1.5 !important;
+        }
+
+        .driver-popover.plyrcard-driver-theme .driver-popover-footer {
+            margin-top: 10px !important;
+            padding-top: 10px !important;
+        }
+
+        .driver-popover.plyrcard-driver-theme .driver-popover-prev-btn,
+        .driver-popover.plyrcard-driver-theme .driver-popover-next-btn,
+        .driver-popover.plyrcard-driver-theme .driver-popover-close-btn {
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+            border-radius: 10px !important;
+        }
+
+        .driver-popover.plyrcard-driver-theme .driver-popover-progress-text {
+            font-size: 11px !important;
+        }
+    }
 </style>
 
 <script>
@@ -95,7 +130,7 @@
 
     (function () {
         const USER_ID = window.PLYRCARD_CURRENT_USER_ID ?? 'guest';
-        const TOUR_VERSION = 'v8';
+        const TOUR_VERSION = 'v9';
         const KEY_PREFIX = `${TOUR_VERSION}-user-${USER_ID}`;
 
         const TOUR_KEYS = {
@@ -274,6 +309,90 @@
             return null;
         }
 
+        function isMobileViewport() {
+            return window.matchMedia('(max-width: 768px)').matches;
+        }
+
+        function getScrollableTabsContainer(el) {
+            if (!el) return null;
+
+            return (
+                el.closest('[role="tablist"]') ||
+                el.closest('.overflow-x-auto') ||
+                el.closest('.overflow-auto') ||
+                el.parentElement
+            );
+        }
+
+        function scrollElementIntoViewSmart(el) {
+            if (!el) return;
+
+            const topOffset = isMobileViewport() ? 92 : 72;
+
+            try {
+                const rect = el.getBoundingClientRect();
+                const absoluteTop = window.scrollY + rect.top - topOffset;
+
+                window.scrollTo({
+                    top: Math.max(0, absoluteTop),
+                    behavior: 'smooth',
+                });
+            } catch (e) {}
+        }
+
+        function ensureHorizontalVisibility(el) {
+            if (!el) return;
+
+            const container = getScrollableTabsContainer(el);
+            if (!container) return;
+
+            const containerStyle = window.getComputedStyle(container);
+            const canScrollX =
+                container.scrollWidth > container.clientWidth ||
+                containerStyle.overflowX === 'auto' ||
+                containerStyle.overflowX === 'scroll';
+
+            if (!canScrollX) return;
+
+            const elRect = el.getBoundingClientRect();
+            const cRect = container.getBoundingClientRect();
+
+            const outLeft = elRect.left < cRect.left + 8;
+            const outRight = elRect.right > cRect.right - 8;
+
+            if (outLeft || outRight) {
+                try {
+                    const left =
+                        el.offsetLeft - Math.max(12, (container.clientWidth - el.clientWidth) / 2);
+
+                    container.scrollTo({
+                        left: Math.max(0, left),
+                        behavior: 'smooth',
+                    });
+                } catch (e) {
+                    try {
+                        el.scrollIntoView({
+                            behavior: 'smooth',
+                            inline: 'center',
+                            block: 'nearest',
+                        });
+                    } catch (_) {}
+                }
+            }
+        }
+
+        function prepareElementForStep(selector) {
+            const el = document.querySelector(selector);
+            if (!el) return Promise.resolve();
+
+            ensureHorizontalVisibility(el);
+            scrollElementIntoViewSmart(el);
+
+            return new Promise((resolve) => {
+                setTimeout(resolve, isMobileViewport() ? 450 : 250);
+            });
+        }
+
         function buildDashboardSteps() {
             clearTourMarks();
 
@@ -282,7 +401,6 @@
             const completeProfile = mark('complete-profile', findButton('Complete profile'));
             const profileLink = mark('profile-link', findSidebarLink('Profile'));
 
-            // Be tolerant here: if one widget is missing, still allow the tour.
             const steps = [
                 makeStep(viewsCard, 'Card activity', 'This card shows your current views and visibility stats.'),
                 makeStep(progressSection, 'Profile progress', 'This section shows how complete your profile is and what is still missing.'),
@@ -363,6 +481,87 @@
             return null;
         }
 
+        function buildDriverConfig(config) {
+            return {
+                showProgress: true,
+                allowClose: false,
+                animate: true,
+                overlayOpacity: isMobileViewport() ? 0.22 : 0.35,
+                stagePadding: isMobileViewport() ? 6 : 8,
+                stageRadius: isMobileViewport() ? 12 : 16,
+                disableActiveInteraction: true,
+                popoverClass: 'plyrcard-driver-theme',
+                nextBtnText: 'Next',
+                prevBtnText: 'Back',
+                doneBtnText: 'Finish',
+                steps: config.steps,
+                onDestroyed: () => {
+                    console.log('Tour destroyed');
+                    activeTourInstance = null;
+                    activeTourKey = null;
+                    activeStepsCount = 0;
+                    completionLocked = false;
+                },
+                onHighlightStarted: async (element, step) => {
+                    try {
+                        const selector =
+                            typeof step?.element === 'string'
+                                ? step.element
+                                : element?.id
+                                    ? `#${element.id}`
+                                    : null;
+
+                        if (selector) {
+                            await prepareElementForStep(selector);
+                        } else if (element) {
+                            ensureHorizontalVisibility(element);
+                            scrollElementIntoViewSmart(element);
+                        }
+                    } catch (e) {}
+                },
+                onNextClick: async (element, step, options) => {
+                    const currentIndex = Number(options.state.activeIndex ?? 0);
+                    const isLastStep = currentIndex === activeStepsCount - 1;
+
+                    console.log('Next clicked', {
+                        currentIndex,
+                        activeStepsCount,
+                        isLastStep,
+                        activeTourKey,
+                    });
+
+                    if (isLastStep) {
+                        if (completionLocked) return;
+                        completionLocked = true;
+
+                        await setTourDoneByKey(activeTourKey);
+                        activeTourInstance.destroy();
+                        return;
+                    }
+
+                    const nextStep = config.steps[currentIndex + 1];
+                    if (nextStep?.element) {
+                        await prepareElementForStep(nextStep.element);
+                    }
+
+                    activeTourInstance.moveNext();
+                },
+                onPrevClick: async (element, step, options) => {
+                    const currentIndex = Number(options.state.activeIndex ?? 0);
+                    const prevStep = config.steps[currentIndex - 1];
+
+                    if (prevStep?.element) {
+                        await prepareElementForStep(prevStep.element);
+                    }
+
+                    activeTourInstance.movePrevious();
+                },
+                onCloseClick: () => {
+                    activeTourInstance.destroy();
+                },
+            };
+        }
+
         function startTourForCurrentPage() {
             const page = detectPage();
             console.log('Detected onboarding page:', page);
@@ -403,58 +602,8 @@
             activeTourKey = config.key;
             activeStepsCount = config.steps.length;
 
-            const driverObj = window.driver.js.driver({
-                showProgress: true,
-                allowClose: false,
-                animate: true,
-                overlayOpacity: 0.35,
-                stagePadding: 8,
-                stageRadius: 16,
-                disableActiveInteraction: true,
-                popoverClass: 'plyrcard-driver-theme',
-                nextBtnText: 'Next',
-                prevBtnText: 'Back',
-                doneBtnText: 'Finish',
-                steps: config.steps,
-                onDestroyed: () => {
-                    console.log('Tour destroyed');
-                    activeTourInstance = null;
-                    activeTourKey = null;
-                    activeStepsCount = 0;
-                    completionLocked = false;
-                },
-                onNextClick: async (element, step, options) => {
-                    const currentIndex = Number(options.state.activeIndex ?? 0);
-                    const isLastStep = currentIndex === activeStepsCount - 1;
-
-                    console.log('Next clicked', {
-                        currentIndex,
-                        activeStepsCount,
-                        isLastStep,
-                        activeTourKey,
-                    });
-
-                    if (isLastStep) {
-                        if (completionLocked) return;
-                        completionLocked = true;
-
-                        await setTourDoneByKey(activeTourKey);
-                        driverObj.destroy();
-                        return;
-                    }
-
-                    driverObj.moveNext();
-                },
-                onPrevClick: () => {
-                    driverObj.movePrevious();
-                },
-                onCloseClick: () => {
-                    driverObj.destroy();
-                },
-            });
-
-            activeTourInstance = driverObj;
-            driverObj.drive();
+            activeTourInstance = window.driver.js.driver(buildDriverConfig(config));
+            activeTourInstance.drive();
             return true;
         }
 

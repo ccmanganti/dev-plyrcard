@@ -119,6 +119,13 @@
             box-shadow: 0 8px 16px rgba(255, 107, 74, 0.16);
         }
 
+        .profile-section-highlight {
+            scroll-margin-top: 110px;
+            transition: box-shadow 0.25s ease, border-color 0.25s ease;
+            box-shadow: 0 0 0 1px rgba(255, 107, 74, 0.45), 0 0 0 6px rgba(255, 107, 74, 0.08);
+            border-radius: 1rem;
+        }
+
         .profile-avatar img {
             width: 100%;
             height: 100%;
@@ -579,7 +586,11 @@
             </div>
         </div>
 
-        <div class="profile-page-tabs">
+        <div
+            class="profile-page-tabs"
+            data-requested-tab="{{ $this->requestedTab }}"
+            data-requested-section="{{ $this->getRequestedSectionId() }}"
+        >
             {{ $this->form }}
         </div>
 
@@ -662,4 +673,67 @@
             </div>
         </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:navigated', handleProfileSectionJump);
+        document.addEventListener('livewire:initialized', handleProfileSectionJump);
+        document.addEventListener('DOMContentLoaded', handleProfileSectionJump);
+
+        function handleProfileSectionJump() {
+            const wrapper = document.querySelector('.profile-page-tabs');
+
+            if (!wrapper) {
+                return;
+            }
+
+            const requestedTab = wrapper.dataset.requestedTab;
+            const requestedSection = wrapper.dataset.requestedSection;
+
+            if (!requestedTab && !requestedSection) {
+                return;
+            }
+
+            const activateTabAndScroll = () => {
+                if (requestedTab) {
+                    const tabButtons = Array.from(
+                        wrapper.querySelectorAll('[role="tab"], button[role="tab"]')
+                    );
+
+                    const matchingTab = tabButtons.find((button) => {
+                        const label = (button.textContent || '').trim().toLowerCase();
+                        return label === requestedTab.trim().toLowerCase();
+                    });
+
+                    if (matchingTab && matchingTab.getAttribute('aria-selected') !== 'true') {
+                        matchingTab.click();
+                    }
+                }
+
+                if (requestedSection) {
+                    setTimeout(() => {
+                        const target = document.getElementById(requestedSection);
+
+                        if (!target) {
+                            return;
+                        }
+
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                        });
+
+                        target.classList.add('profile-section-highlight');
+
+                        setTimeout(() => {
+                            target.classList.remove('profile-section-highlight');
+                        }, 2200);
+                    }, 180);
+                }
+            };
+
+            requestAnimationFrame(() => {
+                setTimeout(activateTabAndScroll, 80);
+            });
+        }
+    </script>
 </x-filament-panels::page>

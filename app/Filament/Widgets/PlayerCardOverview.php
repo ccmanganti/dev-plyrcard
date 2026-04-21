@@ -27,19 +27,16 @@ class PlayerCardOverview extends StatsOverviewWidget
             Stat::make('Card Views', number_format($totalViews))
                 ->description('Total Views on Your PlyrCard')
                 ->descriptionIcon(Heroicon::OutlinedEye)
-                ->chart([0, 0, 0, 0, 0, 0, 0])
                 ->color('danger'),
 
             Stat::make('Card Score', (string) $cardScore)
                 ->description('Your PlyrCard performance score')
                 ->descriptionIcon(Heroicon::OutlinedStar)
-                ->chart([0, 0, 0, 0, 0, 0, 0])
                 ->color('warning'),
 
             Stat::make('Profile Complete', $profileCompletion . '%')
                 ->description($profileCompletionLabel)
                 ->descriptionIcon(Heroicon::OutlinedChartPie)
-                ->chart([10, 20, 35, 45, 60, 75, $profileCompletion])
                 ->color($this->getProfileCompletionColor($profileCompletion)),
         ];
     }

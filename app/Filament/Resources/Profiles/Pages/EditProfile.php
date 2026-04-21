@@ -76,6 +76,12 @@ class EditProfile extends Page implements HasForms
 
         abort_unless($this->user, 403);
 
+        $this->requestedSection = request()->query('section');
+
+        $sectionConfig = $this->getRequestedSectionConfig();
+
+        $this->requestedTab = $sectionConfig['tab'] ?? null;
+
         $this->user->loadMissing('roles', 'nationalTeam');
 
         $this->website = $this->user->websites()->first();
@@ -483,6 +489,10 @@ class EditProfile extends Page implements HasForms
                             ->schema([
                                 Section::make('Personal Information')
                                     ->icon('heroicon-m-user')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-personal-information',
+                                        'data-profile-section' => 'basic-information',
+                                    ])
                                     ->columns(6)
                                     ->schema([
                                         TextInput::make('first_name')
@@ -552,6 +562,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Address')
                                     ->icon('heroicon-m-map-pin')
                                     ->columns(2)
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-address',
+                                        'data-profile-section' => 'location',
+                                    ])
                                     ->schema([
                                         TextInput::make('street')
                                             ->prefixIcon('heroicon-m-map-pin')
@@ -585,6 +599,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Sport Details')
                                     ->icon('heroicon-m-cog-6-tooth')
                                     ->columns(3)
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-sport-details',
+                                        'data-profile-section' => 'athletic-profile',
+                                    ])
                                     ->schema([
                                         Select::make('sport')
                                             ->prefixIcon('heroicon-m-trophy')
@@ -675,6 +693,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Physical Stats')
                                     ->columns(2)
                                     ->icon('heroicon-m-chart-bar-square')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-physical-stats',
+                                        'data-profile-section' => 'athletic-profile',
+                                    ])
                                     ->schema([
                                         TextInput::make('height')
                                             ->prefixIcon('heroicon-m-arrows-up-down')
@@ -711,6 +733,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Experience')
                                     ->icon('heroicon-m-flag')
                                     ->columns(2)
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-experience',
+                                        'data-profile-section' => 'associations national-team',
+                                    ])
                                     ->schema([
                                         Select::make('league_id')
                                             ->prefixIcon('heroicon-m-squares-2x2')
@@ -881,6 +907,10 @@ class EditProfile extends Page implements HasForms
                             ->schema([
                                 Section::make('Player Bio')
                                     ->icon('heroicon-m-pencil-square')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-player-bio',
+                                        'data-profile-section' => 'bio',
+                                    ])
                                     ->description('Write your athlete story — who you are, your playing style, and what drives you.')
                                     ->schema([
                                         Textarea::make('player_bio')
@@ -892,6 +922,10 @@ class EditProfile extends Page implements HasForms
 
                                 Section::make('Academic Accolades')
                                     ->icon('heroicon-m-academic-cap')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-academic-accolades',
+                                        'data-profile-section' => 'bio',
+                                    ])
                                     ->description('Honors, dean’s list, certifications — anything that showcases your academic excellence.')
                                     ->schema([
                                         Textarea::make('academic_accolades')
@@ -904,6 +938,10 @@ class EditProfile extends Page implements HasForms
 
                                 Section::make('Sports Accolades')
                                     ->icon('heroicon-m-trophy')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-sports-accolades',
+                                        'data-profile-section' => 'bio',
+                                    ])
                                     ->schema([
                                         Textarea::make('sports_accolades')
                                             ->label('Sports Accolades')
@@ -919,6 +957,10 @@ class EditProfile extends Page implements HasForms
                             ->schema([
                                 Section::make('Profile & Hero Images')
                                     ->icon('heroicon-m-photo')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-profile-hero-images',
+                                        'data-profile-section' => 'media-branding',
+                                    ])
                                     ->description('Shared player images used across your card and website.')
                                     ->columns(3)
                                     ->schema([
@@ -974,6 +1016,10 @@ class EditProfile extends Page implements HasForms
                                     ]),
 
                                 Section::make('YouTube Highlights')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-youtube-highlights',
+                                        'data-profile-section' => 'media-branding',
+                                    ])
                                     ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-play-circle' : 'heroicon-m-lock-closed')
                                     ->description(
                                         ($this->getPlanInfo()?->hasPremiumAccess() ?? false)
@@ -1024,6 +1070,10 @@ class EditProfile extends Page implements HasForms
                             ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
                             ->schema([
                                 Section::make('Social Profiles')
+                                ->extraAttributes([
+                                    'id' => 'profile-section-social-profiles',
+                                    'data-profile-section' => 'social',
+                                ])
                                     ->icon(($this->getPlanInfo()?->hasPremiumAccess() ?? false) ? 'heroicon-m-share' : 'heroicon-m-lock-closed')
                                     ->description(
                                         ($this->getPlanInfo()?->hasPremiumAccess() ?? false)
@@ -1085,6 +1135,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Parents / Guardians')
                                     ->icon('heroicon-m-heart')
                                     ->columns(3)
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-parents-guardians',
+                                        'data-profile-section' => 'people',
+                                    ])
                                     ->schema([
                                         TextInput::make('parent')
                                             ->label('Primary Parent')
@@ -1130,6 +1184,10 @@ class EditProfile extends Page implements HasForms
                                 Section::make('Coaches')
                                     ->icon('heroicon-m-megaphone')
                                     ->columns(3)
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-coaches',
+                                        'data-profile-section' => 'people',
+                                    ])
                                     ->schema([
                                         TextInput::make('club_coach')
                                             ->label('Club Coach')
@@ -1174,6 +1232,10 @@ class EditProfile extends Page implements HasForms
 
                                 Section::make('Trainers')
                                     ->icon('heroicon-m-bolt')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-trainers',
+                                        'data-profile-section' => 'people',
+                                    ])
                                     ->columns(3)
                                     ->schema([
                                         TextInput::make('tech_trainer')
@@ -1223,6 +1285,10 @@ class EditProfile extends Page implements HasForms
                             ->schema([
                                 Section::make('Website Settings')
                                     ->icon('heroicon-m-globe-alt')
+                                    ->extraAttributes([
+                                        'id' => 'profile-section-website-settings',
+                                        'data-profile-section' => 'website',
+                                    ])
                                     ->description('Configure your personal athlete website.')
                                     ->columns(2)
                                     ->schema([
@@ -1525,5 +1591,69 @@ class EditProfile extends Page implements HasForms
     public function closePreviewAccessModal(): void
     {
         $this->showPreviewAccessModal = false;
+    }
+
+    public ?string $requestedSection = null;
+
+    public ?string $requestedTab = null;
+
+    protected function getSectionNavigationMap(): array
+    {
+        return [
+            'basic-information' => [
+                'tab' => 'Basic Info',
+                'section_id' => 'profile-section-personal-information',
+            ],
+            'location' => [
+                'tab' => 'Basic Info',
+                'section_id' => 'profile-section-address',
+            ],
+            'athletic-profile' => [
+                'tab' => 'Athlete Info',
+                'section_id' => 'profile-section-sport-details',
+            ],
+            'associations' => [
+                'tab' => 'Athlete Info',
+                'section_id' => 'profile-section-experience',
+            ],
+            'media-branding' => [
+                'tab' => 'Media',
+                'section_id' => 'profile-section-profile-hero-images',
+            ],
+            'national-team' => [
+                'tab' => 'Athlete Info',
+                'section_id' => 'profile-section-experience',
+            ],
+            'bio' => [
+                'tab' => 'Bio & Accolades',
+                'section_id' => 'profile-section-player-bio',
+            ],
+            'social' => [
+                'tab' => 'Social',
+                'section_id' => 'profile-section-social-profiles',
+            ],
+            'people' => [
+                'tab' => 'People',
+                'section_id' => 'profile-section-parents-guardians',
+            ],
+            'website' => [
+                'tab' => 'Website',
+                'section_id' => 'profile-section-website-settings',
+            ],
+        ];
+    }
+
+    public function getRequestedSectionConfig(): ?array
+    {
+        if (blank($this->requestedSection)) {
+            return null;
+        }
+
+        return $this->getSectionNavigationMap()[$this->requestedSection] ?? null;
+    }
+
+    public function getRequestedSectionId(): ?string
+    {
+        return $this->getRequestedSectionConfig()['section_id'] ?? null;
     }
 }

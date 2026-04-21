@@ -2,10 +2,9 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Resources\Users\UserResource;
+use App\Filament\Resources\Profiles\ProfileResource;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
-use App\Filament\Resources\Profiles\ProfileResource;
 
 class ProfileProgressWidget extends Widget
 {
@@ -20,12 +19,12 @@ class ProfileProgressWidget extends Widget
         $user = Auth::user();
 
         $completion = $this->getProfileCompletion($user);
-        $missingItems = $this->getMissingItems($user);
+        $missingSections = $this->getMissingSections($user);
         $achievements = $this->getAchievements($completion);
 
         return [
             'completion' => $completion,
-            'missingItems' => $missingItems,
+            'missingSections' => $missingSections,
             'achievements' => $achievements,
             'profileUrl' => ProfileResource::getUrl('index'),
         ];
@@ -88,39 +87,101 @@ class ProfileProgressWidget extends Widget
         return (int) min(100, round($corePercentage + $sportBonus));
     }
 
-    protected function getMissingItems($user): array
+    protected function getMissingSections($user): array
     {
         if (! $user) {
             return [];
         }
 
-        $fields = [
-            'first_name' => 'First name',
-            'last_name' => 'Last name',
-            'email' => 'Email',
-            'phone' => 'Phone',
-            'birth' => 'Birth date',
-            'gender' => 'Gender',
-            'country' => 'Country',
-            'city' => 'City',
-            'sport' => 'Sport',
-            'height' => 'Height',
-            'weight' => 'Weight',
-            'player_bio' => 'Player bio',
-            'player_image' => 'Profile photo',
-            'plyrcard_image' => 'PlyrCard image',
-            'school_id' => 'School',
-            'club_id' => 'Club',
-            'league_id' => 'League',
-            'featured_video_url' => 'Featured video',
-            'ig_handle' => 'Instagram handle',
-            'position' => 'Position',
-            'dominant_foot' => 'Dominant foot',
-            'jersey_number' => 'Jersey number',
+        $profileBaseUrl = ProfileResource::getUrl('index');
+
+        $sections = [
+            [
+                'key' => 'basic-information',
+                'title' => 'Basic Information',
+                'items' => [
+                    'first_name' => 'First name',
+                    'last_name' => 'Last name',
+                    'email' => 'Email',
+                    'phone' => 'Phone',
+                    'birth' => 'Birth date',
+                    'gender' => 'Gender',
+                ],
+            ],
+            [
+                'key' => 'location',
+                'title' => 'Location',
+                'items' => [
+                    'country' => 'Country',
+                    'city' => 'City',
+                ],
+            ],
+            [
+                'key' => 'athletic-profile',
+                'title' => 'Athletic Profile',
+                'items' => [
+                    'sport' => 'Sport',
+                    'position' => 'Position',
+                    'dominant_foot' => 'Dominant foot',
+                    'height' => 'Height',
+                    'weight' => 'Weight',
+                    'jersey_number' => 'Jersey number',
+                    'max_speed' => 'Max speed',
+                    'player_bio' => 'Player bio',
+                ],
+            ],
+            [
+                'key' => 'associations',
+                'title' => 'Associations',
+                'items' => [
+                    'school_id' => 'School',
+                    'club_id' => 'Club',
+                    'league_id' => 'League',
+                ],
+            ],
+            [
+                'key' => 'media-branding',
+                'title' => 'Media & Branding',
+                'items' => [
+                    'player_image' => 'Profile photo',
+                    'plyrcard_image' => 'PlyrCard image',
+                    'featured_video_url' => 'Featured video',
+                    'ig_handle' => 'Instagram handle',
+                ],
+            ],
+            [
+                'key' => 'national-team',
+                'title' => 'National Team',
+                'items' => [
+                    'natl_team_exp' => 'National team experience',
+                    'national_team_id' => 'National team',
+                    'national_team_period' => 'National team period',
+                ],
+            ],
         ];
 
-        return collect($fields)
-            ->filter(fn ($label, $field) => ! $this->hasValue($user->{$field} ?? null))
+        return collect($sections)
+            ->map(function (array $section) use ($user, $profileBaseUrl) {
+                $missingItems = collect($section['items'])
+                    ->filter(fn ($label, $field) => ! $this->hasValue($user->{$field} ?? null))
+                    ->map(function ($label) use ($profileBaseUrl, $section) {
+                        return [
+                            'label' => $label,
+                            'url' => $profileBaseUrl . '?section=' . $section['key'],
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                return [
+                    'key' => $section['key'],
+                    'title' => $section['title'],
+                    'count' => count($missingItems),
+                    'items' => $missingItems,
+                    'url' => $profileBaseUrl . '?section=' . $section['key'],
+                ];
+            })
+            ->filter(fn (array $section) => $section['count'] > 0)
             ->values()
             ->all();
     }

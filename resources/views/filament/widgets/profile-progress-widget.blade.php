@@ -70,6 +70,59 @@
                 transition: width 0.3s ease;
             }
 
+            .profile-sections {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .profile-section-block {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.025);
+                border-radius: 14px;
+                padding: 1rem;
+            }
+
+            .profile-section-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+                margin-bottom: 0.85rem;
+            }
+
+            .profile-section-title-wrap {
+                min-width: 0;
+            }
+
+            .profile-section-title {
+                margin: 0;
+                font-size: 0.9rem;
+                font-weight: 700;
+                color: #fff;
+            }
+
+            .profile-section-meta {
+                margin: 0.2rem 0 0;
+                font-size: 0.78rem;
+                color: #94a3b8;
+            }
+
+            .profile-section-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                font-size: 0.8rem;
+                font-weight: 700;
+                color: #fb923c;
+                text-decoration: none;
+                white-space: nowrap;
+            }
+
+            .profile-section-link:hover {
+                color: #fdba74;
+            }
+
             .profile-grid {
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -85,6 +138,14 @@
                 border-radius: 12px;
                 border: 1px solid rgba(249, 115, 22, 0.18);
                 background: rgba(249, 115, 22, 0.08);
+                text-decoration: none;
+                transition: 0.2s ease;
+            }
+
+            .profile-item:hover {
+                border-color: rgba(251, 146, 60, 0.35);
+                background: rgba(249, 115, 22, 0.14);
+                transform: translateY(-1px);
             }
 
             .profile-item-icon {
@@ -186,7 +247,8 @@
                     grid-template-columns: 1fr;
                 }
 
-                .profile-card-header {
+                .profile-card-header,
+                .profile-section-header {
                     flex-direction: column;
                     align-items: flex-start;
                 }
@@ -237,18 +299,40 @@
                     <div class="profile-card-header">
                         <div>
                             <p class="profile-title">Missing profile parts</p>
-                            <p class="profile-subtle">{{ count($missingItems) }} remaining</p>
+                            <p class="profile-subtle">
+                                {{ collect($missingSections)->sum('count') }} remaining across {{ count($missingSections) }} section(s)
+                            </p>
                         </div>
                     </div>
 
-                    @if (count($missingItems))
-                        <div class="profile-grid">
-                            @foreach ($missingItems as $item)
-                                <div class="profile-item">
-                                    <span class="profile-item-icon">
-                                        <x-filament::icon icon="heroicon-o-exclamation-circle" class="h-4 w-4" />
-                                    </span>
-                                    <span class="profile-item-text">{{ $item }}</span>
+                    @if (count($missingSections))
+                        <div class="profile-sections">
+                            @foreach ($missingSections as $section)
+                                <div class="profile-section-block">
+                                    <div class="profile-section-header">
+                                        <div class="profile-section-title-wrap">
+                                            <p class="profile-section-title">{{ $section['title'] }}</p>
+                                            <p class="profile-section-meta">
+                                                {{ $section['count'] }} missing item{{ $section['count'] > 1 ? 's' : '' }}
+                                            </p>
+                                        </div>
+
+                                        <a href="{{ $section['url'] }}" class="profile-section-link">
+                                            <x-filament::icon icon="heroicon-o-pencil-square" class="h-4 w-4" />
+                                            <span>Edit section</span>
+                                        </a>
+                                    </div>
+
+                                    <div class="profile-grid">
+                                        @foreach ($section['items'] as $item)
+                                            <a href="{{ $item['url'] }}" class="profile-item">
+                                                <span class="profile-item-icon">
+                                                    <x-filament::icon icon="heroicon-o-exclamation-circle" class="h-4 w-4" />
+                                                </span>
+                                                <span class="profile-item-text">{{ $item['label'] }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
