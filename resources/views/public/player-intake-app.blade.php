@@ -70,40 +70,79 @@
             width:100%;
             max-width:var(--pc-app-width);
             min-height:100vh;
-            background:var(--pc-orange);
             position:relative;
-            overflow:visible;
+            overflow:hidden;
             box-shadow:0 18px 50px rgba(0,0,0,.14);
+            background:#000;
+        }
+
+        #contact_field{
+            display:flex;
+        }
+
+        #gender_field.field{
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        }
+
+        #league_field{
+            margin-bottom:30px;
         }
 
         @media (max-width: 480px){
-            body,.page{background:var(--pc-orange)}
+            body,.page{background:#000}
             .app{max-width:none;box-shadow:none}
-        }
-
-        .app::before{
-            content:"";
-            position:absolute;
-            inset:0;
-            pointer-events:none;
-            opacity:.16;
-            background:
-                radial-gradient(circle at 14% 18%, rgba(255,255,255,.20), transparent 18%),
-                radial-gradient(circle at 82% 24%, rgba(255,255,255,.13), transparent 18%),
-                radial-gradient(circle at 22% 72%, rgba(255,255,255,.11), transparent 18%),
-                radial-gradient(circle at 78% 86%, rgba(255,255,255,.10), transparent 20%);
-            mix-blend-mode:soft-light;
-            z-index:0;
         }
 
         .screen{
             position:relative;
             min-height:100vh;
-            background:var(--pc-orange);
+            z-index:1;
+            background-position:center center;
+            background-repeat:no-repeat;
+            background-size:cover;
+            background-image:var(--screen-bg);
+        }
+
+        .screen::before{
+            content:"";
+            position:absolute;
+            inset:0;
+            pointer-events:none;
+            z-index:0;
+        }
+
+        .screen > *{
+            position:relative;
             z-index:1;
         }
 
-        .logo-main{width:98px;display:block;margin:0 auto;opacity:.92}
+        #introScreen{
+            --screen-bg:url("{{ asset('images/plyr-1.png') }}");
+        }
+
+        #thanksScreen{
+            --screen-bg:url("{{ asset('images/plyr-5.png') }}");
+        }
+
+        #formScreen.step-bg-1{
+            --screen-bg:url("{{ asset('images/plyr-2.png') }}");
+        }
+
+        #formScreen.step-bg-2{
+            --screen-bg:url("{{ asset('images/plyr-3.png') }}");
+        }
+
+        #formScreen.step-bg-3{
+            --screen-bg:url("{{ asset('images/plyr-4.png') }}");
+        }
+
+        #formScreen.step-bg-4{
+            --screen-bg:url("{{ asset('images/plyr-5.png') }}");
+        }
+
+        .logo-main{width:220px;display:block;}
 
         .hero-screen{
             padding:34px 28px calc(28px + env(safe-area-inset-bottom));
@@ -113,13 +152,13 @@
             min-height:100vh;
         }
 
-        .hero-logo-wrap{text-align:center;padding-top:104px}
+        .hero-logo-wrap{text-align:start;}
         .hero-copy{margin-top:auto}
 
         .hero-title,
         .final-title{
             margin:0 0 16px;
-            font-size:56px;
+            font-size:36px;
             line-height:.9;
             letter-spacing:.01em;
             text-transform:uppercase;
@@ -130,7 +169,7 @@
         .hero-text,
         .final-text{
             margin:0 0 18px;
-            font-size:14px;
+            font-size:12px;
             line-height:1.22;
             color:#fff;
             opacity:.96;
@@ -170,6 +209,8 @@
             position:relative;
             z-index:3;
             flex:0 0 var(--topbar-h);
+            background:rgba(0,0,0,.14);
+            backdrop-filter:blur(3px);
         }
 
         .back-btn{
@@ -186,35 +227,54 @@
         }
 
         .back-btn svg{width:20px;height:20px;stroke:#666;stroke-width:2.6}
-        .topbar-title{font-size:14px;line-height:1;color:#fff;letter-spacing:.02em;font-weight:700}
+        .topbar-title{display:none}
+
+        .topbar-logo{
+            display:block;
+            height:28px;
+            width:auto;
+            margin-left:auto;
+            object-fit:contain;
+        }
 
         .progress-band{
-            background:#efefec;
-            min-height:var(--band-h);
-            display:grid;
-            grid-template-columns:86px 1fr;
-            gap:10px;
-            align-items:center;
-            padding:12px 14px 12px 6px;
             position:relative;
+            background:rgba(64, 64, 64, 0.2);
+            min-height:var(--band-h);
+            padding:16px 14px 14px;
             z-index:2;
             flex:0 0 var(--band-h);
+            backdrop-filter:blur(6px);
         }
 
-        .ring-wrap{display:flex;justify-content:center;align-items:center}
         .ring{
-            width:76px;
-            height:76px;
-            border-radius:50%;
-            background:conic-gradient(var(--pc-blue) 0deg var(--ring-angle, 90deg), #dfdfdf var(--ring-angle, 90deg) 360deg);
-            position:relative;
-            display:grid;
-            place-items:center;
-            transition:background .28s ease;
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:5px;
+            background:rgba(0,0,0,.08);
+            border-radius:0;
+            overflow:hidden;
         }
-        .ring::after{content:"";position:absolute;inset:13px;border-radius:50%;background:#efefec}
-        .ring-value{position:relative;z-index:1;font-size:18px;color:#4b4b4b;font-weight:300}
-        .progress-title{margin:0;color:#141414;font-size:22px;line-height:.98;font-weight:700;max-width:250px}
+
+        .ring::after{
+            content:"";
+            position:absolute;
+            inset:0 auto 0 0;
+            width:var(--progress-width, 25%);
+            background:var(--pc-blue);
+            transition:width .28s ease;
+        }
+
+        .progress-title{
+            margin:10px 0 0;
+            color:white;
+            font-size:22px;
+            line-height:.98;
+            font-weight:700;
+            max-width:320px;
+        }
 
         .step-screen{
             color:#fff;
@@ -227,37 +287,49 @@
         .final-screen{
             display:none;
             position:relative;
+            width:100%;
             flex:1 1 auto;
-            min-height:0;
-            padding:18px 22px calc(18px + env(safe-area-inset-bottom));
+            min-height:calc(100vh - var(--topbar-h) - var(--band-h));
+            padding:20px 20px calc(20px + env(safe-area-inset-bottom));
             overflow:visible;
             animation:fadeSlide .22s ease;
         }
 
         .panel-scroll{
-            height:auto;
+            display:flex;
+            flex-direction:column;
+            flex:1 1 auto;
+            min-height:0;
             overflow:visible;
             padding-bottom:8px;
         }
 
-        .panel-scroll.with-sticky-cta{
-            height:auto;
-            min-height:0;
-            padding-bottom:120px;
+        .panel-scroll.with-bottom-cta{
+            display:flex;
+            flex-direction:column;
+            min-height:100%;
             overflow:visible;
         }
 
         .step-panel.active,
-        .final-screen.active{display:block}
+        .final-screen.active{display:flex}
 
         @keyframes fadeSlide{
             from{opacity:0;transform:translateY(12px)}
             to{opacity:1;transform:translateY(0)}
         }
 
-        .field{margin-bottom:18px;position:relative;z-index:2}
-        .field.field-open{z-index:120}
-        .field.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .field{
+            margin-bottom:16px;
+            position:relative;
+            z-index:1;
+        }
+
+        .field.field-open{
+            z-index:3000;
+        }
+        .field.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+        .field.three{display:grid;grid-template-columns:1fr 2fr 2fr;gap:16px}
         .field.narrow{max-width:172px}
         .label{display:block;margin:0 0 8px;font-size:17px;line-height:1;text-transform:uppercase;letter-spacing:.02em;color:#fff;font-weight:700}
 
@@ -269,16 +341,23 @@
             width:100%;
             min-height:34px;
             border:0;
+            border-bottom: 2px solid #ff6347;
             outline:none;
-            border-radius:999px;
-            background:var(--pc-white);
-            color:#111;
+            background: #8383832f;
+            color:white;
             font-family:"Antonio", system-ui, sans-serif;
-            font-size:13px;
-            padding:7px 12px;
+            font-size:15px;
+            padding:15px 12px;
             appearance:none;
             transition:transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+        
         }
+
+
+        .input {
+            margin-top:8px;
+        }
+        
 
         .input:focus,
         .select:focus,
@@ -299,27 +378,118 @@
             width:192px;
         }
 
-        .gender-list{display:flex;flex-direction:row;gap:10px;padding-left:1px}
-        .gender-item{display:flex;align-items:center;gap:12px;color:#fff;font-size:15px;line-height:1}
-        .gender-item input{width:16px;height:16px;accent-color:#111;transform:scale(1.65);margin:0}
-
-        .step1-grid{
+        .gender-list{
             display:grid;
-            grid-template-columns:minmax(0, 1fr) 176px;
+            grid-template-columns:1fr 1fr;
             gap:12px;
-            align-items:start;
+            padding-left:1px;
         }
-        .step1-left{min-width:0}
-        .step1-logo-col{position:relative;min-height:360px}
-        .step1-logo-col .watermark{position:absolute;right:-10px;top:54px;width:204px}
 
-        .search-select{position:relative;z-index:20;transition:opacity .18s ease, transform .18s ease}
-        .search-select.open{z-index:260}
+        .gender-card{
+            width:100%;
+            border:1px solid rgba(255,255,255,.14);
+            border-bottom:2px solid #ff6347;
+            background:rgba(131,131,131,.18);
+            color:#fff;
+            border-radius:14px;
+            padding:12px 10px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            cursor:pointer;
+            transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+        }
+
+        .gender-card:hover{
+            transform:translateY(-1px);
+            background:rgba(131,131,131,.24);
+        }
+
+        .gender-card.is-selected{
+            background:rgba(31,132,216,.18);
+            border-color:rgba(31,132,216,.6);
+            box-shadow:0 0 0 2px rgba(31,132,216,.18);
+        }
+
+        .gender-card svg{
+            width:34px;
+            height:34px;
+            display:block;
+        }
+
+        .gender-card-label{
+            font-size:15px;
+            line-height:1;
+            font-weight:700;
+            letter-spacing:.02em;
+            text-transform:uppercase;
+        }
+
+        .gender-input{
+            display:none;
+        }
+
+        .step1-left{min-width:0}
+
+        .search-select{
+            position:relative;
+            z-index:20;
+            transition:opacity .18s ease, transform .18s ease;
+        }
+
+        .search-select.open{
+            z-index:3100;
+        }
         .search-select.is-disabled{opacity:.58;pointer-events:none}
         .search-select.is-hidden{display:none}
         .search-select-control{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer}
         .search-select-value{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
-        .search-select-placeholder,.search-select-meta{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111}
+        .search-select-placeholder,.search-select-meta{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color: white;}
+
+        select.select{
+            background-color:#232323;
+            color:#fff;
+            -webkit-appearance:none;
+            appearance:none;
+        }
+
+        select.select option,
+        select.select optgroup{
+            background:#171717;
+            color:#fff;
+        }
+
+        select.select option:checked,
+        select.select option:hover,
+        select.select option:focus{
+            background:#232323 linear-gradient(0deg, #232323 0%, #232323 100%);
+            color:#fff;
+        }
+
+        #position_select{
+            background-color:#232323;
+            color:#fff;
+        }
+
+        #position_select::-webkit-scrollbar{
+            width:10px;
+            height:10px;
+        }
+
+        #position_select::-webkit-scrollbar-track{
+            background:rgba(242,241,236,.18);
+            border-radius:999px;
+        }
+
+        #position_select::-webkit-scrollbar-thumb{
+            background:rgba(17,17,17,.38);
+            border-radius:999px;
+            border:2px solid transparent;
+            background-clip:padding-box;
+        }
+
         .search-select-logo{width:18px;height:18px;border-radius:50%;object-fit:cover;background:#ddd;flex:0 0 auto}
         .search-select-caret,.search-select-search-icon{width:15px;height:15px;color:#666;flex:0 0 auto}
 
@@ -329,21 +499,75 @@
             left:0;
             right:0;
             top:calc(100% + 6px);
-            z-index:280;
-            background:#f6f6f2;
+            z-index:3200;
+            background:#171717;
+            border:1px solid rgba(255,255,255,.08);
             border-radius:14px;
             overflow:hidden;
-            box-shadow:0 18px 36px rgba(0,0,0,.16);
+            box-shadow:0 18px 36px rgba(0,0,0,.28);
         }
-        .search-select.open .search-select-dropdown{display:block}
-        .search-select-search{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid rgba(0,0,0,.08);color:#666}
-        .search-select-search input{width:100%;min-height:32px;border:0;border-radius:999px;outline:none;background:#fff;padding:7px 12px;font-family:"Antonio", system-ui, sans-serif;font-size:13px}
-        .search-select-list{max-height:190px;overflow:auto;padding:6px 0}
-        .search-select-option{width:100%;border:0;background:transparent;color:#111;text-align:left;padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
+
+        .search-select.open .search-select-dropdown{
+            display:block;
+            z-index:3200;
+        }
+
+        .search-select-search{
+            display:flex;
+            gap:8px;
+            align-items:center;
+            padding:8px;
+            border-bottom:1px solid rgba(255,255,255,.08);
+            color:#bfbfbf;
+            background:#171717;
+            position:relative;
+            z-index:1;
+        }
+        .search-select-search input{width:100%;min-height:32px;border:1px solid rgba(255,255,255,.08);border-radius:999px;outline:none;background:#232323;color:#fff;padding:7px 12px;font-family:"Antonio", system-ui, sans-serif;font-size:13px}
+        .search-select-list{
+            max-height:190px;
+            overflow:auto;
+            padding:6px 0;
+            background:#171717;
+            scrollbar-width:thin;
+            scrollbar-color:rgba(17,17,17,.38) rgba(242,241,236,.18);
+        }
+
+        .search-select-list::-webkit-scrollbar{
+            width:10px;
+            height:10px;
+        }
+
+        .search-select-list::-webkit-scrollbar-track{
+            background:rgba(242,241,236,.18);
+            border-radius:999px;
+        }
+
+        .search-select-list::-webkit-scrollbar-thumb{
+            background:rgba(17,17,17,.38);
+            border-radius:999px;
+            border:2px solid transparent;
+            background-clip:padding-box;
+        }
+
+        .search-select-list::-webkit-scrollbar-thumb:hover{
+            background:rgba(17,17,17,.54);
+            background-clip:padding-box;
+        }
+        .search-select-option{width:100%;border:0;background:#171717;color:#fff;text-align:left;padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
         .search-select-option-copy{display:flex;flex-direction:column;min-width:0}
         .search-select-option-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .search-select-option-subtitle{font-size:10px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .search-select-empty{padding:12px;color:#666;font-size:12px}
+        .search-select-option-subtitle{font-size:10px;color:#a7a7a7;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .search-select-empty{padding:12px;color:#bfbfbf;font-size:12px;background:#171717}
+
+        .search-select-option:hover,
+        .search-select-option:focus{
+            background:#232323;
+        }
+
+        .search-select-option.is-selected{
+            background:#202a36;
+        }
 
         .manual-input-wrap{display:none;animation:fadeSlide .2s ease}
         .manual-input-actions{display:flex;justify-content:flex-end;margin-top:8px}
@@ -368,15 +592,12 @@
         .sample-copy{margin:0 0 16px;font-size:13px;line-height:1.18;color:#fff;opacity:.95}
 
         .step-cta{
-            position:sticky;
-            left:0;
-            right:0;
-            bottom:0;
-            z-index:4;
-            margin-top:18px;
-            padding-top:14px;
-            padding-bottom:calc(2px + env(safe-area-inset-bottom));
-            background:linear-gradient(to bottom, rgba(231,118,89,0), rgba(231,118,89,.92) 34%, rgba(231,118,89,1) 100%);
+            margin-top:auto;
+            padding-top:20px;
+            padding-bottom:calc(6px + env(safe-area-inset-bottom));
+            position:relative;
+            z-index:1;
+            background:linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,0));
         }
 
         .final-screen{padding-top:14px}
@@ -390,7 +611,7 @@
             margin-top:8px;
             font-size:11px;
             line-height:1.3;
-            color:#fff2f2;
+            color: #ea3131ff;;
         }
 
         .field.is-invalid .input,
@@ -437,7 +658,7 @@
         @if (session('success'))
             <section class="screen hero-screen" id="thanksScreen">
                 <div class="hero-logo-wrap">
-                    <img src="{{ asset('images/plyrcardlogo.png') }}" alt="PLYRCARD" class="logo-main">
+                    <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="logo-main">
                 </div>
 
                 <div class="hero-copy">
@@ -456,7 +677,7 @@
         @else
             <section class="screen hero-screen" id="introScreen">
                 <div class="hero-logo-wrap">
-                    <img src="{{ asset('images/plyrcardlogo.png') }}" alt="PLYRCARD" class="logo-main">
+                    <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="logo-main">
                 </div>
 
                 <div class="hero-copy">
@@ -479,15 +700,11 @@
                         <button type="button" class="back-btn" id="backBtn" aria-label="Back">
                             <svg viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6"/></svg>
                         </button>
-                        <div class="topbar-title" id="topbarTitle">PLYRPROFILE</div>
+                        <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="topbar-logo">
                     </div>
 
                     <div class="progress-band" id="progressBand">
-                        <div class="ring-wrap">
-                            <div class="ring" id="progressRing">
-                                <div class="ring-value" id="progressValue">25%</div>
-                            </div>
-                        </div>
+                        <div class="ring" id="progressRing" style="--progress-width:25%;"></div>
                         <div>
                             <h2 class="progress-title" id="progressTitle">Begin with the basics and lay the foundation for your PLYRCARD.</h2>
                         </div>
@@ -496,88 +713,99 @@
                     <div class="step-panel active" data-step="1">
                         <div class="panel-scroll">
                             <div class="field two">
-                                        <div>
-                                            <label class="label" for="first_name">First Name</label>
-                                            <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" placeholder="Enter first name" required>
-                                            <div class="field-message" id="first_name_error"></div>
-                                        </div>
-                                        <div>
-                                            <label class="label" for="last_name">Last Name</label>
-                                            <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" placeholder="Enter last name" required>
-                                            <div class="field-message" id="last_name_error"></div>
-                                        </div>
-                                    </div>
+                                <div>
+                                    <label class="label" for="first_name">First Name</label>
+                                    <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" placeholder="Enter first name" required>
+                                    <div class="field-message" id="first_name_error"></div>
+                                </div>
+                                <div>
+                                    <label class="label" for="last_name">Last Name</label>
+                                    <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" placeholder="Enter last name" required>
+                                    <div class="field-message" id="last_name_error"></div>
+                                </div>
+                            </div>
                             <div class="step1-grid">
                                 <div class="step1-left">
-                                    
-
                                     <div class="field" id="gender_field">
                                         <label class="label">Gender</label>
-                                        <div class="gender-list">
-                                            @php
-                                                $oldGender = old('gender');
-                                                $isFemale = in_array($oldGender, ['female', 'girls'], true);
-                                                $isMale = ! $isFemale;
-                                            @endphp
-                                            <label class="gender-item">
-                                                <input type="radio" name="gender" value="male" {{ $isMale ? 'checked' : '' }}>
-                                                <span>Boys</span>
-                                            </label>
-                                            <label class="gender-item">
-                                                <input type="radio" name="gender" value="female" {{ $isFemale ? 'checked' : '' }}>
-                                                <span>Girls</span>
-                                            </label>
+                                        @php
+                                            $oldGender = old('gender');
+                                            $isFemale = in_array($oldGender, ['female', 'girls'], true);
+                                            $selectedGender = $isFemale ? 'female' : 'male';
+                                        @endphp
+                                        <input type="hidden" name="gender" id="gender" value="{{ $selectedGender }}">
+                                        <div class="gender-list" id="genderList">
+                                            <button type="button" class="gender-card {{ $selectedGender === 'male' ? 'is-selected' : '' }}" data-gender-value="male" aria-pressed="{{ $selectedGender === 'male' ? 'true' : 'false' }}">
+                                                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                                                    <circle cx="18" cy="30" r="8" stroke="currentColor" stroke-width="3"/>
+                                                    <path d="M24 24L36 12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                                    <path d="M28 12H36V20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                                <span class="gender-card-label">Boys</span>
+                                            </button>
+                                            <button type="button" class="gender-card {{ $selectedGender === 'female' ? 'is-selected' : '' }}" data-gender-value="female" aria-pressed="{{ $selectedGender === 'female' ? 'true' : 'false' }}">
+                                                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                                                    <circle cx="24" cy="18" r="8" stroke="currentColor" stroke-width="3"/>
+                                                    <path d="M24 26V40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                                    <path d="M18 34H30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                                </svg>
+                                                <span class="gender-card-label">Girls</span>
+                                            </button>
                                         </div>
                                         <div class="field-message" id="gender_error"></div>
                                     </div>
 
-                                    <div class="field narrow">
-                                        <label class="label" for="personal_email">Email</label>
-                                        <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" placeholder="Enter email address" required>
-                                        <div class="field-message" id="personal_email_error"></div>
-                                    </div>
+                                    <div class="field two">
+                                        <div class="field narrow">
+                                            <label class="label" for="personal_email">Email</label>
+                                            <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" placeholder="Enter email address" required>
+                                            <div class="field-message" id="personal_email_error"></div>
+                                        </div>
 
-                                    <div class="field narrow">
-                                        <label class="label" for="phone">Cell Phone</label>
-                                        <input class="input phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" inputmode="tel" placeholder="Enter mobile number">
+                                        <div class="field narrow">
+                                            <label class="label" for="phone">Cell Phone</label>
+                                            <input class="input phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" inputmode="tel" placeholder="(555) 123-4567">
                                         <div class="field-message" id="phone_error"></div>
                                     </div>
                                 </div>
 
-                                <div class="step1-logo-col">
-                                    <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="watermark">
+
                                 </div>
+                            </div>
+
+                            <div class="step-cta">
+                                <button type="button" class="btn" id="nextBtn1">Next</button>
                             </div>
                         </div>
 
-                        <div class="step-cta">
-                            <button type="button" class="btn" id="nextBtn1">Next</button>
-                        </div>
+                        
                     </div>
 
                     <div class="step-panel" data-step="2">
-                        <div class="panel-scroll">
-                            <div class="field">
-                                <label class="label" for="sport">Sport</label>
-                                <select class="select" id="sport" name="sport" required>
-                                    <option value="">Select One</option>
-                                    @foreach ($sportPositions as $sportKey => $positions)
-                                        <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
-                                            {{ str($sportKey)->replace('_', ' ')->title() }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="field-message" id="sport_error"></div>
+                        <div class="panel-scroll with-bottom-cta">
+                            <div class="field two">
+                                <div>
+                                    <label class="label" for="sport">Sport</label>
+                                    <select class="select" id="sport" name="sport" required>
+                                        <option value="">Select One</option>
+                                        @foreach ($sportPositions as $sportKey => $positions)
+                                            <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
+                                                {{ str($sportKey)->replace('_', ' ')->title() }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="field-message" id="sport_error"></div>
+                                </div>
+                                <div>
+                                    <div class="field" id="position_field">
+                                        <label class="label" for="position_select">Position</label>
+                                        <select class="select" id="position_select" aria-label="Position"></select>
+                                        <div class="field-message" id="position_error"></div>
+                                        <div class="chips-wrap" id="positionChips"></div>
+                                        <input type="hidden" name="position[]" id="position_values" value="">
+                                    </div>
+                                </div>
                             </div>
-
-                            <div class="field" id="position_field">
-                                <label class="label" for="position_select">Position</label>
-                                <select class="select" id="position_select" aria-label="Position"></select>
-                                <div class="field-message" id="position_error"></div>
-                                <div class="chips-wrap" id="positionChips"></div>
-                                <input type="hidden" name="position[]" id="position_values" value="">
-                            </div>
-
                             <div class="field" id="league_field">
                                 <label class="label">League</label>
                                 <div id="leagueSelectRoot"></div>
@@ -588,35 +816,41 @@
                                 </div>
                                 <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
                             </div>
-
-                            <div class="field" id="club_field">
-                                <label class="label">Club</label>
-                                <div id="clubSelectRoot"></div>
-                                <div class="field-message" id="club_error"></div>
-                                <div class="manual-input-wrap" id="clubManualWrap">
-                                    <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club name">
+                            
+                            <div class="field two">
+                                
+                                <div class="field" id="club_field">
+                                    <label class="label">Club</label>
+                                    <div id="clubSelectRoot"></div>
+                                    <div class="field-message" id="club_error"></div>
+                                    <div class="manual-input-wrap" id="clubManualWrap">
+                                        <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club name">
+                                    </div>
+                                    <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
                                 </div>
-                                <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
+
+                                <div class="field" id="team_field">
+                                    <label class="label">Team</label>
+                                    <div id="teamSelectRoot"></div>
+                                    <div class="field-message" id="team_error"></div>
+                                    <div class="manual-input-wrap" id="teamManualWrap">
+                                        <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter team name">
+                                    </div>
+                                    <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
+                                </div>
                             </div>
+                            
 
-                            <div class="field" id="team_field">
-                                <label class="label">Team</label>
-                                <div id="teamSelectRoot"></div>
-                                <div class="field-message" id="team_error"></div>
-                                <div class="manual-input-wrap" id="teamManualWrap">
-                                    <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter team name">
-                                </div>
-                                <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
+                            <div class="step-cta">
+                                <button type="button" class="btn" id="nextBtn2">Next</button>
                             </div>
                         </div>
 
-                        <div class="step-cta">
-                            <button type="button" class="btn" id="nextBtn2">Next</button>
-                        </div>
+                        
                     </div>
 
                     <div class="step-panel" data-step="3">
-                        <div class="panel-scroll with-sticky-cta" id="imageStepScroll">
+                        <div class="panel-scroll with-bottom-cta" id="imageStepScroll">
                             <div class="field" id="portrait_images_field">
                                 <label class="label" for="portrait_images">Profile Image</label>
                                 <input class="file-input" type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
@@ -637,23 +871,25 @@
                                 <p class="sample-copy">Please upload a clear profile headshot and a few action shots to help us build the best visual version of your PLYRCARD.</p>
                                 <p class="sample-copy">Add a quality headshot for your main profile image, plus a few action shots for possible custom image creation.</p>
                             </div>
+                            <div class="step-cta">
+                                <button type="button" class="btn" id="nextBtn3">Next</button>
+                            </div>
                         </div>
 
-                        <div class="step-cta sticky">
-                            <button type="button" class="btn" id="nextBtn3">Next</button>
-                        </div>
+                        
                     </div>
 
                     <div class="final-screen" data-step="4">
-                        <div class="panel-scroll">
+                        <div class="panel-scroll with-bottom-cta">
                             <h1 class="final-title">Now Make It Unforgettable</h1>
                             <p class="final-text">You’ve built the foundation, now add the final touches that make your PLYRCARD stand out. Finish it now or come back later, but don’t skip the step that brings it all together.</p>
                             <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="final-logo">
+                            <div class="step-cta">
+                                <button type="submit" class="btn" id="submitBtn">Submit</button>
+                            </div>
                         </div>
 
-                        <div class="step-cta">
-                            <button type="submit" class="btn" id="submitBtn">Submit</button>
-                        </div>
+                        
                     </div>
                 </section>
             </form>
@@ -738,6 +974,14 @@ window.plyrIntakeData = {
         if (thanks) thanks.style.display = 'none';
     }
 
+    function setFormScreenBackground(step){
+        const form = document.getElementById('formScreen');
+        if (!form) return;
+
+        form.classList.remove('step-bg-1', 'step-bg-2', 'step-bg-3', 'step-bg-4');
+        form.classList.add('step-bg-' + String(step));
+    }
+
     function showIntro(){
         currentStep = 0;
         hideAllScreens();
@@ -754,7 +998,10 @@ window.plyrIntakeData = {
         currentStep = step;
         hideAllScreens();
         const form = $('#formScreen');
-        if (form) form.style.display = 'flex';
+        if (form) {
+            form.style.display = 'flex';
+            setFormScreenBackground(step);
+        }
 
         $all('.step-panel').forEach(function(panel){ panel.classList.remove('active'); panel.scrollTop = 0; });
         $all('.final-screen').forEach(function(panel){ panel.classList.remove('active'); panel.scrollTop = 0; });
@@ -763,7 +1010,6 @@ window.plyrIntakeData = {
         if (target) target.classList.add('active');
 
         $('.topbar').style.display = 'flex';
-        $('#topbarTitle').textContent = stepMeta[step].topbar;
 
         if (step <= 3){
             $('#progressBand').style.display = 'grid';
@@ -778,27 +1024,31 @@ window.plyrIntakeData = {
 
     function animateProgress(percent){
         const ring = $('#progressRing');
-        const valueEl = $('#progressValue');
-        if (!ring || !valueEl) return;
+        if (!ring) return;
         const current = Number(ring.dataset.percent || 0);
         const target = Math.max(0, Math.min(100, Number(percent) || 0));
         const duration = 280;
         const start = performance.now();
+
         function tick(now){
             const t = Math.min(1, (now - start) / duration);
             const eased = 1 - Math.pow(1 - t, 3);
             const value = current + ((target - current) * eased);
-            ring.style.setProperty('--ring-angle', (value * 3.6) + 'deg');
-            valueEl.textContent = Math.round(value) + '%';
-            if (t < 1) requestAnimationFrame(tick);
+            ring.style.setProperty('--progress-width', value + '%');
+            if (t < 1) {
+                requestAnimationFrame(tick);
+            } else {
+                ring.style.setProperty('--progress-width', target + '%');
+            }
         }
+
         ring.dataset.percent = String(target);
         requestAnimationFrame(tick);
     }
 
     function validateEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safe(v)); }
     function digitsOnly(v){ return safe(v).replace(/\D/g, ''); }
-    function validatePhone(v){ const len = digitsOnly(v).length; return !safe(v) || (len >= 7 && len <= 15); }
+    function validatePhone(v){ const len = digitsOnly(v).length; return !safe(v) || len === 10; }
 
     function getFieldContainer(fieldId){
         if (fieldId === 'gender') return document.getElementById('gender_field');
@@ -843,7 +1093,7 @@ window.plyrIntakeData = {
         });
     }
 
-    function getSelectedGender(){ return safe(document.querySelector('input[name="gender"]:checked') && document.querySelector('input[name="gender"]:checked').value).toLowerCase(); }
+    function getSelectedGender(){ return safe($('#gender') && $('#gender').value).toLowerCase(); }
     function getSelectedSport(){ return safe($('#sport') && $('#sport').value).toLowerCase(); }
 
     function mapLeagueOptions(){
@@ -979,6 +1229,9 @@ window.plyrIntakeData = {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'search-select-option';
+                    if (String(item.id) === String(hiddenInput.value)) {
+                        btn.classList.add('is-selected');
+                    }
                     btn.innerHTML =
                         (item.logo_url ? '<img src="' + item.logo_url + '" class="search-select-logo" alt="">' : '<span class="search-select-logo"></span>') +
                         '<span class="search-select-option-copy">' +
@@ -1147,14 +1400,14 @@ window.plyrIntakeData = {
         if (step === 1){
             const first = safe($('#first_name') && $('#first_name').value);
             const last = safe($('#last_name') && $('#last_name').value);
-            const gender = safe(document.querySelector('input[name="gender"]:checked') && document.querySelector('input[name="gender"]:checked').value);
+            const gender = safe($('#gender') && $('#gender').value);
             const email = safe($('#personal_email') && $('#personal_email').value);
             const phone = safe($('#phone') && $('#phone').value);
             setFieldError('first_name', first ? '' : 'First name is required.');
             setFieldError('last_name', last ? '' : 'Last name is required.');
             setFieldError('gender', gender ? '' : 'Select a gender.');
             setFieldError('personal_email', !email ? 'Email is required.' : (validateEmail(email) ? '' : 'Enter a valid email address.'));
-            setFieldError('phone', !phone ? '' : (validatePhone(phone) ? '' : 'Enter a valid phone number.'));
+            setFieldError('phone', !phone ? '' : (validatePhone(phone) ? '' : 'Enter a valid US phone number.'));
             return !!(first && last && gender && email && validateEmail(email) && validatePhone(phone));
         }
 
@@ -1187,7 +1440,7 @@ window.plyrIntakeData = {
         const total = 5;
         if (safe($('#first_name') && $('#first_name').value)) filled += 1;
         if (safe($('#last_name') && $('#last_name').value)) filled += 1;
-        if (safe(document.querySelector('input[name="gender"]:checked') && document.querySelector('input[name="gender"]:checked').value)) filled += 1;
+        if (safe($('#gender') && $('#gender').value)) filled += 1;
         if (validateEmail(safe($('#personal_email') && $('#personal_email').value))) filled += 1;
         if (validatePhone(safe($('#phone') && $('#phone').value)) && safe($('#phone') && $('#phone').value)) filled += 1;
         return 25 + Math.round((filled / total) * 25);
@@ -1307,20 +1560,11 @@ window.plyrIntakeData = {
     function clearDraft(){ try{ localStorage.removeItem(draftKey); } catch(e){} }
 
     function formatPhoneInputValue(value) {
-        let raw = String(value || '').replace(/[^\d+]/g, '');
-        const hasPlus = raw.indexOf('+') === 0;
-        let digits = raw.replace(/\D/g, '').slice(0, 15);
-        if (!digits) return hasPlus ? '+' : '';
-        if (hasPlus) {
-            if (digits.length <= 3) return '+' + digits;
-            if (digits.length <= 6) return '+' + digits.slice(0,3) + ' ' + digits.slice(3);
-            if (digits.length <= 10) return '+' + digits.slice(0,3) + ' ' + digits.slice(3,6) + ' ' + digits.slice(6);
-            return '+' + digits.slice(0,3) + ' ' + digits.slice(3,6) + ' ' + digits.slice(6,10) + ' ' + digits.slice(10);
-        }
-        if (digits.length <= 4) return digits;
-        if (digits.length <= 7) return digits.slice(0,4) + ' ' + digits.slice(4);
-        if (digits.length <= 11) return digits.slice(0,4) + ' ' + digits.slice(4,7) + ' ' + digits.slice(7);
-        return digits.slice(0,4) + ' ' + digits.slice(4,8) + ' ' + digits.slice(8,12) + ' ' + digits.slice(12);
+        const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+        if (!digits) return '';
+        if (digits.length < 4) return '(' + digits;
+        if (digits.length < 7) return '(' + digits.slice(0, 3) + ') ' + digits.slice(3);
+        return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
     }
 
     document.addEventListener('DOMContentLoaded', function(){
@@ -1328,6 +1572,13 @@ window.plyrIntakeData = {
 
         const draft = restoreDraft();
         if (!selectedPositions.length && oldPositions.length) selectedPositions = oldPositions.slice();
+
+        const initialGender = safe($('#gender') && $('#gender').value);
+        $all('[data-gender-value]').forEach(function(card){
+            const isSelected = String(card.getAttribute('data-gender-value')) === String(initialGender);
+            card.classList.toggle('is-selected', isSelected);
+            card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        });
 
         renderPositions();
         updatePositionField();
@@ -1449,8 +1700,17 @@ window.plyrIntakeData = {
             updateLiveProgress();
         });
 
-        $all('input[name="gender"]').forEach(function(radio){
-            radio.addEventListener('change', function(){
+        $all('[data-gender-value]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                const genderInput = $('#gender');
+                if (genderInput) genderInput.value = this.getAttribute('data-gender-value') || '';
+
+                $all('[data-gender-value]').forEach(function(card){
+                    const isSelected = card === btn;
+                    card.classList.toggle('is-selected', isSelected);
+                    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+                });
+
                 $('#league_id').value = '';
                 $('#club_id').value = '';
                 $('#team_id').value = '';
@@ -1465,6 +1725,7 @@ window.plyrIntakeData = {
                 teamApi && teamApi.render();
                 saveDraft();
                 updateLiveProgress();
+                validateStep(1);
             });
         });
 
