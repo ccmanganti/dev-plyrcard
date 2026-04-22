@@ -328,7 +328,7 @@
         .field.field-open{
             z-index:3000;
         }
-        .field.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+        .field.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;z-index:999;}
         .field.three{display:grid;grid-template-columns:1fr 2fr 2fr;gap:16px}
         .field.narrow{max-width:172px}
         .label{display:block;margin:0 0 8px;font-size:17px;line-height:1;text-transform:uppercase;letter-spacing:.02em;color:#fff;font-weight:700}
