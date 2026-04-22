@@ -18,8 +18,8 @@
             --pc-border-soft: rgba(255, 255, 255, 0.06);
             --pc-text: #f5f5f5;
             --pc-muted: #8f8f95;
-            --pc-orange: #ff6b4a;
-            --pc-orange-2: #ff7e5f;
+            --pc-orange: #ff6347;
+            --pc-orange-2: #ff6347;
             --pc-red-brown: #2a120f;
             --pc-red-border: rgba(255, 107, 74, 0.35);
             --pc-cyan: #29c5ff;
@@ -281,7 +281,7 @@
             height: 44px;
             border-radius: 999px;
             background: rgba(255, 107, 74, 0.14);
-            color: #ff6b4a;
+            color: #ff6347;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -316,7 +316,7 @@
 
         .pc-inline-lock__button {
             border: 0;
-            background: #ff6b4a;
+            background: #ff6347;
             color: #fff;
             border-radius: 0.8rem;
             padding: 0.8rem 1rem;
