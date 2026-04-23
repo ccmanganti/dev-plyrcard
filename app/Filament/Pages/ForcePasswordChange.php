@@ -23,6 +23,45 @@ class ForcePasswordChange extends Page
     public function mount(): void
     {
         abort_unless(auth()->check(), 403);
+
+        if (\STS\FilamentImpersonate\Facades\Impersonation::isImpersonating()) {
+            $this->redirect(filament()->getUrl(), navigate: false);
+            return;
+        }
+    }
+
+    protected function shouldBypassPasswordChange($user): bool
+    {
+        if ($user->hasRole('superadmin')) {
+            return true;
+        }
+
+        if (app()->bound('impersonate')) {
+            $manager = app('impersonate');
+
+            if (method_exists($manager, 'isImpersonating') && $manager->isImpersonating()) {
+                $impersonatorId = method_exists($manager, 'getImpersonatorId')
+                    ? $manager->getImpersonatorId()
+                    : null;
+
+                if ($impersonatorId) {
+                    $impersonator = \App\Models\User::find($impersonatorId);
+
+                    return $impersonator?->hasRole('superadmin') ?? false;
+                }
+            }
+        }
+
+        $sessionKey = config('laravel-impersonate.session_key', 'impersonated_by');
+        $impersonatorId = session($sessionKey);
+
+        if ($impersonatorId) {
+            $impersonator = \App\Models\User::find($impersonatorId);
+
+            return $impersonator?->hasRole('superadmin') ?? false;
+        }
+
+        return false;
     }
 
     public function save(): void
@@ -55,6 +94,6 @@ class ForcePasswordChange extends Page
 
     public function getTitle(): string | Htmlable
     {
-        return 'Change Your Password';
+        return 'Security';
     }
 }

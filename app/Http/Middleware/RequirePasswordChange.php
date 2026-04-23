@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use STS\FilamentImpersonate\Facades\Impersonation;
 use Symfony\Component\HttpFoundation\Response;
 
 class RequirePasswordChange
@@ -16,7 +17,12 @@ class RequirePasswordChange
             return $next($request);
         }
 
-        // Allow the password change page, logout, and onboarding-complete endpoint
+        // If this session is impersonating, do not force the password-change page.
+        // This prevents superadmins from getting blocked when impersonating users.
+        if (Impersonation::isImpersonating()) {
+            return $next($request);
+        }
+
         $allowedRouteNames = [
             'filament.admin.pages.force-password-change',
             'filament.admin.auth.logout',

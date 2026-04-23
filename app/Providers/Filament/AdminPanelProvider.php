@@ -63,7 +63,9 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): string => Blade::render('@include("filament.hooks.onboarding-script")'),
+                fn (): string => auth()->check() && auth()->user()->shouldSeeOnboarding()
+                    ? Blade::render('@include("filament.hooks.onboarding-script")')
+                    : '',
             )
             ->middleware([
                 EncryptCookies::class,

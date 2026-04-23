@@ -580,13 +580,56 @@
         .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.18);font-size:12px;color:#fff;line-height:1}
         .chip button{border:0;background:transparent;color:#fff;font:inherit;cursor:pointer;padding:0;line-height:1}
 
-        .file-input{padding:7px 10px}
+        .file-input{
+            position:absolute;
+            width:1px;
+            height:1px;
+            padding:0;
+            margin:-1px;
+            overflow:hidden;
+            clip:rect(0,0,0,0);
+            white-space:nowrap;
+            border:0;
+        }
         .file-input::file-selector-button{border:0;border-radius:999px;padding:6px 10px;background:#deded8;color:#111;font-family:"Antonio", system-ui, sans-serif;margin-right:8px;cursor:pointer}
         .image-preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;max-width:318px}
         .image-preview-card{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);animation:fadeSlide .2s ease}
         .image-preview-card img{width:100%;height:100%;object-fit:cover;display:block}
         .image-preview-overlay{position:absolute;inset:0;background:linear-gradient(to top, rgba(0,0,0,.52), rgba(0,0,0,.08));display:flex;align-items:flex-end;justify-content:center;padding:8px}
         .image-preview-remove{border:0;border-radius:999px;background:rgba(255,255,255,.94);color:#111;font-family:"Antonio", system-ui, sans-serif;font-size:11px;line-height:1;text-transform:uppercase;padding:7px 10px;cursor:pointer}
+        .image-add-tile{
+            aspect-ratio:1/1;
+            border-radius:14px;
+            border:1px dashed rgba(255,255,255,.28);
+            background:rgba(255,255,255,.08);
+            color:#fff;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            cursor:pointer;
+            padding:8px;
+            text-align:center;
+            transition:transform .18s ease, background .18s ease, border-color .18s ease;
+        }
+        .image-add-tile:hover{
+            transform:translateY(-1px);
+            background:rgba(255,255,255,.14);
+            border-color:rgba(255,255,255,.4);
+        }
+        .image-add-tile svg{
+            width:22px;
+            height:22px;
+            display:block;
+        }
+        .image-add-tile span{
+            font-size:11px;
+            line-height:1.15;
+            text-transform:uppercase;
+            font-weight:700;
+            letter-spacing:.03em;
+        }
         .sample-block{margin-top:6px;position:relative;z-index:2;max-width:292px}
         .sample-title{margin:0 0 14px;font-size:19px;line-height:1;text-transform:uppercase;color:#fff;font-weight:700}
         .sample-copy{margin:0 0 16px;font-size:13px;line-height:1.18;color:#fff;opacity:.95}
@@ -626,6 +669,177 @@
         .file-warning-list.visible{
             display:block;
         }
+        .sample-trigger{
+            display:inline-flex;
+            align-items:center;
+            color:black;
+            margin-bottom: 10px;
+            gap:8px;
+            border:0;
+            background:white;
+            border-radius:10px;
+            padding:10px 20px;
+            font-family:"Antonio", system-ui, sans-serif;
+            font-size:19px;
+            line-height:1;
+            text-transform:uppercase;
+            font-weight:700;
+            cursor:pointer;
+        }
+
+        .sample-trigger:hover{
+            opacity:.92;
+        }
+
+        .sample-trigger svg{
+            width:18px;
+            height:18px;
+            flex:0 0 auto;
+        }
+
+        .sample-modal{
+            position:absolute;
+            inset:0;
+            z-index:5000;
+            display:none;
+            align-items:flex-center;
+            justify-content:center;
+            padding:12px;
+            background:rgba(0,0,0,.66);
+            backdrop-filter:blur(6px);
+        }
+
+        .sample-modal.is-open{
+            display:flex;
+        }
+
+        .sample-modal-panel{
+            width:100%;
+            max-width:100%;
+            overflow:auto;
+            border-radius:18px;
+            background:#0f0f10;
+            border:1px solid rgba(255,255,255,.08);
+            box-shadow:0 18px 40px rgba(0,0,0,.45);
+            padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+        }
+
+        .sample-modal-header{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom:12px;
+        }
+
+        .sample-modal-title{
+            margin:0;
+            color:#fff;
+            font-size:22px;
+            line-height:.95;
+            text-transform:uppercase;
+            font-weight:700;
+        }
+
+        .sample-modal-text{
+            margin:6px 0 0;
+            color:rgba(255,255,255,.84);
+            font-size:12px;
+            line-height:1.28;
+            max-width:100%;
+        }
+
+        .sample-modal-close{
+            width:34px;
+            height:34px;
+            border-radius:999px;
+            border:0;
+            background:#f2f1ec;
+            color:#111;
+            font-family:"Antonio", system-ui, sans-serif;
+            font-size:20px;
+            line-height:1;
+            cursor:pointer;
+            flex:0 0 auto;
+        }
+
+        .sample-grid{
+            display:grid;
+            grid-template-columns:1fr;
+            gap:12px;
+        }
+
+        .sample-card{
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:14px;
+            overflow:hidden;
+            background:#171717;
+        }
+
+        .sample-card-image{
+            display:block;
+            width:100%;
+            aspect-ratio:10/16;
+            object-fit:cover;
+            background:#111;
+        }
+
+        .sample-card-copy{
+            padding:12px;
+        }
+
+        .sample-card-kicker{
+            margin:0 0 6px;
+            color:#ff6347;
+            font-size:12px;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:.04em;
+            font-weight:700;
+        }
+
+        .sample-card-title{
+            margin:0 0 8px;
+            color:#fff;
+            font-size:18px;
+            line-height:.95;
+            text-transform:uppercase;
+            font-weight:700;
+        }
+
+        .sample-card-list{
+            margin:0;
+            padding-left:18px;
+            color:rgba(255,255,255,.9);
+            font-size:12px;
+            line-height:1.28;
+        }
+
+        .sample-card-list li + li{
+            margin-top:6px;
+        }
+
+        .sample-footer-note{
+            margin:14px 0 0;
+            color:rgba(255,255,255,.78);
+            font-size:12px;
+            line-height:1.3;
+        }
+
+        @media (min-width: 320px){
+            .sample-modal{
+                padding:14px;
+            }
+
+            .sample-modal-panel{
+                width:min(100%, 680px);
+            }
+
+            .sample-grid{
+                grid-template-columns:1fr 1fr;
+            }
+        }
+
 
         @media (max-width: 400px){
             .hero-title,.final-title{font-size:52px}
@@ -852,24 +1066,27 @@
                     <div class="step-panel" data-step="3">
                         <div class="panel-scroll with-bottom-cta" id="imageStepScroll">
                             <div class="field" id="portrait_images_field">
-                                <label class="label" for="portrait_images">Profile Image</label>
+                                <label class="label" for="portrait_images">Portrait Images</label>
                                 <input class="file-input" type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <input class="file-input" type="file" id="portrait_images_addmore" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
                                 <div class="image-preview-grid" id="portrait_images_preview"></div>
                                 <div class="file-warning-list" id="portrait_images_feedback"></div>
                             </div>
 
                             <div class="field" id="action_images_field">
-                                <label class="label" for="action_images">Action Image</label>
+                                <label class="label" for="action_images">Action Images</label>
                                 <input class="file-input" type="file" id="action_images" name="action_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
+                                <input class="file-input" type="file" id="action_images_addmore" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
                                 <div class="image-preview-grid" id="action_images_preview"></div>
                                 <div class="file-warning-list" id="action_images_feedback"></div>
                             </div>
 
                             <div class="sample-block">
-                                <h3 class="sample-title">Sample (Click Here)</h3>
-                                <p class="sample-copy">Start with a strong headshot, then add a few action shots so we have options for a more custom image if needed.</p>
-                                <p class="sample-copy">Please upload a clear profile headshot and a few action shots to help us build the best visual version of your PLYRCARD.</p>
-                                <p class="sample-copy">Add a quality headshot for your main profile image, plus a few action shots for possible custom image creation.</p>
+                                <button type="button" class="sample-trigger" id="openSampleModal">
+                                    <span>Sample (Click Here)</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
+                                </button>
+                                <p class="sample-copy">Use the sample guide to see ideal framing for portrait and action uploads before you submit your images.</p>
                             </div>
                             <div class="step-cta">
                                 <button type="button" class="btn" id="nextBtn3">Next</button>
@@ -894,6 +1111,49 @@
                 </section>
             </form>
         @endif
+        <div class="sample-modal" id="sampleModal" aria-hidden="true">
+            <div class="sample-modal-panel" role="dialog" aria-modal="true" aria-labelledby="sampleModalTitle">
+                <div class="sample-modal-header">
+                    <div>
+                        <h2 class="sample-modal-title" id="sampleModalTitle">Image Upload Samples</h2>
+                        <p class="sample-modal-text">Use these as quick guides for framing, clarity, and cropping.</p>
+                    </div>
+                    <button type="button" class="sample-modal-close" id="closeSampleModal" aria-label="Close sample guide">×</button>
+                </div>
+
+                <div class="sample-grid">
+                    <article class="sample-card">
+                        <img src="{{ asset('images/portrait-sample.png') }}" alt="Portrait sample" class="sample-card-image">
+                        <div class="sample-card-copy">
+                            <p class="sample-card-kicker">Portrait Sample</p>
+                            <h3 class="sample-card-title">Best for Profile Image</h3>
+                            <ul class="sample-card-list">
+                                <li>Face forward.</li>
+                                <li>Crop head to hips.</li>
+                                <li>Keep face clear.</li>
+                                <li>Use clean background.</li>
+                            </ul>
+                        </div>
+                    </article>
+
+                    <article class="sample-card">
+                        <img src="{{ asset('images/action-sample.png') }}" alt="Action sample" class="sample-card-image">
+                        <div class="sample-card-copy">
+                            <p class="sample-card-kicker">Action Sample</p>
+                            <h3 class="sample-card-title">Best for Action Image</h3>
+                            <ul class="sample-card-list">
+                                <li>Show real gameplay.</li>
+                                <li>Keep full movement visible.</li>
+                                <li>Jersey/number should show.</li>
+                                <li>Use sharp, clear shots.</li>
+                            </ul>
+                        </div>
+                    </article>
+                </div>
+
+                <p class="sample-footer-note">Best: 1 portrait + 2–3 action shots.</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1323,11 +1583,23 @@ window.plyrIntakeData = {
         input.files = dt.files;
     }
 
+    function appendFilesToInput(input, newFiles){
+        if (!input) return;
+        const existingFiles = Array.prototype.slice.call(input.files || []);
+        const dt = new DataTransfer();
+        existingFiles.concat(Array.prototype.slice.call(newFiles || [])).forEach(function(file){
+            dt.items.add(file);
+        });
+        input.files = dt.files;
+    }
+
     function renderImagePreviews(fieldId){
         const input = document.getElementById(fieldId);
         const preview = document.getElementById(fieldId + '_preview');
+        const addMoreInput = document.getElementById(fieldId + '_addmore');
         if (!input || !preview) return;
         preview.innerHTML = '';
+
         Array.prototype.slice.call(input.files || []).forEach(function(file, index){
             if (!file.type.match(/^image\//)) return;
             const card = document.createElement('div');
@@ -1357,6 +1629,14 @@ window.plyrIntakeData = {
             card.appendChild(overlay);
             preview.appendChild(card);
         });
+
+        const addTile = document.createElement('label');
+        addTile.className = 'image-add-tile';
+        addTile.setAttribute('for', fieldId + '_addmore');
+        addTile.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg><span>Add More</span>';
+        preview.appendChild(addTile);
+
+        if (addMoreInput) addMoreInput.value = '';
     }
 
     function validateFilesLive(fieldId){
@@ -1739,8 +2019,32 @@ window.plyrIntakeData = {
             updateLiveProgress();
         });
 
-        $('#portrait_images') && $('#portrait_images').addEventListener('change', function(){ validateFilesLive('portrait_images'); saveDraft(); updateLiveProgress(); });
-        $('#action_images') && $('#action_images').addEventListener('change', function(){ validateFilesLive('action_images'); saveDraft(); updateLiveProgress(); });
+        $('#portrait_images') && $('#portrait_images').addEventListener('change', function(){
+            validateFilesLive('portrait_images');
+            saveDraft();
+            updateLiveProgress();
+        });
+        $('#action_images') && $('#action_images').addEventListener('change', function(){
+            validateFilesLive('action_images');
+            saveDraft();
+            updateLiveProgress();
+        });
+
+        $('#portrait_images_addmore') && $('#portrait_images_addmore').addEventListener('change', function(){
+            appendFilesToInput($('#portrait_images'), this.files);
+            validateFilesLive('portrait_images');
+            saveDraft();
+            updateLiveProgress();
+            this.value = '';
+        });
+
+        $('#action_images_addmore') && $('#action_images_addmore').addEventListener('change', function(){
+            appendFilesToInput($('#action_images'), this.files);
+            validateFilesLive('action_images');
+            saveDraft();
+            updateLiveProgress();
+            this.value = '';
+        });
 
         $all('#playerIntakeForm input, #playerIntakeForm select').forEach(function(el){
             if (el.type === 'file') return;
@@ -1777,6 +2081,37 @@ window.plyrIntakeData = {
             const input = document.getElementById(id);
             if (!input) return;
             input.addEventListener('input', function(){ updateLiveProgress(); saveDraft(); });
+        });
+
+        const sampleModal = $('#sampleModal');
+        const openSampleModalBtn = $('#openSampleModal');
+        const closeSampleModalBtn = $('#closeSampleModal');
+
+        function openSampleModal(){
+            if (!sampleModal) return;
+            sampleModal.classList.add('is-open');
+            sampleModal.setAttribute('aria-hidden', 'false');
+            
+        }
+
+        function closeSampleModal(){
+            if (!sampleModal) return;
+            sampleModal.classList.remove('is-open');
+            sampleModal.setAttribute('aria-hidden', 'true');
+            
+        }
+
+        openSampleModalBtn && openSampleModalBtn.addEventListener('click', openSampleModal);
+        closeSampleModalBtn && closeSampleModalBtn.addEventListener('click', closeSampleModal);
+
+        sampleModal && sampleModal.addEventListener('click', function(e){
+            if (e.target === sampleModal) closeSampleModal();
+        });
+
+        document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape' && sampleModal && sampleModal.classList.contains('is-open')) {
+                closeSampleModal();
+            }
         });
 
         $('#playerIntakeForm') && $('#playerIntakeForm').addEventListener('submit', function(){ clearDraft(); });

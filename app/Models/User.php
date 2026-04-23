@@ -193,4 +193,29 @@ class User extends Authenticatable implements HasName, FilamentUser
     {
         return true;
     }
+
+    public function isSuperadminOrImpersonating(): bool
+    {
+        // If current user is superadmin
+        if ($this->hasRole('superadmin')) {
+            return true;
+        }
+
+        // If we are impersonating
+        if (app('impersonate')->isImpersonating()) {
+            $impersonatorId = app('impersonate')->getImpersonatorId();
+
+            $impersonator = static::find($impersonatorId);
+
+            return $impersonator?->hasRole('superadmin') ?? false;
+        }
+
+        return false;
+    }
+
+    public function shouldSeeOnboarding(): bool
+    {
+        return ! $this->isSuperadminOrImpersonating()
+            && is_null($this->onboarding_completed_at);
+    }
 }
