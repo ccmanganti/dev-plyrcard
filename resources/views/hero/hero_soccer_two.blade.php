@@ -268,8 +268,7 @@
     );
 
     $playerNationalImageUrl = $resolveMediaUrl(
-        $user?->action_image
-            ?? $user?->national_team_image,
+        $user?->national_team_image,
         ''
     );
 
@@ -806,10 +805,10 @@
 
     .hero-action-player-wrap {
         position: absolute;
-        left: 48% !important;
+        left: 60% !important;
         bottom: 5% !important;
-        width: 44% !important;
-        max-width: 44% !important;
+        width: 60% !important;
+        max-width: 60% !important;
         z-index: 3 !important;
         display: flex !important;
         align-items: flex-end !important;
@@ -817,10 +816,10 @@
         pointer-events: none;
     }
 
-    .hero-action-player-img {
+    .hero-national-player-img {
         width: 100% !important;
         max-width: 100% !important;
-        max-height: 64vh !important;
+        max-height: 60vh !important;
         height: auto !important;
         object-fit: contain !important;
         object-position: bottom center !important;
@@ -829,10 +828,10 @@
 
     .hero-national-player-wrap {
         position: absolute;
-        left: 36% !important;
-        bottom: 16% !important;
-        width: 34% !important;
-        max-width: 34% !important;
+        left: 30% !important;
+        bottom: 35% !important;
+        width: 60% !important;
+        max-width: 60% !important;
         z-index: 1 !important;
         display: flex !important;
         align-items: flex-end !important;
@@ -943,8 +942,8 @@
         .hero-action-player-wrap {
             left: 49% !important;
             bottom: 5% !important;
-            width: 45% !important;
-            max-width: 45% !important;
+            width: 60% !important;
+            max-width: 60% !important;
         }
 
         .hero-action-player-img {
@@ -1109,10 +1108,10 @@
         }
 
         .hero-action-player-wrap {
-            left: 40% !important;
+            left: 35% !important;
             bottom: -10% !important;
-            width: 60% !important;
-            max-width: 60% !important;
+            width: 80% !important;
+            max-width: 80% !important;
         }
 
         .hero-action-player-img {
@@ -1544,6 +1543,16 @@
                 @endif
 
                 <div class="hero-layered-stack absolute inset-0 z-10">
+                    @if ($playerNationalImageUrl)
+                        <div class="hero-national-player-wrap">
+                            <img
+                                src="{{ $playerNationalImageUrl }}"
+                                alt="{{ $playerFullName }} national team"
+                                class="hero-national-player-img"
+                            />
+                        </div>
+                    @endif
+
                     @if ($playerActionImageUrl)
                         <div class="hero-action-player-wrap">
                             <img
