@@ -962,12 +962,13 @@ class EditProfile extends Page implements HasForms
                                         'data-profile-section' => 'media-branding',
                                     ])
                                     ->description('Shared player images used across your card and website.')
-                                    ->columns(3)
+                                    ->columns(4)
                                     ->schema([
                                         FileUpload::make('plyrcard_image')
                                             ->label('PlyrCard')
                                             ->image()
                                             ->imageEditor()
+                                            ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
                                             ->disk('public')
                                             ->directory('user-player-images')
                                             ->visibility('public')
@@ -978,22 +979,47 @@ class EditProfile extends Page implements HasForms
                                             ->image()
                                             ->imageEditor()
                                             ->disk('public')
+                                            ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
                                             ->directory('user-player-images')
                                             ->visibility('public')
                                             ->helperText('Upload the half-body player PNG image used across templates.'),
+
+                                        FileUpload::make('action_image')
+                                            ->label('Action Image')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
+                                            ->disk('public')
+                                            ->directory('user-player-images')
+                                            ->visibility('public')
+                                            ->helperText('Upload an in-game action shot (jersey number visible, dynamic pose).'),
+
+                                        FileUpload::make('national_team_image')
+                                            ->label('National Team Image')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
+                                            ->disk('public')
+                                            ->directory('user-player-images')
+                                            ->visibility('public')
+                                            ->helperText('Upload the image used for national team sections or layouts.'),
 
                                         FileUpload::make('mobile_hero_image')
                                             ->label('Vertical Hero Image')
                                             ->image()
                                             ->imageEditor()
+                                            ->columnSpanFull()
                                             ->disk('public')
+                                            ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
                                             ->directory('user-player-images')
                                             ->visibility('public')
                                             ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
 
                                         FileUpload::make('youtube_thumbnail')
                                             ->label('YouTube Thumbnail')
-                                            ->columnSpan(3)
+                                            ->columnSpanFull()
                                             ->image()
                                             ->imageEditor()
                                             ->disk('public')

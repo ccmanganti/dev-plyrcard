@@ -73,6 +73,8 @@ class User extends Authenticatable implements HasName, FilamentUser
         'password',
         'plyrcard_image',
         'player_image',
+        'action_image',
+        'national_team_image',
         'mobile_hero_image',
         'youtube_thumbnail',
         'raw_player_images',

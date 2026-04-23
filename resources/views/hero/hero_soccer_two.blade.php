@@ -262,12 +262,14 @@
     );
 
     $playerActionImageUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_player_action_image'),
+        $user?->action_image
+            ?? $user?->player_image,
         ''
     );
 
     $playerNationalImageUrl = $resolveMediaUrl(
-        $getHeroFieldValue('hero_player_national_image'),
+        $user?->action_image
+            ?? $user?->national_team_image,
         ''
     );
 
@@ -1109,8 +1111,8 @@
         .hero-action-player-wrap {
             left: 40% !important;
             bottom: -10% !important;
-            width: 47% !important;
-            max-width: 47% !important;
+            width: 60% !important;
+            max-width: 60% !important;
         }
 
         .hero-action-player-img {
