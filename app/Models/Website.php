@@ -30,11 +30,13 @@ class Website extends Model
         'surface_color',
         'text_primary_color',
         'text_secondary_color',
+        'published_notification_sent_at',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_published' => 'boolean',
+        'published_notification_sent_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

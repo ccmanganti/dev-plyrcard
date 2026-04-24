@@ -18,7 +18,7 @@ class ProfileProgressWidget extends Widget
     {
         $user = Auth::user();
 
-        $completion = $this->getProfileCompletion($user);
+        $completion = app(\App\Services\ProfileCompletionService::class)->calculate($user);
         $missingSections = $this->getMissingSections($user);
         $achievements = $this->getAchievements($completion);
 

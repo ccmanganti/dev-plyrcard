@@ -87,6 +87,8 @@ class User extends Authenticatable implements HasName, FilamentUser
         'youtube_cache_refreshed_at',
         'national_team_period',
         'max_speed',
+        'profile_completion_percentage',
+        'profile_completion_threshold_sent_at',
         'ghl_contact_id',
 
         // First-login / onboarding fields

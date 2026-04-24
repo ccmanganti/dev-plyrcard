@@ -43,6 +43,7 @@ return [
         'token' => env('GHL_API_TOKEN'),
         'location_id' => env('GHL_LOCATION_ID'),
         'webhook_secret' => env('GHL_WEBHOOK_SECRET'),
+        'profile_completion_field_id' => env('GHL_PROFILE_COMPLETION_FIELD_ID'),
+        'site_status_field_id' => env('GHL_SITE_STATUS_FIELD_ID'),
     ],
-
 ];
