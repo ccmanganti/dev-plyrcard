@@ -1300,35 +1300,6 @@ class EditProfile extends Page implements HasForms
                                             ->maxLength(255),
                                     ]),
                             ]),
-
-                        Tab::make('Website')
-                            ->icon('heroicon-m-globe-alt')
-                            ->schema([
-                                Section::make('Website Settings')
-                                    ->icon('heroicon-m-globe-alt')
-                                    ->extraAttributes([
-                                        'id' => 'profile-section-website-settings',
-                                        'data-profile-section' => 'website',
-                                    ])
-                                    ->description('Configure your personal athlete website.')
-                                    ->columns(2)
-                                    ->schema([
-                                        TextInput::make('domain')
-                                            ->label('Custom Domain')
-                                            ->prefixIcon('heroicon-m-link')
-                                            ->helperText('Enter without https://')
-                                            ->placeholder('yourdomain.com')
-                                            ->columnSpan(2)
-                                            ->disabled()
-                                            ->maxLength(255)
-                                            ->nullable(),
-
-                                        Toggle::make('website_is_published')
-                                            ->label('Website Published')
-                                            ->disabled()
-                                            ->default(false),
-                                    ]),
-                            ]),
                     ])
                     ->contained(true),
             ])

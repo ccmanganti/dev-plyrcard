@@ -1223,34 +1223,6 @@ class UserResource extends Resource
                                         ->maxLength(255),
                                 ]),
                         ]),
-
-                    Tab::make('Website')
-                        ->icon('heroicon-m-globe-alt')
-                        ->schema([
-                            Section::make('Website Settings')
-                                ->icon('heroicon-m-globe-alt')
-                                ->description('Configure website access and publishing settings.')
-                                ->columns(2)
-                                ->schema([
-                                    TextInput::make('domain')
-                                        ->label('Custom Domain')
-                                        ->prefixIcon('heroicon-m-link')
-                                        ->helperText('Enter without https://')
-                                        ->placeholder('yourdomain.com')
-                                        ->columnSpan(2)
-                                        ->maxLength(255)
-                                        ->unique(ignoreRecord: true)
-                                        ->nullable(),
-
-                                    Toggle::make('website_is_published')
-                                        ->label('Website Published')
-                                        ->default(false)
-                                        ->formatStateUsing(function ($state, $record) {
-                                            return (bool) ($record?->websites()->first()?->is_published ?? false);
-                                        })
-                                        ->dehydrated(false),
-                                ]),
-                        ]),
                 ])->columnSpan(2),
         ]);
     }
