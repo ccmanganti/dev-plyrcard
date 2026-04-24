@@ -1244,26 +1244,24 @@ class UserResource extends Resource
             'nationalTeam',
         ]))
         ->columns([
-            TextColumn::make('first_name')
-                ->label('First Name')
-                ->searchable()
-                ->sortable(),
-
-            TextColumn::make('last_name')
-                ->label('Last Name')
-                ->searchable()
-                ->sortable(),
+            TextColumn::make('name')
+                ->label('Name')
+                ->state(fn (User $record): string => trim($record->first_name . ' ' . $record->last_name) ?: '-')
+                ->searchable(['first_name', 'last_name'])
+                ->sortable(['first_name', 'last_name']),
 
             TextColumn::make('email')
-                ->label('PlyrCard Email')
+                ->label('Email')
                 ->searchable()
-                ->copyable(),
+                ->copyable()
+                ->toggleable(),
 
             TextColumn::make('roles.name')
                 ->label('Roles')
                 ->badge()
                 ->separator(',')
-                ->searchable(),
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('sport')
                 ->label('Sport')
@@ -1282,27 +1280,28 @@ class UserResource extends Resource
             TextColumn::make('team_name')
                 ->label('Team')
                 ->searchable()
-                ->toggleable(),
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('club.name')
                 ->label('Club')
                 ->searchable()
-                ->toggleable(),
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('league.name')
                 ->label('League')
                 ->searchable()
-                ->toggleable(),
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('school.name')
                 ->label('School')
                 ->searchable()
-                ->toggleable(),
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('updated_at')
                 ->label('Updated')
                 ->since()
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('personal_email')
                 ->label('Personal Email')
@@ -1582,6 +1581,8 @@ class UserResource extends Resource
             EditAction::make()
                 ->label('Edit')
                 ->icon('heroicon-m-pencil-square')
+                ->iconButton()
+                ->tooltip('Edit')
                 ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
                 ->modalSubmitActionLabel('Save changes')
                 ->modalWidth('7xl')
@@ -1590,6 +1591,8 @@ class UserResource extends Resource
             Action::make('editAccess')
                 ->label('Edit Access')
                 ->icon('heroicon-m-shield-check')
+                ->iconButton()
+                ->tooltip('Edit Access')
                 ->modalHeading('Edit Roles & Website Publishing')
                 ->fillForm(function (User $record): array {
                     return [
@@ -1623,6 +1626,8 @@ class UserResource extends Resource
                 ->successNotificationTitle('User access updated.'),
 
             Impersonate::make()
+                ->iconButton()
+                ->tooltip('Impersonate')
                 ->visible(fn (User $record) => auth()->id() !== $record->id
                     && auth()->user()?->hasRole('Superadmin'))
                 ->redirectTo('/admin'),
