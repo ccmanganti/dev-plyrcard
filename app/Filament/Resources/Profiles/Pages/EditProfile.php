@@ -524,6 +524,7 @@ class EditProfile extends Page implements HasForms
                                             ->label('PlyrCard Email')
                                             ->placeholder('plyrcard login email')
                                             ->email()
+                                            ->autocomplete('off')
                                             ->columnSpan(2)
                                             ->required()
                                             ->maxLength(255),
@@ -542,8 +543,9 @@ class EditProfile extends Page implements HasForms
                                             ->placeholder('Leave blank to keep current password')
                                             ->columnSpan(1)
                                             ->password()
+                                            ->dehydrated(false)
+                                            ->autocomplete('new-password')
                                             ->revealable()
-                                            ->dehydrated(fn ($state) => filled($state))
                                             ->same('password_confirmation')
                                             ->nullable()
                                             ->helperText('Leave blank to keep the current password.'),
@@ -554,6 +556,7 @@ class EditProfile extends Page implements HasForms
                                             ->placeholder('Re-enter new password')
                                             ->columnSpan(1)
                                             ->password()
+                                            ->autocomplete('new-password')
                                             ->revealable()
                                             ->dehydrated(false)
                                             ->nullable(),

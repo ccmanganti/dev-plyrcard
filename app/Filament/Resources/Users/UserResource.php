@@ -14,6 +14,10 @@ use App\Models\Team;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -36,6 +40,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
@@ -1366,6 +1371,9 @@ class UserResource extends Resource
                 ->toggleable(isToggledHiddenByDefault: true),
         ])
         ->filters([
+            TrashedFilter::make()
+                ->label('Deleted Users'),
+
             SelectFilter::make('sport')
                 ->label('Sport')
                 ->options(static::getSportOptions())
@@ -1559,10 +1567,17 @@ class UserResource extends Resource
 
                     return $indicators;
                 }),
-        ], layout: \Filament\Tables\Enums\FiltersLayout::AboveContentCollapsible)
+        ], layout: FiltersLayout::AboveContentCollapsible)
         ->filtersFormColumns(3)
         ->recordAction('edit')
         ->recordUrl(null)
+        ->bulkActions([
+            BulkActionGroup::make([
+                DeleteBulkAction::make(),
+                RestoreBulkAction::make(),
+                ForceDeleteBulkAction::make(),
+            ]),
+        ])
         ->actions([
             EditAction::make()
                 ->label('Edit')
