@@ -51,7 +51,7 @@ class GhlWebhookController extends Controller
         if ($contactId && ! $user->ghl_contact_id) {
             $user->update(['ghl_contact_id' => $contactId]);
         }
-
+                                                        
         // 🎯 5. Map plan → role
         $role = $this->mapPlanToRole($planId, $planName);
 

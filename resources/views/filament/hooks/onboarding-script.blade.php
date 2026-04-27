@@ -63,11 +63,27 @@
     }
 
     .driver-popover.plyrcard-driver-theme .driver-popover-close-btn {
-        background: rgba(255, 255, 255, 0.05) !important;
-        color: #cbd5e1 !important;
+        background: transparent !important;
+        color: #94a3b8 !important;
         border-radius: 12px !important;
         padding: 10px 14px !important;
+        font-weight: 700 !important;
     }
+
+    .driver-popover.plyrcard-driver-theme .driver-popover-close-btn:hover {
+        color: #f97316 !important;
+        background: rgba(249, 115, 22, 0.08) !important;
+    }
+
+    .driver-popover.plyrcard-driver-theme .driver-popover-close-btn[aria-label="Close"] {
+        font-size: 0 !important;
+    }
+
+    .driver-popover.plyrcard-driver-theme .driver-popover-close-btn[aria-label="Close"]::after {
+        content: 'Skip';
+        font-size: 13px !important;
+    }
+
 
     .driver-popover.plyrcard-driver-theme .driver-popover-arrow {
         color: #111827 !important;
@@ -191,6 +207,33 @@
         function setDone(page) {
             localStorage.setItem(TOUR_KEYS[page], 'done');
         }
+
+        function setAllDone() {
+            TOUR_ORDER.forEach((page) => setDone(page));
+        }
+
+        async function skipOnboarding() {
+            if (completionLocked) return;
+
+            completionLocked = true;
+            setAllDone();
+
+            const result = await markOnboardingComplete();
+
+            if (activeTourInstance) {
+                try {
+                    activeTourInstance.destroy();
+                } catch (e) {
+                    console.warn('Failed to destroy active onboarding tour after skip.', e);
+                }
+            }
+
+            if (result?.success) {
+                window.location.reload();
+            }
+        }
+
+        window.skipPlyrCardOnboarding = skipOnboarding;
 
         function allToursFinished() {
             return TOUR_ORDER.every(page => getDone(page));
@@ -615,7 +658,7 @@
         function buildDriverConfig(config) {
             return {
                 showProgress: true,
-                allowClose: false,
+                allowClose: true,
                 animate: true,
                 overlayOpacity: isMobileViewport() ? 0.20 : 0.35,
                 stagePadding: isMobileViewport() ? 6 : 8,
@@ -624,6 +667,7 @@
                 popoverClass: 'plyrcard-driver-theme',
                 nextBtnText: 'Next',
                 prevBtnText: 'Back',
+                closeBtnText: 'Skip',
                 doneBtnText: 'Finish',
                 steps: config.steps,
                 onDestroyed: () => {
@@ -687,8 +731,8 @@
 
                     activeTourInstance.movePrevious();
                 },
-                onCloseClick: () => {
-                    activeTourInstance.destroy();
+                onCloseClick: async () => {
+                    await window.skipPlyrCardOnboarding();
                 },
             };
         }
