@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
@@ -307,6 +308,10 @@ class ScheduleResource extends Resource
 
                         return (int) $record->created_by_user_id === (int) auth()->id();
                     }),
+
+                DeleteAction::make()
+                    ->label('Delete')
+                    ->visible(fn (Schedule $record): bool => static::isSuperadmin()),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
