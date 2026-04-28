@@ -101,8 +101,6 @@ class EditProfile extends Page implements HasForms
             'website_name' => $this->website?->name,
             'site_template_id' => $this->website?->site_template_id,
             'hero_template_id' => $this->website?->hero_template_id,
-            'website_is_active' => $this->website?->is_active ?? true,
-            'website_is_published' => $this->website?->is_published ?? false,
             'primary_color' => $this->website?->primary_color,
             'secondary_color' => $this->website?->secondary_color,
             'accent_color' => $this->website?->accent_color,
@@ -1313,19 +1311,7 @@ class EditProfile extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $websiteKeys = [
-            'website_is_published',
-        ];
-
-        $websiteData = [
-            'is_published' => (bool) ($data['website_is_published'] ?? false),
-        ];
-
         $userData = $data;
-
-        foreach ($websiteKeys as $key) {
-            unset($userData[$key]);
-        }
 
         if (! ($this->getPlanInfo()?->hasPremiumAccess() ?? false)) {
             unset(
@@ -1341,12 +1327,7 @@ class EditProfile extends Page implements HasForms
 
         $this->user->update($userData);
 
-        $website = $this->user->websites()->first();
-
-        if ($website) {
-            $website->update($websiteData);
-            $this->website = $website->fresh();
-        }
+        $this->website = $this->user->websites()->first();
 
         $this->user->refresh()->loadMissing('roles', 'nationalTeam');
         $this->planInfoCache = null;
