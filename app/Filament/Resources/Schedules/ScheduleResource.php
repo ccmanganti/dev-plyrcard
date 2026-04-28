@@ -311,6 +311,7 @@ class ScheduleResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
+                        ->label('Delete selected')
                         ->visible(fn () => static::isSuperadmin()),
                 ]),
             ]);
@@ -337,6 +338,11 @@ class ScheduleResource extends Resource
     }
 
     public static function canDelete(Model $record): bool
+    {
+        return static::isSuperadmin();
+    }
+
+    public static function canDeleteAny(): bool
     {
         return static::isSuperadmin();
     }
