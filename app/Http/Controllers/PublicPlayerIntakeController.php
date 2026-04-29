@@ -386,6 +386,127 @@ class PublicPlayerIntakeController extends Controller
         };
     }
 
+
+    protected function getPlanSlugForSelectedPlan(string $plan): string
+    {
+        return match ($plan) {
+            'Plyr Plus' => 'plyr-plus',
+            'My Journey' => 'my-journey',
+            default => 'free',
+        };
+    }
+
+    protected function buildPaymentUrlForSubmittedUser(string $plan, User $user, ?array $ghlResult = null): ?string
+    {
+        $baseUrl = $this->getPaymentUrlForPlan($plan);
+
+        if (! $baseUrl) {
+            return null;
+        }
+
+        $firstName = $user->first_name;
+        $lastName = $user->last_name;
+        $email = $user->personal_email ?: $user->email;
+        $phone = $user->phone;
+        $contactId = data_get($ghlResult, 'contact_id');
+        $planSlug = $this->getPlanSlugForSelectedPlan($plan);
+
+        // Send several common key variants because embedded GHL surveys/forms
+        // can use different query keys depending on how the fields were built.
+        $query = http_build_query(array_filter([
+            'notrack' => 'true',
+            'utm_plan' => $planSlug,
+            'selected_plan' => $plan,
+            'plan' => $planSlug,
+            'first_name' => $firstName,
+            'firstName' => $firstName,
+            'contact.first_name' => $firstName,
+            'last_name' => $lastName,
+            'lastName' => $lastName,
+            'contact.last_name' => $lastName,
+            'email' => $email,
+            'contact.email' => $email,
+            'phone' => $phone,
+            'contact.phone' => $phone,
+            'user_id' => $user->id,
+            'contact_id' => $contactId,
+        ], fn ($value) => filled($value)));
+
+        if ($query === '') {
+            return $baseUrl;
+        }
+
+        $baseWithoutQuery = strtok($baseUrl, '?') ?: $baseUrl;
+
+        return $baseWithoutQuery . '?' . $query;
+    }
+
+    protected function buildEmbeddedSubmissionPayload(User $user, string $selectedPlan, ?string $paymentUrl = null, ?array $ghlResult = null): array
+    {
+        return [
+            'type' => 'plyrcard-intake-submitted',
+            'plan' => $this->getPlanSlugForSelectedPlan($selectedPlan),
+            'selected_plan' => $selectedPlan,
+            'payment_url' => $paymentUrl,
+            'app_url' => url('/admin/profile'),
+            'payload' => [
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->personal_email ?: $user->email,
+                'phone' => $user->phone,
+                'user_id' => $user->id,
+                'contact_id' => data_get($ghlResult, 'contact_id'),
+            ],
+        ];
+    }
+
+    protected function embeddedPaymentSwitchResponse(User $user, string $selectedPlan, string $paymentUrl, ?array $ghlResult = null)
+    {
+        $payload = $this->buildEmbeddedSubmissionPayload($user, $selectedPlan, $paymentUrl, $ghlResult);
+
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $paymentUrlEscaped = e($paymentUrl);
+        $planEscaped = e($selectedPlan);
+
+        $html = <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Continuing to {$planEscaped}</title>
+    <style>
+        html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        body { display: grid; place-items: center; padding: 24px; text-align: center; }
+        .card { max-width: 360px; }
+        h1 { margin: 0 0 10px; font-size: 24px; line-height: 1.05; text-transform: uppercase; }
+        p { margin: 0 0 18px; color: rgba(255,255,255,.72); line-height: 1.5; }
+        a { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 999px; background: #ff6347; color: #fff; text-decoration: none; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Almost Done</h1>
+        <p>Your intake has been submitted. We are opening the next step now.</p>
+        <a href="{$paymentUrlEscaped}" target="_top" rel="noopener">Continue</a>
+    </div>
+    <script>
+        (function () {
+            var message = {$payloadJson};
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(message, '*');
+            } else {
+                window.location.href = message.payment_url;
+            }
+        })();
+    </script>
+</body>
+</html>
+HTML;
+
+        return response($html, 200)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
     protected function applyUserPlanRole(User $user, string $plan): void
     {
         $role = $this->getRoleForSelectedPlan($plan);
@@ -463,17 +584,17 @@ class PublicPlayerIntakeController extends Controller
         return $hasPlus ? '+' . $digits : $digits;
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
         return $this->handleStore($request, false);
     }
 
-    public function storeApp(Request $request): RedirectResponse
+    public function storeApp(Request $request)
     {
         return $this->handleStore($request, true);
     }
 
-    protected function handleStore(Request $request, bool $isAppFlow = false): RedirectResponse
+    protected function handleStore(Request $request, bool $isAppFlow = false)
     {
         $request->merge([
             'selected_plan' => $this->resolvePlanFromRequest($request),
@@ -894,9 +1015,19 @@ class PublicPlayerIntakeController extends Controller
         $request->session()->regenerate();
         $request->session()->forget('url.intended');
 
-        $paymentUrl = $this->getPaymentUrlForPlan($selectedPlan);
+        $paymentUrl = $this->buildPaymentUrlForSubmittedUser($selectedPlan, $user, $ghlResult);
 
         if ($paymentUrl) {
+            if ($isAppFlow) {
+                $payload = $this->buildEmbeddedSubmissionPayload($user, $selectedPlan, $paymentUrl, $ghlResult);
+
+                if ($request->ajax() || $request->expectsJson() || $request->header('X-Plyrcard-Embed') === '1') {
+                    return response()->json($payload);
+                }
+
+                return $this->embeddedPaymentSwitchResponse($user, $selectedPlan, $paymentUrl, $ghlResult);
+            }
+
             return redirect()->away($paymentUrl);
         }
 
@@ -910,8 +1041,14 @@ class PublicPlayerIntakeController extends Controller
             ->with('ghl_result', $ghlResult)
             ->with('intake_submitted', [
                 'first_name' => $user->first_name,
-                'email' => $user->personal_email,
+                'last_name' => $user->last_name,
+                'email' => $user->personal_email ?: $user->email,
+                'phone' => $user->phone,
+                'user_id' => $user->id,
+                'contact_id' => data_get($ghlResult, 'contact_id'),
                 'selected_plan' => $selectedPlan,
+                'plan' => $this->getPlanSlugForSelectedPlan($selectedPlan),
+                'app_url' => url('/admin/profile'),
             ]);
     }
 

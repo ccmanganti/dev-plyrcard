@@ -866,6 +866,12 @@
             $submitted = session('intake_submitted', []);
             $submittedFirstName = $submitted['first_name'] ?? 'Athlete';
             $submittedEmail = $submitted['email'] ?? null;
+            $submittedPlan = $submitted['selected_plan'] ?? ($selectedPlan ?? 'Free');
+            $submittedPlanSlug = $submitted['plan'] ?? match ($submittedPlan) {
+                'Plyr Plus' => 'plyr-plus',
+                'My Journey' => 'my-journey',
+                default => 'free',
+            };
         @endphp
 
         @if (session('success'))
@@ -1172,6 +1178,21 @@ window.plyrIntakeData = {
     oldManualTeam: @json(old('team_name_manual')),
     stepFieldMap: @json($stepFieldMap ?? []),
     serverErrors: @json($errors->getMessages()),
+    selectedPlan: @json($selectedPlan ?? 'Free'),
+    submitted: @json(session('success') ? [
+        'plan' => $submittedPlanSlug,
+        'selected_plan' => $submittedPlan,
+        'payment_url' => null,
+        'app_url' => $submitted['app_url'] ?? url('/admin/profile'),
+        'payload' => [
+            'first_name' => $submitted['first_name'] ?? null,
+            'last_name' => $submitted['last_name'] ?? null,
+            'email' => $submitted['email'] ?? null,
+            'phone' => $submitted['phone'] ?? null,
+            'user_id' => $submitted['user_id'] ?? null,
+            'contact_id' => $submitted['contact_id'] ?? null,
+        ],
+    ] : null),
 };
 </script>
 <script>
@@ -1841,6 +1862,19 @@ window.plyrIntakeData = {
 
     function clearDraft(){ try{ localStorage.removeItem(draftKey); } catch(e){} }
 
+    function postSubmittedMessage(submission){
+        if (!submission || !window.parent || window.parent === window) return;
+
+        window.parent.postMessage({
+            type: 'plyrcard-intake-submitted',
+            plan: submission.plan || 'free',
+            selected_plan: submission.selected_plan || 'Free',
+            payment_url: submission.payment_url || null,
+            app_url: submission.app_url || null,
+            payload: submission.payload || {}
+        }, '*');
+    }
+
     function formatPhoneInputValue(value) {
         const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
         if (!digits) return '';
@@ -1850,7 +1884,11 @@ window.plyrIntakeData = {
     }
 
     document.addEventListener('DOMContentLoaded', function(){
-        if (document.getElementById('thanksScreen')) { clearDraft(); return; }
+        if (document.getElementById('thanksScreen')) {
+            clearDraft();
+            postSubmittedMessage(data.submitted);
+            return;
+        }
 
         const draft = restoreDraft();
         if (!selectedPositions.length && oldPositions.length) selectedPositions = oldPositions.slice();
@@ -2116,7 +2154,70 @@ window.plyrIntakeData = {
             }
         });
 
-        $('#playerIntakeForm') && $('#playerIntakeForm').addEventListener('submit', function(){ clearDraft(); });
+        const intakeForm = $('#playerIntakeForm');
+        if (intakeForm) {
+            intakeForm.addEventListener('submit', async function(event){
+                clearDraft();
+
+                // When this intake is embedded on plyrcard.com, submit with fetch so the
+                // controller can return JSON, then ask the parent registration page to
+                // switch this iframe to the correct GHL survey URL with query params.
+                if (!(window.parent && window.parent !== window)) return;
+
+                event.preventDefault();
+
+                const submitBtn = $('#submitBtn');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Submitting...';
+                }
+
+                try {
+                    const response = await fetch(intakeForm.action, {
+                        method: 'POST',
+                        body: new FormData(intakeForm),
+                        credentials: 'include',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Plyrcard-Embed': '1'
+                        }
+                    });
+
+                    const contentType = response.headers.get('content-type') || '';
+
+                    if (response.ok && contentType.indexOf('application/json') !== -1) {
+                        const submission = await response.json();
+                        postSubmittedMessage(submission);
+
+                        if (submission.payment_url) {
+                            hideAllScreens();
+                            const formScreen = $('#formScreen');
+                            if (formScreen) formScreen.style.display = 'none';
+                            document.body.innerHTML = '<div class="page"><div class="app"><section class="screen hero-screen" id="thanksScreen"><div class="hero-copy"><h1 class="hero-title">Almost Done</h1><p class="hero-text">Your intake has been submitted. Opening the next step now.</p></div></section></div></div>';
+                            return;
+                        }
+
+                        if (submission.app_url) {
+                            window.top.location.href = submission.app_url;
+                            return;
+                        }
+                    }
+
+                    // If validation fails, Laravel usually returns JSON 422 or HTML.
+                    // Fall back to a normal submit so server-side errors render as before.
+                    intakeForm.submit();
+                } catch (error) {
+                    intakeForm.submit();
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit';
+                    }
+                }
+            });
+        }
+
 
         applyServerErrors();
 
