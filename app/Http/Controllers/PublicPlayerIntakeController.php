@@ -341,12 +341,19 @@ class PublicPlayerIntakeController extends Controller
 
     protected function resolvePlanFromRequest(Request $request): string
     {
+        // Query-string plan must win over the hidden input.
+        // The mobile form caches fields in localStorage, and an older cached
+        // selected_plan can otherwise overwrite ?utm_plan=plyr-plus on submit.
         $rawPlan = trim((string) (
-            $request->input('selected_plan')
-            ?? $request->query('utm_plan')
+            $request->query('utm_plan')
             ?? $request->query('plan')
             ?? $request->query('package')
             ?? $request->query('package_name')
+            ?? $request->input('utm_plan')
+            ?? $request->input('plan')
+            ?? $request->input('package')
+            ?? $request->input('package_name')
+            ?? $request->input('selected_plan')
             ?? ''
         ));
 
@@ -355,34 +362,52 @@ class PublicPlayerIntakeController extends Controller
 
         return match ($normalized) {
             'my journey', 'myjourney' => 'My Journey',
-            'plyr' => 'Plyr',
+            'plyr plus', 'plyrplus', 'plyr' => 'Plyr Plus',
             'free' => 'Free',
             default => 'Free',
         };
     }
 
+    protected function getRoleForSelectedPlan(string $plan): string
+    {
+        return match ($plan) {
+            'Plyr Plus' => 'Plyr',
+            'My Journey' => 'My Journey',
+            default => 'Free',
+        };
+    }
+
+    protected function getPaymentUrlForPlan(string $plan): ?string
+    {
+        return match ($plan) {
+            'Plyr Plus' => 'https://systems.plyrcard.com/widget/survey/rY9lpkKJxgH844GoXuYf?notrack=true',
+            'My Journey' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
+            default => null,
+        };
+    }
+
     protected function applyUserPlanRole(User $user, string $plan): void
     {
-        $plan = in_array($plan, ['Free', 'Plyr', 'My Journey'], true) ? $plan : 'Free';
+        $role = $this->getRoleForSelectedPlan($plan);
 
         if (method_exists($user, 'syncRoles')) {
-            $user->syncRoles([$plan]);
+            $user->syncRoles([$role]);
             return;
         }
 
         if (method_exists($user, 'assignRole')) {
-            if (method_exists($user, 'getRoleNames') && ! $user->getRoleNames()->contains($plan)) {
+            if (method_exists($user, 'getRoleNames') && ! $user->getRoleNames()->contains($role)) {
                 if (method_exists($user, 'syncRoles')) {
-                    $user->syncRoles([$plan]);
+                    $user->syncRoles([$role]);
                 } else {
-                    $user->assignRole($plan);
+                    $user->assignRole($role);
                 }
             }
             return;
         }
 
         if (\Schema::hasColumn($user->getTable(), 'role')) {
-            $user->role = $plan;
+            $user->role = $role;
             $user->save();
         }
     }
@@ -462,7 +487,7 @@ class PublicPlayerIntakeController extends Controller
         ]);
 
         $validator = Validator::make($request->all(), [
-            'selected_plan' => ['nullable', 'in:Free,Plyr,My Journey'],
+            'selected_plan' => ['nullable', 'in:Free,Plyr Plus,My Journey'],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -865,21 +890,24 @@ class PublicPlayerIntakeController extends Controller
                 ->withInput();
         }
 
+        Auth::login($user, true);
+        $request->session()->regenerate();
+        $request->session()->forget('url.intended');
+
+        $paymentUrl = $this->getPaymentUrlForPlan($selectedPlan);
+
+        if ($paymentUrl) {
+            return redirect()->away($paymentUrl);
+        }
+
         $redirectRoute = $isAppFlow
             ? 'public.player-intake-app.create'
             : 'public.player-intake.create';
 
-        $autoLoginUrl = URL::temporarySignedRoute(
-            'public.player-intake-app.auto-login',
-            now()->addDays(7),
-            ['user' => $user->id]
-        );
-
         return redirect()
-            ->route($redirectRoute, ['utm_plan' => $selectedPlan])
+            ->route($redirectRoute, ['utm_plan' => 'free'])
             ->with('success', true)
             ->with('ghl_result', $ghlResult)
-            ->with('auto_login_url', $autoLoginUrl)
             ->with('intake_submitted', [
                 'first_name' => $user->first_name,
                 'email' => $user->personal_email,
@@ -898,7 +926,7 @@ class PublicPlayerIntakeController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        return redirect('/admin');
+        return redirect('/admin/profile');
     }
 
     protected function validationMessages(): array

@@ -866,7 +866,6 @@
             $submitted = session('intake_submitted', []);
             $submittedFirstName = $submitted['first_name'] ?? 'Athlete';
             $submittedEmail = $submitted['email'] ?? null;
-            $autoLoginUrl = session('auto_login_url');
         @endphp
 
         @if (session('success'))
@@ -879,11 +878,11 @@
                     <h1 class="hero-title">Thank You</h1>
                     <p class="hero-text">Your intake has been submitted successfully, {{ $submittedFirstName }}.</p>
                     <p class="hero-text">Please check your email{{ $submittedEmail ? ' at ' . $submittedEmail : '' }} for confirmation of your login and account access details.</p>
-                    <p class="hero-text">When you are ready, tap below to go straight into the app.</p>
+                    <p class="hero-text">You are now signed in. You can continue to your profile when you are ready.</p>
 
                     <div class="bottom-cta">
-                        <a href="{{ $autoLoginUrl ?: url('admin/login') }}" class="btn-link">
-                            <button type="button" class="btn">Login</button>
+                        <a href="{{ url('/admin/profile') }}" class="btn-link">
+                            <button type="button" class="btn">Continue</button>
                         </a>
                     </div>
                 </div>
@@ -905,9 +904,10 @@
                 </div>
             </section>
 
-            <form method="POST" action="{{ route('public.player-intake-app.store') }}" enctype="multipart/form-data" id="playerIntakeForm">
+            <form method="POST" action="{{ route('public.player-intake-app.store', request()->only(['utm_plan', 'plan', 'package', 'package_name'])) }}" enctype="multipart/form-data" id="playerIntakeForm">
                 @csrf
-                <input type="hidden" name="selected_plan" value="{{ old('selected_plan', $selectedPlan ?? 'Free') }}">
+                <input type="hidden" name="selected_plan" value="{{ $selectedPlan ?? 'Free' }}">
+                <input type="hidden" name="utm_plan" value="{{ request('utm_plan', request('plan', request('package', request('package_name', $selectedPlan ?? 'Free')))) }}">
 
                 <section class="screen step-screen" id="formScreen" style="display:none;">
                     <div class="topbar">
@@ -1803,6 +1803,7 @@ window.plyrIntakeData = {
             const payload = { currentStep: currentStep, selectedPositions: selectedPositions };
             $all('#playerIntakeForm input, #playerIntakeForm select').forEach(function(field){
                 if (!field.name || field.type === 'file' || field.name === '_token') return;
+                if (['selected_plan', 'utm_plan', 'plan', 'package', 'package_name'].indexOf(field.name) !== -1) return;
                 if (field.type === 'radio'){
                     if (field.checked) payload[field.name] = field.value;
                     return;
@@ -1822,6 +1823,7 @@ window.plyrIntakeData = {
         const payload = readDraft();
         Object.keys(payload).forEach(function(name){
             if (name === 'currentStep' || name === 'selectedPositions') return;
+            if (['selected_plan', 'utm_plan', 'plan', 'package', 'package_name'].indexOf(name) !== -1) return;
             const selector = '#playerIntakeForm [name="' + CSS.escape(name) + '"]';
             const fields = document.querySelectorAll(selector);
             if (!fields.length) return;
