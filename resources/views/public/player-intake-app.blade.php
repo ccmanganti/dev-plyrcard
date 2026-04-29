@@ -872,6 +872,21 @@
                 'My Journey' => 'my-journey',
                 default => 'free',
             };
+
+            $submittedPayload = session('success') ? [
+                'plan' => $submittedPlanSlug,
+                'selected_plan' => $submittedPlan,
+                'payment_url' => $submitted['payment_url'] ?? null,
+                'app_url' => $submitted['app_url'] ?? url('/admin/profile'),
+                'payload' => [
+                    'first_name' => $submitted['first_name'] ?? null,
+                    'last_name' => $submitted['last_name'] ?? null,
+                    'email' => $submitted['email'] ?? null,
+                    'phone' => $submitted['phone'] ?? null,
+                    'user_id' => $submitted['user_id'] ?? null,
+                    'contact_id' => $submitted['contact_id'] ?? null,
+                ],
+            ] : null;
         @endphp
 
         @if (session('success'))
@@ -1179,20 +1194,7 @@ window.plyrIntakeData = {
     stepFieldMap: @json($stepFieldMap ?? []),
     serverErrors: @json($errors->getMessages()),
     selectedPlan: @json($selectedPlan ?? 'Free'),
-    submitted: @json(session('success') ? [
-        'plan' => $submittedPlanSlug,
-        'selected_plan' => $submittedPlan,
-        'payment_url' => null,
-        'app_url' => $submitted['app_url'] ?? url('/admin/profile'),
-        'payload' => [
-            'first_name' => $submitted['first_name'] ?? null,
-            'last_name' => $submitted['last_name'] ?? null,
-            'email' => $submitted['email'] ?? null,
-            'phone' => $submitted['phone'] ?? null,
-            'user_id' => $submitted['user_id'] ?? null,
-            'contact_id' => $submitted['contact_id'] ?? null,
-        ],
-    ] : null),
+    submitted: @json($submittedPayload),
 };
 </script>
 <script>
