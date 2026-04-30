@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>PLYRCARD Intake</title>
 
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <style>
         :root{
@@ -17,6 +18,8 @@
             --pc-app-width:430px;
             --topbar-h:58px;
             --band-h:118px;
+            --font-display:'Antonio', sans-serif;
+            --font-body:'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         *{box-sizing:border-box}
@@ -24,7 +27,7 @@
         body{
             min-height:100vh;
             background:#e8e8e8;
-            font-family:"Antonio", system-ui, sans-serif;
+            font-family:var(--font-body);
         }
 
         html{
@@ -144,6 +147,49 @@
 
         .logo-main{width:220px;display:block;}
 
+        .hero-title,
+        .final-title,
+        .progress-title,
+        .label,
+        .btn,
+        .gender-card-label,
+        .search-select-control,
+        .search-select-option-title,
+        .manual-toggle-back,
+        .sample-title,
+        .sample-trigger,
+        .sample-modal-title,
+        .sample-modal-close,
+        .sample-card-kicker,
+        .sample-card-title,
+        .image-preview-remove,
+        .image-add-tile span {
+            font-family:var(--font-display);
+        }
+
+        .hero-text,
+        .final-text,
+        .sample-copy,
+        .sample-modal-text,
+        .sample-card-list,
+        .sample-footer-note,
+        .input,
+        .select,
+        .manual-input,
+        .search-select-search input,
+        .search-select-option-subtitle,
+        .search-select-empty,
+        .field-message,
+        .file-warning-list {
+            font-family:var(--font-body);
+        }
+
+        /* Remove the PLYRCARD logo on the first intake screen only. */
+        #introScreen .hero-logo-wrap {
+            display:none;
+        }
+
+
         .hero-screen{
             padding:34px 28px calc(28px + env(safe-area-inset-bottom));
             display:flex;
@@ -183,7 +229,7 @@
             border-radius:12px;
             background:var(--pc-white);
             color:var(--pc-black);
-            font-family:"Antonio", system-ui, sans-serif;
+            font-family:var(--font-display);
             font-size:22px;
             line-height:1;
             letter-spacing:.03em;
@@ -345,7 +391,7 @@
             outline:none;
             background: #8383832f;
             color:white;
-            font-family:"Antonio", system-ui, sans-serif;
+            font-family:var(--font-display);
             font-size:15px;
             padding:15px 12px;
             appearance:none;
@@ -523,7 +569,7 @@
             position:relative;
             z-index:1;
         }
-        .search-select-search input{width:100%;min-height:32px;border:1px solid rgba(255,255,255,.08);border-radius:999px;outline:none;background:#232323;color:#fff;padding:7px 12px;font-family:"Antonio", system-ui, sans-serif;font-size:13px}
+        .search-select-search input{width:100%;min-height:32px;border:1px solid rgba(255,255,255,.08);border-radius:999px;outline:none;background:#232323;color:#fff;padding:7px 12px;font-family:var(--font-display);font-size:13px}
         .search-select-list{
             max-height:190px;
             overflow:auto;
@@ -571,7 +617,7 @@
 
         .manual-input-wrap{display:none;animation:fadeSlide .2s ease}
         .manual-input-actions{display:flex;justify-content:flex-end;margin-top:8px}
-        .manual-toggle-back{border:0;background:transparent;color:#fff;font-family:"Antonio", system-ui, sans-serif;font-size:12px;letter-spacing:.02em;text-transform:uppercase;cursor:pointer;opacity:.9;padding:0}
+        .manual-toggle-back{border:0;background:transparent;color:#fff;font-family:var(--font-display);font-size:12px;letter-spacing:.02em;text-transform:uppercase;cursor:pointer;opacity:.9;padding:0}
         .manual-toggle-back:hover{opacity:1;text-decoration:underline}
         .manual-input::placeholder,.input::placeholder{color:#6a6a6a;opacity:.85}
         .manual-input-wrap.visible{display:block}
@@ -591,12 +637,12 @@
             white-space:nowrap;
             border:0;
         }
-        .file-input::file-selector-button{border:0;border-radius:999px;padding:6px 10px;background:#deded8;color:#111;font-family:"Antonio", system-ui, sans-serif;margin-right:8px;cursor:pointer}
+        .file-input::file-selector-button{border:0;border-radius:999px;padding:6px 10px;background:#deded8;color:#111;font-family:var(--font-display);margin-right:8px;cursor:pointer}
         .image-preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;max-width:318px}
         .image-preview-card{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);animation:fadeSlide .2s ease}
         .image-preview-card img{width:100%;height:100%;object-fit:cover;display:block}
         .image-preview-overlay{position:absolute;inset:0;background:linear-gradient(to top, rgba(0,0,0,.52), rgba(0,0,0,.08));display:flex;align-items:flex-end;justify-content:center;padding:8px}
-        .image-preview-remove{border:0;border-radius:999px;background:rgba(255,255,255,.94);color:#111;font-family:"Antonio", system-ui, sans-serif;font-size:11px;line-height:1;text-transform:uppercase;padding:7px 10px;cursor:pointer}
+        .image-preview-remove{border:0;border-radius:999px;background:rgba(255,255,255,.94);color:#111;font-family:var(--font-display);font-size:11px;line-height:1;text-transform:uppercase;padding:7px 10px;cursor:pointer}
         .image-add-tile{
             aspect-ratio:1/1;
             border-radius:14px;
@@ -679,7 +725,7 @@
             background:white;
             border-radius:10px;
             padding:10px 20px;
-            font-family:"Antonio", system-ui, sans-serif;
+            font-family:var(--font-display);
             font-size:19px;
             line-height:1;
             text-transform:uppercase;
@@ -756,7 +802,7 @@
             border:0;
             background:#f2f1ec;
             color:#111;
-            font-family:"Antonio", system-ui, sans-serif;
+            font-family:var(--font-display);
             font-size:20px;
             line-height:1;
             cursor:pointer;
