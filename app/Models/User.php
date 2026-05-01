@@ -69,7 +69,6 @@ class User extends Authenticatable implements HasName, FilamentUser
         'club_id',
         'league_id',
         'national_team_id',
-        'domain',
         'password',
         'plyrcard_image',
         'player_image',

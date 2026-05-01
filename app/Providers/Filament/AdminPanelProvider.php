@@ -77,6 +77,7 @@ class AdminPanelProvider extends PanelProvider
                 },
             )
             ->middleware([
+                \App\Http\Middleware\RedirectParkedAdminDomains::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,

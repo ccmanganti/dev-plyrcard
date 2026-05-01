@@ -8,9 +8,18 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public website routes
+| Marketing routes
 |--------------------------------------------------------------------------
 */
+
+require __DIR__.'/marketing-routes.php';
+
+/*
+|--------------------------------------------------------------------------
+| Public website root
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/', [PublicWebsiteController::class, 'home'])
     ->name('website.home');
 
@@ -19,6 +28,7 @@ Route::get('/', [PublicWebsiteController::class, 'home'])
 | Local/manual preview routes
 |--------------------------------------------------------------------------
 */
+
 Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
     ->name('website.preview');
 
@@ -27,6 +37,7 @@ Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
 | Public player intake routes
 |--------------------------------------------------------------------------
 */
+
 Route::get('/player-intake', [PublicPlayerIntakeController::class, 'create'])
     ->name('public.player-intake.create');
 
@@ -48,6 +59,7 @@ Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController
 | Website editor routes
 |--------------------------------------------------------------------------
 */
+
 Route::prefix('admin')
     ->middleware(['auth'])
     ->group(function () {
@@ -66,6 +78,7 @@ Route::prefix('admin')
 | Website editor asset routes
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/websites/{id}/assets/upload', [WebsiteEditorController::class, 'uploadAsset'])
         ->name('websites.assets.upload');
@@ -102,6 +115,7 @@ Route::middleware(['auth'])->post('/onboarding/complete', function (Request $req
 | Public website-by-name route
 |--------------------------------------------------------------------------
 */
+
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
-    ->where('websiteName', '[A-Za-z0-9\-]+')
+    ->where('websiteName', '^(?!admin$|about$|pricing$|podcast$|book-demo$|registration$|player-intake$|player-intake-app$|preview$)[A-Za-z0-9\-]+')
     ->name('website.show-by-name');

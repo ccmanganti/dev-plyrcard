@@ -224,6 +224,13 @@ class WebsiteResource extends Resource
                     ->sortable()
                     ->default('Untitled Website'),
 
+                TextInput::make('domain')
+                    ->label('Domain')
+                    ->placeholder('playerdomain.com')
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true)
+                    ->helperText('Use the custom domain assigned to this website. Do not include https:// unless needed.'),
+
                 TextColumn::make('user.first_name')
                     ->label('Player')
                     ->formatStateUsing(fn ($state, Website $record) => $record->user ? "{$record->user->first_name} {$record->user->last_name}" : null)
@@ -255,11 +262,11 @@ class WebsiteResource extends Resource
                     ViewAction::make(),
                     EditAction::make(),
 
-                    Action::make('preview_site')
-                        ->label('Preview Site')
-                        ->icon(Heroicon::OutlinedEye)
-                        ->url(fn (Website $record): string => route('website.preview', ['website' => $record]))
-                        ->openUrlInNewTab(),
+                Action::make('preview_site')
+                    ->label('Preview Site')
+                    ->icon(Heroicon::OutlinedEye)
+                    ->url(fn (Website $record): string => static::getWebsiteUrl($record) ?? route('website.preview', ['website' => $record]))
+                    ->openUrlInNewTab(),
 
                     Action::make('view_website')
                         ->label('View Website')
@@ -357,7 +364,7 @@ class WebsiteResource extends Resource
 
     protected static function getWebsiteUrl(Website $record): ?string
     {
-        $domain = trim((string) ($record->user?->domain ?? ''));
+        $domain = trim((string) ($record->domain ?? ''));
 
         if (blank($domain)) {
             return null;
