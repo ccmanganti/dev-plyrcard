@@ -14,6 +14,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PublicWebsiteController::class, 'home'])
     ->name('website.home');
 
+
+// 👇 keep this
+Route::get('/', [PublicWebsiteController::class, 'home']);
+
+// 👇 marketing routes (if you added them)
+require __DIR__.'/marketing-routes.php';
+
 /*
 |--------------------------------------------------------------------------
 | Local/manual preview routes
@@ -103,5 +110,5 @@ Route::middleware(['auth'])->post('/onboarding/complete', function (Request $req
 |--------------------------------------------------------------------------
 */
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
-    ->where('websiteName', '[A-Za-z0-9\-]+')
+    ->where('websiteName', '^(?!admin$|about$|pricing$|podcast$|book-demo$|registration$)[A-Za-z0-9\-]+')
     ->name('website.show-by-name');
