@@ -9,6 +9,36 @@
         'utm_plan' => $registrationPlan,
     ]);
 @endphp
+@php
+    $activePage = 'registration';
+
+    $plan = request()->query('utm_plan', 'free');
+
+    $plans = [
+        'free' => [
+            'title' => 'Start Free',
+            'headline' => 'Get Your PlyrCard Started',
+            'subheadline' => 'Create your profile and get discovered.',
+        ],
+        'plyr' => [
+            'title' => 'PLYR Plan',
+            'headline' => 'Unlock Your Full Athlete Profile',
+            'subheadline' => 'Stand out with advanced features.',
+        ],
+        'plyr-plus' => [
+            'title' => 'PLYR+ Plan',
+            'headline' => 'Go All-In On Your Recruiting',
+            'subheadline' => 'Maximum exposure and tools.',
+        ],
+        'my-journey' => [
+            'title' => 'My Journey',
+            'headline' => 'Tell Your Story',
+            'subheadline' => 'Build your athlete journey.',
+        ],
+    ];
+
+    $copy = $plans[$plan] ?? $plans['free'];
+@endphp
 
 @include('partials.images')
 <!DOCTYPE html>

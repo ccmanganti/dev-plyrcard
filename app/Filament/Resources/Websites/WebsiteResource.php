@@ -78,6 +78,13 @@ class WebsiteResource extends Resource
                                         ->maxLength(255)
                                         ->helperText('Internal website name'),
 
+                                    TextInput::make('domain')
+                                        ->label('Domain')
+                                        ->placeholder('playerdomain.com')
+                                        ->maxLength(255)
+                                        ->unique(ignoreRecord: true)
+                                        ->helperText('Use the custom domain assigned to this website. Do not include https:// unless needed.'),
+
                                     Select::make('site_template_id')
                                         ->label('Site Template')
                                         ->relationship(
@@ -223,13 +230,6 @@ class WebsiteResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->default('Untitled Website'),
-
-                TextInput::make('domain')
-                    ->label('Domain')
-                    ->placeholder('playerdomain.com')
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true)
-                    ->helperText('Use the custom domain assigned to this website. Do not include https:// unless needed.'),
 
                 TextColumn::make('user.first_name')
                     ->label('Player')
