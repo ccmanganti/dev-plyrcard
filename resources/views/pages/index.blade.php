@@ -1,7 +1,11 @@
 @php
     $activePage = 'home';
 @endphp
+
 @include('partials.images')
+@include('partials.navigation')
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,6 +595,183 @@
       border-radius: 0 0 16px 16px;
     }
 
+
+    /* ─── LIVE MOBILE PREVIEW SLIDER ─────────────────────────────── */
+    .phone-mockup-wrap.live-preview-wrap {
+      margin: 40px auto 0;
+      max-width: 320px;
+      width: min(320px, calc(100vw - 48px));
+      position: relative;
+    }
+
+    .live-preview-device {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 9 / 19;
+      border-radius: 38px;
+      background: #050505;
+      border: 2px solid rgba(255,255,255,0.12);
+      overflow: hidden;
+      box-shadow: 0 40px 90px rgba(0,0,0,0.68), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    .live-preview-notch {
+      position: absolute;
+      top: 9px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 88px;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.92);
+      z-index: 8;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
+    }
+
+    .live-preview-slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease;
+      background: #050505;
+    }
+
+    .live-preview-slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .live-preview-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #050505;
+      transform-origin: top center;
+    }
+
+    .live-preview-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 7;
+      padding: 36px 14px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: none;
+      background: linear-gradient(to top, rgba(0,0,0,0.76), transparent);
+    }
+
+    .live-preview-meta {
+      min-width: 0;
+    }
+
+    .live-preview-kicker {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .live-preview-name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--white);
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    .live-preview-count {
+      font-size: 11px;
+      color: rgba(255,255,255,0.60);
+      margin-top: 4px;
+    }
+
+    .live-preview-controls {
+      position: absolute;
+      z-index: 10;
+      left: 50%;
+      bottom: -58px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .live-preview-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.07);
+      color: var(--white);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .live-preview-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .live-preview-expand {
+      width: auto;
+      padding: 0 15px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .live-preview-dots {
+      position: absolute;
+      z-index: 10;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      gap: 5px;
+    }
+
+    .live-preview-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.30);
+      transition: width 0.2s ease, background 0.2s ease;
+    }
+
+    .live-preview-dot.active {
+      width: 18px;
+      background: var(--accent);
+    }
+
+    @media (min-width: 900px) {
+      .phone-mockup-wrap.live-preview-wrap {
+        max-width: 340px;
+      }
+    }
+
+    @media (max-width: 767px) {
+      .phone-mockup-wrap.live-preview-wrap {
+        margin-bottom: 74px;
+      }
+    }
+
+
     /* ─── WHY IT MATTERS ──────────────────────────────────────────── */
     #why-it-matters {
       background: #111111;
@@ -658,7 +839,7 @@
       height: 70vw;
       min-height: 260px;
       max-height: 640px;
-      background-image: url('/images/PLYRCARD-SITE-READY.jpg');
+      background-image: url('/Images/PLYRCARD-SITE-READY.jpg');
       background-size: cover;
       background-position: center 30%;
       position: relative;
@@ -785,6 +966,16 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: rgba(255,255,255,0.25);
+    }
+    .trust-logo-box img {
+      max-width: 76%;
+      max-height: 54%;
+      object-fit: contain;
+      opacity: 0.42;
+      filter: grayscale(1) brightness(1.45);
+    }
+    .trust-logo-box.is-placeholder {
+      border-style: dashed;
     }
 
     /* ─── FINAL CTA ───────────────────────────────────────────────── */
@@ -1175,6 +1366,493 @@
       .desktop-nav-cta { padding: 10px 18px; }
     }
 
+  
+    /* ─── FINAL TRUSTED PARTNER LOGOS: 6 ACROSS / 2 ROWS ─────────── */
+    .trust-grid,
+    .partner-grid {
+      width: min(1500px, calc(100% - 72px)) !important;
+      max-width: 1500px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      display: grid !important;
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+      gap: 20px !important;
+    }
+
+    .trust-logo-box,
+    .partner-box {
+      height: 124px !important;
+      min-height: 124px !important;
+      border-radius: 18px !important;
+      background: rgba(255,255,255,0.055) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 18px !important;
+      overflow: hidden !important;
+      transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease !important;
+    }
+
+    .trust-logo-box:hover,
+    .partner-box:hover {
+      transform: translateY(-3px) !important;
+      background: rgba(255,255,255,0.085) !important;
+      border-color: rgba(255,92,53,0.26) !important;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.22) !important;
+    }
+
+    .trust-logo-box img,
+    .partner-box img {
+      width: 100% !important;
+      max-width: 165px !important;
+      max-height: 76px !important;
+      object-fit: contain !important;
+      opacity: 0.68 !important;
+      filter: grayscale(1) brightness(1.45) contrast(1.08) !important;
+      transition: opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease !important;
+    }
+
+    .trust-logo-box:hover img,
+    .partner-box:hover img {
+      opacity: 1 !important;
+      filter: none !important;
+      transform: scale(1.04) !important;
+    }
+
+    .trust-logo-box span,
+    .partner-box span {
+      font-size: 16px !important;
+      color: rgba(255,255,255,0.44) !important;
+    }
+
+    @media (max-width: 1280px) {
+      .trust-grid,
+      .partner-grid {
+        width: min(1180px, calc(100% - 48px)) !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 18px !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .trust-grid,
+      .partner-grid {
+        width: calc(100% - 32px) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+      }
+
+      .trust-logo-box,
+      .partner-box {
+        height: 100px !important;
+        min-height: 100px !important;
+        border-radius: 15px !important;
+        padding: 16px !important;
+      }
+
+      .trust-logo-box img,
+      .partner-box img {
+        max-width: 140px !important;
+        max-height: 60px !important;
+      }
+    }
+
+
+    /* ─── PLYRS + VIDEO PLACEHOLDERS ─────────────────────────────── */
+    #plyrs,
+    #plyrcard-show {
+      padding: 96px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #plyrs .plyrs-copy,
+    #plyrcard-show .show-copy {
+      width: min(720px, calc(100% - 64px));
+      margin: 0 auto 42px;
+      text-align: left;
+    }
+
+    #plyrs .plyrs-copy .section-eyebrow,
+    #plyrcard-show .show-copy .section-eyebrow {
+      margin-bottom: 12px;
+    }
+
+    #plyrs .plyrs-copy .section-title,
+    #plyrcard-show .show-copy .section-title {
+      margin: 0 0 20px;
+      line-height: 0.9;
+      text-align: left;
+    }
+
+    #plyrs .plyrs-copy .section-body,
+    #plyrcard-show .show-copy .section-body {
+      margin: 0;
+      max-width: 720px;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .plyrs-embed-card {
+      width: min(1080px, calc(100% - 64px));
+      margin: 0 auto;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .plyrs-embed-card .elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac {
+      width: 100%;
+      min-height: 420px;
+      display: block;
+      overflow: hidden;
+    }
+
+    .youtube-placeholder-grid {
+      width: min(1180px, calc(100% - 64px));
+      margin: 40px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .youtube-placeholder {
+      position: relative;
+      min-height: 230px;
+      border-radius: 22px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      background:
+        radial-gradient(circle at 24% 10%, rgba(255,92,53,0.18), transparent 34%),
+        linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    }
+
+    .youtube-placeholder::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.28));
+      pointer-events: none;
+    }
+
+    .youtube-placeholder-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .youtube-play {
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      box-shadow: 0 18px 42px rgba(255,92,53,0.28);
+    }
+
+    .youtube-play svg {
+      width: 26px;
+      height: 26px;
+      fill: var(--white);
+      margin-left: 4px;
+    }
+
+    .youtube-placeholder-label {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .youtube-placeholder-title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3vw, 40px);
+      line-height: 0.95;
+      text-transform: uppercase;
+      color: var(--white);
+    }
+
+    .youtube-placeholder-copy {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.58);
+      max-width: 300px;
+    }
+
+    .youtube-channel-embed {
+      width: min(1080px, calc(100% - 64px));
+      margin: 42px auto 0;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px dashed rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.045);
+      min-height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 34px;
+    }
+
+    @media (max-width: 980px) {
+      .youtube-placeholder-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 767px) {
+      #plyrs,
+      #plyrcard-show {
+        padding: 64px 0;
+      }
+
+      #plyrs .plyrs-copy,
+      #plyrcard-show .show-copy,
+      .plyrs-embed-card,
+      .youtube-placeholder-grid,
+      .youtube-channel-embed {
+        width: calc(100% - 32px);
+      }
+
+      .youtube-placeholder {
+        min-height: 210px;
+      }
+
+      .youtube-channel-embed {
+        min-height: 360px;
+      }
+    }
+
+  
+    /* ─── RADIAL OVERLAY ONLY FOR BLACK SECTIONS ─────────────────── */
+    #testimonials,
+    #plyrcard-show,
+    #plyrs {
+      position: relative;
+      background-color: var(--black) !important;
+      overflow: hidden;
+    }
+
+    #testimonials::before,
+    #plyrcard-show::before,
+    #plyrs::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 14% 12%, rgba(255, 92, 53, 0.14), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(255, 92, 53, 0.07), transparent 28%);
+    }
+
+    #testimonials > *,
+    #plyrcard-show > *,
+    #plyrs > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Keep existing image backgrounds intact. */
+    #hero,
+    #page-hero,
+    #trusted,
+    #partnerships,
+    #team,
+    .img-break {
+      background-blend-mode: normal !important;
+    }
+
+    /* ─── TESTIMONIAL VIDEO ROW FIX ──────────────────────────────── */
+    #testimonials .youtube-placeholder-grid {
+      grid-column: 1 / -1 !important;
+      width: min(1180px, calc(100% - 64px)) !important;
+      margin: 56px auto 0 !important;
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 24px !important;
+      clear: both !important;
+    }
+
+    #testimonials .youtube-placeholder {
+      min-height: 250px !important;
+      width: 100% !important;
+    }
+
+    @media (max-width: 980px) {
+      #testimonials .youtube-placeholder-grid {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+  
+
+    /* ─── PLAYABLE YOUTUBE + PLYRCARD SHOW EMBED FIX ─────────────── */
+    .youtube-placeholder.youtube-live-card {
+      padding: 0 !important;
+      min-height: 250px !important;
+      aspect-ratio: 16 / 9 !important;
+      background: #050505 !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.25) !important;
+    }
+
+    .youtube-placeholder.youtube-live-card::before {
+      display: none !important;
+    }
+
+    .youtube-live-iframe {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 100% !important;
+      height: 100% !important;
+      border: 0 !important;
+      display: block !important;
+      pointer-events: auto !important;
+    }
+
+    .plyrcard-show-shell {
+      width: min(960px, calc(100% - 64px)) !important;
+      max-width: 960px !important;
+      min-height: 0 !important;
+      padding: 18px !important;
+      border-radius: 24px !important;
+      overflow: hidden !important;
+      background:
+        radial-gradient(circle at 24% 10%, rgba(255,92,53,0.10), transparent 34%),
+        rgba(255,255,255,0.045) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+    }
+
+    .plyrcard-show-frame {
+      width: 100%;
+      max-height: 560px;
+      overflow: hidden;
+      border-radius: 18px;
+      background: #050505;
+      transform-origin: top center;
+    }
+
+    .plyrcard-show-frame .elfsight-app-cabef38f-ac42-4eba-942b-2a8c871fad33 {
+      width: 100%;
+      min-height: 520px;
+      display: block;
+      transform: scale(0.92);
+      transform-origin: top center;
+    }
+
+    @media (max-width: 767px) {
+      .plyrcard-show-shell {
+        width: calc(100% - 32px) !important;
+        padding: 12px !important;
+      }
+
+      .plyrcard-show-frame {
+        max-height: 460px;
+      }
+
+      .plyrcard-show-frame .elfsight-app-cabef38f-ac42-4eba-942b-2a8c871fad33 {
+        transform: scale(0.86);
+        min-height: 480px;
+      }
+    }
+
+  
+    /* ─── LIVE PREVIEW SIZE + CONTROL FIX ────────────────────────── */
+    .phone-mockup-wrap.live-preview-wrap {
+      max-width: 390px !important;
+      width: min(390px, calc(100vw - 40px)) !important;
+      margin-top: 14px !important;
+      margin-bottom: 92px !important;
+    }
+
+    .live-preview-device {
+      aspect-ratio: 10 / 16.8 !important;
+      max-height: min(620px, calc(100vh - 220px)) !important;
+      border-radius: 34px !important;
+    }
+
+    .live-preview-frame {
+      width: 100% !important;
+      height: 118% !important;
+      transform: translateY(var(--preview-shift, 0px)) scale(0.92) !important;
+      transform-origin: top center !important;
+      transition: transform 1.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    .live-preview-slide.active .live-preview-frame {
+      animation: previewHumanPan 8.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes previewHumanPan {
+      0%   { transform: translateY(0px) scale(0.92); }
+      28%  { transform: translateY(-34px) scale(0.92); }
+      55%  { transform: translateY(-88px) scale(0.92); }
+      82%  { transform: translateY(-142px) scale(0.92); }
+      100% { transform: translateY(-176px) scale(0.92); }
+    }
+
+    .live-preview-controls {
+      bottom: -62px !important;
+      z-index: 30 !important;
+      width: max-content !important;
+      padding: 8px !important;
+      border-radius: 999px !important;
+      background: rgba(0,0,0,0.42) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+    }
+
+    .live-preview-btn {
+      width: 44px !important;
+      height: 44px !important;
+      flex: 0 0 auto !important;
+    }
+
+    .live-preview-expand {
+      width: auto !important;
+      min-width: 92px !important;
+    }
+
+    @media (min-width: 900px) {
+      .phone-mockup-wrap.live-preview-wrap {
+        max-width: 410px !important;
+      }
+    }
+
+    @media (max-width: 767px) {
+      .phone-mockup-wrap.live-preview-wrap {
+        max-width: min(390px, calc(100vw - 28px)) !important;
+        width: min(390px, calc(100vw - 28px)) !important;
+        margin-top: 28px !important;
+        margin-bottom: 98px !important;
+      }
+
+      .live-preview-device {
+        max-height: min(640px, calc(100vh - 190px)) !important;
+      }
+
+      .live-preview-controls {
+        bottom: -66px !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1193,61 +1871,61 @@
 
     <!-- Slide 1 — Soccer -->
     <article class="hero-slide active" aria-label="Own Your Journey">
-      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE.jpg');" role="img" aria-label="Soccer athlete in action"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE.jpg');" role="img" aria-label="Soccer athlete in action"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">For Serious Athletes</p>
         <h1 class="hero-headline">Own Your<br>Journey</h1>
         <p class="hero-sub">Your game. Your brand. Your story — all in one place.</p>
-        <a href="https://plyrcard.com/player-intake-app" class="hero-cta">Create Free Account</a>
+        <a href="/registration" class="hero-cta">Create Free Account</a>
       </div>
     </article>
 
     <!-- Slide 2 — Football -->
     <article class="hero-slide" aria-label="Control the Controllables">
-      <div class="slide-bg pos-center" style="background-image: url('/images/PLYRCARD-SITE-SOCCER.jpg');" role="img" aria-label="Football player holding football"></div>
+      <div class="slide-bg pos-center" style="background-image: url('/Images/PLYRCARD-SITE-SOCCER.jpg');" role="img" aria-label="Football player holding football"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Recruiting, Simplified</p>
         <h1 class="hero-headline">Control the<br>Controllables</h1>
         <p class="hero-sub">Give coaches a cleaner way to see your work.</p>
-        <a href="https://plyrcard.com/player-intake-app" class="hero-cta accent">Build Your Card</a>
+        <a href="/registration" class="hero-cta accent">Build Your Card</a>
       </div>
     </article>
 
     <!-- Slide 3 — Basketball -->
     <article class="hero-slide" aria-label="More Than Just an Email">
-      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE-FOOTBALL.jpg');" role="img" aria-label="Basketball players in action"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE-FOOTBALL.jpg');" role="img" aria-label="Basketball players in action"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Be Seen. Be Remembered.</p>
         <h1 class="hero-headline">More Than<br>Just an Email</h1>
         <p class="hero-sub">Turn outreach into something coaches actually remember.</p>
-        <a href="https://plyrcard.com/player-intake-app" class="hero-cta">See How It Works</a>
+        <a href="/registration" class="hero-cta">See How It Works</a>
       </div>
     </article>
 
     <!-- Slide 4 — Track / Running -->
     <article class="hero-slide" aria-label="Know Who's Watching">
-      <div class="slide-bg pos-center" style="background-image: url('/images/PLYRCARD-SITE-VOLLEYBALL.jpg');" role="img" aria-label="Athlete in sprint starting position"></div>
+      <div class="slide-bg pos-center" style="background-image: url('/Images/PLYRCARD-SITE-VOLLEYBALL.jpg');" role="img" aria-label="Athlete in sprint starting position"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Real Visibility. Real Signals.</p>
         <h1 class="hero-headline">Know Who's<br>Watching</h1>
         <p class="hero-sub">Track opens, clicks, and real engagement from coaches.</p>
-        <a href="https://plyrcard.com/player-intake-app" class="hero-cta">Track Engagement</a>
+        <a href="/registration" class="hero-cta">Track Engagement</a>
       </div>
     </article>
 
     <!-- Slide 5 — Volleyball -->
     <article class="hero-slide" aria-label="Your Full Story, One Link">
-      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE-TEAM.jpg');" role="img" aria-label="Volleyball player spiking the ball"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE-TEAM.jpg');" role="img" aria-label="Volleyball player spiking the ball"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">One Link. More Impact.</p>
         <h1 class="hero-headline">Your Full<br>Story.</h1>
         <p class="hero-sub">Highlights, stats, schedule, and personality — all in one card.</p>
-        <a href="https://plyrcard.com/player-intake-app/" class="hero-cta accent">Create Your Card</a>
+        <a href="/registration" class="hero-cta accent">Create Your Card</a>
       </div>
     </article>
 
@@ -1323,53 +2001,59 @@
       </p>
       <div class="btn-row reveal" style="transition-delay:0.15s">
         <a href="/about#sample" class="btn btn-accent">See a Sample Card</a>
-        <a href="https://plyrcard.com/player-intake-app" class="btn btn-outline-white">Create Free</a>
+        <a href="/registration" class="btn btn-outline-white">Create Free</a>
       </div>
     </div>
 
-    <!-- Phone mockup built in CSS -->
-    <div class="phone-mockup-wrap reveal" style="transition-delay:0.2s" aria-hidden="true">
-      <div class="phone-shell">
-        <div class="phone-notch"></div>
-        <div class="phone-screen-top">
-          <span class="phone-logo-text"><span>PLYR</span>CARD</span>
-          <div class="phone-avatar"></div>
+    <!-- Live mobile website previews -->
+    <div class="phone-mockup-wrap live-preview-wrap reveal" style="transition-delay:0.2s" aria-label="Live PLYRCARD website previews">
+      <div class="live-preview-device" id="live-preview-device">
+        <div class="live-preview-notch" aria-hidden="true"></div>
+
+        <div class="live-preview-dots" aria-hidden="true">
+          <span class="live-preview-dot active"></span>
+          <span class="live-preview-dot"></span>
+          <span class="live-preview-dot"></span>
         </div>
-        <div class="phone-hero-img">
-          <span class="athlete-icon">🏃</span>
-        </div>
-        <div class="phone-name-bar">
-          <div class="phone-athlete-name">Jordan Williams</div>
-          <div class="phone-athlete-sport">Midfielder · Class of 2026</div>
-        </div>
-        <div class="phone-stats-row">
-          <div class="phone-stat-cell">
-            <div class="pstat-num">4.1</div>
-            <div class="pstat-label">GPA</div>
-          </div>
-          <div class="phone-stat-cell">
-            <div class="pstat-num">34</div>
-            <div class="pstat-label">Goals</div>
-          </div>
-          <div class="phone-stat-cell">
-            <div class="pstat-num">D1</div>
-            <div class="pstat-label">Target</div>
+
+        <div class="live-preview-slide active" data-preview-url="https://plyrcard.com/preview/1">
+          <iframe class="live-preview-frame" src="https://plyrcard.com/preview/1" title="PLYRCARD preview 1" loading="lazy"></iframe>
+          <div class="live-preview-overlay">
+            <div class="live-preview-meta">
+              <div class="live-preview-kicker">Live Preview</div>
+              <div class="live-preview-name">Preview 01</div>
+              <div class="live-preview-count">Auto browsing player site</div>
+            </div>
           </div>
         </div>
-        <div class="phone-links">
-          <div class="phone-link-item">
-            <div class="phone-link-dot"></div>
-            <span class="phone-link-text">Highlight Reel</span>
-          </div>
-          <div class="phone-link-item">
-            <div class="phone-link-dot"></div>
-            <span class="phone-link-text">Game Schedule</span>
-          </div>
-          <div class="phone-link-item">
-            <div class="phone-link-dot"></div>
-            <span class="phone-link-text">Academic Transcript</span>
+
+        <div class="live-preview-slide" data-preview-url="https://plyrcard.com/preview/5">
+          <iframe class="live-preview-frame" src="https://plyrcard.com/preview/5" title="PLYRCARD preview 5" loading="lazy"></iframe>
+          <div class="live-preview-overlay">
+            <div class="live-preview-meta">
+              <div class="live-preview-kicker">Live Preview</div>
+              <div class="live-preview-name">Preview 05</div>
+              <div class="live-preview-count">Auto browsing player site</div>
+            </div>
           </div>
         </div>
+
+        <div class="live-preview-slide" data-preview-url="https://plyrcard.com/preview/6">
+          <iframe class="live-preview-frame" src="https://plyrcard.com/preview/6" title="PLYRCARD preview 6" loading="lazy"></iframe>
+          <div class="live-preview-overlay">
+            <div class="live-preview-meta">
+              <div class="live-preview-kicker">Live Preview</div>
+              <div class="live-preview-name">Preview 06</div>
+              <div class="live-preview-count">Auto browsing player site</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="live-preview-controls" aria-label="Preview controls">
+        <button class="live-preview-btn" type="button" data-preview-prev aria-label="Previous preview">‹</button>
+        <button class="live-preview-btn live-preview-expand" type="button" data-preview-expand>Expand</button>
+        <button class="live-preview-btn" type="button" data-preview-next aria-label="Next preview">›</button>
       </div>
     </div>
   </div>
@@ -1379,7 +2063,7 @@
 <!-- ════════════════════════════════════════════════════════
      WHY IT MATTERS
 ═══════════════════════════════════════════════════════════ -->
-<section id="why-it-matters"  style="background-image: url('/images/PLYRCARD-SITE-COACH.jpg');" role="img" aria-label="Athlete in sprint starting position">
+<section id="why-it-matters"  style="background-image: url('/Images/PLYRCARD-SITE-COACH.jpg');" role="img" aria-label="Athlete in sprint starting position">
   <span class="big-number" aria-hidden="true">300</span>
   <p class="section-eyebrow reveal">The Problem</p>
   <h2 class="section-title reveal">Coaches get<br>hundreds of<br>emails a day.</h2>
@@ -1390,7 +2074,7 @@
     PLYRCARD gives you a cleaner, more memorable way to be seen — before a coach ever replies.
   </p>
   <div class="btn-row reveal" style="transition-delay:0.2s">
-    <a href="https://plyrcard.com/pricing.php#compare" class="btn btn-white">See the Difference</a>
+    <a href="https://plyrcard.com//pricing#compare" class="btn btn-white">See the Difference</a>
   </div>
 </section>
 
@@ -1428,7 +2112,7 @@
     </li>
   </ol>
   <div class="btn-row reveal" style="transition-delay:0.3s">
-    <a href="https://plyrcard.com/player-intake-app" class="btn btn-accent">Start Free</a>
+    <a href="/registration" class="btn btn-accent">Start Free</a>
     <a href="/book-demo" class="btn btn-outline-dark">Book a Demo</a>
   </div>
 </section>
@@ -1453,7 +2137,7 @@
   <h2 class="section-title" id="final-cta-headline">Start Your<br>Journey</h2>
   <p class="cta-body">Build a recruiting card coaches will actually remember.</p>
   <div class="btn-row">
-    <a href="https://plyrcard.com/player-intake-app" class="btn-white-cta">Create Free Account</a>
+    <a href="/registration" class="btn-white-cta">Create Free Account</a>
     <a href="/pricing" class="btn-outline-white-cta">See Pricing</a>
   </div>
   <p class="fine-print">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Set up in minutes</p>
@@ -1463,6 +2147,26 @@
 <!-- ════════════════════════════════════════════════════════
      TESTIMONIALS
 ═══════════════════════════════════════════════════════════ -->
+
+<!-- ══════════════════════════════════════════════════════
+     MEET THE PLYRS
+═══════════════════════════════════════════════════════ -->
+<section id="plyrs">
+  <div class="plyrs-copy">
+    <p class="section-eyebrow reveal">The PLYRs</p>
+    <h2 class="section-title reveal">Meet the<br>PLYRs</h2>
+    <p class="section-body reveal" style="transition-delay:0.08s;">
+      A growing community of athletes building sharper profiles, stronger stories, and cleaner recruiting visibility.
+    </p>
+  </div>
+
+  <div class="plyrs-embed-card reveal" style="transition-delay:0.14s">
+    <!-- Elfsight Instagram Feed | Instagram New PLYRs -->
+    <script src="https://elfsightcdn.com/platform.js" async></script>
+    <div class="elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac" data-elfsight-app-lazy></div>
+  </div>
+</section>
+
 <section id="testimonials">
   <p class="section-eyebrow reveal">Hear It From Them</p>
   <h2 class="section-title reveal">Real Stories.<br>Real Trust.</h2>
@@ -1496,7 +2200,66 @@
       <p class="testimonial-name">Class of 2026 · Midfielder</p>
     </div>
   </div>
+
+  <div class="youtube-placeholder-grid reveal" style="transition-delay:0.18s" aria-label="Testimonial video placeholders">
+    <div class="youtube-placeholder youtube-live-card">
+      <iframe
+        class="youtube-live-iframe"
+        src="https://www.youtube.com/embed/NNsqmghz-2I?si=5AQ0jJCwzDytnuk8"
+        title="Coach testimonial video"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allowfullscreen
+      ></iframe>
+    </div>
+
+    <div class="youtube-placeholder">
+      <!-- Placeholder here: replace with YouTube testimonial embed. -->
+      <div class="youtube-placeholder-inner">
+        <span class="youtube-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+        <p class="youtube-placeholder-label">YouTube Placeholder</p>
+        <h3 class="youtube-placeholder-title">Athlete Story</h3>
+        <p class="youtube-placeholder-copy">Embed an athlete testimonial video here.</p>
+      </div>
+    </div>
+
+    <div class="youtube-placeholder">
+      <!-- Placeholder here: replace with YouTube testimonial embed. -->
+      <div class="youtube-placeholder-inner">
+        <span class="youtube-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+        <p class="youtube-placeholder-label">YouTube Placeholder</p>
+        <h3 class="youtube-placeholder-title">Parent Story</h3>
+        <p class="youtube-placeholder-copy">Embed a parent testimonial video here.</p>
+      </div>
+    </div>
+  </div>
+
 </section>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PLYRCARD SHOW
+═══════════════════════════════════════════════════════ -->
+<section id="plyrcard-show">
+  <div class="show-copy">
+    <p class="section-eyebrow reveal">The PLYRCARD Show</p>
+    <h2 class="section-title reveal">Watch the<br>PLYRCARD Show</h2>
+    <p class="section-body reveal" style="transition-delay:0.08s;">
+      Stories, conversations, and recruiting insights from the athletes, coaches, and people moving the game forward.
+    </p>
+  </div>
+
+  <div class="youtube-channel-embed reveal plyrcard-show-shell" style="transition-delay:0.14s">
+    <div class="plyrcard-show-frame">
+      <!-- Elfsight YouTube Gallery | The PLYRCard Show -->
+      <script src="https://elfsightcdn.com/platform.js" async></script>
+      <div class="elfsight-app-cabef38f-ac42-4eba-942b-2a8c871fad33" data-elfsight-app-lazy></div>
+    </div>
+  </div>
+</section>
+
+
 
 
 <!-- ════════════════════════════════════════════════════════
@@ -1505,12 +2268,13 @@
 <section id="trust-logos">
   <p class="trust-eyebrow">Trusted in the Game</p>
   <div class="trust-grid" aria-label="Partner logos">
-    <div class="trust-logo-box"><span>NCSAA</span></div>
-    <div class="trust-logo-box"><span>RecruitIQ</span></div>
-    <div class="trust-logo-box"><span>Verso</span></div>
-    <div class="trust-logo-box"><span>D1 Programs</span></div>
-    <div class="trust-logo-box"><span>ECNL</span></div>
-    <div class="trust-logo-box"><span>Club Teams</span></div>
+    <?php foreach (($partnerLogoPlaceholders ?? []) as $index => $logoPath): ?>
+      <div class="trust-logo-box is-placeholder">
+        <!-- Placeholder here: replace with partner logo image. -->
+        <img src="<?= htmlspecialchars($logoPath, ENT_QUOTES, 'UTF-8') ?>" alt="Partner logo placeholder <?= $index + 1 ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
+        <span style="display:none;">Partner <?= $index + 1 ?></span>
+      </div>
+    <?php endforeach; ?>
   </div>
 </section>
 
@@ -1798,6 +2562,68 @@
       }
     });
   }
+
+  const livePreviewRoot = document.getElementById('live-preview-device');
+
+  if (livePreviewRoot) {
+    const slides = Array.from(livePreviewRoot.querySelectorAll('.live-preview-slide'));
+    const dots = Array.from(livePreviewRoot.querySelectorAll('.live-preview-dot'));
+    const wrap = livePreviewRoot.closest('.live-preview-wrap');
+    const prevBtn = wrap?.querySelector('[data-preview-prev]');
+    const nextBtn = wrap?.querySelector('[data-preview-next]');
+    const expandBtn = wrap?.querySelector('[data-preview-expand]');
+
+    let previewIndex = 0;
+    let previewTimer = null;
+    let manualPauseTimer = null;
+
+    const setPreview = (nextIndex) => {
+      if (!slides.length) return;
+
+      slides[previewIndex]?.classList.remove('active');
+      dots[previewIndex]?.classList.remove('active');
+
+      previewIndex = (nextIndex + slides.length) % slides.length;
+
+      slides[previewIndex]?.classList.add('active');
+      dots[previewIndex]?.classList.add('active');
+    };
+
+    const startPreviewTimer = () => {
+      clearInterval(previewTimer);
+      previewTimer = setInterval(() => {
+        setPreview(previewIndex + 1);
+      }, 5000);
+    };
+
+    const pauseThenResume = () => {
+      clearInterval(previewTimer);
+      clearTimeout(manualPauseTimer);
+      manualPauseTimer = setTimeout(startPreviewTimer, 6000);
+    };
+
+    prevBtn?.addEventListener('click', () => {
+      setPreview(previewIndex - 1);
+      pauseThenResume();
+    });
+
+    nextBtn?.addEventListener('click', () => {
+      setPreview(previewIndex + 1);
+      pauseThenResume();
+    });
+
+    expandBtn?.addEventListener('click', () => {
+      const url = slides[previewIndex]?.dataset.previewUrl;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    });
+
+    livePreviewRoot.addEventListener('mouseenter', () => clearInterval(previewTimer));
+    livePreviewRoot.addEventListener('mouseleave', startPreviewTimer);
+
+    startPreviewTimer();
+  }
+
+
 })();
 </script>
 	

@@ -1,6 +1,7 @@
 @php
-// Shared image helpers/placeholders for the marketing Blade pages.
-// Store partner logos in public/images/partners.
+
+// Shared image helpers/placeholders for the static PLYRCARD pages.
+// Placeholder here: replace these paths with final uploaded assets when ready.
 $partnerLogoPlaceholders = [
     '/images/partners/partner-ecnl.png',
     '/images/partners/partner-mls-next.png',
@@ -15,4 +16,6 @@ $partnerLogoPlaceholders = [
     '/images/partners/partner-trainer-gorres.png',
     '/images/partners/partner-plyrcard-show.png',
 ];
+
+
 @endphp

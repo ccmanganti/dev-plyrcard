@@ -1,7 +1,11 @@
 @php
     $activePage = 'about';
 @endphp
+
 @include('partials.images')
+@include('partials.navigation')
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -541,9 +545,25 @@
       border: 1px solid rgba(255,255,255,0.04);
     }
     .value-icon {
-      font-size: 26px;
-      margin-bottom: 14px;
-      display: block;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      background: rgba(255,92,53,0.10);
+      border: 1px solid rgba(255,92,53,0.20);
+    }
+    .value-icon svg {
+      width: 21px;
+      height: 21px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .value-title {
       font-family: var(--font-display);
@@ -577,9 +597,26 @@
     }
     .diff-item:last-child { border-bottom: none; }
     .diff-icon {
-      font-size: 22px;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 1px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      background: rgba(255,92,53,0.10);
+      border: 1px solid rgba(255,92,53,0.18);
+    }
+    .diff-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .diff-text {}
     .diff-title {
@@ -1250,6 +1287,425 @@
       .desktop-nav-cta { padding: 10px 18px; }
     }
 
+  
+    /* ─── FINAL TRUSTED PARTNER LOGOS: 6 ACROSS / 2 ROWS ─────────── */
+    .trust-grid,
+    .partner-grid {
+      width: min(1500px, calc(100% - 72px)) !important;
+      max-width: 1500px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      display: grid !important;
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+      gap: 20px !important;
+    }
+
+    .trust-logo-box,
+    .partner-box {
+      height: 124px !important;
+      min-height: 124px !important;
+      border-radius: 18px !important;
+      background: rgba(255,255,255,0.055) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 18px !important;
+      overflow: hidden !important;
+      transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease !important;
+    }
+
+    .trust-logo-box:hover,
+    .partner-box:hover {
+      transform: translateY(-3px) !important;
+      background: rgba(255,255,255,0.085) !important;
+      border-color: rgba(255,92,53,0.26) !important;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.22) !important;
+    }
+
+    .trust-logo-box img,
+    .partner-box img {
+      width: 100% !important;
+      max-width: 165px !important;
+      max-height: 76px !important;
+      object-fit: contain !important;
+      opacity: 0.68 !important;
+      filter: grayscale(1) brightness(1.45) contrast(1.08) !important;
+      transition: opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease !important;
+    }
+
+    .trust-logo-box:hover img,
+    .partner-box:hover img {
+      opacity: 1 !important;
+      filter: none !important;
+      transform: scale(1.04) !important;
+    }
+
+    .trust-logo-box span,
+    .partner-box span {
+      font-size: 16px !important;
+      color: rgba(255,255,255,0.44) !important;
+    }
+
+    @media (max-width: 1280px) {
+      .trust-grid,
+      .partner-grid {
+        width: min(1180px, calc(100% - 48px)) !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 18px !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .trust-grid,
+      .partner-grid {
+        width: calc(100% - 32px) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+      }
+
+      .trust-logo-box,
+      .partner-box {
+        height: 100px !important;
+        min-height: 100px !important;
+        border-radius: 15px !important;
+        padding: 16px !important;
+      }
+
+      .trust-logo-box img,
+      .partner-box img {
+        max-width: 140px !important;
+        max-height: 60px !important;
+      }
+    }
+
+  
+    .plyrs-embed-card {
+      overflow: hidden !important;
+    }
+
+    .plyrs-embed-card .elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac {
+      width: 100%;
+      min-height: 520px;
+    }
+
+
+    /* ─── PLYRS FINAL ALIGNMENT FIX ─────────────────────────────── */
+    #plyrs {
+      padding-top: 72px !important;
+      padding-bottom: 72px !important;
+    }
+
+    #plyrs .section-eyebrow,
+    #plyrs .section-title,
+    #plyrs .section-body {
+      width: min(720px, calc(100% - 64px)) !important;
+      max-width: 720px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      text-align: left !important;
+      padding-left: 0 !important;
+      transform: none !important;
+    }
+
+    #plyrs .section-eyebrow {
+      margin-bottom: 12px !important;
+    }
+
+    #plyrs .section-title {
+      margin-top: 0 !important;
+      margin-bottom: 20px !important;
+      line-height: 0.9 !important;
+    }
+
+    #plyrs .section-body {
+      margin-top: 0 !important;
+      margin-bottom: 42px !important;
+      line-height: 1.48 !important;
+    }
+
+    #plyrs .plyrs-embed-card {
+      width: min(1080px, calc(100% - 64px)) !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      min-height: 0 !important;
+      display: block !important;
+      overflow: hidden !important;
+      border-radius: 18px !important;
+      background: rgba(255,255,255,0.035) !important;
+    }
+
+    #plyrs .elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac {
+      width: 100% !important;
+      min-height: 420px !important;
+      display: block !important;
+      overflow: hidden !important;
+    }
+
+    @media (max-width: 767px) {
+      #plyrs {
+        padding-top: 52px !important;
+        padding-bottom: 52px !important;
+      }
+
+      #plyrs .section-eyebrow,
+      #plyrs .section-title,
+      #plyrs .section-body,
+      #plyrs .plyrs-embed-card {
+        width: calc(100% - 32px) !important;
+        max-width: none !important;
+      }
+
+      #plyrs .section-body {
+        margin-bottom: 30px !important;
+      }
+
+      #plyrs .plyrs-embed-card {
+        border-radius: 14px !important;
+      }
+    }
+
+
+    /* ─── PLYRS + VIDEO PLACEHOLDERS ─────────────────────────────── */
+    #plyrs,
+    #plyrcard-show {
+      padding: 96px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #plyrs .plyrs-copy,
+    #plyrcard-show .show-copy {
+      width: min(720px, calc(100% - 64px));
+      margin: 0 auto 42px;
+      text-align: left;
+    }
+
+    #plyrs .plyrs-copy .section-eyebrow,
+    #plyrcard-show .show-copy .section-eyebrow {
+      margin-bottom: 12px;
+    }
+
+    #plyrs .plyrs-copy .section-title,
+    #plyrcard-show .show-copy .section-title {
+      margin: 0 0 20px;
+      line-height: 0.9;
+      text-align: left;
+    }
+
+    #plyrs .plyrs-copy .section-body,
+    #plyrcard-show .show-copy .section-body {
+      margin: 0;
+      max-width: 720px;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .plyrs-embed-card {
+      width: min(1080px, calc(100% - 64px));
+      margin: 0 auto;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .plyrs-embed-card .elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac {
+      width: 100%;
+      min-height: 420px;
+      display: block;
+      overflow: hidden;
+    }
+
+    .youtube-placeholder-grid {
+      width: min(1180px, calc(100% - 64px));
+      margin: 40px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .youtube-placeholder {
+      position: relative;
+      min-height: 230px;
+      border-radius: 22px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      background:
+        radial-gradient(circle at 24% 10%, rgba(255,92,53,0.18), transparent 34%),
+        linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    }
+
+    .youtube-placeholder::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.28));
+      pointer-events: none;
+    }
+
+    .youtube-placeholder-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .youtube-play {
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      box-shadow: 0 18px 42px rgba(255,92,53,0.28);
+    }
+
+    .youtube-play svg {
+      width: 26px;
+      height: 26px;
+      fill: var(--white);
+      margin-left: 4px;
+    }
+
+    .youtube-placeholder-label {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .youtube-placeholder-title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3vw, 40px);
+      line-height: 0.95;
+      text-transform: uppercase;
+      color: var(--white);
+    }
+
+    .youtube-placeholder-copy {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.58);
+      max-width: 300px;
+    }
+
+    .youtube-channel-embed {
+      width: min(1080px, calc(100% - 64px));
+      margin: 42px auto 0;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px dashed rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.045);
+      min-height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 34px;
+    }
+
+    @media (max-width: 980px) {
+      .youtube-placeholder-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 767px) {
+      #plyrs,
+      #plyrcard-show {
+        padding: 64px 0;
+      }
+
+      #plyrs .plyrs-copy,
+      #plyrcard-show .show-copy,
+      .plyrs-embed-card,
+      .youtube-placeholder-grid,
+      .youtube-channel-embed {
+        width: calc(100% - 32px);
+      }
+
+      .youtube-placeholder {
+        min-height: 210px;
+      }
+
+      .youtube-channel-embed {
+        min-height: 360px;
+      }
+    }
+
+  
+    /* ─── RADIAL OVERLAY ONLY FOR BLACK SECTIONS ─────────────────── */
+    #testimonials,
+    #plyrcard-show,
+    #plyrs {
+      position: relative;
+      background-color: var(--black) !important;
+      overflow: hidden;
+    }
+
+    #testimonials::before,
+    #plyrcard-show::before,
+    #plyrs::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 14% 12%, rgba(255, 92, 53, 0.14), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(255, 92, 53, 0.07), transparent 28%);
+    }
+
+    #testimonials > *,
+    #plyrcard-show > *,
+    #plyrs > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Keep existing image backgrounds intact. */
+    #hero,
+    #page-hero,
+    #trusted,
+    #partnerships,
+    #team,
+    .img-break {
+      background-blend-mode: normal !important;
+    }
+
+    /* ─── TESTIMONIAL VIDEO ROW FIX ──────────────────────────────── */
+    #testimonials .youtube-placeholder-grid {
+      grid-column: 1 / -1 !important;
+      width: min(1180px, calc(100% - 64px)) !important;
+      margin: 56px auto 0 !important;
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 24px !important;
+      clear: both !important;
+    }
+
+    #testimonials .youtube-placeholder {
+      min-height: 250px !important;
+      width: 100% !important;
+    }
+
+    @media (max-width: 980px) {
+      #testimonials .youtube-placeholder-grid {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1417,7 +1873,7 @@
 <!-- ══════════════════════════════════════════════════════
      IMAGE BREAK #1
 ═══════════════════════════════════════════════════════ -->
-<div class="img-break" style="background-image: url('/images/PLYRCARD-SITE-ABOUT.jpg'); background-position: center 35%;" role="img" aria-label="Runner in starting blocks on a track, preparing for a race">
+<div class="img-break" style="background-image: url('/Images/PLYRCARD-SITE-ABOUT.jpg'); background-position: center 35%;" role="img" aria-label="Runner in starting blocks on a track, preparing for a race">
   <div class="img-break-text">
     <p class="page-eyebrow" style="margin-bottom:6px">The Insight</p>
     <h3 class="img-break-headline">More Than<br>a Platform.</h3>
@@ -1459,7 +1915,7 @@
   <ul class="diff-list" aria-label="PLYRCARD differentiators">
 
     <li class="diff-item reveal" style="transition-delay:0.05s">
-      <span class="diff-icon">🃏</span>
+      <span class="diff-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M9 8h6M9 12h6M9 16h3"></path></svg></span>
       <div class="diff-text">
         <h3 class="diff-title">One Card. Your Whole Story.</h3>
         <p class="diff-copy">Stats, highlights, schedule, academics, and personality — all in a single shareable link. No more attaching five files to a cold email.</p>
@@ -1467,7 +1923,7 @@
     </li>
 
     <li class="diff-item reveal" style="transition-delay:0.10s">
-      <span class="diff-icon">📊</span>
+      <span class="diff-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"></path><path d="M7 16V9"></path><path d="M12 16V5"></path><path d="M17 16v-4"></path></svg></span>
       <div class="diff-text">
         <h3 class="diff-title">Real Engagement Data</h3>
         <p class="diff-copy">Know exactly when a coach opens your card, clicks your video, and views your profile. Follow up with data, not guesswork.</p>
@@ -1475,7 +1931,7 @@
     </li>
 
     <li class="diff-item reveal" style="transition-delay:0.15s">
-      <span class="diff-icon">🎨</span>
+      <span class="diff-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18h1.2a1.8 1.8 0 0 0 1.2-3.1l-.3-.3a1.8 1.8 0 0 1 1.2-3.1H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3Z"></path><circle cx="8" cy="10" r="1"></circle><circle cx="11" cy="7" r="1"></circle><circle cx="15" cy="8" r="1"></circle></svg></span>
       <div class="diff-text">
         <h3 class="diff-title">Custom Athlete Branding</h3>
         <p class="diff-copy">Your card looks like your brand — not a generic template. Custom graphics, colors, and layout that reflect your identity on and off the field.</p>
@@ -1483,7 +1939,7 @@
     </li>
 
     <li class="diff-item reveal" style="transition-delay:0.20s">
-      <span class="diff-icon">📅</span>
+      <span class="diff-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg></span>
       <div class="diff-text">
         <h3 class="diff-title">Live Schedule Integration</h3>
         <p class="diff-copy">Coaches can see your upcoming game schedule directly on your card — and filter to find events near them. Easier access means more chances to be seen in person.</p>
@@ -1491,7 +1947,7 @@
     </li>
 
     <li class="diff-item reveal" style="transition-delay:0.25s">
-      <span class="diff-icon">📱</span>
+      <span class="diff-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M11 18h2"></path></svg></span>
       <div class="diff-text">
         <h3 class="diff-title">Built for Mobile</h3>
         <p class="diff-copy">Coaches recruit on their phones. PLYRCARD is designed to look and perform perfectly on any device — fast, clean, and easy to share forward.</p>
@@ -1505,7 +1961,7 @@
 <!-- ══════════════════════════════════════════════════════
      IMAGE BREAK #2
 ═══════════════════════════════════════════════════════ -->
-<div class="img-break" style="background-image: url('https://sspark.genspark.ai/cfimages?u1=lhVID6%2F91ej5Q0aIYhsQG3%2FrLLuiBUtYF5iz%2FL93D8jZLxjc2P4wPR3yBIiz404jiexjrGt%2BR8iiO3JZLxmvB%2FyneeYygHYm84onQ8QZFeGbhjiNkAU8KfZg%2BkLy5CjART8ynhLibjPxUGljk4N1sGQgHXhux0l34FKO1UKcGmgs9L%2FfqoSp44l%2BmA%3D%3D&u2=fJYHg6K%2BPA7iRjGU&width=2560'); background-position: center 30%;" role="img" aria-label="Athlete training at gym, determined and focused">
+<div class="img-break" style="background-image: url('/Images/young-athlete-training.jpg'); background-position: center 28%;" role="img" aria-label="Young athlete training with focus and determination">
   <div class="img-break-text">
     <p class="page-eyebrow" style="margin-bottom:6px">Our Values</p>
     <h3 class="img-break-headline">What We<br>Stand For.</h3>
@@ -1524,37 +1980,37 @@
   <div class="values-grid">
 
     <div class="value-card reveal" style="transition-delay:0.05s">
-      <span class="value-icon">🏆</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"></path><path d="M5 5H3v2a4 4 0 0 0 4 4"></path><path d="M19 5h2v2a4 4 0 0 1-4 4"></path></svg></span>
       <h3 class="value-title">Athlete First</h3>
       <p class="value-body">Every decision starts with: does this help the athlete? Not the brand, not the platform — the player.</p>
     </div>
 
     <div class="value-card reveal" style="transition-delay:0.10s">
-      <span class="value-icon">🔍</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4.2-4.2"></path></svg></span>
       <h3 class="value-title">Radical Clarity</h3>
       <p class="value-body">Recruiting is confusing enough. PLYRCARD cuts through the noise with clean, simple tools anyone can use on day one.</p>
     </div>
 
     <div class="value-card reveal" style="transition-delay:0.15s">
-      <span class="value-icon">⚡</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"></path></svg></span>
       <h3 class="value-title">Own Your Brand</h3>
       <p class="value-body">Your story belongs to you. We give you the tools to tell it — on your terms, in your voice, with your personality front and center.</p>
     </div>
 
     <div class="value-card reveal" style="transition-delay:0.20s">
-      <span class="value-icon">📊</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"></path><path d="M7 16V9"></path><path d="M12 16V5"></path><path d="M17 16v-4"></path></svg></span>
       <h3 class="value-title">Real Visibility</h3>
       <p class="value-body">No more guessing. Know when coaches open, click, and engage so you can follow up with confidence — not anxiety.</p>
     </div>
 
     <div class="value-card reveal" style="transition-delay:0.25s">
-      <span class="value-icon">🌎</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18"></path><path d="M12 3a14 14 0 0 0 0 18"></path></svg></span>
       <h3 class="value-title">Equal Access</h3>
       <p class="value-body">The recruiting process shouldn't favor those with the most connections. We're building tools that give every athlete an equal shot.</p>
     </div>
 
     <div class="value-card reveal" style="transition-delay:0.30s">
-      <span class="value-icon">🚀</span>
+      <span class="value-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c2.5.5 4.5-.2 6-2l6-6c1.7-1.7 2.7-4 3-7-3 .3-5.3 1.3-7 3l-6 6c-1.8 1.5-2.5 3.5-2 6Z"></path><path d="M15 9h.01"></path><path d="M4 20l4-1"></path></svg></span>
       <h3 class="value-title">Always Improving</h3>
       <p class="value-body">We listen to athletes, coaches, and families constantly. The product evolves because the recruiting world never stops changing.</p>
     </div>
@@ -1566,93 +2022,17 @@
 <!-- ══════════════════════════════════════════════════════
      TEAM
 ═══════════════════════════════════════════════════════ -->
-<section>
-  <p id="sample" class="section-eyebrow reveal">The People</p>
-  <h2 class="section-title reveal">Meet the<br>Team</h2>
+<section id="plyrs">
+  <p id="sample" class="section-eyebrow reveal">The PLYRs</p>
+  <h2 class="section-title reveal">Meet the<br>PLYRs</h2>
   <p class="section-body reveal" style="transition-delay:0.08s; margin-bottom:0;">
-    Athletes, coaches, parents, and builders — united by the belief that every player deserves a fair shot at being seen.
+    A growing community of athletes building sharper profiles, stronger stories, and cleaner recruiting visibility.
   </p>
 
-  <div class="team-grid" role="list">
-
-    <div class="team-card reveal" style="transition-delay:0.05s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">JD</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Founder</div>
-        <div class="team-role">CEO & Vision</div>
-        <div class="team-sport">Builder</div>
-      </div>
-    </div>
-
-    <div class="team-card reveal" style="transition-delay:0.10s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">SM</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Co-Founder</div>
-        <div class="team-role">Product & Design</div>
-        <div class="team-sport">Former Athlete</div>
-      </div>
-    </div>
-
-    <div class="team-card reveal" style="transition-delay:0.15s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">AR</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Advisor</div>
-        <div class="team-role">College Recruiting</div>
-        <div class="team-sport">NCAA Advisor</div>
-      </div>
-    </div>
-
-    <div class="team-card reveal" style="transition-delay:0.20s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">TW</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Advisor</div>
-        <div class="team-role">D1 Coach Network</div>
-        <div class="team-sport">Division I</div>
-      </div>
-    </div>
-
-    <div class="team-card reveal" style="transition-delay:0.25s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">KL</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Engineer</div>
-        <div class="team-role">Platform & Data</div>
-        <div class="team-sport">Tech Lead</div>
-      </div>
-    </div>
-
-    <div class="team-card reveal" style="transition-delay:0.30s" role="listitem">
-      <div class="team-avatar">
-        <div class="team-avatar-bg"></div>
-        <span class="team-initials">MB</span>
-        <div class="team-stripe"></div>
-      </div>
-      <div class="team-info">
-        <div class="team-name">Growth</div>
-        <div class="team-role">Athlete Outreach</div>
-        <div class="team-sport">Community</div>
-      </div>
-    </div>
-
+  <div class="plyrs-embed-card reveal" style="transition-delay:0.14s">
+    <!-- Elfsight Instagram Feed | Instagram New PLYRs -->
+    <script src="https://elfsightcdn.com/platform.js" async></script>
+    <div class="elfsight-app-c088c003-42fd-4aa0-8d82-ce6f542e31ac" data-elfsight-app-lazy></div>
   </div>
 </section>
 
@@ -1667,12 +2047,13 @@
     PLYRCARD works alongside the platforms, programs, and organizations that athletes already trust — building a full recruiting ecosystem, not just an isolated tool.
   </p>
   <div class="partner-grid reveal" style="transition-delay:0.14s" aria-label="Partner organizations">
-    <div class="partner-box"><span>RecruitIQ</span></div>
-    <div class="partner-box"><span>Verso</span></div>
-    <div class="partner-box"><span>ECNL</span></div>
-    <div class="partner-box"><span>NCSAA</span></div>
-    <div class="partner-box"><span>Club Teams</span></div>
-    <div class="partner-box"><span>D1 Programs</span></div>
+    <?php foreach (($partnerLogoPlaceholders ?? []) as $index => $logoPath): ?>
+      <div class="partner-box is-placeholder">
+        <!-- Placeholder here: replace with partner logo image. -->
+        <img src="<?= htmlspecialchars($logoPath, ENT_QUOTES, 'UTF-8') ?>" alt="Partner logo placeholder <?= $index + 1 ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
+        <span style="display:none;">Partner <?= $index + 1 ?></span>
+      </div>
+    <?php endforeach; ?>
   </div>
 </section>
 
@@ -1685,7 +2066,7 @@
   <h2 class="section-title" id="about-cta-headline">Start Your<br>Journey</h2>
   <p class="cta-body">Build a recruiting card coaches will actually remember.</p>
   <div class="btn-row">
-    <a href="https://plyrcard.com/" class="btn-white-cta">Create Free Account</a>
+    <a href="/registration" class="btn-white-cta">Create Free Account</a>
     <a href="/pricing"          class="btn-outline-white-cta">See Pricing</a>
   </div>
   <p class="fine-print">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Set up in minutes</p>

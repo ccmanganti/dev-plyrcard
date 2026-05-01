@@ -1,7 +1,11 @@
 @php
     $activePage = 'podcast';
 @endphp
+
 @include('partials.images')
+@include('partials.navigation')
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -702,7 +706,7 @@
     .podcast-art {
       min-height: 440px;
       border-radius: 24px;
-      background: linear-gradient(135deg, rgba(255,92,53,0.88), rgba(225,29,72,0.76)), url('/images/podcast-placeholder.jpg');
+      background: linear-gradient(135deg, rgba(255,92,53,0.88), rgba(225,29,72,0.76)), url('/Images/podcast-placeholder.jpg');
       background-size: cover;
       background-position: center;
       display: flex;

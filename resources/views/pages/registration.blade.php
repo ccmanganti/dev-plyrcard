@@ -5,15 +5,16 @@
 @include('partials.images')
 @include('partials.navigation')
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-  <script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6941fea74ca18223c7de491d"></script>
+	
+	<script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6941fea74ca18223c7de491d"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="<?= htmlspecialchars($copy['meta_description'], ENT_QUOTES, 'UTF-8') ?>" />
-  <title><?= htmlspecialchars($copy['title'], ENT_QUOTES, 'UTF-8') ?></title>
+  <meta name="description" content="Start free with PLYRCARD — Create your athlete profile and begin building your recruiting presence." />
+  <title>Start Free — PLYRCARD</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -53,6 +54,7 @@
     a   { color: inherit; text-decoration: none; }
     ul  { list-style: none; }
 
+    /* HEADER */
     #site-header {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -76,9 +78,27 @@
       border-bottom-color: transparent;
     }
 
-    .logo-wrap { display: flex; align-items: center; height: 32px; }
-    .logo-wrap img { height: 32px; width: auto; object-fit: contain; filter: brightness(0) invert(1); }
-    .logo-text { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; }
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      height: 32px;
+    }
+
+    .logo-wrap img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+      filter: brightness(0) invert(1);
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
     .logo-text span { color: var(--accent); }
 
     .menu-btn {
@@ -94,7 +114,14 @@
       margin-right: -6px;
     }
 
-    .menu-btn span { display: block; width: 24px; height: 2px; background: var(--white); border-radius: 2px; transition: transform 0.3s, opacity 0.3s; }
+    .menu-btn span {
+      display: block;
+      width: 24px; height: 2px;
+      background: var(--white);
+      border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+
     .menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
     .menu-btn.open span:nth-child(2) { opacity: 0; }
     .menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
@@ -115,7 +142,11 @@
       transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out);
     }
 
-    #mobile-nav.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    #mobile-nav.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
 
     .nav-link {
       font-family: var(--font-display);
@@ -127,7 +158,8 @@
       transition: color 0.2s;
     }
 
-    .nav-link:hover, .nav-link.active { color: var(--accent); }
+    .nav-link:hover,
+    .nav-link.active { color: var(--accent); }
 
     .nav-cta-pill {
       display: inline-flex;
@@ -144,11 +176,13 @@
       margin-top: 8px;
     }
 
+    /* ONE SECTION DEMO PAGE */
     #book-demo {
       position: relative;
       min-height: 100svh;
       padding: calc(var(--header-h) + var(--safe-top) + 44px) 24px calc(64px + var(--safe-bottom));
       background-color: var(--black);
+      /* background-image: url('https://sspark.genspark.ai/cfimages?u1=iQbVZ84bc1gGwxenWqUmUOgj%2F2Wg%2BqiEhoLVWNblJQ8%2FPLZy1BcpnRWyXC4lwJcZqpWhKu4CZJ8lTCaA0EiurwYpLi9YlAQazS7mQ3YrY2F0rB7A&u2=0S8QqchqH1OMoytY&width=2560'); */
       background-size: cover;
       background-position: center 34%;
       overflow: hidden;
@@ -191,7 +225,9 @@
       align-items: center;
     }
 
-    .demo-copy { max-width: 560px; }
+    .demo-copy {
+      max-width: 560px;
+    }
 
     .page-eyebrow {
       font-family: var(--font-display);
@@ -224,17 +260,80 @@
       margin-bottom: 24px;
     }
 
-    .demo-points { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 26px; max-width: 500px; }
-    .demo-point { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.075); }
-    .demo-point:last-child { border-bottom: none; }
-    .point-number { flex-shrink: 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1; color: var(--accent); width: 34px; }
-    .point-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: -0.01em; margin-bottom: 3px; }
-    .point-copy { font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.56); }
+    .demo-points {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 26px;
+      max-width: 500px;
+    }
 
-    .mini-proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 480px; margin-top: 28px; }
-    .proof-box { background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px 12px; }
-    .proof-num { font-family: var(--font-display); font-size: 24px; font-weight: 700; line-height: 1; color: var(--white); }
-    .proof-label { margin-top: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.38); }
+    .demo-point {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.075);
+    }
+
+    .demo-point:last-child { border-bottom: none; }
+
+    .point-number {
+      flex-shrink: 0;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--accent);
+      width: 34px;
+    }
+
+    .point-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      margin-bottom: 3px;
+    }
+
+    .point-copy {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.56);
+    }
+
+    .mini-proof {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 480px;
+      margin-top: 28px;
+    }
+
+    .proof-box {
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 14px 12px;
+    }
+
+    .proof-num {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--white);
+    }
+
+    .proof-label {
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.38);
+    }
 
     .calendar-card {
       width: 100%;
@@ -247,55 +346,403 @@
       -webkit-backdrop-filter: blur(18px);
     }
 
-    #site-footer { background: var(--black); border-top: 1px solid rgba(255,255,255,0.07); padding: 48px 24px calc(40px + var(--safe-bottom)); }
-    .footer-logo { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 28px; }
-    .footer-logo span { color: var(--accent); }
-    .footer-nav { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
-    .footer-nav a { font-size: 15px; color: rgba(255,255,255,0.50); transition: color 0.2s; }
-    .footer-nav a:hover, .footer-nav a.active { color: var(--white); }
-    .footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; }
-    .footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
-    .footer-tagline { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.18); }
+    .calendar-card-top {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.075);
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+    }
 
-    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .calendar-label {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .calendar-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      margin-top: 3px;
+    }
+
+    .calendar-badge {
+      flex-shrink: 0;
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--white);
+      background: rgba(255,92,53,0.16);
+      border: 1px solid rgba(255,92,53,0.32);
+      border-radius: var(--radius-btn);
+      padding: 7px 11px;
+    }
+
+    .calendar-embed {
+      height: min(680px, calc(100svh - 210px));
+      min-height: 560px;
+      background: var(--white);
+      overflow: hidden;
+    }
+
+    .calendar-embed iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--white);
+    }
+
+    .calendar-placeholder {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      text-align: center;
+      color: #0D0D0D;
+      background:
+        linear-gradient(135deg, rgba(255,92,53,0.10), rgba(255,255,255,0.95)),
+        var(--white);
+    }
+
+    .placeholder-inner {
+      max-width: 340px;
+    }
+
+    .placeholder-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: var(--accent);
+      color: var(--white);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    .placeholder-title {
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    .placeholder-copy {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(0,0,0,0.58);
+    }
+
+    .calendar-note {
+      padding: 13px 18px 16px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.42);
+    }
+
+    /* FOOTER */
+    #site-footer {
+      background: var(--black);
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 48px 24px calc(40px + var(--safe-bottom));
+    }
+
+    .footer-logo {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+    }
+
+    .footer-logo span { color: var(--accent); }
+
+    .footer-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+
+    .footer-nav a {
+      font-size: 15px;
+      color: rgba(255,255,255,0.50);
+      transition: color 0.2s;
+    }
+
+    .footer-nav a:hover,
+    .footer-nav a.active { color: var(--white); }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 24px;
+    }
+
+    .footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
+
+    .footer-tagline {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.18);
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
     @media (min-width: 768px) {
-      #book-demo { padding-left: 48px; padding-right: 48px; }
-      .demo-shell { grid-template-columns: minmax(0, 0.92fr) minmax(430px, 1.08fr); gap: 44px; }
-      .calendar-card { align-self: center; }
-      #site-footer { padding-left: 48px; padding-right: 48px; }
+      #book-demo {
+        padding-left: 48px;
+        padding-right: 48px;
+      }
+
+      .demo-shell {
+        grid-template-columns: minmax(0, 0.92fr) minmax(430px, 1.08fr);
+        gap: 44px;
+      }
+
+      .calendar-card {
+        align-self: center;
+      }
+
+      #site-footer {
+        padding-left: 48px;
+        padding-right: 48px;
+      }
     }
 
     @media (min-width: 1100px) {
-      #book-demo { display: flex; align-items: center; }
-      .demo-shell { gap: 64px; }
+      #book-demo {
+        display: flex;
+        align-items: center;
+      }
+
+      .demo-shell {
+        gap: 64px;
+      }
+
+      .calendar-embed {
+        min-height: 620px;
+      }
     }
 
-    @media (max-width: 420px) { #book-demo { padding-left: 18px; padding-right: 18px; } .mini-proof { grid-template-columns: 1fr; } }
-    @media (prefers-reduced-motion: reduce) { .reveal { transition: none; } }
+    @media (max-width: 420px) {
+      #book-demo {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
 
-    .desktop-nav { display: none; align-items: center; gap: 28px; margin-left: auto; flex-wrap: nowrap; }
-    .desktop-nav a { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.72); white-space: nowrap; transition: color 0.2s, background 0.2s; }
-    .desktop-nav a:hover, .desktop-nav a.active { color: var(--white); }
-    .desktop-nav-cta { background: var(--accent); color: var(--white) !important; border-radius: var(--radius-btn); padding: 12px 22px; }
+      .mini-proof {
+        grid-template-columns: 1fr;
+      }
+
+      .calendar-card-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .calendar-embed {
+        min-height: 520px;
+        height: 540px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { transition: none; }
+    }
+  
+    /* SHARED NAV / FOOTER TEMPLATE SUPPORT */
+    .desktop-nav {
+      display: none;
+      align-items: center;
+      gap: 28px;
+      margin-left: auto;
+      flex-wrap: nowrap;
+    }
+    .desktop-nav a {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.72);
+      white-space: nowrap;
+      transition: color 0.2s, background 0.2s;
+    }
+    .desktop-nav a:hover,
+    .desktop-nav a.active { color: var(--white); }
+    .desktop-nav-cta {
+      background: var(--accent);
+      color: var(--white) !important;
+      border-radius: var(--radius-btn);
+      padding: 12px 22px;
+    }
     .desktop-nav-cta:hover { background: var(--accent-dark); }
-
     @media (min-width: 1024px) {
-      #site-header { padding-left: clamp(40px, 5vw, 72px); padding-right: clamp(40px, 5vw, 72px); white-space: nowrap; }
+      #site-header {
+        padding-left: clamp(40px, 5vw, 72px);
+        padding-right: clamp(40px, 5vw, 72px);
+        white-space: nowrap;
+      }
       .logo-wrap { flex-shrink: 0; }
       .logo-wrap img { height: 36px; }
       .desktop-nav { display: flex; justify-content: flex-end; }
       .menu-btn, #mobile-nav { display: none; }
-      #site-footer { padding-left: clamp(40px, 5vw, 72px); padding-right: clamp(40px, 5vw, 72px); }
-      .footer-nav { flex-direction: row; flex-wrap: wrap; gap: 24px; }
+      #site-footer {
+        padding-left: clamp(40px, 5vw, 72px);
+        padding-right: clamp(40px, 5vw, 72px);
+      }
+      .footer-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+    }
+    @media (max-width: 1140px) and (min-width: 1024px) {
+      .desktop-nav { gap: 18px; }
+      .desktop-nav a { font-size: 12px; }
+      .desktop-nav-cta { padding: 10px 18px; }
     }
 
-    @media (max-width: 1140px) and (min-width: 1024px) { .desktop-nav { gap: 18px; } .desktop-nav a { font-size: 12px; } .desktop-nav-cta { padding: 10px 18px; } }
+  
 
-    .registration-form-embed { width: 100%; height: 100%; min-height: 760px; border-radius: 22px; overflow: hidden; background: var(--black); }
-    .registration-form-embed iframe { background: var(--black); }
+    .registration-form-placeholder {
+      min-height: 620px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+      padding: 32px;
+      border: 1px dashed rgba(255,255,255,0.20);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.035);
+    }
 
+    .registration-form-placeholder .placeholder-eyebrow {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .registration-form-placeholder h2 {
+      font-family: var(--font-display);
+      font-size: clamp(30px, 5vw, 48px);
+      line-height: 0.95;
+      text-transform: uppercase;
+    }
+
+    .registration-form-placeholder p:last-child {
+      max-width: 340px;
+      color: rgba(255,255,255,0.62);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    @media (max-width: 767px) {
+      .registration-page {
+        padding: 0 !important;
+        min-height: 100svh;
+        background: var(--black) !important;
+      }
+
+      .registration-page::before,
+      .registration-page::after,
+      .registration-page .demo-copy {
+        display: none !important;
+      }
+
+      .registration-page .demo-shell {
+        display: block;
+        width: 100%;
+        min-height: 100svh;
+        margin: 0;
+      }
+
+      .registration-page .calendar-card,
+      .registration-page .form-card {
+        min-height: 100svh;
+        width: 100%;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: var(--black) !important;
+        padding: 0 !important;
+      }
+
+      .registration-form-placeholder {
+        min-height: 100svh;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+      }
+
+      body:has(.registration-page) #site-header,
+      
+    }
+
+  
+    .registration-form-embed {
+      width: 100%;
+      height: 100%;
+      min-height: 760px;
+      border-radius: 22px;
+      overflow: hidden;
+      background: var(--black);
+    }
+
+    .registration-form-embed iframe {
+      background: var(--black);
+    }
+
+    @media (max-width: 767px) {
+      .registration-form-embed {
+        min-height: 100svh;
+        border-radius: 0;
+      }
+
+      .registration-form-embed iframe {
+        min-height: 100svh !important;
+      }
+    }
+
+  
+    /* ─── REGISTRATION IFRAME DISPLAY FIX ───────────────────────── */
     .registration-page .calendar-card.form-card {
       display: flex !important;
       justify-content: center !important;
@@ -312,7 +759,6 @@
       max-width: 425px !important;
       min-height: 811px !important;
       height: 811px !important;
-      max-height: 811px !important;
       border-radius: 24px !important;
       overflow: hidden !important;
       background: #000 !important;
@@ -325,24 +771,79 @@
       max-width: 100% !important;
       height: 811px !important;
       min-height: 811px !important;
-      max-height: 811px !important;
       border: 0 !important;
       display: block !important;
       background: #000 !important;
     }
 
-    @media (min-width: 768px) { .registration-page .demo-shell { align-items: flex-start !important; } .registration-page .form-card { padding-top: 0 !important; } }
+    @media (min-width: 768px) {
+      .registration-page .demo-shell {
+        align-items: flex-start !important;
+      }
+
+      .registration-page .form-card {
+        padding-top: 0 !important;
+      }
+    }
 
     @media (max-width: 767px) {
-      body:has(.registration-page) #site-header { display: flex !important; }
-      body:has(.registration-page) #mobile-nav { display: flex !important; }
-      .registration-page { padding-top: calc(var(--header-h, 76px) + var(--safe-top, 0px)) !important; min-height: 100svh !important; background: var(--black) !important; }
-      .registration-page::before, .registration-page::after, .registration-page .demo-copy { display: none !important; }
-      .registration-page .demo-shell { display: block !important; width: 100% !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; margin: 0 !important; }
-      .registration-page .calendar-card, .registration-page .form-card { width: 100% !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; border: 0 !important; border-radius: 0 !important; background: var(--black) !important; padding: 0 !important; display: block !important; }
-      .registration-form-embed { width: 100% !important; max-width: none !important; height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; max-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; border-radius: 0 !important; border: 0 !important; box-shadow: none !important; overflow: hidden !important; }
-      .registration-form-embed iframe { width: 100% !important; height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; max-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; }
+      body:has(.registration-page) #site-header {
+        display: flex !important;
+      }
+
+      body:has(.registration-page) #mobile-nav {
+        display: flex !important;
+      }
+
+      
+
+      .registration-page {
+        padding-top: calc(var(--header-h, 76px) + var(--safe-top, 0px)) !important;
+        min-height: 100svh !important;
+        background: var(--black) !important;
+      }
+
+      .registration-page::before,
+      .registration-page::after,
+      .registration-page .demo-copy {
+        display: none !important;
+      }
+
+      .registration-page .demo-shell {
+        display: block !important;
+        width: 100% !important;
+        min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+        margin: 0 !important;
+      }
+
+      .registration-page .calendar-card,
+      .registration-page .form-card {
+        width: 100% !important;
+        min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: var(--black) !important;
+        padding: 0 !important;
+        display: block !important;
+      }
+
+      .registration-form-embed {
+        width: 100% !important;
+        max-width: none !important;
+        height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+        min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+        border-radius: 0 !important;
+        border: 0 !important;
+        box-shadow: none !important;
+      }
+
+      .registration-form-embed iframe {
+        width: 100% !important;
+        height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+        min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important;
+      }
     }
+
   </style>
 </head>
 <body>
@@ -353,43 +854,66 @@
     <div class="demo-shell">
 
       <div class="demo-copy">
-        <p class="page-eyebrow reveal"><?= htmlspecialchars($copy['eyebrow'], ENT_QUOTES, 'UTF-8') ?></p>
+        <p class="page-eyebrow reveal">Start Free</p>
         <h1 class="demo-title reveal" id="registration-title">
-          <?= htmlspecialchars($copy['heading_lines'][0], ENT_QUOTES, 'UTF-8') ?><br><?= htmlspecialchars($copy['heading_lines'][1], ENT_QUOTES, 'UTF-8') ?><br><span><?= htmlspecialchars($copy['heading_lines'][2], ENT_QUOTES, 'UTF-8') ?></span>
+          Build Your<br>PLYRCARD<br><span>Free.</span>
         </h1>
 
         <p class="demo-lead reveal" style="transition-delay:0.08s">
-          <?= htmlspecialchars($copy['lead'], ENT_QUOTES, 'UTF-8') ?>
+          Create your free athlete profile and start turning your highlights, stats, story, schedule, and contact details into one clean coach-ready link.
         </p>
 
-        <div class="demo-points" aria-label="Registration steps">
-          <?php foreach ($copy['steps'] as $index => $step): ?>
-            <div class="demo-point reveal" style="transition-delay:<?= htmlspecialchars((string) (0.12 + ($index * 0.06)), ENT_QUOTES, 'UTF-8') ?>s">
-              <span class="point-number"><?= str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) ?></span>
-              <div>
-                <h2 class="point-title"><?= htmlspecialchars($step[0], ENT_QUOTES, 'UTF-8') ?></h2>
-                <p class="point-copy"><?= htmlspecialchars($step[1], ENT_QUOTES, 'UTF-8') ?></p>
-              </div>
+        <div class="demo-points" aria-label="What the demo covers">
+          <div class="demo-point reveal" style="transition-delay:0.12s">
+            <span class="point-number">01</span>
+            <div>
+              <h2 class="point-title">Create Your Account</h2>
+              <p class="point-copy">Start with the essentials so your athlete profile has a clean foundation from day one.</p>
             </div>
-          <?php endforeach; ?>
+          </div>
+
+          <div class="demo-point reveal" style="transition-delay:0.18s">
+            <span class="point-number">02</span>
+            <div>
+              <h2 class="point-title">Add Your Athlete Details</h2>
+              <p class="point-copy">Upload your sport, position, contact details, highlights, images, and recruiting information.</p>
+            </div>
+          </div>
+
+          <div class="demo-point reveal" style="transition-delay:0.24s">
+            <span class="point-number">03</span>
+            <div>
+              <h2 class="point-title">Preview Your Card</h2>
+              <p class="point-copy">Once submitted, your PLYRCARD profile can be reviewed and prepared for sharing.</p>
+            </div>
+          </div>
         </div>
 
         <div class="mini-proof reveal" style="transition-delay:0.30s" aria-label="PLYRCARD platform metrics">
-          <div class="proof-box"><div class="proof-num">8.8K+</div><div class="proof-label">Emails Sent</div></div>
-          <div class="proof-box"><div class="proof-num">10K+</div><div class="proof-label">Total Clicks</div></div>
-          <div class="proof-box"><div class="proof-num">4.8K+</div><div class="proof-label">Coach Views</div></div>
+          <div class="proof-box">
+            <div class="proof-num">8.8K+</div>
+            <div class="proof-label">Emails Sent</div>
+          </div>
+          <div class="proof-box">
+            <div class="proof-num">10K+</div>
+            <div class="proof-label">Total Clicks</div>
+          </div>
+          <div class="proof-box">
+            <div class="proof-num">4.8K+</div>
+            <div class="proof-label">Coach Views</div>
+          </div>
         </div>
       </div>
 
-      <aside class="calendar-card form-card reveal" style="transition-delay:0.16s" aria-label="<?= htmlspecialchars($copy['form_label'], ENT_QUOTES, 'UTF-8') ?>">
+      <aside class="calendar-card form-card reveal" style="transition-delay:0.16s" aria-label="Start free registration form">
+        <!-- Placeholder here: replace this block with your registration form embed. -->
         <div class="registration-form-embed">
           <iframe
-            id="registrationEmbedFrame"
-            src="<?= htmlspecialchars($currentFormEmbedUrl, ENT_QUOTES, 'UTF-8') ?>"
-            title="<?= htmlspecialchars($copy['form_label'], ENT_QUOTES, 'UTF-8') ?>"
+            src="https://plyrcard.com/player-intake-app"
+            title="PLYRCARD Player Intake Registration"
             loading="lazy"
             scrolling="yes"
-            style="width:425px;max-width:100%;height:811px;min-height:811px;max-height:811px;border:none;display:block;background:#000;"
+            style="width:425px;max-width:100%;height:811px;min-height:811px;border:none;display:block;background:#000;"
           ></iframe>
         </div>
       </aside>
@@ -403,65 +927,6 @@
 <script>
 (function () {
   'use strict';
-
-  const registrationIframe = document.getElementById('registrationEmbedFrame');
-
-  const paymentEmbeds = {
-    'plyr-plus': 'https://systems.plyrcard.com/widget/survey/rY9lpkKJxgH844GoXuYf?notrack=true',
-    'my-journey': 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true'
-  };
-
-  function appendParamsToUrl(baseUrl, values) {
-    try {
-      const url = new URL(baseUrl);
-      Object.entries(values || {}).forEach(([key, value]) => {
-        if (value === undefined || value === null || String(value).trim() === '') return;
-        url.searchParams.set(key, value);
-      });
-      return url.toString();
-    } catch (error) {
-      return baseUrl;
-    }
-  }
-
-  function setRegistrationFrameSrc(url) {
-    if (!registrationIframe || !url) return;
-    registrationIframe.src = url;
-    registrationIframe.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  window.addEventListener('message', function (event) {
-    if (event.origin !== 'https://dev.plyrcard.com') return;
-    if (!registrationIframe) return;
-
-    const data = event.data || {};
-
-    if (data.type !== 'plyrcard-intake-submitted') return;
-
-    const plan = String(data.plan || '').toLowerCase();
-
-    if (plan === 'plyr-plus' || plan === 'my-journey') {
-      const fallbackUrl = paymentEmbeds[plan];
-      const paymentUrl = data.payment_url || appendParamsToUrl(fallbackUrl, {
-        utm_plan: plan,
-        selected_plan: data.selected_plan || '',
-        first_name: data.payload?.first_name || '',
-        last_name: data.payload?.last_name || '',
-        email: data.payload?.email || '',
-        phone: data.payload?.phone || '',
-        user_id: data.payload?.user_id || '',
-        contact_id: data.payload?.contact_id || ''
-      });
-
-      setRegistrationFrameSrc(paymentUrl);
-      return;
-    }
-
-    if (plan === 'free') {
-      const appUrl = data.app_url || 'https://dev.plyrcard.com/admin/profile';
-      window.top.location.href = appUrl;
-    }
-  });
 
   const SLIDE_DUR = 6000;
   const slides = document.querySelectorAll('.hero-slide');

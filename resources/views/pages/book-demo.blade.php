@@ -1,7 +1,11 @@
 @php
     $activePage = 'book-demo';
 @endphp
+
 @include('partials.images')
+@include('partials.navigation')
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
