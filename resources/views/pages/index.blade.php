@@ -2266,13 +2266,16 @@
 <section id="trust-logos">
   <p class="trust-eyebrow">Trusted in the Game</p>
   <div class="trust-grid" aria-label="Partner logos">
-    <?php foreach (($partnerLogoPlaceholders ?? []) as $index => $logoPath): ?>
+    @foreach (($partnerLogoPlaceholders ?? []) as $index => $logoPath)
       <div class="trust-logo-box is-placeholder">
-        <!-- Placeholder here: replace with partner logo image. -->
-        <img src="<?= htmlspecialchars($logoPath, ENT_QUOTES, 'UTF-8') ?>" alt="Partner logo placeholder <?= $index + 1 ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />
-        <span style="display:none;">Partner <?= $index + 1 ?></span>
+          <img
+              src="{{ $logoPath }}"
+              alt="Partner logo placeholder {{ $index + 1 }}"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+          />
+          <span style="display:none;">Partner {{ $index + 1 }}</span>
       </div>
-    <?php endforeach; ?>
+  @endforeach
   </div>
 </section>
 
