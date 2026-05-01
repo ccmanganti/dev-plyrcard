@@ -596,6 +596,11 @@ HTML;
 
     protected function handleStore(Request $request, bool $isAppFlow = false)
     {
+        $isEmbeddedSubmit = $isAppFlow && (
+            $request->ajax()
+            || $request->expectsJson()
+            || $request->header('X-Plyrcard-Embed') === '1'
+        );
         $request->merge([
             'selected_plan' => $this->resolvePlanFromRequest($request),
             'phone' => $this->normalizePhone($request->input('phone')),
@@ -702,7 +707,18 @@ HTML;
 
         $this->addImageValidationErrors($validator, $request);
 
-        $validated = $validator->validate();
+        if ($validator->fails()) {
+            if ($isEmbeddedSubmit) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            throw new ValidationException($validator);
+        }
+
+        $validated = $validator->validated();
         $selectedPlan = $validated['selected_plan'] ?? 'Free';
 
         if (($validated['league_id'] ?? null) === '__add_new__') {
@@ -1018,17 +1034,28 @@ HTML;
         $paymentUrl = $this->buildPaymentUrlForSubmittedUser($selectedPlan, $user, $ghlResult);
 
         if ($paymentUrl) {
+            if ($isEmbeddedSubmit) {
+                return response()->json(
+                    $this->buildEmbeddedSubmissionPayload($user, $selectedPlan, $paymentUrl, $ghlResult)
+                );
+            }
+
             if ($isAppFlow) {
-                $payload = $this->buildEmbeddedSubmissionPayload($user, $selectedPlan, $paymentUrl, $ghlResult);
-
-                if ($request->ajax() || $request->expectsJson() || $request->header('X-Plyrcard-Embed') === '1') {
-                    return response()->json($payload);
-                }
-
                 return $this->embeddedPaymentSwitchResponse($user, $selectedPlan, $paymentUrl, $ghlResult);
             }
 
             return redirect()->away($paymentUrl);
+        }
+
+        if ($isEmbeddedSubmit) {
+            return response()->json(
+                $this->buildEmbeddedSubmissionPayload(
+                    $user,
+                    $selectedPlan,
+                    null,
+                    $ghlResult
+                )
+            );
         }
 
         $redirectRoute = $isAppFlow
