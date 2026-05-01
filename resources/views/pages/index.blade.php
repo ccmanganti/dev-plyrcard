@@ -2267,15 +2267,13 @@
   <p class="trust-eyebrow">Trusted in the Game</p>
   <div class="trust-grid" aria-label="Partner logos">
     @foreach (($partnerLogoPlaceholders ?? []) as $index => $logoPath)
-      <div class="trust-logo-box is-placeholder">
-          <img
-              src="{{ $logoPath }}"
-              alt="Partner logo placeholder {{ $index + 1 }}"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-          />
-          <span style="display:none;">Partner {{ $index + 1 }}</span>
-      </div>
-  @endforeach
+        <div class="trust-logo-box">
+            <img
+                src="{{ $logoPath }}"
+                alt="Partner logo {{ $index + 1 }}"
+            />
+        </div>
+    @endforeach
   </div>
 </section>
 
