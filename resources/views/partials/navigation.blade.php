@@ -249,7 +249,7 @@
     <a data-nav href="/pricing" class="{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
     <a data-nav href="/podcast" class="{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
     <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
-    <a href="https://plyrcard.com/admin/login" target="_blank" rel="noopener">Login</a>
+    <a href="https://plyrcard.com" target="_blank" rel="noopener">Login</a>
     <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
   </nav>
 
