@@ -24,9 +24,9 @@ class PublicWebsiteController extends Controller
 
         if (
             in_array($host, $platformHosts, true) &&
-            ! str_starts_with($path, '/admin')
+            ! str_starts_with($path, '/')
         ) {
-            return redirect('/admin');
+            return view('pages.index');
         } else if (
             in_array($host, $platformHosts, true) &&
             ! str_starts_with($path, '/')
