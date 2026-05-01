@@ -241,6 +241,10 @@ class WebsiteResource extends Resource
                                 ->orWhere('last_name', 'like', "%{$search}%");
                         });
                     }),
+                TextColumn::make('domain')
+                    ->label('Domain')
+                    ->searchable()
+                    ->toggleable(),
 
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),
