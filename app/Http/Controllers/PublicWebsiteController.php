@@ -20,18 +20,8 @@ class PublicWebsiteController extends Controller
             'www.plyrcard.com',
         ];
 
-        $path = $request->getPathInfo();
-
-        if (
-            in_array($host, $platformHosts, true) &&
-            ! str_starts_with($path, '/')
-        ) {
-            return view('pages.index');
-        } else if (
-            in_array($host, $platformHosts, true) &&
-            ! str_starts_with($path, '/')
-        ) {
-            return view('pages.index');
+        if (in_array($host, $platformHosts, true)) {
+            return redirect('/admin');
         }
 
         if (in_array($host, ['127.0.0.1', 'localhost'], true)) {

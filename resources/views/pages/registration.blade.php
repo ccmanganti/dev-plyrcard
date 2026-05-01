@@ -1,5 +1,13 @@
 @php
     $activePage = 'registration';
+
+    $allowedPlans = ['free', 'plyr', 'plyr-plus', 'my-journey'];
+    $registrationPlan = request()->query('utm_plan', 'free');
+    $registrationPlan = in_array($registrationPlan, $allowedPlans, true) ? $registrationPlan : 'free';
+
+    $registrationEmbedUrl = 'https://plyrcard.com/player-intake-app?' . http_build_query([
+        'utm_plan' => $registrationPlan,
+    ]);
 @endphp
 
 @include('partials.images')
@@ -906,7 +914,7 @@
         <!-- Placeholder here: replace this block with your registration form embed. -->
         <div class="registration-form-embed">
           <iframe
-            src="https://plyrcard.com/player-intake-app"
+            src="{{ $registrationEmbedUrl }}"
             title="PLYRCARD Player Intake Registration"
             loading="lazy"
             scrolling="yes"
@@ -1163,6 +1171,7 @@
         const step = 16;
         const increment = target / (duration / step);
         let count = 0;
+
         const tick = setInterval(() => {
           count += increment;
           if (count >= target) {
