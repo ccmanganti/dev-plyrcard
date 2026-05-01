@@ -78,18 +78,17 @@ class PublicWebsiteController extends Controller
 
     protected function findWebsiteByDomain(string $host): ?Website
     {
+        $host = strtolower(trim($host));
         $normalizedHost = preg_replace('/^www\./', '', $host);
 
         return Website::query()
-            ->whereHas('user', function ($query) use ($host, $normalizedHost) {
-                $query->where(function ($subQuery) use ($host, $normalizedHost) {
-                    $subQuery
-                        ->whereRaw('LOWER(domain) = ?', [$host])
-                        ->orWhereRaw('LOWER(domain) = ?', [$normalizedHost])
-                        ->orWhereRaw("LOWER(REPLACE(domain, 'www.', '')) = ?", [$normalizedHost]);
-                });
-            })
             ->with($this->websiteRelations())
+            ->where(function ($query) use ($host, $normalizedHost) {
+                $query
+                    ->whereRaw('LOWER(domain) = ?', [$host])
+                    ->orWhereRaw('LOWER(domain) = ?', [$normalizedHost])
+                    ->orWhereRaw("LOWER(REPLACE(domain, 'www.', '')) = ?", [$normalizedHost]);
+            })
             ->where('is_active', true)
             ->where('is_published', true)
             ->first();
