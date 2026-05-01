@@ -1,18 +1,16 @@
 @php
-// Shared image helpers/placeholders for the static PLYRCARD pages.
-// Placeholder here: replace these paths with final uploaded assets when ready.
 $partnerLogoPlaceholders = [
-    '/images/partner-ecnl.png',
-    '/images/partner-mls-next.png',
-    '/images/partner-nva.png',
-    '/images/partner-vda.png',
-    '/images/partner-the-st-james.png',
-    '/images/partner-lamorinda.png',
-    '/images/partner-syc.png',
-    '/images/partner-fairfax-union.png',
-    '/images/partner-girls-academy.png',
-    '/images/partner-onyx-elite.png',
-    '/images/partner-trainer-gorres.png',
-    '/images/partner-plyrcard-show.png',
+    asset('images/partner-ecnl.png'),
+    asset('images/partner-mls-next.png'),
+    asset('images/partner-nva.png'),
+    asset('images/partner-vda.png'),
+    asset('images/partner-the-st-james.png'),
+    asset('images/partner-lamorinda.png'),
+    asset('images/partner-syc.png'),
+    asset('images/partner-fairfax-union.png'),
+    asset('images/partner-girls-academy.png'),
+    asset('images/partner-onyx-elite.png'),
+    asset('images/partner-trainer-gorres.png'),
+    asset('images/partner-plyrcard-show.png'),
 ];
 @endphp
