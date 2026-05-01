@@ -26,7 +26,7 @@ class PublicWebsiteController extends Controller
             in_array($host, $platformHosts, true) &&
             ! str_starts_with($path, '/admin')
         ) {
-            return redirect('/admin/login');
+            return redirect('/');
         }
 
         if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
