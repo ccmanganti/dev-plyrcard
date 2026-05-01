@@ -1,5 +1,4 @@
 @php
-
 // Shared image helpers/placeholders for the static PLYRCARD pages.
 // Placeholder here: replace these paths with final uploaded assets when ready.
 $partnerLogoPlaceholders = [
@@ -16,6 +15,4 @@ $partnerLogoPlaceholders = [
     '/images/partners/partner-trainer-gorres.png',
     '/images/partners/partner-plyrcard-show.png',
 ];
-
-
 @endphp

@@ -3,8 +3,6 @@
 @endphp
 
 @include('partials.images')
-@include('partials.navigation')
-
 
 <!DOCTYPE html>
 <html lang="en">

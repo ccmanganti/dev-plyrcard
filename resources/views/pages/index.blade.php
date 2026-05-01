@@ -3,8 +3,6 @@
 @endphp
 
 @include('partials.images')
-@include('partials.navigation')
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -839,7 +837,7 @@
       height: 70vw;
       min-height: 260px;
       max-height: 640px;
-      background-image: url('/Images/PLYRCARD-SITE-READY.jpg');
+      background-image: url('/images/PLYRCARD-SITE-READY.jpg');
       background-size: cover;
       background-position: center 30%;
       position: relative;
@@ -1871,7 +1869,7 @@
 
     <!-- Slide 1 — Soccer -->
     <article class="hero-slide active" aria-label="Own Your Journey">
-      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE.jpg');" role="img" aria-label="Soccer athlete in action"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE.jpg');" role="img" aria-label="Soccer athlete in action"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">For Serious Athletes</p>
@@ -1883,7 +1881,7 @@
 
     <!-- Slide 2 — Football -->
     <article class="hero-slide" aria-label="Control the Controllables">
-      <div class="slide-bg pos-center" style="background-image: url('/Images/PLYRCARD-SITE-SOCCER.jpg');" role="img" aria-label="Football player holding football"></div>
+      <div class="slide-bg pos-center" style="background-image: url('/images/PLYRCARD-SITE-SOCCER.jpg');" role="img" aria-label="Football player holding football"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Recruiting, Simplified</p>
@@ -1895,7 +1893,7 @@
 
     <!-- Slide 3 — Basketball -->
     <article class="hero-slide" aria-label="More Than Just an Email">
-      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE-FOOTBALL.jpg');" role="img" aria-label="Basketball players in action"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE-FOOTBALL.jpg');" role="img" aria-label="Basketball players in action"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Be Seen. Be Remembered.</p>
@@ -1907,7 +1905,7 @@
 
     <!-- Slide 4 — Track / Running -->
     <article class="hero-slide" aria-label="Know Who's Watching">
-      <div class="slide-bg pos-center" style="background-image: url('/Images/PLYRCARD-SITE-VOLLEYBALL.jpg');" role="img" aria-label="Athlete in sprint starting position"></div>
+      <div class="slide-bg pos-center" style="background-image: url('/images/PLYRCARD-SITE-VOLLEYBALL.jpg');" role="img" aria-label="Athlete in sprint starting position"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">Real Visibility. Real Signals.</p>
@@ -1919,7 +1917,7 @@
 
     <!-- Slide 5 — Volleyball -->
     <article class="hero-slide" aria-label="Your Full Story, One Link">
-      <div class="slide-bg pos-top" style="background-image: url('/Images/PLYRCARD-SITE-TEAM.jpg');" role="img" aria-label="Volleyball player spiking the ball"></div>
+      <div class="slide-bg pos-top" style="background-image: url('/images/PLYRCARD-SITE-TEAM.jpg');" role="img" aria-label="Volleyball player spiking the ball"></div>
       <div class="slide-overlay"></div>
       <div class="hero-content">
         <p class="hero-eyebrow">One Link. More Impact.</p>
@@ -2063,7 +2061,7 @@
 <!-- ════════════════════════════════════════════════════════
      WHY IT MATTERS
 ═══════════════════════════════════════════════════════════ -->
-<section id="why-it-matters"  style="background-image: url('/Images/PLYRCARD-SITE-COACH.jpg');" role="img" aria-label="Athlete in sprint starting position">
+<section id="why-it-matters"  style="background-image: url('/images/PLYRCARD-SITE-COACH.jpg');" role="img" aria-label="Athlete in sprint starting position">
   <span class="big-number" aria-hidden="true">300</span>
   <p class="section-eyebrow reveal">The Problem</p>
   <h2 class="section-title reveal">Coaches get<br>hundreds of<br>emails a day.</h2>

@@ -3,8 +3,6 @@
 @endphp
 
 @include('partials.images')
-@include('partials.navigation')
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -1873,7 +1871,7 @@
 <!-- ══════════════════════════════════════════════════════
      IMAGE BREAK #1
 ═══════════════════════════════════════════════════════ -->
-<div class="img-break" style="background-image: url('/Images/PLYRCARD-SITE-ABOUT.jpg'); background-position: center 35%;" role="img" aria-label="Runner in starting blocks on a track, preparing for a race">
+<div class="img-break" style="background-image: url('/images/PLYRCARD-SITE-ABOUT.jpg'); background-position: center 35%;" role="img" aria-label="Runner in starting blocks on a track, preparing for a race">
   <div class="img-break-text">
     <p class="page-eyebrow" style="margin-bottom:6px">The Insight</p>
     <h3 class="img-break-headline">More Than<br>a Platform.</h3>
@@ -1961,7 +1959,7 @@
 <!-- ══════════════════════════════════════════════════════
      IMAGE BREAK #2
 ═══════════════════════════════════════════════════════ -->
-<div class="img-break" style="background-image: url('/Images/young-athlete-training.jpg'); background-position: center 28%;" role="img" aria-label="Young athlete training with focus and determination">
+<div class="img-break" style="background-image: url('/images/young-athlete-training.jpg'); background-position: center 28%;" role="img" aria-label="Young athlete training with focus and determination">
   <div class="img-break-text">
     <p class="page-eyebrow" style="margin-bottom:6px">Our Values</p>
     <h3 class="img-break-headline">What We<br>Stand For.</h3>

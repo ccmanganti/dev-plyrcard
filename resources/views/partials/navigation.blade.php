@@ -1,5 +1,3 @@
-
-
 <style>
     /* PLYRCARD shared navigation - single source of truth */
     :root {
@@ -39,11 +37,14 @@
     }
 
     #site-header.plyrcard-site-header .logo-wrap img {
-      display: none !important;
+      height: 32px !important;
+      width: auto !important;
+      object-fit: contain !important;
+      display: block !important;
     }
 
     #site-header.plyrcard-site-header .logo-text {
-      display: inline-flex !important;
+      display: none !important;
       font-family: var(--font-display, sans-serif) !important;
       font-size: 30px !important;
       font-weight: 800 !important;
@@ -239,17 +240,17 @@
 
 <header id="site-header" class="plyrcard-site-header over-hero">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
-    <span class="logo-text">PLYR<span>CARD</span></span>
+    <img src="../images/plyr-logo.png" alt="PLYRCARD Logo">
   </a>
 
   <nav class="desktop-nav" aria-label="Primary navigation">
-    <a data-nav href="/" class="<?= plyrcard_nav_active('home', $activePage) ?>">Home</a>
-    <a data-nav href="/about" class="<?= plyrcard_nav_active('about', $activePage) ?>">About</a>
-    <a data-nav href="/pricing" class="<?= plyrcard_nav_active('pricing', $activePage) ?>">Pricing</a>
-    <a data-nav href="/podcast" class="<?= plyrcard_nav_active('podcast', $activePage) ?>">Podcast</a>
-    <a data-nav href="/book-demo" class="<?= plyrcard_nav_active('book-demo', $activePage) ?>">Book a Demo</a>
-    <a href="https://plyrcard.com" target="_blank" rel="noopener">Login</a>
-    <a data-nav href="/registration" class="desktop-nav-cta<?= plyrcard_nav_active('registration', $activePage) ?>">Start Free</a>
+    <a data-nav href="/" class="{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
+    <a data-nav href="/about" class="{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
+    <a data-nav href="/pricing" class="{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
+    <a data-nav href="/podcast" class="{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
+    <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
+    <a href="https://plyrcard.com/admin/login" target="_blank" rel="noopener">Login</a>
+    <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
   </nav>
 
   <button class="menu-btn" id="menu-btn" type="button" aria-label="Open menu" aria-controls="mobile-nav" aria-expanded="false">
@@ -258,11 +259,11 @@
 </header>
 
 <nav id="mobile-nav" class="plyrcard-mobile-nav" aria-label="Mobile navigation">
-  <a data-nav href="/" class="nav-link{{ ($activePage == "home") ? " active" : "" }}">Home</a>
-  <a data-nav href="/about" class="nav-link{{ ($activePage == "about") ? " active" : "" }}">About</a>
-  <a data-nav href="/pricing" class="nav-link{{ ($activePage == "pricing") ? " active" : "" }}">Pricing</a>
-  <a data-nav href="/podcast" class="nav-link{{ ($activePage == "podcast") ? " active" : "" }}">Podcast</a>
-  <a data-nav href="/book-demo" class="nav-link{{ ($activePage == "book-demo") ? " active" : "" }}">Book Demo</a>
+  <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
+  <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
+  <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
+  <a data-nav href="/podcast" class="nav-link{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
+  <a data-nav href="/book-demo" class="nav-link{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book Demo</a>
   <a href="https://plyrcard.com" target="_blank" rel="noopener" class="nav-link">Login</a>
-  <a data-nav href="/registration" class="nav-cta-pill<?= plyrcard_nav_active('registration', $activePage) ?>">Start Free</a>
+  <a data-nav href="/registration?utm_plan=free" class="nav-cta-pill{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
 </nav>
