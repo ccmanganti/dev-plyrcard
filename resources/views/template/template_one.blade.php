@@ -1733,6 +1733,7 @@ HTML;
 </head>
 
 <body>
+    @include('partials.navigation')
     @if ($website->heroTemplate?->blade_view)
         <div id="hero-container">
             @include($website->heroTemplate->blade_view, ['website' => $website])
