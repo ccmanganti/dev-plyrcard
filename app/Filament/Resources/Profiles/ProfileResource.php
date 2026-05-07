@@ -16,7 +16,7 @@ class ProfileResource extends Resource
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::User;
 
     protected static ?string $navigationLabel = 'Profile';
-    protected static ?string $slug = 'profile';
+    protected static ?string $slug = 'my-profile';
 
     public static function canAccess(): bool
     {

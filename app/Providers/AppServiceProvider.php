@@ -8,20 +8,16 @@ use App\Models\User;
 use App\Observers\UserObserver;
 use App\Models\Website;
 use App\Observers\WebsiteObserver;
+use App\Http\Responses\LoginResponse as PlyrCardLoginResponse;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
+        $this->app->singleton(LoginResponseContract::class, PlyrCardLoginResponse::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         Gate::before(function ($user, string $ability) {

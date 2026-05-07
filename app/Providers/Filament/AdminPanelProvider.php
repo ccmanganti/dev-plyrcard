@@ -21,6 +21,9 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\PasswordReset\RequestPasswordReset;
+use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -32,7 +35,13 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->font('Antonio', provider: GoogleFontProvider::class)
             ->maxContentWidth(Width::Full)
-            ->login()
+            ->login(Login::class)
+            ->passwordReset(
+                requestAction: RequestPasswordReset::class,
+                resetAction: ResetPassword::class,
+            )
+            ->emailVerification()
+            ->profile()
             ->brandLogo(asset('logo.png'))
             ->brandLogoHeight('3rem')
             ->globalSearch(false)
@@ -51,29 +60,20 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Widgets\PlayerCardOverview::class,
             ])
             ->renderHook(
-                PanelsRenderHook::TOPBAR_END,
-                fn (): string => auth()->check()
-                    ? Blade::render(
-                        '@include("filament.components.topbar-plan-info", ["planInfo" => $planInfo])',
-                        [
-                            'planInfo' => ProfilePlanInfo::for(auth()->user()),
-                        ],
-                    )
-                    : '',
-            )
-            ->renderHook(
                 PanelsRenderHook::BODY_END,
                 function (): string {
                     $user = auth()->user();
 
-                    if (! $user || ! $user->shouldSeeOnboarding()) {
-                        return '';
+                    $html = Blade::render('@include("partials.navigation", ["activePage" => "admin"])');
+
+                    if ($user && $user->shouldSeeOnboarding()) {
+                        $html .= Blade::render(
+                            '@include("filament.hooks.onboarding-script", ["user" => $user])',
+                            ['user' => $user],
+                        );
                     }
 
-                    return Blade::render(
-                        '@include("filament.hooks.onboarding-script", ["user" => $user])',
-                        ['user' => $user],
-                    );
+                    return $html;
                 },
             )
             ->middleware([

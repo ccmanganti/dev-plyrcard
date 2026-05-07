@@ -12,7 +12,39 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-require __DIR__.'/marketing-routes.php';
+require __DIR__ . '/marketing-routes.php';
+
+/*
+|--------------------------------------------------------------------------
+| Reserved public slugs
+|--------------------------------------------------------------------------
+|
+| These should never be treated as public website names.
+| Important: "admin" must stay reserved because Filament owns /admin.
+|
+*/
+
+$reservedWebsiteSlugs = implode('|', [
+    'admin',
+    'about',
+    'pricing',
+    'podcast',
+    'book-demo',
+    'registration',
+    'player-intake',
+    'player-intake-app',
+    'preview',
+    'login',
+    'logout',
+    'register',
+    'password-reset',
+    'forgot-password',
+    'email-verification',
+    'livewire',
+    'filament',
+    'storage',
+    'api',
+]);
 
 /*
 |--------------------------------------------------------------------------
@@ -56,38 +88,46 @@ Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController
 
 /*
 |--------------------------------------------------------------------------
-| Website editor routes
+| Filament-related custom admin routes
 |--------------------------------------------------------------------------
+|
+| Filament itself should own:
+|
+|   /admin
+|   /admin/login
+|   /admin/password-reset/...
+|
+| These custom routes are only for your website editor actions.
+|
 */
 
-Route::prefix('admin')
-    ->middleware(['auth'])
+Route::prefix('admin/websites')
+    ->middleware(['web', 'auth'])
+    ->name('websites.')
     ->group(function () {
-        Route::get('/websites/{id}/load', [WebsiteEditorController::class, 'loadProject'])
-            ->name('websites.load');
+        Route::get('/{id}/editor', [WebsiteEditorController::class, 'editor'])
+            ->name('editor');
 
-        Route::post('/websites/{id}/save', [WebsiteEditorController::class, 'saveProject'])
-            ->name('websites.save');
+        Route::get('/{id}/load', [WebsiteEditorController::class, 'loadProject'])
+            ->name('load');
 
-        Route::get('/websites/{id}/editor', [WebsiteEditorController::class, 'editor'])
-            ->name('websites.editor');
+        Route::post('/{id}/save', [WebsiteEditorController::class, 'saveProject'])
+            ->name('save');
+
+        Route::post('/{id}/assets/upload', [WebsiteEditorController::class, 'uploadAsset'])
+            ->name('assets.upload');
+
+        Route::delete('/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
+            ->name('assets.delete');
     });
 
 /*
 |--------------------------------------------------------------------------
-| Website editor asset routes
+| Onboarding routes
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['web', 'auth'])->group(function () {
-    Route::post('/websites/{id}/assets/upload', [WebsiteEditorController::class, 'uploadAsset'])
-        ->name('websites.assets.upload');
-
-    Route::delete('/websites/{id}/assets/delete', [WebsiteEditorController::class, 'deleteAsset'])
-        ->name('websites.assets.delete');
-});
-
-Route::middleware(['auth'])->post('/onboarding/complete', function (Request $request) {
+Route::middleware(['web', 'auth'])->post('/onboarding/complete', function (Request $request) {
     $user = $request->user();
 
     if (! $user) {
@@ -114,8 +154,12 @@ Route::middleware(['auth'])->post('/onboarding/complete', function (Request $req
 |--------------------------------------------------------------------------
 | Public website-by-name route
 |--------------------------------------------------------------------------
+|
+| Keep this at the very bottom.
+| This prevents public website names from hijacking reserved app routes.
+|
 */
 
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
-    ->where('websiteName', '^(?!admin$|about$|pricing$|podcast$|book-demo$|registration$|player-intake$|player-intake-app$|preview$)[A-Za-z0-9\-]+')
+    ->where('websiteName', '^(?!(' . $reservedWebsiteSlugs . ')$)[A-Za-z0-9\-]+$')
     ->name('website.show-by-name');

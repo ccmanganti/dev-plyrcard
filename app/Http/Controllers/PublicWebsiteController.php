@@ -10,40 +10,51 @@ use Illuminate\Support\Str;
 class PublicWebsiteController extends Controller
 {
     protected array $platformHosts = [
+        'localhost',
+        '127.0.0.1',
         'dev.plyrcard.com',
         'plyrcard.com',
         'www.plyrcard.com',
+    ];
+
+    protected array $reservedPaths = [
+        'admin',
+        'login',
+        'logout',
+        'register',
+        'password-reset',
+        'forgot-password',
+        'email-verification',
+        'livewire',
+        'filament',
+        'storage',
+        'api',
     ];
 
     public function home(Request $request, YouTubeChannelService $youtube)
     {
         $host = strtolower($request->getHost());
 
-        // Main platform domains show marketing homepage.
-        if (in_array($host, $this->platformHosts, true)) {
+        /*
+        |--------------------------------------------------------------------------
+        | Platform domains show the marketing homepage
+        |--------------------------------------------------------------------------
+        |
+        | Localhost should also show the platform homepage.
+        | Do not automatically render the first website record locally.
+        |
+        */
+
+        if ($this->isPlatformHost($host)) {
             return view('pages.index');
         }
 
-        // Local fallback for preview/testing.
-        if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
-            $website = Website::query()
-                ->with([
-                    'user.school',
-                    'user.club',
-                    'siteTemplate',
-                    'heroTemplate',
-                    'fieldValues.templateField',
-                    'heroFieldValues.templateField',
-                ])
-                ->orderBy('id')
-                ->first();
+        /*
+        |--------------------------------------------------------------------------
+        | Parked/custom player domains show the matching player website
+        |--------------------------------------------------------------------------
+        */
 
-            abort_unless($website, 404, 'No website record found.');
-
-            return $this->renderWebsite($website, $youtube);
-        }
-
-        // Parked/custom player domains show the matching player website.
         $website = $this->findWebsiteByDomain($host);
 
         abort_unless($website, 404);
@@ -58,10 +69,26 @@ class PublicWebsiteController extends Controller
         return $this->renderWebsite($website, $youtube);
     }
 
-    public function showByName(string $websiteName, YouTubeChannelService $youtube)
-    {
-        $normalizedRequestedName = $this->normalizeWebsiteName($websiteName);
+public function showByName(Request $request, string $websiteName, YouTubeChannelService $youtube)
+{
+    if ($this->isReservedPath($websiteName)) {
+        abort(404);
+    }
 
+    $normalizedRequestedName = $this->normalizeWebsiteName($websiteName);
+
+    $website = Website::query()
+        ->with($this->websiteRelations())
+        ->where('is_active', true)
+        ->where('is_published', true)
+        ->where(function ($query) use ($websiteName, $normalizedRequestedName) {
+            $query
+                ->whereRaw('LOWER(slug) = ?', [strtolower($websiteName)])
+                ->orWhereRaw('LOWER(slug) = ?', [$normalizedRequestedName]);
+        })
+        ->first();
+
+    if (! $website) {
         $website = Website::query()
             ->with($this->websiteRelations())
             ->where('is_active', true)
@@ -70,11 +97,12 @@ class PublicWebsiteController extends Controller
             ->first(function (Website $website) use ($normalizedRequestedName) {
                 return $this->normalizeWebsiteName($website->name) === $normalizedRequestedName;
             });
-
-        abort_unless($website, 404);
-
-        return $this->renderWebsite($website, $youtube);
     }
+
+    abort_unless($website, 404);
+
+    return $this->renderWebsite($website, $youtube);
+}
 
     protected function findWebsiteByDomain(string $host): ?Website
     {
@@ -137,5 +165,15 @@ class PublicWebsiteController extends Controller
     protected function normalizeWebsiteName(?string $value): string
     {
         return Str::slug((string) $value);
+    }
+
+    protected function isPlatformHost(string $host): bool
+    {
+        return in_array(strtolower($host), $this->platformHosts, true);
+    }
+
+    protected function isReservedPath(string $path): bool
+    {
+        return in_array($this->normalizeWebsiteName($path), $this->reservedPaths, true);
     }
 }
