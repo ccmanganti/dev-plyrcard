@@ -385,7 +385,7 @@
     .plyrcard-main-title,
     .plyrcard-section-title {
       margin: 0 !important;
-      font-size: 22px !important;
+      font-size: 16px !important;
       line-height: 1 !important;
       font-weight: 900 !important;
       color: #050505 !important;
