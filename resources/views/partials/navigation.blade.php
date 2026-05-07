@@ -6,14 +6,47 @@
 @endonce
 
 <style>
-    /* PLYRCARD shared navigation - single source of truth */
+    /* PLYRCARD navigation: final compact design lock */
     :root {
       --plyrcard-nav-height: calc(var(--header-h, 76px) + var(--safe-top, 0px));
-      --plyrcard-accent: var(--accent, #ff2d35);
-      --plyrcard-panel-bg: rgba(8,10,12,0.94);
-      --plyrcard-panel-line: rgba(255,255,255,0.18);
-      --font-display: 'Antonio', 'Arial Narrow', Impact, sans-serif;
-      --font-body: 'Antonio', 'Arial Narrow', Impact, sans-serif;
+      --plyrcard-accent: #ff2731;
+      --plyrcard-accent-2: #ff424b;
+      --plyrcard-dark: rgba(8,10,12,0.96);
+      --plyrcard-font: 'Antonio', 'Arial Narrow', Impact, sans-serif;
+    }
+
+    .plyrcard-site-header,
+    .plyrcard-site-header *,
+    .plyrcard-mobile-nav,
+    .plyrcard-mobile-nav *,
+    .plyrcard-action-drawer,
+    .plyrcard-action-drawer * {
+      box-sizing: border-box !important;
+      font-family: var(--plyrcard-font) !important;
+    }
+
+    .plyrcard-action-drawer .fa-solid,
+    .plyrcard-action-drawer .fas,
+    .plyrcard-mobile-nav .fa-solid,
+    .plyrcard-site-header .fa-solid {
+      font-family: "Font Awesome 6 Free" !important;
+      font-weight: 900 !important;
+    }
+
+    .plyrcard-action-drawer .fa-regular,
+    .plyrcard-action-drawer .far,
+    .plyrcard-mobile-nav .fa-regular,
+    .plyrcard-site-header .fa-regular {
+      font-family: "Font Awesome 6 Free" !important;
+      font-weight: 400 !important;
+    }
+
+    .plyrcard-action-drawer .fa-brands,
+    .plyrcard-action-drawer .fab,
+    .plyrcard-mobile-nav .fa-brands,
+    .plyrcard-site-header .fa-brands {
+      font-family: "Font Awesome 6 Brands" !important;
+      font-weight: 400 !important;
     }
 
     #site-header.plyrcard-site-header {
@@ -30,12 +63,12 @@
       justify-content: space-between !important;
       background: transparent !important;
       border-bottom: 1px solid transparent !important;
-      transition: background 0.3s var(--ease-out, ease), border-color 0.3s var(--ease-out, ease), backdrop-filter 0.3s var(--ease-out, ease) !important;
+      transition: background .25s ease, border-color .25s ease, backdrop-filter .25s ease !important;
     }
 
     #site-header.plyrcard-site-header.scrolled {
-      background: rgba(13,13,13,0.92) !important;
-      border-bottom-color: rgba(255,255,255,0.07) !important;
+      background: rgba(13,13,13,.92) !important;
+      border-bottom-color: rgba(255,255,255,.07) !important;
       backdrop-filter: blur(16px) !important;
       -webkit-backdrop-filter: blur(16px) !important;
     }
@@ -44,30 +77,14 @@
       display: flex !important;
       align-items: center !important;
       height: 50px !important;
-      flex: 0 0 auto !important;
-      gap: 0 !important;
+      text-decoration: none !important;
     }
 
     #site-header.plyrcard-site-header .logo-wrap img {
+      display: block !important;
       height: 32px !important;
       width: auto !important;
       object-fit: contain !important;
-      display: block !important;
-    }
-
-    #site-header.plyrcard-site-header .logo-text {
-      display: none !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: 30px !important;
-      font-weight: 800 !important;
-      letter-spacing: 0.03em !important;
-      line-height: 1 !important;
-      color: var(--white, #fff) !important;
-      text-transform: uppercase !important;
-    }
-
-    #site-header.plyrcard-site-header .logo-text span {
-      color: var(--accent, #ff5c35) !important;
     }
 
     #site-header.plyrcard-site-header .desktop-nav {
@@ -75,55 +92,36 @@
       display: none !important;
       align-items: center !important;
       justify-content: flex-end !important;
-      gap: clamp(30px, 3vw, 48px) !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: clamp(22px, 1.45vw, 30px) !important;
+      gap: clamp(28px, 3vw, 46px) !important;
+      font-size: clamp(20px, 1.4vw, 28px) !important;
       line-height: 1 !important;
       font-weight: 800 !important;
-      letter-spacing: 0.08em !important;
+      letter-spacing: .08em !important;
       text-transform: uppercase !important;
       white-space: nowrap !important;
     }
 
     #site-header.plyrcard-site-header .desktop-nav a {
-      font: inherit !important;
-      line-height: 1 !important;
-      letter-spacing: inherit !important;
-      text-transform: inherit !important;
-      color: rgba(255,255,255,0.72) !important;
+      color: rgba(255,255,255,.74) !important;
       text-decoration: none !important;
       padding: 8px 0 !important;
-      margin: 0 !important;
-      white-space: nowrap !important;
       background: transparent !important;
       border: 0 !important;
-      box-shadow: none !important;
-      text-shadow: 0 2px 18px rgba(0,0,0,0.28) !important;
-      transition: color 0.2s ease, transform 0.2s ease, background 0.2s ease !important;
+      font: inherit !important;
+      letter-spacing: inherit !important;
+      text-transform: inherit !important;
     }
 
     #site-header.plyrcard-site-header .desktop-nav a:hover,
-    #site-header.plyrcard-site-header .desktop-nav a.active {
-      color: var(--white, #fff) !important;
-    }
+    #site-header.plyrcard-site-header .desktop-nav a.active { color: #fff !important; }
 
     #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      min-height: 58px !important;
-      padding: 18px 28px !important;
-      border-radius: var(--radius-btn, 9999px) !important;
-      background: var(--accent, #ff5c35) !important;
-      color: var(--white, #fff) !important;
-      box-shadow: 0 14px 34px rgba(255,92,53,0.28) !important;
-    }
-
-    #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta:hover,
-    #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta.active {
-      color: var(--white, #fff) !important;
-      background: var(--accent, #ff5c35) !important;
-      transform: translateY(-1px) !important;
+      min-height: 54px !important;
+      padding: 16px 26px !important;
+      border-radius: 999px !important;
+      background: #ff5c35 !important;
+      color: #fff !important;
+      box-shadow: 0 14px 34px rgba(255,92,53,.28) !important;
     }
 
     #site-header.plyrcard-site-header .menu-btn {
@@ -138,8 +136,6 @@
       padding: 10px 6px !important;
       background: transparent !important;
       border: 0 !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
       cursor: pointer !important;
     }
 
@@ -147,9 +143,9 @@
       display: block !important;
       width: 24px !important;
       height: 2px !important;
-      background: var(--white, #fff) !important;
+      background: #fff !important;
       border-radius: 2px !important;
-      transition: transform 0.3s ease, opacity 0.3s ease !important;
+      transition: transform .25s ease, opacity .25s ease !important;
     }
 
     #site-header.plyrcard-site-header .menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg) !important; }
@@ -161,23 +157,20 @@
       top: var(--plyrcard-nav-height) !important;
       left: 0 !important;
       right: 0 !important;
-      bottom: auto !important;
       z-index: 9990 !important;
-      background: rgba(13,13,13,0.98) !important;
-      border-top: 1px solid rgba(255,255,255,0.08) !important;
-      border-bottom: 1px solid rgba(255,255,255,0.08) !important;
-      backdrop-filter: blur(18px) !important;
-      -webkit-backdrop-filter: blur(18px) !important;
-      padding: 22px 24px calc(24px + var(--safe-bottom, 0px)) !important;
       display: flex !important;
       flex-direction: column !important;
-      align-items: stretch !important;
-      justify-content: flex-start !important;
-      gap: 16px !important;
+      gap: 14px !important;
+      padding: 20px 24px calc(24px + var(--safe-bottom, 0px)) !important;
+      background: rgba(13,13,13,.98) !important;
+      border-top: 1px solid rgba(255,255,255,.08) !important;
+      border-bottom: 1px solid rgba(255,255,255,.08) !important;
+      backdrop-filter: blur(18px) !important;
+      -webkit-backdrop-filter: blur(18px) !important;
       opacity: 0 !important;
       transform: translateY(-120%) !important;
       pointer-events: none !important;
-      transition: transform 0.32s var(--ease-out, ease), opacity 0.25s ease !important;
+      transition: transform .3s ease, opacity .2s ease !important;
     }
 
     #mobile-nav.plyrcard-mobile-nav.open {
@@ -188,42 +181,29 @@
 
     #mobile-nav.plyrcard-mobile-nav a,
     #mobile-nav.plyrcard-mobile-nav button {
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
+      color: rgba(255,255,255,.78) !important;
+      text-decoration: none !important;
+      border: 0 !important;
+      background: transparent !important;
+      padding: 6px 0 !important;
+      text-align: left !important;
       font-size: 18px !important;
       font-weight: 800 !important;
       line-height: 1 !important;
-      letter-spacing: 0.04em !important;
+      letter-spacing: .04em !important;
       text-transform: uppercase !important;
-      color: rgba(255,255,255,0.76) !important;
-      text-decoration: none !important;
-      padding: 7px 0 !important;
-      background: transparent !important;
-      border: 0 !important;
-      text-align: left !important;
       cursor: pointer !important;
     }
 
-    #mobile-nav.plyrcard-mobile-nav a:hover,
-    #mobile-nav.plyrcard-mobile-nav a.active,
-    #mobile-nav.plyrcard-mobile-nav button:hover {
-      color: var(--white, #fff) !important;
-    }
-
     #mobile-nav.plyrcard-mobile-nav .nav-cta-pill {
-      margin-top: 6px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      border-radius: var(--radius-btn, 9999px) !important;
-      background: var(--accent, #ff5c35) !important;
-      color: var(--white, #fff) !important;
-      padding: 15px 18px !important;
-    }
-
-    /* PLYRCARD locker-room / get-started action menu */
-    .plyrcard-action-drawer,
-    .plyrcard-action-drawer * {
-      box-sizing: border-box !important;
+      min-height: 48px !important;
+      border-radius: 999px !important;
+      background: #ff5c35 !important;
+      color: #fff !important;
+      padding: 12px 18px !important;
     }
 
     .plyrcard-action-drawer {
@@ -231,24 +211,21 @@
       left: 0 !important;
       right: 0 !important;
       bottom: 0 !important;
-      z-index: 9980 !important;
+      z-index: 10000 !important;
+      display: block !important;
+      width: 100vw !important;
       pointer-events: none !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-    }
-
-    .plyrcard-action-drawer.is-open {
-      pointer-events: auto !important;
     }
 
     .plyrcard-drawer-scrim {
       position: fixed !important;
       inset: 0 !important;
-      background: rgba(0,0,0,0.36) !important;
+      background: rgba(0,0,0,.34) !important;
       backdrop-filter: blur(4px) !important;
       -webkit-backdrop-filter: blur(4px) !important;
       opacity: 0 !important;
       pointer-events: none !important;
-      transition: opacity 0.25s ease !important;
+      transition: opacity .22s ease !important;
     }
 
     .plyrcard-action-drawer.is-open .plyrcard-drawer-scrim {
@@ -257,78 +234,63 @@
     }
 
     .plyrcard-drawer-panel {
-      width: min(100%, 980px) !important;
-      margin: 0 auto !important;
-      max-height: min(78vh, 760px) !important;
+      position: relative !important;
+      width: 100vw !important;
+      max-width: none !important;
+      margin: 0 !important;
+      max-height: min(74vh, 560px) !important;
       overflow: hidden !important;
-      border-radius: 24px 24px 0 0 !important;
-      background: var(--plyrcard-panel-bg) !important;
-      border: 1px solid rgba(255,255,255,0.12) !important;
-      box-shadow: 0 -22px 60px rgba(0,0,0,0.5) !important;
-      transform: translateY(calc(100% - 96px)) !important;
-      transition: transform 0.34s var(--ease-out, cubic-bezier(.2,.8,.2,1)) !important;
+      border-radius: 18px 18px 0 0 !important;
+      background: var(--plyrcard-dark) !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      box-shadow: 0 -20px 54px rgba(0,0,0,.5) !important;
+      transform: translateY(100%) !important;
+      transition: transform .32s cubic-bezier(.2,.8,.2,1) !important;
       pointer-events: auto !important;
     }
 
-    .plyrcard-action-drawer.is-open .plyrcard-drawer-panel {
-      transform: translateY(0) !important;
-    }
+    .plyrcard-action-drawer.is-open .plyrcard-drawer-panel { transform: translateY(0) !important; }
 
     .plyrcard-drawer-handle {
       position: absolute !important;
-      top: 14px !important;
+      top: 8px !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
-      width: 86px !important;
-      height: 8px !important;
+      width: 48px !important;
+      height: 5px !important;
       border-radius: 999px !important;
-      background: rgba(0,0,0,0.2) !important;
+      background: rgba(0,0,0,.22) !important;
       z-index: 2 !important;
     }
 
     .plyrcard-drawer-head {
-      min-height: 96px !important;
-      padding: 28px 50px 18px !important;
+      min-height: 58px !important;
+      padding: 16px 16px 9px !important;
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      gap: 18px !important;
+      gap: 10px !important;
       background: #fff !important;
-      color: #090909 !important;
-      border-radius: 24px 24px 0 0 !important;
+      color: #070707 !important;
+      border-radius: 18px 18px 0 0 !important;
     }
 
     .plyrcard-drawer-title-row {
       display: flex !important;
       align-items: center !important;
-      gap: 14px !important;
+      gap: 8px !important;
       min-width: 0 !important;
     }
 
     .plyrcard-drawer-title {
       margin: 0 !important;
       color: #050505 !important;
-      font-size: clamp(29px, 4.6vw, 42px) !important;
+      font-size: 24px !important;
       line-height: 1 !important;
       font-weight: 900 !important;
-      letter-spacing: 0.01em !important;
-      text-transform: none !important;
+      letter-spacing: .01em !important;
       white-space: nowrap !important;
-    }
-
-    .plyrcard-journey-badge {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      min-height: 36px !important;
-      padding: 9px 15px !important;
-      border-radius: 9px !important;
-      background: linear-gradient(135deg, #ff2731, #ff404a) !important;
-      color: #fff !important;
-      font-size: 18px !important;
-      line-height: 1 !important;
-      font-weight: 800 !important;
-      text-decoration: none !important;
+      text-transform: none !important;
     }
 
     .plyrcard-drawer-icon-btn,
@@ -337,21 +299,20 @@
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      min-width: 44px !important;
-      min-height: 44px !important;
+      min-width: 34px !important;
+      min-height: 34px !important;
       padding: 0 !important;
       background: transparent !important;
       border: 0 !important;
       color: #050505 !important;
       cursor: pointer !important;
-      font: inherit !important;
       text-decoration: none !important;
+      font: inherit !important;
     }
 
     .plyrcard-drawer-back {
-      gap: 10px !important;
-      min-width: auto !important;
-      font-size: 25px !important;
+      gap: 5px !important;
+      font-size: 18px !important;
       font-weight: 800 !important;
       line-height: 1 !important;
     }
@@ -359,105 +320,97 @@
     .plyrcard-drawer-close svg,
     .plyrcard-drawer-back svg,
     .plyrcard-drawer-tab-chevron svg {
-      width: 34px !important;
-      height: 34px !important;
+      width: 23px !important;
+      height: 23px !important;
       stroke-width: 3 !important;
     }
 
     .plyrcard-drawer-body {
-      padding: 28px 50px calc(110px + var(--safe-bottom, 0px)) !important;
+      width: 100% !important;
+      max-width: 430px !important;
+      margin: 0 auto !important;
+      padding: 14px 15px calc(70px + var(--safe-bottom, 0px)) !important;
       color: #fff !important;
       overflow-y: auto !important;
-      max-height: calc(min(78vh, 760px) - 96px) !important;
+      max-height: calc(min(74vh, 560px) - 58px) !important;
     }
 
-    .plyrcard-drawer-view {
-      display: none !important;
-    }
-
-    .plyrcard-drawer-view.is-active {
-      display: block !important;
-    }
+    .plyrcard-drawer-view { display: none !important; }
+    .plyrcard-drawer-view.is-active { display: block !important; }
 
     .plyrcard-drawer-grid {
       display: grid !important;
       grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 18px 26px !important;
+      gap: 8px !important;
     }
 
     .plyrcard-drawer-card {
-      min-height: 156px !important;
-      padding: 19px 14px 16px !important;
+      min-width: 0 !important;
+      min-height: 78px !important;
+      padding: 8px 4px 7px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 13px !important;
-      border-radius: 14px !important;
+      gap: 6px !important;
+      border-radius: 10px !important;
       background: #fff !important;
       color: #050505 !important;
-      border: 1px solid rgba(0,0,0,0.08) !important;
-      box-shadow: 0 8px 22px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.6) !important;
+      border: 1px solid rgba(0,0,0,.08) !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,.24), inset 0 0 0 1px rgba(255,255,255,.55) !important;
       text-decoration: none !important;
       text-align: center !important;
       cursor: pointer !important;
       font: inherit !important;
-      transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
     }
 
-    .plyrcard-drawer-card:hover {
-      transform: translateY(-2px) !important;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6) !important;
-    }
-
-    .plyrcard-drawer-card.is-accent {
-      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
-      color: #fff !important;
-    }
-
-    .plyrcard-drawer-card svg {
-      width: 56px !important;
-      height: 56px !important;
-      stroke: currentColor !important;
-      stroke-width: 1.8 !important;
-      fill: none !important;
-    }
+    .plyrcard-drawer-card:hover { transform: translateY(-1px) !important; }
+    .plyrcard-drawer-card.is-accent { background: linear-gradient(135deg, var(--plyrcard-accent), var(--plyrcard-accent-2)) !important; color: #fff !important; }
+    .plyrcard-drawer-card.is-disabled { opacity: .55 !important; cursor: not-allowed !important; }
 
     .plyrcard-menu-icon {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      font-size: 38px !important;
-      width: 42px !important;
-      height: 42px !important;
+      width: 24px !important;
+      height: 24px !important;
+      font-size: 21px !important;
       line-height: 1 !important;
       color: currentColor !important;
+      text-rendering: auto !important;
+      -webkit-font-smoothing: antialiased !important;
     }
 
-    .plyrcard-drawer-card span {
+    .plyrcard-drawer-card > span {
       display: block !important;
-      font-size: clamp(21px, 3vw, 29px) !important;
+      max-width: 100% !important;
+      color: currentColor !important;
+      font-size: 11px !important;
       font-weight: 850 !important;
       line-height: 1.05 !important;
-      color: currentColor !important;
+      letter-spacing: 0 !important;
+      text-transform: none !important;
+      word-break: normal !important;
     }
 
     .plyrcard-drawer-section-divider {
-      margin: 30px 0 24px !important;
+      margin: 15px 0 13px !important;
       height: 1px !important;
-      background: var(--plyrcard-panel-line) !important;
+      background: rgba(255,255,255,.16) !important;
     }
 
     .plyrcard-social-row {
       display: flex !important;
       align-items: center !important;
       flex-wrap: wrap !important;
-      gap: clamp(22px, 5vw, 46px) !important;
+      gap: 14px 22px !important;
       color: #fff !important;
     }
 
     .plyrcard-social-label {
-      font-size: clamp(25px, 4vw, 36px) !important;
+      font-size: 20px !important;
       font-weight: 850 !important;
       line-height: 1 !important;
     }
@@ -470,739 +423,207 @@
       justify-content: center !important;
     }
 
-    .plyrcard-social-row svg {
-      width: 34px !important;
-      height: 34px !important;
-      stroke: currentColor !important;
-      fill: none !important;
-      stroke-width: 2 !important;
-    }
-
     .plyrcard-social-row i {
-      font-size: 31px !important;
-      width: 31px !important;
-      height: 31px !important;
-      line-height: 1 !important;
-      color: #fff !important;
-    }
-
-    .plyrcard-social-row .youtube-wordmark {
       display: inline-flex !important;
       align-items: center !important;
-      gap: 8px !important;
-      font-size: clamp(22px, 3.4vw, 32px) !important;
-      font-weight: 900 !important;
+      justify-content: center !important;
+      width: 21px !important;
+      height: 21px !important;
+      font-size: 21px !important;
       line-height: 1 !important;
+      color: #fff !important;
     }
 
     .plyrcard-drawer-tab {
       position: absolute !important;
       right: 0 !important;
       bottom: 0 !important;
-      min-width: min(380px, 72vw) !important;
-      height: 96px !important;
-      padding: 0 35px 0 86px !important;
+      width: 250px !important;
+      min-width: 250px !important;
+      height: 54px !important;
+      padding: 0 18px 0 46px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 16px !important;
-      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
+      gap: 10px !important;
+      background: linear-gradient(135deg, var(--plyrcard-accent), var(--plyrcard-accent-2)) !important;
       color: #fff !important;
       border: 0 !important;
       border-radius: 0 !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: clamp(32px, 5.3vw, 47px) !important;
+      font-size: 22px !important;
       font-weight: 900 !important;
       line-height: 1 !important;
+      letter-spacing: .01em !important;
       text-transform: none !important;
       cursor: pointer !important;
       pointer-events: auto !important;
-      clip-path: polygon(70px 0, 100% 0, 100% 100%, 0% 100%) !important;
+      clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%) !important;
+      box-shadow: 0 -8px 28px rgba(0,0,0,.22) !important;
+      z-index: 3 !important;
     }
 
     .plyrcard-drawer-tab-chevron {
       display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
       transform: rotate(0deg) !important;
-      transition: transform 0.28s ease !important;
+      transition: transform .25s ease !important;
     }
 
-    .plyrcard-action-drawer.is-open .plyrcard-drawer-tab-chevron {
-      transform: rotate(180deg) !important;
-    }
+    .plyrcard-action-drawer.is-open .plyrcard-drawer-tab-chevron { transform: rotate(180deg) !important; }
 
-    .plyrcard-form-stack {
-      display: grid !important;
-      gap: 14px !important;
-    }
+    .plyrcard-form-stack { display: grid !important; gap: 10px !important; }
+    .plyrcard-input-wrap { position: relative !important; display: block !important; }
 
-    .plyrcard-input-wrap {
-      position: relative !important;
-    }
-
-    .plyrcard-input-wrap svg,
-    .plyrcard-input-wrap i.plyrcard-field-icon {
+    .plyrcard-field-icon {
       position: absolute !important;
-      left: 28px !important;
+      left: 18px !important;
       top: 50% !important;
       transform: translateY(-50%) !important;
-      width: 32px !important;
-      height: 32px !important;
-      color: #111 !important;
-      stroke: currentColor !important;
-      fill: none !important;
-      stroke-width: 1.8 !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      font-size: 28px !important;
+      width: 20px !important;
+      height: 20px !important;
+      color: #111 !important;
+      font-size: 19px !important;
       line-height: 1 !important;
+      z-index: 1 !important;
     }
 
-    .plyrcard-input-wrap.textarea svg,
-    .plyrcard-input-wrap.textarea i.plyrcard-field-icon {
-      top: 28px !important;
-      transform: none !important;
-    }
+    .plyrcard-input-wrap.textarea .plyrcard-field-icon { top: 18px !important; transform: none !important; }
 
     .plyrcard-drawer-input,
     .plyrcard-drawer-select,
     .plyrcard-drawer-textarea {
       width: 100% !important;
-      min-height: 74px !important;
-      border-radius: 12px !important;
+      min-height: 52px !important;
+      border-radius: 10px !important;
       border: 0 !important;
       background: #fff !important;
       color: #111 !important;
-      padding: 18px 24px 18px 92px !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: clamp(19px, 3vw, 28px) !important;
+      padding: 13px 16px 13px 54px !important;
+      font-size: 15px !important;
       font-weight: 700 !important;
       outline: none !important;
     }
 
-    .plyrcard-drawer-textarea {
-      min-height: 130px !important;
-      resize: vertical !important;
-      padding-top: 22px !important;
-    }
-
+    .plyrcard-drawer-textarea { min-height: 92px !important; resize: vertical !important; padding-top: 15px !important; }
     .plyrcard-drawer-input::placeholder,
     .plyrcard-drawer-textarea::placeholder,
-    .plyrcard-drawer-select {
-      color: rgba(0,0,0,0.42) !important;
-    }
+    .plyrcard-drawer-select { color: rgba(0,0,0,.44) !important; }
 
     .plyrcard-submit-btn {
-      min-height: 78px !important;
-      width: min(100%, 560px) !important;
-      margin: 18px auto 0 !important;
+      width: 100% !important;
+      min-height: 52px !important;
+      margin-top: 12px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 16px !important;
+      gap: 10px !important;
       border: 0 !important;
-      border-radius: 12px !important;
-      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
+      border-radius: 10px !important;
+      background: linear-gradient(135deg, var(--plyrcard-accent), var(--plyrcard-accent-2)) !important;
       color: #fff !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: clamp(27px, 4vw, 38px) !important;
+      font-size: 20px !important;
       font-weight: 900 !important;
       cursor: pointer !important;
       text-decoration: none !important;
     }
 
-    .plyrcard-submit-btn svg {
-      width: 36px !important;
-      height: 36px !important;
-      stroke: currentColor !important;
-      fill: none !important;
-      stroke-width: 2 !important;
-    }
-
-    .plyrcard-offer-list {
-      display: grid !important;
-      gap: 18px !important;
-    }
+    .plyrcard-offer-list { display: grid !important; gap: 10px !important; }
 
     .plyrcard-offer-card {
       display: grid !important;
-      grid-template-columns: 92px 1fr auto !important;
+      grid-template-columns: 48px 1fr auto !important;
       align-items: center !important;
-      gap: 22px !important;
-      min-height: 140px !important;
-      padding: 20px 36px 20px 24px !important;
-      border-radius: 14px !important;
+      gap: 10px !important;
+      min-height: 88px !important;
+      padding: 12px 14px 12px 12px !important;
+      border-radius: 10px !important;
       background: #fff !important;
       color: #050505 !important;
       text-decoration: none !important;
-      box-shadow: 0 8px 22px rgba(0,0,0,0.25) !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,.24) !important;
     }
 
     .plyrcard-offer-icon {
-      width: 70px !important;
-      height: 70px !important;
+      width: 44px !important;
+      height: 44px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      border-radius: 14px !important;
+      border-radius: 10px !important;
       background: #fff !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.14) !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,.14) !important;
     }
 
-    .plyrcard-offer-icon svg {
-      width: 44px !important;
-      height: 44px !important;
-      stroke: currentColor !important;
-      fill: none !important;
-      stroke-width: 1.8 !important;
-    }
+    .plyrcard-offer-icon i { font-size: 22px !important; color: #050505 !important; line-height: 1 !important; }
+    .plyrcard-offer-title { margin: 0 0 4px !important; font-size: 18px !important; line-height: 1 !important; font-weight: 900 !important; color: #050505 !important; }
+    .plyrcard-offer-copy { margin: 0 !important; color: #303746 !important; font-size: 12px !important; line-height: 1.2 !important; font-weight: 500 !important; }
+    .plyrcard-offer-price { text-align: right !important; color: #168bff !important; font-size: 23px !important; font-weight: 950 !important; line-height: .9 !important; white-space: nowrap !important; }
+    .plyrcard-offer-price small { display: block !important; margin-top: 6px !important; color: #4d5565 !important; font-size: 10px !important; line-height: 1 !important; letter-spacing: .06em !important; text-transform: uppercase !important; }
 
-    .plyrcard-offer-title {
-      margin: 0 0 6px !important;
-      font-size: clamp(25px, 3.6vw, 35px) !important;
-      line-height: 1 !important;
-      font-weight: 900 !important;
+    .plyrcard-contact-card {
+      display: grid !important;
+      grid-template-columns: 42px 1fr !important;
+      gap: 12px !important;
+      align-items: center !important;
+      min-height: 82px !important;
+      padding: 14px !important;
+      border-radius: 12px !important;
+      background: #fff !important;
       color: #050505 !important;
+      text-decoration: none !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,.24) !important;
     }
 
-    .plyrcard-offer-copy {
-      margin: 0 !important;
-      color: #303746 !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: clamp(16px, 2.7vw, 23px) !important;
-      line-height: 1.25 !important;
-      font-weight: 500 !important;
-    }
+    .plyrcard-contact-card > i { font-size: 25px !important; color: #050505 !important; text-align: center !important; }
+    .plyrcard-contact-card strong { display: block !important; font-size: 19px !important; line-height: 1 !important; color: #050505 !important; }
+    .plyrcard-contact-card span span { display: block !important; margin-top: 5px !important; font-size: 12px !important; line-height: 1.2 !important; color: #49505c !important; }
 
-    .plyrcard-offer-price {
-      text-align: right !important;
-      color: #168bff !important;
-      font-size: clamp(31px, 4.5vw, 45px) !important;
-      font-weight: 950 !important;
-      line-height: .9 !important;
-      white-space: nowrap !important;
-    }
-
-    .plyrcard-offer-price small {
-      display: block !important;
-      margin-top: 8px !important;
-      color: #4d5565 !important;
-      font-size: clamp(14px, 2vw, 21px) !important;
-      line-height: 1 !important;
-      letter-spacing: 0.06em !important;
-      text-transform: uppercase !important;
-    }
-
-    .plyrcard-placeholder-panel {
-      padding: 28px !important;
-      border-radius: 16px !important;
-      border: 1px dashed rgba(255,255,255,0.35) !important;
-      color: rgba(255,255,255,0.8) !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      font-size: 18px !important;
-      line-height: 1.45 !important;
-    }
-
-    @media (min-width: 960px) {
-      .plyrcard-action-drawer { display: none !important; }
-      #site-header.plyrcard-site-header {
-        padding-left: 24px !important;
-        padding-right: 24px !important;
-      }
-
-      #site-header.plyrcard-site-header .desktop-nav {
-        display: flex !important;
-      }
-
-      #site-header.plyrcard-site-header .menu-btn {
-        display: none !important;
-      }
-
-      #mobile-nav.plyrcard-mobile-nav {
-        display: none !important;
-      }
-    }
-
-    @media (max-width: 767px) {
-      #site-header.plyrcard-site-header {
-        min-height: calc(64px + var(--safe-top, 0px)) !important;
-        padding-left: 20px !important;
-        padding-right: 20px !important;
-      }
-
-      #site-header.plyrcard-site-header .logo-wrap {
-        height: 46px !important;
-      }
-
-      #site-header.plyrcard-site-header .logo-text {
-        font-size: 27px !important;
-      }
-
-      .plyrcard-drawer-panel {
-        border-radius: 18px 18px 0 0 !important;
-        transform: translateY(calc(100% - 84px)) !important;
-      }
-
-      .plyrcard-drawer-head {
-        min-height: 84px !important;
-        padding: 24px 20px 14px !important;
-        border-radius: 18px 18px 0 0 !important;
-      }
-
-      .plyrcard-drawer-title-row {
-        gap: 9px !important;
-      }
-
-      .plyrcard-drawer-title {
-        font-size: 30px !important;
-      }
-
-      .plyrcard-journey-badge {
-        min-height: 32px !important;
-        padding: 8px 12px !important;
-        font-size: 16px !important;
-      }
-
-      .plyrcard-drawer-back {
-        font-size: 21px !important;
-        gap: 5px !important;
-      }
-
-      .plyrcard-drawer-close svg,
-      .plyrcard-drawer-back svg {
-        width: 30px !important;
-        height: 30px !important;
-      }
-
-      .plyrcard-drawer-body {
-        padding: 24px 20px calc(98px + var(--safe-bottom, 0px)) !important;
-      }
-
-      .plyrcard-drawer-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 16px !important;
-      }
-
-      .plyrcard-drawer-card {
-        min-height: 124px !important;
-        padding: 16px 10px 14px !important;
-        gap: 10px !important;
-      }
-
-      .plyrcard-drawer-card svg {
-        width: 46px !important;
-        height: 46px !important;
-      }
-
-      .plyrcard-drawer-card span {
-        font-size: 22px !important;
-      }
-
-      .plyrcard-drawer-tab {
-        min-width: 62vw !important;
-        height: 84px !important;
-        padding: 0 22px 0 70px !important;
-        font-size: 31px !important;
-        clip-path: polygon(54px 0, 100% 0, 100% 100%, 0% 100%) !important;
-      }
-
-      .plyrcard-social-row {
-        gap: 22px !important;
-      }
-
-      .plyrcard-social-label {
-        width: 100% !important;
-        font-size: 28px !important;
-      }
-
-      .plyrcard-offer-card {
-        grid-template-columns: 58px 1fr auto !important;
-        gap: 12px !important;
-        min-height: 116px !important;
-        padding: 18px 18px 18px 14px !important;
-      }
-
-      .plyrcard-offer-icon {
-        width: 52px !important;
-        height: 52px !important;
-      }
-
-      .plyrcard-offer-icon svg {
-        width: 34px !important;
-        height: 34px !important;
-      }
-
-      .plyrcard-offer-title {
-        font-size: 24px !important;
-      }
-
-      .plyrcard-offer-copy {
-        font-size: 16px !important;
-      }
-
-      .plyrcard-offer-price {
-        font-size: 30px !important;
-      }
-
-      .plyrcard-offer-price small {
-        font-size: 13px !important;
-      }
-    }
-
-
-    /* Share pop-up and final compact mobile sizing */
     .plyrcard-share-grid {
       display: grid !important;
       grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 14px !important;
+      gap: 8px !important;
     }
 
     .plyrcard-share-option {
-      min-height: 104px !important;
-      padding: 14px 8px !important;
+      min-height: 76px !important;
+      padding: 9px 4px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 9px !important;
-      border-radius: 12px !important;
+      gap: 6px !important;
+      border-radius: 10px !important;
       background: #fff !important;
       color: #050505 !important;
       text-decoration: none !important;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.24) !important;
-      border: 0 !important;
-      cursor: pointer !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,.24) !important;
     }
 
-    .plyrcard-share-option i {
-      font-size: 30px !important;
-      line-height: 1 !important;
-      color: #050505 !important;
-    }
+    .plyrcard-share-option i { font-size: 22px !important; line-height: 1 !important; color: #050505 !important; }
+    .plyrcard-share-option span { font-size: 11px !important; font-weight: 850 !important; line-height: 1 !important; color: #050505 !important; }
+    .plyrcard-share-note { margin: 12px 0 0 !important; color: rgba(255,255,255,.72) !important; font-size: 12px !important; line-height: 1.35 !important; }
 
-    .plyrcard-share-option span {
-      font-size: 16px !important;
-      font-weight: 850 !important;
-      line-height: 1 !important;
-      color: #050505 !important;
-    }
-
-    .plyrcard-share-note {
-      margin: 14px 0 0 !important;
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-      color: rgba(255,255,255,0.72) !important;
-      font-size: 13px !important;
-      line-height: 1.35 !important;
-    }
-
-    .plyrcard-menu-icon,
-    .plyrcard-social-row i,
-    .plyrcard-field-icon,
-    .plyrcard-offer-icon i {
-      line-height: 1 !important;
-      color: currentColor !important;
-    }
-
-    @media (max-width: 959px) {
-      .plyrcard-action-drawer { display: block !important; }
-      .plyrcard-drawer-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px 14px !important; }
-      .plyrcard-drawer-card { min-height: 90px !important; padding: 10px 6px 8px !important; gap: 6px !important; border-radius: 10px !important; }
-      .plyrcard-menu-icon { font-size: 25px !important; width: 28px !important; height: 28px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
-      .plyrcard-drawer-card span { font-size: clamp(13px, 2.2vw, 17px) !important; line-height: 1.05 !important; }
-      .plyrcard-drawer-head { min-height: 62px !important; padding: 17px 26px 10px !important; }
-      .plyrcard-drawer-title { font-size: clamp(21px, 3.1vw, 28px) !important; }
-      .plyrcard-drawer-body { padding: 16px 26px calc(76px + var(--safe-bottom, 0px)) !important; }
-      .plyrcard-drawer-tab { width: min(340px, 64vw) !important; min-width: 260px !important; height: 66px !important; padding: 0 22px 0 58px !important; font-size: clamp(23px, 3.7vw, 31px) !important; clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%) !important; }
-      .plyrcard-drawer-tab-chevron svg { width: 26px !important; height: 26px !important; }
-      .plyrcard-social-row { gap: 16px 26px !important; }
-      .plyrcard-social-label { font-size: clamp(19px, 3.2vw, 24px) !important; }
-      .plyrcard-social-row i { font-size: 22px !important; width: 22px !important; height: 22px !important; }
-      .plyrcard-form-stack { gap: 10px !important; }
-      .plyrcard-drawer-input, .plyrcard-drawer-select, .plyrcard-drawer-textarea { min-height: 54px !important; padding-left: 62px !important; font-size: clamp(14px, 2.3vw, 19px) !important; }
-      .plyrcard-field-icon { left: 20px !important; font-size: 20px !important; }
-      .plyrcard-submit-btn { min-height: 54px !important; font-size: clamp(19px, 3vw, 25px) !important; }
-      .plyrcard-offer-card { min-height: 88px !important; grid-template-columns: 54px 1fr auto !important; padding: 12px 18px 12px 12px !important; }
-      .plyrcard-offer-icon { width: 46px !important; height: 46px !important; }
-      .plyrcard-offer-icon i { font-size: 24px !important; }
-      .plyrcard-offer-title { font-size: clamp(17px, 2.8vw, 23px) !important; }
-      .plyrcard-offer-copy { font-size: clamp(11px, 1.8vw, 15px) !important; }
-      .plyrcard-offer-price { font-size: clamp(21px, 3.4vw, 29px) !important; }
+    @media (min-width: 960px) {
+      #site-header.plyrcard-site-header .desktop-nav { display: flex !important; }
+      #site-header.plyrcard-site-header .menu-btn { display: none !important; }
+      #mobile-nav.plyrcard-mobile-nav { display: none !important; }
+      .plyrcard-action-drawer:not(.is-pullup-only) { display: none !important; }
     }
 
     @media (max-width: 520px) {
-      .plyrcard-drawer-body { padding: 14px 16px calc(70px + var(--safe-bottom, 0px)) !important; }
-      .plyrcard-drawer-grid { gap: 8px !important; }
-      .plyrcard-drawer-card { min-height: 78px !important; padding: 8px 4px 7px !important; }
-      .plyrcard-menu-icon { font-size: 21px !important; width: 24px !important; height: 24px !important; }
-      .plyrcard-drawer-card span { font-size: 11px !important; }
-      .plyrcard-drawer-tab { min-width: 240px !important; width: 68vw !important; height: 58px !important; padding-left: 50px !important; font-size: 21px !important; }
-      .plyrcard-share-grid { gap: 8px !important; }
-      .plyrcard-share-option { min-height: 76px !important; padding: 9px 4px !important; gap: 6px !important; }
-      .plyrcard-share-option i { font-size: 22px !important; }
-      .plyrcard-share-option span { font-size: 11px !important; }
+      #site-header.plyrcard-site-header { min-height: calc(64px + var(--safe-top, 0px)) !important; padding-left: 20px !important; padding-right: 20px !important; }
+      #site-header.plyrcard-site-header .logo-wrap img { height: 30px !important; }
+      .plyrcard-drawer-body { max-width: none !important; padding-left: 14px !important; padding-right: 14px !important; }
+      .plyrcard-drawer-grid { gap: 7px !important; }
+      .plyrcard-drawer-card { min-height: 74px !important; padding: 7px 3px 6px !important; }
+      .plyrcard-menu-icon { width: 22px !important; height: 22px !important; font-size: 20px !important; }
+      .plyrcard-drawer-card > span { font-size: 10.5px !important; }
+      .plyrcard-drawer-tab { width: min(250px, 68vw) !important; min-width: 226px !important; height: 54px !important; padding-left: 46px !important; font-size: 21px !important; }
     }
-
-
-    /* On admin and player website pages, only the bottom pull-up drawer should show. */
-    .plyrcard-action-drawer.is-pullup-only {
-      display: block !important;
-    }
-
-    @media (min-width: 960px) {
-      .plyrcard-action-drawer.is-pullup-only {
-        display: block !important;
-      }
-    }
-
-
-    /* Admin/player website desktop mode: show ONLY the compact angled Locker Room tab while closed. */
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-panel {
-      width: min(430px, 100vw) !important;
-      margin-left: auto !important;
-      margin-right: 0 !important;
-      max-height: min(78vh, 620px) !important;
-      border-radius: 18px 18px 0 0 !important;
-      transform: translateY(100%) !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only.is-open .plyrcard-drawer-panel {
-      transform: translateY(0) !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-head {
-      min-height: 62px !important;
-      padding: 17px 18px 10px !important;
-      border-radius: 18px 18px 0 0 !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-handle {
-      top: 10px !important;
-      width: 52px !important;
-      height: 5px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-title-row {
-      gap: 8px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-title {
-      font-size: 26px !important;
-      line-height: 1 !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-journey-badge {
-      min-height: 30px !important;
-      padding: 7px 11px !important;
-      border-radius: 8px !important;
-      font-size: 14px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-close svg,
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-back svg {
-      width: 26px !important;
-      height: 26px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-back {
-      font-size: 18px !important;
-      gap: 4px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-body {
-      padding: 14px 16px calc(70px + var(--safe-bottom, 0px)) !important;
-      max-height: calc(min(78vh, 620px) - 62px) !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 8px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-card {
-      min-height: 78px !important;
-      padding: 8px 4px 7px !important;
-      gap: 6px !important;
-      border-radius: 10px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-menu-icon {
-      font-size: 21px !important;
-      width: 24px !important;
-      height: 24px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-card span {
-      font-size: 11px !important;
-      line-height: 1.05 !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-section-divider {
-      margin: 16px 0 14px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-social-row {
-      gap: 14px 22px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-social-label {
-      font-size: 21px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-social-row i {
-      font-size: 21px !important;
-      width: 21px !important;
-      height: 21px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-tab {
-      width: 292px !important;
-      min-width: 292px !important;
-      height: 58px !important;
-      padding: 0 18px 0 50px !important;
-      gap: 10px !important;
-      font-size: 23px !important;
-      clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%) !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-tab-chevron svg {
-      width: 23px !important;
-      height: 23px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-form-stack {
-      gap: 10px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-input,
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-select,
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-textarea {
-      min-height: 52px !important;
-      border-radius: 10px !important;
-      padding: 13px 16px 13px 54px !important;
-      font-size: 15px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-textarea {
-      min-height: 92px !important;
-      padding-top: 15px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-field-icon {
-      left: 18px !important;
-      font-size: 19px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-submit-btn {
-      min-height: 52px !important;
-      margin-top: 12px !important;
-      border-radius: 10px !important;
-      font-size: 20px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-list {
-      gap: 10px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-card {
-      min-height: 88px !important;
-      grid-template-columns: 48px 1fr auto !important;
-      gap: 10px !important;
-      padding: 12px 14px 12px 12px !important;
-      border-radius: 10px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-icon {
-      width: 44px !important;
-      height: 44px !important;
-      border-radius: 10px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-icon i {
-      font-size: 22px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-title {
-      font-size: 18px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-copy {
-      font-size: 12px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-price {
-      font-size: 23px !important;
-    }
-
-    .plyrcard-action-drawer.is-pullup-only .plyrcard-offer-price small {
-      font-size: 10px !important;
-    }
-
-    @media (max-width: 430px) {
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-panel {
-        width: 100vw !important;
-      }
-    }
-
-
-    /* Final hard lock: Antonio font + compact Font Awesome sizing */
-    .plyrcard-site-header,
-    .plyrcard-mobile-nav,
-    .plyrcard-action-drawer,
-    .plyrcard-action-drawer * {
-      font-family: 'Antonio', 'Arial Narrow', Impact, sans-serif !important;
-    }
-
-    .plyrcard-menu-icon::before,
-    .plyrcard-social-row i::before,
-    .plyrcard-field-icon::before,
-    .plyrcard-offer-icon i::before,
-    .plyrcard-share-option i::before {
-      font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important;
-    }
-
-    .fa-solid::before,
-    .fa-regular::before {
-      font-family: "Font Awesome 6 Free" !important;
-    }
-
-    .fa-brands::before {
-      font-family: "Font Awesome 6 Brands" !important;
-    }
-
-    @media (min-width: 960px) {
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-panel {
-        width: 390px !important;
-        max-width: 390px !important;
-      }
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-tab {
-        width: 250px !important;
-        min-width: 250px !important;
-        height: 54px !important;
-        padding: 0 18px 0 46px !important;
-        font-size: 22px !important;
-        letter-spacing: 0.01em !important;
-      }
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-tab-chevron svg {
-        width: 21px !important;
-        height: 21px !important;
-      }
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-card {
-        min-height: 74px !important;
-        padding: 7px 4px 6px !important;
-      }
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-menu-icon {
-        font-size: 19px !important;
-        width: 22px !important;
-        height: 22px !important;
-      }
-      .plyrcard-action-drawer.is-pullup-only .plyrcard-drawer-card span {
-        font-size: 10.5px !important;
-      }
-    }
-
 </style>
 
 @php
@@ -1312,11 +733,9 @@
     <div class="plyrcard-drawer-head">
       <div class="plyrcard-drawer-title-row" data-plyrcard-main-title>
         @auth
-          <svg width="43" height="43" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c1.6-4.2 4.2-6.3 8-6.3s6.4 2.1 8 6.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <h2 class="plyrcard-drawer-title">Hi {{ $plyrFirstName ?? 'Clark' }}!</h2>
-          <a class="plyrcard-journey-badge" href="/admin">My Journey</a>
+          <h2 class="plyrcard-drawer-title">Locker Room</h2>
         @else
-          <h2 class="plyrcard-drawer-title">Welcome to PLYRCARD!</h2>
+          <h2 class="plyrcard-drawer-title">GET STARTED</h2>
         @endauth
       </div>
 
@@ -1381,7 +800,7 @@
             <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
             <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
             <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
-            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
           </div>
         </div>
 
@@ -1458,7 +877,7 @@
               <i class="plyrcard-menu-icon fa-regular fa-calendar-days" aria-hidden="true"></i><span>Book a Demo</span>
             </a>
             <a class="plyrcard-drawer-card" href="/pricing">
-              <i class="plyrcard-menu-icon fa-regular fa-user-plus" aria-hidden="true"></i><span>Register Now</span>
+              <i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Register Now</span>
             </a>
             <a class="plyrcard-drawer-card is-accent" href="/admin">
               <i class="plyrcard-menu-icon fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i><span>Login</span>
@@ -1470,7 +889,7 @@
             <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
             <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
             <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
-            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
           </div>
         </div>
 
@@ -1485,7 +904,7 @@
             <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode($plyrShareUrl) }}"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i><span>Facebook</span></a>
             <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.instagram.com/plyrcard/"><i class="fa-brands fa-instagram" aria-hidden="true"></i><span>Instagram</span></a>
             <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url={{ urlencode($plyrShareUrl) }}&text={{ urlencode('Check out PLYRCARD') }}"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i><span>X</span></a>
-            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.youtube.com/@plyrcard"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.youtube.com/@plyrcard"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
           </div>
           <p class="plyrcard-share-note">Facebook and X open pre-filled share dialogs. Instagram and YouTube do not support website pre-fill sharing, so they open the PLYRCARD profile/link destination.</p>
         </div>
