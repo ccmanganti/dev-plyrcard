@@ -83,7 +83,7 @@
     $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
     $plyrWebsiteActionLabel = $plyrOnPlayerWebsite ? 'Edit my Website' : 'View my Website';
-    $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? url('/admin') : ($plyrWebsiteUrl ?: '#');
+    $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? '#' : ($plyrWebsiteUrl ?: '#');
     $plyrWebsiteActionTarget = (! $plyrOnPlayerWebsite && $plyrWebsiteUrl) ? '_blank' : null;
     $plyrWebsiteActionDisabled = (! $plyrOnPlayerWebsite && ! $plyrWebsiteUrl);
 
@@ -456,8 +456,55 @@
       color: #fff !important;
     }
 
-    .plyrcard-drawer-view { display: none !important; }
-    .plyrcard-drawer-view.is-active { display: block !important; }
+    .plyrcard-drawer-view {
+      display: none !important;
+      opacity: 0 !important;
+      transform: translateY(10px) scale(.985) !important;
+      transform-origin: top center !important;
+    }
+    .plyrcard-drawer-view.is-active {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      transform: none !important;
+      filter: none !important;
+      animation: plyrcardViewIn .26s cubic-bezier(.2,.8,.2,1) both !important;
+    }
+    .plyrcard-drawer-view.is-active .plyrcard-nav-group {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    .plyrcard-drawer-view.is-active .plyrcard-drawer-grid {
+      display: grid !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    .plyrcard-drawer-view.is-active .plyrcard-drawer-card {
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    .plyrcard-drawer-view.is-active .plyrcard-drawer-card.is-disabled,
+    .plyrcard-drawer-view.is-active .plyrcard-drawer-card[aria-disabled="true"] {
+      opacity: .46 !important;
+    }
+    .plyrcard-drawer-panel.is-switching .plyrcard-drawer-view.is-active {
+      animation: plyrcardViewIn .26s cubic-bezier(.2,.8,.2,1) both !important;
+    }
+    @keyframes plyrcardViewIn {
+      from { opacity: 0; transform: translateY(12px) scale(.985); filter: blur(2px); }
+      to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+    @keyframes plyrcardCardIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .plyrcard-drawer-view.is-active .plyrcard-form-card,
+    .plyrcard-drawer-view.is-active .plyrcard-mini-panel,
+    .plyrcard-drawer-view.is-active .plyrcard-offer-card {
+      animation: plyrcardCardIn .3s cubic-bezier(.2,.8,.2,1) both !important;
+    }
 
     .plyrcard-nav-group + .plyrcard-nav-group { margin-top: 10px !important; }
     .plyrcard-nav-group-title {
@@ -539,36 +586,49 @@
 
     .plyrcard-form-card,
     .plyrcard-mini-panel {
-      border-radius: 14px !important;
-      background: #fff !important;
+      border-radius: 16px !important;
+      background: linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%) !important;
       color: #111 !important;
-      padding: 14px !important;
-      box-shadow: 0 8px 24px rgba(0,0,0,.22) !important;
+      padding: 16px !important;
+      box-shadow: 0 10px 26px rgba(0,0,0,.26) !important;
+      border: 1px solid rgba(255,255,255,.75) !important;
     }
 
-    .plyrcard-form-stack { display: grid !important; gap: 10px !important; }
-    .plyrcard-input-label { display: grid !important; gap: 5px !important; color: rgba(0,0,0,.56) !important; font-size: 12px !important; font-weight: 900 !important; text-transform: uppercase !important; }
+    .plyrcard-form-stack { display: grid !important; gap: 11px !important; }
+    .plyrcard-input-label { display: grid !important; gap: 6px !important; color: rgba(0,0,0,.52) !important; font-size: 11px !important; font-weight: 900 !important; text-transform: uppercase !important; letter-spacing: .035em !important; }
     .plyrcard-input-wrap { position: relative !important; display: block !important; }
-    .plyrcard-input-wrap > i { position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important; color: #111 !important; font-size: 14px !important; }
+    .plyrcard-input-wrap > i { position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important; color: rgba(0,0,0,.8) !important; font-size: 13px !important; }
     .plyrcard-input-wrap.textarea > i { top: 15px !important; transform: none !important; }
 
     .plyrcard-drawer-input,
     .plyrcard-drawer-textarea,
     .plyrcard-drawer-select {
       width: 100% !important;
-      min-height: 42px !important;
-      border-radius: 9px !important;
-      border: 1px solid rgba(0,0,0,.08) !important;
-      background: #f8f8f8 !important;
+      min-height: 43px !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(0,0,0,.075) !important;
+      background: #fff !important;
       color: #111 !important;
-      padding: 10px 11px 10px 36px !important;
-      font-size: 15px !important;
-      font-weight: 700 !important;
+      padding: 10px 12px 10px 37px !important;
+      font-size: 14px !important;
+      font-weight: 750 !important;
       outline: none !important;
+      box-shadow: inset 0 1px 0 rgba(0,0,0,.02), 0 1px 0 rgba(255,255,255,.75) !important;
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease !important;
+    }
+    .plyrcard-drawer-input:focus,
+    .plyrcard-drawer-textarea:focus,
+    .plyrcard-drawer-select:focus {
+      border-color: rgba(255,92,53,.55) !important;
+      box-shadow: 0 0 0 3px rgba(255,92,53,.12) !important;
     }
 
-    .plyrcard-drawer-textarea { min-height: 96px !important; resize: vertical !important; padding-top: 11px !important; }
+    .plyrcard-drawer-textarea { min-height: 92px !important; resize: vertical !important; padding-top: 12px !important; }
     .plyrcard-clean-row { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; }
+    .plyrcard-text-link { border: 0 !important; background: transparent !important; color: #111 !important; padding: 0 !important; font: inherit !important; text-decoration: underline !important; cursor: pointer !important; }
+    .plyrcard-subsection-lead { margin: 0 0 12px !important; color: rgba(255,255,255,.72) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
+    .plyrcard-mini-title { margin: 0 0 6px !important; color: #111 !important; font-size: 18px !important; line-height: 1 !important; font-weight: 950 !important; }
+    .plyrcard-mini-copy { margin: 0 0 13px !important; color: rgba(0,0,0,.58) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
 
     .plyrcard-submit-btn,
     .plyrcard-secondary-btn,
@@ -628,9 +688,9 @@
     <a data-nav href="/podcast" class="{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
     <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
     @auth
-      <a href="/admin">Dashboard</a>
+      <a href="#" data-plyrcard-open-drawer>Dashboard</a>
     @else
-      <a href="/admin">Login</a>
+      <a href="#" data-plyrcard-open-drawer>Login</a>
       <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
     @endauth
   </nav>
@@ -680,7 +740,7 @@
 
       <div class="plyrcard-drawer-actions">
         @auth
-          <form class="plyrcard-signout-form" method="POST" action="{{ $plyrLogoutAction }}">
+          <form class="plyrcard-signout-form" method="POST" action="{{ $plyrLogoutAction }}" data-plyrcard-logout-form>
             @csrf
             <button type="submit" class="plyrcard-signout-btn"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Sign Out</button>
           </form>
@@ -697,8 +757,8 @@
           <div class="plyrcard-nav-group">
             <strong class="plyrcard-nav-group-title">Locker Room</strong>
             <div class="plyrcard-drawer-grid">
-              <a class="plyrcard-drawer-card" href="/admin"><i class="plyrcard-menu-icon fa-solid fa-gauge-high" aria-hidden="true"></i><span>Dashboard</span></a>
-              <a class="plyrcard-drawer-card" href="/admin/profile"><i class="plyrcard-menu-icon fa-solid fa-user" aria-hidden="true"></i><span>Profile</span></a>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="dashboard"><i class="plyrcard-menu-icon fa-solid fa-gauge-high" aria-hidden="true"></i><span>Dashboard</span></button>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="profile"><i class="plyrcard-menu-icon fa-solid fa-user" aria-hidden="true"></i><span>Profile</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="schedule"><i class="plyrcard-menu-icon fa-solid fa-calendar-days" aria-hidden="true"></i><span>My Schedule</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="settings"><i class="plyrcard-menu-icon fa-solid fa-gear" aria-hidden="true"></i><span>Settings</span></button>
             </div>
@@ -710,7 +770,11 @@
               @if($plyrWebsiteActionDisabled)
                 <button type="button" class="plyrcard-drawer-card is-disabled" disabled aria-disabled="true"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
               @else
-                <a class="plyrcard-drawer-card {{ $plyrOnPlayerWebsite ? '' : '' }}" href="{{ $plyrWebsiteActionHref }}" @if($plyrWebsiteActionTarget) target="{{ $plyrWebsiteActionTarget }}" rel="noopener" @endif><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></a>
+                @if($plyrOnPlayerWebsite)
+                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="edit-website"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
+                @else
+                <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteActionHref }}" @if($plyrWebsiteActionTarget) target="{{ $plyrWebsiteActionTarget }}" rel="noopener" @endif><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></a>
+                @endif
               @endif
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share Card</span></button>
               <a class="plyrcard-drawer-card" href="/podcast"><i class="plyrcard-menu-icon fa-solid fa-podcast" aria-hidden="true"></i><span>PLYRCard Show</span></a>
@@ -721,11 +785,7 @@
           <div class="plyrcard-nav-group">
             <strong class="plyrcard-nav-group-title">Growth</strong>
             <div class="plyrcard-drawer-grid">
-              @if(!$plyrHasMyJourneyRole)
-                <a class="plyrcard-drawer-card" href="/admin/my-journey"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></a>
-              @else
-                <button type="button" class="plyrcard-drawer-card is-disabled" disabled aria-disabled="true"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
-              @endif
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check" aria-hidden="true"></i><span>Book a Call</span></button>
@@ -790,9 +850,31 @@
           </div>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="schedule" data-title="My Schedule"><div class="plyrcard-mini-panel">Schedule placeholder. Add your schedule link or embedded calendar here.</div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="billing" data-title="Billing"><div class="plyrcard-mini-panel">Billing placeholder. Add your billing link or billing portal here.</div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="settings" data-title="Settings"><div class="plyrcard-mini-panel">Settings placeholder. Add your settings links here.</div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="dashboard" data-title="Dashboard">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Dashboard</h3><p class="plyrcard-mini-copy">Quick dashboard tools can live here without leaving the page.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-chart-line"></i> Add dashboard content</button></div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="profile" data-title="Profile">
+          <div class="plyrcard-form-card plyrcard-form-stack">
+            <p class="plyrcard-mini-copy">Profile controls placeholder. Add editable player profile fields here.</p>
+            <label class="plyrcard-input-label">Display Name<span class="plyrcard-input-wrap"><i class="fa-solid fa-user"></i><input class="plyrcard-drawer-input" type="text" value="{{ $plyrFirstName }}" placeholder="Player name"></span></label>
+            <button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-check"></i> Save Profile</button>
+          </div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="edit-website" data-title="Edit Website">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Edit Website</h3><p class="plyrcard-mini-copy">Website editing tools can be embedded here so players stay on their card.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-pen-to-square"></i> Add editor shortcut</button></div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="upgrade" data-title="Upgrade">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Upgrade</h3><p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Add your plan upgrade cards or checkout embed here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-arrow-trend-up"></i> Explore upgrades</button></div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="schedule" data-title="My Schedule">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">My Schedule</h3><p class="plyrcard-mini-copy">Add schedule content, calendars, games, or booking tools here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-calendar-days"></i> Add schedule content</button></div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="billing" data-title="Billing">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Billing</h3><p class="plyrcard-mini-copy">Add your billing portal, invoices, or plan management embed here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-credit-card"></i> Add billing portal</button></div>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="settings" data-title="Settings">
+          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Settings</h3><p class="plyrcard-mini-copy">Add account preferences and notification controls here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-gear"></i> Add settings content</button></div>
+        </div>
       @else
         <div class="plyrcard-drawer-view is-active" data-plyrcard-view="main">
           <div class="plyrcard-nav-group"><strong class="plyrcard-nav-group-title">Contact</strong><div class="plyrcard-drawer-grid">
@@ -817,9 +899,17 @@
             @csrf
             <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
             <label class="plyrcard-input-label">Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" placeholder="Password" required></span></label>
-            <label class="plyrcard-clean-row" style="color:#111;font-size:13px;font-weight:800;"><span><input type="checkbox" name="remember" value="1"> Remember me</span><a href="{{ url('/admin/password-reset/request') }}" style="color:#111;">Forgot Password?</a></label>
+            <label class="plyrcard-clean-row" style="color:#111;font-size:13px;font-weight:800;"><span><input type="checkbox" name="remember" value="1"> Remember me</span><button type="button" class="plyrcard-text-link" data-plyrcard-section="forgot-password">Forgot Password?</button></label>
             <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
-            <div class="plyrcard-clean-row"><a class="plyrcard-secondary-btn" href="/pricing">Register</a><a class="plyrcard-secondary-btn" href="/book-demo">Book Demo</a></div>
+            <div class="plyrcard-clean-row"><a class="plyrcard-secondary-btn" href="/pricing">Register</a><button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="book-demo">Book Demo</button></div>
+          </form>
+        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="forgot-password" data-title="Reset Password">
+          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/password-reset/request') }}">
+            @csrf
+            <p class="plyrcard-mini-copy">Enter your email and we’ll send password reset instructions.</p>
+            <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
+            <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> Send Reset Link</button>
           </form>
         </div>
       @endauth
@@ -849,17 +939,39 @@
     const backButton = drawer.querySelector('[data-plyrcard-back]');
     const tabButton = drawer.querySelector('[data-plyrcard-toggle-drawer]');
 
+    function resetDrawerScroll() {
+      const body = drawer.querySelector('.plyrcard-drawer-body');
+      if (body) body.scrollTop = 0;
+    }
+
+    function ensureMainView() {
+      const active = drawer.querySelector('.plyrcard-drawer-view.is-active');
+      if (!active || !active.querySelector('.plyrcard-drawer-card, .plyrcard-form-card, .plyrcard-mini-panel, .plyrcard-offer-list, .plyrcard-booking-wrap')) {
+        showView('main');
+      }
+    }
+
     function setOpen(isOpen) {
+      if (isOpen) ensureMainView();
       drawer.classList.toggle('is-open', isOpen);
       drawer.dataset.state = isOpen ? 'open' : 'closed';
       if (tabButton) tabButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       document.documentElement.classList.toggle('plyrcard-drawer-open', isOpen);
+      if (isOpen) window.requestAnimationFrame(resetDrawerScroll);
     }
 
     function showView(name) {
       const view = drawer.querySelector('[data-plyrcard-view="' + name + '"]');
       if (!view) return;
+      const panel = drawer.querySelector('.plyrcard-drawer-panel');
+      if (panel) {
+        panel.classList.remove('is-switching');
+        void panel.offsetWidth;
+        panel.classList.add('is-switching');
+        window.setTimeout(() => panel.classList.remove('is-switching'), 280);
+      }
       drawer.querySelectorAll('[data-plyrcard-view]').forEach(item => item.classList.toggle('is-active', item === view));
+      resetDrawerScroll();
       const isMain = name === 'main';
       if (mainTitle) mainTitle.style.setProperty('display', isMain ? 'flex' : 'none', 'important');
       if (subTitle) subTitle.style.setProperty('display', isMain ? 'none' : 'flex', 'important');
@@ -870,6 +982,35 @@
     closeButtons.forEach(button => button.addEventListener('click', () => { setOpen(false); showView('main'); }));
     drawer.querySelectorAll('[data-plyrcard-section]').forEach(button => button.addEventListener('click', () => { showView(button.dataset.plyrcardSection); setOpen(true); }));
     if (backButton) backButton.addEventListener('click', () => showView('main'));
+
+    showView('main');
+
+    drawer.querySelectorAll('[data-plyrcard-logout-form]').forEach(form => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        const token = formData.get('_token') || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        try {
+          await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+            headers: {
+              'X-CSRF-TOKEN': token,
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'text/html, application/xhtml+xml',
+            },
+          });
+        } catch (error) {
+          // If the logout request fails because of a browser/network quirk,
+          // still send the visitor back to the public website instead of /admin/login.
+        }
+
+        window.location.assign('/');
+      });
+    });
 
     drawer.querySelectorAll('[data-plyrcard-copy]').forEach(button => {
       button.addEventListener('click', async () => {

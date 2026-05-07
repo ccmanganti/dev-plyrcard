@@ -190,7 +190,7 @@ Route::post('/admin/login', function (Request $request) {
         ->first();
 
     if (! $website) {
-        return redirect('/admin');
+        return redirect('/');
     }
 
     if (! blank($website->domain)) {
@@ -202,5 +202,5 @@ Route::post('/admin/login', function (Request $request) {
         return redirect('/' . ltrim($website->slug, '/'));
     }
 
-    return redirect('/admin');
+    return redirect('/');
 })->middleware('web')->name('plyrcard.drawer-login');
