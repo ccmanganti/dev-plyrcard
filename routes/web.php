@@ -5,6 +5,7 @@ use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
@@ -163,3 +164,43 @@ Route::middleware(['web', 'auth'])->post('/onboarding/complete', function (Reque
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
     ->where('websiteName', '^(?!(' . $reservedWebsiteSlugs . ')$)[A-Za-z0-9\-]+$')
     ->name('website.show-by-name');
+
+
+Route::post('/admin/login', function (Request $request) {
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
+    ]);
+
+    if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        return back()
+            ->withErrors(['email' => 'These credentials do not match our records.'])
+            ->onlyInput('email');
+    }
+
+    $request->session()->regenerate();
+
+    $user = Auth::user();
+
+    $website = \App\Models\Website::query()
+        ->where('user_id', $user->id)
+        ->where('is_active', true)
+        ->where('is_published', true)
+        ->latest('updated_at')
+        ->first();
+
+    if (! $website) {
+        return redirect('/admin');
+    }
+
+    if (! blank($website->domain)) {
+        $domain = preg_replace('#^https?://#i', '', trim($website->domain));
+        return redirect()->away('https://' . rtrim($domain, '/'));
+    }
+
+    if (! blank($website->slug)) {
+        return redirect('/' . ltrim($website->slug, '/'));
+    }
+
+    return redirect('/admin');
+})->middleware('web')->name('plyrcard.drawer-login');
