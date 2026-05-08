@@ -65,16 +65,42 @@
     $plyrActivePage = $activePage ?? null;
     $plyrCurrentPath = trim(request()->path(), '/');
     $plyrCurrentHost = request()->getHost();
+    $plyrCurrentHostNormalized = strtolower(preg_replace('/:\d+$/', '', $plyrCurrentHost));
     $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
     $plyrOnAdmin = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
 
-    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true);
+    $plyrViewedWebsite = null;
+
+    /*
+     * Player website detection must work even on a custom domain and even when the visitor
+     * is logged out. On a custom player domain the path can be just '/', so path-only checks
+     * are not enough. We look for an active/published Website whose domain matches the host.
+     */
+    if (class_exists(Website::class) && ! in_array($plyrCurrentHostNormalized, ['127.0.0.1', 'localhost'], true)) {
+        $plyrViewedWebsite = Website::query()
+            ->where('is_active', true)
+            ->where('is_published', true)
+            ->whereNotNull('domain')
+            ->get()
+            ->first(function (Website $website) use ($plyrCurrentHostNormalized) {
+                $domain = strtolower(trim((string) $website->domain));
+                $domain = preg_replace('#^https?://#i', '', $domain);
+                $domain = preg_replace('/:\d+$/', '', $domain);
+                $domain = rtrim($domain, '/');
+
+                return $domain === $plyrCurrentHostNormalized;
+            });
+    }
+
+    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true)
+        || (bool) $plyrViewedWebsite;
+
     if (! $plyrOnPlayerWebsite && $plyrWebsite) {
         $slug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
         $domain = $plyrWebsite->domain ? rtrim(preg_replace('#^https?://#i', '', trim($plyrWebsite->domain)), '/') : null;
 
         $plyrOnPlayerWebsite = ($slug && $plyrCurrentPath === $slug)
-            || ($domain && strtolower($plyrCurrentHost) === strtolower($domain));
+            || ($domain && strtolower($plyrCurrentHostNormalized) === strtolower(preg_replace('/:\d+$/', '', $domain)));
     }
     if (! $plyrOnPlayerWebsite && ! $plyrOnAdmin && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
         $plyrOnPlayerWebsite = true;
