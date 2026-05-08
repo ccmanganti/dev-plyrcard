@@ -81,6 +81,7 @@
     }
 
     $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
+    $plyrHideHeaderNavigation = $plyrOnPlayerWebsite;
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
     $plyrWebsiteActionLabel = $plyrOnPlayerWebsite ? 'Edit my Website' : 'View my Website';
     $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? '#' : ($plyrWebsiteUrl ?: '#');
@@ -127,6 +128,13 @@
 
     #site-header.plyrcard-site-header.is-pullup-only,
     #mobile-nav.plyrcard-mobile-nav.is-pullup-only {
+      display: none !important;
+    }
+
+    /* Hide only the normal header/nav on player website pages like /player-name.
+       The pull-up Locker Room drawer/tab remains unchanged. */
+    #site-header.plyrcard-site-header.is-player-website-header-hidden,
+    #mobile-nav.plyrcard-mobile-nav.is-player-website-header-hidden {
       display: none !important;
     }
 
@@ -676,7 +684,7 @@
     }
 </style>
 
-<header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }}">
+<header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
     <img src="{{ asset('images/plyr-logo.png') }}" alt="PLYRCARD Logo">
   </a>
@@ -700,7 +708,7 @@
   </button>
 </header>
 
-<nav id="mobile-nav" class="plyrcard-mobile-nav {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }}" aria-label="Mobile navigation">
+<nav id="mobile-nav" class="plyrcard-mobile-nav {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}" aria-label="Mobile navigation">
   <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
   <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
   <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
