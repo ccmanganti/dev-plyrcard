@@ -10,6 +10,8 @@
       || (! $plyrIsAdminPage && ! $plyrIsMarketingPage && ! request()->is('api/*'));
 
   $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrIsAdminPage || $plyrIsPlayerWebsitePage);
+  $plyrPlayerSiteClass = $plyrIsPlayerWebsitePage ? ' is-player-website-page' : '';
+  $plyrAdminSiteClass = $plyrIsAdminPage ? ' is-admin-page' : '';
 @endphp
 
 <style>
@@ -826,6 +828,15 @@
         font-size: 13px !important;
       }
     }
+
+
+    /* Only hide the normal header navigation on player website pages (/player-name). */
+    #site-header.plyrcard-site-header.is-player-website-page,
+    #mobile-nav.plyrcard-mobile-nav.is-player-website-page {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
 </style>
 
 @php
@@ -834,7 +845,7 @@
   $plyrFirstName = $plyrLoggedIn ? explode(' ', trim($plyrUser->name ?? 'Clark'))[0] : null;
 @endphp
 
-<header id="site-header" class="plyrcard-site-header over-hero">
+<header id="site-header" class="plyrcard-site-header over-hero{{ $plyrPlayerSiteClass ?? '' }}">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
     <img src="../images/plyr-logo.png" alt="PLYRCARD Logo">
   </a>
@@ -859,7 +870,7 @@
   </button>
 </header>
 
-<nav id="mobile-nav" class="plyrcard-mobile-nav" aria-label="Mobile navigation">
+<nav id="mobile-nav" class="plyrcard-mobile-nav{{ $plyrPlayerSiteClass ?? '' }}" aria-label="Mobile navigation">
   <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
   <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
   <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
