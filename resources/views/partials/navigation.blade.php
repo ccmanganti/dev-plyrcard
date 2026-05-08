@@ -39,6 +39,24 @@
         ? $plyrUser->hasRole('My Journey')
         : false;
 
+    $plyrActivePage = $activePage ?? null;
+    $plyrCurrentPath = trim(request()->path(), '/');
+    $plyrCurrentHost = request()->getHost();
+    $plyrCurrentHostNormalized = strtolower(preg_replace('/:\d+$/', '', $plyrCurrentHost));
+    $plyrRequestUrl = rtrim(request()->url(), '/');
+
+    $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
+    $plyrMainHosts = array_filter(array_map('strtolower', [
+        'plyrcard.com',
+        'www.plyrcard.com',
+        parse_url(config('app.url'), PHP_URL_HOST),
+        '127.0.0.1',
+        'localhost',
+    ]));
+
+    $plyrOnAdmin = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
+    $plyrOnMainPlyrSite = in_array($plyrCurrentHostNormalized, $plyrMainHosts, true);
+
     $plyrWebsite = null;
     $plyrWebsiteUrl = null;
 
@@ -62,52 +80,76 @@
         }
     }
 
-    $plyrActivePage = $activePage ?? null;
-    $plyrCurrentPath = trim(request()->path(), '/');
-    $plyrCurrentHost = request()->getHost();
-    $plyrCurrentHostNormalized = strtolower(preg_replace('/:\d+$/', '', $plyrCurrentHost));
-    $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
-    $plyrOnAdmin = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
-
     $plyrViewedWebsite = null;
 
-    /*
-     * Player website detection must work even on a custom domain and even when the visitor
-     * is logged out. On a custom player domain the path can be just '/', so path-only checks
-     * are not enough. We look for an active/published Website whose domain matches the host.
-     */
-    if (class_exists(Website::class) && ! in_array($plyrCurrentHostNormalized, ['127.0.0.1', 'localhost'], true)) {
-        $plyrViewedWebsite = Website::query()
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->whereNotNull('domain')
-            ->get()
-            ->first(function (Website $website) use ($plyrCurrentHostNormalized) {
-                $domain = strtolower(trim((string) $website->domain));
-                $domain = preg_replace('#^https?://#i', '', $domain);
-                $domain = preg_replace('/:\d+$/', '', $domain);
-                $domain = rtrim($domain, '/');
+    if (class_exists(Website::class)) {
+        // Custom-domain player site detection. This covers domains such as ernestomarin.com.
+        if (! $plyrOnMainPlyrSite) {
+            $plyrViewedWebsite = Website::query()
+                ->where('is_active', true)
+                ->where('is_published', true)
+                ->whereNotNull('domain')
+                ->get()
+                ->first(function (Website $website) use ($plyrCurrentHostNormalized) {
+                    $domain = strtolower(trim((string) $website->domain));
+                    $domain = preg_replace('#^https?://#i', '', $domain);
+                    $domain = preg_replace('/:\d+$/', '', $domain);
+                    $domain = rtrim($domain, '/');
 
-                return $domain === $plyrCurrentHostNormalized;
-            });
+                    return $domain === $plyrCurrentHostNormalized || 'www.' . $domain === $plyrCurrentHostNormalized;
+                });
+        }
+
+        // Path-based player site detection for main-domain URLs like /player-name.
+        if (! $plyrViewedWebsite && ! $plyrOnAdmin && $plyrCurrentPath !== '' && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
+            $pathSlug = strtolower($plyrCurrentPath);
+            $plyrViewedWebsite = Website::query()
+                ->where('is_active', true)
+                ->where('is_published', true)
+                ->where(function ($query) use ($pathSlug) {
+                    $query->whereRaw('LOWER(slug) = ?', [$pathSlug]);
+                })
+                ->first();
+
+            if (! $plyrViewedWebsite) {
+                $plyrViewedWebsite = Website::query()
+                    ->where('is_active', true)
+                    ->where('is_published', true)
+                    ->get()
+                    ->first(function (Website $website) use ($pathSlug) {
+                        return Str::slug($website->name) === $pathSlug;
+                    });
+            }
+        }
     }
 
-    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true)
-        || (bool) $plyrViewedWebsite;
+    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true) || (bool) $plyrViewedWebsite;
+    $plyrOwnsViewedWebsite = $plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id);
 
-    if (! $plyrOnPlayerWebsite && $plyrWebsite) {
-        $slug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
-        $domain = $plyrWebsite->domain ? rtrim(preg_replace('#^https?://#i', '', trim($plyrWebsite->domain)), '/') : null;
+    // When included from the player's own template with activePage only, fall back to the user's published website.
+    if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrWebsite) {
+        $ownSlug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
+        $ownDomain = $plyrWebsite->domain ? strtolower(rtrim(preg_replace('#^https?://#i', '', trim($plyrWebsite->domain)), '/')) : null;
 
-        $plyrOnPlayerWebsite = ($slug && $plyrCurrentPath === $slug)
-            || ($domain && strtolower($plyrCurrentHostNormalized) === strtolower(preg_replace('/:\d+$/', '', $domain)));
-    }
-    if (! $plyrOnPlayerWebsite && ! $plyrOnAdmin && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
-        $plyrOnPlayerWebsite = true;
+        $plyrOwnsViewedWebsite = ($ownSlug && $ownSlug === $plyrCurrentPath)
+            || ($ownDomain && strtolower($ownDomain) === $plyrCurrentHostNormalized);
     }
 
     $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
     $plyrHideHeaderNavigation = $plyrOnPlayerWebsite;
+
+    /*
+     * Visibility rules:
+     * - Main PLYRCard site: logged out shows GET STARTED, logged in shows Locker Room.
+     * - Player's own website: logged in owner shows Locker Room only.
+     * - Other player websites: show nothing.
+     */
+    if ($plyrOnPlayerWebsite) {
+        $plyrShouldRenderPullup = $plyrLoggedIn && $plyrOwnsViewedWebsite;
+    } else {
+        $plyrShouldRenderPullup = true;
+    }
+
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
     $plyrWebsiteActionLabel = $plyrOnPlayerWebsite ? 'Edit my Website' : 'View my Website';
     $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? '#' : ($plyrWebsiteUrl ?: '#');
@@ -746,6 +788,7 @@
   @endguest
 </nav>
 
+@if($plyrShouldRenderPullup)
 <div id="plyrcard-action-drawer" class="plyrcard-action-drawer" data-state="closed">
   <div class="plyrcard-drawer-scrim" data-plyrcard-close-drawer></div>
 
@@ -1068,3 +1111,4 @@
     });
   })();
 </script>
+@endif
