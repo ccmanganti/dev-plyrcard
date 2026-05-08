@@ -1,3 +1,17 @@
+@php
+  $plyrCurrentPath = request()->path();
+  $plyrActivePage = $activePage ?? null;
+
+  $plyrIsAdminPage = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
+  $plyrKnownMarketingPages = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration'];
+  $plyrIsMarketingPage = in_array($plyrCurrentPath, $plyrKnownMarketingPages, true) || $plyrActivePage === 'home';
+  $plyrIsPlayerWebsitePage = $plyrActivePage === 'player-website'
+      || (isset($website) && $website instanceof \App\Models\Website)
+      || (! $plyrIsAdminPage && ! $plyrIsMarketingPage && ! request()->is('api/*'));
+
+  $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrIsAdminPage || $plyrIsPlayerWebsitePage);
+@endphp
+
 <style>
     /* PLYRCARD shared navigation - single source of truth */
     :root {
@@ -211,104 +225,6 @@
       padding: 15px 18px !important;
     }
 
-
-    /* Desktop uses a header dropdown, not the mobile sticky footer drawer */
-    .plyrcard-desktop-action-menu {
-      position: relative !important;
-      display: inline-flex !important;
-      align-items: center !important;
-    }
-
-    .plyrcard-desktop-action-toggle {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 10px !important;
-      min-height: 58px !important;
-      padding: 18px 28px !important;
-      border-radius: var(--radius-btn, 9999px) !important;
-      background: var(--accent, #ff5c35) !important;
-      color: var(--white, #fff) !important;
-      border: 0 !important;
-      box-shadow: 0 14px 34px rgba(255,92,53,0.28) !important;
-      font: inherit !important;
-      line-height: 1 !important;
-      letter-spacing: inherit !important;
-      text-transform: inherit !important;
-      cursor: pointer !important;
-      white-space: nowrap !important;
-    }
-
-    .plyrcard-desktop-action-toggle svg {
-      width: 20px !important;
-      height: 20px !important;
-      transition: transform 0.2s ease !important;
-    }
-
-    .plyrcard-desktop-action-menu:hover .plyrcard-desktop-action-toggle svg,
-    .plyrcard-desktop-action-menu:focus-within .plyrcard-desktop-action-toggle svg {
-      transform: rotate(180deg) !important;
-    }
-
-    .plyrcard-desktop-action-dropdown {
-      position: absolute !important;
-      top: calc(100% + 16px) !important;
-      right: 0 !important;
-      width: 360px !important;
-      padding: 14px !important;
-      border-radius: 18px !important;
-      background: rgba(13,13,13,0.96) !important;
-      border: 1px solid rgba(255,255,255,0.12) !important;
-      box-shadow: 0 18px 50px rgba(0,0,0,0.42) !important;
-      backdrop-filter: blur(18px) !important;
-      -webkit-backdrop-filter: blur(18px) !important;
-      opacity: 0 !important;
-      transform: translateY(8px) !important;
-      pointer-events: none !important;
-      transition: opacity 0.2s ease, transform 0.2s ease !important;
-    }
-
-    .plyrcard-desktop-action-menu:hover .plyrcard-desktop-action-dropdown,
-    .plyrcard-desktop-action-menu:focus-within .plyrcard-desktop-action-dropdown {
-      opacity: 1 !important;
-      transform: translateY(0) !important;
-      pointer-events: auto !important;
-    }
-
-    .plyrcard-desktop-action-dropdown a,
-    .plyrcard-desktop-action-dropdown button {
-      width: 100% !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: 12px !important;
-      padding: 14px 16px !important;
-      border-radius: 12px !important;
-      border: 0 !important;
-      background: transparent !important;
-      color: rgba(255,255,255,0.82) !important;
-      font-family: var(--font-display, sans-serif) !important;
-      font-size: 18px !important;
-      font-weight: 850 !important;
-      line-height: 1 !important;
-      letter-spacing: 0.04em !important;
-      text-transform: uppercase !important;
-      text-decoration: none !important;
-      cursor: pointer !important;
-    }
-
-    .plyrcard-desktop-action-dropdown a:hover,
-    .plyrcard-desktop-action-dropdown button:hover {
-      background: rgba(255,255,255,0.08) !important;
-      color: #fff !important;
-    }
-
-    .plyrcard-desktop-action-dropdown .is-accent {
-      margin-top: 8px !important;
-      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
-      color: #fff !important;
-    }
-
     /* PLYRCARD locker-room / get-started action menu */
     .plyrcard-action-drawer,
     .plyrcard-action-drawer * {
@@ -354,7 +270,7 @@
       background: var(--plyrcard-panel-bg) !important;
       border: 1px solid rgba(255,255,255,0.12) !important;
       box-shadow: 0 -22px 60px rgba(0,0,0,0.5) !important;
-      transform: translateY(100%) !important;
+      transform: translateY(calc(100% - 96px)) !important;
       transition: transform 0.34s var(--ease-out, cubic-bezier(.2,.8,.2,1)) !important;
       pointer-events: auto !important;
     }
@@ -566,13 +482,12 @@
     }
 
     .plyrcard-drawer-tab {
-      position: fixed !important;
+      position: absolute !important;
       right: 0 !important;
       bottom: 0 !important;
-      min-width: 0 !important;
-      width: min(390px, 58vw) !important;
-      height: 86px !important;
-      padding: 0 28px !important;
+      min-width: min(380px, 72vw) !important;
+      height: 96px !important;
+      padding: 0 35px 0 86px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -588,7 +503,7 @@
       text-transform: none !important;
       cursor: pointer !important;
       pointer-events: auto !important;
-      clip-path: none !important;
+      clip-path: polygon(70px 0, 100% 0, 100% 100%, 0% 100%) !important;
     }
 
     .plyrcard-drawer-tab-chevron {
@@ -784,21 +699,6 @@
       #mobile-nav.plyrcard-mobile-nav {
         display: none !important;
       }
-
-      .plyrcard-action-drawer,
-      .plyrcard-drawer-tab {
-        display: none !important;
-      }
-    }
-
-    @media (max-width: 959px) {
-      .plyrcard-action-drawer {
-        display: block !important;
-      }
-
-      body {
-        padding-bottom: calc(84px + var(--safe-bottom, 0px)) !important;
-      }
     }
 
     @media (max-width: 767px) {
@@ -818,7 +718,7 @@
 
       .plyrcard-drawer-panel {
         border-radius: 18px 18px 0 0 !important;
-        transform: translateY(100%) !important;
+        transform: translateY(calc(100% - 84px)) !important;
       }
 
       .plyrcard-drawer-head {
@@ -877,11 +777,11 @@
       }
 
       .plyrcard-drawer-tab {
-        width: min(390px, 58vw) !important;
+        min-width: 62vw !important;
         height: 84px !important;
-        padding: 0 22px !important;
+        padding: 0 22px 0 70px !important;
         font-size: 31px !important;
-        clip-path: none !important;
+        clip-path: polygon(54px 0, 100% 0, 100% 100%, 0% 100%) !important;
       }
 
       .plyrcard-social-row {
@@ -926,46 +826,6 @@
         font-size: 13px !important;
       }
     }
-
-
-    /* Pull-up-only pages: admin/player website should not show the standard desktop/mobile header navigation. */
-    #site-header.plyrcard-site-header.is-pullup-only,
-    #mobile-nav.plyrcard-mobile-nav.is-pullup-only {
-      display: none !important;
-    }
-
-    /* Player website desktop rule:
-       On player websites at desktop widths, hide the full drawer/navigation panel.
-       Only the fixed Locker Room tab remains visible. Mobile/tablet still opens normally. */
-    @media (min-width: 960px) {
-      .plyrcard-action-drawer.is-player-website {
-        pointer-events: none !important;
-      }
-
-      .plyrcard-action-drawer.is-player-website .plyrcard-drawer-scrim,
-      .plyrcard-action-drawer.is-player-website .plyrcard-drawer-panel {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-      }
-
-      .plyrcard-action-drawer.is-player-website .plyrcard-drawer-tab {
-        display: inline-flex !important;
-        position: fixed !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        pointer-events: auto !important;
-        z-index: 100001 !important;
-      }
-
-      .plyrcard-action-drawer.is-player-website.is-open .plyrcard-drawer-tab-chevron,
-      .plyrcard-action-drawer.is-player-website.is-open .plyrcard-drawer-tab i,
-      .plyrcard-action-drawer.is-player-website.is-open .plyrcard-drawer-tab svg {
-        transform: none !important;
-      }
-    }
-
 </style>
 
 @php
@@ -974,7 +834,7 @@
   $plyrFirstName = $plyrLoggedIn ? explode(' ', trim($plyrUser->name ?? 'Clark'))[0] : null;
 @endphp
 
-<header id="site-header" class="plyrcard-site-header over-hero{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}">
+<header id="site-header" class="plyrcard-site-header over-hero">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
     <img src="../images/plyr-logo.png" alt="PLYRCARD Logo">
   </a>
@@ -987,40 +847,10 @@
     <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
     @auth
       <a href="/dashboard">Dashboard</a>
-      <div class="plyrcard-desktop-action-menu">
-        <button type="button" class="plyrcard-desktop-action-toggle" aria-haspopup="true" aria-expanded="false">
-          Locker Room
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>
-        </button>
-        <div class="plyrcard-desktop-action-dropdown" role="menu">
-          <a href="#upgrade" role="menuitem">Upgrade</a>
-          <a href="#support" role="menuitem">Support</a>
-          <a href="#book-call" role="menuitem">Book a Call</a>
-          <a href="#refer-friend" role="menuitem">Refer a Friend</a>
-          <a href="#plyrcard-show" role="menuitem">PLYRCard Show</a>
-          <a href="#a-la-carte" role="menuitem">A La Carte</a>
-          <a href="#my-website" role="menuitem">Go to my Website</a>
-          <a href="/journey" class="is-accent" role="menuitem">My Journey</a>
-        </div>
-      </div>
       <a href="/logout">Logout</a>
     @else
-      <div class="plyrcard-desktop-action-menu">
-        <button type="button" class="plyrcard-desktop-action-toggle" aria-haspopup="true" aria-expanded="false">
-          Get Started
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>
-        </button>
-        <div class="plyrcard-desktop-action-dropdown" role="menu">
-          <a href="#email-us" role="menuitem">Email Us</a>
-          <a href="#text-us" role="menuitem">Text us</a>
-          <a href="#call-us" role="menuitem">Call us</a>
-          <a href="#chat-us" role="menuitem">Chat Us</a>
-          <a href="#share" role="menuitem">Share</a>
-          <a href="/book-demo" role="menuitem">Book a Demo</a>
-          <a href="/registration?utm_plan=free" role="menuitem">Register Now</a>
-          <a href="/admin" class="is-accent" role="menuitem">Login</a>
-        </div>
-      </div>
+      <a href="/admin">Login</a>
+      <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
     @endauth
   </nav>
 
@@ -1029,7 +859,7 @@
   </button>
 </header>
 
-<nav id="mobile-nav" class="plyrcard-mobile-nav{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}" aria-label="Mobile navigation">
+<nav id="mobile-nav" class="plyrcard-mobile-nav" aria-label="Mobile navigation">
   <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
   <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
   <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
@@ -1046,7 +876,7 @@
   @endauth
 </nav>
 
-<div id="plyrcard-action-drawer" class="plyrcard-action-drawer{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}{{ $plyrViewingPlayerWebsite ? ' is-player-website' : '' }}{{ $plyrOnAdmin ? ' is-admin-site' : '' }}" data-state="closed" data-logged-in="{{ $plyrLoggedIn ? 'true' : 'false' }}">
+<div id="plyrcard-action-drawer" class="plyrcard-action-drawer{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}" data-state="closed" data-logged-in="{{ $plyrLoggedIn ? 'true' : 'false' }}">
   <div class="plyrcard-drawer-scrim" data-plyrcard-close-drawer></div>
 
   <section class="plyrcard-drawer-panel" aria-label="{{ $plyrLoggedIn ? 'Locker Room menu' : 'Get Started menu' }}">
@@ -1221,12 +1051,11 @@
       @endauth
     </div>
 
+    <button type="button" class="plyrcard-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false">
+      <span class="plyrcard-drawer-tab-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span>{{ $plyrLoggedIn ? 'Locker Room' : 'GET STARTED' }}</span>
+    </button>
   </section>
-
-  <button type="button" class="plyrcard-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false">
-    <span class="plyrcard-drawer-tab-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-    <span>{{ ($plyrLoggedIn || $plyrViewingPlayerWebsite) ? 'Locker Room' : 'GET STARTED' }}</span>
-  </button>
 </div>
 
 <script>
@@ -1242,15 +1071,7 @@
     const backButton = drawer.querySelector('[data-plyrcard-back]');
     const tabButton = drawer.querySelector('[data-plyrcard-toggle-drawer]');
 
-    function isPlayerWebsiteDesktopOnly() {
-      return drawer.classList.contains('is-player-website') && window.matchMedia('(min-width: 960px)').matches;
-    }
-
     function setOpen(isOpen) {
-      if (isPlayerWebsiteDesktopOnly()) {
-        isOpen = false;
-      }
-
       drawer.classList.toggle('is-open', isOpen);
       drawer.dataset.state = isOpen ? 'open' : 'closed';
       if (tabButton) tabButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -1272,13 +1093,7 @@
     }
 
     toggleButtons.forEach(function (button) {
-      button.addEventListener('click', function (event) {
-        if (isPlayerWebsiteDesktopOnly()) {
-          event.preventDefault();
-          setOpen(false);
-          return;
-        }
-
+      button.addEventListener('click', function () {
         setOpen(!drawer.classList.contains('is-open'));
       });
     });
@@ -1302,12 +1117,6 @@
         showView('main');
       });
     }
-
-    window.addEventListener('resize', function () {
-      if (isPlayerWebsiteDesktopOnly()) {
-        setOpen(false);
-      }
-    });
 
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
