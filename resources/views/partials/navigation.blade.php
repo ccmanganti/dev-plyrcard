@@ -1,138 +1,10 @@
-@once
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-@endonce
-
-@php
-    use App\Models\Website;
-    use Illuminate\Support\Str;
-
-    $plyrUser = auth()->user();
-    $plyrLoggedIn = auth()->check();
-
-    $plyrFirstName = 'Player';
-    if ($plyrLoggedIn && $plyrUser) {
-        $rawFirstName = $plyrUser->first_name
-            ?? $plyrUser->firstname
-            ?? $plyrUser->given_name
-            ?? null;
-
-        $plyrFirstName = $rawFirstName
-            ? trim($rawFirstName)
-            : Str::of($plyrUser->name ?? 'Player')->trim()->explode(' ')->first();
-    }
-
-    $plyrPlanName = 'Free';
-    if ($plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'hasRole')) {
-        if ($plyrUser->hasRole('My Journey')) {
-            $plyrPlanName = 'My Journey';
-        } elseif ($plyrUser->hasRole('Plyr')) {
-            $plyrPlanName = 'Plyr';
-        } elseif ($plyrUser->hasRole('Free')) {
-            $plyrPlanName = 'Free';
-        }
-    }
-
-    $plyrHasMyJourneyRole = $plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'hasRole')
-        ? $plyrUser->hasRole('My Journey')
-        : false;
-
-    $plyrWebsite = null;
-    $plyrWebsiteUrl = null;
-
-    if ($plyrLoggedIn && $plyrUser && class_exists(Website::class)) {
-        $plyrWebsite = Website::query()
-            ->where('user_id', $plyrUser->id)
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->latest('updated_at')
-            ->first();
-
-        if ($plyrWebsite) {
-            if (! blank($plyrWebsite->domain)) {
-                $domain = preg_replace('#^https?://#i', '', trim($plyrWebsite->domain));
-                $plyrWebsiteUrl = 'https://' . rtrim($domain, '/');
-            } elseif (! blank($plyrWebsite->slug)) {
-                $plyrWebsiteUrl = url('/' . ltrim($plyrWebsite->slug, '/'));
-            } elseif (! blank($plyrWebsite->name)) {
-                $plyrWebsiteUrl = url('/' . Str::slug($plyrWebsite->name));
-            }
-        }
-    }
-
-    $plyrActivePage = $activePage ?? null;
-    $plyrCurrentPath = trim(request()->path(), '/');
-    $plyrCurrentHost = request()->getHost();
-    $plyrCurrentHostNormalized = strtolower(preg_replace('/:\d+$/', '', $plyrCurrentHost));
-    $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
-    $plyrOnAdmin = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
-
-    $plyrViewedWebsite = null;
-
-    /*
-     * Player website detection must work even on a custom domain and even when the visitor
-     * is logged out. On a custom player domain the path can be just '/', so path-only checks
-     * are not enough. We look for an active/published Website whose domain matches the host.
-     */
-    if (class_exists(Website::class) && ! in_array($plyrCurrentHostNormalized, ['127.0.0.1', 'localhost'], true)) {
-        $plyrViewedWebsite = Website::query()
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->whereNotNull('domain')
-            ->get()
-            ->first(function (Website $website) use ($plyrCurrentHostNormalized) {
-                $domain = strtolower(trim((string) $website->domain));
-                $domain = preg_replace('#^https?://#i', '', $domain);
-                $domain = preg_replace('/:\d+$/', '', $domain);
-                $domain = rtrim($domain, '/');
-
-                return $domain === $plyrCurrentHostNormalized;
-            });
-    }
-
-    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true)
-        || (bool) $plyrViewedWebsite;
-
-    if (! $plyrOnPlayerWebsite && $plyrWebsite) {
-        $slug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
-        $domain = $plyrWebsite->domain ? rtrim(preg_replace('#^https?://#i', '', trim($plyrWebsite->domain)), '/') : null;
-
-        $plyrOnPlayerWebsite = ($slug && $plyrCurrentPath === $slug)
-            || ($domain && strtolower($plyrCurrentHostNormalized) === strtolower(preg_replace('/:\d+$/', '', $domain)));
-    }
-    if (! $plyrOnPlayerWebsite && ! $plyrOnAdmin && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
-        $plyrOnPlayerWebsite = true;
-    }
-
-    $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
-    $plyrHideHeaderNavigation = $plyrOnPlayerWebsite;
-    $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
-    $plyrWebsiteActionLabel = $plyrOnPlayerWebsite ? 'Edit my Website' : 'View my Website';
-    $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? '#' : ($plyrWebsiteUrl ?: '#');
-    $plyrWebsiteActionTarget = (! $plyrOnPlayerWebsite && $plyrWebsiteUrl) ? '_blank' : null;
-    $plyrWebsiteActionDisabled = (! $plyrOnPlayerWebsite && ! $plyrWebsiteUrl);
-
-    $plyrSupportEmail = 'support@plyrcard.com';
-    $plyrPhoneDisplay = '+1 571-888-0852';
-    $plyrPhoneHref = '+15718880852';
-    $plyrMainShareUrl = 'https://plyrcard.com';
-    $plyrWebsiteShareUrl = $plyrWebsiteUrl ?: url('/');
-    $plyrLogoutAction = url('/admin/logout');
-
-    $plyrFacebookUrl = $plyrUser->facebook_url ?? $plyrUser->facebook ?? 'https://www.facebook.com/plyrcard';
-    $plyrInstagramUrl = $plyrUser->instagram_url ?? $plyrUser->instagram ?? 'https://www.instagram.com/plyrcard/';
-    $plyrXUrl = $plyrUser->x_url ?? $plyrUser->twitter_url ?? $plyrUser->twitter ?? 'https://x.com/plyrcard';
-    $plyrYouTubeUrl = $plyrUser->youtube_url ?? $plyrUser->youtube ?? 'https://www.youtube.com/@plyrcard';
-@endphp
-
 <style>
-    /* Existing header/navigation styles kept separate so desktop does not get touched by the drawer. */
+    /* PLYRCARD shared navigation - single source of truth */
     :root {
       --plyrcard-nav-height: calc(var(--header-h, 76px) + var(--safe-top, 0px));
-      --plyr-accent: #FF5C35;
-      --plyr-font: 'Antonio', 'Arial Narrow', Impact, sans-serif;
+      --plyrcard-accent: var(--accent, #ff2d35);
+      --plyrcard-panel-bg: rgba(8,10,12,0.94);
+      --plyrcard-panel-line: rgba(255,255,255,0.18);
     }
 
     #site-header.plyrcard-site-header {
@@ -150,18 +22,6 @@
       background: transparent !important;
       border-bottom: 1px solid transparent !important;
       transition: background 0.3s var(--ease-out, ease), border-color 0.3s var(--ease-out, ease), backdrop-filter 0.3s var(--ease-out, ease) !important;
-    }
-
-    #site-header.plyrcard-site-header.is-pullup-only,
-    #mobile-nav.plyrcard-mobile-nav.is-pullup-only {
-      display: none !important;
-    }
-
-    /* Hide only the normal header/nav on player website pages like /player-name.
-       The pull-up Locker Room drawer/tab remains unchanged. */
-    #site-header.plyrcard-site-header.is-player-website-header-hidden,
-    #mobile-nav.plyrcard-mobile-nav.is-player-website-header-hidden {
-      display: none !important;
     }
 
     #site-header.plyrcard-site-header.scrolled {
@@ -186,13 +46,28 @@
       display: block !important;
     }
 
+    #site-header.plyrcard-site-header .logo-text {
+      display: none !important;
+      font-family: var(--font-display, sans-serif) !important;
+      font-size: 30px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.03em !important;
+      line-height: 1 !important;
+      color: var(--white, #fff) !important;
+      text-transform: uppercase !important;
+    }
+
+    #site-header.plyrcard-site-header .logo-text span {
+      color: var(--accent, #ff5c35) !important;
+    }
+
     #site-header.plyrcard-site-header .desktop-nav {
       margin-left: auto !important;
       display: none !important;
       align-items: center !important;
       justify-content: flex-end !important;
       gap: clamp(30px, 3vw, 48px) !important;
-      font-family: var(--font-display, var(--plyr-font)) !important;
+      font-family: var(--font-display, sans-serif) !important;
       font-size: clamp(22px, 1.45vw, 30px) !important;
       line-height: 1 !important;
       font-weight: 800 !important;
@@ -219,7 +94,9 @@
     }
 
     #site-header.plyrcard-site-header .desktop-nav a:hover,
-    #site-header.plyrcard-site-header .desktop-nav a.active { color: var(--white, #fff) !important; }
+    #site-header.plyrcard-site-header .desktop-nav a.active {
+      color: var(--white, #fff) !important;
+    }
 
     #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta {
       display: inline-flex !important;
@@ -231,6 +108,13 @@
       background: var(--accent, #ff5c35) !important;
       color: var(--white, #fff) !important;
       box-shadow: 0 14px 34px rgba(255,92,53,0.28) !important;
+    }
+
+    #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta:hover,
+    #site-header.plyrcard-site-header .desktop-nav .desktop-nav-cta.active {
+      color: var(--white, #fff) !important;
+      background: var(--accent, #ff5c35) !important;
+      transform: translateY(-1px) !important;
     }
 
     #site-header.plyrcard-site-header .menu-btn {
@@ -245,6 +129,8 @@
       padding: 10px 6px !important;
       background: transparent !important;
       border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
       cursor: pointer !important;
     }
 
@@ -254,18 +140,30 @@
       height: 2px !important;
       background: var(--white, #fff) !important;
       border-radius: 2px !important;
+      transition: transform 0.3s ease, opacity 0.3s ease !important;
     }
+
+    #site-header.plyrcard-site-header .menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg) !important; }
+    #site-header.plyrcard-site-header .menu-btn.open span:nth-child(2) { opacity: 0 !important; }
+    #site-header.plyrcard-site-header .menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg) !important; }
 
     #mobile-nav.plyrcard-mobile-nav {
       position: fixed !important;
       top: var(--plyrcard-nav-height) !important;
       left: 0 !important;
       right: 0 !important;
+      bottom: auto !important;
       z-index: 9990 !important;
       background: rgba(13,13,13,0.98) !important;
+      border-top: 1px solid rgba(255,255,255,0.08) !important;
+      border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+      backdrop-filter: blur(18px) !important;
+      -webkit-backdrop-filter: blur(18px) !important;
       padding: 22px 24px calc(24px + var(--safe-bottom, 0px)) !important;
       display: flex !important;
       flex-direction: column !important;
+      align-items: stretch !important;
+      justify-content: flex-start !important;
       gap: 16px !important;
       opacity: 0 !important;
       transform: translateY(-120%) !important;
@@ -281,7 +179,7 @@
 
     #mobile-nav.plyrcard-mobile-nav a,
     #mobile-nav.plyrcard-mobile-nav button {
-      font-family: var(--font-display, var(--plyr-font)) !important;
+      font-family: var(--font-display, sans-serif) !important;
       font-size: 18px !important;
       font-weight: 800 !important;
       line-height: 1 !important;
@@ -293,6 +191,13 @@
       background: transparent !important;
       border: 0 !important;
       text-align: left !important;
+      cursor: pointer !important;
+    }
+
+    #mobile-nav.plyrcard-mobile-nav a:hover,
+    #mobile-nav.plyrcard-mobile-nav a.active,
+    #mobile-nav.plyrcard-mobile-nav button:hover {
+      color: var(--white, #fff) !important;
     }
 
     #mobile-nav.plyrcard-mobile-nav .nav-cta-pill {
@@ -306,10 +211,481 @@
       padding: 15px 18px !important;
     }
 
+    /* PLYRCARD locker-room / get-started action menu */
+    .plyrcard-action-drawer,
+    .plyrcard-action-drawer * {
+      box-sizing: border-box !important;
+    }
+
+    .plyrcard-action-drawer {
+      position: fixed !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      z-index: 9980 !important;
+      pointer-events: none !important;
+      font-family: var(--font-display, 'Arial Narrow', Impact, sans-serif) !important;
+    }
+
+    .plyrcard-action-drawer.is-open {
+      pointer-events: auto !important;
+    }
+
+    .plyrcard-drawer-scrim {
+      position: fixed !important;
+      inset: 0 !important;
+      background: rgba(0,0,0,0.36) !important;
+      backdrop-filter: blur(4px) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 0.25s ease !important;
+    }
+
+    .plyrcard-action-drawer.is-open .plyrcard-drawer-scrim {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+
+    .plyrcard-drawer-panel {
+      width: min(100%, 980px) !important;
+      margin: 0 auto !important;
+      max-height: min(78vh, 760px) !important;
+      overflow: hidden !important;
+      border-radius: 24px 24px 0 0 !important;
+      background: var(--plyrcard-panel-bg) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      box-shadow: 0 -22px 60px rgba(0,0,0,0.5) !important;
+      transform: translateY(calc(100% - 96px)) !important;
+      transition: transform 0.34s var(--ease-out, cubic-bezier(.2,.8,.2,1)) !important;
+      pointer-events: auto !important;
+    }
+
+    .plyrcard-action-drawer.is-open .plyrcard-drawer-panel {
+      transform: translateY(0) !important;
+    }
+
+    .plyrcard-drawer-handle {
+      position: absolute !important;
+      top: 14px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      width: 86px !important;
+      height: 8px !important;
+      border-radius: 999px !important;
+      background: rgba(0,0,0,0.2) !important;
+      z-index: 2 !important;
+    }
+
+    .plyrcard-drawer-head {
+      min-height: 96px !important;
+      padding: 28px 50px 18px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 18px !important;
+      background: #fff !important;
+      color: #090909 !important;
+      border-radius: 24px 24px 0 0 !important;
+    }
+
+    .plyrcard-drawer-title-row {
+      display: flex !important;
+      align-items: center !important;
+      gap: 14px !important;
+      min-width: 0 !important;
+    }
+
+    .plyrcard-drawer-title {
+      margin: 0 !important;
+      color: #050505 !important;
+      font-size: clamp(29px, 4.6vw, 42px) !important;
+      line-height: 1 !important;
+      font-weight: 900 !important;
+      letter-spacing: 0.01em !important;
+      text-transform: none !important;
+      white-space: nowrap !important;
+    }
+
+    .plyrcard-journey-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 36px !important;
+      padding: 9px 15px !important;
+      border-radius: 9px !important;
+      background: linear-gradient(135deg, #ff2731, #ff404a) !important;
+      color: #fff !important;
+      font-size: 18px !important;
+      line-height: 1 !important;
+      font-weight: 800 !important;
+      text-decoration: none !important;
+    }
+
+    .plyrcard-drawer-icon-btn,
+    .plyrcard-drawer-back {
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      color: #050505 !important;
+      cursor: pointer !important;
+      font: inherit !important;
+      text-decoration: none !important;
+    }
+
+    .plyrcard-drawer-back {
+      gap: 10px !important;
+      min-width: auto !important;
+      font-size: 25px !important;
+      font-weight: 800 !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-drawer-close svg,
+    .plyrcard-drawer-back svg,
+    .plyrcard-drawer-tab-chevron svg {
+      width: 34px !important;
+      height: 34px !important;
+      stroke-width: 3 !important;
+    }
+
+    .plyrcard-drawer-body {
+      padding: 28px 50px calc(110px + var(--safe-bottom, 0px)) !important;
+      color: #fff !important;
+      overflow-y: auto !important;
+      max-height: calc(min(78vh, 760px) - 96px) !important;
+    }
+
+    .plyrcard-drawer-view {
+      display: none !important;
+    }
+
+    .plyrcard-drawer-view.is-active {
+      display: block !important;
+    }
+
+    .plyrcard-drawer-grid {
+      display: grid !important;
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 18px 26px !important;
+    }
+
+    .plyrcard-drawer-card {
+      min-height: 156px !important;
+      padding: 19px 14px 16px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 13px !important;
+      border-radius: 14px !important;
+      background: #fff !important;
+      color: #050505 !important;
+      border: 1px solid rgba(0,0,0,0.08) !important;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.6) !important;
+      text-decoration: none !important;
+      text-align: center !important;
+      cursor: pointer !important;
+      font: inherit !important;
+      transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    }
+
+    .plyrcard-drawer-card:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6) !important;
+    }
+
+    .plyrcard-drawer-card.is-accent {
+      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
+      color: #fff !important;
+    }
+
+    .plyrcard-drawer-card svg {
+      width: 56px !important;
+      height: 56px !important;
+      stroke: currentColor !important;
+      stroke-width: 1.8 !important;
+      fill: none !important;
+    }
+
+    .plyrcard-drawer-card span {
+      display: block !important;
+      font-size: clamp(21px, 3vw, 29px) !important;
+      font-weight: 850 !important;
+      line-height: 1.05 !important;
+      color: currentColor !important;
+    }
+
+    .plyrcard-drawer-section-divider {
+      margin: 30px 0 24px !important;
+      height: 1px !important;
+      background: var(--plyrcard-panel-line) !important;
+    }
+
+    .plyrcard-social-row {
+      display: flex !important;
+      align-items: center !important;
+      flex-wrap: wrap !important;
+      gap: clamp(22px, 5vw, 46px) !important;
+      color: #fff !important;
+    }
+
+    .plyrcard-social-label {
+      font-size: clamp(25px, 4vw, 36px) !important;
+      font-weight: 850 !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-social-row a {
+      color: #fff !important;
+      text-decoration: none !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .plyrcard-social-row svg {
+      width: 34px !important;
+      height: 34px !important;
+      stroke: currentColor !important;
+      fill: none !important;
+      stroke-width: 2 !important;
+    }
+
+    .plyrcard-social-row .youtube-wordmark {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      font-size: clamp(22px, 3.4vw, 32px) !important;
+      font-weight: 900 !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-drawer-tab {
+      position: absolute !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      min-width: min(380px, 72vw) !important;
+      height: 96px !important;
+      padding: 0 35px 0 86px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 16px !important;
+      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
+      color: #fff !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      font-family: var(--font-display, 'Arial Narrow', Impact, sans-serif) !important;
+      font-size: clamp(32px, 5.3vw, 47px) !important;
+      font-weight: 900 !important;
+      line-height: 1 !important;
+      text-transform: none !important;
+      cursor: pointer !important;
+      pointer-events: auto !important;
+      clip-path: polygon(70px 0, 100% 0, 100% 100%, 0% 100%) !important;
+    }
+
+    .plyrcard-drawer-tab-chevron {
+      display: inline-flex !important;
+      transform: rotate(0deg) !important;
+      transition: transform 0.28s ease !important;
+    }
+
+    .plyrcard-action-drawer.is-open .plyrcard-drawer-tab-chevron {
+      transform: rotate(180deg) !important;
+    }
+
+    .plyrcard-form-stack {
+      display: grid !important;
+      gap: 14px !important;
+    }
+
+    .plyrcard-input-wrap {
+      position: relative !important;
+    }
+
+    .plyrcard-input-wrap svg {
+      position: absolute !important;
+      left: 28px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      width: 32px !important;
+      height: 32px !important;
+      color: #111 !important;
+      stroke: currentColor !important;
+      fill: none !important;
+      stroke-width: 1.8 !important;
+    }
+
+    .plyrcard-input-wrap.textarea svg {
+      top: 28px !important;
+      transform: none !important;
+    }
+
+    .plyrcard-drawer-input,
+    .plyrcard-drawer-select,
+    .plyrcard-drawer-textarea {
+      width: 100% !important;
+      min-height: 74px !important;
+      border-radius: 12px !important;
+      border: 0 !important;
+      background: #fff !important;
+      color: #111 !important;
+      padding: 18px 24px 18px 92px !important;
+      font-family: var(--font-display, sans-serif) !important;
+      font-size: clamp(19px, 3vw, 28px) !important;
+      font-weight: 700 !important;
+      outline: none !important;
+    }
+
+    .plyrcard-drawer-textarea {
+      min-height: 130px !important;
+      resize: vertical !important;
+      padding-top: 22px !important;
+    }
+
+    .plyrcard-drawer-input::placeholder,
+    .plyrcard-drawer-textarea::placeholder,
+    .plyrcard-drawer-select {
+      color: rgba(0,0,0,0.42) !important;
+    }
+
+    .plyrcard-submit-btn {
+      min-height: 78px !important;
+      width: min(100%, 560px) !important;
+      margin: 18px auto 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 16px !important;
+      border: 0 !important;
+      border-radius: 12px !important;
+      background: linear-gradient(135deg, #ff2731, #ff424b) !important;
+      color: #fff !important;
+      font-family: var(--font-display, sans-serif) !important;
+      font-size: clamp(27px, 4vw, 38px) !important;
+      font-weight: 900 !important;
+      cursor: pointer !important;
+      text-decoration: none !important;
+    }
+
+    .plyrcard-submit-btn svg {
+      width: 36px !important;
+      height: 36px !important;
+      stroke: currentColor !important;
+      fill: none !important;
+      stroke-width: 2 !important;
+    }
+
+    .plyrcard-offer-list {
+      display: grid !important;
+      gap: 18px !important;
+    }
+
+    .plyrcard-offer-card {
+      display: grid !important;
+      grid-template-columns: 92px 1fr auto !important;
+      align-items: center !important;
+      gap: 22px !important;
+      min-height: 140px !important;
+      padding: 20px 36px 20px 24px !important;
+      border-radius: 14px !important;
+      background: #fff !important;
+      color: #050505 !important;
+      text-decoration: none !important;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.25) !important;
+    }
+
+    .plyrcard-offer-icon {
+      width: 70px !important;
+      height: 70px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 14px !important;
+      background: #fff !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.14) !important;
+    }
+
+    .plyrcard-offer-icon svg {
+      width: 44px !important;
+      height: 44px !important;
+      stroke: currentColor !important;
+      fill: none !important;
+      stroke-width: 1.8 !important;
+    }
+
+    .plyrcard-offer-title {
+      margin: 0 0 6px !important;
+      font-size: clamp(25px, 3.6vw, 35px) !important;
+      line-height: 1 !important;
+      font-weight: 900 !important;
+      color: #050505 !important;
+    }
+
+    .plyrcard-offer-copy {
+      margin: 0 !important;
+      color: #303746 !important;
+      font-family: var(--font-body, sans-serif) !important;
+      font-size: clamp(16px, 2.7vw, 23px) !important;
+      line-height: 1.25 !important;
+      font-weight: 500 !important;
+    }
+
+    .plyrcard-offer-price {
+      text-align: right !important;
+      color: #168bff !important;
+      font-size: clamp(31px, 4.5vw, 45px) !important;
+      font-weight: 950 !important;
+      line-height: .9 !important;
+      white-space: nowrap !important;
+    }
+
+    .plyrcard-offer-price small {
+      display: block !important;
+      margin-top: 8px !important;
+      color: #4d5565 !important;
+      font-size: clamp(14px, 2vw, 21px) !important;
+      line-height: 1 !important;
+      letter-spacing: 0.06em !important;
+      text-transform: uppercase !important;
+    }
+
+    .plyrcard-placeholder-panel {
+      padding: 28px !important;
+      border-radius: 16px !important;
+      border: 1px dashed rgba(255,255,255,0.35) !important;
+      color: rgba(255,255,255,0.8) !important;
+      font-family: var(--font-body, sans-serif) !important;
+      font-size: 18px !important;
+      line-height: 1.45 !important;
+    }
+
     @media (min-width: 960px) {
-      #site-header.plyrcard-site-header .desktop-nav { display: flex !important; }
-      #site-header.plyrcard-site-header .menu-btn { display: none !important; }
-      #mobile-nav.plyrcard-mobile-nav { display: none !important; }
+      .plyrcard-action-drawer { display: none !important; }
+      #site-header.plyrcard-site-header {
+        padding-left: 24px !important;
+        padding-right: 24px !important;
+      }
+
+      #site-header.plyrcard-site-header .desktop-nav {
+        display: flex !important;
+      }
+
+      #site-header.plyrcard-site-header .menu-btn {
+        display: none !important;
+      }
+
+      #mobile-nav.plyrcard-mobile-nav {
+        display: none !important;
+      }
     }
 
     @media (max-width: 767px) {
@@ -318,401 +694,342 @@
         padding-left: 20px !important;
         padding-right: 20px !important;
       }
-      #site-header.plyrcard-site-header .logo-wrap { height: 46px !important; }
+
+      #site-header.plyrcard-site-header .logo-wrap {
+        height: 46px !important;
+      }
+
+      #site-header.plyrcard-site-header .logo-text {
+        font-size: 27px !important;
+      }
+
+      .plyrcard-drawer-panel {
+        border-radius: 18px 18px 0 0 !important;
+        transform: translateY(calc(100% - 84px)) !important;
+      }
+
+      .plyrcard-drawer-head {
+        min-height: 84px !important;
+        padding: 24px 20px 14px !important;
+        border-radius: 18px 18px 0 0 !important;
+      }
+
+      .plyrcard-drawer-title-row {
+        gap: 9px !important;
+      }
+
+      .plyrcard-drawer-title {
+        font-size: 30px !important;
+      }
+
+      .plyrcard-journey-badge {
+        min-height: 32px !important;
+        padding: 8px 12px !important;
+        font-size: 16px !important;
+      }
+
+      .plyrcard-drawer-back {
+        font-size: 21px !important;
+        gap: 5px !important;
+      }
+
+      .plyrcard-drawer-close svg,
+      .plyrcard-drawer-back svg {
+        width: 30px !important;
+        height: 30px !important;
+      }
+
+      .plyrcard-drawer-body {
+        padding: 24px 20px calc(98px + var(--safe-bottom, 0px)) !important;
+      }
+
+      .plyrcard-drawer-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 16px !important;
+      }
+
+      .plyrcard-drawer-card {
+        min-height: 124px !important;
+        padding: 16px 10px 14px !important;
+        gap: 10px !important;
+      }
+
+      .plyrcard-drawer-card svg {
+        width: 46px !important;
+        height: 46px !important;
+      }
+
+      .plyrcard-drawer-card span {
+        font-size: 22px !important;
+      }
+
+      .plyrcard-drawer-tab {
+        min-width: 62vw !important;
+        height: 84px !important;
+        padding: 0 22px 0 70px !important;
+        font-size: 31px !important;
+        clip-path: polygon(54px 0, 100% 0, 100% 100%, 0% 100%) !important;
+      }
+
+      .plyrcard-social-row {
+        gap: 22px !important;
+      }
+
+      .plyrcard-social-label {
+        width: 100% !important;
+        font-size: 28px !important;
+      }
+
+      .plyrcard-offer-card {
+        grid-template-columns: 58px 1fr auto !important;
+        gap: 12px !important;
+        min-height: 116px !important;
+        padding: 18px 18px 18px 14px !important;
+      }
+
+      .plyrcard-offer-icon {
+        width: 52px !important;
+        height: 52px !important;
+      }
+
+      .plyrcard-offer-icon svg {
+        width: 34px !important;
+        height: 34px !important;
+      }
+
+      .plyrcard-offer-title {
+        font-size: 24px !important;
+      }
+
+      .plyrcard-offer-copy {
+        font-size: 16px !important;
+      }
+
+      .plyrcard-offer-price {
+        font-size: 30px !important;
+      }
+
+      .plyrcard-offer-price small {
+        font-size: 13px !important;
+      }
     }
 
-    /* Pull-up navigation only. */
-    .plyrcard-action-drawer,
-    .plyrcard-action-drawer * {
-      box-sizing: border-box !important;
-      font-family: var(--plyr-font) !important;
-    }
 
-    .plyrcard-action-drawer .fa-solid,
-    .plyrcard-action-drawer .fas { font-family: "Font Awesome 6 Free" !important; font-weight: 900 !important; }
-    .plyrcard-action-drawer .fa-regular,
-    .plyrcard-action-drawer .far { font-family: "Font Awesome 6 Free" !important; font-weight: 400 !important; }
-    .plyrcard-action-drawer .fa-brands,
-    .plyrcard-action-drawer .fab { font-family: "Font Awesome 6 Brands" !important; font-weight: 400 !important; }
-
-    .plyrcard-action-drawer {
-      position: fixed !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 100vw !important;
-      max-width: 100vw !important;
-      z-index: 100000 !important;
-      color: #fff !important;
-      pointer-events: none !important;
-    }
-
-    .plyrcard-action-drawer.is-open { pointer-events: auto !important; }
-
-    .plyrcard-drawer-scrim {
-      position: fixed !important;
-      inset: 0 !important;
-      background: rgba(0,0,0,.44) !important;
-      backdrop-filter: blur(3px) !important;
-      -webkit-backdrop-filter: blur(3px) !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      transition: opacity .2s ease !important;
-    }
-
-    .plyrcard-action-drawer.is-open .plyrcard-drawer-scrim { opacity: 1 !important; pointer-events: auto !important; }
-
-    .plyrcard-drawer-panel {
-      position: fixed !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 100vw !important;
-      max-width: 100vw !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      max-height: min(82dvh, 620px) !important;
-      background: #050505 !important;
-      border-radius: 17px 17px 0 0 !important;
-      overflow: hidden !important;
-      box-shadow: 0 -18px 46px rgba(0,0,0,.5) !important;
-      transform: translateY(100%) !important;
-      transition: transform .28s cubic-bezier(.2,.8,.2,1) !important;
-      pointer-events: auto !important;
-    }
-
-    .plyrcard-action-drawer.is-open .plyrcard-drawer-panel { transform: translateY(0) !important; }
-
-    .plyrcard-drawer-handle {
-      position: absolute !important;
-      top: 8px !important;
-      left: 50% !important;
-      width: 58px !important;
-      height: 5px !important;
-      border-radius: 999px !important;
-      background: rgba(0,0,0,.22) !important;
-      transform: translateX(-50%) !important;
-      z-index: 2 !important;
-    }
-
-    .plyrcard-drawer-head {
-      min-height: 56px !important;
-      padding: 16px 12px 10px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: 8px !important;
-      background: #fff !important;
-      color: #050505 !important;
-      border-radius: 17px 17px 0 0 !important;
-    }
-
-    .plyrcard-drawer-title-row,
-    .plyrcard-user-line,
-    .plyrcard-drawer-actions {
-      display: flex !important;
-      align-items: center !important;
-      gap: 7px !important;
-      min-width: 0 !important;
-    }
-
-    .plyrcard-main-title,
-    .plyrcard-section-title {
-      margin: 0 !important;
-      font-size: 16px !important;
-      line-height: 1 !important;
-      font-weight: 900 !important;
-      color: #050505 !important;
-      white-space: nowrap !important;
-    }
-
-    .plyrcard-plan-badge {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      height: 20px !important;
-      padding: 0 7px !important;
-      border-radius: 999px !important;
-      background: var(--plyr-accent) !important;
-      color: #fff !important;
-      font-size: 9px !important;
-      font-weight: 900 !important;
-      line-height: 1 !important;
-      text-transform: uppercase !important;
-      max-width: 78px !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      white-space: nowrap !important;
-    }
-
-    .plyrcard-signout-form { margin: 0 !important; display: inline-flex !important; }
-
-    .plyrcard-signout-btn,
-    .plyrcard-drawer-close,
-    .plyrcard-drawer-back {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      border: 0 !important;
-      cursor: pointer !important;
-      text-decoration: none !important;
-      line-height: 1 !important;
-    }
-
-    .plyrcard-signout-btn {
-      gap: 5px !important;
-      height: 26px !important;
-      padding: 0 8px !important;
-      border-radius: 999px !important;
-      background: #050505 !important;
-      color: #fff !important;
-      font-size: 11px !important;
-      font-weight: 900 !important;
-    }
-
-    .plyrcard-drawer-close,
-    .plyrcard-drawer-back {
-      min-width: 28px !important;
-      height: 28px !important;
-      padding: 0 !important;
-      background: transparent !important;
-      color: #050505 !important;
-      font-size: 19px !important;
-    }
-
-    .plyrcard-drawer-back { gap: 5px !important; min-width: auto !important; font-size: 17px !important; font-weight: 900 !important; }
-
-    .plyrcard-drawer-body {
-      padding: 9px 12px 84px !important;
-      max-height: calc(min(82dvh, 620px) - 56px) !important;
-      overflow-y: auto !important;
-      background: #050505 !important;
-      color: #fff !important;
-    }
-
-    .plyrcard-drawer-view {
-      display: none !important;
-      opacity: 0 !important;
-      transform: translateY(10px) scale(.985) !important;
-      transform-origin: top center !important;
-    }
-    .plyrcard-drawer-view.is-active {
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      transform: none !important;
-      filter: none !important;
-      animation: plyrcardViewIn .26s cubic-bezier(.2,.8,.2,1) both !important;
-    }
-    .plyrcard-drawer-view.is-active .plyrcard-nav-group {
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-    .plyrcard-drawer-view.is-active .plyrcard-drawer-grid {
-      display: grid !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-    .plyrcard-drawer-view.is-active .plyrcard-drawer-card {
-      display: flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-    .plyrcard-drawer-view.is-active .plyrcard-drawer-card.is-disabled,
-    .plyrcard-drawer-view.is-active .plyrcard-drawer-card[aria-disabled="true"] {
-      opacity: .46 !important;
-    }
-    .plyrcard-drawer-panel.is-switching .plyrcard-drawer-view.is-active {
-      animation: plyrcardViewIn .26s cubic-bezier(.2,.8,.2,1) both !important;
-    }
-    @keyframes plyrcardViewIn {
-      from { opacity: 0; transform: translateY(12px) scale(.985); filter: blur(2px); }
-      to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-    }
-    @keyframes plyrcardCardIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .plyrcard-drawer-view.is-active .plyrcard-form-card,
-    .plyrcard-drawer-view.is-active .plyrcard-mini-panel,
-    .plyrcard-drawer-view.is-active .plyrcard-offer-card {
-      animation: plyrcardCardIn .3s cubic-bezier(.2,.8,.2,1) both !important;
-    }
-
-    .plyrcard-nav-group + .plyrcard-nav-group { margin-top: 10px !important; }
-    .plyrcard-nav-group-title {
-      display: block !important;
-      margin: 0 0 5px !important;
-      color: rgba(255,255,255,.62) !important;
-      font-size: 12px !important;
-      line-height: 1 !important;
-      font-weight: 900 !important;
-      text-transform: uppercase !important;
-      letter-spacing: .03em !important;
-    }
-
-    .plyrcard-drawer-grid {
+    /* Share pop-up and final compact mobile sizing */
+    .plyrcard-share-grid {
       display: grid !important;
       grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 8px !important;
+      gap: 14px !important;
     }
 
-    .plyrcard-drawer-card {
-      min-width: 0 !important;
-      min-height: 66px !important;
-      padding: 8px 5px 7px !important;
+    .plyrcard-share-option {
+      min-height: 104px !important;
+      padding: 14px 8px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 6px !important;
-      border: 0 !important;
-      border-radius: 7px !important;
+      gap: 9px !important;
+      border-radius: 12px !important;
       background: #fff !important;
       color: #050505 !important;
-      box-shadow: 0 4px 10px rgba(0,0,0,.24) !important;
-      text-align: center !important;
       text-decoration: none !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.24) !important;
+      border: 0 !important;
       cursor: pointer !important;
-      font: inherit !important;
     }
 
-    .plyrcard-drawer-card.is-accent { background: var(--plyr-accent) !important; color: #fff !important; }
-    .plyrcard-drawer-card.is-disabled,
-    .plyrcard-drawer-card[aria-disabled="true"] { opacity: .46 !important; pointer-events: none !important; cursor: not-allowed !important; }
-    .plyrcard-drawer-card.is-active-page { background: rgba(255,255,255,.42) !important; color: #050505 !important; }
-
-    .plyrcard-menu-icon { font-size: 17px !important; line-height: 1 !important; color: currentColor !important; }
-    .plyrcard-drawer-card span { display: block !important; color: currentColor !important; font-size: 12px !important; line-height: .98 !important; font-weight: 850 !important; }
-
-    .plyrcard-drawer-tab {
-      position: fixed !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 210px !important;
-      height: 60px !important;
-      padding: 0 16px 0 48px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 9px !important;
-      border: 0 !important;
-      border-radius: 0 !important;
-      background: var(--plyr-accent) !important;
-      color: #fff !important;
-      font-size: 21px !important;
-      font-weight: 900 !important;
+    .plyrcard-share-option i {
+      font-size: 30px !important;
       line-height: 1 !important;
-      cursor: pointer !important;
-      pointer-events: auto !important;
-      clip-path: polygon(36px 0, 100% 0, 100% 100%, 0 100%) !important;
+      color: #050505 !important;
     }
 
-    .plyrcard-drawer-tab i { font-size: 14px !important; transition: transform .25s ease !important; }
-    .plyrcard-action-drawer.is-open .plyrcard-drawer-tab i { transform: rotate(180deg) !important; }
-
-    .plyrcard-drawer-section-divider { margin: 13px 0 12px !important; height: 1px !important; background: rgba(255,255,255,.16) !important; }
-    .plyrcard-social-row { display: flex !important; align-items: center !important; gap: 22px !important; color: #fff !important; }
-    .plyrcard-social-label { font-size: 21px !important; font-weight: 850 !important; line-height: 1 !important; }
-    .plyrcard-social-row a { color: #fff !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
-    .plyrcard-social-row i { font-size: 23px !important; }
-
-    .plyrcard-form-card,
-    .plyrcard-mini-panel {
-      border-radius: 16px !important;
-      background: linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%) !important;
-      color: #111 !important;
-      padding: 16px !important;
-      box-shadow: 0 10px 26px rgba(0,0,0,.26) !important;
-      border: 1px solid rgba(255,255,255,.75) !important;
-    }
-
-    .plyrcard-form-stack { display: grid !important; gap: 11px !important; }
-    .plyrcard-input-label { display: grid !important; gap: 6px !important; color: rgba(0,0,0,.52) !important; font-size: 11px !important; font-weight: 900 !important; text-transform: uppercase !important; letter-spacing: .035em !important; }
-    .plyrcard-input-wrap { position: relative !important; display: block !important; }
-    .plyrcard-input-wrap > i { position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important; color: rgba(0,0,0,.8) !important; font-size: 13px !important; }
-    .plyrcard-input-wrap.textarea > i { top: 15px !important; transform: none !important; }
-
-    .plyrcard-drawer-input,
-    .plyrcard-drawer-textarea,
-    .plyrcard-drawer-select {
-      width: 100% !important;
-      min-height: 43px !important;
-      border-radius: 12px !important;
-      border: 1px solid rgba(0,0,0,.075) !important;
-      background: #fff !important;
-      color: #111 !important;
-      padding: 10px 12px 10px 37px !important;
-      font-size: 14px !important;
-      font-weight: 750 !important;
-      outline: none !important;
-      box-shadow: inset 0 1px 0 rgba(0,0,0,.02), 0 1px 0 rgba(255,255,255,.75) !important;
-      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease !important;
-    }
-    .plyrcard-drawer-input:focus,
-    .plyrcard-drawer-textarea:focus,
-    .plyrcard-drawer-select:focus {
-      border-color: rgba(255,92,53,.55) !important;
-      box-shadow: 0 0 0 3px rgba(255,92,53,.12) !important;
-    }
-
-    .plyrcard-drawer-textarea { min-height: 92px !important; resize: vertical !important; padding-top: 12px !important; }
-    .plyrcard-clean-row { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; }
-    .plyrcard-text-link { border: 0 !important; background: transparent !important; color: #111 !important; padding: 0 !important; font: inherit !important; text-decoration: underline !important; cursor: pointer !important; }
-    .plyrcard-subsection-lead { margin: 0 0 12px !important; color: rgba(255,255,255,.72) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
-    .plyrcard-mini-title { margin: 0 0 6px !important; color: #111 !important; font-size: 18px !important; line-height: 1 !important; font-weight: 950 !important; }
-    .plyrcard-mini-copy { margin: 0 0 13px !important; color: rgba(0,0,0,.58) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
-
-    .plyrcard-submit-btn,
-    .plyrcard-secondary-btn,
-    .plyrcard-copy-btn {
-      min-height: 42px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      border: 0 !important;
-      border-radius: 10px !important;
-      padding: 0 14px !important;
-      background: var(--plyr-accent) !important;
-      color: #fff !important;
+    .plyrcard-share-option span {
       font-size: 16px !important;
-      font-weight: 900 !important;
-      text-decoration: none !important;
-      cursor: pointer !important;
+      font-weight: 850 !important;
+      line-height: 1 !important;
+      color: #050505 !important;
     }
 
-    .plyrcard-secondary-btn { background: #111 !important; }
-    .plyrcard-copy-line { display: grid !important; grid-template-columns: 1fr auto !important; gap: 8px !important; }
-    .plyrcard-copy-line input { padding-left: 12px !important; }
-
-    .plyrcard-offer-list { display: grid !important; gap: 9px !important; }
-    .plyrcard-offer-card { display: grid !important; grid-template-columns: 52px 1fr auto !important; align-items: center !important; gap: 10px !important; min-height: 74px !important; padding: 10px 14px 10px 10px !important; border-radius: 9px !important; background: #fff !important; color: #050505 !important; text-decoration: none !important; }
-    .plyrcard-offer-icon { width: 42px !important; height: 42px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 9px !important; background: #fff !important; box-shadow: 0 3px 9px rgba(0,0,0,.14) !important; }
-    .plyrcard-offer-icon i { font-size: 20px !important; color: #050505 !important; }
-    .plyrcard-offer-title { margin: 0 0 4px !important; font-size: 18px !important; line-height: 1 !important; font-weight: 900 !important; color: #050505 !important; }
-    .plyrcard-offer-copy { margin: 0 !important; color: #303746 !important; font-size: 13px !important; line-height: 1.2 !important; font-weight: 600 !important; }
-    .plyrcard-offer-price { text-align: right !important; color: #168bff !important; font-size: 24px !important; font-weight: 950 !important; line-height: .9 !important; white-space: nowrap !important; }
-    .plyrcard-offer-price small { display: block !important; margin-top: 5px !important; color: #4d5565 !important; font-size: 10px !important; letter-spacing: .06em !important; text-transform: uppercase !important; }
-
-    .plyrcard-booking-wrap { height: calc(min(82dvh, 620px) - 70px) !important; border-radius: 12px !important; overflow: hidden !important; background: #fff !important; }
-    .plyrcard-booking-wrap iframe { display: block !important; width: 100% !important; min-height: 100% !important; border: 0 !important; }
-
-    .plyrcard-qr-wrap { display: grid !important; gap: 12px !important; place-items: center !important; text-align: center !important; }
-    .plyrcard-qr-wrap img { width: 170px !important; height: 170px !important; border-radius: 12px !important; background: #fff !important; padding: 8px !important; }
-    .plyrcard-share-options { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; width: 100% !important; }
-
-    @media (min-width: 768px) {
-      .plyrcard-drawer-panel { max-height: min(82dvh, 620px) !important; }
-      .plyrcard-drawer-body { padding-left: 12px !important; padding-right: 12px !important; }
-      .plyrcard-drawer-tab { width: 210px !important; }
+    .plyrcard-share-note {
+      margin: 14px 0 0 !important;
+      font-family: var(--font-body, sans-serif) !important;
+      color: rgba(255,255,255,0.72) !important;
+      font-size: 13px !important;
+      line-height: 1.35 !important;
     }
+
+    .plyrcard-menu-icon,
+    .plyrcard-social-row i,
+    .plyrcard-field-icon,
+    .plyrcard-offer-icon i {
+      line-height: 1 !important;
+      color: currentColor !important;
+    }
+
+    @media (max-width: 959px) {
+      .plyrcard-action-drawer { display: block !important; }
+      .plyrcard-drawer-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px 14px !important; }
+      .plyrcard-drawer-card { min-height: 90px !important; padding: 10px 6px 8px !important; gap: 6px !important; border-radius: 10px !important; }
+      .plyrcard-menu-icon { font-size: 25px !important; width: 28px !important; height: 28px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
+      .plyrcard-drawer-card span { font-size: clamp(13px, 2.2vw, 17px) !important; line-height: 1.05 !important; }
+      .plyrcard-drawer-head { min-height: 62px !important; padding: 17px 26px 10px !important; }
+      .plyrcard-drawer-title { font-size: clamp(21px, 3.1vw, 28px) !important; }
+      .plyrcard-drawer-body { padding: 16px 26px calc(76px + var(--safe-bottom, 0px)) !important; }
+      .plyrcard-drawer-tab { width: min(340px, 64vw) !important; min-width: 260px !important; height: 66px !important; padding: 0 22px 0 58px !important; font-size: clamp(23px, 3.7vw, 31px) !important; clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%) !important; }
+      .plyrcard-drawer-tab-chevron svg { width: 26px !important; height: 26px !important; }
+      .plyrcard-social-row { gap: 16px 26px !important; }
+      .plyrcard-social-label { font-size: clamp(19px, 3.2vw, 24px) !important; }
+      .plyrcard-social-row i { font-size: 22px !important; width: 22px !important; height: 22px !important; }
+      .plyrcard-form-stack { gap: 10px !important; }
+      .plyrcard-drawer-input, .plyrcard-drawer-select, .plyrcard-drawer-textarea { min-height: 54px !important; padding-left: 62px !important; font-size: clamp(14px, 2.3vw, 19px) !important; }
+      .plyrcard-field-icon { left: 20px !important; font-size: 20px !important; }
+      .plyrcard-submit-btn { min-height: 54px !important; font-size: clamp(19px, 3vw, 25px) !important; }
+      .plyrcard-offer-card { min-height: 88px !important; grid-template-columns: 54px 1fr auto !important; padding: 12px 18px 12px 12px !important; }
+      .plyrcard-offer-icon { width: 46px !important; height: 46px !important; }
+      .plyrcard-offer-icon i { font-size: 24px !important; }
+      .plyrcard-offer-title { font-size: clamp(17px, 2.8vw, 23px) !important; }
+      .plyrcard-offer-copy { font-size: clamp(11px, 1.8vw, 15px) !important; }
+      .plyrcard-offer-price { font-size: clamp(21px, 3.4vw, 29px) !important; }
+    }
+
+    @media (max-width: 520px) {
+      .plyrcard-drawer-body { padding: 14px 16px calc(70px + var(--safe-bottom, 0px)) !important; }
+      .plyrcard-drawer-grid { gap: 8px !important; }
+      .plyrcard-drawer-card { min-height: 78px !important; padding: 8px 4px 7px !important; }
+      .plyrcard-menu-icon { font-size: 21px !important; width: 24px !important; height: 24px !important; }
+      .plyrcard-drawer-card span { font-size: 11px !important; }
+      .plyrcard-drawer-tab { min-width: 240px !important; width: 68vw !important; height: 58px !important; padding-left: 50px !important; font-size: 21px !important; }
+      .plyrcard-share-grid { gap: 8px !important; }
+      .plyrcard-share-option { min-height: 76px !important; padding: 9px 4px !important; gap: 6px !important; }
+      .plyrcard-share-option i { font-size: 22px !important; }
+      .plyrcard-share-option span { font-size: 11px !important; }
+    }
+
+
+    /* On admin and player website pages, only the bottom pull-up drawer should show. */
+    .plyrcard-action-drawer.is-pullup-only {
+      display: block !important;
+    }
+
+    @media (min-width: 960px) {
+      .plyrcard-action-drawer.is-pullup-only {
+        display: block !important;
+      }
+    }
+
 </style>
 
-<header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}">
+@php
+  $plyrUser = auth()->user();
+  $plyrLoggedIn = auth()->check();
+  $plyrFirstName = $plyrLoggedIn ? explode(' ', trim($plyrUser->name ?? 'Clark'))[0] : null;
+
+  $plyrSupportEmail = 'support@plyrcard.com';
+  $plyrSupportPhoneDisplay = '(555) 555-5555';
+  $plyrSupportPhoneHref = '5555555555';
+  $plyrShareUrl = 'https://plyrcard.com';
+  $plyrFacebookUrl = 'https://www.facebook.com/plyrcard';
+  $plyrInstagramUrl = 'https://www.instagram.com/plyrcard';
+  $plyrXUrl = 'https://x.com/plyrcard';
+  $plyrYouTubeUrl = 'https://www.youtube.com/@plyrcard';
+
+  $plyrHasMyJourney = false;
+  if ($plyrLoggedIn && $plyrUser) {
+      if (method_exists($plyrUser, 'hasRole')) {
+          $plyrHasMyJourney = $plyrUser->hasRole('My Journey');
+      } elseif (method_exists($plyrUser, 'roles')) {
+          $plyrHasMyJourney = $plyrUser->roles()->where('name', 'My Journey')->exists();
+      }
+  }
+
+  $plyrCurrentWebsite = $website ?? null;
+  $plyrOnAdmin = request()->is('admin') || request()->is('admin/*');
+  $plyrCurrentPath = trim(request()->path(), '/');
+  $plyrCurrentHost = strtolower(preg_replace('/:\d+$/', '', request()->getHost()));
+  $plyrReservedPaths = ['', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
+
+  if (! ($plyrCurrentWebsite instanceof \App\Models\Website) && class_exists(\App\Models\Website::class)) {
+      if (! in_array($plyrCurrentHost, ['127.0.0.1', 'localhost'], true)) {
+          $plyrCurrentWebsite = \App\Models\Website::query()
+              ->where('is_active', true)
+              ->where('is_published', true)
+              ->whereNotNull('domain')
+              ->get()
+              ->first(function ($candidate) use ($plyrCurrentHost) {
+                  $domain = strtolower(trim((string) $candidate->domain));
+                  $domain = preg_replace('#^https?://#i', '', $domain);
+                  $domain = preg_replace('/:\d+$/', '', $domain);
+                  $domain = rtrim($domain, '/');
+
+                  return preg_replace('/^www\./', '', $domain) === preg_replace('/^www\./', '', $plyrCurrentHost);
+              });
+      }
+
+      if (! $plyrCurrentWebsite && ! $plyrOnAdmin && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
+          $normalizedPath = \Illuminate\Support\Str::slug($plyrCurrentPath);
+
+          $plyrCurrentWebsite = \App\Models\Website::query()
+              ->where('is_active', true)
+              ->where('is_published', true)
+              ->where(function ($query) use ($plyrCurrentPath, $normalizedPath) {
+                  $query->whereRaw('LOWER(slug) = ?', [strtolower($plyrCurrentPath)])
+                      ->orWhereRaw('LOWER(slug) = ?', [strtolower($normalizedPath)]);
+              })
+              ->first();
+
+          if (! $plyrCurrentWebsite) {
+              $plyrCurrentWebsite = \App\Models\Website::query()
+                  ->where('is_active', true)
+                  ->where('is_published', true)
+                  ->get()
+                  ->first(function ($candidate) use ($normalizedPath) {
+                      return \Illuminate\Support\Str::slug((string) $candidate->name) === $normalizedPath;
+                  });
+          }
+      }
+  }
+
+  $plyrViewingPlayerWebsite = $plyrCurrentWebsite instanceof \App\Models\Website;
+  $plyrOwnsCurrentWebsite = $plyrViewingPlayerWebsite && $plyrLoggedIn && $plyrUser && ((int) $plyrCurrentWebsite->user_id === (int) $plyrUser->id);
+
+  /*
+   * Main PLYRCard site: show GET STARTED when logged out, Locker Room when logged in.
+   * Own player website: show Locker Room only when logged in.
+   * Other player websites: show nothing, regardless of auth state.
+   */
+  $plyrShouldRenderNavigation = ! $plyrViewingPlayerWebsite || ($plyrLoggedIn && $plyrOwnsCurrentWebsite);
+  $plyrPullUpOnly = $plyrOnAdmin || $plyrViewingPlayerWebsite;
+
+  $plyrWebsite = null;
+  $plyrWebsiteUrl = null;
+  if ($plyrLoggedIn && $plyrUser && class_exists(\App\Models\Website::class)) {
+      $plyrWebsite = \App\Models\Website::query()
+          ->where('user_id', $plyrUser->id)
+          ->where('is_active', true)
+          ->where('is_published', true)
+          ->latest('updated_at')
+          ->first();
+
+      if ($plyrWebsite) {
+          if (! empty($plyrWebsite->domain)) {
+              $plyrWebsiteUrl = \Illuminate\Support\Str::startsWith($plyrWebsite->domain, ['http://', 'https://'])
+                  ? $plyrWebsite->domain
+                  : 'https://' . $plyrWebsite->domain;
+          } else {
+              $plyrWebsiteSlug = $plyrWebsite->slug ?: \Illuminate\Support\Str::slug($plyrWebsite->name);
+              $plyrWebsiteUrl = url('/' . $plyrWebsiteSlug);
+          }
+      }
+  }
+@endphp
+
+@if($plyrShouldRenderNavigation)
+@if(! $plyrPullUpOnly)
+<header id="site-header" class="plyrcard-site-header over-hero">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
-    <img src="{{ asset('images/plyr-logo.png') }}" alt="PLYRCARD Logo">
+    <img src="../images/plyr-logo.png" alt="PLYRCARD Logo">
   </a>
 
   <nav class="desktop-nav" aria-label="Primary navigation">
@@ -722,10 +1039,11 @@
     <a data-nav href="/podcast" class="{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
     <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
     @auth
-      <a href="#" data-plyrcard-open-drawer>Dashboard</a>
+      <a href="/admin">Dashboard</a>
+      <a href="/logout">Logout</a>
     @else
-      <a href="#" data-plyrcard-open-drawer>Login</a>
-      <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
+      <a href="/admin">Login</a>
+      <a data-nav href="/pricing" class="desktop-nav-cta{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Start Free</a>
     @endauth
   </nav>
 
@@ -734,19 +1052,25 @@
   </button>
 </header>
 
-<nav id="mobile-nav" class="plyrcard-mobile-nav {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}" aria-label="Mobile navigation">
+<nav id="mobile-nav" class="plyrcard-mobile-nav" aria-label="Mobile navigation">
   <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
   <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
   <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
   <a data-nav href="/podcast" class="nav-link{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
   <a data-nav href="/book-demo" class="nav-link{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book Demo</a>
-  <button type="button" class="nav-link" data-plyrcard-open-drawer>{{ $plyrTabLabel }}</button>
-  @guest
-    <a data-nav href="/registration?utm_plan=free" class="nav-cta-pill{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
-  @endguest
+  @auth
+    <button type="button" class="nav-link" data-plyrcard-open-drawer>Locker Room</button>
+    <a href="/admin" class="nav-link">Dashboard</a>
+    <a href="/logout" class="nav-link">Logout</a>
+  @else
+    <button type="button" class="nav-link" data-plyrcard-open-drawer>Get Started</button>
+    <a href="/admin" class="nav-link">Login</a>
+    <a data-nav href="/pricing" class="nav-cta-pill{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Start Free</a>
+  @endauth
 </nav>
+@endif
 
-<div id="plyrcard-action-drawer" class="plyrcard-action-drawer" data-state="closed">
+<div id="plyrcard-action-drawer" class="plyrcard-action-drawer{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}" data-state="closed" data-logged-in="{{ $plyrLoggedIn ? 'true' : 'false' }}">
   <div class="plyrcard-drawer-scrim" data-plyrcard-close-drawer></div>
 
   <section class="plyrcard-drawer-panel" aria-label="{{ $plyrLoggedIn ? 'Locker Room menu' : 'Get Started menu' }}">
@@ -755,210 +1079,193 @@
     <div class="plyrcard-drawer-head">
       <div class="plyrcard-drawer-title-row" data-plyrcard-main-title>
         @auth
-          <div class="plyrcard-user-line">
-            <h2 class="plyrcard-main-title">Hi {{ $plyrFirstName }}!</h2>
-            <span class="plyrcard-plan-badge">{{ $plyrPlanName }}</span>
-          </div>
+          <svg width="43" height="43" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c1.6-4.2 4.2-6.3 8-6.3s6.4 2.1 8 6.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <h2 class="plyrcard-drawer-title">Hi {{ $plyrFirstName ?? 'Clark' }}!</h2>
+          <a class="plyrcard-journey-badge" href="/admin">My Journey</a>
         @else
-          <h2 class="plyrcard-main-title">Get Started</h2>
+          <h2 class="plyrcard-drawer-title">Welcome to PLYRCARD!</h2>
         @endauth
       </div>
 
       <div class="plyrcard-drawer-title-row" data-plyrcard-sub-title style="display:none !important;">
         <button type="button" class="plyrcard-drawer-back" data-plyrcard-back>
-          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Back</span>
         </button>
-        <h2 class="plyrcard-section-title" data-plyrcard-section-title></h2>
+        <h2 class="plyrcard-drawer-title" data-plyrcard-section-title></h2>
       </div>
 
-      <div class="plyrcard-drawer-actions">
-        @auth
-          <form class="plyrcard-signout-form" method="POST" action="{{ $plyrLogoutAction }}" data-plyrcard-logout-form>
-            @csrf
-            <button type="submit" class="plyrcard-signout-btn"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Sign Out</button>
-          </form>
-        @endauth
-        <button type="button" class="plyrcard-drawer-close" aria-label="Close menu" data-plyrcard-close-drawer>
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-        </button>
-      </div>
+      <button type="button" class="plyrcard-drawer-icon-btn plyrcard-drawer-close" aria-label="Close menu" data-plyrcard-close-drawer>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-linecap="round"/></svg>
+      </button>
     </div>
 
     <div class="plyrcard-drawer-body">
       @auth
         <div class="plyrcard-drawer-view is-active" data-plyrcard-view="main">
-          <div class="plyrcard-nav-group">
-            <strong class="plyrcard-nav-group-title">Locker Room</strong>
-            <div class="plyrcard-drawer-grid">
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="dashboard"><i class="plyrcard-menu-icon fa-solid fa-gauge-high" aria-hidden="true"></i><span>Dashboard</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="profile"><i class="plyrcard-menu-icon fa-solid fa-user" aria-hidden="true"></i><span>Profile</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="schedule"><i class="plyrcard-menu-icon fa-solid fa-calendar-days" aria-hidden="true"></i><span>My Schedule</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="settings"><i class="plyrcard-menu-icon fa-solid fa-gear" aria-hidden="true"></i><span>Settings</span></button>
-            </div>
+          <div class="plyrcard-drawer-grid">
+            @if($plyrHasMyJourney)
+              <span class="plyrcard-drawer-card is-disabled" aria-disabled="true">
+                <i class="plyrcard-menu-icon fa-regular fa-envelope-open" aria-hidden="true"></i><span>Upgrade</span>
+              </span>
+            @else
+              <a class="plyrcard-drawer-card" href="/admin/my-journey">
+                <i class="plyrcard-menu-icon fa-regular fa-envelope-open" aria-hidden="true"></i><span>Upgrade</span>
+              </a>
+            @endif
+            <a class="plyrcard-drawer-card" href="#">
+              <i class="plyrcard-menu-icon fa-regular fa-message" aria-hidden="true"></i><span>Support</span>
+            </a>
+            <a class="plyrcard-drawer-card" href="/book-demo">
+              <i class="plyrcard-menu-icon fa-solid fa-phone-volume" aria-hidden="true"></i><span>Book a Call</span>
+            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend">
+              <i class="plyrcard-menu-icon fa-regular fa-comments" aria-hidden="true"></i><span>Refer a Friend</span>
+            </button>
+            <a class="plyrcard-drawer-card" href="/podcast">
+              <i class="plyrcard-menu-icon fa-solid fa-share" aria-hidden="true"></i><span>PLYRCard Show</span>
+            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte">
+              <i class="plyrcard-menu-icon fa-regular fa-calendar-days" aria-hidden="true"></i><span>A La Carte</span>
+            </button>
+            @if($plyrWebsiteUrl)
+              <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteUrl }}" target="_blank" rel="noopener">
+                <i class="plyrcard-menu-icon fa-regular fa-address-card" aria-hidden="true"></i><span>Go to my Website</span>
+              </a>
+            @else
+              <span class="plyrcard-drawer-card is-disabled" aria-disabled="true">
+                <i class="plyrcard-menu-icon fa-regular fa-address-card" aria-hidden="true"></i><span>Go to my Website</span>
+              </span>
+            @endif
+            <a class="plyrcard-drawer-card is-accent" href="/admin">
+              <i class="plyrcard-menu-icon fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i><span>My Journey</span>
+            </a>
           </div>
-
-          <div class="plyrcard-nav-group">
-            <strong class="plyrcard-nav-group-title">Website</strong>
-            <div class="plyrcard-drawer-grid">
-              @if($plyrWebsiteActionDisabled)
-                <button type="button" class="plyrcard-drawer-card is-disabled" disabled aria-disabled="true"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
-              @else
-                @if($plyrOnPlayerWebsite)
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="edit-website"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
-                @else
-                <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteActionHref }}" @if($plyrWebsiteActionTarget) target="{{ $plyrWebsiteActionTarget }}" rel="noopener" @endif><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></a>
-                @endif
-              @endif
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share Card</span></button>
-              <a class="plyrcard-drawer-card" href="/podcast"><i class="plyrcard-menu-icon fa-solid fa-podcast" aria-hidden="true"></i><span>PLYRCard Show</span></a>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte"><i class="plyrcard-menu-icon fa-solid fa-bag-shopping" aria-hidden="true"></i><span>A La Carte</span></button>
-            </div>
-          </div>
-
-          <div class="plyrcard-nav-group">
-            <strong class="plyrcard-nav-group-title">Growth</strong>
-            <div class="plyrcard-drawer-grid">
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check" aria-hidden="true"></i><span>Book a Call</span></button>
-            </div>
-          </div>
-
-          <div class="plyrcard-nav-group">
-            <strong class="plyrcard-nav-group-title">Account</strong>
-            <div class="plyrcard-drawer-grid">
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="billing"><i class="plyrcard-menu-icon fa-solid fa-credit-card" aria-hidden="true"></i><span>Billing</span></button>
-            </div>
+          @includeWhen(View::exists('partials.navigation-socials'), 'partials.navigation-socials')
+          <div class="plyrcard-drawer-section-divider"></div>
+          <div class="plyrcard-social-row">
+            <span class="plyrcard-social-label">Follow Us</span>
+            <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
+            <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
+            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
           </div>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="refer-friend" data-title="Refer a Friend">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="#" method="POST">
+        <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
+          <form class="plyrcard-form-stack" action="#" method="POST">
             @csrf
-            <label class="plyrcard-input-label">Friend Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Full name"></span></label>
-            <label class="plyrcard-input-label">Friend Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope" aria-hidden="true"></i><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="friend@example.com"></span></label>
-            <label class="plyrcard-input-label">Friend Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_phone" placeholder="{{ $plyrPhoneDisplay }}"></span></label>
-            <label class="plyrcard-input-label">Message<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></span></label>
+            <select class="plyrcard-drawer-select" name="concern">
+              <option value="">Select your concern</option>
+              <option>Billing</option>
+              <option>Website update</option>
+              <option>Graphics</option>
+              <option>Account help</option>
+              <option>Other</option>
+            </select>
+            <textarea class="plyrcard-drawer-textarea" name="details" placeholder="Give us some more details..."></textarea>
+            <button class="plyrcard-submit-btn" type="submit">Submit</button>
+          </form>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="refer-friend" data-title="Refer a Friend">
+          <form class="plyrcard-form-stack" action="#" method="POST">
+            @csrf
+            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Friend’s name"></label>
+            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-regular fa-envelope" aria-hidden="true"></i><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="Friend’s email"></label>
+            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-solid fa-phone" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_phone" placeholder="Friend’s phone"></label>
+            <label class="plyrcard-input-wrap textarea"><i class="plyrcard-field-icon fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></label>
             <button class="plyrcard-submit-btn" type="submit"><i class="fa-regular fa-paper-plane" aria-hidden="true"></i> Send Invite</button>
           </form>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
-          <div class="plyrcard-form-card plyrcard-form-stack">
-            <label class="plyrcard-input-label">Concern<span class="plyrcard-input-wrap"><i class="fa-solid fa-circle-question" aria-hidden="true"></i><select class="plyrcard-drawer-select"><option>Select your concern</option><option>Billing</option><option>Website</option><option>Account</option><option>Other</option></select></span></label>
-            <label class="plyrcard-input-label">Details<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" placeholder="Give us some more details..."></textarea></span></label>
-            <button class="plyrcard-submit-btn" type="button">Submit</button>
-          </div>
-        </div>
-
-        <div class="plyrcard-drawer-view" data-plyrcard-view="share-card" data-title="Share Card">
-          <div class="plyrcard-form-card plyrcard-qr-wrap">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={{ urlencode($plyrWebsiteShareUrl) }}" alt="QR code for your PLYRCard">
-            <div class="plyrcard-copy-line" style="width:100%;">
-              <input class="plyrcard-drawer-input" type="text" value="{{ $plyrWebsiteShareUrl }}" readonly data-plyrcard-copy-source>
-              <button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrWebsiteShareUrl }}">Copy</button>
-            </div>
-            <div class="plyrcard-share-options">
-              <a class="plyrcard-secondary-btn" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-facebook-f"></i> Facebook</a>
-              <a class="plyrcard-secondary-btn" href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>
-              <a class="plyrcard-secondary-btn" href="{{ $plyrXUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> X</a>
-              <a class="plyrcard-submit-btn" href="{{ $plyrWebsiteShareUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-globe"></i> Website</a>
-            </div>
-          </div>
-        </div>
-
         <div class="plyrcard-drawer-view" data-plyrcard-view="a-la-carte" data-title="A La Carte">
           <div class="plyrcard-offer-list">
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-regular fa-window-maximize"></i></span><span><h3 class="plyrcard-offer-title">Upgraded Site Design</h3><p class="plyrcard-offer-copy">A full redesign of your athlete website</p></span><strong class="plyrcard-offer-price">$150<small>One-time</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-regular fa-images"></i></span><span><h3 class="plyrcard-offer-title">Starting Graphics Bundle</h3><p class="plyrcard-offer-copy">Starting graphic • Showcase graphic • Thank You graphic</p></span><strong class="plyrcard-offer-price">$70<small>Bundle</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-solid fa-pen-nib"></i></span><span><h3 class="plyrcard-offer-title">Individual Graphic</h3><p class="plyrcard-offer-copy">Single custom athlete graphic</p></span><strong class="plyrcard-offer-price">$35<small>Each</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-solid fa-globe"></i></span><span><h3 class="plyrcard-offer-title">Domain</h3><p class="plyrcard-offer-copy">Custom domain registration for your athlete site</p></span><strong class="plyrcard-offer-price">$45<small>/Year</small></strong></a>
+            <a href="#" class="plyrcard-offer-card">
+              <span class="plyrcard-offer-icon"><i class="fa-regular fa-window-maximize" aria-hidden="true"></i></span>
+              <span><h3 class="plyrcard-offer-title">Upgraded Site Design</h3><p class="plyrcard-offer-copy">A full redesign of your athlete website</p></span>
+              <strong class="plyrcard-offer-price">$150<small>One-time</small></strong>
+            </a>
+            <a href="#" class="plyrcard-offer-card">
+              <span class="plyrcard-offer-icon"><i class="fa-regular fa-images" aria-hidden="true"></i></span>
+              <span><h3 class="plyrcard-offer-title">Starting Graphics Bundle</h3><p class="plyrcard-offer-copy">Starting graphic • Showcase graphic • Thank You graphic</p></span>
+              <strong class="plyrcard-offer-price">$70<small>Bundle</small></strong>
+            </a>
+            <a href="#" class="plyrcard-offer-card">
+              <span class="plyrcard-offer-icon"><i class="fa-solid fa-pen-nib" aria-hidden="true"></i></span>
+              <span><h3 class="plyrcard-offer-title">Individual Graphic</h3><p class="plyrcard-offer-copy">Single custom athlete graphic</p></span>
+              <strong class="plyrcard-offer-price">$35<small>Each</small></strong>
+            </a>
+            <a href="#" class="plyrcard-offer-card">
+              <span class="plyrcard-offer-icon"><i class="fa-solid fa-globe" aria-hidden="true"></i></span>
+              <span><h3 class="plyrcard-offer-title">Domain</h3><p class="plyrcard-offer-copy">Custom domain registration for your athlete site</p></span>
+              <strong class="plyrcard-offer-price">$45<small>/Year</small></strong>
+            </a>
           </div>
-        </div>
-
-        <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book a Call">
-          <div class="plyrcard-booking-wrap">
-            <iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe>
-          </div>
-        </div>
-
-        <div class="plyrcard-drawer-view" data-plyrcard-view="dashboard" data-title="Dashboard">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Dashboard</h3><p class="plyrcard-mini-copy">Quick dashboard tools can live here without leaving the page.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-chart-line"></i> Add dashboard content</button></div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="profile" data-title="Profile">
-          <div class="plyrcard-form-card plyrcard-form-stack">
-            <p class="plyrcard-mini-copy">Profile controls placeholder. Add editable player profile fields here.</p>
-            <label class="plyrcard-input-label">Display Name<span class="plyrcard-input-wrap"><i class="fa-solid fa-user"></i><input class="plyrcard-drawer-input" type="text" value="{{ $plyrFirstName }}" placeholder="Player name"></span></label>
-            <button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-check"></i> Save Profile</button>
-          </div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="edit-website" data-title="Edit Website">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Edit Website</h3><p class="plyrcard-mini-copy">Website editing tools can be embedded here so players stay on their card.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-pen-to-square"></i> Add editor shortcut</button></div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="upgrade" data-title="Upgrade">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Upgrade</h3><p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Add your plan upgrade cards or checkout embed here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-arrow-trend-up"></i> Explore upgrades</button></div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="schedule" data-title="My Schedule">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">My Schedule</h3><p class="plyrcard-mini-copy">Add schedule content, calendars, games, or booking tools here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-calendar-days"></i> Add schedule content</button></div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="billing" data-title="Billing">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Billing</h3><p class="plyrcard-mini-copy">Add your billing portal, invoices, or plan management embed here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-credit-card"></i> Add billing portal</button></div>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="settings" data-title="Settings">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Settings</h3><p class="plyrcard-mini-copy">Add account preferences and notification controls here.</p><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-gear"></i> Add settings content</button></div>
         </div>
       @else
         <div class="plyrcard-drawer-view is-active" data-plyrcard-view="main">
-          <div class="plyrcard-nav-group"><strong class="plyrcard-nav-group-title">Contact</strong><div class="plyrcard-drawer-grid">
-            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="email-us"><i class="plyrcard-menu-icon fa-solid fa-envelope"></i><span>Email Us</span></button>
-            <a class="plyrcard-drawer-card" href="sms:{{ $plyrPhoneHref }}"><i class="plyrcard-menu-icon fa-solid fa-comment-dots"></i><span>Text us</span></a>
-            <a class="plyrcard-drawer-card" href="tel:{{ $plyrPhoneHref }}"><i class="plyrcard-menu-icon fa-solid fa-phone"></i><span>Call us</span></a>
-            <a class="plyrcard-drawer-card" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="plyrcard-menu-icon fa-brands fa-facebook-messenger"></i><span>Chat Us</span></a>
-          </div></div>
-          <div class="plyrcard-nav-group"><strong class="plyrcard-nav-group-title">Start</strong><div class="plyrcard-drawer-grid">
-            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-site"><i class="plyrcard-menu-icon fa-solid fa-share-nodes"></i><span>Share</span></button>
-            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check"></i><span>Book Demo</span></button>
-            <a class="plyrcard-drawer-card" href="/pricing"><i class="plyrcard-menu-icon fa-solid fa-user-plus"></i><span>Register Now</span></a>
-            <button type="button" class="plyrcard-drawer-card is-accent" data-plyrcard-section="login"><i class="plyrcard-menu-icon fa-solid fa-right-to-bracket"></i><span>Login</span></button>
-          </div></div>
+          <div class="plyrcard-drawer-grid">
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="email-us">
+              <i class="plyrcard-menu-icon fa-regular fa-envelope" aria-hidden="true"></i><span>Email Us</span>
+            </button>
+            <a class="plyrcard-drawer-card" href="sms:{{ $plyrSupportPhoneHref }}">
+              <i class="plyrcard-menu-icon fa-regular fa-comment-dots" aria-hidden="true"></i><span>Text us</span>
+            </a>
+            <a class="plyrcard-drawer-card" href="tel:{{ $plyrSupportPhoneHref }}">
+              <i class="plyrcard-menu-icon fa-solid fa-phone-volume" aria-hidden="true"></i><span>Call us</span>
+            </a>
+            <a class="plyrcard-drawer-card" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener">
+              <i class="plyrcard-menu-icon fa-regular fa-comments" aria-hidden="true"></i><span>Chat Us</span>
+            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share">
+              <i class="plyrcard-menu-icon fa-solid fa-share-nodes" aria-hidden="true"></i><span>Share</span>
+            </button>
+            <a class="plyrcard-drawer-card" href="/book-demo">
+              <i class="plyrcard-menu-icon fa-regular fa-calendar-days" aria-hidden="true"></i><span>Book a Demo</span>
+            </a>
+            <a class="plyrcard-drawer-card" href="/pricing">
+              <i class="plyrcard-menu-icon fa-regular fa-user-plus" aria-hidden="true"></i><span>Register Now</span>
+            </a>
+            <a class="plyrcard-drawer-card is-accent" href="/admin">
+              <i class="plyrcard-menu-icon fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i><span>Login</span>
+            </a>
+          </div>
+          <div class="plyrcard-drawer-section-divider"></div>
+          <div class="plyrcard-social-row">
+            <span class="plyrcard-social-label">Follow Us</span>
+            <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
+            <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
+            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+          </div>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="email-us" data-title="Email Us"><div class="plyrcard-form-card"><a class="plyrcard-submit-btn" href="mailto:{{ $plyrSupportEmail }}"><i class="fa-solid fa-envelope"></i>{{ $plyrSupportEmail }}</a></div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="share-site" data-title="Share"><div class="plyrcard-form-card plyrcard-form-stack"><label class="plyrcard-input-label">PLYRCard URL</label><div class="plyrcard-copy-line"><input class="plyrcard-drawer-input" type="text" value="{{ $plyrMainShareUrl }}" readonly><button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrMainShareUrl }}">Copy</button></div></div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book Demo"><div class="plyrcard-booking-wrap"><iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe></div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="login" data-title="Login">
-          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/login') }}">
-            @csrf
-            <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
-            <label class="plyrcard-input-label">Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" placeholder="Password" required></span></label>
-            <label class="plyrcard-clean-row" style="color:#111;font-size:13px;font-weight:800;"><span><input type="checkbox" name="remember" value="1"> Remember me</span><button type="button" class="plyrcard-text-link" data-plyrcard-section="forgot-password">Forgot Password?</button></label>
-            <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
-            <div class="plyrcard-clean-row"><a class="plyrcard-secondary-btn" href="/pricing">Register</a><button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="book-demo">Book Demo</button></div>
-          </form>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="email-us" data-title="Email Us">
+          <a class="plyrcard-contact-card" href="mailto:{{ $plyrSupportEmail }}">
+            <i class="fa-regular fa-envelope" aria-hidden="true"></i>
+            <span><strong>{{ $plyrSupportEmail }}</strong><span>Tap to open Gmail or your email app.</span></span>
+          </a>
         </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="forgot-password" data-title="Reset Password">
-          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/password-reset/request') }}">
-            @csrf
-            <p class="plyrcard-mini-copy">Enter your email and we’ll send password reset instructions.</p>
-            <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
-            <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> Send Reset Link</button>
-          </form>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="share" data-title="Share">
+          <div class="plyrcard-share-grid">
+            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode($plyrShareUrl) }}"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i><span>Facebook</span></a>
+            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.instagram.com/plyrcard/"><i class="fa-brands fa-instagram" aria-hidden="true"></i><span>Instagram</span></a>
+            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url={{ urlencode($plyrShareUrl) }}&text={{ urlencode('Check out PLYRCARD') }}"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i><span>X</span></a>
+            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.youtube.com/@plyrcard"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+          </div>
+          <p class="plyrcard-share-note">Facebook and X open pre-filled share dialogs. Instagram and YouTube do not support website pre-fill sharing, so they open the PLYRCARD profile/link destination.</p>
         </div>
       @endauth
     </div>
+
   </section>
 
   <button type="button" class="plyrcard-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false">
-    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-    <span>{{ $plyrTabLabel }}</span>
+    <span class="plyrcard-drawer-tab-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span>{{ $plyrLoggedIn ? 'Locker Room' : 'GET STARTED' }}</span>
   </button>
 </div>
-
-@once
-    <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
-@endonce
 
 <script>
   (function () {
@@ -973,94 +1280,54 @@
     const backButton = drawer.querySelector('[data-plyrcard-back]');
     const tabButton = drawer.querySelector('[data-plyrcard-toggle-drawer]');
 
-    function resetDrawerScroll() {
-      const body = drawer.querySelector('.plyrcard-drawer-body');
-      if (body) body.scrollTop = 0;
-    }
-
-    function ensureMainView() {
-      const active = drawer.querySelector('.plyrcard-drawer-view.is-active');
-      if (!active || !active.querySelector('.plyrcard-drawer-card, .plyrcard-form-card, .plyrcard-mini-panel, .plyrcard-offer-list, .plyrcard-booking-wrap')) {
-        showView('main');
-      }
-    }
-
     function setOpen(isOpen) {
-      if (isOpen) ensureMainView();
       drawer.classList.toggle('is-open', isOpen);
       drawer.dataset.state = isOpen ? 'open' : 'closed';
       if (tabButton) tabButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       document.documentElement.classList.toggle('plyrcard-drawer-open', isOpen);
-      if (isOpen) window.requestAnimationFrame(resetDrawerScroll);
     }
 
     function showView(name) {
       const view = drawer.querySelector('[data-plyrcard-view="' + name + '"]');
       if (!view) return;
-      const panel = drawer.querySelector('.plyrcard-drawer-panel');
-      if (panel) {
-        panel.classList.remove('is-switching');
-        void panel.offsetWidth;
-        panel.classList.add('is-switching');
-        window.setTimeout(() => panel.classList.remove('is-switching'), 280);
-      }
-      drawer.querySelectorAll('[data-plyrcard-view]').forEach(item => item.classList.toggle('is-active', item === view));
-      resetDrawerScroll();
+
+      drawer.querySelectorAll('[data-plyrcard-view]').forEach(function (item) {
+        item.classList.toggle('is-active', item === view);
+      });
+
       const isMain = name === 'main';
       if (mainTitle) mainTitle.style.setProperty('display', isMain ? 'flex' : 'none', 'important');
       if (subTitle) subTitle.style.setProperty('display', isMain ? 'none' : 'flex', 'important');
       if (sectionTitle) sectionTitle.textContent = view.dataset.title || '';
     }
 
-    toggleButtons.forEach(button => button.addEventListener('click', () => setOpen(!drawer.classList.contains('is-open'))));
-    closeButtons.forEach(button => button.addEventListener('click', () => { setOpen(false); showView('main'); }));
-    drawer.querySelectorAll('[data-plyrcard-section]').forEach(button => button.addEventListener('click', () => { showView(button.dataset.plyrcardSection); setOpen(true); }));
-    if (backButton) backButton.addEventListener('click', () => showView('main'));
-
-    showView('main');
-
-    drawer.querySelectorAll('[data-plyrcard-logout-form]').forEach(form => {
-      form.addEventListener('submit', async event => {
-        event.preventDefault();
-
-        const formData = new FormData(form);
-        const token = formData.get('_token') || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-        try {
-          await fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',
-            headers: {
-              'X-CSRF-TOKEN': token,
-              'X-Requested-With': 'XMLHttpRequest',
-              'Accept': 'text/html, application/xhtml+xml',
-            },
-          });
-        } catch (error) {
-          // If the logout request fails because of a browser/network quirk,
-          // still send the visitor back to the public website instead of /admin/login.
-        }
-
-        window.location.assign('/');
+    toggleButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        setOpen(!drawer.classList.contains('is-open'));
       });
     });
 
-    drawer.querySelectorAll('[data-plyrcard-copy]').forEach(button => {
-      button.addEventListener('click', async () => {
-        const value = button.getAttribute('data-plyrcard-copy') || '';
-        try {
-          await navigator.clipboard.writeText(value);
-          const original = button.textContent;
-          button.textContent = 'Copied';
-          setTimeout(() => button.textContent = original, 1400);
-        } catch (error) {
-          window.prompt('Copy this URL:', value);
-        }
+    closeButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        setOpen(false);
+        showView('main');
       });
     });
 
-    document.addEventListener('keydown', event => {
+    drawer.querySelectorAll('[data-plyrcard-section]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        showView(button.dataset.plyrcardSection);
+        setOpen(true);
+      });
+    });
+
+    if (backButton) {
+      backButton.addEventListener('click', function () {
+        showView('main');
+      });
+    }
+
+    document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         setOpen(false);
         showView('main');
@@ -1068,3 +1335,4 @@
     });
   })();
 </script>
+@endif
