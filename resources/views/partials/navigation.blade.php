@@ -669,7 +669,6 @@
     }
 
     @media (min-width: 960px) {
-      .plyrcard-action-drawer { display: none !important; }
       #site-header.plyrcard-site-header {
         padding-left: 24px !important;
         padding-right: 24px !important;
@@ -814,109 +813,9 @@
       }
     }
 
-
-    /* Share pop-up and final compact mobile sizing */
-    .plyrcard-share-grid {
-      display: grid !important;
-      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 14px !important;
-    }
-
-    .plyrcard-share-option {
-      min-height: 104px !important;
-      padding: 14px 8px !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 9px !important;
-      border-radius: 12px !important;
-      background: #fff !important;
-      color: #050505 !important;
-      text-decoration: none !important;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.24) !important;
-      border: 0 !important;
-      cursor: pointer !important;
-    }
-
-    .plyrcard-share-option i {
-      font-size: 30px !important;
-      line-height: 1 !important;
-      color: #050505 !important;
-    }
-
-    .plyrcard-share-option span {
-      font-size: 16px !important;
-      font-weight: 850 !important;
-      line-height: 1 !important;
-      color: #050505 !important;
-    }
-
-    .plyrcard-share-note {
-      margin: 14px 0 0 !important;
-      font-family: var(--font-body, sans-serif) !important;
-      color: rgba(255,255,255,0.72) !important;
-      font-size: 13px !important;
-      line-height: 1.35 !important;
-    }
-
-    .plyrcard-menu-icon,
-    .plyrcard-social-row i,
-    .plyrcard-field-icon,
-    .plyrcard-offer-icon i {
-      line-height: 1 !important;
-      color: currentColor !important;
-    }
-
-    @media (max-width: 959px) {
-      .plyrcard-action-drawer { display: block !important; }
-      .plyrcard-drawer-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px 14px !important; }
-      .plyrcard-drawer-card { min-height: 90px !important; padding: 10px 6px 8px !important; gap: 6px !important; border-radius: 10px !important; }
-      .plyrcard-menu-icon { font-size: 25px !important; width: 28px !important; height: 28px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
-      .plyrcard-drawer-card span { font-size: clamp(13px, 2.2vw, 17px) !important; line-height: 1.05 !important; }
-      .plyrcard-drawer-head { min-height: 62px !important; padding: 17px 26px 10px !important; }
-      .plyrcard-drawer-title { font-size: clamp(21px, 3.1vw, 28px) !important; }
-      .plyrcard-drawer-body { padding: 16px 26px calc(76px + var(--safe-bottom, 0px)) !important; }
-      .plyrcard-drawer-tab { width: min(340px, 64vw) !important; min-width: 260px !important; height: 66px !important; padding: 0 22px 0 58px !important; font-size: clamp(23px, 3.7vw, 31px) !important; clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%) !important; }
-      .plyrcard-drawer-tab-chevron svg { width: 26px !important; height: 26px !important; }
-      .plyrcard-social-row { gap: 16px 26px !important; }
-      .plyrcard-social-label { font-size: clamp(19px, 3.2vw, 24px) !important; }
-      .plyrcard-social-row i { font-size: 22px !important; width: 22px !important; height: 22px !important; }
-      .plyrcard-form-stack { gap: 10px !important; }
-      .plyrcard-drawer-input, .plyrcard-drawer-select, .plyrcard-drawer-textarea { min-height: 54px !important; padding-left: 62px !important; font-size: clamp(14px, 2.3vw, 19px) !important; }
-      .plyrcard-field-icon { left: 20px !important; font-size: 20px !important; }
-      .plyrcard-submit-btn { min-height: 54px !important; font-size: clamp(19px, 3vw, 25px) !important; }
-      .plyrcard-offer-card { min-height: 88px !important; grid-template-columns: 54px 1fr auto !important; padding: 12px 18px 12px 12px !important; }
-      .plyrcard-offer-icon { width: 46px !important; height: 46px !important; }
-      .plyrcard-offer-icon i { font-size: 24px !important; }
-      .plyrcard-offer-title { font-size: clamp(17px, 2.8vw, 23px) !important; }
-      .plyrcard-offer-copy { font-size: clamp(11px, 1.8vw, 15px) !important; }
-      .plyrcard-offer-price { font-size: clamp(21px, 3.4vw, 29px) !important; }
-    }
-
-    @media (max-width: 520px) {
-      .plyrcard-drawer-body { padding: 14px 16px calc(70px + var(--safe-bottom, 0px)) !important; }
-      .plyrcard-drawer-grid { gap: 8px !important; }
-      .plyrcard-drawer-card { min-height: 78px !important; padding: 8px 4px 7px !important; }
-      .plyrcard-menu-icon { font-size: 21px !important; width: 24px !important; height: 24px !important; }
-      .plyrcard-drawer-card span { font-size: 11px !important; }
-      .plyrcard-drawer-tab { min-width: 240px !important; width: 68vw !important; height: 58px !important; padding-left: 50px !important; font-size: 21px !important; }
-      .plyrcard-share-grid { gap: 8px !important; }
-      .plyrcard-share-option { min-height: 76px !important; padding: 9px 4px !important; gap: 6px !important; }
-      .plyrcard-share-option i { font-size: 22px !important; }
-      .plyrcard-share-option span { font-size: 11px !important; }
-    }
-
-
-    /* On admin and player website pages, only the bottom pull-up drawer should show. */
-    .plyrcard-action-drawer.is-pullup-only {
-      display: block !important;
-    }
-
-    @media (min-width: 960px) {
-      .plyrcard-action-drawer.is-pullup-only {
-        display: block !important;
-      }
+    .plyrcard-hide-on-player-site,
+    #mobile-nav.plyrcard-hide-on-player-site {
+      display: none !important;
     }
 
 </style>
@@ -924,110 +823,58 @@
 @php
   $plyrUser = auth()->user();
   $plyrLoggedIn = auth()->check();
-  $plyrFirstName = $plyrLoggedIn ? explode(' ', trim($plyrUser->name ?? 'Clark'))[0] : null;
+  $plyrFirstName = $plyrLoggedIn ? explode(' ', trim($plyrUser->name ?? 'Player'))[0] : null;
 
-  $plyrSupportEmail = 'support@plyrcard.com';
-  $plyrSupportPhoneDisplay = '(555) 555-5555';
-  $plyrSupportPhoneHref = '5555555555';
-  $plyrShareUrl = 'https://plyrcard.com';
-  $plyrFacebookUrl = 'https://www.facebook.com/plyrcard';
-  $plyrInstagramUrl = 'https://www.instagram.com/plyrcard';
-  $plyrXUrl = 'https://x.com/plyrcard';
-  $plyrYouTubeUrl = 'https://www.youtube.com/@plyrcard';
+  $plyrHost = request()->getHost();
+  $plyrHostNormalized = strtolower(preg_replace('/^www\./i', '', $plyrHost));
+  $plyrPath = trim(request()->path(), '/');
+  $plyrFirstSegment = $plyrPath === '' ? '' : explode('/', $plyrPath)[0];
 
-  $plyrHasMyJourney = false;
-  if ($plyrLoggedIn && $plyrUser) {
-      if (method_exists($plyrUser, 'hasRole')) {
-          $plyrHasMyJourney = $plyrUser->hasRole('My Journey');
-      } elseif (method_exists($plyrUser, 'roles')) {
-          $plyrHasMyJourney = $plyrUser->roles()->where('name', 'My Journey')->exists();
-      }
-  }
+  $plyrMainHosts = ['plyrcard.com', 'localhost', '127.0.0.1'];
+  $plyrReservedPaths = [
+      '', 'admin', 'about', 'pricing', 'podcast', 'book-demo', 'registration',
+      'login', 'logout', 'dashboard', 'journey', 'api', 'css', 'js', 'images',
+      'storage', 'livewire', 'filament',
+  ];
 
-  $plyrCurrentWebsite = $website ?? null;
-  $plyrOnAdmin = request()->is('admin') || request()->is('admin/*');
-  $plyrCurrentPath = trim(request()->path(), '/');
-  $plyrCurrentHost = strtolower(preg_replace('/:\d+$/', '', request()->getHost()));
-  $plyrReservedPaths = ['', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
+  $plyrCurrentWebsite = null;
 
-  if (! ($plyrCurrentWebsite instanceof \App\Models\Website) && class_exists(\App\Models\Website::class)) {
-      if (! in_array($plyrCurrentHost, ['127.0.0.1', 'localhost'], true)) {
-          $plyrCurrentWebsite = \App\Models\Website::query()
-              ->where('is_active', true)
-              ->where('is_published', true)
-              ->whereNotNull('domain')
-              ->get()
-              ->first(function ($candidate) use ($plyrCurrentHost) {
-                  $domain = strtolower(trim((string) $candidate->domain));
-                  $domain = preg_replace('#^https?://#i', '', $domain);
-                  $domain = preg_replace('/:\d+$/', '', $domain);
-                  $domain = rtrim($domain, '/');
-
-                  return preg_replace('/^www\./', '', $domain) === preg_replace('/^www\./', '', $plyrCurrentHost);
-              });
-      }
-
-      if (! $plyrCurrentWebsite && ! $plyrOnAdmin && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
-          $normalizedPath = \Illuminate\Support\Str::slug($plyrCurrentPath);
-
-          $plyrCurrentWebsite = \App\Models\Website::query()
-              ->where('is_active', true)
-              ->where('is_published', true)
-              ->where(function ($query) use ($plyrCurrentPath, $normalizedPath) {
-                  $query->whereRaw('LOWER(slug) = ?', [strtolower($plyrCurrentPath)])
-                      ->orWhereRaw('LOWER(slug) = ?', [strtolower($normalizedPath)]);
-              })
-              ->first();
-
-          if (! $plyrCurrentWebsite) {
-              $plyrCurrentWebsite = \App\Models\Website::query()
-                  ->where('is_active', true)
-                  ->where('is_published', true)
-                  ->get()
-                  ->first(function ($candidate) use ($normalizedPath) {
-                      return \Illuminate\Support\Str::slug((string) $candidate->name) === $normalizedPath;
-                  });
-          }
-      }
-  }
-
-  $plyrViewingPlayerWebsite = $plyrCurrentWebsite instanceof \App\Models\Website;
-  $plyrOwnsCurrentWebsite = $plyrViewingPlayerWebsite && $plyrLoggedIn && $plyrUser && ((int) $plyrCurrentWebsite->user_id === (int) $plyrUser->id);
-
-  /*
-   * Main PLYRCard site: show GET STARTED when logged out, Locker Room when logged in.
-   * Own player website: show Locker Room only when logged in.
-   * Other player websites: show nothing, regardless of auth state.
-   */
-  $plyrShouldRenderNavigation = ! $plyrViewingPlayerWebsite || ($plyrLoggedIn && $plyrOwnsCurrentWebsite);
-  $plyrPullUpOnly = $plyrOnAdmin || $plyrViewingPlayerWebsite;
-
-  $plyrWebsite = null;
-  $plyrWebsiteUrl = null;
-  if ($plyrLoggedIn && $plyrUser && class_exists(\App\Models\Website::class)) {
-      $plyrWebsite = \App\Models\Website::query()
-          ->where('user_id', $plyrUser->id)
+  if (class_exists(\App\Models\Website::class)) {
+      $plyrCurrentWebsite = \App\Models\Website::query()
           ->where('is_active', true)
           ->where('is_published', true)
-          ->latest('updated_at')
-          ->first();
+          ->whereNotNull('domain')
+          ->get()
+          ->first(function ($website) use ($plyrHostNormalized) {
+              $domain = strtolower(trim((string) $website->domain));
+              $domain = preg_replace('#^https?://#i', '', $domain);
+              $domain = preg_replace('/^www\./i', '', $domain);
+              $domain = trim($domain, '/');
 
-      if ($plyrWebsite) {
-          if (! empty($plyrWebsite->domain)) {
-              $plyrWebsiteUrl = \Illuminate\Support\Str::startsWith($plyrWebsite->domain, ['http://', 'https://'])
-                  ? $plyrWebsite->domain
-                  : 'https://' . $plyrWebsite->domain;
-          } else {
-              $plyrWebsiteSlug = $plyrWebsite->slug ?: \Illuminate\Support\Str::slug($plyrWebsite->name);
-              $plyrWebsiteUrl = url('/' . $plyrWebsiteSlug);
-          }
+              return $domain !== '' && $domain === $plyrHostNormalized;
+          });
+
+      if (! $plyrCurrentWebsite && ! in_array($plyrFirstSegment, $plyrReservedPaths, true)) {
+          $plyrCurrentWebsite = \App\Models\Website::query()
+              ->where('is_active', true)
+              ->where('is_published', true)
+              ->where('slug', $plyrFirstSegment)
+              ->first();
       }
   }
+
+  $plyrIsPlayerWebsite = (bool) $plyrCurrentWebsite;
+  $plyrIsOwnPlayerWebsite = $plyrLoggedIn
+      && $plyrCurrentWebsite
+      && (int) $plyrCurrentWebsite->user_id === (int) $plyrUser->id;
+
+  // Main PLYRCard site: show Get Started when logged out, Locker Room when logged in.
+  // Player website: show Locker Room only to the owning logged-in player.
+  // Other player website: show nothing.
+  $plyrShowActionDrawer = $plyrIsPlayerWebsite ? $plyrIsOwnPlayerWebsite : true;
 @endphp
 
-@if($plyrShouldRenderNavigation)
-@if(! $plyrPullUpOnly)
-<header id="site-header" class="plyrcard-site-header over-hero">
+<header id="site-header" class="plyrcard-site-header over-hero{{ $plyrIsPlayerWebsite ? ' plyrcard-hide-on-player-site' : '' }}">
   <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
     <img src="../images/plyr-logo.png" alt="PLYRCARD Logo">
   </a>
@@ -1039,11 +886,11 @@
     <a data-nav href="/podcast" class="{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
     <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
     @auth
-      <a href="/admin">Dashboard</a>
+      <a href="/dashboard">Dashboard</a>
       <a href="/logout">Logout</a>
     @else
       <a href="/admin">Login</a>
-      <a data-nav href="/pricing" class="desktop-nav-cta{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Start Free</a>
+      <a data-nav href="/registration?utm_plan=free" class="desktop-nav-cta{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
     @endauth
   </nav>
 
@@ -1052,7 +899,7 @@
   </button>
 </header>
 
-<nav id="mobile-nav" class="plyrcard-mobile-nav" aria-label="Mobile navigation">
+<nav id="mobile-nav" class="plyrcard-mobile-nav{{ $plyrIsPlayerWebsite ? ' plyrcard-hide-on-player-site' : '' }}" aria-label="Mobile navigation">
   <a data-nav href="/" class="nav-link{{ ($activePage ?? '') === 'home' ? ' active' : '' }}">Home</a>
   <a data-nav href="/about" class="nav-link{{ ($activePage ?? '') === 'about' ? ' active' : '' }}">About</a>
   <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
@@ -1060,17 +907,17 @@
   <a data-nav href="/book-demo" class="nav-link{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book Demo</a>
   @auth
     <button type="button" class="nav-link" data-plyrcard-open-drawer>Locker Room</button>
-    <a href="/admin" class="nav-link">Dashboard</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
     <a href="/logout" class="nav-link">Logout</a>
   @else
     <button type="button" class="nav-link" data-plyrcard-open-drawer>Get Started</button>
     <a href="/admin" class="nav-link">Login</a>
-    <a data-nav href="/pricing" class="nav-cta-pill{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Start Free</a>
+    <a data-nav href="/registration?utm_plan=free" class="nav-cta-pill{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
   @endauth
 </nav>
-@endif
 
-<div id="plyrcard-action-drawer" class="plyrcard-action-drawer{{ $plyrPullUpOnly ? ' is-pullup-only' : '' }}" data-state="closed" data-logged-in="{{ $plyrLoggedIn ? 'true' : 'false' }}">
+@if($plyrShowActionDrawer)
+<div id="plyrcard-action-drawer" class="plyrcard-action-drawer" data-state="closed" data-logged-in="{{ $plyrLoggedIn ? 'true' : 'false' }}">
   <div class="plyrcard-drawer-scrim" data-plyrcard-close-drawer></div>
 
   <section class="plyrcard-drawer-panel" aria-label="{{ $plyrLoggedIn ? 'Locker Room menu' : 'Get Started menu' }}">
@@ -1081,7 +928,7 @@
         @auth
           <svg width="43" height="43" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c1.6-4.2 4.2-6.3 8-6.3s6.4 2.1 8 6.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           <h2 class="plyrcard-drawer-title">Hi {{ $plyrFirstName ?? 'Clark' }}!</h2>
-          <a class="plyrcard-journey-badge" href="/admin">My Journey</a>
+          <a class="plyrcard-journey-badge" href="/journey">My Journey</a>
         @else
           <h2 class="plyrcard-drawer-title">Welcome to PLYRCARD!</h2>
         @endauth
@@ -1104,52 +951,52 @@
       @auth
         <div class="plyrcard-drawer-view is-active" data-plyrcard-view="main">
           <div class="plyrcard-drawer-grid">
-            @if($plyrHasMyJourney)
-              <span class="plyrcard-drawer-card is-disabled" aria-disabled="true">
-                <i class="plyrcard-menu-icon fa-regular fa-envelope-open" aria-hidden="true"></i><span>Upgrade</span>
-              </span>
-            @else
-              <a class="plyrcard-drawer-card" href="/admin/my-journey">
-                <i class="plyrcard-menu-icon fa-regular fa-envelope-open" aria-hidden="true"></i><span>Upgrade</span>
-              </a>
-            @endif
-            <a class="plyrcard-drawer-card" href="#">
-              <i class="plyrcard-menu-icon fa-regular fa-message" aria-hidden="true"></i><span>Support</span>
-            </a>
-            <a class="plyrcard-drawer-card" href="/book-demo">
-              <i class="plyrcard-menu-icon fa-solid fa-phone-volume" aria-hidden="true"></i><span>Book a Call</span>
-            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 8 8 6 8-6"/></svg>
+              <span>Upgrade</span>
+            </button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support">
+              <svg viewBox="0 0 24 24"><path d="M4 5h12v10H7l-3 3V5z"/><path d="M17 8h3v9l-2-2h-5"/></svg>
+              <span>Support</span>
+            </button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-call">
+              <svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.5 3 3.6 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.4.6 3.7.6.4 0 .8.4.8.8V20c0 .4-.4.8-.8.8C10.7 20.8 3.2 13.3 3.2 3.8c0-.4.4-.8.8-.8h3.7c.4 0 .8.4.8.8 0 1.3.2 2.5.6 3.7.1.4 0 .8-.3 1.1l-2.2 2.2z"/><path d="M15 4c2.8.5 4.5 2.2 5 5"/><path d="M15 8c.8.2 1.3.7 1.5 1.5"/></svg>
+              <span>Book a Call</span>
+            </button>
             <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend">
-              <i class="plyrcard-menu-icon fa-regular fa-comments" aria-hidden="true"></i><span>Refer a Friend</span>
+              <svg viewBox="0 0 24 24"><path d="M4 6h12v9H8l-4 4V6z"/><path d="M14 9h6v8l-3-3h-3"/></svg>
+              <span>Refer a Friend</span>
             </button>
-            <a class="plyrcard-drawer-card" href="/podcast">
-              <i class="plyrcard-menu-icon fa-solid fa-share" aria-hidden="true"></i><span>PLYRCard Show</span>
-            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="plyrcard-show">
+              <svg viewBox="0 0 24 24"><path d="M4 14c5-1 9-4 12-9v5h4v8h-4v5c-3-5-7-8-12-9z"/></svg>
+              <span>PLYRCard Show</span>
+            </button>
             <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte">
-              <i class="plyrcard-menu-icon fa-regular fa-calendar-days" aria-hidden="true"></i><span>A La Carte</span>
+              <svg viewBox="0 0 24 24"><path d="M7 3v4M17 3v4M4 8h16M5 5h14v15H5z"/><path d="M8 12h2M12 12h2M16 12h2M8 16h2M12 16h2M16 16h2"/></svg>
+              <span>A La Carte</span>
             </button>
-            @if($plyrWebsiteUrl)
-              <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteUrl }}" target="_blank" rel="noopener">
-                <i class="plyrcard-menu-icon fa-regular fa-address-card" aria-hidden="true"></i><span>Go to my Website</span>
-              </a>
-            @else
-              <span class="plyrcard-drawer-card is-disabled" aria-disabled="true">
-                <i class="plyrcard-menu-icon fa-regular fa-address-card" aria-hidden="true"></i><span>Go to my Website</span>
-              </span>
-            @endif
-            <a class="plyrcard-drawer-card is-accent" href="/admin">
-              <i class="plyrcard-menu-icon fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i><span>My Journey</span>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="website">
+              <svg viewBox="0 0 24 24"><path d="M5 20h14M7 17h10V5H7z"/><path d="M9 9h6M9 13h3"/><circle cx="16" cy="8" r="3"/><path d="M16 6v4M14 8h4"/></svg>
+              <span>Go to my Website</span>
+            </button>
+            <a class="plyrcard-drawer-card is-accent" href="/journey">
+              <svg viewBox="0 0 24 24"><path d="M9 6h9v12H9"/><path d="m13 8 4 4-4 4"/><path d="M4 12h13"/></svg>
+              <span>My Journey</span>
             </a>
           </div>
           @includeWhen(View::exists('partials.navigation-socials'), 'partials.navigation-socials')
           <div class="plyrcard-drawer-section-divider"></div>
           <div class="plyrcard-social-row">
             <span class="plyrcard-social-label">Follow Us</span>
-            <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
-            <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
-            <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
-            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+            <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17 7h.01"/></svg></a>
+            <a href="#" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M14 8h3V4h-3c-3 0-5 2-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-.6.4-1 1-1z"/></svg></a>
+            <a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="m4 4 16 16M20 4 4 20"/></svg></a>
+            <a href="#" class="youtube-wordmark" aria-label="YouTube"><svg viewBox="0 0 24 24"><path d="M22 12s0-4-1-5c-.6-.7-1.3-.8-2-.9C16 5 12 5 12 5s-4 0-7 .1c-.7.1-1.4.2-2 .9-1 1-1 5-1 5s0 4 1 5c.6.7 1.3.8 2 .9 3 .1 7 .1 7 .1s4 0 7-.1c.7-.1 1.4-.2 2-.9 1-1 1-5 1-5z"/><path d="m10 9 5 3-5 3z"/></svg><span>YouTube</span></a>
           </div>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="upgrade" data-title="Upgrade">
+          <div class="plyrcard-placeholder-panel">Placeholder for Upgrade. Replace this area with your upgrade plans or link.</div>
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
@@ -1168,104 +1015,90 @@
           </form>
         </div>
 
+        <div class="plyrcard-drawer-view" data-plyrcard-view="book-call" data-title="Book a Call">
+          <div class="plyrcard-placeholder-panel">Placeholder for Book a Call. Add your calendar embed, booking route, or external scheduling link here.</div>
+        </div>
+
         <div class="plyrcard-drawer-view" data-plyrcard-view="refer-friend" data-title="Refer a Friend">
           <form class="plyrcard-form-stack" action="#" method="POST">
             @csrf
-            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Friend’s name"></label>
-            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-regular fa-envelope" aria-hidden="true"></i><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="Friend’s email"></label>
-            <label class="plyrcard-input-wrap"><i class="plyrcard-field-icon fa-solid fa-phone" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_phone" placeholder="Friend’s phone"></label>
-            <label class="plyrcard-input-wrap textarea"><i class="plyrcard-field-icon fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></label>
-            <button class="plyrcard-submit-btn" type="submit"><i class="fa-regular fa-paper-plane" aria-hidden="true"></i> Send Invite</button>
+            <label class="plyrcard-input-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.6-4.2 4.2-6.3 8-6.3s6.4 2.1 8 6.3"/></svg><input class="plyrcard-drawer-input" name="friend_name" placeholder="Friend’s name"></label>
+            <label class="plyrcard-input-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 8 8 6 8-6"/></svg><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="Friend’s email"></label>
+            <label class="plyrcard-input-wrap"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.5 3 3.6 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.4.6 3.7.6.4 0 .8.4.8.8V20c0 .4-.4.8-.8.8C10.7 20.8 3.2 13.3 3.2 3.8c0-.4.4-.8.8-.8h3.7c.4 0 .8.4.8.8 0 1.3.2 2.5.6 3.7.1.4 0 .8-.3 1.1l-2.2 2.2z"/></svg><input class="plyrcard-drawer-input" name="friend_phone" placeholder="Friend’s phone"></label>
+            <label class="plyrcard-input-wrap textarea"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4V5z"/></svg><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></label>
+            <button class="plyrcard-submit-btn" type="submit"><svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg> Send Invite</button>
           </form>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="plyrcard-show" data-title="PLYRCard Show">
+          <div class="plyrcard-placeholder-panel">Placeholder for PLYRCard Show. Replace with your episode list, YouTube link, or podcast route.</div>
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="a-la-carte" data-title="A La Carte">
           <div class="plyrcard-offer-list">
             <a href="#" class="plyrcard-offer-card">
-              <span class="plyrcard-offer-icon"><i class="fa-regular fa-window-maximize" aria-hidden="true"></i></span>
+              <span class="plyrcard-offer-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/><path d="M16 14h3v5"/></svg></span>
               <span><h3 class="plyrcard-offer-title">Upgraded Site Design</h3><p class="plyrcard-offer-copy">A full redesign of your athlete website</p></span>
               <strong class="plyrcard-offer-price">$150<small>One-time</small></strong>
             </a>
             <a href="#" class="plyrcard-offer-card">
-              <span class="plyrcard-offer-icon"><i class="fa-regular fa-images" aria-hidden="true"></i></span>
+              <span class="plyrcard-offer-icon"><svg viewBox="0 0 24 24"><path d="M4 7h10v10H4z"/><path d="M10 4h10v10"/><path d="m7 14 3-3 3 3"/><circle cx="9" cy="10" r="1"/></svg></span>
               <span><h3 class="plyrcard-offer-title">Starting Graphics Bundle</h3><p class="plyrcard-offer-copy">Starting graphic • Showcase graphic • Thank You graphic</p></span>
               <strong class="plyrcard-offer-price">$70<small>Bundle</small></strong>
             </a>
             <a href="#" class="plyrcard-offer-card">
-              <span class="plyrcard-offer-icon"><i class="fa-solid fa-pen-nib" aria-hidden="true"></i></span>
+              <span class="plyrcard-offer-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m8 7 4-4 4 4"/><path d="M6 21h12"/><path d="M7 13c2-3 8-3 10 0"/></svg></span>
               <span><h3 class="plyrcard-offer-title">Individual Graphic</h3><p class="plyrcard-offer-copy">Single custom athlete graphic</p></span>
               <strong class="plyrcard-offer-price">$35<small>Each</small></strong>
             </a>
             <a href="#" class="plyrcard-offer-card">
-              <span class="plyrcard-offer-icon"><i class="fa-solid fa-globe" aria-hidden="true"></i></span>
+              <span class="plyrcard-offer-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span>
               <span><h3 class="plyrcard-offer-title">Domain</h3><p class="plyrcard-offer-copy">Custom domain registration for your athlete site</p></span>
               <strong class="plyrcard-offer-price">$45<small>/Year</small></strong>
             </a>
           </div>
         </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="website" data-title="Go to my Website">
+          <div class="plyrcard-placeholder-panel">Placeholder for Go to my Website. Replace this with the athlete website URL or generated route.</div>
+        </div>
       @else
         <div class="plyrcard-drawer-view is-active" data-plyrcard-view="main">
           <div class="plyrcard-drawer-grid">
-            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="email-us">
-              <i class="plyrcard-menu-icon fa-regular fa-envelope" aria-hidden="true"></i><span>Email Us</span>
-            </button>
-            <a class="plyrcard-drawer-card" href="sms:{{ $plyrSupportPhoneHref }}">
-              <i class="plyrcard-menu-icon fa-regular fa-comment-dots" aria-hidden="true"></i><span>Text us</span>
-            </a>
-            <a class="plyrcard-drawer-card" href="tel:{{ $plyrSupportPhoneHref }}">
-              <i class="plyrcard-menu-icon fa-solid fa-phone-volume" aria-hidden="true"></i><span>Call us</span>
-            </a>
-            <a class="plyrcard-drawer-card" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener">
-              <i class="plyrcard-menu-icon fa-regular fa-comments" aria-hidden="true"></i><span>Chat Us</span>
-            </a>
-            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share">
-              <i class="plyrcard-menu-icon fa-solid fa-share-nodes" aria-hidden="true"></i><span>Share</span>
-            </button>
-            <a class="plyrcard-drawer-card" href="/book-demo">
-              <i class="plyrcard-menu-icon fa-regular fa-calendar-days" aria-hidden="true"></i><span>Book a Demo</span>
-            </a>
-            <a class="plyrcard-drawer-card" href="/pricing">
-              <i class="plyrcard-menu-icon fa-regular fa-user-plus" aria-hidden="true"></i><span>Register Now</span>
-            </a>
-            <a class="plyrcard-drawer-card is-accent" href="/admin">
-              <i class="plyrcard-menu-icon fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i><span>Login</span>
-            </a>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="email-us"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 8 8 6 8-6"/></svg><span>Email Us</span></button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="text-us"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4V5z"/><path d="M8 9h8"/></svg><span>Text us</span></button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="call-us"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.5 3 3.6 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.4.6 3.7.6.4 0 .8.4.8.8V20c0 .4-.4.8-.8.8C10.7 20.8 3.2 13.3 3.2 3.8c0-.4.4-.8.8-.8h3.7c.4 0 .8.4.8.8 0 1.3.2 2.5.6 3.7.1.4 0 .8-.3 1.1l-2.2 2.2z"/><path d="M15 4c2.8.5 4.5 2.2 5 5"/></svg><span>Call us</span></button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="chat-us"><svg viewBox="0 0 24 24"><path d="M4 6h10v8H8l-4 4V6z"/><path d="M12 10h8v8l-3-3h-5"/></svg><span>Chat Us</span></button>
+            <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="5" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.6 6.8-4.2M8.6 13.4l6.8 4.2"/></svg><span>Share</span></button>
+            <a class="plyrcard-drawer-card" href="/book-demo"><svg viewBox="0 0 24 24"><path d="M7 3v4M17 3v4M4 8h16M5 5h14v15H5z"/><path d="M8 12h2M12 12h2M16 12h2M8 16h2M12 16h2M16 16h2"/></svg><span>Book a Demo</span></a>
+            <a class="plyrcard-drawer-card" href="/registration?utm_plan=free"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.4-4 3.8-6 7-6 1.5 0 2.8.4 3.9 1.2"/><circle cx="18" cy="17" r="4"/><path d="M18 15v4M16 17h4"/></svg><span>Register Now</span></a>
+            <a class="plyrcard-drawer-card is-accent" href="/admin"><svg viewBox="0 0 24 24"><path d="M9 6h9v12H9"/><path d="m13 8 4 4-4 4"/><path d="M4 12h13"/></svg><span>Login</span></a>
           </div>
           <div class="plyrcard-drawer-section-divider"></div>
           <div class="plyrcard-social-row">
             <span class="plyrcard-social-label">Follow Us</span>
-            <a href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
-            <a href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
-            <a href="{{ $plyrXUrl }}" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
-            <a href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
+            <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17 7h.01"/></svg></a>
+            <a href="#" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M14 8h3V4h-3c-3 0-5 2-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-.6.4-1 1-1z"/></svg></a>
+            <a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="m4 4 16 16M20 4 4 20"/></svg></a>
+            <a href="#" aria-label="YouTube"><svg viewBox="0 0 24 24"><path d="M22 12s0-4-1-5c-.6-.7-1.3-.8-2-.9C16 5 12 5 12 5s-4 0-7 .1c-.7.1-1.4.2-2 .9-1 1-1 5-1 5s0 4 1 5c.6.7 1.3.8 2 .9 3 .1 7 .1 7 .1s4 0 7-.1c.7-.1 1.4-.2 2-.9 1-1 1-5 1-5z"/><path d="m10 9 5 3-5 3z"/></svg></a>
           </div>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="email-us" data-title="Email Us">
-          <a class="plyrcard-contact-card" href="mailto:{{ $plyrSupportEmail }}">
-            <i class="fa-regular fa-envelope" aria-hidden="true"></i>
-            <span><strong>{{ $plyrSupportEmail }}</strong><span>Tap to open Gmail or your email app.</span></span>
-          </a>
-        </div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="share" data-title="Share">
-          <div class="plyrcard-share-grid">
-            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode($plyrShareUrl) }}"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i><span>Facebook</span></a>
-            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.instagram.com/plyrcard/"><i class="fa-brands fa-instagram" aria-hidden="true"></i><span>Instagram</span></a>
-            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url={{ urlencode($plyrShareUrl) }}&text={{ urlencode('Check out PLYRCARD') }}"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i><span>X</span></a>
-            <a class="plyrcard-share-option" target="_blank" rel="noopener" href="https://www.youtube.com/@plyrcard"><i class="fa-brands fa-youtube" aria-hidden="true"></i><span>YouTube</span></a>
-          </div>
-          <p class="plyrcard-share-note">Facebook and X open pre-filled share dialogs. Instagram and YouTube do not support website pre-fill sharing, so they open the PLYRCARD profile/link destination.</p>
-        </div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="email-us" data-title="Email Us"><div class="plyrcard-placeholder-panel">Placeholder for Email Us. Replace with mailto link, contact form, or route.</div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="text-us" data-title="Text us"><div class="plyrcard-placeholder-panel">Placeholder for Text us. Replace with SMS link, form, or route.</div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="call-us" data-title="Call us"><div class="plyrcard-placeholder-panel">Placeholder for Call us. Replace with tel link or phone support details.</div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="chat-us" data-title="Chat Us"><div class="plyrcard-placeholder-panel">Placeholder for Chat Us. Replace with your chat widget trigger.</div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="share" data-title="Share"><div class="plyrcard-placeholder-panel">Placeholder for Share. Replace with native share code or referral link.</div></div>
       @endauth
     </div>
 
+    <button type="button" class="plyrcard-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false">
+      <span class="plyrcard-drawer-tab-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span>{{ $plyrLoggedIn ? 'Locker Room' : 'GET STARTED' }}</span>
+    </button>
   </section>
-
-  <button type="button" class="plyrcard-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false">
-    <span class="plyrcard-drawer-tab-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-    <span>{{ $plyrLoggedIn ? 'Locker Room' : 'GET STARTED' }}</span>
-  </button>
 </div>
+@endif
 
 <script>
   (function () {
@@ -1335,4 +1168,3 @@
     });
   })();
 </script>
-@endif
