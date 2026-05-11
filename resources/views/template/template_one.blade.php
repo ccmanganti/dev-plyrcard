@@ -992,6 +992,7 @@ HTML;
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    margin-left:-30px;
     width: 100%;
 }
 
@@ -1007,13 +1008,13 @@ HTML;
 }
 
 .footer-logo-slot{
-    width: 174px;
-    height: 104px;
+    /* width: 174px; */
+    height: 90px;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 174px;
-    margin-right: -38px;
+    /* align-items: center; */
+    justify-content: flex-center;
+    /* flex: 0 0 174px; */
+    /* margin-right: -38px; */
 }
 
 .footer-logo-slot:last-child{
