@@ -263,7 +263,7 @@
 
     $playerActionImageUrl = $resolveMediaUrl(
         $user?->action_image
-            ??,
+            ??
         ''
     );
 
