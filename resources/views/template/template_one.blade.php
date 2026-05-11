@@ -990,31 +990,29 @@ HTML;
 
 .footer-logos-wrap{
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-center;
     align-items: center;
-    margin-left:-30px;
-    width: 100%;
+    /* width: 100%; */
 }
 
 .footer-logos-row{
     display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    flex-wrap: nowrap;
+    justify-content: center;
     align-items: center;
     gap: 0;
     width: fit-content;
-    max-width: 100%;
+    /* max-width: 100%; */
     margin-left: auto;
 }
 
 .footer-logo-slot{
-    /* width: 174px; */
-    height: 90px;
+    width: 104px;
+    height: 104px;
     display: flex;
-    /* align-items: center; */
-    justify-content: flex-center;
-    /* flex: 0 0 174px; */
-    /* margin-right: -38px; */
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 104px;
 }
 
 .footer-logo-slot:last-child{
