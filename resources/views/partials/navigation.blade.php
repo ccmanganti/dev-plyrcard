@@ -157,22 +157,43 @@
     }
 
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
-    $plyrWebsiteActionLabel = $plyrOnPlayerWebsite ? 'Edit my Website' : 'View my Website';
-    $plyrWebsiteActionHref = $plyrOnPlayerWebsite ? '#' : ($plyrWebsiteUrl ?: '#');
-    $plyrWebsiteActionTarget = (! $plyrOnPlayerWebsite && $plyrWebsiteUrl) ? '_blank' : null;
-    $plyrWebsiteActionDisabled = (! $plyrOnPlayerWebsite && ! $plyrWebsiteUrl);
+    $plyrWebsiteActionLabel = 'Visit my Website';
+    $plyrWebsiteActionHref = $plyrWebsiteUrl ?: '#';
+    $plyrWebsiteActionTarget = $plyrWebsiteUrl ? '_blank' : null;
+    $plyrWebsiteActionDisabled = ! $plyrWebsiteUrl;
 
     $plyrSupportEmail = 'support@plyrcard.com';
     $plyrPhoneDisplay = '+1 571-888-0852';
     $plyrPhoneHref = '+15718880852';
     $plyrMainShareUrl = 'https://plyrcard.com';
     $plyrWebsiteShareUrl = $plyrWebsiteUrl ?: url('/');
+    $plyrPlayerCardShareUrl = $plyrWebsiteUrl ?: ($plyrRequestUrl ?: url('/'));
     $plyrLogoutAction = url('/admin/logout');
 
-    $plyrFacebookUrl = $plyrUser->facebook_url ?? $plyrUser->facebook ?? 'https://www.facebook.com/plyrcard';
-    $plyrInstagramUrl = $plyrUser->instagram_url ?? $plyrUser->instagram ?? 'https://www.instagram.com/plyrcard/';
-    $plyrXUrl = $plyrUser->x_url ?? $plyrUser->twitter_url ?? $plyrUser->twitter ?? 'https://x.com/plyrcard';
-    $plyrYouTubeUrl = $plyrUser->youtube_url ?? $plyrUser->youtube ?? 'https://www.youtube.com/@plyrcard';
+    $normalizePlayerUrl = function ($value, ?string $prefix = null) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (Str::startsWith($value, ['http://', 'https://'])) {
+            return $value;
+        }
+
+        $value = ltrim($value, '@/');
+
+        return $prefix ? rtrim($prefix, '/') . '/' . $value : 'https://' . $value;
+    };
+
+    $plyrFacebookUrl = $normalizePlayerUrl($plyrUser->facebook_url ?? $plyrUser->facebook ?? '', 'https://www.facebook.com') ?: null;
+    $plyrInstagramUrl = $normalizePlayerUrl($plyrUser->instagram_url ?? $plyrUser->instagram ?? $plyrUser->ig_handle ?? '', 'https://www.instagram.com') ?: null;
+    $plyrXUrl = $normalizePlayerUrl($plyrUser->x_url ?? $plyrUser->twitter_url ?? $plyrUser->twitter ?? $plyrUser->x_handle ?? '', 'https://x.com') ?: null;
+    $plyrYouTubeUrl = $normalizePlayerUrl($plyrUser->youtube_url ?? $plyrUser->youtube ?? $plyrUser->yt_url ?? '', 'https://www.youtube.com') ?: null;
+
+    $plyrCompanyFacebookUrl = 'https://www.facebook.com/plyrcard';
+    $plyrCompanyInstagramUrl = 'https://www.instagram.com/plyrcard/';
+    $plyrCompanyXUrl = 'https://x.com/plyrcard';
+    $plyrCompanyYouTubeUrl = 'https://www.youtube.com/@plyrcard';
 
     $plyrProfileUpdateAction = \Illuminate\Support\Facades\Route::has('locker-room.profile.update')
         ? route('locker-room.profile.update')
@@ -194,14 +215,68 @@
         : url('/admin/login');
 
     $plyrEditableProfileFields = [
-        'first_name', 'last_name', 'personal_email', 'phone', 'street', 'city', 'state', 'country',
+        'first_name', 'last_name', 'phone', 'street', 'city', 'state', 'country',
         'sport', 'position', 'jersey_number', 'year', 'gender', 'birth', 'gpa', 'height', 'weight',
         'player_bio', 'academic_accolades', 'sports_accolades', 'ig_handle', 'x_handle', 'yt_url',
-        'featured_video_url', 'featured_video_urls', 'press', 'parent', 'parent_email', 'parent_phone',
-        'sec_parent', 'sec_parent_email', 'sec_parent_phone', 'club_coach', 'club_coach_email',
-        'club_coach_phone', 'natl_coach', 'natl_coach_email', 'natl_coach_phone', 'tech_trainer',
-        'tech_trainer_email', 'tech_trainer_phone', 'snc_trainer', 'snc_trainer_email', 'snc_trainer_phone',
+        'featured_video_url', 'featured_video_urls', 'press', 'parent', 'parent_phone',
+        'sec_parent', 'sec_parent_phone', 'club_coach', 
+        'club_coach_phone', 'natl_coach', 'natl_coach_phone', 'tech_trainer',
+         'tech_trainer_phone', 'snc_trainer', 'snc_trainer_phone',
     ];
+
+    $plyrSportOptions = [
+        'basketball' => 'Basketball',
+        'volleyball' => 'Volleyball',
+        'football' => 'Football',
+        'baseball' => 'Baseball',
+        'softball' => 'Softball',
+        'soccer' => 'Soccer',
+        'tennis' => 'Tennis',
+        'badminton' => 'Badminton',
+        'table_tennis' => 'Table Tennis',
+        'track_and_field' => 'Track and Field',
+        'swimming' => 'Swimming',
+        'boxing' => 'Boxing',
+        'martial_arts' => 'Martial Arts',
+    ];
+
+    $plyrPositionOptionsBySport = [
+        'basketball' => ['point_guard' => 'Point Guard', 'shooting_guard' => 'Shooting Guard', 'small_forward' => 'Small Forward', 'power_forward' => 'Power Forward', 'center' => 'Center'],
+        'volleyball' => ['setter' => 'Setter', 'outside_hitter' => 'Outside Hitter', 'opposite_hitter' => 'Opposite Hitter', 'middle_blocker' => 'Middle Blocker', 'libero' => 'Libero', 'defensive_specialist' => 'Defensive Specialist'],
+        'football' => ['quarterback' => 'Quarterback', 'running_back' => 'Running Back', 'wide_receiver' => 'Wide Receiver', 'tight_end' => 'Tight End', 'offensive_line' => 'Offensive Line', 'defensive_line' => 'Defensive Line', 'linebacker' => 'Linebacker', 'cornerback' => 'Cornerback', 'safety' => 'Safety', 'kicker' => 'Kicker', 'punter' => 'Punter'],
+        'baseball' => ['pitcher' => 'Pitcher', 'catcher' => 'Catcher', 'first_base' => 'First Base', 'second_base' => 'Second Base', 'third_base' => 'Third Base', 'shortstop' => 'Shortstop', 'left_field' => 'Left Field', 'center_field' => 'Center Field', 'right_field' => 'Right Field', 'designated_hitter' => 'Designated Hitter'],
+        'softball' => ['pitcher' => 'Pitcher', 'catcher' => 'Catcher', 'first_base' => 'First Base', 'second_base' => 'Second Base', 'third_base' => 'Third Base', 'shortstop' => 'Shortstop', 'left_field' => 'Left Field', 'center_field' => 'Center Field', 'right_field' => 'Right Field'],
+        'soccer' => ['goalkeeper' => 'Goalkeeper', 'defender' => 'Defender', 'center_back' => 'Center Back', 'full_back' => 'Full Back', 'wing_back' => 'Wing Back', 'midfielder' => 'Midfielder', 'defensive_midfielder' => 'Defensive Midfielder', 'central_midfielder' => 'Central Midfielder', 'attacking_midfielder' => 'Attacking Midfielder', 'winger' => 'Winger', 'forward' => 'Forward', 'striker' => 'Striker'],
+        'tennis' => ['singles' => 'Singles', 'doubles' => 'Doubles'],
+        'badminton' => ['singles' => 'Singles', 'doubles' => 'Doubles', 'mixed_doubles' => 'Mixed Doubles'],
+        'table_tennis' => ['singles' => 'Singles', 'doubles' => 'Doubles', 'mixed_doubles' => 'Mixed Doubles'],
+        'track_and_field' => ['sprinter' => 'Sprinter', 'middle_distance' => 'Middle Distance', 'long_distance' => 'Long Distance', 'hurdler' => 'Hurdler', 'jumper' => 'Jumper', 'thrower' => 'Thrower', 'relay_runner' => 'Relay Runner', 'decathlete' => 'Decathlete', 'heptathlete' => 'Heptathlete'],
+        'swimming' => ['freestyle' => 'Freestyle', 'backstroke' => 'Backstroke', 'breaststroke' => 'Breaststroke', 'butterfly' => 'Butterfly', 'individual_medley' => 'Individual Medley', 'relay' => 'Relay'],
+        'boxing' => ['flyweight' => 'Flyweight', 'bantamweight' => 'Bantamweight', 'featherweight' => 'Featherweight', 'lightweight' => 'Lightweight', 'welterweight' => 'Welterweight', 'middleweight' => 'Middleweight', 'light_heavyweight' => 'Light Heavyweight', 'heavyweight' => 'Heavyweight'],
+        'martial_arts' => ['lightweight' => 'Lightweight', 'welterweight' => 'Welterweight', 'middleweight' => 'Middleweight', 'heavyweight' => 'Heavyweight', 'striker' => 'Striker', 'grappler' => 'Grappler', 'all_rounder' => 'All-Rounder'],
+    ];
+
+    $plyrSelectedPositions = $plyrLoggedIn && $plyrUser
+        ? (is_array($plyrUser->position ?? null)
+            ? $plyrUser->position
+            : collect(explode(',', (string) ($plyrUser->position ?? '')))->map(fn ($item) => trim($item))->filter()->values()->all())
+        : [];
+
+    $plyrPositionLabelToValue = collect($plyrPositionOptionsBySport)
+        ->flatMap(fn ($positionOptions) => collect($positionOptions)->mapWithKeys(fn ($label, $value) => [Str::lower($label) => $value]))
+        ->all();
+
+    $plyrSelectedPositions = collect($plyrSelectedPositions)
+        ->map(function ($position) use ($plyrPositionLabelToValue) {
+            $position = trim((string) $position);
+
+            return $plyrPositionLabelToValue[Str::lower($position)] ?? $position;
+        })
+        ->filter()
+        ->unique()
+        ->values()
+        ->all();
+
 
     $plyrCompletedProfileFields = 0;
     if ($plyrLoggedIn && $plyrUser) {
@@ -229,14 +304,18 @@
         default => 'Let’s get started — complete your PlyrCard to stand out.',
     };
 
+    $plyrWebsiteActionDisabled = ! $plyrWebsiteUrl || $plyrProfileCompletion < 75;
+    $plyrVisitWebsitePrompt = 'COMPLETE YOUR PROFILE Your profile is currently ' . $plyrProfileCompletion . '% complete. Complete at least 75% of your profile before previewing your card.';
+
+
 
     $plyrDashboardSections = [
-        'Basic Information' => ['first_name' => 'First name', 'last_name' => 'Last name', 'personal_email' => 'Personal email', 'phone' => 'Phone', 'birth' => 'Birth date', 'gender' => 'Sex'],
+        'Basic Information' => ['first_name' => 'First name', 'last_name' => 'Last name', 'phone' => 'Phone', 'birth' => 'Birth date', 'gender' => 'Sex'],
         'Location' => ['street' => 'Street', 'city' => 'City', 'state' => 'State / Province', 'country' => 'Country'],
         'Athlete Details' => ['sport' => 'Sport', 'position' => 'Position', 'jersey_number' => 'Roster #', 'year' => 'Graduation year', 'gpa' => 'GPA', 'height' => 'Height', 'weight' => 'Weight'],
         'Story & Accolades' => ['player_bio' => 'Player bio', 'academic_accolades' => 'Academic accolades', 'sports_accolades' => 'Sports accolades'],
         'Social & Media' => ['ig_handle' => 'Instagram', 'x_handle' => 'X', 'yt_url' => 'YouTube', 'featured_video_url' => 'Featured video', 'press' => 'Press'],
-        'People' => ['parent' => 'Primary parent', 'parent_email' => 'Parent email', 'parent_phone' => 'Parent phone', 'club_coach' => 'Club coach', 'club_coach_email' => 'Club coach email', 'club_coach_phone' => 'Club coach phone'],
+        'People' => ['parent' => 'Primary parent', 'parent_phone' => 'Parent phone', 'club_coach' => 'Club coach', 'club_coach_phone' => 'Club coach phone'],
     ];
 
     $plyrMissingProfileSections = [];
@@ -1216,15 +1295,11 @@
             <strong class="plyrcard-nav-group-title">Website</strong>
             <div class="plyrcard-drawer-grid">
               @if($plyrWebsiteActionDisabled)
-                <button type="button" class="plyrcard-drawer-card is-disabled" disabled aria-disabled="true"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
+                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="complete-profile-prompt"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
               @else
-                @if($plyrOnPlayerWebsite)
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="edit-website"><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></button>
-                @else
                 <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteActionHref }}" @if($plyrWebsiteActionTarget) target="{{ $plyrWebsiteActionTarget }}" rel="noopener" @endif><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></a>
-                @endif
               @endif
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share Card</span></button>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share my PlyrCard</span></button>
               <a class="plyrcard-drawer-card" href="/podcast"><i class="plyrcard-menu-icon fa-solid fa-podcast" aria-hidden="true"></i><span>PLYRCard Show</span></a>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte"><i class="plyrcard-menu-icon fa-solid fa-bag-shopping" aria-hidden="true"></i><span>A La Carte</span></button>
             </div>
@@ -1276,19 +1351,20 @@
           </form>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="share-card" data-title="Share Card">
+        <div class="plyrcard-drawer-view" data-plyrcard-view="share-card" data-title="Share my PlyrCard">
           <div class="plyrcard-form-card plyrcard-qr-wrap">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={{ urlencode($plyrWebsiteShareUrl) }}" alt="QR code for your PLYRCard">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={{ urlencode($plyrPlayerCardShareUrl) }}" alt="QR code for your PLYRCard">
             <div class="plyrcard-copy-line" style="width:100%;">
-              <input class="plyrcard-drawer-input" type="text" value="{{ $plyrWebsiteShareUrl }}" readonly data-plyrcard-copy-source>
-              <button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrWebsiteShareUrl }}">Copy</button>
+              <input class="plyrcard-drawer-input" type="text" value="{{ $plyrPlayerCardShareUrl }}" readonly data-plyrcard-copy-source>
+              <button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrPlayerCardShareUrl }}">Copy</button>
             </div>
             @if($plyrHasPremiumFeatures)
             <div class="plyrcard-share-options">
-              <a class="plyrcard-secondary-btn" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-facebook-f"></i> Facebook</a>
-              <a class="plyrcard-secondary-btn" href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>
-              <a class="plyrcard-secondary-btn" href="{{ $plyrXUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> X</a>
-              <a class="plyrcard-submit-btn" href="{{ $plyrWebsiteShareUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-globe"></i> Website</a>
+              @if($plyrFacebookUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-facebook-f"></i> Facebook</a>@endif
+              @if($plyrInstagramUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>@endif
+              @if($plyrXUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrXUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> X</a>@endif
+              @if($plyrYouTubeUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i> YouTube</a>@endif
+              <a class="plyrcard-submit-btn" href="{{ $plyrPlayerCardShareUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-id-card"></i> PlyrCard</a>
             </div>
             @else
             <div class="plyrcard-locked-panel" style="width:100%;">
@@ -1297,6 +1373,18 @@
               <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">See Plans</button>
             </div>
             @endif
+          </div>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="complete-profile-prompt" data-title="Complete Your Profile">
+          <div class="plyrcard-mini-panel plyrcard-form-stack">
+            <h3 class="plyrcard-mini-title">COMPLETE YOUR PROFILE</h3>
+            <p class="plyrcard-mini-copy">Your profile is currently {{ $plyrProfileCompletion }}% complete. Complete at least 75% of your profile before previewing your card.</p>
+            <div class="plyrcard-progress-shell"><div class="plyrcard-progress-fill" style="--value: {{ $plyrProfileCompletion }}%;"></div></div>
+            <div class="plyrcard-share-options">
+              <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="profile"><i class="fa-solid fa-user-pen"></i> Complete Profile</button>
+              <button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="dashboard"><i class="fa-solid fa-chart-pie"></i> View Progress</button>
+            </div>
           </div>
         </div>
 
@@ -1402,15 +1490,13 @@
         <div class="plyrcard-drawer-view" data-plyrcard-view="profile" data-title="Profile">
           <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrProfileUpdateAction }}" method="POST" enctype="multipart/form-data" data-plyrcard-ajax-form data-success-message="Profile saved successfully.">
             @csrf
-            <p class="plyrcard-mini-copy">Update your player profile. Your PlyrCard login email is locked and cannot be edited here.</p>
+            <p class="plyrcard-mini-copy">Update your player profile details.</p>
 
             <details class="plyrcard-profile-section" open>
               <summary><i class="fa-solid fa-user"></i> Basic Info</summary>
-              <label class="plyrcard-input-label">Locked Login Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="email" value="{{ $plyrUser->email ?? '' }}" readonly disabled></span></label>
               <div class="plyrcard-profile-grid">
                 <label class="plyrcard-input-label">First Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="first_name" value="{{ old('first_name', $plyrUser->first_name ?? '') }}" placeholder="First name" required></span></label>
                 <label class="plyrcard-input-label">Last Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="last_name" value="{{ old('last_name', $plyrUser->last_name ?? '') }}" placeholder="Last name" required></span></label>
-                <label class="plyrcard-input-label">Personal Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="personal_email" value="{{ old('personal_email', $plyrUser->personal_email ?? '') }}" placeholder="personal@example.com"></span></label>
                 <label class="plyrcard-input-label">Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="phone" value="{{ old('phone', $plyrUser->phone ?? '') }}" placeholder="+1 (555) 000-0000"></span></label>
               </div>
             </details>
@@ -1428,8 +1514,8 @@
             <details class="plyrcard-profile-section" open>
               <summary><i class="fa-solid fa-trophy"></i> Athlete Info</summary>
               <div class="plyrcard-profile-grid">
-                <label class="plyrcard-input-label">Sport<span class="plyrcard-input-wrap"><i class="fa-solid fa-medal"></i><select class="plyrcard-drawer-select" name="sport"><option value="">Select sport</option>@foreach(['basketball'=>'Basketball','volleyball'=>'Volleyball','football'=>'Football','baseball'=>'Baseball','softball'=>'Softball','soccer'=>'Soccer','tennis'=>'Tennis','badminton'=>'Badminton','table_tennis'=>'Table Tennis','track_and_field'=>'Track and Field','swimming'=>'Swimming','boxing'=>'Boxing','martial_arts'=>'Martial Arts'] as $sportValue => $sportLabel)<option value="{{ $sportValue }}" @selected(old('sport', $plyrUser->sport ?? '') === $sportValue)>{{ $sportLabel }}</option>@endforeach</select></span></label>
-                <label class="plyrcard-input-label">Position(s)<span class="plyrcard-input-wrap"><i class="fa-solid fa-rectangle-list"></i><input class="plyrcard-drawer-input" name="position" value="{{ old('position', is_array($plyrUser->position ?? null) ? implode(', ', $plyrUser->position) : ($plyrUser->position ?? '')) }}" placeholder="Point Guard, Forward"></span></label>
+                <label class="plyrcard-input-label">Sport<span class="plyrcard-input-wrap"><i class="fa-solid fa-medal"></i><select class="plyrcard-drawer-select" name="sport" data-plyrcard-sport-select><option value="">Select sport</option>@foreach($plyrSportOptions as $sportValue => $sportLabel)<option value="{{ $sportValue }}" @selected(old('sport', $plyrUser->sport ?? '') === $sportValue)>{{ $sportLabel }}</option>@endforeach</select></span></label>
+                <label class="plyrcard-input-label">Position(s)<span class="plyrcard-input-wrap"><i class="fa-solid fa-rectangle-list"></i><select class="plyrcard-drawer-select" name="position[]" multiple data-plyrcard-position-select aria-label="Select one or more positions" data-selected='@json(old("position", $plyrSelectedPositions))'>@foreach($plyrPositionOptionsBySport as $sportKey => $positionOptions)@foreach($positionOptions as $positionValue => $positionLabel)<option value="{{ $positionValue }}" data-sport="{{ $sportKey }}" @selected(in_array($positionValue, old('position', $plyrSelectedPositions), true))>{{ $positionLabel }}</option>@endforeach@endforeach</select></span></label>
                 <label class="plyrcard-input-label">Roster Number<span class="plyrcard-input-wrap"><i class="fa-solid fa-hashtag"></i><input class="plyrcard-drawer-input" name="jersey_number" value="{{ old('jersey_number', $plyrUser->jersey_number ?? '') }}" placeholder="19"></span></label>
                 <label class="plyrcard-input-label">Graduation Year<span class="plyrcard-input-wrap"><i class="fa-solid fa-graduation-cap"></i><input class="plyrcard-drawer-input" type="number" min="2000" max="2100" name="year" value="{{ old('year', $plyrUser->year ?? '') }}" placeholder="2027"></span></label>
                 <label class="plyrcard-input-label">Sex<span class="plyrcard-input-wrap"><i class="fa-solid fa-user"></i><select class="plyrcard-drawer-select" name="gender"><option value="">Select sex</option><option value="male" @selected(old('gender', $plyrUser->gender ?? '') === 'male')>Male</option><option value="female" @selected(old('gender', $plyrUser->gender ?? '') === 'female')>Female</option></select></span></label>
@@ -1495,13 +1581,10 @@
               <summary><i class="fa-solid fa-people-group"></i> Parents, Coaches & Trainers</summary>
               <div class="plyrcard-profile-grid">
                 <label class="plyrcard-input-label">Primary Parent<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="parent" value="{{ old('parent', $plyrUser->parent ?? '') }}" placeholder="Full name"></span></label>
-                <label class="plyrcard-input-label">Parent Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="parent_email" value="{{ old('parent_email', $plyrUser->parent_email ?? '') }}" placeholder="parent@example.com"></span></label>
                 <label class="plyrcard-input-label">Parent Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="parent_phone" value="{{ old('parent_phone', $plyrUser->parent_phone ?? '') }}" placeholder="+1 (555) 000-0000"></span></label>
                 <label class="plyrcard-input-label">Secondary Parent<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="sec_parent" value="{{ old('sec_parent', $plyrUser->sec_parent ?? '') }}" placeholder="Full name"></span></label>
-                <label class="plyrcard-input-label">Secondary Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="sec_parent_email" value="{{ old('sec_parent_email', $plyrUser->sec_parent_email ?? '') }}" placeholder="parent2@example.com"></span></label>
                 <label class="plyrcard-input-label">Secondary Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="sec_parent_phone" value="{{ old('sec_parent_phone', $plyrUser->sec_parent_phone ?? '') }}" placeholder="+1 (555) 000-0000"></span></label>
                 <label class="plyrcard-input-label">Club Coach<span class="plyrcard-input-wrap"><i class="fa-solid fa-bullhorn"></i><input class="plyrcard-drawer-input" name="club_coach" value="{{ old('club_coach', $plyrUser->club_coach ?? '') }}" placeholder="Coach name"></span></label>
-                <label class="plyrcard-input-label">Club Coach Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="club_coach_email" value="{{ old('club_coach_email', $plyrUser->club_coach_email ?? '') }}" placeholder="coach@example.com"></span></label>
                 <label class="plyrcard-input-label">Club Coach Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="club_coach_phone" value="{{ old('club_coach_phone', $plyrUser->club_coach_phone ?? '') }}" placeholder="+1 (555) 000-0000"></span></label>
                 <label class="plyrcard-input-label">National Team Coach<span class="plyrcard-input-wrap"><i class="fa-solid fa-flag"></i><input class="plyrcard-drawer-input" name="natl_coach" value="{{ old('natl_coach', $plyrUser->natl_coach ?? '') }}" placeholder="Coach name"></span></label>
                 <label class="plyrcard-input-label">Technical Trainer<span class="plyrcard-input-wrap"><i class="fa-solid fa-bolt"></i><input class="plyrcard-drawer-input" name="tech_trainer" value="{{ old('tech_trainer', $plyrUser->tech_trainer ?? '') }}" placeholder="Trainer name"></span></label>
@@ -1513,9 +1596,6 @@
           </form>
         </div>
         
-<div class="plyrcard-drawer-view" data-plyrcard-view="edit-website" data-title="Edit Website">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Edit Website</h3><p class="plyrcard-mini-copy">Website editing tools can be embedded here so players stay on their card.</p><div class="plyrcard-share-options"><button type="button" class="plyrcard-submit-btn"><i class="fa-solid fa-pen-to-square"></i> Website Editor</button>@if($plyrWebsiteUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrWebsiteUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Website</a>@endif</div></div>
-        </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="upgrade" data-title="Upgrade">
           <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Upgrade</h3><p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Add your plan upgrade cards or checkout embed here.</p><div class="plyrcard-share-options"><button type="button" class="plyrcard-secondary-btn">Free</button><button type="button" class="plyrcard-secondary-btn">Plyr</button><button type="button" class="plyrcard-submit-btn">My Journey</button><button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="a-la-carte">Add-ons</button></div></div>
         </div>
@@ -1593,7 +1673,7 @@
             <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="email-us"><i class="plyrcard-menu-icon fa-solid fa-envelope"></i><span>Email Us</span></button>
             <a class="plyrcard-drawer-card" href="sms:{{ $plyrPhoneHref }}"><i class="plyrcard-menu-icon fa-solid fa-comment-dots"></i><span>Text us</span></a>
             <a class="plyrcard-drawer-card" href="tel:{{ $plyrPhoneHref }}"><i class="plyrcard-menu-icon fa-solid fa-phone"></i><span>Call us</span></a>
-            <a class="plyrcard-drawer-card" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="plyrcard-menu-icon fa-brands fa-facebook-messenger"></i><span>Chat Us</span></a>
+            <a class="plyrcard-drawer-card" href="{{ $plyrCompanyFacebookUrl }}" target="_blank" rel="noopener"><i class="plyrcard-menu-icon fa-brands fa-facebook-messenger"></i><span>Chat Us</span></a>
           </div></div>
           <div class="plyrcard-nav-group"><strong class="plyrcard-nav-group-title">Start</strong><div class="plyrcard-drawer-grid">
             <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-site"><i class="plyrcard-menu-icon fa-solid fa-share-nodes"></i><span>Share</span></button>
@@ -1643,7 +1723,7 @@
     let drawer = document.getElementById('plyrcard-action-drawer');
     if (!drawer) return;
 
-    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'edit-website', 'settings', 'billing', 'upgrade'];
+    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade'];
     let viewStack = ['main'];
     let currentView = 'main';
     let alertTimer = null;
@@ -1924,6 +2004,27 @@
             window.prompt('Copy this URL:', value);
           }
         });
+      });
+
+      qa('[data-plyrcard-sport-select]').forEach(sportSelect => {
+        if (sportSelect.dataset.plyrPositionBound) return;
+        sportSelect.dataset.plyrPositionBound = '1';
+        const form = sportSelect.closest('form') || drawer;
+        const positionSelect = form.querySelector('[data-plyrcard-position-select]');
+        if (!positionSelect) return;
+
+        const syncPositions = () => {
+          const sport = sportSelect.value || '';
+          Array.from(positionSelect.options).forEach(option => {
+            const matchesSport = !sport || option.dataset.sport === sport;
+            option.hidden = !matchesSport;
+            option.disabled = !matchesSport;
+            if (!matchesSport) option.selected = false;
+          });
+        };
+
+        sportSelect.addEventListener('change', syncPositions);
+        syncPositions();
       });
     }
 

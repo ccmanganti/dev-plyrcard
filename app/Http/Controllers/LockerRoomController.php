@@ -20,7 +20,6 @@ class LockerRoomController extends Controller
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'personal_email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'personal_email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:255'],
             'street' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
@@ -28,7 +27,8 @@ class LockerRoomController extends Controller
             'country' => ['nullable', 'string', 'max:255'],
 
             'sport' => ['nullable', 'string', 'max:255'],
-            'position' => ['nullable', 'string', 'max:1000'],
+            'position' => ['nullable', 'array'],
+            'position.*' => ['nullable', 'string', 'max:255'],
             'jersey_number' => ['nullable', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'gender' => ['nullable', Rule::in(['male', 'female'])],
@@ -55,22 +55,16 @@ class LockerRoomController extends Controller
             'press' => ['nullable', 'string'],
 
             'parent' => ['nullable', 'string', 'max:255'],
-            'parent_email' => ['nullable', 'email', 'max:255'],
             'parent_phone' => ['nullable', 'string', 'max:255'],
             'sec_parent' => ['nullable', 'string', 'max:255'],
-            'sec_parent_email' => ['nullable', 'email', 'max:255'],
             'sec_parent_phone' => ['nullable', 'string', 'max:255'],
             'club_coach' => ['nullable', 'string', 'max:255'],
-            'club_coach_email' => ['nullable', 'email', 'max:255'],
             'club_coach_phone' => ['nullable', 'string', 'max:255'],
             'natl_coach' => ['nullable', 'string', 'max:255'],
-            'natl_coach_email' => ['nullable', 'email', 'max:255'],
             'natl_coach_phone' => ['nullable', 'string', 'max:255'],
             'tech_trainer' => ['nullable', 'string', 'max:255'],
-            'tech_trainer_email' => ['nullable', 'email', 'max:255'],
             'tech_trainer_phone' => ['nullable', 'string', 'max:255'],
             'snc_trainer' => ['nullable', 'string', 'max:255'],
-            'snc_trainer_email' => ['nullable', 'email', 'max:255'],
             'snc_trainer_phone' => ['nullable', 'string', 'max:255'],
 
             'plyrcard_image' => ['nullable', 'image', 'max:10240'],
@@ -82,12 +76,24 @@ class LockerRoomController extends Controller
         ]);
 
         // Never let the drawer update the login email or security/role fields.
-        unset($data['email'], $data['password'], $data['roles']);
+        unset(
+            $data['email'],
+            $data['personal_email'],
+            $data['parent_email'],
+            $data['sec_parent_email'],
+            $data['club_coach_email'],
+            $data['natl_coach_email'],
+            $data['tech_trainer_email'],
+            $data['snc_trainer_email'],
+            $data['password'],
+            $data['roles']
+        );
 
         if (array_key_exists('position', $data)) {
-            $data['position'] = collect(explode(',', (string) $data['position']))
-                ->map(fn ($position) => trim($position))
+            $data['position'] = collect($data['position'] ?? [])
+                ->map(fn ($position) => trim((string) $position))
                 ->filter()
+                ->unique()
                 ->values()
                 ->all();
         }
