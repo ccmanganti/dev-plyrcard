@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\LockerRoomController;
 use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
+use App\Models\Website;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,6 +47,7 @@ $reservedWebsiteSlugs = implode('|', [
     'filament',
     'storage',
     'api',
+    'locker-room',
 ]);
 
 /*
@@ -103,7 +106,7 @@ Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController
 */
 
 Route::prefix('admin/websites')
-    ->middleware(['web', 'auth'])
+    ->middleware(['auth'])
     ->name('websites.')
     ->group(function () {
         Route::get('/{id}/editor', [WebsiteEditorController::class, 'editor'])
@@ -128,7 +131,7 @@ Route::prefix('admin/websites')
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['web', 'auth'])->post('/onboarding/complete', function (Request $request) {
+Route::post('/onboarding/complete', function (Request $request) {
     $user = $request->user();
 
     if (! $user) {
@@ -149,24 +152,21 @@ Route::middleware(['web', 'auth'])->post('/onboarding/complete', function (Reque
         'user_id' => $user->id,
         'onboarding_completed_at' => optional($user->onboarding_completed_at)->toDateTimeString(),
     ]);
-})->name('onboarding.complete');
+})
+    ->middleware(['auth'])
+    ->name('onboarding.complete');
 
 /*
 |--------------------------------------------------------------------------
-| Public website-by-name route
+| Drawer login route
 |--------------------------------------------------------------------------
 |
-| Keep this at the very bottom.
-| This prevents public website names from hijacking reserved app routes.
+| Do not use /admin/login here. Filament owns /admin/login.
+| This route is for the Locker Room / Get Started drawer login form.
 |
 */
 
-Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
-    ->where('websiteName', '^(?!(' . $reservedWebsiteSlugs . ')$)[A-Za-z0-9\-]+$')
-    ->name('website.show-by-name');
-
-
-Route::post('/admin/login', function (Request $request) {
+Route::post('/locker-room/login', function (Request $request) {
     $credentials = $request->validate([
         'email' => ['required', 'email'],
         'password' => ['required', 'string'],
@@ -182,7 +182,7 @@ Route::post('/admin/login', function (Request $request) {
 
     $user = Auth::user();
 
-    $website = \App\Models\Website::query()
+    $website = Website::query()
         ->where('user_id', $user->id)
         ->where('is_active', true)
         ->where('is_published', true)
@@ -195,6 +195,7 @@ Route::post('/admin/login', function (Request $request) {
 
     if (! blank($website->domain)) {
         $domain = preg_replace('#^https?://#i', '', trim($website->domain));
+
         return redirect()->away('https://' . rtrim($domain, '/'));
     }
 
@@ -203,4 +204,41 @@ Route::post('/admin/login', function (Request $request) {
     }
 
     return redirect('/');
-})->middleware('web')->name('plyrcard.drawer-login');
+})->name('plyrcard.drawer-login');
+
+/*
+|--------------------------------------------------------------------------
+| Locker Room drawer form routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth'])->group(function () {
+    Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
+        ->name('locker-room.profile.update');
+
+    Route::post('/locker-room/schedule', [LockerRoomController::class, 'storeSchedule'])
+        ->name('locker-room.schedule.store');
+
+    Route::post('/locker-room/settings', [LockerRoomController::class, 'updateSettings'])
+        ->name('locker-room.settings.update');
+
+    Route::post('/locker-room/support', [LockerRoomController::class, 'storeSupport'])
+        ->name('locker-room.support.store');
+
+    Route::post('/locker-room/referral', [LockerRoomController::class, 'storeReferral'])
+        ->name('locker-room.referral.store');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Public website-by-name route
+|--------------------------------------------------------------------------
+|
+| Keep this at the very bottom.
+| This prevents public website names from hijacking reserved app routes.
+|
+*/
+
+Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
+    ->where('websiteName', '^(?!(' . $reservedWebsiteSlugs . ')$)[A-Za-z0-9\-]+$')
+    ->name('website.show-by-name');
