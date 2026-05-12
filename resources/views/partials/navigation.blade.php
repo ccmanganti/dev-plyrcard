@@ -78,21 +78,89 @@
     $plyrOnMainPlyrSite = in_array($plyrCurrentHostNormalized, $plyrMainHosts, true)
         || in_array($plyrCurrentHostBase, $plyrMainHostBases, true);
 
+    $plyrDomainMatchesHost = function ($domain) use ($plyrNormalizeDomain, $plyrDomainBase, $plyrCurrentHostNormalized, $plyrCurrentHostBase) {
+        $normalizedDomain = $plyrNormalizeDomain($domain);
+        $baseDomain = $plyrDomainBase($normalizedDomain);
+
+        if (blank($normalizedDomain) || blank($baseDomain)) {
+            return false;
+        }
+
+        return $normalizedDomain === $plyrCurrentHostNormalized
+            || $normalizedDomain === 'www.' . $plyrCurrentHostBase
+            || $baseDomain === $plyrCurrentHostBase
+            || 'www.' . $baseDomain === $plyrCurrentHostNormalized;
+    };
+
+    $plyrWebsiteMatchesCurrentRequest = function (Website $website) use ($plyrDomainMatchesHost, $plyrCurrentPath) {
+        if (! blank($website->domain) && $plyrDomainMatchesHost($website->domain)) {
+            return true;
+        }
+
+        $pathSlug = strtolower(trim((string) $plyrCurrentPath, '/'));
+
+        if ($pathSlug === '') {
+            return false;
+        }
+
+        $websiteSlug = strtolower(trim((string) $website->slug, '/'));
+        $websiteNameSlug = Str::slug((string) $website->name);
+
+        return ($websiteSlug && $websiteSlug === $pathSlug)
+            || ($websiteNameSlug && $websiteNameSlug === $pathSlug);
+    };
+
+    $plyrOwnedWebsites = collect();
     $plyrWebsite = null;
     $plyrWebsiteUrl = null;
 
     if ($plyrLoggedIn && $plyrUser && class_exists(Website::class)) {
-        $plyrWebsite = Website::query()
-            ->where('user_id', $plyrUser->id)
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->latest('updated_at')
-            ->first();
+        try {
+            if (method_exists($plyrUser, 'websites')) {
+                $relationshipResult = $plyrUser->websites()
+                    ->where('is_active', true)
+                    ->where('is_published', true)
+                    ->latest('updated_at')
+                    ->get();
+
+                $plyrOwnedWebsites = collect($relationshipResult);
+            } elseif (method_exists($plyrUser, 'website')) {
+                $relationshipResult = $plyrUser->website();
+
+                if (method_exists($relationshipResult, 'where')) {
+                    $relationshipResult = $relationshipResult
+                        ->where('is_active', true)
+                        ->where('is_published', true)
+                        ->latest('updated_at')
+                        ->get();
+                } elseif (method_exists($relationshipResult, 'getResults')) {
+                    $relationshipResult = $relationshipResult->getResults();
+                }
+
+                $plyrOwnedWebsites = $relationshipResult instanceof \Illuminate\Support\Collection
+                    ? $relationshipResult
+                    : collect($relationshipResult ? [$relationshipResult] : []);
+            }
+        } catch (\Throwable $e) {
+            $plyrOwnedWebsites = collect();
+        }
+
+        if ($plyrOwnedWebsites->isEmpty()) {
+            $plyrOwnedWebsites = Website::query()
+                ->where('user_id', $plyrUser->id)
+                ->where('is_active', true)
+                ->where('is_published', true)
+                ->latest('updated_at')
+                ->get();
+        }
+
+        $plyrWebsite = $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website))
+            ?: $plyrOwnedWebsites->first();
 
         if ($plyrWebsite) {
             if (! blank($plyrWebsite->domain)) {
-                $domain = preg_replace('#^https?://#i', '', trim($plyrWebsite->domain));
-                $plyrWebsiteUrl = 'https://' . rtrim($domain, '/');
+                $domain = $plyrNormalizeDomain($plyrWebsite->domain);
+                $plyrWebsiteUrl = $domain ? 'https://' . $domain : null;
             } elseif (! blank($plyrWebsite->slug)) {
                 $plyrWebsiteUrl = url('/' . ltrim($plyrWebsite->slug, '/'));
             } elseif (! blank($plyrWebsite->name)) {
@@ -104,24 +172,23 @@
     $plyrViewedWebsite = null;
 
     if (class_exists(Website::class)) {
-        // Custom-domain player site detection. This covers domains such as ernestomarin.com.
-        if (! $plyrOnMainPlyrSite) {
+        // First detect the logged-in player's own website from their User -> Website relationship.
+        // This is the important custom-domain path for player-owned domains such as selinpehlivan.com.
+        if ($plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
+            $plyrViewedWebsite = $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
+        }
+
+        // Custom-domain player site detection for public visits and other players' domains.
+        if (! $plyrViewedWebsite && ! $plyrOnMainPlyrSite) {
             $plyrViewedWebsite = Website::query()
                 ->where('is_active', true)
                 ->where('is_published', true)
                 ->whereNotNull('domain')
                 ->get()
-                ->first(function (Website $website) use ($plyrCurrentHostNormalized, $plyrCurrentHostBase, $plyrNormalizeDomain, $plyrDomainBase) {
-                    $domain = $plyrNormalizeDomain($website->domain);
-                    $domainBase = $plyrDomainBase($domain);
-
-                    return $domain === $plyrCurrentHostNormalized
-                        || $domain === 'www.' . $plyrCurrentHostBase
-                        || $domainBase === $plyrCurrentHostBase;
-                });
+                ->first(fn (Website $website) => $plyrDomainMatchesHost($website->domain));
         }
 
-        // Path-based player site detection for main-domain URLs like /player-name.
+        // Path-based player site detection for main-domain URLs like /selin-pehlivan.
         if (! $plyrViewedWebsite && ! $plyrOnAdmin && $plyrCurrentPath !== '' && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
             $pathSlug = strtolower($plyrCurrentPath);
             $plyrViewedWebsite = Website::query()
@@ -144,28 +211,12 @@
         }
     }
 
-    // Fallback for the logged-in player's own custom domain. This covers cases where the domain
-    // is stored with or without www, for example selinpehlivan.com vs www.selinpehlivan.com.
-    if (! $plyrViewedWebsite && $plyrLoggedIn && $plyrWebsite && ! $plyrOnMainPlyrSite && ! blank($plyrWebsite->domain)) {
-        $ownDomainBase = $plyrDomainBase($plyrWebsite->domain);
-
-        if ($ownDomainBase && $ownDomainBase === $plyrCurrentHostBase) {
-            $plyrViewedWebsite = $plyrWebsite;
-        }
-    }
-
     $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true) || (bool) $plyrViewedWebsite;
     $plyrOwnsViewedWebsite = $plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id);
 
-    // When included from the player's own template with activePage only, fall back to the user's published website.
-    if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrWebsite) {
-        $ownSlug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
-        $ownDomain = $plyrWebsite->domain ? $plyrNormalizeDomain($plyrWebsite->domain) : null;
-        $ownDomainBase = $ownDomain ? $plyrDomainBase($ownDomain) : null;
-
-        $plyrOwnsViewedWebsite = ($ownSlug && strtolower($ownSlug) === strtolower($plyrCurrentPath))
-            || ($ownDomain && $ownDomain === $plyrCurrentHostNormalized)
-            || ($ownDomainBase && $ownDomainBase === $plyrCurrentHostBase);
+    // Final fallback for custom-domain templates where activePage is passed but the request was not matched earlier.
+    if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
+        $plyrOwnsViewedWebsite = (bool) $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
     }
 
     $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
@@ -178,10 +229,7 @@
      * - Other player websites: show nothing.
      */
     if ($plyrOnPlayerWebsite) {
-        // Show Locker Room on the logged-in player's own website.
-        // For player templates that pass activePage without a detected Website record, allow the logged-in
-        // user to see Locker Room when they have a published site attached to their account.
-        $plyrShouldRenderPullup = $plyrLoggedIn && ($plyrOwnsViewedWebsite || ($plyrWebsite && in_array($plyrActivePage, ['website', 'player', 'player-website'], true)));
+        $plyrShouldRenderPullup = $plyrLoggedIn && $plyrOwnsViewedWebsite;
     } else {
         $plyrShouldRenderPullup = true;
     }
