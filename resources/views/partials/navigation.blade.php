@@ -1663,6 +1663,182 @@
       .plyrcard-plan-card { min-height: 430px !important; }
     }
 
+
+
+    /* Upgrade drawer polish: scoped so the rest of the navigation styling stays intact. */
+    .plyrcard-upgrade-shell {
+      background: #050505 !important;
+      border-color: rgba(255,255,255,.12) !important;
+      box-shadow: none !important;
+      padding: 10px !important;
+      gap: 12px !important;
+    }
+
+    .plyrcard-upgrade-hero {
+      min-height: 154px !important;
+      border-radius: 16px !important;
+      padding: 18px !important;
+      background:
+        radial-gradient(circle at 88% 74%, rgba(255,92,53,.32), transparent 0 37px, transparent 38px),
+        radial-gradient(circle at 100% 0%, rgba(255,92,53,.26), transparent 36%),
+        linear-gradient(135deg, #fff3ef 0%, #fff 55%, #f5f5f5 100%) !important;
+      border: 1px solid rgba(255,92,53,.36) !important;
+      box-shadow: 0 10px 26px rgba(0,0,0,.24) !important;
+      align-items: center !important;
+    }
+
+    .plyrcard-upgrade-title {
+      font-size: clamp(28px, 7vw, 44px) !important;
+      line-height: .92 !important;
+      letter-spacing: .015em !important;
+      max-width: 82% !important;
+    }
+
+    .plyrcard-upgrade-note {
+      max-width: 82% !important;
+      color: rgba(0,0,0,.66) !important;
+      font-size: 13px !important;
+      line-height: 1.22 !important;
+    }
+
+    .plyrcard-upgrade-crown {
+      position: absolute !important;
+      right: 18px !important;
+      bottom: 18px !important;
+      width: 54px !important;
+      height: 54px !important;
+      background: rgba(255,92,53,.13) !important;
+      border-color: rgba(255,92,53,.32) !important;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.42) !important;
+    }
+
+    .plyrcard-upgrade-card-grid {
+      gap: 10px !important;
+    }
+
+    .plyrcard-plan-card {
+      min-height: auto !important;
+      gap: 11px !important;
+      padding: 16px !important;
+      border-radius: 16px !important;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(255,255,255,.06), transparent 42%),
+        linear-gradient(180deg, #17181c 0%, #101115 100%) !important;
+      color: #fff !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      box-shadow: 0 12px 24px rgba(0,0,0,.32) !important;
+    }
+
+    .plyrcard-plan-card.is-featured {
+      background:
+        radial-gradient(circle at 100% 0%, rgba(255,92,53,.22), transparent 42%),
+        linear-gradient(180deg, #201311 0%, #120c0b 100%) !important;
+      border-color: rgba(255,92,53,.58) !important;
+      box-shadow: 0 14px 28px rgba(255,92,53,.14), 0 12px 24px rgba(0,0,0,.34) !important;
+    }
+
+    .plyrcard-plan-card.is-current {
+      background:
+        radial-gradient(circle at 100% 0%, rgba(22,139,255,.22), transparent 42%),
+        linear-gradient(180deg, #111b25 0%, #091018 100%) !important;
+      border-color: rgba(22,139,255,.56) !important;
+    }
+
+    .plyrcard-plan-card.is-myjourney:not(.is-current) {
+      background:
+        radial-gradient(circle at 100% 0%, rgba(22,139,255,.14), transparent 42%),
+        linear-gradient(180deg, #14181f 0%, #0f1116 100%) !important;
+      border-color: rgba(22,139,255,.36) !important;
+    }
+
+    .plyrcard-plan-icon {
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 10px !important;
+      background: rgba(255,255,255,.08) !important;
+      color: rgba(255,255,255,.78) !important;
+    }
+
+    .plyrcard-plan-card.is-featured .plyrcard-plan-icon { background: rgba(255,92,53,.18) !important; color: var(--plyr-accent) !important; }
+    .plyrcard-plan-card.is-current .plyrcard-plan-icon,
+    .plyrcard-plan-card.is-myjourney .plyrcard-plan-icon { background: rgba(22,139,255,.18) !important; color: #168bff !important; }
+
+    .plyrcard-plan-name {
+      color: #fff !important;
+      font-size: 25px !important;
+      line-height: .95 !important;
+    }
+
+    .plyrcard-plan-price {
+      display: flex !important;
+      align-items: baseline !important;
+      gap: 4px !important;
+      margin: 8px 0 3px !important;
+      color: var(--plyr-accent) !important;
+      font-size: 32px !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
+    }
+
+    .plyrcard-plan-card.is-current .plyrcard-plan-price,
+    .plyrcard-plan-card.is-myjourney .plyrcard-plan-price { color: #168bff !important; }
+
+    .plyrcard-plan-price small {
+      color: rgba(255,255,255,.62) !important;
+      font-size: 11px !important;
+      line-height: 1 !important;
+      transform: translateY(-1px) !important;
+    }
+
+    .plyrcard-plan-subtitle {
+      margin: 0 !important;
+      color: rgba(255,255,255,.62) !important;
+      font-size: 12px !important;
+      line-height: 1.2 !important;
+    }
+
+    .plyrcard-plan-features {
+      gap: 9px !important;
+      margin-top: 2px !important;
+    }
+
+    .plyrcard-plan-features li {
+      color: rgba(255,255,255,.90) !important;
+      font-size: 12px !important;
+      line-height: 1.18 !important;
+      grid-template-columns: 15px 1fr !important;
+    }
+
+    .plyrcard-plan-features .is-muted { color: rgba(255,255,255,.38) !important; }
+    .plyrcard-plan-features .is-muted i { color: rgba(255,255,255,.36) !important; }
+
+    .plyrcard-plan-footer-note {
+      background: rgba(255,255,255,.07) !important;
+      color: rgba(255,255,255,.60) !important;
+      border: 1px solid rgba(255,255,255,.08) !important;
+    }
+
+    .plyrcard-plan-action {
+      min-height: 44px !important;
+      border-radius: 11px !important;
+      font-size: 13px !important;
+    }
+
+    .plyrcard-plan-action.is-disabled {
+      background: rgba(255,255,255,.10) !important;
+      color: rgba(255,255,255,.48) !important;
+    }
+
+    @media (max-width: 520px) {
+      .plyrcard-upgrade-shell { padding: 8px !important; }
+      .plyrcard-upgrade-hero { min-height: 142px !important; padding: 16px !important; }
+      .plyrcard-upgrade-title { font-size: 30px !important; max-width: 80% !important; }
+      .plyrcard-upgrade-note { max-width: 78% !important; font-size: 12px !important; }
+      .plyrcard-upgrade-crown { width: 50px !important; height: 50px !important; right: 16px !important; bottom: 16px !important; }
+      .plyrcard-plan-card { padding: 15px !important; }
+      .plyrcard-plan-price { font-size: 31px !important; }
+    }
+
     @media (max-width: 420px) {
       .plyrcard-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
       .plyrcard-stat-card { min-height: 74px !important; padding: 9px 5px !important; }
@@ -2089,7 +2265,7 @@
             $plyrMyJourneyCheckoutUrl = 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?plan=my-journey';
           @endphp
 
-          <div class="plyrcard-mini-panel plyrcard-form-stack">
+          <div class="plyrcard-mini-panel plyrcard-form-stack plyrcard-upgrade-shell">
             <div class="plyrcard-upgrade-hero">
               <div>
                 <span class="plyrcard-upgrade-kicker"><i class="fa-solid fa-rocket" aria-hidden="true"></i> Manage your subscription</span>
@@ -2164,7 +2340,7 @@
                 @endif
               </article>
 
-              <article class="plyrcard-plan-card is-current {{ $plyrIsMyJourneyPlan ? 'is-current' : '' }}">
+              <article class="plyrcard-plan-card is-myjourney {{ $plyrIsMyJourneyPlan ? 'is-current' : '' }}">
                 <div class="plyrcard-plan-top">
                   <span class="plyrcard-plan-icon"><i class="fa-solid fa-crown" aria-hidden="true"></i></span>
                   @if($plyrIsMyJourneyPlan)<span class="plyrcard-plan-badge-small">Current</span>@else<span class="plyrcard-plan-badge-small">Highest Plan</span>@endif
