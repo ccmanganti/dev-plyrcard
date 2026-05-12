@@ -1438,6 +1438,231 @@
       font-weight: 800 !important;
     }
 
+
+
+    .plyrcard-upgrade-hero {
+      position: relative !important;
+      overflow: hidden !important;
+      border-radius: 16px !important;
+      padding: 18px !important;
+      background: radial-gradient(circle at 100% 0%, rgba(255,92,53,.34), transparent 34%), linear-gradient(135deg, rgba(255,92,53,.22), rgba(255,92,53,.08) 48%, rgba(0,0,0,.08)) !important;
+      border: 1px solid rgba(255,92,53,.32) !important;
+      color: #111 !important;
+      display: grid !important;
+      gap: 12px !important;
+    }
+
+    .plyrcard-upgrade-kicker {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 7px !important;
+      color: var(--plyr-accent) !important;
+      font-size: 10px !important;
+      font-weight: 950 !important;
+      letter-spacing: .13em !important;
+      text-transform: uppercase !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-upgrade-title {
+      margin: 0 !important;
+      color: #111 !important;
+      font-size: clamp(28px, 8vw, 48px) !important;
+      line-height: .9 !important;
+      font-weight: 950 !important;
+      letter-spacing: .02em !important;
+      text-transform: uppercase !important;
+    }
+
+    .plyrcard-upgrade-title strong { color: var(--plyr-accent) !important; font: inherit !important; }
+
+    .plyrcard-upgrade-note {
+      margin: 0 !important;
+      color: rgba(0,0,0,.62) !important;
+      font-size: 13px !important;
+      line-height: 1.3 !important;
+      font-weight: 750 !important;
+    }
+
+    .plyrcard-upgrade-crown {
+      width: 56px !important;
+      height: 56px !important;
+      border-radius: 999px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: rgba(255,92,53,.16) !important;
+      border: 1px solid rgba(255,92,53,.28) !important;
+      color: var(--plyr-accent) !important;
+      font-size: 22px !important;
+      justify-self: end !important;
+    }
+
+    .plyrcard-upgrade-card-grid {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 11px !important;
+    }
+
+    .plyrcard-plan-card {
+      position: relative !important;
+      overflow: hidden !important;
+      display: grid !important;
+      gap: 12px !important;
+      min-height: 300px !important;
+      padding: 16px !important;
+      border-radius: 16px !important;
+      background: linear-gradient(180deg, #fff, #f7f7f7) !important;
+      color: #111 !important;
+      border: 1px solid rgba(0,0,0,.09) !important;
+      box-shadow: 0 10px 26px rgba(0,0,0,.2) !important;
+    }
+
+    .plyrcard-plan-card.is-featured {
+      background: radial-gradient(circle at 100% 0%, rgba(255,92,53,.18), transparent 38%), linear-gradient(180deg, #fff, #f8f2ef) !important;
+      border-color: rgba(255,92,53,.52) !important;
+      box-shadow: 0 14px 30px rgba(255,92,53,.13), 0 10px 24px rgba(0,0,0,.2) !important;
+    }
+
+    .plyrcard-plan-card.is-current {
+      border-color: rgba(22,139,255,.45) !important;
+      background: radial-gradient(circle at 100% 0%, rgba(22,139,255,.16), transparent 38%), linear-gradient(180deg, #fff, #f3f8ff) !important;
+    }
+
+    .plyrcard-plan-top {
+      display: flex !important;
+      align-items: flex-start !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+    }
+
+    .plyrcard-plan-icon {
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 10px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: rgba(0,0,0,.07) !important;
+      color: rgba(0,0,0,.65) !important;
+      font-size: 15px !important;
+    }
+
+    .plyrcard-plan-card.is-featured .plyrcard-plan-icon { background: rgba(255,92,53,.15) !important; color: var(--plyr-accent) !important; }
+    .plyrcard-plan-card.is-current .plyrcard-plan-icon { background: rgba(22,139,255,.14) !important; color: #168bff !important; }
+
+    .plyrcard-plan-badge-small {
+      min-height: 22px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 9px !important;
+      border-radius: 999px !important;
+      background: #111 !important;
+      color: #fff !important;
+      font-size: 9px !important;
+      font-weight: 950 !important;
+      line-height: 1 !important;
+      letter-spacing: .09em !important;
+      text-transform: uppercase !important;
+      white-space: nowrap !important;
+    }
+
+    .plyrcard-plan-card.is-featured .plyrcard-plan-badge-small { background: var(--plyr-accent) !important; }
+    .plyrcard-plan-card.is-current .plyrcard-plan-badge-small { background: #168bff !important; }
+
+    .plyrcard-plan-name {
+      margin: 0 !important;
+      color: #111 !important;
+      font-size: 25px !important;
+      font-weight: 950 !important;
+      line-height: .95 !important;
+      text-transform: uppercase !important;
+    }
+
+    .plyrcard-plan-price {
+      display: flex !important;
+      align-items: flex-end !important;
+      gap: 3px !important;
+      margin: 0 !important;
+      color: var(--plyr-accent) !important;
+      font-size: 31px !important;
+      font-weight: 950 !important;
+      line-height: .85 !important;
+    }
+
+    .plyrcard-plan-card.is-current .plyrcard-plan-price { color: #168bff !important; }
+    .plyrcard-plan-price small { color: rgba(0,0,0,.55) !important; font-size: 11px !important; font-weight: 800 !important; line-height: 1.1 !important; }
+
+    .plyrcard-plan-subtitle {
+      margin: -7px 0 0 !important;
+      color: rgba(0,0,0,.55) !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      font-weight: 750 !important;
+      font-style: italic !important;
+    }
+
+    .plyrcard-plan-features {
+      list-style: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      display: grid !important;
+      gap: 8px !important;
+      color: #111 !important;
+    }
+
+    .plyrcard-plan-features li {
+      display: grid !important;
+      grid-template-columns: 16px 1fr !important;
+      gap: 7px !important;
+      align-items: start !important;
+      font-size: 12px !important;
+      line-height: 1.2 !important;
+      font-weight: 850 !important;
+      color: #111 !important;
+    }
+
+    .plyrcard-plan-features i { margin-top: 1px !important; color: #16a34a !important; font-size: 11px !important; }
+    .plyrcard-plan-features .is-muted { color: rgba(0,0,0,.42) !important; }
+    .plyrcard-plan-features .is-muted i { color: rgba(0,0,0,.38) !important; }
+
+    .plyrcard-plan-footer-note {
+      margin: 0 !important;
+      padding: 10px 11px !important;
+      border-radius: 10px !important;
+      background: rgba(0,0,0,.045) !important;
+      color: rgba(0,0,0,.62) !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
+      font-weight: 750 !important;
+    }
+
+    .plyrcard-plan-action {
+      width: 100% !important;
+      min-height: 42px !important;
+      margin-top: auto !important;
+      text-transform: uppercase !important;
+      letter-spacing: .05em !important;
+      font-size: 13px !important;
+    }
+
+    .plyrcard-plan-action.is-disabled {
+      background: rgba(0,0,0,.12) !important;
+      color: rgba(0,0,0,.48) !important;
+      cursor: default !important;
+      pointer-events: none !important;
+    }
+
+    @media (min-width: 900px) {
+      .plyrcard-upgrade-hero {
+        grid-template-columns: 1fr auto !important;
+        align-items: center !important;
+      }
+      .plyrcard-upgrade-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+      .plyrcard-plan-card { min-height: 430px !important; }
+    }
+
     @media (max-width: 420px) {
       .plyrcard-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
       .plyrcard-stat-card { min-height: 74px !important; padding: 9px 5px !important; }
@@ -1853,7 +2078,116 @@
         </div>
         
         <div class="plyrcard-drawer-view" data-plyrcard-view="upgrade" data-title="Upgrade">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Upgrade</h3><p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Add your plan upgrade cards or checkout embed here.</p><div class="plyrcard-share-options"><button type="button" class="plyrcard-secondary-btn">Free</button><button type="button" class="plyrcard-secondary-btn">Plyr</button><button type="button" class="plyrcard-submit-btn">My Journey</button><button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="a-la-carte">Add-ons</button></div></div>
+          @php
+            $plyrPlanKey = strtolower(trim((string) $plyrPlanName));
+            $plyrIsFreePlan = $plyrPlanKey === 'free';
+            $plyrIsPlyrPlan = in_array($plyrPlanKey, ['plyr', 'plyr plus', 'plyr+'], true);
+            $plyrIsMyJourneyPlan = $plyrPlanKey === 'my journey';
+            $plyrPlyrCheckoutUrl = 'https://systems.plyrcard.com/widget/survey/rY9lpkKJxgH844GoXuYf?plan=rookie-plus';
+            $plyrMyJourneyCheckoutUrl = 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?plan=my-journey';
+          @endphp
+
+          <div class="plyrcard-mini-panel plyrcard-form-stack">
+            <div class="plyrcard-upgrade-hero">
+              <div>
+                <span class="plyrcard-upgrade-kicker"><i class="fa-solid fa-rocket" aria-hidden="true"></i> Manage your subscription</span>
+                <h3 class="plyrcard-upgrade-title">You are on <strong>{{ $plyrPlanName }}</strong></h3>
+                <p class="plyrcard-upgrade-note">
+                  @if($plyrIsMyJourneyPlan)
+                    You are already on the highest plan. You can stay on My Journey or downgrade to a lower plan anytime.
+                  @elseif($plyrIsPlyrPlan)
+                    You are on Plyr. Upgrade to My Journey when you are ready for a maintained recruiting web presence.
+                  @else
+                    Start with a free profile, then upgrade when you are ready for a branded athlete website and recruiting tools.
+                  @endif
+                </p>
+              </div>
+              <span class="plyrcard-upgrade-crown"><i class="fa-solid {{ $plyrIsMyJourneyPlan ? 'fa-crown' : 'fa-arrow-trend-up' }}" aria-hidden="true"></i></span>
+            </div>
+
+            <div class="plyrcard-upgrade-card-grid">
+              <article class="plyrcard-plan-card {{ $plyrIsFreePlan ? 'is-current' : '' }}">
+                <div class="plyrcard-plan-top">
+                  <span class="plyrcard-plan-icon"><i class="fa-regular fa-user" aria-hidden="true"></i></span>
+                  @if($plyrIsFreePlan)<span class="plyrcard-plan-badge-small">Current</span>@endif
+                </div>
+                <div>
+                  <h4 class="plyrcard-plan-name">Free</h4>
+                  <p class="plyrcard-plan-price">$0<small>/month</small></p>
+                  <p class="plyrcard-plan-subtitle">Get your info online</p>
+                </div>
+                <ul class="plyrcard-plan-features">
+                  <li><i class="fa-solid fa-check"></i><span>Basic profile site with athlete info</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Basic templates</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>PLYR Card graphic not included</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Personal domain</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Professional email</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Member status & perks</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Graphics ordering</span></li>
+                </ul>
+                <p class="plyrcard-plan-footer-note">Best for athletes who want a simple online presence without design assets.</p>
+                @if($plyrIsFreePlan)
+                  <span class="plyrcard-secondary-btn plyrcard-plan-action is-disabled">Current Plan</span>
+                @else
+                  <span class="plyrcard-secondary-btn plyrcard-plan-action is-disabled">Downgrade to Free</span>
+                @endif
+              </article>
+
+              <article class="plyrcard-plan-card is-featured {{ $plyrIsPlyrPlan ? 'is-current' : '' }}">
+                <div class="plyrcard-plan-top">
+                  <span class="plyrcard-plan-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+                  <span class="plyrcard-plan-badge-small">{{ $plyrIsPlyrPlan ? 'Current' : 'Most Popular' }}</span>
+                </div>
+                <div>
+                  <h4 class="plyrcard-plan-name">Plyr</h4>
+                  <p class="plyrcard-plan-price">$10.99<small>/month</small></p>
+                  <p class="plyrcard-plan-subtitle">Level up your branded web presence</p>
+                </div>
+                <ul class="plyrcard-plan-features">
+                  <li><i class="fa-solid fa-check"></i><span>Personal athlete website</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Your own domain included</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Professional email tied to domain</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Member status & member-only perks</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Order graphics at member rate: $35/graphic</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Included in select PLYR Card promotions</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Graphics not included in plan</span></li>
+                </ul>
+                <p class="plyrcard-plan-footer-note">Best for athletes who want a professional look and access to graphics & promotions.</p>
+                @if($plyrIsPlyrPlan)
+                  <span class="plyrcard-submit-btn plyrcard-plan-action is-disabled">Current Plan</span>
+                @elseif($plyrIsMyJourneyPlan)
+                  <a class="plyrcard-submit-btn plyrcard-plan-action" href="{{ $plyrPlyrCheckoutUrl }}" target="_blank" rel="noopener">Downgrade to Plyr</a>
+                @else
+                  <a class="plyrcard-submit-btn plyrcard-plan-action" href="{{ $plyrPlyrCheckoutUrl }}" target="_blank" rel="noopener">Upgrade to Plyr</a>
+                @endif
+              </article>
+
+              <article class="plyrcard-plan-card is-current {{ $plyrIsMyJourneyPlan ? 'is-current' : '' }}">
+                <div class="plyrcard-plan-top">
+                  <span class="plyrcard-plan-icon"><i class="fa-solid fa-crown" aria-hidden="true"></i></span>
+                  @if($plyrIsMyJourneyPlan)<span class="plyrcard-plan-badge-small">Current</span>@else<span class="plyrcard-plan-badge-small">Highest Plan</span>@endif
+                </div>
+                <div>
+                  <h4 class="plyrcard-plan-name">My Journey</h4>
+                  <p class="plyrcard-plan-price">$45<small>/month</small></p>
+                  <p class="plyrcard-plan-subtitle">Recruiting-ready, always on</p>
+                </div>
+                <ul class="plyrcard-plan-features">
+                  <li><i class="fa-solid fa-check"></i><span>Athlete website on your own domain</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Ongoing monthly service & updates</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>Maintained & upgraded web presence</span></li>
+                  <li><i class="fa-solid fa-check"></i><span>À la carte graphics available</span></li>
+                  <li class="is-muted"><i class="fa-solid fa-xmark"></i><span>Graphics not included in plan</span></li>
+                </ul>
+                <p class="plyrcard-plan-footer-note">Best for athletes who want a maintained website and will order graphics as needed.</p>
+                @if($plyrIsMyJourneyPlan)
+                  <span class="plyrcard-secondary-btn plyrcard-plan-action is-disabled">Current Plan</span>
+                @else
+                  <a class="plyrcard-submit-btn plyrcard-plan-action" href="{{ $plyrMyJourneyCheckoutUrl }}" target="_blank" rel="noopener">Upgrade to My Journey</a>
+                @endif
+              </article>
+            </div>
+          </div>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="schedule" data-title="My Schedule">
           <div class="plyrcard-mini-panel plyrcard-form-stack">
