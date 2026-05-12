@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Schedule;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,7 +12,7 @@ use Illuminate\Validation\Rule;
 
 class LockerRoomController extends Controller
 {
-    public function updateProfile(Request $request): RedirectResponse
+    public function updateProfile(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
 
@@ -26,9 +27,9 @@ class LockerRoomController extends Controller
             'state' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
 
-            'sport' => ['nullable', 'string', 'max:255'],
-            'position' => ['nullable', 'array'],
-            'position.*' => ['nullable', 'string', 'max:255'],
+            'sport' => ['required', 'string', 'max:255'],
+            'position' => ['required', 'array', 'min:1'],
+            'position.*' => ['required', 'string', 'max:255'],
             'jersey_number' => ['nullable', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'gender' => ['nullable', Rule::in(['male', 'female'])],
@@ -108,10 +109,10 @@ class LockerRoomController extends Controller
 
         $user->forceFill($data)->save();
 
-        return back()->with('success', 'Profile updated.');
+        return $this->success($request, 'Profile saved successfully.');
     }
 
-    public function storeSchedule(Request $request): RedirectResponse
+    public function storeSchedule(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
 
@@ -121,7 +122,7 @@ class LockerRoomController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'opponent' => ['required', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['upcoming', 'completed', 'cancelled', 'postponed'])],
-            'game_date' => ['nullable', 'date'],
+            'game_date' => ['required', 'date'],
             'game_time' => ['nullable'],
             'location' => ['nullable', 'string', 'max:255'],
             'venue' => ['nullable', 'string', 'max:255'],
@@ -141,20 +142,20 @@ class LockerRoomController extends Controller
             $schedule->users()->syncWithoutDetaching([$user->id]);
         }
 
-        return back()->with('success', 'Schedule saved.');
+        return $this->success($request, 'Schedule saved successfully.');
     }
 
-    public function updateSettings(Request $request): RedirectResponse
+    public function updateSettings(Request $request): RedirectResponse|JsonResponse
     {
-        return back()->with('success', 'Settings are coming soon.');
+        return $this->success($request, 'Settings are coming soon.');
     }
 
-    public function storeSupport(Request $request): RedirectResponse
+    public function storeSupport(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
 
         $data = $request->validate([
-            'concern' => ['nullable', 'string', 'max:255'],
+            'concern' => ['required', 'string', 'max:255'],
             'details' => ['required', 'string', 'max:5000'],
         ]);
 
@@ -173,17 +174,17 @@ class LockerRoomController extends Controller
             report($e);
         }
 
-        return back()->with('success', 'Support request submitted.');
+        return $this->success($request, 'Support request submitted.');
     }
 
-    public function storeReferral(Request $request): RedirectResponse
+    public function storeReferral(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
 
         $data = $request->validate([
             'friend_name' => ['required', 'string', 'max:255'],
-            'friend_email' => ['nullable', 'email', 'max:255'],
-            'friend_phone' => ['nullable', 'string', 'max:255'],
+            'friend_email' => ['nullable', 'email', 'max:255', 'required_without:friend_phone'],
+            'friend_phone' => ['nullable', 'string', 'max:255', 'required_without:friend_email'],
             'message' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -202,6 +203,18 @@ class LockerRoomController extends Controller
             report($e);
         }
 
-        return back()->with('success', 'Referral submitted.');
+        return $this->success($request, 'Referral submitted.');
     }
+    private function success(Request $request, string $message): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
 }

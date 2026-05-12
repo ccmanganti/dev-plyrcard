@@ -151,7 +151,10 @@
      * - Other player websites: show nothing.
      */
     if ($plyrOnPlayerWebsite) {
-        $plyrShouldRenderPullup = $plyrLoggedIn && $plyrOwnsViewedWebsite;
+        // Show Locker Room on the logged-in player's own website.
+        // For player templates that pass activePage without a detected Website record, allow the logged-in
+        // user to see Locker Room when they have a published site attached to their account.
+        $plyrShouldRenderPullup = $plyrLoggedIn && ($plyrOwnsViewedWebsite || ($plyrWebsite && in_array($plyrActivePage, ['website', 'player', 'player-website'], true)));
     } else {
         $plyrShouldRenderPullup = true;
     }
@@ -166,8 +169,12 @@
     $plyrPhoneDisplay = '+1 571-888-0852';
     $plyrPhoneHref = '+15718880852';
     $plyrMainShareUrl = 'https://plyrcard.com';
-    $plyrWebsiteShareUrl = $plyrWebsiteUrl ?: url('/');
-    $plyrPlayerCardShareUrl = $plyrWebsiteUrl ?: ($plyrRequestUrl ?: url('/'));
+    $plyrWebsiteShareUrl = $plyrWebsiteUrl ?: null;
+    $plyrPlayerCardShareUrl = $plyrWebsiteUrl;
+    if ($plyrOnPlayerWebsite && $plyrOwnsViewedWebsite) {
+        $plyrPlayerCardShareUrl = $plyrRequestUrl;
+    }
+    $plyrHasShareablePlyrCard = filled($plyrPlayerCardShareUrl);
     $plyrLogoutAction = url('/admin/logout');
 
     $normalizePlayerUrl = function ($value, ?string $prefix = null) {
@@ -1041,6 +1048,24 @@
     .plyrcard-locked-panel .plyrcard-submit-btn { min-height: 38px !important; font-size: 13px !important; padding: 0 12px !important; white-space: nowrap !important; }
     .plyrcard-locked-field { opacity: .54 !important; pointer-events: none !important; }
     .plyrcard-drawer-card.is-locked { opacity: .58 !important; }
+    .plyrcard-field-error {
+      display: none !important;
+      margin-top: 5px !important;
+      color: #c73513 !important;
+      font-size: 11px !important;
+      font-weight: 900 !important;
+      line-height: 1.2 !important;
+      text-transform: none !important;
+      letter-spacing: 0 !important;
+    }
+    .plyrcard-input-label.has-error .plyrcard-field-error { display: block !important; }
+    .plyrcard-input-label.has-error .plyrcard-drawer-input,
+    .plyrcard-input-label.has-error .plyrcard-drawer-select,
+    .plyrcard-input-label.has-error .plyrcard-drawer-textarea,
+    .plyrcard-input-label.has-error .plyrcard-position-trigger {
+      border-color: rgba(199,53,19,.65) !important;
+      box-shadow: 0 0 0 3px rgba(199,53,19,.12) !important;
+    }
 
     @media (max-width: 520px) {
       .plyrcard-dashboard-summary { grid-template-columns: 1fr !important; text-align: center !important; }
@@ -1470,11 +1495,11 @@
           @unless($plyrHasPremiumFeatures)
             <div class="plyrcard-form-card"><div class="plyrcard-locked-panel"><span class="plyrcard-locked-icon"><i class="fa-solid fa-lock"></i></span><span><strong>Referrals locked</strong><span>Upgrade to Plyr Plus or My Journey to unlock referral tools.</span></span><button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">See Plans</button></div></div>
           @else
-          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrReferralStoreAction }}" method="POST" data-plyrcard-ajax-form data-success-message="Referral sent.">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrReferralStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Referral sent.">
             @csrf
-            <label class="plyrcard-input-label">Friend Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Full name"></span></label>
-            <label class="plyrcard-input-label">Friend Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope" aria-hidden="true"></i><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="friend@example.com"></span></label>
-            <label class="plyrcard-input-label">Friend Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_phone" placeholder="{{ $plyrPhoneDisplay }}"></span></label>
+            <label class="plyrcard-input-label">Friend Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Full name" required></span></label>
+            <label class="plyrcard-input-label">Friend Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope" aria-hidden="true"></i><input class="plyrcard-drawer-input" type="email" name="friend_email" placeholder="friend@example.com" data-requires-one="friend_phone"></span></label>
+            <label class="plyrcard-input-label">Friend Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_phone" placeholder="{{ $plyrPhoneDisplay }}" data-requires-one="friend_email"></span></label>
             <label class="plyrcard-input-label">Message<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></span></label>
             <button class="plyrcard-submit-btn" type="submit"><i class="fa-regular fa-paper-plane" aria-hidden="true"></i> Send Invite</button>
           </form>
@@ -1482,35 +1507,43 @@
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrSupportStoreAction }}" method="POST" data-plyrcard-ajax-form data-success-message="Support request sent.">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrSupportStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Support request sent.">
             @csrf
-            <label class="plyrcard-input-label">Concern<span class="plyrcard-input-wrap"><i class="fa-solid fa-circle-question" aria-hidden="true"></i><select class="plyrcard-drawer-select" name="concern"><option value="">Select your concern</option><option value="Billing">Billing</option><option value="Website">Website</option><option value="Account">Account</option><option value="Other">Other</option></select></span></label>
-            <label class="plyrcard-input-label">Details<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="details" placeholder="Give us some more details..."></textarea></span></label>
+            <label class="plyrcard-input-label">Concern<span class="plyrcard-input-wrap"><i class="fa-solid fa-circle-question" aria-hidden="true"></i><select class="plyrcard-drawer-select" name="concern" required><option value="">Select your concern</option><option value="Billing">Billing</option><option value="Website">Website</option><option value="Account">Account</option><option value="Other">Other</option></select></span></label>
+            <label class="plyrcard-input-label">Details<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="details" placeholder="Give us some more details..." required minlength="10"></textarea></span></label>
             <button class="plyrcard-submit-btn" type="submit">Submit</button>
           </form>
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="share-card" data-title="Share my PlyrCard">
           <div class="plyrcard-form-card plyrcard-qr-wrap">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={{ urlencode($plyrPlayerCardShareUrl) }}" alt="QR code for your PLYRCard">
-            <div class="plyrcard-copy-line" style="width:100%;">
-              <input class="plyrcard-drawer-input" type="text" value="{{ $plyrPlayerCardShareUrl }}" readonly data-plyrcard-copy-source>
-              <button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrPlayerCardShareUrl }}">Copy</button>
-            </div>
-            @if($plyrHasPremiumFeatures)
-            <div class="plyrcard-share-options">
-              @if($plyrFacebookUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-facebook-f"></i> Facebook</a>@endif
-              @if($plyrInstagramUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>@endif
-              @if($plyrXUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrXUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> X</a>@endif
-              @if($plyrYouTubeUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i> YouTube</a>@endif
-              <a class="plyrcard-submit-btn" href="{{ $plyrPlayerCardShareUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-id-card"></i> PlyrCard</a>
-            </div>
+            @if($plyrHasShareablePlyrCard)
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={{ urlencode($plyrPlayerCardShareUrl) }}" alt="QR code for your PLYRCard">
+              <div class="plyrcard-copy-line" style="width:100%;">
+                <input class="plyrcard-drawer-input" type="text" value="{{ $plyrPlayerCardShareUrl }}" readonly data-plyrcard-copy-source>
+                <button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrPlayerCardShareUrl }}">Copy</button>
+              </div>
+              @if($plyrHasPremiumFeatures)
+              <div class="plyrcard-share-options">
+                @if($plyrFacebookUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrFacebookUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-facebook-f"></i> Facebook</a>@endif
+                @if($plyrInstagramUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrInstagramUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>@endif
+                @if($plyrXUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrXUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> X</a>@endif
+                @if($plyrYouTubeUrl)<a class="plyrcard-secondary-btn" href="{{ $plyrYouTubeUrl }}" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i> YouTube</a>@endif
+                <a class="plyrcard-submit-btn" href="{{ $plyrPlayerCardShareUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-id-card"></i> PlyrCard</a>
+              </div>
+              @else
+              <div class="plyrcard-locked-panel" style="width:100%;">
+                <span class="plyrcard-locked-icon"><i class="fa-solid fa-lock"></i></span>
+                <span><strong>Social sharing locked</strong><span>Upgrade to Plyr Plus or My Journey to unlock social share options.</span></span>
+                <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">See Plans</button>
+              </div>
+              @endif
             @else
-            <div class="plyrcard-locked-panel" style="width:100%;">
-              <span class="plyrcard-locked-icon"><i class="fa-solid fa-lock"></i></span>
-              <span><strong>Social sharing locked</strong><span>Upgrade to Plyr Plus or My Journey to unlock social share options.</span></span>
-              <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">See Plans</button>
-            </div>
+              <div class="plyrcard-locked-panel" style="width:100%;">
+                <span class="plyrcard-locked-icon"><i class="fa-solid fa-globe"></i></span>
+                <span><strong>PlyrCard site not ready</strong><span>Complete your profile and publish your player website before sharing.</span></span>
+                <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="complete-profile-prompt">View Steps</button>
+              </div>
             @endif
           </div>
         </div>
@@ -1627,7 +1660,7 @@
           </div>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="profile" data-title="Profile">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrProfileUpdateAction }}" method="POST" enctype="multipart/form-data" data-plyrcard-ajax-form data-success-message="Profile saved successfully.">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrProfileUpdateAction }}" method="POST" enctype="multipart/form-data" data-plyrcard-ajax-form novalidate data-success-message="Profile saved successfully.">
             @csrf
             <p class="plyrcard-mini-copy">Update your player profile details.</p>
 
@@ -1653,8 +1686,8 @@
             <details class="plyrcard-profile-section" open>
               <summary><i class="fa-solid fa-trophy"></i> Athlete Info</summary>
               <div class="plyrcard-profile-grid">
-                <label class="plyrcard-input-label">Sport<span class="plyrcard-input-wrap"><i class="fa-solid fa-medal"></i><select class="plyrcard-drawer-select" name="sport" data-plyrcard-sport-select><option value="">Select sport</option>@foreach($plyrSportOptions as $sportValue => $sportLabel)<option value="{{ $sportValue }}" @selected(old('sport', $plyrUser->sport ?? '') === $sportValue)>{{ $sportLabel }}</option>@endforeach</select></span></label>
-                <label class="plyrcard-input-label">Position<span class="plyrcard-input-wrap"><i class="fa-solid fa-table-cells-large"></i><select class="plyrcard-drawer-select plyrcard-native-position-select" name="position[]" multiple data-plyrcard-position-select aria-label="Select one or more positions" data-selected='@json(old("position", $plyrSelectedPositions))' style="display:none !important;">@foreach($plyrPositionOptionsBySport as $sportKey => $positionOptions)@foreach($positionOptions as $positionValue => $positionLabel)<option value="{{ $positionValue }}" data-sport="{{ $sportKey }}" @selected(in_array($positionValue, old('position', $plyrSelectedPositions), true))>{{ $positionLabel }}</option>@endforeach@endforeach</select><div class="plyrcard-position-combo" data-plyrcard-position-combo><button type="button" class="plyrcard-position-trigger" data-plyrcard-position-trigger aria-haspopup="listbox" aria-expanded="false"><span class="plyrcard-position-chips" data-plyrcard-position-chips>Select position</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div class="plyrcard-position-menu" data-plyrcard-position-menu role="listbox" aria-multiselectable="true"></div></div></span><small class="plyrcard-field-help">Select one or more positions based on the chosen sport.</small></label>
+                <label class="plyrcard-input-label">Sport<span class="plyrcard-input-wrap"><i class="fa-solid fa-medal"></i><select class="plyrcard-drawer-select" name="sport" data-plyrcard-sport-select required><option value="">Select sport</option>@foreach($plyrSportOptions as $sportValue => $sportLabel)<option value="{{ $sportValue }}" @selected(old('sport', $plyrUser->sport ?? '') === $sportValue)>{{ $sportLabel }}</option>@endforeach</select></span></label>
+                <label class="plyrcard-input-label">Position<span class="plyrcard-input-wrap"><i class="fa-solid fa-table-cells-large"></i><select class="plyrcard-drawer-select plyrcard-native-position-select" name="position[]" multiple data-plyrcard-position-select data-required-position="true" aria-label="Select one or more positions" data-selected='@json(old("position", $plyrSelectedPositions))' style="display:none !important;">@foreach($plyrPositionOptionsBySport as $sportKey => $positionOptions)@foreach($positionOptions as $positionValue => $positionLabel)<option value="{{ $positionValue }}" data-sport="{{ $sportKey }}" @selected(in_array($positionValue, old('position', $plyrSelectedPositions), true))>{{ $positionLabel }}</option>@endforeach@endforeach</select><div class="plyrcard-position-combo" data-plyrcard-position-combo><button type="button" class="plyrcard-position-trigger" data-plyrcard-position-trigger aria-haspopup="listbox" aria-expanded="false"><span class="plyrcard-position-chips" data-plyrcard-position-chips>Select position</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div class="plyrcard-position-menu" data-plyrcard-position-menu role="listbox" aria-multiselectable="true"></div></div></span><small class="plyrcard-field-help">Select one or more positions based on the chosen sport.</small></label>
                 <label class="plyrcard-input-label">Roster Number<span class="plyrcard-input-wrap"><i class="fa-solid fa-hashtag"></i><input class="plyrcard-drawer-input" name="jersey_number" value="{{ old('jersey_number', $plyrUser->jersey_number ?? '') }}" placeholder="19"></span></label>
                 <label class="plyrcard-input-label">Graduation Year<span class="plyrcard-input-wrap"><i class="fa-solid fa-graduation-cap"></i><input class="plyrcard-drawer-input" type="number" min="2000" max="2100" name="year" value="{{ old('year', $plyrUser->year ?? '') }}" placeholder="2027"></span></label>
                 <label class="plyrcard-input-label">Sex<span class="plyrcard-input-wrap"><i class="fa-solid fa-user"></i><select class="plyrcard-drawer-select" name="gender"><option value="">Select sex</option><option value="male" @selected(old('gender', $plyrUser->gender ?? '') === 'male')>Male</option><option value="female" @selected(old('gender', $plyrUser->gender ?? '') === 'female')>Female</option></select></span></label>
@@ -1779,13 +1812,13 @@
           </div>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="schedule-form" data-title="New Schedule">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrScheduleStoreAction }}" method="POST" data-plyrcard-ajax-form data-success-message="Schedule saved successfully.">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrScheduleStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Schedule saved successfully.">
             @csrf
             <p class="plyrcard-mini-copy">Add the game or event details below.</p>
             <label class="plyrcard-input-label">Title<span class="plyrcard-input-wrap"><i class="fa-solid fa-pen"></i><input class="plyrcard-drawer-input" name="title" placeholder="League Match"></span></label>
             <label class="plyrcard-input-label">Opponent<span class="plyrcard-input-wrap"><i class="fa-solid fa-shield-halved"></i><input class="plyrcard-drawer-input" name="opponent" placeholder="Opponent" required></span></label>
             <label class="plyrcard-input-label">Status<span class="plyrcard-input-wrap"><i class="fa-solid fa-flag"></i><select class="plyrcard-drawer-select" name="status"><option value="upcoming">Upcoming</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="postponed">Postponed</option></select></span></label>
-            <label class="plyrcard-input-label">Game Date<span class="plyrcard-input-wrap"><i class="fa-regular fa-calendar"></i><input class="plyrcard-drawer-input" type="date" name="game_date"></span></label>
+            <label class="plyrcard-input-label">Game Date<span class="plyrcard-input-wrap"><i class="fa-regular fa-calendar"></i><input class="plyrcard-drawer-input" type="date" name="game_date" required></span></label>
             <label class="plyrcard-input-label">Game Time<span class="plyrcard-input-wrap"><i class="fa-regular fa-clock"></i><input class="plyrcard-drawer-input" type="time" name="game_time"></span></label>
             <label class="plyrcard-input-label">Location<span class="plyrcard-input-wrap"><i class="fa-solid fa-location-dot"></i><input class="plyrcard-drawer-input" name="location" placeholder="City, State"></span></label>
             <label class="plyrcard-input-label">Venue<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="venue" placeholder="Venue"></span></label>
@@ -1826,17 +1859,17 @@
         <div class="plyrcard-drawer-view" data-plyrcard-view="share-site" data-title="Share"><div class="plyrcard-form-card plyrcard-form-stack"><label class="plyrcard-input-label">PLYRCard URL</label><div class="plyrcard-copy-line"><input class="plyrcard-drawer-input" type="text" value="{{ $plyrMainShareUrl }}" readonly><button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrMainShareUrl }}">Copy</button></div></div></div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book Demo"><div class="plyrcard-booking-wrap"><iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe></div></div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="login" data-title="Login">
-          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ $plyrDrawerLoginAction }}">
+          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ $plyrDrawerLoginAction }}" data-plyrcard-login-form novalidate>
             @csrf
             <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
-            <label class="plyrcard-input-label">Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" placeholder="Password" required></span></label>
+            <label class="plyrcard-input-label">Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" placeholder="Password" required minlength="6"></span></label>
             <label class="plyrcard-clean-row" style="color:#111;font-size:13px;font-weight:800;"><span><input type="checkbox" name="remember" value="1"> Remember me</span><button type="button" class="plyrcard-text-link" data-plyrcard-section="forgot-password">Forgot Password?</button></label>
             <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
             <div class="plyrcard-clean-row"><a class="plyrcard-secondary-btn" href="/pricing">Register</a><button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="book-demo">Book Demo</button></div>
           </form>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="forgot-password" data-title="Reset Password">
-          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/password-reset/request') }}">
+          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/password-reset/request') }}" data-plyrcard-loading-form novalidate>
             @csrf
             <p class="plyrcard-mini-copy">Enter your email and we’ll send password reset instructions.</p>
             <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
@@ -2039,6 +2072,7 @@
           currentBody.innerHTML = freshBody.innerHTML;
           ensureRefreshIndicator();
           bindDynamicHandlers();
+          bindLoadingForms();
           bindPullToRefresh();
           const viewExists = q('[data-plyrcard-view="' + keepView + '"]');
           showView(viewExists ? keepView : 'main', { push: false });
@@ -2052,6 +2086,93 @@
         isRefreshing = false;
       }
       return false;
+    }
+
+    function clearFormValidation(form) {
+      if (!form) return;
+      qa('.plyrcard-input-label.has-error', form).forEach(label => label.classList.remove('has-error'));
+      qa('.plyrcard-field-error', form).forEach(error => error.remove());
+      qa('[aria-invalid="true"]', form).forEach(field => field.removeAttribute('aria-invalid'));
+    }
+
+    function addFieldError(field, message) {
+      if (!field) return;
+      const label = field.closest('.plyrcard-input-label') || field.closest('label') || field.parentElement;
+      if (!label) return;
+      label.classList.add('has-error');
+      field.setAttribute('aria-invalid', 'true');
+      let error = label.querySelector('.plyrcard-field-error');
+      if (!error) {
+        error = document.createElement('small');
+        error.className = 'plyrcard-field-error';
+        label.appendChild(error);
+      }
+      error.textContent = message;
+    }
+
+    function validateDrawerForm(form) {
+      if (!form) return true;
+      clearFormValidation(form);
+      let firstInvalid = null;
+
+      const fields = qa('input, select, textarea', form).filter(field => !field.disabled && field.type !== 'hidden' && field.type !== 'file');
+      fields.forEach(field => {
+        const value = (field.value || '').trim();
+        if (field.required && !value) {
+          addFieldError(field, 'This field is required.');
+          firstInvalid = firstInvalid || field;
+          return;
+        }
+        if (value && field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          addFieldError(field, 'Enter a valid email address.');
+          firstInvalid = firstInvalid || field;
+          return;
+        }
+        if (value && field.type === 'url') {
+          try { new URL(value); }
+          catch (error) {
+            addFieldError(field, 'Enter a valid URL, including https://');
+            firstInvalid = firstInvalid || field;
+            return;
+          }
+        }
+        if (field.minLength > 0 && value && value.length < field.minLength) {
+          addFieldError(field, 'Enter at least ' + field.minLength + ' characters.');
+          firstInvalid = firstInvalid || field;
+        }
+      });
+
+      qa('[data-requires-one]', form).forEach(field => {
+        if (firstInvalid && field.getAttribute('aria-invalid') === 'true') return;
+        const others = (field.dataset.requiresOne || '').split(',').map(name => form.querySelector('[name="' + name.trim() + '"]')).filter(Boolean);
+        const hasAny = [(field.value || '').trim()].concat(others.map(other => (other.value || '').trim())).some(Boolean);
+        if (!hasAny) {
+          addFieldError(field, 'Add at least one contact method.');
+          firstInvalid = firstInvalid || field;
+        }
+      });
+
+      qa('[data-required-position]', form).forEach(select => {
+        const selectedCount = Array.from(select.options).filter(option => option.selected && !option.disabled).length;
+        if (!selectedCount) {
+          const trigger = form.querySelector('[data-plyrcard-position-trigger]') || select;
+          addFieldError(trigger, 'Select at least one position.');
+          firstInvalid = firstInvalid || trigger;
+        }
+      });
+
+      if (firstInvalid) {
+        showAlert('Please complete the highlighted fields.', true);
+        if (typeof firstInvalid.focus === 'function') firstInvalid.focus({ preventScroll: true });
+        const drawerBody = body();
+        const label = firstInvalid.closest('.plyrcard-input-label') || firstInvalid;
+        if (drawerBody && label) {
+          drawerBody.scrollTo({ top: Math.max(0, label.offsetTop - 16), behavior: 'smooth' });
+        }
+        return false;
+      }
+
+      return true;
     }
 
     function bindDynamicHandlers() {
@@ -2068,6 +2189,7 @@
         form.dataset.plyrAjaxBound = '1';
         form.addEventListener('submit', async event => {
           event.preventDefault();
+          if (!validateDrawerForm(form)) return;
 
           const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
           const originalHtml = submitButton ? submitButton.innerHTML : '';
@@ -2257,6 +2379,24 @@
       });
     }
 
+    function bindLoadingForms() {
+      qa('[data-plyrcard-login-form], [data-plyrcard-loading-form]').forEach(form => {
+        if (form.dataset.plyrLoadingBound) return;
+        form.dataset.plyrLoadingBound = '1';
+        form.addEventListener('submit', event => {
+          event.preventDefault();
+          if (!validateDrawerForm(form)) return;
+          const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.classList.add('is-loading');
+            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Loading...';
+          }
+          form.submit();
+        });
+      });
+    }
+
     function bindStaticHandlers() {
       document.querySelectorAll('[data-plyrcard-toggle-drawer], [data-plyrcard-open-drawer]').forEach(button => {
         if (button.dataset.plyrToggleBound) return;
@@ -2352,6 +2492,7 @@
 
     bindStaticHandlers();
     bindDynamicHandlers();
+    bindLoadingForms();
     bindPullToRefresh();
     showView('main', { push: false });
 
