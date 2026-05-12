@@ -49,7 +49,20 @@
     $plyrCurrentPath = trim(request()->path(), '/');
     $plyrCurrentHost = request()->getHost();
     $plyrCurrentHostNormalized = strtolower(preg_replace('/:\d+$/', '', $plyrCurrentHost));
+    $plyrCurrentHostBase = preg_replace('/^www\./i', '', $plyrCurrentHostNormalized);
     $plyrRequestUrl = rtrim(request()->url(), '/');
+
+    $plyrNormalizeDomain = function ($value) {
+        $domain = strtolower(trim((string) $value));
+        $domain = preg_replace('#^https?://#i', '', $domain);
+        $domain = preg_replace('#/.*$#', '', $domain);
+        $domain = preg_replace('/:\d+$/', '', $domain);
+        return rtrim($domain, '/');
+    };
+
+    $plyrDomainBase = function ($value) use ($plyrNormalizeDomain) {
+        return preg_replace('/^www\./i', '', $plyrNormalizeDomain($value));
+    };
 
     $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
     $plyrMainHosts = array_filter(array_map('strtolower', [
@@ -59,9 +72,11 @@
         '127.0.0.1',
         'localhost',
     ]));
+    $plyrMainHostBases = array_values(array_unique(array_filter(array_map(fn ($host) => preg_replace('/^www\./i', '', (string) $host), $plyrMainHosts))));
 
     $plyrOnAdmin = request()->is('admin') || request()->is('admin/*') || $plyrActivePage === 'admin';
-    $plyrOnMainPlyrSite = in_array($plyrCurrentHostNormalized, $plyrMainHosts, true);
+    $plyrOnMainPlyrSite = in_array($plyrCurrentHostNormalized, $plyrMainHosts, true)
+        || in_array($plyrCurrentHostBase, $plyrMainHostBases, true);
 
     $plyrWebsite = null;
     $plyrWebsiteUrl = null;
@@ -96,13 +111,13 @@
                 ->where('is_published', true)
                 ->whereNotNull('domain')
                 ->get()
-                ->first(function (Website $website) use ($plyrCurrentHostNormalized) {
-                    $domain = strtolower(trim((string) $website->domain));
-                    $domain = preg_replace('#^https?://#i', '', $domain);
-                    $domain = preg_replace('/:\d+$/', '', $domain);
-                    $domain = rtrim($domain, '/');
+                ->first(function (Website $website) use ($plyrCurrentHostNormalized, $plyrCurrentHostBase, $plyrNormalizeDomain, $plyrDomainBase) {
+                    $domain = $plyrNormalizeDomain($website->domain);
+                    $domainBase = $plyrDomainBase($domain);
 
-                    return $domain === $plyrCurrentHostNormalized || 'www.' . $domain === $plyrCurrentHostNormalized;
+                    return $domain === $plyrCurrentHostNormalized
+                        || $domain === 'www.' . $plyrCurrentHostBase
+                        || $domainBase === $plyrCurrentHostBase;
                 });
         }
 
@@ -129,16 +144,28 @@
         }
     }
 
+    // Fallback for the logged-in player's own custom domain. This covers cases where the domain
+    // is stored with or without www, for example selinpehlivan.com vs www.selinpehlivan.com.
+    if (! $plyrViewedWebsite && $plyrLoggedIn && $plyrWebsite && ! $plyrOnMainPlyrSite && ! blank($plyrWebsite->domain)) {
+        $ownDomainBase = $plyrDomainBase($plyrWebsite->domain);
+
+        if ($ownDomainBase && $ownDomainBase === $plyrCurrentHostBase) {
+            $plyrViewedWebsite = $plyrWebsite;
+        }
+    }
+
     $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true) || (bool) $plyrViewedWebsite;
     $plyrOwnsViewedWebsite = $plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id);
 
     // When included from the player's own template with activePage only, fall back to the user's published website.
     if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrWebsite) {
         $ownSlug = trim((string) ($plyrWebsite->slug ?: Str::slug($plyrWebsite->name)), '/');
-        $ownDomain = $plyrWebsite->domain ? strtolower(rtrim(preg_replace('#^https?://#i', '', trim($plyrWebsite->domain)), '/')) : null;
+        $ownDomain = $plyrWebsite->domain ? $plyrNormalizeDomain($plyrWebsite->domain) : null;
+        $ownDomainBase = $ownDomain ? $plyrDomainBase($ownDomain) : null;
 
-        $plyrOwnsViewedWebsite = ($ownSlug && $ownSlug === $plyrCurrentPath)
-            || ($ownDomain && strtolower($ownDomain) === $plyrCurrentHostNormalized);
+        $plyrOwnsViewedWebsite = ($ownSlug && strtolower($ownSlug) === strtolower($plyrCurrentPath))
+            || ($ownDomain && $ownDomain === $plyrCurrentHostNormalized)
+            || ($ownDomainBase && $ownDomainBase === $plyrCurrentHostBase);
     }
 
     $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
