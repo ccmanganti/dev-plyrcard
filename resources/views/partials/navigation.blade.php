@@ -1190,6 +1190,145 @@
     .plyrcard-profile-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 10px !important; }
     .plyrcard-profile-grid .plyrcard-input-label { min-width: 0 !important; }
 
+    .plyrcard-field-help {
+      display: block !important;
+      margin: 6px 0 0 !important;
+      color: rgba(255,255,255,.72) !important;
+      font-size: 12px !important;
+      line-height: 1.25 !important;
+      font-weight: 750 !important;
+      text-transform: none !important;
+      letter-spacing: 0 !important;
+    }
+
+    .plyrcard-position-combo {
+      position: relative !important;
+      width: 100% !important;
+    }
+
+    .plyrcard-position-trigger {
+      width: 100% !important;
+      min-height: 43px !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(0,0,0,.075) !important;
+      background: #fff !important;
+      color: #111 !important;
+      padding: 7px 34px 7px 37px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      text-align: left !important;
+      cursor: pointer !important;
+      box-shadow: inset 0 1px 0 rgba(0,0,0,.02), 0 1px 0 rgba(255,255,255,.75) !important;
+    }
+
+    .plyrcard-position-trigger:focus {
+      outline: none !important;
+      border-color: rgba(255,92,53,.55) !important;
+      box-shadow: 0 0 0 3px rgba(255,92,53,.12) !important;
+    }
+
+    .plyrcard-position-trigger > i {
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      color: rgba(0,0,0,.48) !important;
+      font-size: 13px !important;
+      pointer-events: none !important;
+    }
+
+    .plyrcard-position-chips {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: 5px !important;
+      min-width: 0 !important;
+      color: rgba(0,0,0,.48) !important;
+      font-size: 14px !important;
+      font-weight: 750 !important;
+      line-height: 1.15 !important;
+    }
+
+    .plyrcard-position-chip {
+      min-height: 24px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      padding: 0 8px !important;
+      border-radius: 8px !important;
+      background: rgba(255,92,53,.14) !important;
+      color: var(--plyr-accent) !important;
+      border: 1px solid rgba(255,92,53,.28) !important;
+      font-size: 12px !important;
+      font-weight: 950 !important;
+      white-space: nowrap !important;
+    }
+
+    .plyrcard-position-chip button {
+      appearance: none !important;
+      border: 0 !important;
+      background: transparent !important;
+      color: inherit !important;
+      padding: 0 !important;
+      cursor: pointer !important;
+      font-size: 12px !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-position-menu {
+      position: absolute !important;
+      z-index: 20 !important;
+      left: 0 !important;
+      right: 0 !important;
+      top: calc(100% + 6px) !important;
+      display: none !important;
+      max-height: 224px !important;
+      overflow-y: auto !important;
+      border-radius: 14px !important;
+      background: #fff !important;
+      border: 1px solid rgba(0,0,0,.1) !important;
+      box-shadow: 0 18px 34px rgba(0,0,0,.28) !important;
+      padding: 7px !important;
+    }
+
+    .plyrcard-position-combo.is-open .plyrcard-position-menu { display: grid !important; gap: 5px !important; }
+
+    .plyrcard-position-option {
+      width: 100% !important;
+      min-height: 38px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      border: 0 !important;
+      border-radius: 10px !important;
+      background: transparent !important;
+      color: #111 !important;
+      padding: 8px 10px !important;
+      font-size: 13px !important;
+      font-weight: 900 !important;
+      text-align: left !important;
+      cursor: pointer !important;
+    }
+
+    .plyrcard-position-option:hover,
+    .plyrcard-position-option.is-selected {
+      background: rgba(255,92,53,.12) !important;
+      color: var(--plyr-accent) !important;
+    }
+
+    .plyrcard-position-option i { opacity: 0 !important; font-size: 12px !important; }
+    .plyrcard-position-option.is-selected i { opacity: 1 !important; }
+
+    .plyrcard-position-empty {
+      padding: 12px 10px !important;
+      color: rgba(0,0,0,.5) !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+    }
+
     @media (max-width: 420px) {
       .plyrcard-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
       .plyrcard-stat-card { min-height: 74px !important; padding: 9px 5px !important; }
@@ -1515,7 +1654,7 @@
               <summary><i class="fa-solid fa-trophy"></i> Athlete Info</summary>
               <div class="plyrcard-profile-grid">
                 <label class="plyrcard-input-label">Sport<span class="plyrcard-input-wrap"><i class="fa-solid fa-medal"></i><select class="plyrcard-drawer-select" name="sport" data-plyrcard-sport-select><option value="">Select sport</option>@foreach($plyrSportOptions as $sportValue => $sportLabel)<option value="{{ $sportValue }}" @selected(old('sport', $plyrUser->sport ?? '') === $sportValue)>{{ $sportLabel }}</option>@endforeach</select></span></label>
-                <label class="plyrcard-input-label">Position(s)<span class="plyrcard-input-wrap"><i class="fa-solid fa-rectangle-list"></i><select class="plyrcard-drawer-select" name="position[]" multiple data-plyrcard-position-select aria-label="Select one or more positions" data-selected='@json(old("position", $plyrSelectedPositions))'>@foreach($plyrPositionOptionsBySport as $sportKey => $positionOptions)@foreach($positionOptions as $positionValue => $positionLabel)<option value="{{ $positionValue }}" data-sport="{{ $sportKey }}" @selected(in_array($positionValue, old('position', $plyrSelectedPositions), true))>{{ $positionLabel }}</option>@endforeach@endforeach</select></span></label>
+                <label class="plyrcard-input-label">Position<span class="plyrcard-input-wrap"><i class="fa-solid fa-table-cells-large"></i><select class="plyrcard-drawer-select plyrcard-native-position-select" name="position[]" multiple data-plyrcard-position-select aria-label="Select one or more positions" data-selected='@json(old("position", $plyrSelectedPositions))' style="display:none !important;">@foreach($plyrPositionOptionsBySport as $sportKey => $positionOptions)@foreach($positionOptions as $positionValue => $positionLabel)<option value="{{ $positionValue }}" data-sport="{{ $sportKey }}" @selected(in_array($positionValue, old('position', $plyrSelectedPositions), true))>{{ $positionLabel }}</option>@endforeach@endforeach</select><div class="plyrcard-position-combo" data-plyrcard-position-combo><button type="button" class="plyrcard-position-trigger" data-plyrcard-position-trigger aria-haspopup="listbox" aria-expanded="false"><span class="plyrcard-position-chips" data-plyrcard-position-chips>Select position</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div class="plyrcard-position-menu" data-plyrcard-position-menu role="listbox" aria-multiselectable="true"></div></div></span><small class="plyrcard-field-help">Select one or more positions based on the chosen sport.</small></label>
                 <label class="plyrcard-input-label">Roster Number<span class="plyrcard-input-wrap"><i class="fa-solid fa-hashtag"></i><input class="plyrcard-drawer-input" name="jersey_number" value="{{ old('jersey_number', $plyrUser->jersey_number ?? '') }}" placeholder="19"></span></label>
                 <label class="plyrcard-input-label">Graduation Year<span class="plyrcard-input-wrap"><i class="fa-solid fa-graduation-cap"></i><input class="plyrcard-drawer-input" type="number" min="2000" max="2100" name="year" value="{{ old('year', $plyrUser->year ?? '') }}" placeholder="2027"></span></label>
                 <label class="plyrcard-input-label">Sex<span class="plyrcard-input-wrap"><i class="fa-solid fa-user"></i><select class="plyrcard-drawer-select" name="gender"><option value="">Select sex</option><option value="male" @selected(old('gender', $plyrUser->gender ?? '') === 'male')>Male</option><option value="female" @selected(old('gender', $plyrUser->gender ?? '') === 'female')>Female</option></select></span></label>
@@ -2011,9 +2150,84 @@
         sportSelect.dataset.plyrPositionBound = '1';
         const form = sportSelect.closest('form') || drawer;
         const positionSelect = form.querySelector('[data-plyrcard-position-select]');
-        if (!positionSelect) return;
+        const combo = form.querySelector('[data-plyrcard-position-combo]');
+        const trigger = form.querySelector('[data-plyrcard-position-trigger]');
+        const chips = form.querySelector('[data-plyrcard-position-chips]');
+        const menu = form.querySelector('[data-plyrcard-position-menu]');
+        if (!positionSelect || !combo || !trigger || !chips || !menu) return;
 
-        const syncPositions = () => {
+        const closeMenu = () => {
+          combo.classList.remove('is-open');
+          trigger.setAttribute('aria-expanded', 'false');
+        };
+
+        const openMenu = () => {
+          combo.classList.add('is-open');
+          trigger.setAttribute('aria-expanded', 'true');
+        };
+
+        const selectedOptions = () => Array.from(positionSelect.options).filter(option => option.selected && !option.disabled);
+
+        const renderChips = () => {
+          const selected = selectedOptions();
+          if (!selected.length) {
+            chips.textContent = 'Select position';
+            return;
+          }
+
+          chips.innerHTML = '';
+          selected.forEach(option => {
+            const chip = document.createElement('span');
+            chip.className = 'plyrcard-position-chip';
+            chip.textContent = option.textContent.trim();
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', 'Remove ' + option.textContent.trim());
+            remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+            remove.addEventListener('click', event => {
+              event.preventDefault();
+              event.stopPropagation();
+              option.selected = false;
+              renderPositionUI();
+            });
+
+            chip.appendChild(remove);
+            chips.appendChild(chip);
+          });
+        };
+
+        const renderMenu = () => {
+          const sport = sportSelect.value || '';
+          const available = Array.from(positionSelect.options).filter(option => !sport || option.dataset.sport === sport);
+          menu.innerHTML = '';
+
+          if (!available.length) {
+            const empty = document.createElement('div');
+            empty.className = 'plyrcard-position-empty';
+            empty.textContent = sport ? 'No positions available for this sport yet.' : 'Choose a sport first.';
+            menu.appendChild(empty);
+            return;
+          }
+
+          available.forEach(option => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'plyrcard-position-option' + (option.selected ? ' is-selected' : '');
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+            item.dataset.value = option.value;
+            item.innerHTML = '<span>' + option.textContent.trim() + '</span><i class="fa-solid fa-check" aria-hidden="true"></i>';
+            item.addEventListener('click', event => {
+              event.preventDefault();
+              option.selected = !option.selected;
+              renderPositionUI();
+            });
+            menu.appendChild(item);
+          });
+        };
+
+        function renderPositionUI() {
           const sport = sportSelect.value || '';
           Array.from(positionSelect.options).forEach(option => {
             const matchesSport = !sport || option.dataset.sport === sport;
@@ -2021,10 +2235,25 @@
             option.disabled = !matchesSport;
             if (!matchesSport) option.selected = false;
           });
-        };
+          renderChips();
+          renderMenu();
+        }
 
-        sportSelect.addEventListener('change', syncPositions);
-        syncPositions();
+        trigger.addEventListener('click', event => {
+          event.preventDefault();
+          combo.classList.contains('is-open') ? closeMenu() : openMenu();
+        });
+
+        sportSelect.addEventListener('change', () => {
+          closeMenu();
+          renderPositionUI();
+        });
+
+        document.addEventListener('click', event => {
+          if (!combo.contains(event.target)) closeMenu();
+        });
+
+        renderPositionUI();
       });
     }
 
