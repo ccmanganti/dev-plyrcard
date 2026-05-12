@@ -974,7 +974,7 @@
       <p class="plan-setup">No set-up fee &nbsp;· No credit card required</p>
 
       <div class="plan-cta-wrap">
-        <a href="https:/plyrcard.com/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a>
+        <a href="/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a>
       </div>
 
       <div class="plan-divider"></div>
@@ -1054,7 +1054,7 @@
       </p>
 
       <div class="plan-cta-wrap">
-        <a href="https:/plyrcard.com/registration?utm_plan=plyr-plus" class="plan-cta solid">Get PLYR PLUS</a>
+        <a href="/registration?utm_plan=plyr-plus" class="plan-cta solid">Get PLYR PLUS</a>
       </div>
 
       <div class="plan-divider"></div>
@@ -1132,7 +1132,7 @@
       </p>
 
       <div class="plan-cta-wrap">
-        <a href="https:/plyrcard.com/registration?utm_plan=my-journey" class="plan-cta outline">Get My Journey</a>
+        <a href="/registration?utm_plan=my-journey" class="plan-cta outline">Get My Journey</a>
         <!-- My Journey: fixed $49/mo — no annual discount -->
       </div>
 
@@ -1375,7 +1375,7 @@
   <h2 class="section-title" id="pricing-cta-title">Start Your<br>Journey</h2>
   <p class="cta-body">Build a recruiting card coaches will actually remember.</p>
   <div class="btn-row">
-    <a href="https:/plyrcard.com/registration?utm_plan=free" class="btn-white-cta">Create Free Account</a>
+    <a href="/registration?utm_plan=free" class="btn-white-cta">Create Free Account</a>
     <a href="/book-demo" class="btn-outline-white-cta">Book a Demo</a>
   </div>
   <p class="fine-print">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Set up in minutes</p>
