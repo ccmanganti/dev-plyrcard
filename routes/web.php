@@ -4,6 +4,7 @@ use App\Http\Controllers\LockerRoomController;
 use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
+use App\Http\Controllers\WebsiteOwnerAccessController;
 use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -164,6 +165,11 @@ Route::post('/onboarding/complete', function (Request $request) {
 | Do not use /admin/login here. Filament owns /admin/login.
 | This route is for the Locker Room / Get Started drawer login form.
 |
+| Important:
+| If the player has a custom domain, we send them through the owner bridge
+| route instead of directly redirecting to the custom domain. This lets the
+| custom domain receive its own owner/session access.
+|
 */
 
 Route::post('/locker-room/login', function (Request $request) {
@@ -194,9 +200,7 @@ Route::post('/locker-room/login', function (Request $request) {
     }
 
     if (! blank($website->domain)) {
-        $domain = preg_replace('#^https?://#i', '', trim($website->domain));
-
-        return redirect()->away('https://' . rtrim($domain, '/'));
+        return redirect()->route('locker-room.website.visit', $website);
     }
 
     if (! blank($website->slug)) {
@@ -205,6 +209,33 @@ Route::post('/locker-room/login', function (Request $request) {
 
     return redirect('/');
 })->name('plyrcard.drawer-login');
+
+/*
+|--------------------------------------------------------------------------
+| Locker Room owner website access bridge
+|--------------------------------------------------------------------------
+|
+| This is needed because a session on plyrcard.com/admin does not automatically
+| exist on a custom player domain like selinpehlivan.com.
+|
+| Flow:
+| 1. Logged-in user clicks Visit my Website.
+| 2. /locker-room/visit-my-website/{website} verifies ownership.
+| 3. It redirects to the custom domain with a temporary signed access token.
+| 4. /locker-room/owner-access on the custom domain consumes the token and
+|    logs the owner in on that domain.
+|
+| Keep these routes above the catch-all /{websiteName} route.
+|
+*/
+
+Route::middleware(['web', 'auth'])
+    ->get('/locker-room/visit-my-website/{website}', [WebsiteOwnerAccessController::class, 'redirectToOwnedWebsite'])
+    ->name('locker-room.website.visit');
+
+Route::middleware(['web'])
+    ->get('/locker-room/owner-access', [WebsiteOwnerAccessController::class, 'consumeOwnerAccess'])
+    ->name('locker-room.website.owner-access');
 
 /*
 |--------------------------------------------------------------------------

@@ -236,8 +236,17 @@
 
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
     $plyrWebsiteActionLabel = 'Visit my Website';
-    $plyrWebsiteActionHref = $plyrWebsiteUrl ?: '#';
-    $plyrWebsiteActionTarget = $plyrWebsiteUrl ? '_blank' : null;
+    $plyrWebsiteOwnerVisitUrl = $plyrWebsiteUrl;
+
+    // Custom domains cannot see the auth cookie from plyrcard.com/admin directly.
+    // This owner-visit route creates a short-lived bridge token, redirects to the custom domain,
+    // and signs the user in on that custom-domain host so Locker Room can render there too.
+    if ($plyrLoggedIn && $plyrWebsite && \Illuminate\Support\Facades\Route::has('locker-room.website.visit')) {
+        $plyrWebsiteOwnerVisitUrl = route('locker-room.website.visit', $plyrWebsite);
+    }
+
+    $plyrWebsiteActionHref = $plyrWebsiteOwnerVisitUrl ?: '#';
+    $plyrWebsiteActionTarget = null;
     $plyrWebsiteActionDisabled = ! $plyrWebsiteUrl;
 
     $plyrSupportEmail = 'support@plyrcard.com';
