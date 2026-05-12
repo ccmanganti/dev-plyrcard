@@ -1949,7 +1949,9 @@
                 </div>
                 <div class="plyrcard-achievement-list">
                   @foreach($plyrAchievements as $achievement)
-                    @php($achievementUnlocked = $plyrProfileCompletion >= $achievement['threshold'])
+                    @php
+                      $achievementUnlocked = $plyrProfileCompletion >= $achievement['threshold'];
+                    @endphp
                     <div class="plyrcard-achievement-card {{ $achievementUnlocked ? 'is-unlocked' : '' }}">
                       <i class="fa-solid {{ $achievementUnlocked ? 'fa-trophy' : 'fa-lock' }}"></i>
                       <span>
