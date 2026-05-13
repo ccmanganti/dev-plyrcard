@@ -1454,7 +1454,7 @@
 
         .mobile-class-year {
             font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            font-size: 40px;
+            font-size: 50px;
             line-height: 0.8;
             font-weight: 900;
             letter-spacing: -0.045em;
