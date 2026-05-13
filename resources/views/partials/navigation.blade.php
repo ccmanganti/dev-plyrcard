@@ -1977,11 +1977,7 @@
             <strong class="plyrcard-nav-group-title">Growth</strong>
             <div class="plyrcard-drawer-grid">
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
-              @if($plyrHasPremiumFeatures)
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
-              @else
-                <button type="button" class="plyrcard-drawer-card is-locked" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-lock" aria-hidden="true"></i><span>Refer Friend</span></button>
-              @endif
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check" aria-hidden="true"></i><span>Book a Call</span></button>
             </div>
@@ -1996,9 +1992,6 @@
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="refer-friend" data-title="Refer a Friend">
-          @unless($plyrHasPremiumFeatures)
-            <div class="plyrcard-form-card"><div class="plyrcard-locked-panel"><span class="plyrcard-locked-icon"><i class="fa-solid fa-lock"></i></span><span><strong>Referrals locked</strong><span>Upgrade to Plyr Plus or My Journey to unlock referral tools.</span></span><button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">See Plans</button></div></div>
-          @else
           <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrReferralStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Referral sent.">
             @csrf
             <label class="plyrcard-input-label">Friend Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user" aria-hidden="true"></i><input class="plyrcard-drawer-input" name="friend_name" placeholder="Full name" required></span></label>
@@ -2007,7 +2000,6 @@
             <label class="plyrcard-input-label">Message<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="message" placeholder="Add a short message..."></textarea></span></label>
             <button class="plyrcard-submit-btn" type="submit"><i class="fa-regular fa-paper-plane" aria-hidden="true"></i> Send Invite</button>
           </form>
-          @endunless
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
@@ -2075,7 +2067,7 @@
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book a Call">
           <div class="plyrcard-booking-wrap">
-            <iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe>
+            <iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" data-plyrcard-booking-iframe data-src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe>
           </div>
         </div>
 
@@ -2445,7 +2437,49 @@
           </form>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="billing" data-title="Billing">
-          <div class="plyrcard-mini-panel"><h3 class="plyrcard-mini-title">Billing</h3><p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Add your billing portal, invoices, or plan management embed here.</p><div class="plyrcard-share-options"><button type="button" class="plyrcard-secondary-btn">Plan</button><button type="button" class="plyrcard-secondary-btn">Invoices</button><button type="button" class="plyrcard-secondary-btn">Payment Method</button><button type="button" class="plyrcard-submit-btn" data-plyrcard-section="support">Billing Help</button></div></div>
+          <form class="plyrcard-form-card plyrcard-form-stack" action="#" method="POST" data-plyrcard-mock-form data-success-message="Billing information saved locally for preview.">
+            @csrf
+            <h3 class="plyrcard-mini-title">Billing Information</h3>
+            <p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Billing data is not connected to the user model yet, so this is a ready-to-wire mockup form.</p>
+
+            <details class="plyrcard-profile-section" open>
+              <summary><i class="fa-solid fa-file-invoice-dollar"></i> Billing Contact</summary>
+              <div class="plyrcard-profile-grid">
+                <label class="plyrcard-input-label">Full Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="billing_name" placeholder="Full name" required></span></label>
+                <label class="plyrcard-input-label">Billing Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="billing_email" placeholder="billing@example.com" required></span></label>
+                <label class="plyrcard-input-label">Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="billing_phone" placeholder="+1 (555) 000-0000"></span></label>
+                <label class="plyrcard-input-label">Company / Organization<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_company" placeholder="Optional"></span></label>
+              </div>
+            </details>
+
+            <details class="plyrcard-profile-section" open>
+              <summary><i class="fa-solid fa-location-dot"></i> Billing Address</summary>
+              <div class="plyrcard-profile-grid">
+                <label class="plyrcard-input-label">Address Line 1<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_1" placeholder="Street address" required></span></label>
+                <label class="plyrcard-input-label">Address Line 2<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_2" placeholder="Apt, suite, unit"></span></label>
+                <label class="plyrcard-input-label">City<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_city" placeholder="City" required></span></label>
+                <label class="plyrcard-input-label">State / Province<span class="plyrcard-input-wrap"><i class="fa-regular fa-map"></i><input class="plyrcard-drawer-input" name="billing_state" placeholder="State / Province" required></span></label>
+                <label class="plyrcard-input-label">Postal Code<span class="plyrcard-input-wrap"><i class="fa-solid fa-signs-post"></i><input class="plyrcard-drawer-input" name="billing_postal_code" placeholder="Postal code" required></span></label>
+                <label class="plyrcard-input-label">Country<span class="plyrcard-input-wrap"><i class="fa-solid fa-globe"></i><input class="plyrcard-drawer-input" name="billing_country" placeholder="Country" required></span></label>
+              </div>
+            </details>
+
+            <details class="plyrcard-profile-section">
+              <summary><i class="fa-solid fa-credit-card"></i> Payment Method</summary>
+              <p class="plyrcard-mini-copy">For security, do not store card numbers in the users table. Wire this section to your billing provider/portal later.</p>
+              <div class="plyrcard-profile-grid">
+                <label class="plyrcard-input-label">Cardholder Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="cardholder_name" placeholder="Name on card"></span></label>
+                <label class="plyrcard-input-label">Last 4 Digits<span class="plyrcard-input-wrap"><i class="fa-solid fa-credit-card"></i><input class="plyrcard-drawer-input" name="card_last_four" inputmode="numeric" maxlength="4" placeholder="1234"></span></label>
+                <label class="plyrcard-input-label">Expiration<span class="plyrcard-input-wrap"><i class="fa-regular fa-calendar"></i><input class="plyrcard-drawer-input" name="card_expiration" placeholder="MM/YY"></span></label>
+                <label class="plyrcard-input-label">Payment Type<span class="plyrcard-input-wrap"><i class="fa-solid fa-wallet"></i><select class="plyrcard-drawer-select" name="payment_type"><option value="">Select type</option><option value="card">Card</option><option value="bank">Bank transfer</option><option value="other">Other</option></select></span></label>
+              </div>
+            </details>
+
+            <div class="plyrcard-share-options">
+              <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Billing Info</button>
+              <button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="support"><i class="fa-solid fa-headset"></i> Billing Help</button>
+            </div>
+          </form>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="settings" data-title="Settings">
           <div class="plyrcard-mini-panel plyrcard-form-stack">
@@ -2472,9 +2506,9 @@
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="email-us" data-title="Email Us"><div class="plyrcard-form-card"><a class="plyrcard-submit-btn" href="mailto:{{ $plyrSupportEmail }}"><i class="fa-solid fa-envelope"></i>{{ $plyrSupportEmail }}</a></div></div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="share-site" data-title="Share"><div class="plyrcard-form-card plyrcard-form-stack"><label class="plyrcard-input-label">PLYRCard URL</label><div class="plyrcard-copy-line"><input class="plyrcard-drawer-input" type="text" value="{{ $plyrMainShareUrl }}" readonly><button type="button" class="plyrcard-copy-btn" data-plyrcard-copy="{{ $plyrMainShareUrl }}">Copy</button></div></div></div>
-        <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book Demo"><div class="plyrcard-booking-wrap"><iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe></div></div>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="book-demo" data-title="Book Demo"><div class="plyrcard-booking-wrap"><iframe src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" data-plyrcard-booking-iframe data-src="https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l" scrolling="no" id="SvuQy1svAyETQ5Q9px9l_1778163042192"></iframe></div></div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="login" data-title="Login">
-          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ $plyrDrawerLoginAction }}" data-plyrcard-login-form novalidate>
+          <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ $plyrDrawerLoginAction }}" data-plyrcard-login-form novalidate data-success-message="Signed in successfully.">
             @csrf
             <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>
             <label class="plyrcard-input-label">Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" placeholder="Password" required minlength="6"></span></label>
@@ -2615,6 +2649,16 @@
         viewStack[viewStack.length - 1] = name;
       }
       currentView = name;
+
+      if (name === 'book-demo') {
+        window.setTimeout(() => {
+          qa('[data-plyrcard-booking-iframe]').forEach(iframe => {
+            const src = iframe.getAttribute('data-src') || iframe.getAttribute('src');
+            if (src && !iframe.getAttribute('src')) iframe.setAttribute('src', src);
+            try { iframe.contentWindow?.postMessage({ type: 'resize' }, '*'); } catch (error) {}
+          });
+        }, 120);
+      }
     }
 
     function goBack() {
@@ -2670,7 +2714,7 @@
       try {
         const response = await fetch(window.location.href, {
           method: 'GET',
-          credentials: 'same-origin',
+          credentials: 'include',
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'text/html, application/xhtml+xml',
@@ -2828,7 +2872,7 @@
             const response = await fetch(action, {
               method: (form.getAttribute('method') || 'POST').toUpperCase(),
               body: formData,
-              credentials: 'same-origin',
+              credentials: 'include',
               headers: {
                 'X-CSRF-TOKEN': token,
                 'X-Requested-With': 'XMLHttpRequest',
@@ -2995,7 +3039,64 @@
     }
 
     function bindLoadingForms() {
-      qa('[data-plyrcard-login-form], [data-plyrcard-loading-form]').forEach(form => {
+      qa('[data-plyrcard-login-form]').forEach(form => {
+        if (form.dataset.plyrLoginBound) return;
+        form.dataset.plyrLoginBound = '1';
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (!validateDrawerForm(form)) return;
+
+          const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
+          const originalHtml = submitButton ? submitButton.innerHTML : '';
+          const formData = new FormData(form);
+          const token = formData.get('_token') || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.classList.add('is-loading');
+            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Signing in...';
+          }
+
+          try {
+            const response = await fetch(form.action, {
+              method: 'POST',
+              body: formData,
+              credentials: 'include',
+              headers: {
+                'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+              },
+            });
+
+            let payload = null;
+            try { payload = await response.clone().json(); } catch (error) {}
+
+            if (!response.ok || payload?.success === false) {
+              const message = payload?.message || Object.values(payload?.errors || {}).flat()[0] || 'The email or password is incorrect.';
+              const emailField = form.querySelector('[name="email"]');
+              addFieldError(emailField, message);
+              showAlert(message, true);
+              return;
+            }
+
+            showAlert(payload?.message || form.dataset.successMessage || 'Signed in successfully.');
+            window.setTimeout(() => {
+              window.location.assign(payload?.redirect_url || '/');
+            }, 280);
+          } catch (error) {
+            showAlert('Unable to sign in right now. Please try again.', true);
+          } finally {
+            if (submitButton) {
+              submitButton.disabled = false;
+              submitButton.classList.remove('is-loading');
+              submitButton.innerHTML = originalHtml;
+            }
+          }
+        });
+      });
+
+      qa('[data-plyrcard-loading-form]').forEach(form => {
         if (form.dataset.plyrLoadingBound) return;
         form.dataset.plyrLoadingBound = '1';
         form.addEventListener('submit', event => {
@@ -3008,6 +3109,30 @@
             submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Loading...';
           }
           form.submit();
+        });
+      });
+
+      qa('[data-plyrcard-mock-form]').forEach(form => {
+        if (form.dataset.plyrMockBound) return;
+        form.dataset.plyrMockBound = '1';
+        form.addEventListener('submit', event => {
+          event.preventDefault();
+          if (!validateDrawerForm(form)) return;
+          const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
+          const originalHtml = submitButton ? submitButton.innerHTML : '';
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.classList.add('is-loading');
+            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Saving...';
+          }
+          window.setTimeout(() => {
+            showAlert(form.dataset.successMessage || 'Saved.');
+            if (submitButton) {
+              submitButton.disabled = false;
+              submitButton.classList.remove('is-loading');
+              submitButton.innerHTML = originalHtml;
+            }
+          }, 500);
         });
       });
     }
@@ -3050,7 +3175,7 @@
             await fetch(form.action, {
               method: 'POST',
               body: formData,
-              credentials: 'same-origin',
+              credentials: 'include',
               headers: {
                 'X-CSRF-TOKEN': token,
                 'X-Requested-With': 'XMLHttpRequest',

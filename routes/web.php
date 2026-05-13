@@ -22,10 +22,6 @@ require __DIR__ . '/marketing-routes.php';
 |--------------------------------------------------------------------------
 | Reserved public slugs
 |--------------------------------------------------------------------------
-|
-| These should never be treated as public website names.
-| Important: "admin" must stay reserved because Filament owns /admin.
-|
 */
 
 $reservedWebsiteSlugs = implode('|', [
@@ -95,15 +91,6 @@ Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController
 |--------------------------------------------------------------------------
 | Filament-related custom admin routes
 |--------------------------------------------------------------------------
-|
-| Filament itself should own:
-|
-|   /admin
-|   /admin/login
-|   /admin/password-reset/...
-|
-| These custom routes are only for your website editor actions.
-|
 */
 
 Route::prefix('admin/websites')
@@ -162,13 +149,9 @@ Route::post('/onboarding/complete', function (Request $request) {
 | Drawer login route
 |--------------------------------------------------------------------------
 |
-| Do not use /admin/login here. Filament owns /admin/login.
-| This route is for the Locker Room / Get Started drawer login form.
-|
-| Important:
-| If the player has a custom domain, we send them through the owner bridge
-| route instead of directly redirecting to the custom domain. This lets the
-| custom domain receive its own owner/session access.
+| This route is for the Get Started drawer login form. It returns JSON for
+| the drawer AJAX flow so bad credentials show inside the drawer instead of
+| redirecting back to the homepage.
 |
 */
 
@@ -179,8 +162,18 @@ Route::post('/locker-room/login', function (Request $request) {
     ]);
 
     if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The email or password is incorrect.',
+                'errors' => [
+                    'email' => ['The email or password is incorrect.'],
+                ],
+            ], 422);
+        }
+
         return back()
-            ->withErrors(['email' => 'These credentials do not match our records.'])
+            ->withErrors(['email' => 'The email or password is incorrect.'])
             ->onlyInput('email');
     }
 
@@ -195,38 +188,31 @@ Route::post('/locker-room/login', function (Request $request) {
         ->latest('updated_at')
         ->first();
 
-    if (! $website) {
-        return redirect('/');
+    $redirectUrl = url('/');
+
+    if ($website) {
+        if (! blank($website->domain) && Route::has('locker-room.website.visit')) {
+            $redirectUrl = route('locker-room.website.visit', $website);
+        } elseif (! blank($website->slug)) {
+            $redirectUrl = url('/' . ltrim($website->slug, '/'));
+        }
     }
 
-    if (! blank($website->domain)) {
-        return redirect()->route('locker-room.website.visit', $website);
+    if ($request->expectsJson() || $request->ajax()) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Signed in successfully.',
+            'redirect_url' => $redirectUrl,
+        ]);
     }
 
-    if (! blank($website->slug)) {
-        return redirect('/' . ltrim($website->slug, '/'));
-    }
-
-    return redirect('/');
+    return redirect()->to($redirectUrl);
 })->name('plyrcard.drawer-login');
 
 /*
 |--------------------------------------------------------------------------
 | Locker Room owner website access bridge
 |--------------------------------------------------------------------------
-|
-| This is needed because a session on plyrcard.com/admin does not automatically
-| exist on a custom player domain like selinpehlivan.com.
-|
-| Flow:
-| 1. Logged-in user clicks Visit my Website.
-| 2. /locker-room/visit-my-website/{website} verifies ownership.
-| 3. It redirects to the custom domain with a temporary signed access token.
-| 4. /locker-room/owner-access on the custom domain consumes the token and
-|    logs the owner in on that domain.
-|
-| Keep these routes above the catch-all /{websiteName} route.
-|
 */
 
 Route::middleware(['web', 'auth'])
@@ -264,10 +250,6 @@ Route::middleware(['auth'])->group(function () {
 |--------------------------------------------------------------------------
 | Public website-by-name route
 |--------------------------------------------------------------------------
-|
-| Keep this at the very bottom.
-| This prevents public website names from hijacking reserved app routes.
-|
 */
 
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
