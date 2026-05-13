@@ -103,7 +103,7 @@
             $parts = preg_split('/\s+/', $fullName) ?: [];
             $lastName = end($parts) ?: $fullName;
 
-            return $firstName . ' ' . $lastName;
+            return $fullName;
         };
 
         $formatDateDisplay = function ($value) use ($normalizeDisplayValue) {
