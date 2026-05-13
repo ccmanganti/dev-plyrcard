@@ -110,6 +110,15 @@
             || ($websiteNameSlug && $websiteNameSlug === $pathSlug);
     };
 
+    /*
+     * If this partial is included inside a rendered player website template,
+     * PublicWebsiteController already passes the active Website as $website.
+     * Trust that variable first so custom domains and /slug player cards always
+     * hide the normal header navigation, even if request/domain matching changes.
+     */
+    $plyrRenderedWebsite = (isset($website) && $website instanceof Website) ? $website : null;
+    $plyrControllerSaysOwnerCanSeeLocker = (bool) ($showPlyrNavigation ?? false);
+
     $plyrOwnedWebsites = collect();
     $plyrWebsite = null;
     $plyrWebsiteUrl = null;
@@ -169,7 +178,7 @@
         }
     }
 
-    $plyrViewedWebsite = null;
+    $plyrViewedWebsite = $plyrRenderedWebsite;
 
     if (class_exists(Website::class)) {
         // First detect the logged-in player's own website from their User -> Website relationship.
@@ -211,8 +220,12 @@
         }
     }
 
-    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true) || (bool) $plyrViewedWebsite;
-    $plyrOwnsViewedWebsite = $plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id);
+    $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true)
+        || (bool) $plyrViewedWebsite
+        || (bool) $plyrRenderedWebsite;
+
+    $plyrOwnsViewedWebsite = $plyrControllerSaysOwnerCanSeeLocker
+        || ($plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id));
 
     // Final fallback for custom-domain templates where activePage is passed but the request was not matched earlier.
     if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
@@ -503,6 +516,12 @@
        The pull-up Locker Room drawer/tab remains unchanged. */
     #site-header.plyrcard-site-header.is-player-website-header-hidden,
     #mobile-nav.plyrcard-mobile-nav.is-player-website-header-hidden {
+      display: none !important;
+    }
+
+    /* Extra guard for player-card pages rendered by PublicWebsiteController. */
+    body:has(#plyrcard-action-drawer) #site-header.plyrcard-site-header.is-player-website-header-hidden,
+    body:has(#plyrcard-action-drawer) #mobile-nav.plyrcard-mobile-nav.is-player-website-header-hidden {
       display: none !important;
     }
 
