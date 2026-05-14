@@ -314,6 +314,12 @@
     $plyrReferralStoreAction = \Illuminate\Support\Facades\Route::has('locker-room.referral.store')
         ? route('locker-room.referral.store')
         : '#';
+    $plyrBillingUpdateAction = \Illuminate\Support\Facades\Route::has('locker-room.billing.update')
+        ? route('locker-room.billing.update')
+        : '#';
+    $plyrAdditionalServiceStoreAction = \Illuminate\Support\Facades\Route::has('locker-room.additional-service.store')
+        ? route('locker-room.additional-service.store')
+        : '#';
     $plyrDrawerLoginAction = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
         : url('/admin/login');
@@ -480,6 +486,26 @@
             $plyrSchedules = collect();
         }
     }
+
+    $plyrBillingInfo = null;
+    if ($plyrLoggedIn && $plyrUser && class_exists(\App\Models\BillingInformation::class)) {
+        try {
+            $plyrBillingInfo = \App\Models\BillingInformation::query()
+                ->where('user_id', $plyrUser->id)
+                ->first();
+        } catch (\Throwable $e) {
+            $plyrBillingInfo = null;
+        }
+    }
+
+    $plyrBillingValue = function (string $field, $fallback = '') use ($plyrBillingInfo, $plyrUser) {
+        if ($plyrBillingInfo && filled($plyrBillingInfo->{$field} ?? null)) {
+            return $plyrBillingInfo->{$field};
+        }
+
+        return $fallback;
+    };
+
 @endphp
 
 <style>
@@ -1969,7 +1995,7 @@
               @endif
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share my PlyrCard</span></button>
               <a class="plyrcard-drawer-card" href="/podcast"><i class="plyrcard-menu-icon fa-solid fa-podcast" aria-hidden="true"></i><span>PLYRCard Show</span></a>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte"><i class="plyrcard-menu-icon fa-solid fa-bag-shopping" aria-hidden="true"></i><span>A La Carte</span></button>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte"><i class="plyrcard-menu-icon fa-solid fa-bag-shopping" aria-hidden="true"></i><span>Additional Services</span></button>
             </div>
           </div>
 
@@ -2056,12 +2082,40 @@
           </div>
         </div>
 
-        <div class="plyrcard-drawer-view" data-plyrcard-view="a-la-carte" data-title="A La Carte">
-          <div class="plyrcard-offer-list">
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-regular fa-window-maximize"></i></span><span><h3 class="plyrcard-offer-title">Upgraded Site Design</h3><p class="plyrcard-offer-copy">A full redesign of your athlete website</p></span><strong class="plyrcard-offer-price">$150<small>One-time</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-regular fa-images"></i></span><span><h3 class="plyrcard-offer-title">Starting Graphics Bundle</h3><p class="plyrcard-offer-copy">Starting graphic • Showcase graphic • Thank You graphic</p></span><strong class="plyrcard-offer-price">$70<small>Bundle</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-solid fa-pen-nib"></i></span><span><h3 class="plyrcard-offer-title">Individual Graphic</h3><p class="plyrcard-offer-copy">Single custom athlete graphic</p></span><strong class="plyrcard-offer-price">$35<small>Each</small></strong></a>
-            <a href="#" class="plyrcard-offer-card"><span class="plyrcard-offer-icon"><i class="fa-solid fa-globe"></i></span><span><h3 class="plyrcard-offer-title">Domain</h3><p class="plyrcard-offer-copy">Custom domain registration for your athlete site</p></span><strong class="plyrcard-offer-price">$45<small>/Year</small></strong></a>
+        <div class="plyrcard-drawer-view" data-plyrcard-view="a-la-carte" data-title="Additional Services">
+          <div class="plyrcard-mini-panel plyrcard-form-stack">
+            <h3 class="plyrcard-mini-title">Additional Services</h3>
+            <p class="plyrcard-mini-copy">Request a one-time add-on. We’ll confirm details and follow up through your account and GHL contact record.</p>
+
+            <div class="plyrcard-offer-list">
+              @foreach([
+                ['key' => 'upgraded_site_design', 'icon' => 'fa-regular fa-window-maximize', 'title' => 'Upgraded Site Design', 'copy' => 'A full redesign of your athlete website', 'price' => '$150', 'unit' => 'One-time'],
+                ['key' => 'starting_graphics_bundle', 'icon' => 'fa-regular fa-images', 'title' => 'Starting Graphics Bundle', 'copy' => 'Starting graphic • Showcase graphic • Thank You graphic', 'price' => '$70', 'unit' => 'Bundle'],
+                ['key' => 'individual_graphic', 'icon' => 'fa-solid fa-pen-nib', 'title' => 'Individual Graphic', 'copy' => 'Single custom athlete graphic', 'price' => '$35', 'unit' => 'Each'],
+                ['key' => 'domain', 'icon' => 'fa-solid fa-globe', 'title' => 'Domain', 'copy' => 'Custom domain registration for your athlete site', 'price' => '$45', 'unit' => '/Year'],
+              ] as $service)
+                <form action="{{ $plyrAdditionalServiceStoreAction }}" method="POST" class="plyrcard-offer-card" data-plyrcard-ajax-form novalidate data-success-message="Additional service request sent.">
+                  @csrf
+                  <input type="hidden" name="service_key" value="{{ $service['key'] }}">
+                  <input type="hidden" name="service_name" value="{{ $service['title'] }}">
+                  <input type="hidden" name="listed_price" value="{{ $service['price'] }} {{ $service['unit'] }}">
+                  <span class="plyrcard-offer-icon"><i class="{{ $service['icon'] }}"></i></span>
+                  <span>
+                    <h3 class="plyrcard-offer-title">{{ $service['title'] }}</h3>
+                    <p class="plyrcard-offer-copy">{{ $service['copy'] }}</p>
+                  </span>
+                  <span class="plyrcard-offer-price">{{ $service['price'] }}<small>{{ $service['unit'] }}</small><button type="submit" class="plyrcard-submit-btn" style="min-height:34px;font-size:12px;margin-top:9px;">Request</button></span>
+                </form>
+              @endforeach
+            </div>
+
+            <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrAdditionalServiceStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Custom service request sent.">
+              @csrf
+              <h3 class="plyrcard-mini-title">Custom Request</h3>
+              <label class="plyrcard-input-label">Service Needed<span class="plyrcard-input-wrap"><i class="fa-solid fa-list-check"></i><select class="plyrcard-drawer-select" name="service_key" required><option value="">Select service</option><option value="upgraded_site_design">Upgraded Site Design</option><option value="starting_graphics_bundle">Starting Graphics Bundle</option><option value="individual_graphic">Individual Graphic</option><option value="domain">Domain</option><option value="custom">Custom / Other</option></select></span></label>
+              <label class="plyrcard-input-label">Notes<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message"></i><textarea class="plyrcard-drawer-textarea" name="notes" placeholder="Tell us what you need..." minlength="5"></textarea></span></label>
+              <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> Send Request</button>
+            </form>
           </div>
         </div>
 
@@ -2437,30 +2491,30 @@
           </form>
         </div>
         <div class="plyrcard-drawer-view" data-plyrcard-view="billing" data-title="Billing">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="#" method="POST" data-plyrcard-mock-form data-success-message="Billing information saved locally for preview.">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrBillingUpdateAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Billing information saved and synced.">
             @csrf
             <h3 class="plyrcard-mini-title">Billing Information</h3>
-            <p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Billing data is not connected to the user model yet, so this is a ready-to-wire mockup form.</p>
+            <p class="plyrcard-mini-copy">Current plan: {{ $plyrPlanName }}. Update your billing profile. This saves locally and syncs to your GHL contact record.</p>
 
             <details class="plyrcard-profile-section" open>
               <summary><i class="fa-solid fa-file-invoice-dollar"></i> Billing Contact</summary>
               <div class="plyrcard-profile-grid">
-                <label class="plyrcard-input-label">Full Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="billing_name" placeholder="Full name" required></span></label>
-                <label class="plyrcard-input-label">Billing Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="billing_email" placeholder="billing@example.com" required></span></label>
-                <label class="plyrcard-input-label">Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="billing_phone" placeholder="+1 (555) 000-0000"></span></label>
-                <label class="plyrcard-input-label">Company / Organization<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_company" placeholder="Optional"></span></label>
+                <label class="plyrcard-input-label">Full Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="billing_name" value="{{ old('billing_name', $plyrBillingValue('billing_name', trim(($plyrUser->first_name ?? '') . ' ' . ($plyrUser->last_name ?? '')))) }}" placeholder="Full name" required></span></label>
+                <label class="plyrcard-input-label">Billing Email<span class="plyrcard-input-wrap"><i class="fa-regular fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="billing_email" value="{{ old('billing_email', $plyrBillingValue('billing_email', $plyrUser->email ?? '')) }}" placeholder="billing@example.com" required></span></label>
+                <label class="plyrcard-input-label">Phone<span class="plyrcard-input-wrap"><i class="fa-solid fa-phone"></i><input class="plyrcard-drawer-input" name="billing_phone" value="{{ old('billing_phone', $plyrBillingValue('billing_phone', $plyrUser->phone ?? '')) }}" placeholder="+1 (555) 000-0000"></span></label>
+                <label class="plyrcard-input-label">Company / Organization<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_company" value="{{ old('billing_company', $plyrBillingValue('billing_company')) }}" placeholder="Optional"></span></label>
               </div>
             </details>
 
             <details class="plyrcard-profile-section" open>
               <summary><i class="fa-solid fa-location-dot"></i> Billing Address</summary>
               <div class="plyrcard-profile-grid">
-                <label class="plyrcard-input-label">Address Line 1<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_1" placeholder="Street address" required></span></label>
-                <label class="plyrcard-input-label">Address Line 2<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_2" placeholder="Apt, suite, unit"></span></label>
-                <label class="plyrcard-input-label">City<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_city" placeholder="City" required></span></label>
-                <label class="plyrcard-input-label">State / Province<span class="plyrcard-input-wrap"><i class="fa-regular fa-map"></i><input class="plyrcard-drawer-input" name="billing_state" placeholder="State / Province" required></span></label>
-                <label class="plyrcard-input-label">Postal Code<span class="plyrcard-input-wrap"><i class="fa-solid fa-signs-post"></i><input class="plyrcard-drawer-input" name="billing_postal_code" placeholder="Postal code" required></span></label>
-                <label class="plyrcard-input-label">Country<span class="plyrcard-input-wrap"><i class="fa-solid fa-globe"></i><input class="plyrcard-drawer-input" name="billing_country" placeholder="Country" required></span></label>
+                <label class="plyrcard-input-label">Address Line 1<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_1" value="{{ old('billing_address_1', $plyrBillingValue('billing_address_1', $plyrUser->street ?? '')) }}" placeholder="Street address" required></span></label>
+                <label class="plyrcard-input-label">Address Line 2<span class="plyrcard-input-wrap"><i class="fa-solid fa-map-pin"></i><input class="plyrcard-drawer-input" name="billing_address_2" value="{{ old('billing_address_2', $plyrBillingValue('billing_address_2')) }}" placeholder="Apt, suite, unit"></span></label>
+                <label class="plyrcard-input-label">City<span class="plyrcard-input-wrap"><i class="fa-regular fa-building"></i><input class="plyrcard-drawer-input" name="billing_city" value="{{ old('billing_city', $plyrBillingValue('billing_city', $plyrUser->city ?? '')) }}" placeholder="City" required></span></label>
+                <label class="plyrcard-input-label">State / Province<span class="plyrcard-input-wrap"><i class="fa-regular fa-map"></i><input class="plyrcard-drawer-input" name="billing_state" value="{{ old('billing_state', $plyrBillingValue('billing_state', $plyrUser->state ?? '')) }}" placeholder="State / Province" required></span></label>
+                <label class="plyrcard-input-label">Postal Code<span class="plyrcard-input-wrap"><i class="fa-solid fa-signs-post"></i><input class="plyrcard-drawer-input" name="billing_postal_code" value="{{ old('billing_postal_code', $plyrBillingValue('billing_postal_code')) }}" placeholder="Postal code" required></span></label>
+                <label class="plyrcard-input-label">Country<span class="plyrcard-input-wrap"><i class="fa-solid fa-globe"></i><input class="plyrcard-drawer-input" name="billing_country" value="{{ old('billing_country', $plyrBillingValue('billing_country', $plyrUser->country ?? '')) }}" placeholder="Country" required></span></label>
               </div>
             </details>
 
@@ -2468,10 +2522,10 @@
               <summary><i class="fa-solid fa-credit-card"></i> Payment Method</summary>
               <p class="plyrcard-mini-copy">For security, do not store card numbers in the users table. Wire this section to your billing provider/portal later.</p>
               <div class="plyrcard-profile-grid">
-                <label class="plyrcard-input-label">Cardholder Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="cardholder_name" placeholder="Name on card"></span></label>
-                <label class="plyrcard-input-label">Last 4 Digits<span class="plyrcard-input-wrap"><i class="fa-solid fa-credit-card"></i><input class="plyrcard-drawer-input" name="card_last_four" inputmode="numeric" maxlength="4" placeholder="1234"></span></label>
-                <label class="plyrcard-input-label">Expiration<span class="plyrcard-input-wrap"><i class="fa-regular fa-calendar"></i><input class="plyrcard-drawer-input" name="card_expiration" placeholder="MM/YY"></span></label>
-                <label class="plyrcard-input-label">Payment Type<span class="plyrcard-input-wrap"><i class="fa-solid fa-wallet"></i><select class="plyrcard-drawer-select" name="payment_type"><option value="">Select type</option><option value="card">Card</option><option value="bank">Bank transfer</option><option value="other">Other</option></select></span></label>
+                <label class="plyrcard-input-label">Cardholder Name<span class="plyrcard-input-wrap"><i class="fa-regular fa-user"></i><input class="plyrcard-drawer-input" name="cardholder_name" value="{{ old('cardholder_name', $plyrBillingValue('cardholder_name')) }}" placeholder="Name on card"></span></label>
+                <label class="plyrcard-input-label">Last 4 Digits<span class="plyrcard-input-wrap"><i class="fa-solid fa-credit-card"></i><input class="plyrcard-drawer-input" name="card_last_four" value="{{ old('card_last_four', $plyrBillingValue('card_last_four')) }}" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="1234"></span></label>
+                <label class="plyrcard-input-label">Expiration<span class="plyrcard-input-wrap"><i class="fa-regular fa-calendar"></i><input class="plyrcard-drawer-input" name="card_expiration" value="{{ old('card_expiration', $plyrBillingValue('card_expiration')) }}" placeholder="MM/YY"></span></label>
+                <label class="plyrcard-input-label">Payment Type<span class="plyrcard-input-wrap"><i class="fa-solid fa-wallet"></i><select class="plyrcard-drawer-select" name="payment_type"><option value="">Select type</option><option value="card" @selected(old('payment_type', $plyrBillingValue('payment_type')) === 'card')>Card</option><option value="bank" @selected(old('payment_type', $plyrBillingValue('payment_type')) === 'bank')>Bank transfer</option><option value="other" @selected(old('payment_type', $plyrBillingValue('payment_type')) === 'other')>Other</option></select></span></label>
               </div>
             </details>
 
@@ -2544,7 +2598,7 @@
     let drawer = document.getElementById('plyrcard-action-drawer');
     if (!drawer) return;
 
-    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade'];
+    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade', 'a-la-carte'];
     let viewStack = ['main'];
     let currentView = 'main';
     let alertTimer = null;

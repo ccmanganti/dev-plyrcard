@@ -239,11 +239,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/locker-room/settings', [LockerRoomController::class, 'updateSettings'])
         ->name('locker-room.settings.update');
 
+    Route::post('/locker-room/billing', [LockerRoomController::class, 'updateBilling'])
+        ->name('locker-room.billing.update');
+
     Route::post('/locker-room/support', [LockerRoomController::class, 'storeSupport'])
         ->name('locker-room.support.store');
 
     Route::post('/locker-room/referral', [LockerRoomController::class, 'storeReferral'])
         ->name('locker-room.referral.store');
+
+    Route::post('/locker-room/additional-service', [LockerRoomController::class, 'storeAdditionalService'])
+        ->name('locker-room.additional-service.store');
 });
 
 /*

@@ -1,8 +1,19 @@
 @php
     $user = $website->user;
 
-    $primary   = $website->primary_color ?: '#0e4f86';
-    $secondary = $website->secondary_color ?: '#061a4f';
+    $primary = $getHeroFieldValue(
+        'primary_color',
+        $website->primary_color
+            ?: $club?->primary_color
+            ?: $defaultPrimary
+    );
+
+    $secondary = $getHeroFieldValue(
+        'secondary_color',
+        $website->secondary_color
+            ?: $club?->secondary_color
+            ?: $defaultSecondary
+    );
     $accent    = $website->accent_color ?: '#ffffff';
     $bg        = $website->background_color ?: '#0b0b0b';
     $surface   = $website->surface_color ?: '#171717';
