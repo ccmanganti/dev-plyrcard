@@ -45,5 +45,11 @@ return [
         'webhook_secret' => env('GHL_WEBHOOK_SECRET'),
         'profile_completion_field_id' => env('GHL_PROFILE_COMPLETION_FIELD_ID'),
         'site_status_field_id' => env('GHL_SITE_STATUS_FIELD_ID'),
+
+        // Optional: only needed if player calendars live in multiple GHL sub-accounts.
+        'agency_token' => env('GHL_AGENCY_ACCESS_TOKEN'),
+        'company_id' => env('GHL_COMPANY_ID'),
     ],
+
+
 ];

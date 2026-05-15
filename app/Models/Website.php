@@ -30,6 +30,12 @@ class Website extends Model
         'surface_color',
         'text_primary_color',
         'text_secondary_color',
+        'article_section_type',
+        'ghl_location_id',
+        'ghl_api_token',
+        'ghl_calendar_id',
+        'ghl_calendar_name',
+        'ghl_calendar_embed_url',
         'published_notification_sent_at',
     ];
 
@@ -37,6 +43,7 @@ class Website extends Model
         'is_active' => 'boolean',
         'is_published' => 'boolean',
         'published_notification_sent_at' => 'datetime',
+        'ghl_api_token' => 'encrypted',
     ];
 
     public function user(): BelongsTo
@@ -63,4 +70,22 @@ class Website extends Model
     {
         return $this->hasMany(WebsiteHeroFieldValue::class);
     }
+    public function hasGhlCalendarCredentials(): bool
+    {
+        return filled($this->ghl_location_id) && filled($this->ghl_api_token);
+    }
+
+    public function calendarEmbedUrl(): ?string
+    {
+        if (filled($this->ghl_calendar_embed_url)) {
+            return $this->ghl_calendar_embed_url;
+        }
+
+        if (filled($this->ghl_calendar_id)) {
+            return 'https://systems.plyrcard.com/widget/booking/' . ltrim($this->ghl_calendar_id, '/');
+        }
+
+        return null;
+    }
+
 }

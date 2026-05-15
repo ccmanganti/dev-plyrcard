@@ -218,7 +218,63 @@ class WebsiteResource extends Resource
                                     ColorPicker::make('text_secondary_color')->nullable(),
                                 ]),
                         ]),
+
+                    Tabs\Tab::make('Article Section')
+                        ->schema([
+                            Section::make('My Journey Article Section')
+                                ->description('Admin-only GHL setup. Add the player sub-account Location ID and Private Integration Token. The app will pull the first active personal calendar automatically; players never see the API token.')
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('article_section_type')
+                                        ->label('Default Article Section Display')
+                                        ->options([
+                                            'follow_me' => 'Follow Me Form',
+                                            'calendar' => 'GHL Calendar',
+                                        ])
+                                        ->default('follow_me')
+                                        ->helperText('Only My Journey players can use Calendar on the public player site.'),
+
+                                    TextInput::make('ghl_location_id')
+                                        ->label('GHL Location ID')
+                                        ->placeholder('vlsP1Bv6vsSN9OI8WALb')
+                                        ->maxLength(255)
+                                        ->helperText("Use the player's GHL sub-account/location ID."),
+
+                                    TextInput::make('ghl_api_token')
+                                        ->label('GHL Private Integration Token')
+                                        ->password()
+                                        ->revealable()
+                                        ->dehydrated(fn ($state): bool => filled($state))
+                                        ->dehydrateStateUsing(fn ($state) => filled($state) ? trim((string) $state) : null)
+                                        ->maxLength(2000)
+                                        ->helperText('Admin only. Leave blank when editing to keep the currently saved encrypted token.'),
+
+                                    Placeholder::make('calendar_auto_pull_note')
+                                        ->label('Calendar Auto Pull')
+                                        ->content(new HtmlString('<strong>The selected calendar is pulled automatically.</strong><br>After the player chooses Calendar in Locker Room, the backend finds the first active personal calendar from this Location ID/token and stores it below.')),
+
+                                    TextInput::make('ghl_calendar_id')
+                                        ->label('Auto-Pulled Calendar ID')
+                                        ->disabled()
+                                        ->dehydrated(false)
+                                        ->helperText('Read-only. Filled automatically from GHL.'),
+
+                                    TextInput::make('ghl_calendar_name')
+                                        ->label('Auto-Pulled Calendar Name')
+                                        ->disabled()
+                                        ->dehydrated(false)
+                                        ->helperText('Read-only. Filled automatically from GHL.'),
+
+                                    TextInput::make('ghl_calendar_embed_url')
+                                        ->label('Auto-Pulled Calendar Embed URL')
+                                        ->disabled()
+                                        ->dehydrated(false)
+                                        ->columnSpanFull()
+                                        ->helperText('Read-only. Generated from the auto-pulled GHL Calendar ID.'),
+                                ]),
+                        ]),
                 ]),
+
         ]);
     }
 
@@ -245,6 +301,20 @@ class WebsiteResource extends Resource
                     ->label('Domain')
                     ->searchable()
                     ->toggleable(),
+
+                TextColumn::make('article_section_type')
+                    ->label('Article Section')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'calendar' => 'Calendar',
+                        default => 'Follow Me',
+                    })
+                    ->toggleable(),
+
+                TextColumn::make('ghl_calendar_name')
+                    ->label('GHL Calendar')
+                    ->placeholder('Not selected')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),

@@ -376,6 +376,38 @@ $text2 = $getFieldValue(
 HTML;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Article / Contact Section
+    |--------------------------------------------------------------------------
+    | Default: Follow Me form embed.
+    | My Journey only: If the player selected Calendar in Locker Room and the
+    | website has a synced GHL calendar id/embed url, render the calendar in
+    | this right-side article/contact section instead.
+    */
+    $playerRoleNames = $user && method_exists($user, 'getRoleNames')
+        ? $user->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)))->values()
+        : collect();
+
+    $playerHasMyJourney = $playerRoleNames->contains('my journey')
+        || $playerRoleNames->contains('myjourney')
+        || ($user && method_exists($user, 'hasRole') && $user->hasRole('My Journey'));
+
+    $articleSectionType = $playerHasMyJourney
+        ? strtolower((string) ($website->article_section_type ?: 'follow_me'))
+        : 'follow_me';
+
+    $calendarEmbedUrl = filled($website->ghl_calendar_embed_url)
+        ? trim((string) $website->ghl_calendar_embed_url)
+        : (filled($website->ghl_calendar_id)
+            ? 'https://systems.plyrcard.com/widget/booking/' . ltrim(trim((string) $website->ghl_calendar_id), '/')
+            : null);
+
+    $shouldRenderCalendarArticleSection = $playerHasMyJourney
+        && $articleSectionType === 'calendar'
+        && filled($calendarEmbedUrl);
+
     $aboutVideoUrls = filled($user?->featured_video_url)
         ? $user->featured_video_url
         : $getFieldValue('yt_embed', '');
@@ -2003,7 +2035,18 @@ HTML;
 
         <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="p-4 md:p-6 rounded min-h-[180px]">
-                {!! $contactFormEmbed !!}
+                @if($shouldRenderCalendarArticleSection)
+                    <iframe
+                        src="{{ $calendarEmbedUrl }}"
+                        style="width:100%;min-height:520px;border:none;border-radius:4px;overflow:hidden;background:#fff;"
+                        scrolling="no"
+                        id="plyrcard-ghl-calendar-{{ $website->id }}"
+                        title="{{ $website->ghl_calendar_name ?: 'Book with ' . ($playerDisplayName ?: 'this player') }}"
+                    ></iframe>
+                    <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
+                @else
+                    {!! $contactFormEmbed !!}
+                @endif
             </div>
         </div>
     </div>

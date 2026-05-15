@@ -6,11 +6,11 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Throwable;
+use Illuminate\Support\Str;
 
 class GoHighLevelService
 {
-    protected string $baseUrl = 'https://services.leadconnectorhq.com';
+    private string $baseUrl = 'https://services.leadconnectorhq.com';
 
     public function syncProfileCompletion(User $user, int $completion): bool
     {
@@ -77,146 +77,321 @@ class GoHighLevelService
     }
 
     /**
-     * Upsert a GHL contact and return a normalized result array.
+     * List calendars for a GHL location.
      *
-     * This intentionally supports two use cases:
-     * - syncing the authenticated player/contact
-     * - creating a new contact for a referral using override email/phone fields
+     * Pass $tokenOverride for a player's manually configured sub-account Private Integration Token.
      */
-    public function upsertContact(User $user, array $attributes = [], array $customFields = [], string $source = 'PlyrCard Locker Room'): array
+    public function getCalendars(?string $locationId = null, ?string $tokenOverride = null): array
     {
-        if (! $this->enabled()) {
+        $locationId = $locationId ?: config('services.ghl.location_id');
+
+        if (! $locationId) {
+            return [];
+        }
+
+        $token = $this->tokenForLocation($locationId, $tokenOverride);
+
+        if (! $token) {
+            Log::warning('GHL calendar list skipped. Missing token.', [
+                'location_id' => $locationId,
+                'has_manual_token' => filled($tokenOverride),
+            ]);
+
+            return [];
+        }
+
+        $response = Http::withHeaders([
+                'Version' => '2021-04-15',
+            ])
+            ->withToken($token)
+            ->acceptJson()
+            ->get("{$this->baseUrl}/calendars/", [
+                'locationId' => $locationId,
+            ]);
+
+        if ($response->failed()) {
+            Log::error('GHL calendar list failed.', [
+                'location_id' => $locationId,
+                'has_manual_token' => filled($tokenOverride),
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return [];
+        }
+
+        $data = $response->json() ?? [];
+        $calendars = $data['calendars'] ?? $data['data'] ?? [];
+
+        return collect($calendars)
+            ->map(function (array $calendar) use ($locationId) {
+                $id = $calendar['id'] ?? $calendar['_id'] ?? null;
+
+                if (! $id) {
+                    return null;
+                }
+
+                return [
+                    'id' => $id,
+                    'name' => $calendar['name'] ?? $calendar['title'] ?? 'Calendar',
+                    'location_id' => $calendar['locationId'] ?? $locationId,
+                    'is_active' => $this->calendarIsActive($calendar),
+                    'is_personal' => $this->calendarIsPersonal($calendar),
+                    'embed_url' => $this->calendarEmbedUrl($id),
+                    'raw' => $calendar,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Pull the first active personal calendar from a sub-account.
+     *
+     * "Personal" is detected defensively because GHL responses may vary:
+     * - calendarType/type/calendar_type equals personal, OR
+     * - exactly one team member is attached, which matches GHL's personal-calendar rule.
+     */
+    public function getFirstActivePersonalCalendar(?string $locationId = null, ?string $tokenOverride = null): ?array
+    {
+        $calendars = collect($this->getCalendars($locationId, $tokenOverride));
+
+        $personalActive = $calendars
+            ->filter(fn (array $calendar) => (bool) ($calendar['is_active'] ?? false))
+            ->filter(fn (array $calendar) => (bool) ($calendar['is_personal'] ?? false))
+            ->values();
+
+        if ($personalActive->isNotEmpty()) {
+            return $personalActive->first();
+        }
+
+        /*
+         * Fallback: if GHL did not expose personal-calendar metadata clearly,
+         * use the first active calendar so the admin can still get a working widget.
+         */
+        return $calendars
+            ->filter(fn (array $calendar) => (bool) ($calendar['is_active'] ?? false))
+            ->values()
+            ->first();
+    }
+
+    /**
+     * Resolve and store the first active personal calendar for a Website.
+     */
+    public function syncFirstActivePersonalCalendarForWebsite(Website $website): array
+    {
+        $locationId = $website->ghl_location_id ?: config('services.ghl.location_id');
+        $token = $website->ghl_api_token ?: null;
+
+        if (blank($locationId)) {
             return [
                 'ok' => false,
-                'skipped' => true,
-                'message' => 'GHL is not configured.',
-                'response' => null,
+                'message' => 'Missing GHL Location ID.',
             ];
         }
 
-        $email = $attributes['email'] ?? $user->email ?? null;
-        $phone = $attributes['phone'] ?? $user->phone ?? null;
-
-        $payload = array_filter([
-            'locationId' => config('services.ghl.location_id'),
-            'firstName' => $attributes['firstName'] ?? $user->first_name ?? null,
-            'lastName' => $attributes['lastName'] ?? $user->last_name ?? null,
-            'name' => $attributes['name'] ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')),
-            'email' => $email,
-            'phone' => $phone,
-            'address1' => $attributes['address1'] ?? null,
-            'city' => $attributes['city'] ?? null,
-            'state' => $attributes['state'] ?? null,
-            'postalCode' => $attributes['postalCode'] ?? null,
-            'country' => $attributes['country'] ?? null,
-            'companyName' => $attributes['companyName'] ?? null,
-            'source' => $source,
-        ], fn ($value) => ! is_null($value) && $value !== '');
-
-        if (! empty($customFields)) {
-            $payload['customFields'] = $customFields;
-        }
-
-        try {
-            $response = Http::withHeaders([
-                    'Version' => '2021-07-28',
-                    'Accept' => 'application/json',
-                ])
-                ->withToken(config('services.ghl.token'))
-                ->timeout(20)
-                ->post($this->baseUrl . '/contacts/upsert', $payload);
-
-            $responseData = $response->json() ?: ['body' => $response->body()];
-            $contactId = data_get($responseData, 'contact.id')
-                ?? data_get($responseData, 'id')
-                ?? data_get($responseData, 'contactId');
-
-            if ($response->failed()) {
-                Log::error('GHL contact upsert failed.', [
-                    'user_id' => $user->id,
-                    'status' => $response->status(),
-                    'body' => $responseData,
-                    'payload' => $payload,
-                ]);
-            }
-
-            // Only write ghl_contact_id back onto the user when the upserted contact is the user's own email.
-            if ($response->successful() && $contactId && $email && strtolower(trim($email)) === strtolower(trim((string) $user->email)) && ! $user->ghl_contact_id) {
-                $user->forceFill([
-                    'ghl_contact_id' => $contactId,
-                ])->saveQuietly();
-            }
-
+        if (blank($token) && blank(config('services.ghl.token'))) {
             return [
-                'ok' => $response->successful(),
-                'skipped' => false,
-                'status' => $response->status(),
-                'response' => $responseData,
-                'contact_id' => $contactId,
+                'ok' => false,
+                'message' => 'Missing GHL Private Integration Token.',
             ];
-        } catch (Throwable $e) {
-            Log::error('GHL contact upsert exception.', [
-                'user_id' => $user->id,
-                'message' => $e->getMessage(),
+        }
+
+        $calendar = $this->getFirstActivePersonalCalendar($locationId, $token);
+
+        if (! $calendar) {
+            return [
+                'ok' => false,
+                'message' => 'No active personal calendar was found for this GHL location.',
+            ];
+        }
+
+        $website->forceFill([
+            'ghl_location_id' => $locationId,
+            'ghl_calendar_id' => $calendar['id'] ?? null,
+            'ghl_calendar_name' => $calendar['name'] ?? null,
+            'ghl_calendar_embed_url' => $calendar['embed_url'] ?? $this->calendarEmbedUrl($calendar['id'] ?? ''),
+        ])->saveQuietly();
+
+        return [
+            'ok' => true,
+            'message' => 'First active personal calendar synced.',
+            'calendar' => $calendar,
+        ];
+    }
+
+    public function calendarEmbedUrl(string $calendarId): string
+    {
+        return 'https://systems.plyrcard.com/widget/booking/' . ltrim(trim($calendarId), '/');
+    }
+
+    public function findCalendarById(string $calendarId, ?string $locationId = null, ?string $tokenOverride = null): ?array
+    {
+        return collect($this->getCalendars($locationId, $tokenOverride))->firstWhere('id', $calendarId);
+    }
+
+    public function upsertContact(array $payload, ?string $locationId = null, ?string $tokenOverride = null): ?string
+    {
+        $locationId = $locationId ?: config('services.ghl.location_id');
+        $token = $this->tokenForLocation($locationId, $tokenOverride);
+
+        if (! $token || ! $locationId) {
+            return null;
+        }
+
+        $payload['locationId'] = $payload['locationId'] ?? $locationId;
+
+        $response = Http::withHeaders([
+                'Version' => '2021-07-28',
+            ])
+            ->withToken($token)
+            ->acceptJson()
+            ->post("{$this->baseUrl}/contacts/upsert", $payload);
+
+        if ($response->failed()) {
+            Log::error('GHL contact upsert failed.', [
+                'status' => $response->status(),
+                'body' => $response->body(),
                 'payload' => $payload,
             ]);
 
-            return [
-                'ok' => false,
-                'skipped' => false,
-                'message' => $e->getMessage(),
-                'response' => null,
-            ];
+            return null;
         }
+
+        $data = $response->json() ?? [];
+
+        return $data['contact']['id'] ?? $data['id'] ?? null;
     }
 
-    public function addContactNote(?string $contactId, string $body): array
+    public function addContactNote(string $contactId, string $body, ?string $locationId = null, ?string $tokenOverride = null): bool
     {
-        if (! $this->enabled() || blank($contactId)) {
-            return [
-                'ok' => false,
-                'skipped' => true,
-                'message' => 'GHL note skipped.',
-            ];
+        $token = $this->tokenForLocation($locationId ?: config('services.ghl.location_id'), $tokenOverride);
+
+        if (! $token || ! $contactId || ! $body) {
+            return false;
         }
 
-        try {
-            $response = Http::withHeaders([
-                    'Version' => '2021-07-28',
-                    'Accept' => 'application/json',
-                ])
-                ->withToken(config('services.ghl.token'))
-                ->timeout(20)
-                ->post($this->baseUrl . '/contacts/' . $contactId . '/notes', [
-                    'body' => $body,
-                ]);
-
-            $responseData = $response->json() ?: ['body' => $response->body()];
-
-            if ($response->failed()) {
-                Log::error('GHL contact note failed.', [
-                    'contact_id' => $contactId,
-                    'status' => $response->status(),
-                    'body' => $responseData,
-                ]);
-            }
-
-            return [
-                'ok' => $response->successful(),
-                'status' => $response->status(),
-                'response' => $responseData,
-            ];
-        } catch (Throwable $e) {
-            Log::error('GHL contact note exception.', [
-                'contact_id' => $contactId,
-                'message' => $e->getMessage(),
+        $response = Http::withHeaders([
+                'Version' => '2021-07-28',
+            ])
+            ->withToken($token)
+            ->acceptJson()
+            ->post("{$this->baseUrl}/contacts/{$contactId}/notes", [
+                'body' => $body,
             ]);
 
-            return [
-                'ok' => false,
-                'message' => $e->getMessage(),
-            ];
+        if ($response->failed()) {
+            Log::error('GHL contact note failed.', [
+                'contact_id' => $contactId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return false;
         }
+
+        return true;
+    }
+
+    public function tokenForLocation(?string $locationId = null, ?string $tokenOverride = null): ?string
+    {
+        if (filled($tokenOverride)) {
+            return trim((string) $tokenOverride);
+        }
+
+        $locationId = $locationId ?: config('services.ghl.location_id');
+        $defaultLocationId = config('services.ghl.location_id');
+        $defaultToken = config('services.ghl.token');
+
+        if (! $locationId || ! $defaultToken) {
+            return $defaultToken ?: null;
+        }
+
+        if ($locationId === $defaultLocationId) {
+            return $defaultToken;
+        }
+
+        return $this->getLocationAccessToken($locationId) ?: $defaultToken;
+    }
+
+    /**
+     * Optional agency-level support for calendars across multiple GHL sub-accounts.
+     */
+    public function getLocationAccessToken(string $locationId): ?string
+    {
+        $agencyToken = config('services.ghl.agency_token');
+        $companyId = config('services.ghl.company_id');
+
+        if (! $agencyToken || ! $companyId || ! $locationId) {
+            return null;
+        }
+
+        $response = Http::asForm()
+            ->withHeaders([
+                'Version' => '2023-02-21',
+            ])
+            ->withToken($agencyToken)
+            ->acceptJson()
+            ->post("{$this->baseUrl}/oauth/locationToken", [
+                'companyId' => $companyId,
+                'locationId' => $locationId,
+            ]);
+
+        if ($response->failed()) {
+            Log::error('GHL location token request failed.', [
+                'location_id' => $locationId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response->json('access_token');
+    }
+
+    private function calendarIsActive(array $calendar): bool
+    {
+        foreach (['isActive', 'is_active', 'active'] as $key) {
+            if (array_key_exists($key, $calendar)) {
+                return filter_var($calendar[$key], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        $status = strtolower((string) ($calendar['status'] ?? $calendar['calendarStatus'] ?? ''));
+
+        if (in_array($status, ['inactive', 'disabled', 'archived', 'deleted'], true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function calendarIsPersonal(array $calendar): bool
+    {
+        $type = strtolower((string) (
+            $calendar['calendarType']
+            ?? $calendar['calendar_type']
+            ?? $calendar['type']
+            ?? $calendar['kind']
+            ?? ''
+        ));
+
+        if (in_array($type, ['personal', 'personal_calendar'], true)) {
+            return true;
+        }
+
+        $teamMembers = $calendar['teamMembers']
+            ?? $calendar['team_members']
+            ?? $calendar['users']
+            ?? [];
+
+        if (is_array($teamMembers) && count($teamMembers) === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     private function resolveContactId(User $user): ?string
@@ -264,7 +439,7 @@ class GoHighLevelService
 
     private function findContactIdByEmail(?string $email): ?string
     {
-        if (! $email || ! $this->enabled()) {
+        if (! $email) {
             return null;
         }
 
@@ -275,7 +450,7 @@ class GoHighLevelService
             ])
             ->withToken(config('services.ghl.token'))
             ->acceptJson()
-            ->get($this->baseUrl . '/contacts/search/duplicate', [
+            ->get("{$this->baseUrl}/contacts/search/duplicate", [
                 'locationId' => config('services.ghl.location_id'),
                 'email' => $email,
             ]);

@@ -7,6 +7,7 @@
 
 @php
     use App\Models\Website;
+    use App\Services\GoHighLevelService;
     use Illuminate\Support\Str;
 
     $plyrUser = auth()->user();
@@ -24,26 +25,27 @@
             : Str::of($plyrUser->name ?? 'Player')->trim()->explode(' ')->first();
     }
 
-    $plyrPlanName = 'Free';
-    if ($plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'hasRole')) {
-        if ($plyrUser->hasRole('My Journey')) {
-            $plyrPlanName = 'My Journey';
-        } elseif ($plyrUser->hasRole('Plyr Plus')) {
-            $plyrPlanName = 'Plyr Plus';
-        } elseif ($plyrUser->hasRole('Plyr')) {
-            $plyrPlanName = 'Plyr';
-        } elseif ($plyrUser->hasRole('Free')) {
-            $plyrPlanName = 'Free';
-        }
+    $plyrRoleNames = collect();
+    if ($plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'getRoleNames')) {
+        $plyrRoleNames = $plyrUser->getRoleNames()
+            ->map(fn ($role) => strtolower(trim((string) $role)))
+            ->values();
     }
 
-    $plyrHasMyJourneyRole = $plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'hasRole')
-        ? $plyrUser->hasRole('My Journey')
-        : false;
+    $plyrHasMyJourneyRole = $plyrRoleNames->contains('my journey');
+    $plyrHasPlyrPlusRole = $plyrRoleNames->contains('plyr plus') || $plyrRoleNames->contains('plyr+') || $plyrRoleNames->contains('rookie plus');
+    $plyrHasPlyrRole = $plyrRoleNames->contains('plyr');
+    $plyrHasFreeRole = $plyrRoleNames->contains('free');
 
-    $plyrHasPremiumFeatures = $plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'hasRole')
-        ? ($plyrUser->hasRole('Plyr Plus') || $plyrUser->hasRole('My Journey'))
-        : false;
+    $plyrPlanName = match (true) {
+        $plyrHasMyJourneyRole => 'My Journey',
+        $plyrHasPlyrPlusRole => 'Plyr Plus',
+        $plyrHasPlyrRole => 'Plyr',
+        $plyrHasFreeRole => 'Free',
+        default => 'Free',
+    };
+
+    $plyrHasPremiumFeatures = $plyrHasPlyrPlusRole || $plyrHasMyJourneyRole;
 
     $plyrActivePage = $activePage ?? null;
     $plyrCurrentPath = trim(request()->path(), '/');
@@ -320,6 +322,24 @@
     $plyrAdditionalServiceStoreAction = \Illuminate\Support\Facades\Route::has('locker-room.additional-service.store')
         ? route('locker-room.additional-service.store')
         : '#';
+    $plyrWebsiteSettingsUpdateAction = \Illuminate\Support\Facades\Route::has('locker-room.website-settings.update')
+        ? route('locker-room.website-settings.update')
+        : '#';
+    $plyrPasswordUpdateAction = \Illuminate\Support\Facades\Route::has('locker-room.password.update')
+        ? route('locker-room.password.update')
+        : '#';
+
+    $plyrArticleSectionType = old('article_section_type', $plyrWebsite->article_section_type ?? 'follow_me');
+    $plyrSelectedGhlCalendarId = old('ghl_calendar_id', $plyrWebsite->ghl_calendar_id ?? '');
+    $plyrSelectedGhlCalendarName = old('ghl_calendar_name', $plyrWebsite->ghl_calendar_name ?? '');
+    $plyrSelectedGhlLocationId = old('ghl_location_id', $plyrWebsite->ghl_location_id ?? config('services.ghl.location_id'));
+    $plyrHasWebsiteGhlCredentials = $plyrWebsite
+        && filled($plyrSelectedGhlLocationId)
+        && (filled($plyrWebsite->ghl_api_token ?? null) || filled(config('services.ghl.token')));
+    $plyrWebsiteCalendarRefreshAction = \Illuminate\Support\Facades\Route::has('locker-room.website-calendar.refresh')
+        ? route('locker-room.website-calendar.refresh')
+        : '#';
+    $plyrShouldShowPasswordOverlay = $plyrLoggedIn && $plyrUser && (bool) (($plyrUser->password_change_required ?? false) || session('plyrcard_show_password_overlay'));
     $plyrDrawerLoginAction = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
         : url('/admin/login');
@@ -1931,7 +1951,7 @@
 </nav>
 
 @if($plyrShouldRenderPullup)
-<div id="plyrcard-action-drawer" class="plyrcard-action-drawer" data-state="closed">
+<div id="plyrcard-action-drawer" class="plyrcard-action-drawer" data-state="closed" data-force-password="{{ $plyrShouldShowPasswordOverlay ? '1' : '0' }}">
   <div class="plyrcard-drawer-scrim" data-plyrcard-close-drawer></div>
 
   <section class="plyrcard-drawer-panel" aria-label="{{ $plyrLoggedIn ? 'Locker Room menu' : 'Get Started menu' }}">
@@ -1994,6 +2014,7 @@
                 <a class="plyrcard-drawer-card" href="{{ $plyrWebsiteActionHref }}" @if($plyrWebsiteActionTarget) target="{{ $plyrWebsiteActionTarget }}" rel="noopener" @endif><i class="plyrcard-menu-icon fa-solid fa-globe" aria-hidden="true"></i><span>{{ $plyrWebsiteActionLabel }}</span></a>
               @endif
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="share-card"><i class="plyrcard-menu-icon fa-solid fa-qrcode" aria-hidden="true"></i><span>Share my PlyrCard</span></button>
+              <button type="button" class="plyrcard-drawer-card {{ $plyrHasMyJourneyRole ? '' : 'is-locked' }}" data-plyrcard-section="website-settings"><i class="plyrcard-menu-icon fa-solid {{ $plyrHasMyJourneyRole ? 'fa-toggle-on' : 'fa-lock' }}" aria-hidden="true"></i><span>Website Settings</span></button>
               <a class="plyrcard-drawer-card" href="/podcast"><i class="plyrcard-menu-icon fa-solid fa-podcast" aria-hidden="true"></i><span>PLYRCard Show</span></a>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="a-la-carte"><i class="plyrcard-menu-icon fa-solid fa-bag-shopping" aria-hidden="true"></i><span>Additional Services</span></button>
             </div>
@@ -2080,6 +2101,69 @@
               <button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="dashboard"><i class="fa-solid fa-chart-pie"></i> View Progress</button>
             </div>
           </div>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="website-settings" data-title="Website Settings">
+          @unless($plyrHasMyJourneyRole)
+            <div class="plyrcard-form-card">
+              <div class="plyrcard-locked-panel">
+                <span class="plyrcard-locked-icon"><i class="fa-solid fa-lock"></i></span>
+                <span><strong>My Journey only</strong><span>Article-section controls are available on the My Journey plan.</span></span>
+                <button type="button" class="plyrcard-submit-btn" data-plyrcard-section="upgrade">Upgrade</button>
+              </div>
+            </div>
+          @else
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrWebsiteSettingsUpdateAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Website settings saved.">
+            @csrf
+            <h3 class="plyrcard-mini-title">Website Settings</h3>
+            <p class="plyrcard-mini-copy">Choose what appears in the article/contact section on your player website. Calendar uses the first active personal calendar from the GHL sub-account configured by an admin.</p>
+
+            <label class="plyrcard-input-label">Article Section Display
+              <span class="plyrcard-input-wrap"><i class="fa-solid fa-layer-group"></i>
+                <select class="plyrcard-drawer-select" name="article_section_type" data-plyrcard-article-section-select required>
+                  <option value="follow_me" @selected($plyrArticleSectionType === 'follow_me')>Follow Me Form</option>
+                  <option value="calendar" @selected($plyrArticleSectionType === 'calendar')>GHL Calendar</option>
+                </select>
+              </span>
+            </label>
+
+            <div data-plyrcard-calendar-options style="display: {{ $plyrArticleSectionType === 'calendar' ? 'grid' : 'none' }} !important; gap: 11px !important;">
+              @if($plyrHasWebsiteGhlCredentials)
+                <div class="plyrcard-mini-panel">
+                  <h3 class="plyrcard-mini-title">Calendar Source</h3>
+                  <p class="plyrcard-mini-copy">
+                    Location ID: {{ $plyrSelectedGhlLocationId ?: 'Not configured' }}<br>
+                    Calendar: {{ $plyrSelectedGhlCalendarName ?: 'The first active personal calendar will be pulled automatically when you save.' }}
+                  </p>
+                </div>
+              @else
+                <div class="plyrcard-locked-panel">
+                  <span class="plyrcard-locked-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                  <span><strong>Calendar not configured</strong><span>Ask an admin to add this website's GHL Location ID and Private Integration Token in Filament.</span></span>
+                </div>
+              @endif
+
+              <input type="hidden" name="ghl_calendar_id" value="{{ $plyrSelectedGhlCalendarId }}">
+              <p class="plyrcard-mini-copy">Players do not select calendar IDs manually. The backend will pull the first active personal calendar from GHL using the admin-configured Location ID and API token.</p>
+            </div>
+
+            <div class="plyrcard-share-options">
+              <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+              <button type="button" class="plyrcard-secondary-btn" data-plyrcard-section="dashboard"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+            </div>
+          </form>
+          @endunless
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="password-overlay" data-title="Change Password">
+          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrPasswordUpdateAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Password updated.">
+            @csrf
+            <h3 class="plyrcard-mini-title">Change Your Password</h3>
+            <p class="plyrcard-mini-copy">Before continuing, create a secure password for your PlyrCard account.</p>
+            <label class="plyrcard-input-label">New Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password" minlength="8" placeholder="At least 8 characters" required></span></label>
+            <label class="plyrcard-input-label">Confirm Password<span class="plyrcard-input-wrap"><i class="fa-solid fa-lock"></i><input class="plyrcard-drawer-input" type="password" name="password_confirmation" minlength="8" placeholder="Repeat password" required></span></label>
+            <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-check"></i> Save Password</button>
+          </form>
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="a-la-carte" data-title="Additional Services">
@@ -2598,7 +2682,7 @@
     let drawer = document.getElementById('plyrcard-action-drawer');
     if (!drawer) return;
 
-    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade', 'a-la-carte'];
+    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade', 'a-la-carte', 'website-settings', 'password-overlay'];
     let viewStack = ['main'];
     let currentView = 'main';
     let alertTimer = null;
@@ -2980,6 +3064,21 @@
         });
       });
 
+      qa('[data-plyrcard-article-section-select]').forEach(select => {
+        if (select.dataset.plyrArticleBound) return;
+        select.dataset.plyrArticleBound = '1';
+        const form = select.closest('form') || drawer;
+        const calendarOptions = form.querySelector('[data-plyrcard-calendar-options]');
+        const calendarSelect = form.querySelector('[data-plyrcard-calendar-select]');
+        const syncArticleSettings = () => {
+          const showCalendar = select.value === 'calendar';
+          if (calendarOptions) calendarOptions.style.setProperty('display', showCalendar ? 'grid' : 'none', 'important');
+          if (calendarSelect) calendarSelect.required = showCalendar;
+        };
+        select.addEventListener('change', syncArticleSettings);
+        syncArticleSettings();
+      });
+
       qa('[data-plyrcard-sport-select]').forEach(sportSelect => {
         if (sportSelect.dataset.plyrPositionBound) return;
         sportSelect.dataset.plyrPositionBound = '1';
@@ -3289,6 +3388,10 @@
     bindLoadingForms();
     bindPullToRefresh();
     showView('main', { push: false });
+    if (drawer.dataset.forcePassword === '1') {
+      setOpen(true);
+      showView('password-overlay', { push: true });
+    }
 
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {

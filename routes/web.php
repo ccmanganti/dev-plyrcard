@@ -250,6 +250,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/locker-room/additional-service', [LockerRoomController::class, 'storeAdditionalService'])
         ->name('locker-room.additional-service.store');
+
+    Route::post('/locker-room/website-settings', [LockerRoomController::class, 'updateWebsiteSettings'])
+        ->name('locker-room.website-settings.update');
+
+    Route::post('/locker-room/website-calendar/refresh', [LockerRoomController::class, 'refreshWebsiteCalendar'])
+        ->name('locker-room.website-calendar.refresh');
 });
 
 /*

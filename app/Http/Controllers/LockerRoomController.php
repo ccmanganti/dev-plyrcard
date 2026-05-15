@@ -7,11 +7,13 @@ use App\Models\BillingInformation;
 use App\Models\LockerRoomReferral;
 use App\Models\LockerRoomSupportRequest;
 use App\Models\Schedule;
+use App\Models\Website;
 use App\Services\GoHighLevelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
@@ -201,6 +203,126 @@ class LockerRoomController extends Controller
         return $this->success($request, 'Settings are coming soon.');
     }
 
+    public function updateWebsiteSettings(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        if (! method_exists($user, 'hasRole') || ! $user->hasRole('My Journey')) {
+            return $this->failure($request, 'Website Settings are only available on the My Journey plan.', 403);
+        }
+
+        $data = $request->validate([
+            'article_section_type' => ['required', Rule::in(['follow_me', 'calendar'])],
+        ]);
+
+        $website = Website::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_published', true)
+            ->latest('updated_at')
+            ->first();
+
+        if (! $website) {
+            return $this->failure($request, 'No active published website was found yet.', 422);
+        }
+
+        if ($data['article_section_type'] === 'follow_me') {
+            $website->forceFill([
+                'article_section_type' => 'follow_me',
+                'ghl_calendar_id' => null,
+                'ghl_calendar_name' => null,
+                'ghl_calendar_embed_url' => null,
+            ])->save();
+
+            return $this->success($request, 'Website settings saved. Follow Me form will be shown.', [
+                'website' => $website->fresh(),
+            ]);
+        }
+
+        $locationId = $website->ghl_location_id ?: config('services.ghl.location_id');
+        $manualToken = $website->ghl_api_token ?: null;
+
+        if (blank($locationId)) {
+            return $this->failure($request, 'Ask an admin to add the GHL Location ID for this website first.', 422);
+        }
+
+        if (blank($manualToken) && blank(config('services.ghl.token'))) {
+            return $this->failure($request, 'Ask an admin to add the GHL Private Integration Token for this website first.', 422);
+        }
+
+        $sync = $ghl->syncFirstActivePersonalCalendarForWebsite($website);
+
+        if (! ($sync['ok'] ?? false)) {
+            return $this->failure($request, $sync['message'] ?? 'No active personal calendar was found.', 422);
+        }
+
+        $website->forceFill([
+            'article_section_type' => 'calendar',
+        ])->save();
+
+        return $this->success($request, 'Website settings saved. The first active personal calendar was pulled from GHL.', [
+            'website' => $website->fresh(),
+            'calendar' => $sync['calendar'] ?? null,
+        ]);
+    }
+
+    public function refreshWebsiteCalendar(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        if (! method_exists($user, 'hasRole') || ! $user->hasRole('My Journey')) {
+            return $this->failure($request, 'Website Calendar is only available on the My Journey plan.', 403);
+        }
+
+        $website = Website::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_published', true)
+            ->latest('updated_at')
+            ->first();
+
+        if (! $website) {
+            return $this->failure($request, 'No active published website was found yet.', 422);
+        }
+
+        $sync = $ghl->syncFirstActivePersonalCalendarForWebsite($website);
+
+        if (! ($sync['ok'] ?? false)) {
+            return $this->failure($request, $sync['message'] ?? 'No active personal calendar was found.', 422);
+        }
+
+        $website->forceFill([
+            'article_section_type' => 'calendar',
+        ])->save();
+
+        return $this->success($request, 'Calendar refreshed from GHL.', [
+            'website' => $website->fresh(),
+            'calendar' => $sync['calendar'] ?? null,
+        ]);
+    }
+
+    public function updatePasswordFromOverlay(Request $request): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'password_change_required' => false,
+            'password_changed_at' => now(),
+        ])->save();
+
+        $request->session()->forget('plyrcard_show_password_overlay');
+
+        return $this->success($request, 'Password updated.');
+    }
+
     public function storeSupport(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
@@ -348,6 +470,18 @@ class LockerRoomController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    private function failure(Request $request, string $message, int $status = 422, array $extra = []): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(array_merge([
+                'success' => false,
+                'message' => $message,
+            ], $extra), $status);
+        }
+
+        return back()->withErrors(['locker_room' => $message]);
     }
 
     private function success(Request $request, string $message, array $extra = []): RedirectResponse|JsonResponse
