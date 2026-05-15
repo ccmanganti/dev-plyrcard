@@ -1271,6 +1271,148 @@ HTML;
                     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='6' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='11' width='16' height='2' rx='1' fill='black'/%3E%3Crect x='4' y='16' width='16' height='2' rx='1' fill='black'/%3E%3C/svg%3E") no-repeat center / contain;
         }
 
+
+
+        .follow-me-card{
+            width: 100%;
+            min-height: 100%;
+            color: var(--on-primary);
+        }
+
+        .follow-me-title{
+            font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            font-size: clamp(2rem, 4vw, 3.3rem);
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin: 0 0 1rem;
+            color: var(--on-primary);
+        }
+
+        .follow-me-copy{
+            max-width: 460px;
+            font-size: 1rem;
+            line-height: 1.55;
+            font-weight: 600;
+            color: var(--on-primary);
+            margin: 0 0 1.5rem;
+        }
+
+        .follow-me-form{
+            display: grid;
+            gap: 1.15rem;
+        }
+
+        .follow-me-field{
+            display: grid;
+            gap: .55rem;
+        }
+
+        .follow-me-label{
+            display: block;
+            font-size: 1rem;
+            line-height: 1;
+            font-weight: 800;
+            color: var(--on-primary);
+        }
+
+        .follow-me-control{
+            width: 100%;
+            border: 0;
+            border-bottom: 2px solid color-mix(in srgb, var(--on-primary) 82%, transparent 18%);
+            border-radius: 0;
+            background: transparent;
+            color: var(--on-primary);
+            outline: none;
+            padding: .8rem 0 .85rem;
+            font: inherit;
+            font-size: .95rem;
+            line-height: 1.35;
+            transition: border-color .18s ease, opacity .18s ease;
+        }
+
+        .follow-me-control::placeholder{
+            color: color-mix(in srgb, var(--on-primary) 76%, transparent 24%);
+        }
+
+        .follow-me-control:focus{
+            border-bottom-color: var(--on-primary);
+        }
+
+        textarea.follow-me-control{
+            min-height: 88px;
+            resize: vertical;
+        }
+
+        .follow-me-field.has-error .follow-me-control{
+            border-bottom-color: #ffffff;
+            box-shadow: 0 1px 0 #ffffff;
+        }
+
+        .follow-me-error{
+            display: none;
+            color: var(--on-primary);
+            font-size: .82rem;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .follow-me-field.has-error .follow-me-error{
+            display: block;
+        }
+
+        .follow-me-submit{
+            width: 100%;
+            min-height: 58px;
+            border: 0;
+            border-radius: 999px;
+            margin-top: .6rem;
+            background: var(--on-primary);
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .follow-me-submit:hover{
+            transform: translateY(-1px);
+        }
+
+        .follow-me-submit:disabled{
+            opacity: .72;
+            cursor: wait;
+            transform: none;
+        }
+
+        .follow-me-status{
+            display: none;
+            margin-top: .8rem;
+            padding: .85rem 1rem;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--on-primary) 14%, transparent 86%);
+            color: var(--on-primary);
+            font-size: .9rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .follow-me-status.is-visible{
+            display: block;
+        }
+
+        @media (max-width: 767px){
+            .follow-me-title{
+                font-size: 2.35rem;
+            }
+
+            .follow-me-copy{
+                font-size: .95rem;
+            }
+        }
+
         .schedule-shell{
             border: 1px solid rgba(15, 23, 42, 0.08);
             background: #ffffff;
@@ -2075,7 +2217,106 @@ HTML;
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
                 @else
-                    {!! $contactFormEmbed !!}
+                    <div class="follow-me-card">
+                        <h2 class="follow-me-title">Follow Me</h2>
+                        <p class="follow-me-copy">
+                            If you’d like to stay updated on my {{ filled($sportText) ? strtolower($sportText) : 'athlete' }} journey,
+                            upcoming games, and development, please fill out the form below. I’ll only send updates related
+                            to my progress and achievements.
+                        </p>
+
+                        @php
+                            $followMeFormAction = \Illuminate\Support\Facades\Route::has('public.follow-me.store')
+                                ? route('public.follow-me.store', $website)
+                                : null;
+                        @endphp
+
+                        <form
+                            class="follow-me-form"
+                            method="POST"
+                            action="{{ $followMeFormAction ?: '#' }}"
+                            data-follow-me-form
+                            data-player-email="{{ $playerEmail }}"
+                            novalidate
+                        >
+                            @csrf
+                            <input type="hidden" name="website_id" value="{{ $website->id }}">
+                            <input type="hidden" name="player_id" value="{{ $user?->id }}">
+                            <input type="hidden" name="player_name" value="{{ $playerDisplayName }}">
+
+                            <div class="follow-me-field" data-field-wrap>
+                                <label class="follow-me-label" for="follow_me_first_name_{{ $website->id }}">First Name</label>
+                                <input
+                                    id="follow_me_first_name_{{ $website->id }}"
+                                    class="follow-me-control"
+                                    type="text"
+                                    name="first_name"
+                                    placeholder="Coach First Name"
+                                    autocomplete="given-name"
+                                    required
+                                >
+                                <span class="follow-me-error">First name is required.</span>
+                            </div>
+
+                            <div class="follow-me-field" data-field-wrap>
+                                <label class="follow-me-label" for="follow_me_last_name_{{ $website->id }}">Last Name</label>
+                                <input
+                                    id="follow_me_last_name_{{ $website->id }}"
+                                    class="follow-me-control"
+                                    type="text"
+                                    name="last_name"
+                                    placeholder="Coach Last Name"
+                                    autocomplete="family-name"
+                                    required
+                                >
+                                <span class="follow-me-error">Last name is required.</span>
+                            </div>
+
+                            <div class="follow-me-field" data-field-wrap>
+                                <label class="follow-me-label" for="follow_me_email_{{ $website->id }}">Email *</label>
+                                <input
+                                    id="follow_me_email_{{ $website->id }}"
+                                    class="follow-me-control"
+                                    type="email"
+                                    name="email"
+                                    placeholder="Email"
+                                    autocomplete="email"
+                                    required
+                                >
+                                <span class="follow-me-error">Enter a valid email address.</span>
+                            </div>
+
+                            <div class="follow-me-field" data-field-wrap>
+                                <label class="follow-me-label" for="follow_me_school_{{ $website->id }}">School</label>
+                                <input
+                                    id="follow_me_school_{{ $website->id }}"
+                                    class="follow-me-control"
+                                    type="text"
+                                    name="school"
+                                    placeholder="School or organization"
+                                    autocomplete="organization"
+                                >
+                                <span class="follow-me-error">Please enter a valid school or organization.</span>
+                            </div>
+
+                            <div class="follow-me-field" data-field-wrap>
+                                <label class="follow-me-label" for="follow_me_message_{{ $website->id }}">Message</label>
+                                <textarea
+                                    id="follow_me_message_{{ $website->id }}"
+                                    class="follow-me-control"
+                                    name="message"
+                                    placeholder="Optional note..."
+                                ></textarea>
+                                <span class="follow-me-error">Please enter a valid message.</span>
+                            </div>
+
+                            <button class="follow-me-submit" type="submit" data-default-text="Follow Me">
+                                Follow Me
+                            </button>
+
+                            <div class="follow-me-status" data-follow-me-status aria-live="polite"></div>
+                        </form>
+                    </div>
                 @endif
             </div>
         </div>
@@ -2850,6 +3091,143 @@ HTML;
 
             setDefaultToNextUpcomingMatch();
             render();
+        });
+    </script>
+
+    
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-follow-me-form]').forEach(function (form) {
+                const submitButton = form.querySelector('.follow-me-submit');
+                const status = form.querySelector('[data-follow-me-status]');
+                const defaultText = submitButton?.dataset.defaultText || 'Follow Me';
+
+                const setStatus = function (message, visible = true) {
+                    if (!status) {
+                        return;
+                    }
+
+                    status.textContent = message;
+                    status.classList.toggle('is-visible', visible);
+                };
+
+                const clearErrors = function () {
+                    form.querySelectorAll('[data-field-wrap]').forEach(function (wrap) {
+                        wrap.classList.remove('has-error');
+                    });
+                };
+
+                const validate = function () {
+                    clearErrors();
+
+                    let isValid = true;
+                    const requiredFields = form.querySelectorAll('[required]');
+
+                    requiredFields.forEach(function (field) {
+                        const wrap = field.closest('[data-field-wrap]');
+                        const value = String(field.value || '').trim();
+                        let fieldValid = value.length > 0;
+
+                        if (field.type === 'email') {
+                            fieldValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+                        }
+
+                        if (!fieldValid) {
+                            isValid = false;
+                            wrap?.classList.add('has-error');
+                        }
+                    });
+
+                    return isValid;
+                };
+
+                const fallbackMailTo = function () {
+                    const playerEmail = form.dataset.playerEmail || '';
+
+                    if (!playerEmail) {
+                        setStatus('Thanks — your follow request has been recorded on this page.');
+                        return;
+                    }
+
+                    const formData = new FormData(form);
+                    const firstName = formData.get('first_name') || '';
+                    const lastName = formData.get('last_name') || '';
+                    const email = formData.get('email') || '';
+                    const school = formData.get('school') || '';
+                    const message = formData.get('message') || '';
+                    const playerName = formData.get('player_name') || 'this player';
+
+                    const subject = encodeURIComponent('Follow Me Request for ' + playerName);
+                    const body = encodeURIComponent([
+                        'New Follow Me request:',
+                        '',
+                        'Name: ' + [firstName, lastName].filter(Boolean).join(' '),
+                        'Email: ' + email,
+                        'School / Organization: ' + school,
+                        '',
+                        'Message:',
+                        message || 'No message added.',
+                    ].join('\n'));
+
+                    window.location.href = 'mailto:' + encodeURIComponent(playerEmail) + '?subject=' + subject + '&body=' + body;
+                    setStatus('Opening your email app so you can send the follow request.');
+                };
+
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    setStatus('', false);
+
+                    if (!validate()) {
+                        setStatus('Please complete the required fields before submitting.');
+                        return;
+                    }
+
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.textContent = 'Sending...';
+                    }
+
+                    const action = form.getAttribute('action');
+                    const hasRealAction = action && action !== '#';
+
+                    try {
+                        if (!hasRealAction) {
+                            fallbackMailTo();
+                            form.reset();
+                            return;
+                        }
+
+                        const response = await fetch(action, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                            },
+                            body: new FormData(form),
+                            credentials: 'same-origin',
+                        });
+
+                        const payload = await response.json().catch(function () {
+                            return {};
+                        });
+
+                        if (!response.ok || payload.success === false) {
+                            throw new Error(payload.message || 'We could not submit the form right now.');
+                        }
+
+                        form.reset();
+                        setStatus(payload.message || 'Thanks — your follow request has been sent.');
+                    } catch (error) {
+                        setStatus(error.message || 'Something went wrong. Please try again.');
+                    } finally {
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.textContent = defaultText;
+                        }
+                    }
+                });
+            });
         });
     </script>
 
