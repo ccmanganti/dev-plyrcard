@@ -1277,10 +1277,11 @@ HTML;
             width: 100%;
             min-height: 100%;
             color: var(--on-primary);
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         .follow-me-title{
-            font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-size: clamp(2rem, 4vw, 3.3rem);
             line-height: 1;
             font-weight: 700;
@@ -1325,7 +1326,7 @@ HTML;
             color: var(--on-primary);
             outline: none;
             padding: .8rem 0 .85rem;
-            font: inherit;
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-size: .95rem;
             line-height: 1.35;
             transition: border-color .18s ease, opacity .18s ease;
@@ -1369,6 +1370,7 @@ HTML;
             margin-top: .6rem;
             background: var(--on-primary);
             color: var(--primary);
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-weight: 700;
             font-size: 1rem;
             letter-spacing: .08em;
@@ -1394,6 +1396,7 @@ HTML;
             border-radius: 14px;
             background: color-mix(in srgb, var(--on-primary) 14%, transparent 86%);
             color: var(--on-primary);
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-size: .9rem;
             font-weight: 700;
             line-height: 1.4;
