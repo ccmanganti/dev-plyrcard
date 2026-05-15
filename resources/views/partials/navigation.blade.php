@@ -7,7 +7,6 @@
 
 @php
     use App\Models\Website;
-    use App\Services\GoHighLevelService;
     use Illuminate\Support\Str;
 
     $plyrUser = auth()->user();
@@ -330,15 +329,9 @@
         : '#';
 
     $plyrArticleSectionType = old('article_section_type', $plyrWebsite->article_section_type ?? 'follow_me');
-    $plyrSelectedGhlCalendarId = old('ghl_calendar_id', $plyrWebsite->ghl_calendar_id ?? '');
-    $plyrSelectedGhlCalendarName = old('ghl_calendar_name', $plyrWebsite->ghl_calendar_name ?? '');
-    $plyrSelectedGhlLocationId = old('ghl_location_id', $plyrWebsite->ghl_location_id ?? config('services.ghl.location_id'));
-    $plyrHasWebsiteGhlCredentials = $plyrWebsite
-        && filled($plyrSelectedGhlLocationId)
-        && (filled($plyrWebsite->ghl_api_token ?? null) || filled(config('services.ghl.token')));
-    $plyrWebsiteCalendarRefreshAction = \Illuminate\Support\Facades\Route::has('locker-room.website-calendar.refresh')
-        ? route('locker-room.website-calendar.refresh')
-        : '#';
+    $plyrArticleSectionType = in_array($plyrArticleSectionType, ['follow_me', 'calendar'], true)
+        ? $plyrArticleSectionType
+        : 'follow_me';
     $plyrShouldShowPasswordOverlay = $plyrLoggedIn && $plyrUser && (bool) (($plyrUser->password_change_required ?? false) || session('plyrcard_show_password_overlay'));
     $plyrDrawerLoginAction = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
@@ -1070,6 +1063,75 @@
     .plyrcard-subsection-lead { margin: 0 0 12px !important; color: rgba(255,255,255,.72) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
     .plyrcard-mini-title { margin: 0 0 6px !important; color: #111 !important; font-size: 18px !important; line-height: 1 !important; font-weight: 950 !important; }
     .plyrcard-mini-copy { margin: 0 0 13px !important; color: rgba(0,0,0,.58) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
+
+    .plyrcard-toggle-choice-grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+      width: 100% !important;
+    }
+    .plyrcard-toggle-choice {
+      min-height: 76px !important;
+      border: 1px solid rgba(0,0,0,.08) !important;
+      border-radius: 14px !important;
+      background: #fff !important;
+      color: #111 !important;
+      padding: 11px 10px !important;
+      display: grid !important;
+      grid-template-columns: auto 1fr !important;
+      gap: 10px !important;
+      align-items: center !important;
+      text-align: left !important;
+      cursor: pointer !important;
+      font: inherit !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,.08) !important;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease !important;
+    }
+    .plyrcard-toggle-choice:hover {
+      transform: translateY(-1px) !important;
+      box-shadow: 0 10px 22px rgba(0,0,0,.12) !important;
+    }
+    .plyrcard-toggle-choice.is-active {
+      border-color: rgba(255,92,53,.72) !important;
+      background: linear-gradient(180deg, rgba(255,92,53,.13), rgba(255,255,255,1)) !important;
+      box-shadow: 0 0 0 3px rgba(255,92,53,.12), 0 10px 22px rgba(0,0,0,.12) !important;
+    }
+    .plyrcard-toggle-choice-icon {
+      width: 34px !important;
+      height: 34px !important;
+      border-radius: 11px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: rgba(0,0,0,.07) !important;
+      color: #111 !important;
+      font-size: 15px !important;
+    }
+    .plyrcard-toggle-choice.is-active .plyrcard-toggle-choice-icon {
+      background: var(--plyr-accent) !important;
+      color: #fff !important;
+    }
+    .plyrcard-toggle-choice-title {
+      display: block !important;
+      color: #111 !important;
+      font-size: 13px !important;
+      line-height: 1 !important;
+      font-weight: 950 !important;
+      text-transform: uppercase !important;
+    }
+    .plyrcard-toggle-choice-copy {
+      display: block !important;
+      margin-top: 5px !important;
+      color: rgba(0,0,0,.56) !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      font-weight: 700 !important;
+      text-transform: none !important;
+      letter-spacing: 0 !important;
+    }
+    @media (max-width: 390px) {
+      .plyrcard-toggle-choice-grid { grid-template-columns: 1fr !important; }
+    }
 
     .plyrcard-submit-btn,
     .plyrcard-secondary-btn,
@@ -2116,36 +2178,33 @@
           <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrWebsiteSettingsUpdateAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Website settings saved.">
             @csrf
             <h3 class="plyrcard-mini-title">Website Settings</h3>
-            <p class="plyrcard-mini-copy">Choose what appears in the article/contact section on your player website. Calendar uses the first active personal calendar from the GHL sub-account configured by an admin.</p>
+            <p class="plyrcard-mini-copy">Choose what appears in the article/contact section on your player website. This is available for My Journey players only.</p>
 
-            <label class="plyrcard-input-label">Article Section Display
-              <span class="plyrcard-input-wrap"><i class="fa-solid fa-layer-group"></i>
-                <select class="plyrcard-drawer-select" name="article_section_type" data-plyrcard-article-section-select required>
-                  <option value="follow_me" @selected($plyrArticleSectionType === 'follow_me')>Follow Me Form</option>
-                  <option value="calendar" @selected($plyrArticleSectionType === 'calendar')>GHL Calendar</option>
-                </select>
-              </span>
-            </label>
+            <input type="hidden" name="article_section_type" value="{{ $plyrArticleSectionType }}" data-plyrcard-article-section-value>
 
-            <div data-plyrcard-calendar-options style="display: {{ $plyrArticleSectionType === 'calendar' ? 'grid' : 'none' }} !important; gap: 11px !important;">
-              @if($plyrHasWebsiteGhlCredentials)
-                <div class="plyrcard-mini-panel">
-                  <h3 class="plyrcard-mini-title">Calendar Source</h3>
-                  <p class="plyrcard-mini-copy">
-                    Location ID: {{ $plyrSelectedGhlLocationId ?: 'Not configured' }}<br>
-                    Calendar: {{ $plyrSelectedGhlCalendarName ?: 'The first active personal calendar will be pulled automatically when you save.' }}
-                  </p>
-                </div>
-              @else
-                <div class="plyrcard-locked-panel">
-                  <span class="plyrcard-locked-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                  <span><strong>Calendar not configured</strong><span>Ask an admin to add this website's GHL Location ID and Private Integration Token in Filament.</span></span>
-                </div>
-              @endif
+            <div class="plyrcard-toggle-choice-grid" role="radiogroup" aria-label="Article section display">
+              <button type="button" class="plyrcard-toggle-choice {{ $plyrArticleSectionType === 'follow_me' ? 'is-active' : '' }}" data-plyrcard-article-toggle="follow_me" role="radio" aria-checked="{{ $plyrArticleSectionType === 'follow_me' ? 'true' : 'false' }}">
+                <span class="plyrcard-toggle-choice-icon"><i class="fa-solid fa-user-plus"></i></span>
+                <span>
+                  <span class="plyrcard-toggle-choice-title">Follow Me</span>
+                  <span class="plyrcard-toggle-choice-copy">Show the coach follow-up form.</span>
+                </span>
+              </button>
 
-              <input type="hidden" name="ghl_calendar_id" value="{{ $plyrSelectedGhlCalendarId }}">
-              <p class="plyrcard-mini-copy">Players do not select calendar IDs manually. The backend will pull the first active personal calendar from GHL using the admin-configured Location ID and API token.</p>
+              <button type="button" class="plyrcard-toggle-choice {{ $plyrArticleSectionType === 'calendar' ? 'is-active' : '' }}" data-plyrcard-article-toggle="calendar" role="radio" aria-checked="{{ $plyrArticleSectionType === 'calendar' ? 'true' : 'false' }}">
+                <span class="plyrcard-toggle-choice-icon"><i class="fa-regular fa-calendar-days"></i></span>
+                <span>
+                  <span class="plyrcard-toggle-choice-title">Calendar</span>
+                  <span class="plyrcard-toggle-choice-copy">Let visitors book a call directly.</span>
+                </span>
+              </button>
             </div>
+
+            <p class="plyrcard-mini-copy" data-plyrcard-article-help>
+              {{ $plyrArticleSectionType === 'calendar'
+                  ? 'Your player site will show your booking calendar when it is available. If not, Follow Me will stay visible.'
+                  : 'Your player site will show the Follow Me form for coaches and visitors.' }}
+            </p>
 
             <div class="plyrcard-share-options">
               <button class="plyrcard-submit-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
@@ -2337,7 +2396,7 @@
 
             <details class="plyrcard-profile-section">
               <summary><i class="fa-solid fa-flag"></i> Team & Experience</summary>
-              <p class="plyrcard-mini-copy">These fields save existing IDs when your backend sends them. Team/league search can be upgraded later with AJAX.</p>
+              <p class="plyrcard-mini-copy">Team and league details stay connected to the player profile.</p>
               <div class="plyrcard-profile-grid">
                 <label class="plyrcard-input-label">School ID<span class="plyrcard-input-wrap"><i class="fa-solid fa-building-columns"></i><input class="plyrcard-drawer-input" name="school_id" value="{{ old('school_id', $plyrUser->school_id ?? '') }}" placeholder="School ID"></span></label>
                 <label class="plyrcard-input-label">National Team ID<span class="plyrcard-input-wrap"><i class="fa-solid fa-flag"></i><input class="plyrcard-drawer-input" name="national_team_id" value="{{ old('national_team_id', $plyrUser->national_team_id ?? '') }}" placeholder="National Team ID"></span></label>
@@ -3064,19 +3123,29 @@
         });
       });
 
-      qa('[data-plyrcard-article-section-select]').forEach(select => {
-        if (select.dataset.plyrArticleBound) return;
-        select.dataset.plyrArticleBound = '1';
-        const form = select.closest('form') || drawer;
-        const calendarOptions = form.querySelector('[data-plyrcard-calendar-options]');
-        const calendarSelect = form.querySelector('[data-plyrcard-calendar-select]');
-        const syncArticleSettings = () => {
-          const showCalendar = select.value === 'calendar';
-          if (calendarOptions) calendarOptions.style.setProperty('display', showCalendar ? 'grid' : 'none', 'important');
-          if (calendarSelect) calendarSelect.required = showCalendar;
+      qa('[data-plyrcard-article-section-value]').forEach(input => {
+        if (input.dataset.plyrArticleBound) return;
+        input.dataset.plyrArticleBound = '1';
+        const form = input.closest('form') || drawer;
+        const toggles = Array.from(form.querySelectorAll('[data-plyrcard-article-toggle]'));
+        const help = form.querySelector('[data-plyrcard-article-help]');
+        const copy = {
+          follow_me: 'Your player site will show the Follow Me form for coaches and visitors.',
+          calendar: 'Your player site will show your booking calendar when it is available. If not, Follow Me will stay visible.',
         };
-        select.addEventListener('change', syncArticleSettings);
-        syncArticleSettings();
+        const syncArticleToggle = value => {
+          input.value = value;
+          toggles.forEach(button => {
+            const active = button.getAttribute('data-plyrcard-article-toggle') === value;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-checked', active ? 'true' : 'false');
+          });
+          if (help) help.textContent = copy[value] || copy.follow_me;
+        };
+        toggles.forEach(button => {
+          button.addEventListener('click', () => syncArticleToggle(button.getAttribute('data-plyrcard-article-toggle') || 'follow_me'));
+        });
+        syncArticleToggle(input.value || 'follow_me');
       });
 
       qa('[data-plyrcard-sport-select]').forEach(sportSelect => {
