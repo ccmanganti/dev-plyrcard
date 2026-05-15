@@ -37,6 +37,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
@@ -220,102 +222,90 @@ class WebsiteResource extends Resource
 
                     Tabs\Tab::make('GHL Settings')
                         ->schema([
-                            Section::make('GHL Connection')
-                                ->icon(Heroicon::OutlinedKey)
-                                ->description('Admin-only connection credentials for this player website. These credentials can be used for calendars, contacts, billing syncs, support notes, and future GHL features.')
+                            Section::make('GHL Credentials')
+                                ->description('Admin-only connection values for this player website. When the Location ID or token changes, the first active personal calendar is pulled and placed into the override fields below.')
                                 ->columns(2)
                                 ->schema([
                                     TextInput::make('ghl_location_id')
                                         ->label('GHL Location ID')
                                         ->placeholder('vlsP1Bv6vsSN9OI8WALb')
                                         ->maxLength(255)
-                                        ->helperText('Player sub-account/location ID. Leave blank to fall back to the platform default GHL location ID.'),
+                                        ->live(onBlur: true)
+                                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, ?Website $record): void {
+                                            $token = $get('ghl_api_token') ?: $record?->ghl_api_token;
+
+                                            static::pullFirstActivePersonalCalendarIntoOverrides(
+                                                locationId: $state,
+                                                apiToken: $token,
+                                                set: $set,
+                                            );
+                                        })
+                                        ->helperText('Sub-account/location ID used to pull this player’s calendar.'),
 
                                     TextInput::make('ghl_api_token')
                                         ->label('GHL Private Integration Token')
                                         ->password()
                                         ->revealable()
+                                        ->placeholder(fn (?Website $record): string => $record?->ghl_api_token ? 'Saved token hidden. Enter a new token to replace it.' : 'Paste private integration token')
+                                        ->maxLength(2048)
+                                        ->live(onBlur: true)
                                         ->dehydrated(fn ($state): bool => filled($state))
-                                        ->dehydrateStateUsing(fn ($state) => filled($state) ? $state : null)
-                                        ->helperText('Admin only. Leave blank when editing to keep the currently saved encrypted token.'),
+                                        ->afterStateHydrated(function (TextInput $component): void {
+                                            $component->state(null);
+                                        })
+                                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, ?Website $record): void {
+                                            $token = $state ?: $record?->ghl_api_token;
 
-                                    Placeholder::make('ghl_token_status')
-                                        ->label('Token Status')
-                                        ->content(function (?Website $record): HtmlString {
-                                            $hasToken = filled($record?->ghl_api_token);
-
-                                            $label = $hasToken
-                                                ? 'A private integration token is saved for this website.'
-                                                : 'No website-specific token is saved. The app will use the platform GHL token if available.';
-
-                                            $tone = $hasToken ? '#16a34a' : '#f97316';
-
-                                            return new HtmlString(
-                                                '<div style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;">'
-                                                . '<span style="width:.65rem;height:.65rem;border-radius:999px;background:' . e($tone) . ';display:inline-block;"></span>'
-                                                . e($label)
-                                                . '</div>'
+                                            static::pullFirstActivePersonalCalendarIntoOverrides(
+                                                locationId: $get('ghl_location_id'),
+                                                apiToken: $token,
+                                                set: $set,
                                             );
-                                        }),
-
-                                    Placeholder::make('ghl_usage_note')
-                                        ->label('Usage')
-                                        ->content(new HtmlString(
-                                            '<div class="text-sm text-gray-500 dark:text-gray-400">'
-                                            . 'These credentials are separate from Website Settings so they can be reused by all GHL-powered features, not only the article section calendar.'
-                                            . '</div>'
-                                        )),
+                                        })
+                                        ->helperText('This is encrypted on the website record. Leave blank to keep the existing saved token.'),
                                 ]),
 
-                            Section::make('Synced Calendar Values')
-                                ->icon(Heroicon::OutlinedCalendarDays)
-                                ->description('These fields are automatically filled after the app pulls the first active personal calendar from the configured GHL location/token.')
+                            Section::make('Calendar Override')
+                                ->description('These fields are auto-filled from the first active personal GHL calendar, but can still be edited manually to override the detected calendar.')
                                 ->columns(2)
                                 ->schema([
                                     TextInput::make('ghl_calendar_id')
-                                        ->label('Selected GHL Calendar ID')
+                                        ->label('Calendar ID Override')
+                                        ->placeholder('Auto-filled from GHL or paste a calendar ID')
                                         ->maxLength(255)
-                                        ->readOnly()
-                                        ->helperText('Auto-filled by the Website Settings calendar sync.'),
+                                        ->helperText('Optional. If blank, the system will try to pull the first active personal calendar from the GHL credentials above.'),
 
                                     TextInput::make('ghl_calendar_name')
-                                        ->label('Selected GHL Calendar Name')
+                                        ->label('Calendar Name Override')
+                                        ->placeholder('Auto-filled calendar name')
                                         ->maxLength(255)
-                                        ->readOnly()
-                                        ->helperText('Auto-filled for display/reference.'),
+                                        ->helperText('Optional display name for admin reference and embed title.'),
 
                                     TextInput::make('ghl_calendar_embed_url')
-                                        ->label('Calendar Embed URL')
+                                        ->label('Calendar Embed URL Override')
+                                        ->placeholder('https://systems.plyrcard.com/widget/booking/...')
+                                        ->url()
+                                        ->maxLength(2048)
                                         ->columnSpanFull()
-                                        ->readOnly()
-                                        ->helperText('Auto-generated from the selected calendar ID unless manually set by backend logic.'),
+                                        ->helperText('Optional. If blank, the player site generates the booking embed URL from the Calendar ID.'),
                                 ]),
                         ]),
 
                     Tabs\Tab::make('Website Settings')
                         ->schema([
-                            Section::make('Article Section Display')
-                                ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
-                                ->description('Controls what appears in the article/contact section on the public player website. Calendar display is intended for My Journey users.')
+                            Section::make('Article Section')
+                                ->description('Controls what appears in the right-side article/contact section of the player website.')
                                 ->columns(2)
                                 ->schema([
                                     Select::make('article_section_type')
-                                        ->label('Default Article Section Display')
+                                        ->label('Article Section Display')
                                         ->options([
                                             'follow_me' => 'Follow Me Form',
                                             'calendar' => 'Calendar',
                                         ])
                                         ->default('follow_me')
                                         ->native(false)
-                                        ->helperText('Players can also choose this from Locker Room if they are on My Journey.'),
-
-                                    Placeholder::make('article_section_note')
-                                        ->label('How it works')
-                                        ->content(new HtmlString(
-                                            '<div class="text-sm text-gray-500 dark:text-gray-400">'
-                                            . 'Follow Me uses the default embed. Calendar uses the GHL credentials from the GHL Settings tab to automatically pull the first active personal calendar.'
-                                            . '</div>'
-                                        )),
+                                        ->helperText('My Journey player sites can show a GHL calendar. Other plans should keep Follow Me.'),
                                 ]),
                         ]),
                 ]),
@@ -349,11 +339,12 @@ class WebsiteResource extends Resource
 
                 TextColumn::make('article_section_type')
                     ->label('Article Section')
+                    ->badge()
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         'calendar' => 'Calendar',
+                        'follow_me' => 'Follow Me',
                         default => 'Follow Me',
                     })
-                    ->badge()
                     ->toggleable(),
 
                 TextColumn::make('ghl_location_id')
@@ -362,15 +353,13 @@ class WebsiteResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('ghl_calendar_name')
-                    ->label('GHL Calendar')
+                    ->label('Calendar')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),
-
                 IconColumn::make('is_active')->boolean(),
-
                 ToggleColumn::make('is_published')
                     ->label('Website Published')
                     ->updateStateUsing(function (Website $record, bool $state): void {
@@ -378,7 +367,6 @@ class WebsiteResource extends Resource
                             'is_published' => $state,
                         ]);
                     }),
-
                 TextColumn::make('updated_at')->since()->label('Updated'),
             ])
             ->filters([
@@ -430,6 +418,165 @@ class WebsiteResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    protected static function pullFirstActivePersonalCalendarIntoOverrides(?string $locationId, ?string $apiToken, Set $set): void
+    {
+        $locationId = trim((string) $locationId);
+        $apiToken = trim((string) $apiToken);
+
+        if ($locationId === '' || $apiToken === '') {
+            return;
+        }
+
+        try {
+            $calendar = static::getFirstActivePersonalCalendar($locationId, $apiToken);
+
+            if (! $calendar) {
+                return;
+            }
+
+            $calendarId = $calendar['id'] ?? null;
+            $calendarName = $calendar['name'] ?? null;
+            $calendarEmbedUrl = $calendar['embed_url'] ?? null;
+
+            if (filled($calendarId)) {
+                $set('ghl_calendar_id', $calendarId);
+            }
+
+            if (filled($calendarName)) {
+                $set('ghl_calendar_name', $calendarName);
+            }
+
+            if (filled($calendarEmbedUrl)) {
+                $set('ghl_calendar_embed_url', $calendarEmbedUrl);
+            } elseif (filled($calendarId)) {
+                $set('ghl_calendar_embed_url', 'https://systems.plyrcard.com/widget/booking/' . ltrim((string) $calendarId, '/'));
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to pull first active personal GHL calendar in WebsiteResource.', [
+                'location_id' => $locationId,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected static function getFirstActivePersonalCalendar(string $locationId, string $apiToken): ?array
+    {
+        $response = Http::withHeaders([
+                'Version' => '2021-07-28',
+            ])
+            ->withToken($apiToken)
+            ->acceptJson()
+            ->get('https://services.leadconnectorhq.com/calendars/', [
+                'locationId' => $locationId,
+            ]);
+
+        if ($response->failed()) {
+            Log::warning('GHL calendar pull failed in WebsiteResource.', [
+                'location_id' => $locationId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        $data = $response->json() ?? [];
+
+        $calendars = collect($data['calendars'] ?? $data['calendar'] ?? $data)
+            ->filter(fn ($calendar): bool => is_array($calendar))
+            ->values();
+
+        if ($calendars->isEmpty()) {
+            return null;
+        }
+
+        $activeCalendars = $calendars
+            ->filter(fn (array $calendar): bool => static::isGhlCalendarActive($calendar))
+            ->values();
+
+        if ($activeCalendars->isEmpty()) {
+            return null;
+        }
+
+        $calendar = $activeCalendars->first(fn (array $calendar): bool => static::isGhlCalendarPersonal($calendar))
+            ?: $activeCalendars->first();
+
+        if (! $calendar) {
+            return null;
+        }
+
+        $id = $calendar['id']
+            ?? $calendar['_id']
+            ?? $calendar['calendarId']
+            ?? null;
+
+        if (blank($id)) {
+            return null;
+        }
+
+        $name = $calendar['name']
+            ?? $calendar['title']
+            ?? 'GHL Calendar';
+
+        $embedUrl = $calendar['embedUrl']
+            ?? $calendar['widgetUrl']
+            ?? $calendar['calendarUrl']
+            ?? ('https://systems.plyrcard.com/widget/booking/' . ltrim((string) $id, '/'));
+
+        return [
+            'id' => (string) $id,
+            'name' => (string) $name,
+            'embed_url' => (string) $embedUrl,
+        ];
+    }
+
+    protected static function isGhlCalendarActive(array $calendar): bool
+    {
+        $status = strtolower((string) ($calendar['status'] ?? ''));
+
+        if (array_key_exists('isActive', $calendar)) {
+            return (bool) $calendar['isActive'];
+        }
+
+        if (array_key_exists('active', $calendar)) {
+            return (bool) $calendar['active'];
+        }
+
+        if (array_key_exists('isDeleted', $calendar) && (bool) $calendar['isDeleted']) {
+            return false;
+        }
+
+        if (array_key_exists('deleted', $calendar) && (bool) $calendar['deleted']) {
+            return false;
+        }
+
+        if ($status === '') {
+            return true;
+        }
+
+        return in_array($status, ['active', 'enabled', 'published'], true);
+    }
+
+    protected static function isGhlCalendarPersonal(array $calendar): bool
+    {
+        $type = strtolower((string) ($calendar['calendarType'] ?? $calendar['type'] ?? $calendar['eventType'] ?? ''));
+
+        if (str_contains($type, 'personal')) {
+            return true;
+        }
+
+        $teamMembers = $calendar['teamMembers']
+            ?? $calendar['teamMemberIds']
+            ?? $calendar['teamMember']
+            ?? [];
+
+        if (is_array($teamMembers) && count($teamMembers) === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     protected static function renderTemplatePreview(string $title, ?string $imageUrl, string $emptyMessage): string
