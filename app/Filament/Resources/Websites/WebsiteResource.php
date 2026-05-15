@@ -21,6 +21,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -223,24 +224,14 @@ class WebsiteResource extends Resource
                     Tabs\Tab::make('GHL Settings')
                         ->schema([
                             Section::make('GHL Credentials')
-                                ->description('Admin-only connection values for this player website. When the Location ID or token changes, the first active personal calendar is pulled and placed into the override fields below.')
+                                ->description('Admin-only connection values for this player website. These credentials can be used by backend automations, syncs, calendar pulls, and future GHL features.')
                                 ->columns(2)
                                 ->schema([
                                     TextInput::make('ghl_location_id')
                                         ->label('GHL Location ID')
                                         ->placeholder('vlsP1Bv6vsSN9OI8WALb')
                                         ->maxLength(255)
-                                        ->live(onBlur: true)
-                                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, ?Website $record): void {
-                                            $token = $get('ghl_api_token') ?: $record?->ghl_api_token;
-
-                                            static::pullFirstActivePersonalCalendarIntoOverrides(
-                                                locationId: $state,
-                                                apiToken: $token,
-                                                set: $set,
-                                            );
-                                        })
-                                        ->helperText('Sub-account/location ID used to pull this player’s calendar.'),
+                                        ->helperText('Sub-account/location ID for this player. Adding or changing this does not auto-fill the embed override.'),
 
                                     TextInput::make('ghl_api_token')
                                         ->label('GHL Private Integration Token')
@@ -248,46 +239,22 @@ class WebsiteResource extends Resource
                                         ->revealable()
                                         ->placeholder(fn (?Website $record): string => $record?->ghl_api_token ? 'Saved token hidden. Enter a new token to replace it.' : 'Paste private integration token')
                                         ->maxLength(2048)
-                                        ->live(onBlur: true)
                                         ->dehydrated(fn ($state): bool => filled($state))
                                         ->afterStateHydrated(function (TextInput $component): void {
                                             $component->state(null);
                                         })
-                                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, ?Website $record): void {
-                                            $token = $state ?: $record?->ghl_api_token;
-
-                                            static::pullFirstActivePersonalCalendarIntoOverrides(
-                                                locationId: $get('ghl_location_id'),
-                                                apiToken: $token,
-                                                set: $set,
-                                            );
-                                        })
-                                        ->helperText('This is encrypted on the website record. Leave blank to keep the existing saved token.'),
+                                        ->helperText('Encrypted on the website record. Leave blank to keep the existing saved token.'),
                                 ]),
 
-                            Section::make('Calendar Override')
-                                ->description('These fields are auto-filled from the first active personal GHL calendar, but can still be edited manually to override the detected calendar.')
-                                ->columns(2)
+                            Section::make('Calendar / Form Embed Override')
+                                ->description('Optional. Paste the exact GHL calendar/form embed code or iframe URL that should render on the player website when Calendar is selected. Leave blank to show Follow Me fallback.')
                                 ->schema([
-                                    TextInput::make('ghl_calendar_id')
-                                        ->label('Calendar ID Override')
-                                        ->placeholder('Auto-filled from GHL or paste a calendar ID')
-                                        ->maxLength(255)
-                                        ->helperText('Optional. If blank, the system will try to pull the first active personal calendar from the GHL credentials above.'),
-
-                                    TextInput::make('ghl_calendar_name')
-                                        ->label('Calendar Name Override')
-                                        ->placeholder('Auto-filled calendar name')
-                                        ->maxLength(255)
-                                        ->helperText('Optional display name for admin reference and embed title.'),
-
-                                    TextInput::make('ghl_calendar_embed_url')
-                                        ->label('Calendar Embed URL Override')
-                                        ->placeholder('https://systems.plyrcard.com/widget/booking/...')
-                                        ->url()
-                                        ->maxLength(2048)
+                                    Textarea::make('ghl_calendar_embed_url')
+                                        ->label('Embed Form Override')
+                                        ->placeholder('<iframe src="https://systems.plyrcard.com/widget/booking/..." style="width:100%;border:none;overflow:hidden;" scrolling="no"></iframe>')
+                                        ->rows(6)
                                         ->columnSpanFull()
-                                        ->helperText('Optional. If blank, the player site generates the booking embed URL from the Calendar ID.'),
+                                        ->helperText('Accepts a full GHL iframe/script embed or a plain booking/form URL. This field is not auto-filled when Location ID or token changes.'),
                                 ]),
                         ]),
 
