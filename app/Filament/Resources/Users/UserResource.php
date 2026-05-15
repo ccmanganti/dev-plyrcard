@@ -1358,9 +1358,20 @@ class UserResource extends Resource
                 ->label('Weight')
                 ->toggleable(isToggledHiddenByDefault: true),
 
-            TextColumn::make('domain')
+            TextColumn::make('websites.domain')
                 ->label('Custom Domain')
-                ->searchable()
+                ->state(function (User $record): string {
+                    return $record->websites
+                        ->pluck('domain')
+                        ->filter(fn ($domain) => filled($domain))
+                        ->unique()
+                        ->implode(', ') ?: '-';
+                })
+                ->searchable(query: function (Builder $query, string $search): Builder {
+                    return $query->orWhereHas('websites', function (Builder $query) use ($search) {
+                        $query->where('domain', 'like', '%' . $search . '%');
+                    });
+                })
                 ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('created_at')
@@ -1441,9 +1452,11 @@ class UserResource extends Resource
             TernaryFilter::make('has_domain')
                 ->label('Has Custom Domain')
                 ->queries(
-                    true: fn (Builder $query) => $query->whereNotNull('domain')->where('domain', '!=', ''),
-                    false: fn (Builder $query) => $query->where(function (Builder $q) {
-                        $q->whereNull('domain')->orWhere('domain', '');
+                    true: fn (Builder $query) => $query->whereHas('websites', function (Builder $q) {
+                        $q->whereNotNull('domain')->where('domain', '!=', '');
+                    }),
+                    false: fn (Builder $query) => $query->whereDoesntHave('websites', function (Builder $q) {
+                        $q->whereNotNull('domain')->where('domain', '!=', '');
                     }),
                     blank: fn (Builder $query) => $query,
                 ),
