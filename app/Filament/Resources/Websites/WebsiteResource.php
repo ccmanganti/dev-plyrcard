@@ -13,6 +13,10 @@ use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -27,6 +31,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,12 +40,6 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Tables\Columns\ToggleColumn;
-
 
 class WebsiteResource extends Resource
 {
@@ -219,62 +218,107 @@ class WebsiteResource extends Resource
                                 ]),
                         ]),
 
-                    Tabs\Tab::make('Article Section')
+                    Tabs\Tab::make('GHL Settings')
                         ->schema([
-                            Section::make('My Journey Article Section')
-                                ->description('Admin-only GHL setup. Add the player sub-account Location ID and Private Integration Token. The app will pull the first active personal calendar automatically; players never see the API token.')
+                            Section::make('GHL Connection')
+                                ->icon(Heroicon::OutlinedKey)
+                                ->description('Admin-only connection credentials for this player website. These credentials can be used for calendars, contacts, billing syncs, support notes, and future GHL features.')
                                 ->columns(2)
                                 ->schema([
-                                    Select::make('article_section_type')
-                                        ->label('Default Article Section Display')
-                                        ->options([
-                                            'follow_me' => 'Follow Me Form',
-                                            'calendar' => 'GHL Calendar',
-                                        ])
-                                        ->default('follow_me')
-                                        ->helperText('Only My Journey players can use Calendar on the public player site.'),
-
                                     TextInput::make('ghl_location_id')
                                         ->label('GHL Location ID')
                                         ->placeholder('vlsP1Bv6vsSN9OI8WALb')
                                         ->maxLength(255)
-                                        ->helperText("Use the player's GHL sub-account/location ID."),
+                                        ->helperText('Player sub-account/location ID. Leave blank to fall back to the platform default GHL location ID.'),
 
                                     TextInput::make('ghl_api_token')
                                         ->label('GHL Private Integration Token')
                                         ->password()
                                         ->revealable()
                                         ->dehydrated(fn ($state): bool => filled($state))
-                                        ->dehydrateStateUsing(fn ($state) => filled($state) ? trim((string) $state) : null)
-                                        ->maxLength(2000)
+                                        ->dehydrateStateUsing(fn ($state) => filled($state) ? $state : null)
                                         ->helperText('Admin only. Leave blank when editing to keep the currently saved encrypted token.'),
 
-                                    Placeholder::make('calendar_auto_pull_note')
-                                        ->label('Calendar Auto Pull')
-                                        ->content(new HtmlString('<strong>The selected calendar is pulled automatically.</strong><br>After the player chooses Calendar in Locker Room, the backend finds the first active personal calendar from this Location ID/token and stores it below.')),
+                                    Placeholder::make('ghl_token_status')
+                                        ->label('Token Status')
+                                        ->content(function (?Website $record): HtmlString {
+                                            $hasToken = filled($record?->ghl_api_token);
 
+                                            $label = $hasToken
+                                                ? 'A private integration token is saved for this website.'
+                                                : 'No website-specific token is saved. The app will use the platform GHL token if available.';
+
+                                            $tone = $hasToken ? '#16a34a' : '#f97316';
+
+                                            return new HtmlString(
+                                                '<div style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;">'
+                                                . '<span style="width:.65rem;height:.65rem;border-radius:999px;background:' . e($tone) . ';display:inline-block;"></span>'
+                                                . e($label)
+                                                . '</div>'
+                                            );
+                                        }),
+
+                                    Placeholder::make('ghl_usage_note')
+                                        ->label('Usage')
+                                        ->content(new HtmlString(
+                                            '<div class="text-sm text-gray-500 dark:text-gray-400">'
+                                            . 'These credentials are separate from Website Settings so they can be reused by all GHL-powered features, not only the article section calendar.'
+                                            . '</div>'
+                                        )),
+                                ]),
+
+                            Section::make('Synced Calendar Values')
+                                ->icon(Heroicon::OutlinedCalendarDays)
+                                ->description('These fields are automatically filled after the app pulls the first active personal calendar from the configured GHL location/token.')
+                                ->columns(2)
+                                ->schema([
                                     TextInput::make('ghl_calendar_id')
-                                        ->label('Auto-Pulled Calendar ID')
-                                        ->disabled()
-                                        ->dehydrated(false)
-                                        ->helperText('Read-only. Filled automatically from GHL.'),
+                                        ->label('Selected GHL Calendar ID')
+                                        ->maxLength(255)
+                                        ->readOnly()
+                                        ->helperText('Auto-filled by the Website Settings calendar sync.'),
 
                                     TextInput::make('ghl_calendar_name')
-                                        ->label('Auto-Pulled Calendar Name')
-                                        ->disabled()
-                                        ->dehydrated(false)
-                                        ->helperText('Read-only. Filled automatically from GHL.'),
+                                        ->label('Selected GHL Calendar Name')
+                                        ->maxLength(255)
+                                        ->readOnly()
+                                        ->helperText('Auto-filled for display/reference.'),
 
                                     TextInput::make('ghl_calendar_embed_url')
-                                        ->label('Auto-Pulled Calendar Embed URL')
-                                        ->disabled()
-                                        ->dehydrated(false)
+                                        ->label('Calendar Embed URL')
                                         ->columnSpanFull()
-                                        ->helperText('Read-only. Generated from the auto-pulled GHL Calendar ID.'),
+                                        ->readOnly()
+                                        ->helperText('Auto-generated from the selected calendar ID unless manually set by backend logic.'),
+                                ]),
+                        ]),
+
+                    Tabs\Tab::make('Website Settings')
+                        ->schema([
+                            Section::make('Article Section Display')
+                                ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+                                ->description('Controls what appears in the article/contact section on the public player website. Calendar display is intended for My Journey users.')
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('article_section_type')
+                                        ->label('Default Article Section Display')
+                                        ->options([
+                                            'follow_me' => 'Follow Me Form',
+                                            'calendar' => 'Calendar',
+                                        ])
+                                        ->default('follow_me')
+                                        ->native(false)
+                                        ->helperText('Players can also choose this from Locker Room if they are on My Journey.'),
+
+                                    Placeholder::make('article_section_note')
+                                        ->label('How it works')
+                                        ->content(new HtmlString(
+                                            '<div class="text-sm text-gray-500 dark:text-gray-400">'
+                                            . 'Follow Me uses the default embed. Calendar uses the GHL credentials from the GHL Settings tab to automatically pull the first active personal calendar.'
+                                            . '</div>'
+                                        )),
                                 ]),
                         ]),
                 ]),
-
         ]);
     }
 
@@ -297,6 +341,7 @@ class WebsiteResource extends Resource
                                 ->orWhere('last_name', 'like', "%{$search}%");
                         });
                     }),
+
                 TextColumn::make('domain')
                     ->label('Domain')
                     ->searchable()
@@ -304,21 +349,28 @@ class WebsiteResource extends Resource
 
                 TextColumn::make('article_section_type')
                     ->label('Article Section')
-                    ->badge()
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         'calendar' => 'Calendar',
                         default => 'Follow Me',
                     })
+                    ->badge()
                     ->toggleable(),
+
+                TextColumn::make('ghl_location_id')
+                    ->label('GHL Location')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('ghl_calendar_name')
                     ->label('GHL Calendar')
-                    ->placeholder('Not selected')
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('siteTemplate.name')->label('Site Template')->toggleable(),
                 TextColumn::make('heroTemplate.name')->label('Hero Template')->toggleable(),
+
                 IconColumn::make('is_active')->boolean(),
+
                 ToggleColumn::make('is_published')
                     ->label('Website Published')
                     ->updateStateUsing(function (Website $record, bool $state): void {
@@ -326,6 +378,7 @@ class WebsiteResource extends Resource
                             'is_published' => $state,
                         ]);
                     }),
+
                 TextColumn::make('updated_at')->since()->label('Updated'),
             ])
             ->filters([
@@ -336,11 +389,11 @@ class WebsiteResource extends Resource
                     ViewAction::make(),
                     EditAction::make(),
 
-                Action::make('preview_site')
-                    ->label('Preview Site')
-                    ->icon(Heroicon::OutlinedEye)
-                    ->url(fn (Website $record): string => static::getWebsiteUrl($record) ?? route('website.preview', ['website' => $record]))
-                    ->openUrlInNewTab(),
+                    Action::make('preview_site')
+                        ->label('Preview Site')
+                        ->icon(Heroicon::OutlinedEye)
+                        ->url(fn (Website $record): string => static::getWebsiteUrl($record) ?? route('website.preview', ['website' => $record]))
+                        ->openUrlInNewTab(),
 
                     Action::make('view_website')
                         ->label('View Website')
