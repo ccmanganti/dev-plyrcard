@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class GoHighLevelService
 {
@@ -77,9 +76,10 @@ class GoHighLevelService
     }
 
     /**
-     * List calendars for a GHL location.
+     * Return all calendars for the given GHL location.
      *
-     * Pass $tokenOverride for a player's manually configured sub-account Private Integration Token.
+     * If a website/player token is provided, it is used first. Otherwise this
+     * falls back to the configured platform token or optional agency location token.
      */
     public function getCalendars(?string $locationId = null, ?string $tokenOverride = null): array
     {
@@ -94,7 +94,7 @@ class GoHighLevelService
         if (! $token) {
             Log::warning('GHL calendar list skipped. Missing token.', [
                 'location_id' => $locationId,
-                'has_manual_token' => filled($tokenOverride),
+                'has_token_override' => filled($tokenOverride),
             ]);
 
             return [];
@@ -112,7 +112,7 @@ class GoHighLevelService
         if ($response->failed()) {
             Log::error('GHL calendar list failed.', [
                 'location_id' => $locationId,
-                'has_manual_token' => filled($tokenOverride),
+                'has_token_override' => filled($tokenOverride),
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
@@ -121,23 +121,30 @@ class GoHighLevelService
         }
 
         $data = $response->json() ?? [];
-        $calendars = $data['calendars'] ?? $data['data'] ?? [];
+        $calendars = $data['calendars'] ?? $data['calendar'] ?? $data['data'] ?? $data;
 
         return collect($calendars)
+            ->filter(fn ($calendar): bool => is_array($calendar))
             ->map(function (array $calendar) use ($locationId) {
-                $id = $calendar['id'] ?? $calendar['_id'] ?? null;
+                $id = $calendar['id']
+                    ?? $calendar['_id']
+                    ?? $calendar['calendarId']
+                    ?? null;
 
                 if (! $id) {
                     return null;
                 }
 
                 return [
-                    'id' => $id,
-                    'name' => $calendar['name'] ?? $calendar['title'] ?? 'Calendar',
-                    'location_id' => $calendar['locationId'] ?? $locationId,
-                    'is_active' => $this->calendarIsActive($calendar),
-                    'is_personal' => $this->calendarIsPersonal($calendar),
-                    'embed_url' => $this->calendarEmbedUrl($id),
+                    'id' => (string) $id,
+                    'name' => (string) ($calendar['name'] ?? $calendar['title'] ?? 'GHL Calendar'),
+                    'location_id' => (string) ($calendar['locationId'] ?? $locationId),
+                    'embed_url' => (string) ($calendar['embedUrl']
+                        ?? $calendar['widgetUrl']
+                        ?? $calendar['calendarUrl']
+                        ?? $this->calendarEmbedUrl((string) $id)),
+                    'is_active' => $this->isCalendarActive($calendar),
+                    'is_personal' => $this->isCalendarPersonal($calendar),
                     'raw' => $calendar,
                 ];
             })
@@ -147,78 +154,34 @@ class GoHighLevelService
     }
 
     /**
-     * Pull the first active personal calendar from a sub-account.
-     *
-     * "Personal" is detected defensively because GHL responses may vary:
-     * - calendarType/type/calendar_type equals personal, OR
-     * - exactly one team member is attached, which matches GHL's personal-calendar rule.
+     * Dynamically pull the first active personal calendar for a website.
+     * This does not write the result into the website record.
      */
-    public function getFirstActivePersonalCalendar(?string $locationId = null, ?string $tokenOverride = null): ?array
+    public function getFirstActivePersonalCalendarForWebsite(Website $website): ?array
     {
-        $calendars = collect($this->getCalendars($locationId, $tokenOverride));
+        $locationId = filled($website->ghl_location_id)
+            ? trim((string) $website->ghl_location_id)
+            : config('services.ghl.location_id');
 
-        $personalActive = $calendars
-            ->filter(fn (array $calendar) => (bool) ($calendar['is_active'] ?? false))
-            ->filter(fn (array $calendar) => (bool) ($calendar['is_personal'] ?? false))
-            ->values();
+        $tokenOverride = filled($website->ghl_api_token)
+            ? trim((string) $website->ghl_api_token)
+            : null;
 
-        if ($personalActive->isNotEmpty()) {
-            return $personalActive->first();
-        }
-
-        /*
-         * Fallback: if GHL did not expose personal-calendar metadata clearly,
-         * use the first active calendar so the admin can still get a working widget.
-         */
-        return $calendars
-            ->filter(fn (array $calendar) => (bool) ($calendar['is_active'] ?? false))
-            ->values()
-            ->first();
+        return $this->getFirstActivePersonalCalendar($locationId, $tokenOverride);
     }
 
-    /**
-     * Resolve and store the first active personal calendar for a Website.
-     */
-    public function syncFirstActivePersonalCalendarForWebsite(Website $website): array
+    public function getFirstActivePersonalCalendar(?string $locationId = null, ?string $tokenOverride = null): ?array
     {
-        $locationId = $website->ghl_location_id ?: config('services.ghl.location_id');
-        $token = $website->ghl_api_token ?: null;
+        $calendars = collect($this->getCalendars($locationId, $tokenOverride))
+            ->filter(fn (array $calendar): bool => (bool) ($calendar['is_active'] ?? false))
+            ->values();
 
-        if (blank($locationId)) {
-            return [
-                'ok' => false,
-                'message' => 'Missing GHL Location ID.',
-            ];
+        if ($calendars->isEmpty()) {
+            return null;
         }
 
-        if (blank($token) && blank(config('services.ghl.token'))) {
-            return [
-                'ok' => false,
-                'message' => 'Missing GHL Private Integration Token.',
-            ];
-        }
-
-        $calendar = $this->getFirstActivePersonalCalendar($locationId, $token);
-
-        if (! $calendar) {
-            return [
-                'ok' => false,
-                'message' => 'No active personal calendar was found for this GHL location.',
-            ];
-        }
-
-        $website->forceFill([
-            'ghl_location_id' => $locationId,
-            'ghl_calendar_id' => $calendar['id'] ?? null,
-            'ghl_calendar_name' => $calendar['name'] ?? null,
-            'ghl_calendar_embed_url' => $calendar['embed_url'] ?? $this->calendarEmbedUrl($calendar['id'] ?? ''),
-        ])->saveQuietly();
-
-        return [
-            'ok' => true,
-            'message' => 'First active personal calendar synced.',
-            'calendar' => $calendar,
-        ];
+        return $calendars->first(fn (array $calendar): bool => (bool) ($calendar['is_personal'] ?? false))
+            ?: $calendars->first();
     }
 
     public function calendarEmbedUrl(string $calendarId): string
@@ -317,6 +280,9 @@ class GoHighLevelService
 
     /**
      * Optional agency-level support for calendars across multiple GHL sub-accounts.
+     * Add to config/services.php if needed:
+     * 'agency_token' => env('GHL_AGENCY_ACCESS_TOKEN'),
+     * 'company_id' => env('GHL_COMPANY_ID'),
      */
     public function getLocationAccessToken(string $locationId): ?string
     {
@@ -351,40 +317,44 @@ class GoHighLevelService
         return $response->json('access_token');
     }
 
-    private function calendarIsActive(array $calendar): bool
+    private function isCalendarActive(array $calendar): bool
     {
-        foreach (['isActive', 'is_active', 'active'] as $key) {
-            if (array_key_exists($key, $calendar)) {
-                return filter_var($calendar[$key], FILTER_VALIDATE_BOOLEAN);
-            }
+        $status = strtolower((string) ($calendar['status'] ?? ''));
+
+        if (array_key_exists('isActive', $calendar)) {
+            return (bool) $calendar['isActive'];
         }
 
-        $status = strtolower((string) ($calendar['status'] ?? $calendar['calendarStatus'] ?? ''));
+        if (array_key_exists('active', $calendar)) {
+            return (bool) $calendar['active'];
+        }
 
-        if (in_array($status, ['inactive', 'disabled', 'archived', 'deleted'], true)) {
+        if (array_key_exists('isDeleted', $calendar) && (bool) $calendar['isDeleted']) {
             return false;
         }
 
-        return true;
+        if (array_key_exists('deleted', $calendar) && (bool) $calendar['deleted']) {
+            return false;
+        }
+
+        if ($status === '') {
+            return true;
+        }
+
+        return in_array($status, ['active', 'enabled', 'published'], true);
     }
 
-    private function calendarIsPersonal(array $calendar): bool
+    private function isCalendarPersonal(array $calendar): bool
     {
-        $type = strtolower((string) (
-            $calendar['calendarType']
-            ?? $calendar['calendar_type']
-            ?? $calendar['type']
-            ?? $calendar['kind']
-            ?? ''
-        ));
+        $type = strtolower((string) ($calendar['calendarType'] ?? $calendar['type'] ?? $calendar['eventType'] ?? ''));
 
-        if (in_array($type, ['personal', 'personal_calendar'], true)) {
+        if (str_contains($type, 'personal')) {
             return true;
         }
 
         $teamMembers = $calendar['teamMembers']
-            ?? $calendar['team_members']
-            ?? $calendar['users']
+            ?? $calendar['teamMemberIds']
+            ?? $calendar['teamMember']
             ?? [];
 
         if (is_array($teamMembers) && count($teamMembers) === 1) {

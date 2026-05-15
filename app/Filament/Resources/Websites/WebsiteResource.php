@@ -38,8 +38,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
@@ -231,7 +229,7 @@ class WebsiteResource extends Resource
                                         ->label('GHL Location ID')
                                         ->placeholder('vlsP1Bv6vsSN9OI8WALb')
                                         ->maxLength(255)
-                                        ->helperText('Sub-account/location ID for this player. Adding or changing this does not auto-fill the embed override.'),
+                                        ->helperText('Sub-account/location ID for this player. Used by the player site to dynamically pull the first active personal calendar when Calendar is selected.'),
 
                                     TextInput::make('ghl_api_token')
                                         ->label('GHL Private Integration Token')
@@ -247,14 +245,14 @@ class WebsiteResource extends Resource
                                 ]),
 
                             Section::make('Calendar / Form Embed Override')
-                                ->description('Optional. Paste the exact GHL calendar/form embed code or iframe URL that should render on the player website when Calendar is selected. Leave blank to show Follow Me fallback.')
+                                ->description('Optional manual override. Leave blank to dynamically pull the first active personal GHL calendar from the Location ID and token above.')
                                 ->schema([
                                     Textarea::make('ghl_calendar_embed_url')
                                         ->label('Embed Form Override')
                                         ->placeholder('<iframe src="https://systems.plyrcard.com/widget/booking/..." style="width:100%;border:none;overflow:hidden;" scrolling="no"></iframe>')
                                         ->rows(6)
                                         ->columnSpanFull()
-                                        ->helperText('Accepts a full GHL iframe/script embed or a plain booking/form URL. This field is not auto-filled when Location ID or token changes.'),
+                                        ->helperText('Optional. If filled, this exact embed or URL is used. If blank, the player site dynamically pulls the first active personal calendar from GHL.'),
                                 ]),
                         ]),
 
@@ -385,165 +383,6 @@ class WebsiteResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
-    }
-
-    protected static function pullFirstActivePersonalCalendarIntoOverrides(?string $locationId, ?string $apiToken, Set $set): void
-    {
-        $locationId = trim((string) $locationId);
-        $apiToken = trim((string) $apiToken);
-
-        if ($locationId === '' || $apiToken === '') {
-            return;
-        }
-
-        try {
-            $calendar = static::getFirstActivePersonalCalendar($locationId, $apiToken);
-
-            if (! $calendar) {
-                return;
-            }
-
-            $calendarId = $calendar['id'] ?? null;
-            $calendarName = $calendar['name'] ?? null;
-            $calendarEmbedUrl = $calendar['embed_url'] ?? null;
-
-            if (filled($calendarId)) {
-                $set('ghl_calendar_id', $calendarId);
-            }
-
-            if (filled($calendarName)) {
-                $set('ghl_calendar_name', $calendarName);
-            }
-
-            if (filled($calendarEmbedUrl)) {
-                $set('ghl_calendar_embed_url', $calendarEmbedUrl);
-            } elseif (filled($calendarId)) {
-                $set('ghl_calendar_embed_url', 'https://systems.plyrcard.com/widget/booking/' . ltrim((string) $calendarId, '/'));
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('Unable to pull first active personal GHL calendar in WebsiteResource.', [
-                'location_id' => $locationId,
-                'message' => $exception->getMessage(),
-            ]);
-        }
-    }
-
-    protected static function getFirstActivePersonalCalendar(string $locationId, string $apiToken): ?array
-    {
-        $response = Http::withHeaders([
-                'Version' => '2021-07-28',
-            ])
-            ->withToken($apiToken)
-            ->acceptJson()
-            ->get('https://services.leadconnectorhq.com/calendars/', [
-                'locationId' => $locationId,
-            ]);
-
-        if ($response->failed()) {
-            Log::warning('GHL calendar pull failed in WebsiteResource.', [
-                'location_id' => $locationId,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
-            return null;
-        }
-
-        $data = $response->json() ?? [];
-
-        $calendars = collect($data['calendars'] ?? $data['calendar'] ?? $data)
-            ->filter(fn ($calendar): bool => is_array($calendar))
-            ->values();
-
-        if ($calendars->isEmpty()) {
-            return null;
-        }
-
-        $activeCalendars = $calendars
-            ->filter(fn (array $calendar): bool => static::isGhlCalendarActive($calendar))
-            ->values();
-
-        if ($activeCalendars->isEmpty()) {
-            return null;
-        }
-
-        $calendar = $activeCalendars->first(fn (array $calendar): bool => static::isGhlCalendarPersonal($calendar))
-            ?: $activeCalendars->first();
-
-        if (! $calendar) {
-            return null;
-        }
-
-        $id = $calendar['id']
-            ?? $calendar['_id']
-            ?? $calendar['calendarId']
-            ?? null;
-
-        if (blank($id)) {
-            return null;
-        }
-
-        $name = $calendar['name']
-            ?? $calendar['title']
-            ?? 'GHL Calendar';
-
-        $embedUrl = $calendar['embedUrl']
-            ?? $calendar['widgetUrl']
-            ?? $calendar['calendarUrl']
-            ?? ('https://systems.plyrcard.com/widget/booking/' . ltrim((string) $id, '/'));
-
-        return [
-            'id' => (string) $id,
-            'name' => (string) $name,
-            'embed_url' => (string) $embedUrl,
-        ];
-    }
-
-    protected static function isGhlCalendarActive(array $calendar): bool
-    {
-        $status = strtolower((string) ($calendar['status'] ?? ''));
-
-        if (array_key_exists('isActive', $calendar)) {
-            return (bool) $calendar['isActive'];
-        }
-
-        if (array_key_exists('active', $calendar)) {
-            return (bool) $calendar['active'];
-        }
-
-        if (array_key_exists('isDeleted', $calendar) && (bool) $calendar['isDeleted']) {
-            return false;
-        }
-
-        if (array_key_exists('deleted', $calendar) && (bool) $calendar['deleted']) {
-            return false;
-        }
-
-        if ($status === '') {
-            return true;
-        }
-
-        return in_array($status, ['active', 'enabled', 'published'], true);
-    }
-
-    protected static function isGhlCalendarPersonal(array $calendar): bool
-    {
-        $type = strtolower((string) ($calendar['calendarType'] ?? $calendar['type'] ?? $calendar['eventType'] ?? ''));
-
-        if (str_contains($type, 'personal')) {
-            return true;
-        }
-
-        $teamMembers = $calendar['teamMembers']
-            ?? $calendar['teamMemberIds']
-            ?? $calendar['teamMember']
-            ?? [];
-
-        if (is_array($teamMembers) && count($teamMembers) === 1) {
-            return true;
-        }
-
-        return false;
     }
 
     protected static function renderTemplatePreview(string $title, ?string $imageUrl, string $emptyMessage): string

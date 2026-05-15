@@ -382,9 +382,10 @@ HTML;
     | Article / Contact Section
     |--------------------------------------------------------------------------
     | Default: Follow Me form embed.
-    | My Journey only: If the player selected Calendar and an admin provided an
-    | Embed Form Override on the website record, render that override here.
-    | The template no longer auto-generates a calendar URL from Calendar ID.
+    | My Journey only: If Calendar is selected, first use the optional admin
+    | Embed Form Override. If no override is entered, dynamically pull the first
+    | active personal calendar from GHL using this website's Location ID and
+    | encrypted Private Integration Token.
     */
     $playerRoleNames = $user && method_exists($user, 'getRoleNames')
         ? $user->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)))->values()
@@ -402,16 +403,36 @@ HTML;
         ? trim((string) $website->ghl_calendar_embed_url)
         : null;
 
-    $articleEmbedOverrideIsHtml = filled($articleEmbedOverride)
-        && str_contains(strtolower($articleEmbedOverride), '<iframe');
+    $dynamicCalendar = null;
 
-    $articleEmbedOverrideUrl = filled($articleEmbedOverride) && ! $articleEmbedOverrideIsHtml
+    if ($playerHasMyJourney && $articleSectionType === 'calendar' && blank($articleEmbedOverride)) {
+        try {
+            $dynamicCalendar = app(\App\Services\GoHighLevelService::class)
+                ->getFirstActivePersonalCalendarForWebsite($website);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $dynamicCalendar = null;
+        }
+    }
+
+    $articleCalendarEmbed = filled($articleEmbedOverride)
         ? $articleEmbedOverride
+        : ($dynamicCalendar['embed_url'] ?? null);
+
+    $articleCalendarTitle = filled($articleEmbedOverride)
+        ? 'Book with ' . ($playerDisplayName ?: 'this player')
+        : ($dynamicCalendar['name'] ?? ('Book with ' . ($playerDisplayName ?: 'this player')));
+
+    $articleCalendarEmbedIsHtml = filled($articleCalendarEmbed)
+        && str_contains(strtolower($articleCalendarEmbed), '<iframe');
+
+    $articleCalendarEmbedUrl = filled($articleCalendarEmbed) && ! $articleCalendarEmbedIsHtml
+        ? $articleCalendarEmbed
         : null;
 
     $shouldRenderCalendarArticleSection = $playerHasMyJourney
         && $articleSectionType === 'calendar'
-        && filled($articleEmbedOverride);
+        && filled($articleCalendarEmbed);
 
     $aboutVideoUrls = filled($user?->featured_video_url)
         ? $user->featured_video_url
@@ -2041,15 +2062,15 @@ HTML;
         <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
             <div class="p-4 md:p-6 rounded min-h-[180px]">
                 @if($shouldRenderCalendarArticleSection)
-                    @if($articleEmbedOverrideIsHtml)
-                        {!! $articleEmbedOverride !!}
+                    @if($articleCalendarEmbedIsHtml)
+                        {!! $articleCalendarEmbed !!}
                     @else
                         <iframe
-                            src="{{ $articleEmbedOverrideUrl }}"
+                            src="{{ $articleCalendarEmbedUrl }}"
                             style="width:100%;min-height:520px;border:none;border-radius:4px;overflow:hidden;background:#fff;"
                             scrolling="no"
                             id="plyrcard-ghl-calendar-{{ $website->id }}"
-                            title="{{ 'Book with ' . ($playerDisplayName ?: 'this player') }}"
+                            title="{{ $articleCalendarTitle }}"
                         ></iframe>
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
