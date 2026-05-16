@@ -2478,6 +2478,63 @@
       }
     }
 
+
+
+    /* Support ticket embed zoom fix: keep the GHL iframe readable but scaled down. */
+    .plyrcard-drawer-panel.is-support-fullscreen .plyrcard-support-ticket-wrap,
+    .plyrcard-support-ticket-wrap {
+      height: calc(100dvh - 112px) !important;
+      min-height: calc(100dvh - 112px) !important;
+      max-height: calc(100dvh - 112px) !important;
+      overflow: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      background: #ffffff !important;
+      border-radius: 10px !important;
+    }
+
+    .plyrcard-support-ticket-scale-wrap {
+      width: 100% !important;
+      height: auto !important;
+      min-height: 100% !important;
+      overflow: visible !important;
+      background: #ffffff !important;
+      position: relative !important;
+    }
+
+    .plyrcard-support-ticket-scale-wrap iframe,
+    .plyrcard-support-ticket-iframe,
+    iframe[data-plyrcard-support-iframe],
+    iframe#inline-HDaBy0CDwdO7Fw54wi1K {
+      width: 125% !important;
+      max-width: none !important;
+      height: 1425px !important;
+      min-height: 1425px !important;
+      border: 0 !important;
+      border-radius: 3px !important;
+      display: block !important;
+      background: #ffffff !important;
+      transform: scale(0.8) !important;
+      transform-origin: top left !important;
+    }
+
+    @media (max-width: 520px) {
+      .plyrcard-drawer-panel.is-support-fullscreen .plyrcard-support-ticket-wrap,
+      .plyrcard-support-ticket-wrap {
+        height: calc(100dvh - 104px) !important;
+        min-height: calc(100dvh - 104px) !important;
+        max-height: calc(100dvh - 104px) !important;
+      }
+
+      .plyrcard-support-ticket-scale-wrap iframe,
+      .plyrcard-support-ticket-iframe,
+      iframe[data-plyrcard-support-iframe],
+      iframe#inline-HDaBy0CDwdO7Fw54wi1K {
+        width: 133.333% !important;
+        height: 1540px !important;
+        min-height: 1540px !important;
+        transform: scale(0.75) !important;
+      }
+    }
 </style>
 
 <header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}">
@@ -2622,6 +2679,7 @@
                 src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
                 class="plyrcard-support-ticket-iframe"
                 data-plyrcard-support-iframe
+                style="width:125%;max-width:none;height:1425px;min-height:1425px;border:none;border-radius:3px;transform:scale(0.8);transform-origin:top left;background:#fff;display:block;"
                 id="inline-HDaBy0CDwdO7Fw54wi1K"
                 data-layout="{'id':'INLINE'}"
                 data-trigger-type="alwaysShow"
@@ -3369,7 +3427,7 @@
                 class="plyrcard-support-ticket-iframe"
                 data-plyrcard-support-iframe
                 src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
-              style="width:100%;height:100%;border:none;border-radius:3px"
+              style="width:125%;max-width:none;height:1425px;min-height:1425px;border:none;border-radius:3px;transform:scale(0.8);transform-origin:top left;background:#fff;display:block;"
               id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-layout="{'id':'INLINE'}"
               data-trigger-type="alwaysShow"
@@ -4143,9 +4201,12 @@
         if (supportWrap && supportWrap.dataset.loaded !== 'true') {
           supportWrap.dataset.loaded = 'true';
           supportWrap.innerHTML = `
+            <div class="plyrcard-support-ticket-scale-wrap">
             <iframe
               src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
-              style="width:100%;height:100%;border:none;border-radius:3px"
+              class="plyrcard-support-ticket-iframe"
+              data-plyrcard-support-iframe
+              style="width:125%;max-width:none;height:1425px;min-height:1425px;border:none;border-radius:3px;transform:scale(0.8);transform-origin:top left;background:#fff;display:block;"
               id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-layout="{'id':'INLINE'}"
               data-trigger-type="alwaysShow"
