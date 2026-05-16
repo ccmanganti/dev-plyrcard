@@ -2144,7 +2144,7 @@
             <div class="plyrcard-drawer-grid">
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support" data-plyrcard-support-trigger onclick="if (window.plyrOpenLockerRoomSection) { window.plyrOpenLockerRoomSection('support', event); }"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check" aria-hidden="true"></i><span>Book a Call</span></button>
             </div>
           </div>
@@ -2909,6 +2909,25 @@
       if (sectionTitle) sectionTitle.textContent = view?.dataset.title || '';
     }
 
+    function loadSupportTicketFrame() {
+      window.setTimeout(() => {
+        qa('[data-plyrcard-support-iframe]').forEach(iframe => {
+          const src = iframe.getAttribute('data-src') || iframe.getAttribute('src');
+          if (src && !iframe.getAttribute('src')) iframe.setAttribute('src', src);
+          try { iframe.contentWindow?.postMessage({ type: 'resize' }, '*'); } catch (error) {}
+        });
+
+        if (!document.querySelector('script[data-plyrcard-ghl-form-embed]')) {
+          const script = document.createElement('script');
+          script.src = 'https://systems.plyrcard.com/js/form_embed.js';
+          script.type = 'text/javascript';
+          script.async = true;
+          script.setAttribute('data-plyrcard-ghl-form-embed', '1');
+          document.body.appendChild(script);
+        }
+      }, 90);
+    }
+
     function showView(name, options = {}) {
       const push = options.push !== false;
       const view = q('[data-plyrcard-view="' + name + '"]');
@@ -2945,24 +2964,20 @@
       }
 
       if (name === 'support') {
-        window.setTimeout(() => {
-          qa('[data-plyrcard-support-iframe]').forEach(iframe => {
-            const src = iframe.getAttribute('data-src') || iframe.getAttribute('src');
-            if (src && !iframe.getAttribute('src')) iframe.setAttribute('src', src);
-            try { iframe.contentWindow?.postMessage({ type: 'resize' }, '*'); } catch (error) {}
-          });
-
-          if (!document.querySelector('script[data-plyrcard-ghl-form-embed]')) {
-            const script = document.createElement('script');
-            script.src = 'https://systems.plyrcard.com/js/form_embed.js';
-            script.type = 'text/javascript';
-            script.async = true;
-            script.setAttribute('data-plyrcard-ghl-form-embed', '1');
-            document.body.appendChild(script);
-          }
-        }, 120);
+        loadSupportTicketFrame();
       }
     }
+
+    window.plyrOpenLockerRoomSection = function (sectionName, event) {
+      if (!sectionName) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      showView(sectionName, { push: true });
+      setOpen(true);
+    };
+
 
     function goBack() {
       if (viewStack.length > 1) {
@@ -3532,12 +3547,19 @@
       setOpen(true);
     }
 
+    document.addEventListener('click', event => {
+      const supportTrigger = event.target.closest('[data-plyrcard-support-trigger]');
+      if (!supportTrigger || !drawer.contains(supportTrigger)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
+      showView('support', { push: true });
+      setOpen(true);
+    }, true);
+
     drawer.addEventListener('click', handleSectionButton);
-    drawer.addEventListener('pointerup', event => {
-      const sectionButton = event.target.closest('[data-plyrcard-section="support"]');
-      if (!sectionButton || !drawer.contains(sectionButton)) return;
-      handleSectionButton(event);
-    });
 
     function bindPullToRefresh() {
       const p = panel();
