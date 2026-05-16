@@ -2195,11 +2195,25 @@
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
-          <div class="plyrcard-support-ticket-wrap" data-plyrcard-support-ticket-wrap>
-            <div class="plyrcard-support-ticket-loading" data-plyrcard-support-ticket-loading>
-              <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
-              <span>Loading support form...</span>
-            </div>
+          <div class="plyrcard-booking-wrap plyrcard-support-ticket-wrap" data-plyrcard-support-ticket-wrap data-loaded="true">
+            <iframe
+              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+              data-plyrcard-support-iframe
+              style="width:100%;height:100%;border:none;border-radius:3px"
+              id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-layout="{'id':'INLINE'}"
+              data-trigger-type="alwaysShow"
+              data-trigger-value=""
+              data-activation-type="alwaysActivated"
+              data-activation-value=""
+              data-deactivation-type="neverDeactivate"
+              data-deactivation-value=""
+              data-form-name="PLYR Card Support Ticketing Submission Form"
+              data-height="912"
+              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-form-id="HDaBy0CDwdO7Fw54wi1K"
+              title="PLYR Card Support Ticketing Submission Form"
+            ></iframe>
           </div>
         </div>
 
@@ -2895,7 +2909,7 @@
 
     function ensureMainView() {
       const active = q('.plyrcard-drawer-view.is-active');
-      if (!active || !active.querySelector('.plyrcard-drawer-card, .plyrcard-form-card, .plyrcard-mini-panel, .plyrcard-offer-list, .plyrcard-booking-wrap')) {
+      if (!active || !active.querySelector('.plyrcard-drawer-card, .plyrcard-form-card, .plyrcard-mini-panel, .plyrcard-offer-list, .plyrcard-booking-wrap, .plyrcard-support-ticket-wrap')) {
         showView('main', { push: false });
       }
     }
