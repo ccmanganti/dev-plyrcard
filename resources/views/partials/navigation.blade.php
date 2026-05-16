@@ -1176,6 +1176,19 @@
     .plyrcard-booking-wrap { height: calc(min(82dvh, 620px) - 70px) !important; border-radius: 12px !important; overflow: hidden !important; background: #fff !important; }
     .plyrcard-booking-wrap iframe { display: block !important; width: 100% !important; min-height: 100% !important; border: 0 !important; }
 
+    .plyrcard-drawer-panel.is-support-fullscreen,
+    .plyrcard-drawer-panel.is-expanded.is-support-fullscreen {
+      height: 100dvh !important;
+      max-height: 100dvh !important;
+      border-radius: 17px 17px 0 0 !important;
+    }
+
+    .plyrcard-drawer-panel.is-support-fullscreen .plyrcard-drawer-body {
+      height: calc(100dvh - 56px) !important;
+      max-height: calc(100dvh - 56px) !important;
+      padding-bottom: 68px !important;
+    }
+
     .plyrcard-support-ticket-wrap {
       height: calc(100dvh - 56px - 76px) !important;
       min-height: 620px !important;
@@ -1192,6 +1205,19 @@
       min-height: 912px !important;
       border: 0 !important;
       background: #fff !important;
+    }
+    .plyrcard-support-ticket-loading {
+      height: 100% !important;
+      min-height: 320px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 10px !important;
+      color: #050505 !important;
+      font-size: 14px !important;
+      font-weight: 900 !important;
+      letter-spacing: .04em !important;
+      text-transform: uppercase !important;
     }
 
     .plyrcard-qr-wrap { display: grid !important; gap: 12px !important; place-items: center !important; text-align: center !important; }
@@ -2144,7 +2170,7 @@
             <div class="plyrcard-drawer-grid">
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="refer-friend"><i class="plyrcard-menu-icon fa-solid fa-user-plus" aria-hidden="true"></i><span>Refer Friend</span></button>
-              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support" data-plyrcard-support-trigger onclick="if (window.plyrOpenLockerRoomSection) { window.plyrOpenLockerRoomSection('support', event); }"><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
+              <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="support" data-plyrcard-open-support><i class="plyrcard-menu-icon fa-solid fa-headset" aria-hidden="true"></i><span>Support</span></button>
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="book-demo"><i class="plyrcard-menu-icon fa-solid fa-calendar-check" aria-hidden="true"></i><span>Book a Call</span></button>
             </div>
           </div>
@@ -2169,25 +2195,11 @@
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
-          <div class="plyrcard-support-ticket-wrap">
-            <iframe
-              data-plyrcard-support-iframe
-              data-src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
-              style="width:100%;height:100%;border:none;border-radius:3px"
-              id="inline-HDaBy0CDwdO7Fw54wi1K"
-              data-layout="{'id':'INLINE'}"
-              data-trigger-type="alwaysShow"
-              data-trigger-value=""
-              data-activation-type="alwaysActivated"
-              data-activation-value=""
-              data-deactivation-type="neverDeactivate"
-              data-deactivation-value=""
-              data-form-name="PLYR Card Support Ticketing Submission Form"
-              data-height="912"
-              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
-              data-form-id="HDaBy0CDwdO7Fw54wi1K"
-              title="PLYR Card Support Ticketing Submission Form"
-            ></iframe>
+          <div class="plyrcard-support-ticket-wrap" data-plyrcard-support-ticket-wrap>
+            <div class="plyrcard-support-ticket-loading" data-plyrcard-support-ticket-loading>
+              <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+              <span>Loading support form...</span>
+            </div>
           </div>
         </div>
 
@@ -2911,6 +2923,31 @@
 
     function loadSupportTicketFrame() {
       window.setTimeout(() => {
+        const supportWrap = q('[data-plyrcard-support-ticket-wrap]');
+        if (supportWrap && supportWrap.dataset.loaded !== 'true') {
+          supportWrap.dataset.loaded = 'true';
+          supportWrap.innerHTML = `
+            <iframe
+              data-plyrcard-support-iframe
+              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+              style="width:100%;height:100%;border:none;border-radius:3px"
+              id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-layout="{'id':'INLINE'}"
+              data-trigger-type="alwaysShow"
+              data-trigger-value=""
+              data-activation-type="alwaysActivated"
+              data-activation-value=""
+              data-deactivation-type="neverDeactivate"
+              data-deactivation-value=""
+              data-form-name="PLYR Card Support Ticketing Submission Form"
+              data-height="912"
+              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-form-id="HDaBy0CDwdO7Fw54wi1K"
+              title="PLYR Card Support Ticketing Submission Form"
+            ></iframe>
+          `;
+        }
+
         qa('[data-plyrcard-support-iframe]').forEach(iframe => {
           const src = iframe.getAttribute('data-src') || iframe.getAttribute('src');
           if (src && !iframe.getAttribute('src')) iframe.setAttribute('src', src);
@@ -2936,6 +2973,7 @@
       const p = panel();
       if (p) {
         p.classList.toggle('is-expanded', expandedSections.includes(name));
+        p.classList.toggle('is-support-fullscreen', name === 'support');
         p.classList.remove('is-switching');
         void p.offsetWidth;
         p.classList.add('is-switching');
@@ -3548,7 +3586,7 @@
     }
 
     document.addEventListener('click', event => {
-      const supportTrigger = event.target.closest('[data-plyrcard-support-trigger]');
+      const supportTrigger = event.target.closest('[data-plyrcard-open-support], [data-plyrcard-section="support"]');
       if (!supportTrigger || !drawer.contains(supportTrigger)) return;
       event.preventDefault();
       event.stopPropagation();
@@ -3613,3 +3651,89 @@
   })();
 </script>
 @endif
+
+<script>
+  (function () {
+    document.addEventListener('DOMContentLoaded', function () {
+      const drawer = document.getElementById('plyrcard-action-drawer');
+      if (!drawer) return;
+
+      function openSupportSubsection(event) {
+        const supportButton = event.target.closest('[data-plyrcard-open-support], [data-plyrcard-section="support"]');
+        if (!supportButton || !drawer.contains(supportButton)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+
+        const panel = drawer.querySelector('.plyrcard-drawer-panel');
+        const mainTitle = drawer.querySelector('[data-plyrcard-main-title]');
+        const subTitle = drawer.querySelector('[data-plyrcard-sub-title]');
+        const sectionTitle = drawer.querySelector('[data-plyrcard-section-title]');
+        const tab = drawer.querySelector('[data-plyrcard-toggle-drawer]');
+        const supportView = drawer.querySelector('[data-plyrcard-view="support"]');
+
+        drawer.classList.add('is-open');
+        drawer.dataset.state = 'open';
+        document.documentElement.classList.add('plyrcard-drawer-open');
+        if (tab) tab.setAttribute('aria-expanded', 'true');
+
+        drawer.querySelectorAll('[data-plyrcard-view]').forEach(function (view) {
+          view.classList.toggle('is-active', view === supportView);
+        });
+
+        if (mainTitle) mainTitle.style.setProperty('display', 'none', 'important');
+        if (subTitle) subTitle.style.setProperty('display', 'flex', 'important');
+        if (sectionTitle) sectionTitle.textContent = 'Support';
+
+        if (panel) {
+          panel.classList.add('is-expanded', 'is-support-fullscreen');
+          panel.classList.remove('is-switching');
+          void panel.offsetWidth;
+          panel.classList.add('is-switching');
+          window.setTimeout(function () { panel.classList.remove('is-switching'); }, 280);
+        }
+
+        const drawerBody = drawer.querySelector('.plyrcard-drawer-body');
+        if (drawerBody) drawerBody.scrollTop = 0;
+
+        const supportWrap = drawer.querySelector('[data-plyrcard-support-ticket-wrap]');
+        if (supportWrap && supportWrap.dataset.loaded !== 'true') {
+          supportWrap.dataset.loaded = 'true';
+          supportWrap.innerHTML = `
+            <iframe
+              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+              style="width:100%;height:100%;border:none;border-radius:3px"
+              id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-layout="{'id':'INLINE'}"
+              data-trigger-type="alwaysShow"
+              data-trigger-value=""
+              data-activation-type="alwaysActivated"
+              data-activation-value=""
+              data-deactivation-type="neverDeactivate"
+              data-deactivation-value=""
+              data-form-name="PLYR Card Support Ticketing Submission Form"
+              data-height="912"
+              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-form-id="HDaBy0CDwdO7Fw54wi1K"
+              title="PLYR Card Support Ticketing Submission Form"
+            ></iframe>
+          `;
+        }
+
+        if (!document.querySelector('script[data-plyrcard-ghl-form-embed]')) {
+          const script = document.createElement('script');
+          script.src = 'https://systems.plyrcard.com/js/form_embed.js';
+          script.type = 'text/javascript';
+          script.async = true;
+          script.setAttribute('data-plyrcard-ghl-form-embed', '1');
+          document.body.appendChild(script);
+        }
+      }
+
+      document.addEventListener('click', openSupportSubsection, true);
+    });
+  })();
+</script>
