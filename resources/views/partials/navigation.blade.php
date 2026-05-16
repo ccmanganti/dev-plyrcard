@@ -2617,24 +2617,26 @@
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
           <div class="plyrcard-booking-wrap plyrcard-support-ticket-wrap" data-plyrcard-support-ticket-wrap data-loaded="true">
-            <iframe
-              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
-              data-plyrcard-support-iframe
-              style="width:100%;height:100%;border:none;border-radius:3px"
-              id="inline-HDaBy0CDwdO7Fw54wi1K"
-              data-layout="{'id':'INLINE'}"
-              data-trigger-type="alwaysShow"
-              data-trigger-value=""
-              data-activation-type="alwaysActivated"
-              data-activation-value=""
-              data-deactivation-type="neverDeactivate"
-              data-deactivation-value=""
-              data-form-name="PLYR Card Support Ticketing Submission Form"
-              data-height="912"
-              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
-              data-form-id="HDaBy0CDwdO7Fw54wi1K"
-              title="PLYR Card Support Ticketing Submission Form"
-            ></iframe>
+            <div class="plyrcard-support-ticket-scale-wrap">
+              <iframe
+                src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+                class="plyrcard-support-ticket-iframe"
+                data-plyrcard-support-iframe
+                id="inline-HDaBy0CDwdO7Fw54wi1K"
+                data-layout="{'id':'INLINE'}"
+                data-trigger-type="alwaysShow"
+                data-trigger-value=""
+                data-activation-type="alwaysActivated"
+                data-activation-value=""
+                data-deactivation-type="neverDeactivate"
+                data-deactivation-value=""
+                data-form-name="PLYR Card Support Ticketing Submission Form"
+                data-height="912"
+                data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+                data-form-id="HDaBy0CDwdO7Fw54wi1K"
+                title="PLYR Card Support Ticketing Submission Form"
+              ></iframe>
+            </div>
           </div>
         </div>
 
@@ -3362,9 +3364,11 @@
         if (supportWrap && supportWrap.dataset.loaded !== 'true') {
           supportWrap.dataset.loaded = 'true';
           supportWrap.innerHTML = `
-            <iframe
-              data-plyrcard-support-iframe
-              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+            <div class="plyrcard-support-ticket-scale-wrap">
+              <iframe
+                class="plyrcard-support-ticket-iframe"
+                data-plyrcard-support-iframe
+                src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
               style="width:100%;height:100%;border:none;border-radius:3px"
               id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-layout="{'id':'INLINE'}"
@@ -3379,7 +3383,8 @@
               data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-form-id="HDaBy0CDwdO7Fw54wi1K"
               title="PLYR Card Support Ticketing Submission Form"
-            ></iframe>
+              ></iframe>
+            </div>
           `;
         }
 
@@ -4154,7 +4159,8 @@
               data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-form-id="HDaBy0CDwdO7Fw54wi1K"
               title="PLYR Card Support Ticketing Submission Form"
-            ></iframe>
+              ></iframe>
+            </div>
           `;
         }
 
