@@ -1379,13 +1379,44 @@
       border: 1px solid rgba(255,255,255,.75) !important;
     }
     .plyrcard-schedule-date {
-      min-height: 44px !important;
+      width: 42px !important;
+      min-width: 42px !important;
+      height: 48px !important;
       border-radius: 12px !important;
-      display: grid !important;
-      place-items: center !important;
-      background: rgba(255,92,53,.11) !important;
-      color: var(--plyr-accent) !important;
-      font-size: 18px !important;
+      display: inline-flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      background: #ffffff !important;
+      border: 1px solid rgba(255,92,53,.28) !important;
+      box-shadow: 0 8px 18px rgba(0,0,0,.12) !important;
+      font-family: "Antonio", sans-serif !important;
+    }
+    .plyrcard-schedule-date-month {
+      width: 100% !important;
+      padding: 4px 0 3px !important;
+      background: var(--plyr-accent) !important;
+      color: #ffffff !important;
+      font-size: 10px !important;
+      font-weight: 950 !important;
+      line-height: 1 !important;
+      letter-spacing: .08em !important;
+      text-align: center !important;
+      text-transform: uppercase !important;
+    }
+    .plyrcard-schedule-date-day {
+      flex: 1 !important;
+      width: 100% !important;
+      color: #050505 !important;
+      font-size: 21px !important;
+      font-weight: 950 !important;
+      line-height: 1 !important;
+      letter-spacing: -.02em !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #ffffff !important;
     }
     .plyrcard-schedule-title { margin: 0 !important; color: #111 !important; font-size: 16px !important; line-height: 1 !important; font-weight: 950 !important; }
     .plyrcard-schedule-meta { margin: 5px 0 0 !important; color: rgba(0,0,0,.56) !important; font-size: 12px !important; line-height: 1.2 !important; font-weight: 650 !important; }
@@ -2591,8 +2622,24 @@
             </div>
             <div class="plyrcard-schedule-list">
               @forelse($plyrSchedules as $schedule)
+                @php
+                  $plyrScheduleDate = null;
+
+                  if (! blank($schedule->game_date)) {
+                      try {
+                          $plyrScheduleDate = $schedule->game_date instanceof \Carbon\CarbonInterface
+                              ? $schedule->game_date
+                              : \Carbon\Carbon::parse($schedule->game_date);
+                      } catch (\Throwable $e) {
+                          $plyrScheduleDate = null;
+                      }
+                  }
+                @endphp
                 <div class="plyrcard-schedule-card">
-                  <div class="plyrcard-schedule-date"><i class="fa-regular fa-calendar"></i></div>
+                  <div class="plyrcard-schedule-date" aria-label="{{ $plyrScheduleDate ? $plyrScheduleDate->format('M j') : 'Date to be determined' }}">
+                    <span class="plyrcard-schedule-date-month">{{ $plyrScheduleDate ? strtoupper($plyrScheduleDate->format('M')) : 'TBD' }}</span>
+                    <span class="plyrcard-schedule-date-day">{{ $plyrScheduleDate ? $plyrScheduleDate->format('d') : '--' }}</span>
+                  </div>
                   <div>
                     <h4 class="plyrcard-schedule-title">{{ $schedule->title ?: 'Game vs ' . ($schedule->opponent ?? 'Opponent') }}</h4>
                     <p class="plyrcard-schedule-meta">
