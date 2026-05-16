@@ -985,6 +985,14 @@
 
     .plyrcard-menu-icon { font-size: 15px !important; line-height: 1 !important; color: currentColor !important; }
     .plyrcard-drawer-card span { display: block !important; color: currentColor !important; font-size: 11px !important; line-height: .98 !important; font-weight: 850 !important; }
+    .plyrcard-drawer-card[data-plyrcard-section="support"] {
+      pointer-events: auto !important;
+      position: relative !important;
+      z-index: 3 !important;
+    }
+    .plyrcard-drawer-card[data-plyrcard-section="support"] * {
+      pointer-events: none !important;
+    }
 
     .plyrcard-drawer-tab {
       position: fixed !important;
@@ -2163,7 +2171,8 @@
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
           <div class="plyrcard-support-ticket-wrap">
             <iframe
-              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+              data-plyrcard-support-iframe
+              data-src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
               style="width:100%;height:100%;border:none;border-radius:3px"
               id="inline-HDaBy0CDwdO7Fw54wi1K"
               data-layout="{'id':'INLINE'}"
@@ -2934,6 +2943,25 @@
           });
         }, 120);
       }
+
+      if (name === 'support') {
+        window.setTimeout(() => {
+          qa('[data-plyrcard-support-iframe]').forEach(iframe => {
+            const src = iframe.getAttribute('data-src') || iframe.getAttribute('src');
+            if (src && !iframe.getAttribute('src')) iframe.setAttribute('src', src);
+            try { iframe.contentWindow?.postMessage({ type: 'resize' }, '*'); } catch (error) {}
+          });
+
+          if (!document.querySelector('script[data-plyrcard-ghl-form-embed]')) {
+            const script = document.createElement('script');
+            script.src = 'https://systems.plyrcard.com/js/form_embed.js';
+            script.type = 'text/javascript';
+            script.async = true;
+            script.setAttribute('data-plyrcard-ghl-form-embed', '1');
+            document.body.appendChild(script);
+          }
+        }, 120);
+      }
     }
 
     function goBack() {
@@ -3490,12 +3518,25 @@
       });
     }
 
-    drawer.addEventListener('click', event => {
+    function handleSectionButton(event) {
       const sectionButton = event.target.closest('[data-plyrcard-section]');
       if (!sectionButton || !drawer.contains(sectionButton)) return;
+      if (sectionButton.disabled || sectionButton.getAttribute('aria-disabled') === 'true') return;
+
+      const sectionName = sectionButton.getAttribute('data-plyrcard-section');
+      if (!sectionName) return;
+
       event.preventDefault();
-      showView(sectionButton.dataset.plyrcardSection, { push: true });
+      event.stopPropagation();
+      showView(sectionName, { push: true });
       setOpen(true);
+    }
+
+    drawer.addEventListener('click', handleSectionButton);
+    drawer.addEventListener('pointerup', event => {
+      const sectionButton = event.target.closest('[data-plyrcard-section="support"]');
+      if (!sectionButton || !drawer.contains(sectionButton)) return;
+      handleSectionButton(event);
     });
 
     function bindPullToRefresh() {
