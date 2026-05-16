@@ -2057,6 +2057,427 @@
       .plyrcard-schedule-badge { grid-column: 2 !important; justify-self: start !important; }
     }
 
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Compact UI polish
+    |--------------------------------------------------------------------------
+    | Keeps the existing Locker Room / Get Started styling, but tightens the
+    | spacing, cards, form controls, and section typography so the drawer feels
+    | faster and less bulky across mobile, admin, and player website views.
+    */
+    .plyrcard-action-drawer,
+    .plyrcard-action-drawer * {
+      font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      letter-spacing: .01em !important;
+    }
+
+    .plyrcard-drawer-panel {
+      border-radius: 14px 14px 0 0 !important;
+      max-height: min(78dvh, 580px) !important;
+      box-shadow: 0 -12px 34px rgba(0,0,0,.46) !important;
+    }
+
+    .plyrcard-drawer-handle {
+      top: 7px !important;
+      width: 50px !important;
+      height: 4px !important;
+      background: rgba(0,0,0,.2) !important;
+    }
+
+    .plyrcard-drawer-head {
+      min-height: 50px !important;
+      padding: 13px 10px 8px !important;
+      gap: 6px !important;
+      border-radius: 14px 14px 0 0 !important;
+    }
+
+    .plyrcard-drawer-title-row,
+    .plyrcard-user-line,
+    .plyrcard-drawer-actions {
+      gap: 6px !important;
+    }
+
+    .plyrcard-main-title,
+    .plyrcard-section-title {
+      font-size: 14px !important;
+      letter-spacing: .015em !important;
+    }
+
+    .plyrcard-plan-badge {
+      height: 18px !important;
+      padding: 0 6px !important;
+      font-size: 8px !important;
+      max-width: 72px !important;
+    }
+
+    .plyrcard-signout-btn {
+      height: 24px !important;
+      padding: 0 7px !important;
+      gap: 4px !important;
+      font-size: 10px !important;
+    }
+
+    .plyrcard-drawer-close,
+    .plyrcard-drawer-back {
+      min-width: 26px !important;
+      height: 26px !important;
+      font-size: 17px !important;
+    }
+
+    .plyrcard-drawer-back {
+      gap: 4px !important;
+      font-size: 15px !important;
+    }
+
+    .plyrcard-drawer-body {
+      padding: 7px 9px 68px !important;
+      max-height: calc(min(78dvh, 580px) - 50px) !important;
+    }
+
+    .plyrcard-nav-group + .plyrcard-nav-group {
+      margin-top: 7px !important;
+    }
+
+    .plyrcard-nav-group-title {
+      margin-bottom: 4px !important;
+      font-size: 10px !important;
+      letter-spacing: .055em !important;
+      color: rgba(255,255,255,.58) !important;
+    }
+
+    .plyrcard-drawer-grid {
+      gap: 6px !important;
+    }
+
+    .plyrcard-drawer-card {
+      min-height: 52px !important;
+      padding: 6px 4px 5px !important;
+      gap: 4px !important;
+      border-radius: 7px !important;
+      box-shadow: 0 3px 8px rgba(0,0,0,.22) !important;
+    }
+
+    .plyrcard-menu-icon {
+      font-size: 13px !important;
+    }
+
+    .plyrcard-drawer-card span {
+      font-size: 10px !important;
+      line-height: 1.02 !important;
+      font-weight: 850 !important;
+    }
+
+    .plyrcard-drawer-tab {
+      width: 196px !important;
+      height: 54px !important;
+      padding: 0 12px 0 42px !important;
+      gap: 8px !important;
+      font-size: 18px !important;
+      clip-path: polygon(32px 0, 100% 0, 100% 100%, 0 100%) !important;
+    }
+
+    .plyrcard-drawer-tab i {
+      font-size: 13px !important;
+    }
+
+    .plyrcard-drawer-section-divider {
+      margin: 10px 0 9px !important;
+    }
+
+    .plyrcard-social-row {
+      gap: 16px !important;
+    }
+
+    .plyrcard-social-label {
+      font-size: 17px !important;
+    }
+
+    .plyrcard-social-row i {
+      font-size: 19px !important;
+    }
+
+    .plyrcard-form-card,
+    .plyrcard-mini-panel,
+    .plyrcard-offer-card,
+    .plyrcard-plan-card,
+    .plyrcard-dashboard-card,
+    .plyrcard-profile-card,
+    .plyrcard-settings-card {
+      border-radius: 12px !important;
+      padding: 11px !important;
+      box-shadow: 0 6px 18px rgba(0,0,0,.22) !important;
+    }
+
+    .plyrcard-form-stack,
+    .plyrcard-offer-list {
+      gap: 7px !important;
+    }
+
+    .plyrcard-input-label {
+      gap: 4px !important;
+      font-size: 10px !important;
+      letter-spacing: .045em !important;
+    }
+
+    .plyrcard-input-wrap > i {
+      left: 10px !important;
+      font-size: 12px !important;
+    }
+
+    .plyrcard-input-wrap.textarea > i {
+      top: 12px !important;
+    }
+
+    .plyrcard-drawer-input,
+    .plyrcard-drawer-textarea,
+    .plyrcard-drawer-select,
+    .plyrcard-position-trigger {
+      min-height: 36px !important;
+      border-radius: 9px !important;
+      padding: 8px 10px 8px 31px !important;
+      font-size: 12px !important;
+      font-weight: 750 !important;
+    }
+
+    .plyrcard-drawer-textarea {
+      min-height: 72px !important;
+      padding-top: 9px !important;
+    }
+
+    .plyrcard-subsection-lead {
+      margin-bottom: 9px !important;
+      font-size: 12px !important;
+      line-height: 1.28 !important;
+    }
+
+    .plyrcard-mini-title,
+    .plyrcard-card-title,
+    .plyrcard-section-heading {
+      font-size: 16px !important;
+      line-height: 1.02 !important;
+      margin-bottom: 5px !important;
+    }
+
+    .plyrcard-mini-copy,
+    .plyrcard-card-copy,
+    .plyrcard-helper-text {
+      font-size: 12px !important;
+      line-height: 1.28 !important;
+      margin-bottom: 9px !important;
+    }
+
+    .plyrcard-submit-btn,
+    .plyrcard-secondary-btn,
+    .plyrcard-copy-btn {
+      min-height: 36px !important;
+      border-radius: 8px !important;
+      padding: 0 12px !important;
+      gap: 6px !important;
+      font-size: 13px !important;
+    }
+
+    .plyrcard-toggle-choice-grid {
+      gap: 6px !important;
+    }
+
+    .plyrcard-toggle-choice {
+      min-height: 62px !important;
+      padding: 8px !important;
+      border-radius: 11px !important;
+      gap: 8px !important;
+    }
+
+    .plyrcard-toggle-choice-icon {
+      width: 29px !important;
+      height: 29px !important;
+      border-radius: 9px !important;
+      font-size: 13px !important;
+    }
+
+    .plyrcard-toggle-choice-title {
+      font-size: 12px !important;
+      line-height: 1 !important;
+    }
+
+    .plyrcard-toggle-choice-copy {
+      margin-top: 3px !important;
+      font-size: 10px !important;
+      line-height: 1.16 !important;
+    }
+
+    .plyrcard-offer-card {
+      grid-template-columns: 44px 1fr auto !important;
+      min-height: 64px !important;
+      gap: 8px !important;
+      padding: 8px 10px 8px 8px !important;
+      border-radius: 8px !important;
+    }
+
+    .plyrcard-offer-icon {
+      width: 36px !important;
+      height: 36px !important;
+      border-radius: 8px !important;
+    }
+
+    .plyrcard-offer-icon i {
+      font-size: 17px !important;
+    }
+
+    .plyrcard-offer-title {
+      font-size: 16px !important;
+      margin-bottom: 3px !important;
+    }
+
+    .plyrcard-offer-copy {
+      font-size: 12px !important;
+      line-height: 1.16 !important;
+    }
+
+    .plyrcard-offer-price {
+      font-size: 20px !important;
+    }
+
+    .plyrcard-offer-price small {
+      margin-top: 4px !important;
+      font-size: 9px !important;
+    }
+
+    .plyrcard-locked-panel {
+      grid-template-columns: 36px 1fr auto !important;
+      gap: 9px !important;
+      padding: 10px !important;
+      border-radius: 12px !important;
+      margin-bottom: 9px !important;
+    }
+
+    .plyrcard-locked-icon {
+      width: 32px !important;
+      height: 32px !important;
+    }
+
+    .plyrcard-locked-panel strong {
+      font-size: 12px !important;
+    }
+
+    .plyrcard-locked-panel span span {
+      margin-top: 3px !important;
+      font-size: 11px !important;
+    }
+
+    .plyrcard-locked-panel .plyrcard-submit-btn {
+      min-height: 34px !important;
+      font-size: 11px !important;
+      padding: 0 9px !important;
+    }
+
+    .plyrcard-qr-wrap {
+      gap: 9px !important;
+    }
+
+    .plyrcard-qr-wrap img {
+      width: 148px !important;
+      height: 148px !important;
+      border-radius: 10px !important;
+      padding: 7px !important;
+    }
+
+    .plyrcard-share-options {
+      gap: 6px !important;
+    }
+
+    .plyrcard-alert,
+    .plyrcard-refresh-indicator {
+      margin-bottom: 8px !important;
+      padding: 9px 10px !important;
+      border-radius: 10px !important;
+      font-size: 11px !important;
+    }
+
+    .plyrcard-booking-wrap {
+      height: calc(min(78dvh, 580px) - 62px) !important;
+      border-radius: 10px !important;
+    }
+
+    .plyrcard-drawer-panel.is-expanded {
+      max-height: 92dvh !important;
+    }
+
+    .plyrcard-drawer-panel.is-expanded .plyrcard-drawer-body {
+      max-height: calc(92dvh - 50px) !important;
+    }
+
+    .plyrcard-drawer-panel.is-support-fullscreen,
+    .plyrcard-drawer-panel.is-expanded.is-support-fullscreen {
+      border-radius: 14px 14px 0 0 !important;
+    }
+
+    .plyrcard-drawer-panel.is-support-fullscreen .plyrcard-drawer-body {
+      height: calc(100dvh - 50px) !important;
+      max-height: calc(100dvh - 50px) !important;
+      padding-bottom: 62px !important;
+    }
+
+    .plyrcard-support-ticket-wrap {
+      height: calc(100dvh - 50px - 68px) !important;
+      min-height: 560px !important;
+      border-radius: 10px !important;
+      box-shadow: 0 7px 18px rgba(0,0,0,.22) !important;
+    }
+
+    .plyrcard-support-ticket-loading {
+      font-size: 12px !important;
+    }
+
+    .plyrcard-schedule-date-badge {
+      width: 38px !important;
+      min-width: 38px !important;
+      height: 44px !important;
+      border-radius: 10px !important;
+    }
+
+    .plyrcard-schedule-date-month {
+      padding: 3px 0 2px !important;
+      font-size: 9px !important;
+    }
+
+    .plyrcard-schedule-date-day {
+      font-size: 19px !important;
+    }
+
+    @media (max-width: 390px) {
+      .plyrcard-drawer-body {
+        padding-left: 7px !important;
+        padding-right: 7px !important;
+      }
+
+      .plyrcard-drawer-grid {
+        gap: 5px !important;
+      }
+
+      .plyrcard-drawer-card {
+        min-height: 49px !important;
+        padding: 5px 3px !important;
+      }
+
+      .plyrcard-menu-icon {
+        font-size: 12px !important;
+      }
+
+      .plyrcard-drawer-card span {
+        font-size: 9.5px !important;
+      }
+
+      .plyrcard-drawer-tab {
+        width: 184px !important;
+        height: 50px !important;
+        padding-left: 38px !important;
+        font-size: 16px !important;
+        clip-path: polygon(29px 0, 100% 0, 100% 100%, 0 100%) !important;
+      }
+    }
+
 </style>
 
 <header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}">
