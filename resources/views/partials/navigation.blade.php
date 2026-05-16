@@ -819,7 +819,7 @@
     .plyrcard-main-title,
     .plyrcard-section-title {
       margin: 0 !important;
-      font-size: 16px !important;
+      font-size: 15px !important;
       line-height: 1 !important;
       font-weight: 900 !important;
       color: #050505 !important;
@@ -883,7 +883,7 @@
     .plyrcard-drawer-back { gap: 5px !important; min-width: auto !important; font-size: 17px !important; font-weight: 900 !important; }
 
     .plyrcard-drawer-body {
-      padding: 9px 12px 84px !important;
+      padding: 8px 10px 76px !important;
       max-height: calc(min(82dvh, 620px) - 56px) !important;
       overflow-y: auto !important;
       background: #050505 !important;
@@ -940,10 +940,10 @@
       animation: plyrcardCardIn .3s cubic-bezier(.2,.8,.2,1) both !important;
     }
 
-    .plyrcard-nav-group + .plyrcard-nav-group { margin-top: 10px !important; }
+    .plyrcard-nav-group + .plyrcard-nav-group { margin-top: 8px !important; }
     .plyrcard-nav-group-title {
       display: block !important;
-      margin: 0 0 5px !important;
+      margin: 0 0 4px !important;
       color: rgba(255,255,255,.62) !important;
       font-size: 12px !important;
       line-height: 1 !important;
@@ -955,18 +955,18 @@
     .plyrcard-drawer-grid {
       display: grid !important;
       grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 8px !important;
+      gap: 7px !important;
     }
 
     .plyrcard-drawer-card {
       min-width: 0 !important;
-      min-height: 66px !important;
-      padding: 8px 5px 7px !important;
+      min-height: 58px !important;
+      padding: 7px 5px 6px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: 6px !important;
+      gap: 5px !important;
       border: 0 !important;
       border-radius: 7px !important;
       background: #fff !important;
@@ -983,8 +983,8 @@
     .plyrcard-drawer-card[aria-disabled="true"] { opacity: .46 !important; pointer-events: none !important; cursor: not-allowed !important; }
     .plyrcard-drawer-card.is-active-page { background: rgba(255,255,255,.42) !important; color: #050505 !important; }
 
-    .plyrcard-menu-icon { font-size: 17px !important; line-height: 1 !important; color: currentColor !important; }
-    .plyrcard-drawer-card span { display: block !important; color: currentColor !important; font-size: 12px !important; line-height: .98 !important; font-weight: 850 !important; }
+    .plyrcard-menu-icon { font-size: 15px !important; line-height: 1 !important; color: currentColor !important; }
+    .plyrcard-drawer-card span { display: block !important; color: currentColor !important; font-size: 11px !important; line-height: .98 !important; font-weight: 850 !important; }
 
     .plyrcard-drawer-tab {
       position: fixed !important;
@@ -1023,12 +1023,12 @@
       border-radius: 16px !important;
       background: linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%) !important;
       color: #111 !important;
-      padding: 16px !important;
+      padding: 14px !important;
       box-shadow: 0 10px 26px rgba(0,0,0,.26) !important;
       border: 1px solid rgba(255,255,255,.75) !important;
     }
 
-    .plyrcard-form-stack { display: grid !important; gap: 11px !important; }
+    .plyrcard-form-stack { display: grid !important; gap: 9px !important; }
     .plyrcard-input-label { display: grid !important; gap: 6px !important; color: rgba(0,0,0,.52) !important; font-size: 11px !important; font-weight: 900 !important; text-transform: uppercase !important; letter-spacing: .035em !important; }
     .plyrcard-input-wrap { position: relative !important; display: block !important; }
     .plyrcard-input-wrap > i { position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important; color: rgba(0,0,0,.8) !important; font-size: 13px !important; }
@@ -1038,13 +1038,13 @@
     .plyrcard-drawer-textarea,
     .plyrcard-drawer-select {
       width: 100% !important;
-      min-height: 43px !important;
+      min-height: 40px !important;
       border-radius: 12px !important;
       border: 1px solid rgba(0,0,0,.075) !important;
       background: #fff !important;
       color: #111 !important;
-      padding: 10px 12px 10px 37px !important;
-      font-size: 14px !important;
+      padding: 9px 11px 9px 35px !important;
+      font-size: 13px !important;
       font-weight: 750 !important;
       outline: none !important;
       box-shadow: inset 0 1px 0 rgba(0,0,0,.02), 0 1px 0 rgba(255,255,255,.75) !important;
@@ -1057,7 +1057,7 @@
       box-shadow: 0 0 0 3px rgba(255,92,53,.12) !important;
     }
 
-    .plyrcard-drawer-textarea { min-height: 92px !important; resize: vertical !important; padding-top: 12px !important; }
+    .plyrcard-drawer-textarea { min-height: 84px !important; resize: vertical !important; padding-top: 11px !important; }
     .plyrcard-clean-row { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; flex-wrap: wrap !important; }
     .plyrcard-text-link { border: 0 !important; background: transparent !important; color: #111 !important; padding: 0 !important; font: inherit !important; text-decoration: underline !important; cursor: pointer !important; }
     .plyrcard-subsection-lead { margin: 0 0 12px !important; color: rgba(255,255,255,.72) !important; font-size: 13px !important; line-height: 1.35 !important; font-weight: 650 !important; }
@@ -1136,7 +1136,7 @@
     .plyrcard-submit-btn,
     .plyrcard-secondary-btn,
     .plyrcard-copy-btn {
-      min-height: 42px !important;
+      min-height: 40px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -1146,7 +1146,7 @@
       padding: 0 14px !important;
       background: var(--plyr-accent) !important;
       color: #fff !important;
-      font-size: 16px !important;
+      font-size: 15px !important;
       font-weight: 900 !important;
       text-decoration: none !important;
       cursor: pointer !important;
@@ -1167,6 +1167,24 @@
 
     .plyrcard-booking-wrap { height: calc(min(82dvh, 620px) - 70px) !important; border-radius: 12px !important; overflow: hidden !important; background: #fff !important; }
     .plyrcard-booking-wrap iframe { display: block !important; width: 100% !important; min-height: 100% !important; border: 0 !important; }
+
+    .plyrcard-support-ticket-wrap {
+      height: calc(100dvh - 56px - 76px) !important;
+      min-height: 620px !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+      background: #fff !important;
+      box-shadow: 0 10px 26px rgba(0,0,0,.26) !important;
+      border: 1px solid rgba(255,255,255,.65) !important;
+    }
+    .plyrcard-support-ticket-wrap iframe {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 912px !important;
+      border: 0 !important;
+      background: #fff !important;
+    }
 
     .plyrcard-qr-wrap { display: grid !important; gap: 12px !important; place-items: center !important; text-align: center !important; }
     .plyrcard-qr-wrap img { width: 170px !important; height: 170px !important; border-radius: 12px !important; background: #fff !important; padding: 8px !important; }
@@ -1442,7 +1460,7 @@
       padding: 12px 13px !important;
       color: #111 !important;
       background: linear-gradient(180deg,#fff,#f7f7f7) !important;
-      font-size: 14px !important;
+      font-size: 13px !important;
       line-height: 1 !important;
       font-weight: 950 !important;
       text-transform: uppercase !important;
@@ -1475,7 +1493,7 @@
 
     .plyrcard-position-trigger {
       width: 100% !important;
-      min-height: 43px !important;
+      min-height: 40px !important;
       border-radius: 12px !important;
       border: 1px solid rgba(0,0,0,.075) !important;
       background: #fff !important;
@@ -1513,7 +1531,7 @@
       gap: 5px !important;
       min-width: 0 !important;
       color: rgba(0,0,0,.48) !important;
-      font-size: 14px !important;
+      font-size: 13px !important;
       font-weight: 750 !important;
       line-height: 1.15 !important;
     }
@@ -1522,7 +1540,7 @@
       min-height: 24px !important;
       display: inline-flex !important;
       align-items: center !important;
-      gap: 6px !important;
+      gap: 5px !important;
       padding: 0 8px !important;
       border-radius: 8px !important;
       background: rgba(255,92,53,.14) !important;
@@ -1668,7 +1686,7 @@
       display: grid !important;
       gap: 12px !important;
       min-height: 300px !important;
-      padding: 16px !important;
+      padding: 14px !important;
       border-radius: 16px !important;
       background: linear-gradient(180deg, #fff, #f7f7f7) !important;
       color: #111 !important;
@@ -1798,7 +1816,7 @@
 
     .plyrcard-plan-action {
       width: 100% !important;
-      min-height: 42px !important;
+      min-height: 40px !important;
       margin-top: auto !important;
       text-transform: uppercase !important;
       letter-spacing: .05em !important;
@@ -1877,7 +1895,7 @@
     .plyrcard-plan-card {
       min-height: auto !important;
       gap: 11px !important;
-      padding: 16px !important;
+      padding: 14px !important;
       border-radius: 16px !important;
       background:
         radial-gradient(circle at 100% 0%, rgba(255,255,255,.06), transparent 42%),
@@ -2143,12 +2161,25 @@
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="support" data-title="Support">
-          <form class="plyrcard-form-card plyrcard-form-stack" action="{{ $plyrSupportStoreAction }}" method="POST" data-plyrcard-ajax-form novalidate data-success-message="Support request sent.">
-            @csrf
-            <label class="plyrcard-input-label">Concern<span class="plyrcard-input-wrap"><i class="fa-solid fa-circle-question" aria-hidden="true"></i><select class="plyrcard-drawer-select" name="concern" required><option value="">Select your concern</option><option value="Billing">Billing</option><option value="Website">Website</option><option value="Account">Account</option><option value="Other">Other</option></select></span></label>
-            <label class="plyrcard-input-label">Details<span class="plyrcard-input-wrap textarea"><i class="fa-regular fa-message" aria-hidden="true"></i><textarea class="plyrcard-drawer-textarea" name="details" placeholder="Give us some more details..." required minlength="10"></textarea></span></label>
-            <button class="plyrcard-submit-btn" type="submit">Submit</button>
-          </form>
+          <div class="plyrcard-support-ticket-wrap">
+            <iframe
+              src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+              style="width:100%;height:100%;border:none;border-radius:3px"
+              id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-layout="{'id':'INLINE'}"
+              data-trigger-type="alwaysShow"
+              data-trigger-value=""
+              data-activation-type="alwaysActivated"
+              data-activation-value=""
+              data-deactivation-type="neverDeactivate"
+              data-deactivation-value=""
+              data-form-name="PLYR Card Support Ticketing Submission Form"
+              data-height="912"
+              data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+              data-form-id="HDaBy0CDwdO7Fw54wi1K"
+              title="PLYR Card Support Ticketing Submission Form"
+            ></iframe>
+          </div>
         </div>
 
         <div class="plyrcard-drawer-view" data-plyrcard-view="share-card" data-title="Share my PlyrCard">
@@ -2788,7 +2819,7 @@
     let drawer = document.getElementById('plyrcard-action-drawer');
     if (!drawer) return;
 
-    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'settings', 'billing', 'upgrade', 'a-la-carte', 'website-settings', 'password-overlay'];
+    const expandedSections = ['dashboard', 'profile', 'schedule', 'schedule-form', 'book-demo', 'support', 'settings', 'billing', 'upgrade', 'a-la-carte', 'website-settings', 'password-overlay'];
     let viewStack = ['main'];
     let currentView = 'main';
     let alertTimer = null;
