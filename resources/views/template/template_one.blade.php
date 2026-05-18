@@ -2211,7 +2211,7 @@ HTML;
                     <h2 class="font-heading text-6xl md:text-[60px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
                         Recruiting Calendar
                     </h2>
-                    <p class="text-base md:text-[40px] uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
+                    <p class="text-base md:text-[40px] pb-2 uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
                         Meet with me about recruiting
                     </p>
                     @if($articleCalendarEmbedIsHtml)
