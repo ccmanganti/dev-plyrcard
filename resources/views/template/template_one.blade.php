@@ -2208,10 +2208,10 @@ HTML;
             
             <div class="p-4 md:p-6 rounded min-h-[180px]">
                 @if($shouldRenderCalendarArticleSection)
-                    <h2 class="font-heading text-4xl md:text-[40px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
+                    <h2 class="font-heading text-6xl md:text-[60px] leading-none uppercase tracking-tight" style="color: {{ $onPrimary }};">
                         Recruiting Calendar
                     </h2>
-                    <p class="text-base md:text-[20px] uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
+                    <p class="text-base md:text-[40px] uppercase tracking-[0.1rem] font-thin" style="font-family: Poppins, ui-sans-serif, system-ui; color: {{ $onPrimary }}; opacity: 0.9;">
                         Meet with me about recruiting
                     </p>
                     @if($articleCalendarEmbedIsHtml)
