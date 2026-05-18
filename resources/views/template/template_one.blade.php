@@ -2205,8 +2205,12 @@ HTML;
         </div>
 
         <div class="w-full md:w-4/12 p-6 md:p-10" style="background: {{ $primary }}; color: {{ $onPrimary }};">
+            
             <div class="p-4 md:p-6 rounded min-h-[180px]">
                 @if($shouldRenderCalendarArticleSection)
+                    <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $defaultBg }};">
+                        {{ $aboutHeadline }}
+                    </h2>   
                     @if($articleCalendarEmbedIsHtml)
                         {!! $articleCalendarEmbed !!}
                     @else
