@@ -1232,6 +1232,303 @@ class UserResource extends Resource
         ]);
     }
 
+
+    protected static function profileCoreFields(): array
+    {
+        return [
+            'first_name' => 'First name',
+            'last_name' => 'Last name',
+            'email' => 'Email',
+            'phone' => 'Phone',
+            'birth' => 'Birth date',
+            'gender' => 'Gender',
+            'country' => 'Country',
+            'city' => 'City',
+            'sport' => 'Sport',
+            'height' => 'Height',
+            'weight' => 'Weight',
+            'player_bio' => 'Player bio',
+            'player_image' => 'Profile photo',
+            'plyrcard_image' => 'PlyrCard image',
+            'school_id' => 'School',
+            'club_id' => 'Club',
+            'league_id' => 'League',
+            'featured_video_url' => 'Featured video',
+            'ig_handle' => 'Instagram handle',
+        ];
+    }
+
+    protected static function profileSportSpecificFields(): array
+    {
+        return [
+            'position' => 'Position',
+            'dominant_foot' => 'Dominant foot',
+            'jersey_number' => 'Jersey number',
+            'max_speed' => 'Max speed',
+            'natl_team_exp' => 'National team experience',
+            'national_team_id' => 'National team',
+            'national_team_period' => 'National team period',
+        ];
+    }
+
+    protected static function profileSections(): array
+    {
+        return [
+            'basic_information' => [
+                'label' => 'Basic Information',
+                'fields' => [
+                    'first_name',
+                    'last_name',
+                    'email',
+                    'phone',
+                    'birth',
+                    'gender',
+                ],
+            ],
+            'location' => [
+                'label' => 'Location',
+                'fields' => [
+                    'country',
+                    'city',
+                ],
+            ],
+            'athletic_profile' => [
+                'label' => 'Athletic Profile',
+                'fields' => [
+                    'sport',
+                    'position',
+                    'dominant_foot',
+                    'height',
+                    'weight',
+                    'jersey_number',
+                    'max_speed',
+                    'player_bio',
+                ],
+            ],
+            'associations' => [
+                'label' => 'Associations',
+                'fields' => [
+                    'school_id',
+                    'club_id',
+                    'league_id',
+                ],
+            ],
+            'media_branding' => [
+                'label' => 'Media & Branding',
+                'fields' => [
+                    'player_image',
+                    'plyrcard_image',
+                    'featured_video_url',
+                    'ig_handle',
+                ],
+            ],
+            'national_team' => [
+                'label' => 'National Team',
+                'fields' => [
+                    'natl_team_exp',
+                    'national_team_id',
+                    'national_team_period',
+                ],
+            ],
+        ];
+    }
+
+    protected static function profileMilestones(): array
+    {
+        return [
+            'starter' => [
+                'label' => 'Starter',
+                'threshold' => 25,
+            ],
+            'rising_talent' => [
+                'label' => 'Rising Talent',
+                'threshold' => 50,
+            ],
+            'scouted_ready' => [
+                'label' => 'Scouted Ready',
+                'threshold' => 75,
+            ],
+            'plyrcard_complete' => [
+                'label' => 'PlyrCard Complete',
+                'threshold' => 100,
+            ],
+        ];
+    }
+
+    protected static function profileMilestoneBandOptions(): array
+    {
+        return [
+            'below_starter' => 'Below Starter (0-24%)',
+            'starter' => 'Starter (25-49%)',
+            'rising_talent' => 'Rising Talent (50-74%)',
+            'scouted_ready' => 'Scouted Ready (75-99%)',
+            'plyrcard_complete' => 'PlyrCard Complete (100%)',
+        ];
+    }
+
+    protected static function profileMilestoneOptions(): array
+    {
+        return collect(static::profileMilestones())
+            ->mapWithKeys(fn (array $milestone, string $key): array => [
+                $key => $milestone['label'] . ' (' . $milestone['threshold'] . '%+)',
+            ])
+            ->all();
+    }
+
+    protected static function userColumn(string $field): string
+    {
+        return (new User())->getTable() . '.' . $field;
+    }
+
+    protected static function fieldHasValueSql(string $field): string
+    {
+        $column = static::userColumn($field);
+
+        return "({$column} IS NOT NULL AND {$column} != '' AND {$column} != '[]' AND {$column} != 'null')";
+    }
+
+    protected static function profileCompletionSql(): string
+    {
+        $coreFields = array_keys(static::profileCoreFields());
+        $sportFields = array_keys(static::profileSportSpecificFields());
+
+        $coreScore = collect($coreFields)
+            ->map(fn (string $field): string => 'CASE WHEN ' . static::fieldHasValueSql($field) . ' THEN 1 ELSE 0 END')
+            ->implode(' + ');
+
+        $sportScore = collect($sportFields)
+            ->map(fn (string $field): string => 'CASE WHEN ' . static::fieldHasValueSql($field) . ' THEN 1 ELSE 0 END')
+            ->implode(' + ');
+
+        return "LEAST(100, ROUND((({$coreScore}) / " . count($coreFields) . ") * 100 + (({$sportScore}) / " . count($sportFields) . ") * 10))";
+    }
+
+    protected static function applyProfileCompletionRange(Builder $query, ?int $min = null, ?int $max = null): Builder
+    {
+        $completionSql = static::profileCompletionSql();
+
+        return $query
+            ->when(! is_null($min), fn (Builder $q): Builder => $q->whereRaw("({$completionSql}) >= ?", [$min]))
+            ->when(! is_null($max), fn (Builder $q): Builder => $q->whereRaw("({$completionSql}) <= ?", [$max]));
+    }
+
+    protected static function applyProfileMilestoneBand(Builder $query, ?string $band): Builder
+    {
+        return match ($band) {
+            'below_starter' => static::applyProfileCompletionRange($query, null, 24),
+            'starter' => static::applyProfileCompletionRange($query, 25, 49),
+            'rising_talent' => static::applyProfileCompletionRange($query, 50, 74),
+            'scouted_ready' => static::applyProfileCompletionRange($query, 75, 99),
+            'plyrcard_complete' => static::applyProfileCompletionRange($query, 100, 100),
+            default => $query,
+        };
+    }
+
+    protected static function applyProfileMilestoneReached(Builder $query, ?string $milestone): Builder
+    {
+        $threshold = static::profileMilestones()[$milestone]['threshold'] ?? null;
+
+        if (is_null($threshold)) {
+            return $query;
+        }
+
+        return static::applyProfileCompletionRange($query, $threshold);
+    }
+
+    protected static function applyExactProfileMilestoneFilter(Builder $query, bool $onMilestone): Builder
+    {
+        $completionSql = static::profileCompletionSql();
+        $milestones = collect(static::profileMilestones())
+            ->pluck('threshold')
+            ->values()
+            ->all();
+
+        $placeholders = implode(', ', array_fill(0, count($milestones), '?'));
+
+        return $onMilestone
+            ? $query->whereRaw("({$completionSql}) IN ({$placeholders})", $milestones)
+            : $query->whereRaw("({$completionSql}) NOT IN ({$placeholders})", $milestones);
+    }
+
+    protected static function applyMissingProfileSection(Builder $query, string $sectionKey): Builder
+    {
+        $section = static::profileSections()[$sectionKey] ?? null;
+
+        if (! $section) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($section): Builder {
+            foreach ($section['fields'] as $field) {
+                $query->orWhereRaw('NOT ' . static::fieldHasValueSql($field));
+            }
+
+            return $query;
+        });
+    }
+
+    protected static function calculateProfileCompletion(User $record): int
+    {
+        $completedCore = collect(static::profileCoreFields())
+            ->filter(fn (string $label, string $field): bool => static::hasProfileValue($record->{$field} ?? null))
+            ->count();
+
+        $corePercentage = count(static::profileCoreFields())
+            ? ($completedCore / count(static::profileCoreFields())) * 100
+            : 0;
+
+        $completedSportSpecific = collect(static::profileSportSpecificFields())
+            ->filter(fn (string $label, string $field): bool => static::hasProfileValue($record->{$field} ?? null))
+            ->count();
+
+        $sportBonus = count(static::profileSportSpecificFields())
+            ? ($completedSportSpecific / count(static::profileSportSpecificFields())) * 10
+            : 0;
+
+        return (int) min(100, round($corePercentage + $sportBonus));
+    }
+
+    protected static function getProfileMilestoneLabel(int $completion): string
+    {
+        if ($completion >= 100) {
+            return 'PlyrCard Complete';
+        }
+
+        if ($completion >= 75) {
+            return 'Scouted Ready';
+        }
+
+        if ($completion >= 50) {
+            return 'Rising Talent';
+        }
+
+        if ($completion >= 25) {
+            return 'Starter';
+        }
+
+        return 'Below Starter';
+    }
+
+    protected static function hasProfileValue(mixed $value): bool
+    {
+        if (is_null($value)) {
+            return false;
+        }
+
+        if (is_string($value)) {
+            return trim($value) !== '' && trim($value) !== '[]' && trim($value) !== 'null';
+        }
+
+        if (is_array($value)) {
+            return count(array_filter(
+                $value,
+                fn ($item) => ! is_null($item) && $item !== ''
+            )) > 0;
+        }
+
+        return true;
+    }
+
     public static function table(Table $table): Table
 {
     return $table
@@ -1262,6 +1559,40 @@ class UserResource extends Resource
                 ->separator(',')
                 ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
+
+            TextColumn::make('profile_completion')
+                ->label('Profile Completion')
+                ->state(fn (User $record): string => static::calculateProfileCompletion($record) . '%')
+                ->badge()
+                ->color(function (User $record): string {
+                    $completion = static::calculateProfileCompletion($record);
+
+                    return match (true) {
+                        $completion >= 100 => 'success',
+                        $completion >= 75 => 'info',
+                        $completion >= 50 => 'warning',
+                        $completion >= 25 => 'gray',
+                        default => 'danger',
+                    };
+                })
+                ->toggleable(),
+
+            TextColumn::make('profile_milestone')
+                ->label('Profile Milestone')
+                ->state(fn (User $record): string => static::getProfileMilestoneLabel(static::calculateProfileCompletion($record)))
+                ->badge()
+                ->color(function (User $record): string {
+                    $completion = static::calculateProfileCompletion($record);
+
+                    return match (true) {
+                        $completion >= 100 => 'success',
+                        $completion >= 75 => 'info',
+                        $completion >= 50 => 'warning',
+                        $completion >= 25 => 'gray',
+                        default => 'danger',
+                    };
+                })
+                ->toggleable(),
 
             TextColumn::make('sport')
                 ->label('Sport')
@@ -1383,6 +1714,131 @@ class UserResource extends Resource
         ->filters([
             TrashedFilter::make()
                 ->label('Deleted Users'),
+
+            SelectFilter::make('profile_milestone_band')
+                ->label('Profile Completion Band')
+                ->options(static::profileMilestoneBandOptions())
+                ->query(fn (Builder $query, array $data): Builder => static::applyProfileMilestoneBand(
+                    $query,
+                    $data['value'] ?? null,
+                ))
+                ->indicator('Profile completion band'),
+
+            SelectFilter::make('profile_milestone_reached')
+                ->label('Reached Milestone')
+                ->options(static::profileMilestoneOptions())
+                ->query(fn (Builder $query, array $data): Builder => static::applyProfileMilestoneReached(
+                    $query,
+                    $data['value'] ?? null,
+                ))
+                ->indicator('Reached milestone'),
+
+            TernaryFilter::make('profile_exact_milestone')
+                ->label('Exactly On Milestone')
+                ->placeholder('All users')
+                ->trueLabel('Exactly 25%, 50%, 75%, or 100%')
+                ->falseLabel('Not exactly on a milestone')
+                ->queries(
+                    true: fn (Builder $query): Builder => static::applyExactProfileMilestoneFilter($query, true),
+                    false: fn (Builder $query): Builder => static::applyExactProfileMilestoneFilter($query, false),
+                    blank: fn (Builder $query): Builder => $query,
+                ),
+
+            Filter::make('profile_completion_range')
+                ->label('Profile Completion Range')
+                ->form([
+                    TextInput::make('completion_min')
+                        ->label('Minimum %')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100),
+                    TextInput::make('completion_max')
+                        ->label('Maximum %')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100),
+                ])
+                ->query(function (Builder $query, array $data): Builder {
+                    return static::applyProfileCompletionRange(
+                        $query,
+                        filled($data['completion_min'] ?? null) ? (int) $data['completion_min'] : null,
+                        filled($data['completion_max'] ?? null) ? (int) $data['completion_max'] : null,
+                    );
+                })
+                ->indicateUsing(function (array $data): array {
+                    $indicators = [];
+
+                    if (filled($data['completion_min'] ?? null)) {
+                        $indicators[] = 'Completion ≥ ' . $data['completion_min'] . '%';
+                    }
+
+                    if (filled($data['completion_max'] ?? null)) {
+                        $indicators[] = 'Completion ≤ ' . $data['completion_max'] . '%';
+                    }
+
+                    return $indicators;
+                }),
+
+            SelectFilter::make('missing_profile_sections')
+                ->label('Missing Profile Sections')
+                ->multiple()
+                ->options(collect(static::profileSections())->mapWithKeys(fn (array $section, string $key): array => [
+                    $key => $section['label'],
+                ])->all())
+                ->query(function (Builder $query, array $data): Builder {
+                    $sections = $data['values'] ?? [];
+
+                    foreach ($sections as $section) {
+                        static::applyMissingProfileSection($query, $section);
+                    }
+
+                    return $query;
+                })
+                ->indicator('Missing profile sections'),
+
+            TernaryFilter::make('has_complete_core_profile')
+                ->label('Core Profile Complete')
+                ->queries(
+                    true: function (Builder $query): Builder {
+                        foreach (array_keys(static::profileCoreFields()) as $field) {
+                            $query->whereRaw(static::fieldHasValueSql($field));
+                        }
+
+                        return $query;
+                    },
+                    false: function (Builder $query): Builder {
+                        return $query->where(function (Builder $query): Builder {
+                            foreach (array_keys(static::profileCoreFields()) as $field) {
+                                $query->orWhereRaw('NOT ' . static::fieldHasValueSql($field));
+                            }
+
+                            return $query;
+                        });
+                    },
+                    blank: fn (Builder $query): Builder => $query,
+                ),
+
+            TernaryFilter::make('has_complete_sport_profile')
+                ->label('Sport-Specific Profile Complete')
+                ->queries(
+                    true: function (Builder $query): Builder {
+                        foreach (array_keys(static::profileSportSpecificFields()) as $field) {
+                            $query->whereRaw(static::fieldHasValueSql($field));
+                        }
+
+                        return $query;
+                    },
+                    false: function (Builder $query): Builder {
+                        return $query->where(function (Builder $query): Builder {
+                            foreach (array_keys(static::profileSportSpecificFields()) as $field) {
+                                $query->orWhereRaw('NOT ' . static::fieldHasValueSql($field));
+                            }
+
+                            return $query;
+                        });
+                    },
+                    blank: fn (Builder $query): Builder => $query,
+                ),
 
             SelectFilter::make('sport')
                 ->label('Sport')
