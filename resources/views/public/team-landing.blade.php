@@ -297,7 +297,7 @@
             background:
                 linear-gradient(180deg, rgba(0,0,0,.68), rgba(0,0,0,.90)),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
-            opacity: .34;
+            opacity: .42;
             pointer-events: none;
         }
 
@@ -367,7 +367,7 @@
 
         .team-hero-card {
             position: relative;
-            border-radius: 15px;
+            border-radius: 12px;
             border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.12));
             overflow: hidden;
             background:
@@ -377,14 +377,14 @@
             box-shadow: 0 12px 30px rgba(0,0,0,.36);
         }
 
-        .team-hero-card::before {
+                .team-hero-card::before {
             content: "";
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(90deg, rgba(0,0,0,.84), rgba(0,0,0,.48), rgba(0,0,0,.82)),
-                linear-gradient(135deg, color-mix(in srgb, var(--team-brand-primary, var(--team-primary)) 26%, transparent), transparent 56%),
-                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 22%, transparent), transparent 62%);
+                linear-gradient(90deg, rgba(0,0,0,.78), rgba(0,0,0,.52), rgba(0,0,0,.76)),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 56%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 20%, transparent), transparent 62%);
         }
 
         .team-hero-card::after {
@@ -446,7 +446,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
             background: rgba(255,255,255,.13);
         }
@@ -809,23 +809,23 @@
             gap: 6px;
         }
 
-        .player-nav-arrow {
+                .player-nav-arrow {
             position: absolute;
             z-index: 8;
             top: 50%;
             transform: translateY(-50%);
-            width: 42px;
-            height: 58px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,.18);
-            background: rgba(0,0,0,.64);
+            width: 34px;
+            height: 50px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(0,0,0,.58);
             color: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 16px 38px rgba(0,0,0,.44);
-            backdrop-filter: blur(16px);
+            box-shadow: 0 12px 28px rgba(0,0,0,.40);
+            backdrop-filter: blur(14px);
             transition: transform .18s ease, background .18s ease, border-color .18s ease;
         }
 
@@ -836,8 +836,8 @@
             border-color: var(--team-border);
         }
 
-        .player-nav-arrow.is-left { left: 8px; }
-        .player-nav-arrow.is-right { right: 8px; }
+        .player-nav-arrow.is-left { left: 6px; }
+        .player-nav-arrow.is-right { right: 6px; }
 
         .player-stats-dialog {
             width: 100%;
@@ -862,26 +862,25 @@
             border-radius: 999px;
         }
 
-        .player-stats-card {
-            max-width: 390px;
+                .player-stats-card {
+            max-width: 380px;
             margin: 0 auto;
-            border-radius: 17px;
-            border: 1px solid rgba(255,255,255,.11);
-            background: rgba(255,255,255,.05);
-            box-shadow: 0 16px 44px rgba(0,0,0,.38);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.045);
+            box-shadow: 0 12px 30px rgba(0,0,0,.34);
             overflow: hidden;
         }
 
-        .player-stats-hero {
-            min-height: 104px;
+                .player-stats-hero {
+            min-height: 92px;
             padding: 12px;
             display: flex;
             align-items: center;
             gap: 11px;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 56%),
-                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 22%, transparent), transparent 62%),
-                rgba(255,255,255,.035);
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 24%, transparent), transparent 58%),
+                rgba(255,255,255,.032);
         }
 
         .player-stats-avatar {
@@ -921,15 +920,15 @@
             font-weight: 900;
         }
 
-        .player-profile-actions {
+                .player-profile-actions {
             display: flex;
             gap: 8px;
-            padding: 0 10px 10px;
+            padding: 12px 12px 4px;
         }
 
         .player-website-btn {
             min-height: 37px;
-            border-radius: 11px;
+            border-radius: 9px;
             background: linear-gradient(135deg, var(--team-primary), var(--team-brand-primary, var(--team-secondary)));
             color: var(--team-text-on-primary);
             text-decoration: none;
@@ -946,11 +945,11 @@
             box-shadow: 0 10px 22px color-mix(in srgb, var(--team-primary) 26%, transparent);
         }
 
-        .player-chip-row {
+                .player-chip-row {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-            padding: 0 10px 10px;
+            padding: 8px 12px 10px;
         }
 
         .player-chip {
@@ -1006,15 +1005,16 @@
             overflow-wrap: anywhere;
         }
 
-        .player-stats-section {
-            padding: 0 10px 10px;
+                .player-stats-section {
+            padding: 12px;
+            border-top: 1px solid rgba(255,255,255,.08);
         }
 
         .player-stats-section-title {
             display: flex;
             align-items: center;
             gap: 7px;
-            margin: 0 0 8px;
+            margin: 0 0 10px;
             color: rgba(255,255,255,.86);
             font-family: var(--team-heading);
             font-size: 15px;
@@ -1032,11 +1032,11 @@
             gap: 7px;
         }
 
-        .player-info-item {
-            min-height: 42px;
-            border-radius: 11px;
-            border: 1px solid rgba(255,255,255,.10);
-            background: rgba(255,255,255,.045);
+                .player-info-item {
+            min-height: 40px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,.09);
+            background: rgba(255,255,255,.035);
             display: flex;
             align-items: center;
             gap: 8px;

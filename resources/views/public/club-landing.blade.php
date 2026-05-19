@@ -253,13 +253,13 @@
             padding: 14px 0;
         }
 
-        .club-card {
-            border: 1px solid color-mix(in srgb, var(--club-border) 35%, rgba(255,255,255,.12));
+                .club-card {
+            border: 1px solid color-mix(in srgb, var(--club-border) 32%, rgba(255,255,255,.11));
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-brand-primary) 12%, transparent), transparent 42%),
-                color-mix(in srgb, var(--club-surface) 90%, transparent);
-            backdrop-filter: blur(18px);
-            box-shadow: 0 18px 58px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05);
+                linear-gradient(135deg, color-mix(in srgb, var(--club-brand-primary) 10%, transparent), transparent 44%),
+                color-mix(in srgb, var(--club-surface) 91%, transparent);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 14px 38px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.045);
         }
 
         .club-hero {
@@ -277,6 +277,23 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+        }
+
+        .club-hero-main::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background:
+                linear-gradient(90deg, rgba(0,0,0,.74), rgba(0,0,0,.58)),
+                url("{{ $heroImageUrl }}") center/cover no-repeat;
+            opacity: .42;
+            pointer-events: none;
+        }
+
+        .club-hero-main > * {
+            position: relative;
+            z-index: 2;
         }
 
         .club-hero-main::before,
@@ -312,15 +329,15 @@
             border: 1px solid color-mix(in srgb, var(--club-primary) 28%, rgba(255,255,255,.14));
         }
 
-        .club-name {
+                .club-name {
             font-family: var(--club-heading);
-            font-size: clamp(27px, 3.4vw, 42px);
-            line-height: .92;
-            letter-spacing: .085em;
+            font-size: clamp(23px, 3vw, 36px);
+            line-height: .96;
+            letter-spacing: .075em;
             text-transform: uppercase;
             font-weight: 900;
             text-wrap: balance;
-            max-width: 560px;
+            max-width: 520px;
         }
 
         .club-type {
@@ -344,14 +361,14 @@
             margin-bottom: 9px;
         }
 
-        .club-headline {
+                .club-headline {
             position: relative;
-            max-width: 760px;
+            max-width: 720px;
             margin: 0;
             font-family: var(--club-heading);
-            font-size: clamp(42px, 6.2vw, 74px);
-            line-height: .94;
-            letter-spacing: .028em;
+            font-size: clamp(37px, 5.5vw, 64px);
+            line-height: 1.02;
+            letter-spacing: .026em;
             text-transform: uppercase;
             font-weight: 900;
             text-wrap: balance;
@@ -414,50 +431,51 @@
             gap: 8px;
         }
 
-        .club-mini-stat {
-            min-height: 70px;
-            border-radius: 16px;
-            padding: 11px 12px;
+                .club-mini-stat {
+            min-height: 62px;
+            border-radius: 12px;
+            padding: 9px 10px;
             display: grid;
-            grid-template-columns: 28px minmax(0, 1fr);
+            grid-template-columns: 24px minmax(0, 1fr);
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .club-mini-stat i {
-            width: 28px;
-            height: 28px;
-            border-radius: 10px;
+                .club-mini-stat i {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: var(--club-primary);
-            font-size: 15px;
-            background: rgba(255,255,255,.055);
-            filter: drop-shadow(0 0 12px color-mix(in srgb, var(--club-primary) 28%, transparent));
+            font-size: 12px;
+            background: rgba(255,255,255,.06);
+            filter: drop-shadow(0 0 10px color-mix(in srgb, var(--club-primary) 24%, transparent));
             margin: 0;
         }
 
-        .club-mini-stat span {
+                .club-mini-stat span {
             display: block;
-            color: rgba(255,255,255,.64);
-            font-size: 8.5px;
-            letter-spacing: .12em;
+            color: rgba(255,255,255,.66);
+            font-size: 7.5px;
+            letter-spacing: .10em;
             text-transform: uppercase;
             font-weight: 900;
-            margin: 0 0 4px;
+            margin: 0 0 3px;
         }
 
-        .club-mini-stat strong {
+                .club-mini-stat strong {
             display: block;
             font-family: var(--club-heading);
-            font-size: clamp(17px, 1.7vw, 23px);
-            line-height: 1;
+            font-size: clamp(12px, 1.4vw, 18px);
+            line-height: 1.06;
             font-weight: 900;
             text-transform: uppercase;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            overflow-wrap: anywhere;
         }
 
         .club-teams {
@@ -662,35 +680,41 @@
             font-weight: 800;
         }
 
-        .club-footer {
+                .club-footer {
             position: relative;
-            border-radius: 20px;
+            border-radius: 10px;
             overflow: hidden;
+            margin-top: 2px;
+            border-left: 0;
+            border-right: 0;
+            background:
+                linear-gradient(180deg, color-mix(in srgb, var(--club-surface) 86%, transparent), rgba(0,0,0,.90));
+            box-shadow: none;
         }
 
-        .club-footer-top {
-            padding: 14px;
-            border-bottom: 1px solid rgba(255,255,255,.09);
+                .club-footer-top {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
             display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(240px, .9fr);
-            gap: 14px;
+            grid-template-columns: minmax(0, 1fr) minmax(220px, .86fr);
+            gap: 12px;
         }
 
-        .club-footer h2 {
-            margin: 0 0 7px;
+                .club-footer h2 {
+            margin: 0 0 6px;
             font-family: var(--club-heading);
-            font-size: clamp(26px, 3vw, 38px);
-            line-height: .9;
+            font-size: clamp(20px, 2.4vw, 30px);
+            line-height: 1;
             letter-spacing: .06em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
-        .club-footer p {
+                .club-footer p {
             margin: 0;
-            color: rgba(255,255,255,.74);
-            line-height: 1.42;
-            font-size: 12.5px;
+            color: rgba(255,255,255,.68);
+            line-height: 1.38;
+            font-size: 11.5px;
             font-weight: 650;
         }
 
@@ -700,18 +724,18 @@
             gap: 7px;
         }
 
-        .club-footer-item {
-            min-height: 47px;
+                .club-footer-item {
+            min-height: 40px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            border-radius: 12px;
-            padding: 8px;
-            background: rgba(255,255,255,.05);
-            border: 1px solid rgba(255,255,255,.08);
-            color: rgba(255,255,255,.80);
+            gap: 7px;
+            border-radius: 8px;
+            padding: 7px;
+            background: rgba(255,255,255,.035);
+            border: 1px solid rgba(255,255,255,.07);
+            color: rgba(255,255,255,.76);
             text-decoration: none;
-            font-size: 11.5px;
+            font-size: 10.5px;
         }
 
         .club-footer-item i {
@@ -996,10 +1020,58 @@
             }
         }
 
+
+        @media (max-width: 560px) {
+            .club-hero-side {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 6px;
+            }
+
+            .club-mini-stat {
+                min-height: 54px !important;
+                grid-template-columns: 20px minmax(0, 1fr) !important;
+                gap: 6px !important;
+                padding: 7px !important;
+                border-radius: 10px !important;
+            }
+
+            .club-mini-stat i {
+                width: 20px !important;
+                height: 20px !important;
+                font-size: 10px !important;
+                border-radius: 7px !important;
+            }
+
+            .club-mini-stat span {
+                font-size: 6.5px !important;
+                margin-bottom: 2px !important;
+                letter-spacing: .08em !important;
+            }
+
+            .club-mini-stat strong {
+                font-size: 10.5px !important;
+                line-height: 1.05 !important;
+                letter-spacing: .02em !important;
+            }
+
+            .club-headline {
+                font-size: clamp(33px, 9.8vw, 42px) !important;
+                line-height: 1.02 !important;
+            }
+
+            .club-name {
+                font-size: clamp(21px, 6.4vw, 27px) !important;
+                line-height: .96 !important;
+            }
+        }
+
         @media (max-width: 380px) {
-            .club-hero-side,
             .club-footer-info {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .club-hero-side {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             }
 
             .club-headline {
@@ -1067,13 +1139,13 @@
                         <div class="club-mini-stat club-card">
                             <i class="fa-solid fa-trophy" aria-hidden="true"></i>
                             <span>League</span>
-                            <strong>{{ $club->league?->name ? \Illuminate\Support\Str::of($club->league->name)->limit(10, '') : 'TBD' }}</strong>
+                            <strong>{{ $club->league?->name ?: 'TBD' }}</strong>
                         </div>
 
                         <div class="club-mini-stat club-card">
                             <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
                             <span>Location</span>
-                            <strong>{{ $address ? \Illuminate\Support\Str::of($address)->limit(10, '') : 'TBD' }}</strong>
+                            <strong>{{ $address ?: 'TBD' }}</strong>
                         </div>
                     </aside>
                 </section>
