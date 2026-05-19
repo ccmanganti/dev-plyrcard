@@ -431,51 +431,62 @@
             gap: 8px;
         }
 
-                .club-mini-stat {
-            min-height: 62px;
+                        .club-mini-stat {
+            min-height: 76px;
             border-radius: 12px;
-            padding: 9px 10px;
-            display: grid;
-            grid-template-columns: 24px minmax(0, 1fr);
-            align-items: center;
-            gap: 8px;
+            padding: 10px 11px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 7px;
         }
 
-                .club-mini-stat i {
-            width: 24px;
-            height: 24px;
-            border-radius: 8px;
+                        .club-mini-stat i {
+            width: 22px;
+            height: 22px;
+            border-radius: 7px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: var(--club-primary);
-            font-size: 12px;
+            font-size: 11px;
             background: rgba(255,255,255,.06);
             filter: drop-shadow(0 0 10px color-mix(in srgb, var(--club-primary) 24%, transparent));
             margin: 0;
+            flex: 0 0 auto;
         }
 
-                .club-mini-stat span {
-            display: block;
-            color: rgba(255,255,255,.66);
+                        .club-mini-stat span {
+            display: inline-flex;
+            align-items: center;
+            min-width: 0;
+            color: rgba(255,255,255,.68);
             font-size: 7.5px;
-            letter-spacing: .10em;
+            letter-spacing: .09em;
             text-transform: uppercase;
             font-weight: 900;
-            margin: 0 0 3px;
+            margin: 0;
         }
 
-                .club-mini-stat strong {
+                        .club-mini-stat i + span {
+            margin-top: -29px;
+            margin-left: 30px;
+            min-height: 22px;
+        }
+
+        .club-mini-stat strong {
             display: block;
+            width: 100%;
             font-family: var(--club-heading);
-            font-size: clamp(12px, 1.4vw, 18px);
-            line-height: 1.06;
+            font-size: clamp(13px, 1.25vw, 17px);
+            line-height: 1.08;
             font-weight: 900;
             text-transform: uppercase;
             white-space: normal;
             overflow: visible;
             text-overflow: clip;
-            overflow-wrap: anywhere;
+            overflow-wrap: normal;
+            word-break: normal;
         }
 
         .club-teams {
@@ -1078,6 +1089,62 @@
                 font-size: 40px;
             }
         }
+
+        @media (max-width: 560px) {
+            .club-hero-side {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 6px !important;
+            }
+
+            .club-mini-stat {
+                min-height: 72px !important;
+                display: flex !important;
+                grid-template-columns: none !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+                gap: 7px !important;
+                padding: 9px !important;
+                border-radius: 10px !important;
+            }
+
+            .club-mini-stat i {
+                width: 20px !important;
+                height: 20px !important;
+                font-size: 10px !important;
+                border-radius: 7px !important;
+            }
+
+            .club-mini-stat i + span {
+                margin-top: -27px !important;
+                margin-left: 27px !important;
+                min-height: 20px !important;
+                font-size: 6.5px !important;
+                letter-spacing: .08em !important;
+            }
+
+            .club-mini-stat strong {
+                width: 100% !important;
+                font-size: clamp(10.5px, 3.1vw, 13px) !important;
+                line-height: 1.08 !important;
+                letter-spacing: .02em !important;
+                white-space: normal !important;
+                overflow-wrap: normal !important;
+                word-break: normal !important;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .club-mini-stat {
+                min-height: 70px !important;
+                padding: 8px !important;
+            }
+
+            .club-mini-stat strong {
+                font-size: 10px !important;
+                line-height: 1.08 !important;
+            }
+        }
+
     </style>
 </head>
 
