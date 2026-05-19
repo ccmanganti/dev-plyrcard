@@ -16,10 +16,35 @@ class Club extends Model
         'conference_id',
         'name',
         'logo',
+        'hero_image',
+        'background_image',
         'primary_color',
         'secondary_color',
         'city',
         'state',
+
+        'has_landing_page',
+        'landing_page_is_published',
+        'landing_page_slug',
+        'landing_page_intro',
+        'landing_page_content',
+
+        'contact_info',
+        'coaching_staff',
+        'sponsors_partners',
+        'social_links',
+        'branding',
+    ];
+
+    protected $casts = [
+        'has_landing_page' => 'boolean',
+        'landing_page_is_published' => 'boolean',
+
+        'contact_info' => 'array',
+        'coaching_staff' => 'array',
+        'sponsors_partners' => 'array',
+        'social_links' => 'array',
+        'branding' => 'array',
     ];
 
     public function users(): HasMany

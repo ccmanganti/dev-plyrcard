@@ -9,6 +9,8 @@ use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PublicClubTeamController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -222,6 +224,13 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web'])
     ->get('/locker-room/owner-access', [WebsiteOwnerAccessController::class, 'consumeOwnerAccess'])
     ->name('locker-room.website.owner-access');
+
+
+Route::get('/clubs/{slug}', [PublicClubTeamController::class, 'club'])
+    ->name('clubs.landing');
+
+Route::get('/teams/{slug}', [PublicClubTeamController::class, 'team'])
+    ->name('teams.landing');
 
 /*
 |--------------------------------------------------------------------------

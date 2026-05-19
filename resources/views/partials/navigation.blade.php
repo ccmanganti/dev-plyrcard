@@ -7,6 +7,7 @@
 
 @php
     use App\Models\Website;
+    use App\Models\Team;
     use Illuminate\Support\Str;
 
     $plyrUser = auth()->user();
@@ -246,6 +247,58 @@
         $plyrShouldRenderPullup = $plyrLoggedIn && $plyrOwnsViewedWebsite;
     } else {
         $plyrShouldRenderPullup = true;
+    }
+
+
+    /*
+     * Club / Team landing pages for Locker Room.
+     * Club uses the authenticated player's club_id relationship.
+     * Team uses users.team_name + club_id to stay compatible with the current schema.
+     */
+    $plyrClub = $plyrLoggedIn && $plyrUser && method_exists($plyrUser, 'club')
+        ? $plyrUser->club
+        : null;
+
+    $plyrClubLandingUrl = null;
+    $plyrClubLandingName = $plyrClub?->name ?: 'My Club';
+
+    if (
+        $plyrClub
+        && ($plyrClub->has_landing_page ?? false)
+        && ($plyrClub->landing_page_is_published ?? false)
+        && filled($plyrClub->landing_page_slug ?? null)
+        && \Illuminate\Support\Facades\Route::has('clubs.landing')
+    ) {
+        $plyrClubLandingUrl = route('clubs.landing', $plyrClub->landing_page_slug);
+    }
+
+    $plyrTeam = null;
+    $plyrTeamLandingUrl = null;
+    $plyrTeamLandingName = 'My Team';
+
+    if ($plyrLoggedIn && $plyrUser && filled($plyrUser->team_name ?? null) && class_exists(Team::class)) {
+        try {
+            $plyrTeam = Team::query()
+                ->where('name', $plyrUser->team_name)
+                ->when($plyrUser->club_id ?? null, fn ($query) => $query->where('club_id', $plyrUser->club_id))
+                ->first();
+
+            $plyrTeamLandingName = $plyrTeam?->name ?: $plyrUser->team_name ?: 'My Team';
+
+            if (
+                $plyrTeam
+                && ($plyrTeam->has_landing_page ?? false)
+                && ($plyrTeam->landing_page_is_published ?? false)
+                && filled($plyrTeam->landing_page_slug ?? null)
+                && \Illuminate\Support\Facades\Route::has('teams.landing')
+            ) {
+                $plyrTeamLandingUrl = route('teams.landing', $plyrTeam->landing_page_slug);
+            }
+        } catch (\Throwable $e) {
+            $plyrTeam = null;
+            $plyrTeamLandingUrl = null;
+            $plyrTeamLandingName = $plyrUser->team_name ?: 'My Team';
+        }
     }
 
     $plyrTabLabel = $plyrLoggedIn ? 'Locker Room' : 'GET STARTED';
@@ -2644,6 +2697,23 @@
           </div>
 
           <div class="plyrcard-nav-group">
+            <strong class="plyrcard-nav-group-title">Club & Team</strong>
+            <div class="plyrcard-drawer-grid">
+              @if($plyrClubLandingUrl)
+                <a class="plyrcard-drawer-card" href="{{ $plyrClubLandingUrl }}"><i class="plyrcard-menu-icon fa-solid fa-shield-halved" aria-hidden="true"></i><span>My Club</span></a>
+              @else
+                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="club-team-pages"><i class="plyrcard-menu-icon fa-solid fa-shield-halved" aria-hidden="true"></i><span>My Club</span></button>
+              @endif
+
+              @if($plyrTeamLandingUrl)
+                <a class="plyrcard-drawer-card" href="{{ $plyrTeamLandingUrl }}"><i class="plyrcard-menu-icon fa-solid fa-people-group" aria-hidden="true"></i><span>My Team</span></a>
+              @else
+                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="club-team-pages"><i class="plyrcard-menu-icon fa-solid fa-people-group" aria-hidden="true"></i><span>My Team</span></button>
+              @endif
+            </div>
+          </div>
+
+          <div class="plyrcard-nav-group">
             <strong class="plyrcard-nav-group-title">Growth</strong>
             <div class="plyrcard-drawer-grid">
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="upgrade"><i class="plyrcard-menu-icon fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>Upgrade</span></button>
@@ -2657,6 +2727,46 @@
             <strong class="plyrcard-nav-group-title">Account</strong>
             <div class="plyrcard-drawer-grid">
               <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="billing"><i class="plyrcard-menu-icon fa-solid fa-credit-card" aria-hidden="true"></i><span>Billing</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="plyrcard-drawer-view" data-plyrcard-view="club-team-pages" data-title="Club & Team">
+          <div class="plyrcard-form-card plyrcard-form-stack">
+            <div class="plyrcard-mini-status">
+              <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+              <div>
+                <strong>Club & Team Pages</strong>
+                <span>View your club landing page and team squad page once they are published.</span>
+              </div>
+            </div>
+
+            <div class="plyrcard-offer-stack">
+              <div class="plyrcard-service-card">
+                <div>
+                  <strong>{{ $plyrClubLandingName }}</strong>
+                  <span>{{ $plyrClubLandingUrl ? 'Club page is ready.' : 'Club page is not published yet.' }}</span>
+                </div>
+
+                @if($plyrClubLandingUrl)
+                  <a class="plyrcard-secondary-btn" href="{{ $plyrClubLandingUrl }}">View Club</a>
+                @else
+                  <button class="plyrcard-secondary-btn" type="button" disabled>Coming Soon</button>
+                @endif
+              </div>
+
+              <div class="plyrcard-service-card">
+                <div>
+                  <strong>{{ $plyrTeamLandingName }}</strong>
+                  <span>{{ $plyrTeamLandingUrl ? 'Team squad page is ready.' : 'Team page is not published yet.' }}</span>
+                </div>
+
+                @if($plyrTeamLandingUrl)
+                  <a class="plyrcard-secondary-btn" href="{{ $plyrTeamLandingUrl }}">View Team</a>
+                @else
+                  <button class="plyrcard-secondary-btn" type="button" disabled>Coming Soon</button>
+                @endif
+              </div>
             </div>
           </div>
         </div>
