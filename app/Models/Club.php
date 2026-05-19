@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Club extends Model
 {
@@ -46,6 +47,49 @@ class Club extends Model
         'social_links' => 'array',
         'branding' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Club $club) {
+            if (blank($club->landing_page_slug) && filled($club->name)) {
+                $club->landing_page_slug = static::uniqueLandingPageSlug($club->name, $club);
+            }
+        });
+    }
+
+    public static function uniqueLandingPageSlug(string $name, ?Club $club = null): string
+    {
+        $base = Str::slug($name) ?: 'club';
+        $slug = $base;
+        $counter = 2;
+
+        while (
+            static::query()
+                ->where('landing_page_slug', $slug)
+                ->when($club?->exists, fn ($query) => $query->whereKeyNot($club->getKey()))
+                ->exists()
+        ) {
+            $slug = "{$base}-{$counter}";
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    public function landingUrl(): ?string
+    {
+        if (
+            ! $this->has_landing_page
+            || ! $this->landing_page_is_published
+            || blank($this->landing_page_slug)
+        ) {
+            return null;
+        }
+
+        return route('clubs.landing', [
+            'clubSlug' => $this->landing_page_slug,
+        ]);
+    }
 
     public function users(): HasMany
     {

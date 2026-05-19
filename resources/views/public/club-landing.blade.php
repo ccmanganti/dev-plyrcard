@@ -847,7 +847,7 @@
 
                         <div class="club-team-slider is-active" data-club-team-panel="men">
                             @foreach($mensTeams as $team)
-                                <a class="club-team-card" href="{{ $team->landing_page_slug ? route('teams.landing', $team->landing_page_slug) : '#' }}">
+                                <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
                                     <span class="club-team-card-mark">
                                         <i class="fa-solid fa-users" aria-hidden="true"></i>
                                     </span>
@@ -859,7 +859,7 @@
 
                         <div class="club-team-slider" data-club-team-panel="women">
                             @foreach($womensTeams as $team)
-                                <a class="club-team-card" href="{{ $team->landing_page_slug ? route('teams.landing', $team->landing_page_slug) : '#' }}">
+                                <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
                                     <span class="club-team-card-mark">
                                         <i class="fa-solid fa-users" aria-hidden="true"></i>
                                     </span>

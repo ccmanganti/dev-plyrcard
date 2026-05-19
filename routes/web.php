@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LockerRoomController;
+use App\Http\Controllers\PublicClubTeamController;
 use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
@@ -9,8 +10,6 @@ use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PublicClubTeamController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -24,6 +23,10 @@ require __DIR__ . '/marketing-routes.php';
 |--------------------------------------------------------------------------
 | Reserved public slugs
 |--------------------------------------------------------------------------
+|
+| These should never be treated as public website names.
+| Important: "admin" must stay reserved because Filament owns /admin.
+|
 */
 
 $reservedWebsiteSlugs = implode('|', [
@@ -47,6 +50,8 @@ $reservedWebsiteSlugs = implode('|', [
     'storage',
     'api',
     'locker-room',
+    'clubs',
+    'teams',
 ]);
 
 /*
@@ -66,6 +71,40 @@ Route::get('/', [PublicWebsiteController::class, 'home'])
 
 Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
     ->name('website.preview');
+
+/*
+|--------------------------------------------------------------------------
+| Club / Team Landing Pages
+|--------------------------------------------------------------------------
+|
+| Keep these ABOVE the catch-all /{websiteName} route.
+|
+| Final structure:
+| /clubs/{clubSlug}
+| /clubs/{clubSlug}/teams/mens/{teamSlug}
+| /clubs/{clubSlug}/teams/womens/{teamSlug}
+|
+*/
+
+Route::get('/clubs/{clubSlug}', [PublicClubTeamController::class, 'club'])
+    ->name('clubs.landing');
+
+Route::get('/clubs/{clubSlug}/teams/{gender}/{teamSlug}', [PublicClubTeamController::class, 'team'])
+    ->whereIn('gender', ['mens', 'womens'])
+    ->name('clubs.teams.landing');
+
+/*
+|--------------------------------------------------------------------------
+| Legacy Team Redirect
+|--------------------------------------------------------------------------
+|
+| Keep this for old /teams/{slug} links. It redirects to the new club-based URI.
+| You can remove this later once old links are no longer used.
+|
+*/
+
+Route::get('/teams/{teamSlug}', [PublicClubTeamController::class, 'legacyTeam'])
+    ->name('teams.landing');
 
 /*
 |--------------------------------------------------------------------------
@@ -93,6 +132,15 @@ Route::get('/player-intake-app/auto-login/{user}', [PublicPlayerIntakeController
 |--------------------------------------------------------------------------
 | Filament-related custom admin routes
 |--------------------------------------------------------------------------
+|
+| Filament itself should own:
+|
+|   /admin
+|   /admin/login
+|   /admin/password-reset/...
+|
+| These custom routes are only for your website editor actions.
+|
 */
 
 Route::prefix('admin/websites')
@@ -151,9 +199,13 @@ Route::post('/onboarding/complete', function (Request $request) {
 | Drawer login route
 |--------------------------------------------------------------------------
 |
-| This route is for the Get Started drawer login form. It returns JSON for
-| the drawer AJAX flow so bad credentials show inside the drawer instead of
-| redirecting back to the homepage.
+| Do not use /admin/login here. Filament owns /admin/login.
+| This route is for the Locker Room / Get Started drawer login form.
+|
+| Important:
+| If the player has a custom domain, we send them through the owner bridge
+| route instead of directly redirecting to the custom domain. This lets the
+| custom domain receive its own owner/session access.
 |
 */
 
@@ -164,18 +216,8 @@ Route::post('/locker-room/login', function (Request $request) {
     ]);
 
     if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-        if ($request->expectsJson() || $request->ajax()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'The email or password is incorrect.',
-                'errors' => [
-                    'email' => ['The email or password is incorrect.'],
-                ],
-            ], 422);
-        }
-
         return back()
-            ->withErrors(['email' => 'The email or password is incorrect.'])
+            ->withErrors(['email' => 'These credentials do not match our records.'])
             ->onlyInput('email');
     }
 
@@ -190,31 +232,38 @@ Route::post('/locker-room/login', function (Request $request) {
         ->latest('updated_at')
         ->first();
 
-    $redirectUrl = url('/');
-
-    if ($website) {
-        if (! blank($website->domain) && Route::has('locker-room.website.visit')) {
-            $redirectUrl = route('locker-room.website.visit', $website);
-        } elseif (! blank($website->slug)) {
-            $redirectUrl = url('/' . ltrim($website->slug, '/'));
-        }
+    if (! $website) {
+        return redirect('/');
     }
 
-    if ($request->expectsJson() || $request->ajax()) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Signed in successfully.',
-            'redirect_url' => $redirectUrl,
-        ]);
+    if (! blank($website->domain)) {
+        return redirect()->route('locker-room.website.visit', $website);
     }
 
-    return redirect()->to($redirectUrl);
+    if (! blank($website->slug)) {
+        return redirect('/' . ltrim($website->slug, '/'));
+    }
+
+    return redirect('/');
 })->name('plyrcard.drawer-login');
 
 /*
 |--------------------------------------------------------------------------
 | Locker Room owner website access bridge
 |--------------------------------------------------------------------------
+|
+| This is needed because a session on plyrcard.com/admin does not automatically
+| exist on a custom player domain like selinpehlivan.com.
+|
+| Flow:
+| 1. Logged-in user clicks Visit my Website.
+| 2. /locker-room/visit-my-website/{website} verifies ownership.
+| 3. It redirects to the custom domain with a temporary signed access token.
+| 4. /locker-room/owner-access on the custom domain consumes the token and
+|    logs the owner in on that domain.
+|
+| Keep these routes above the catch-all /{websiteName} route.
+|
 */
 
 Route::middleware(['web', 'auth'])
@@ -224,13 +273,6 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web'])
     ->get('/locker-room/owner-access', [WebsiteOwnerAccessController::class, 'consumeOwnerAccess'])
     ->name('locker-room.website.owner-access');
-
-
-Route::get('/clubs/{slug}', [PublicClubTeamController::class, 'club'])
-    ->name('clubs.landing');
-
-Route::get('/teams/{slug}', [PublicClubTeamController::class, 'team'])
-    ->name('teams.landing');
 
 /*
 |--------------------------------------------------------------------------
@@ -248,29 +290,21 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/locker-room/settings', [LockerRoomController::class, 'updateSettings'])
         ->name('locker-room.settings.update');
 
-    Route::post('/locker-room/billing', [LockerRoomController::class, 'updateBilling'])
-        ->name('locker-room.billing.update');
-
     Route::post('/locker-room/support', [LockerRoomController::class, 'storeSupport'])
         ->name('locker-room.support.store');
 
     Route::post('/locker-room/referral', [LockerRoomController::class, 'storeReferral'])
         ->name('locker-room.referral.store');
-
-    Route::post('/locker-room/additional-service', [LockerRoomController::class, 'storeAdditionalService'])
-        ->name('locker-room.additional-service.store');
-
-    Route::post('/locker-room/website-settings', [LockerRoomController::class, 'updateWebsiteSettings'])
-        ->name('locker-room.website-settings.update');
-
-    Route::post('/locker-room/website-calendar/refresh', [LockerRoomController::class, 'refreshWebsiteCalendar'])
-        ->name('locker-room.website-calendar.refresh');
 });
 
 /*
 |--------------------------------------------------------------------------
 | Public website-by-name route
 |--------------------------------------------------------------------------
+|
+| Keep this at the very bottom.
+| This prevents public website names from hijacking reserved app routes.
+|
 */
 
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
