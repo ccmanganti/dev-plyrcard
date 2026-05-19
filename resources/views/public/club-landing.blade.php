@@ -244,7 +244,7 @@
         .club-shell {
             position: relative;
             z-index: 2;
-            width: min(1080px, calc(100% - 24px));
+            width: min(980px, calc(100% - 22px));
             margin: 0 auto;
             min-height: 100vh;
             display: grid;
@@ -264,16 +264,16 @@
 
         .club-hero {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 280px;
-            gap: 12px;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
         }
 
         .club-hero-main {
             position: relative;
-            min-height: 390px;
+            min-height: 355px;
             border-radius: 22px;
             overflow: hidden;
-            padding: clamp(22px, 4vw, 42px);
+            padding: clamp(20px, 3.4vw, 36px);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -294,10 +294,12 @@
 
         .club-brand {
             position: relative;
-            display: flex;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
             align-items: center;
             gap: 12px;
-            margin-bottom: clamp(18px, 2.6vw, 28px);
+            margin-bottom: clamp(18px, 2.4vw, 26px);
+            max-width: 680px;
         }
 
         .club-logo {
@@ -312,20 +314,21 @@
 
         .club-name {
             font-family: var(--club-heading);
-            font-size: clamp(28px, 3.7vw, 45px);
-            line-height: .88;
-            letter-spacing: .1em;
+            font-size: clamp(27px, 3.4vw, 42px);
+            line-height: .92;
+            letter-spacing: .085em;
             text-transform: uppercase;
             font-weight: 900;
             text-wrap: balance;
+            max-width: 560px;
         }
 
         .club-type {
-            margin-top: 8px;
+            margin-top: 6px;
             color: var(--club-primary);
             font-family: var(--club-heading);
-            font-size: 12px;
-            letter-spacing: .24em;
+            font-size: 10.5px;
+            letter-spacing: .20em;
             text-transform: uppercase;
             font-weight: 900;
         }
@@ -346,11 +349,12 @@
             max-width: 760px;
             margin: 0;
             font-family: var(--club-heading);
-            font-size: clamp(46px, 7vw, 86px);
-            line-height: .84;
-            letter-spacing: .03em;
+            font-size: clamp(42px, 6.2vw, 74px);
+            line-height: .94;
+            letter-spacing: .028em;
             text-transform: uppercase;
             font-weight: 900;
+            text-wrap: balance;
         }
 
         .club-copy {
@@ -406,40 +410,54 @@
 
         .club-hero-side {
             display: grid;
-            gap: 10px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
         }
 
         .club-mini-stat {
-            min-height: 116px;
-            border-radius: 18px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
+            min-height: 70px;
+            border-radius: 16px;
+            padding: 11px 12px;
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
         }
 
         .club-mini-stat i {
+            width: 28px;
+            height: 28px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             color: var(--club-primary);
-            font-size: 21px;
-            margin-bottom: 14px;
-            filter: drop-shadow(0 0 14px color-mix(in srgb, var(--club-primary) 34%, transparent));
+            font-size: 15px;
+            background: rgba(255,255,255,.055);
+            filter: drop-shadow(0 0 12px color-mix(in srgb, var(--club-primary) 28%, transparent));
+            margin: 0;
         }
 
         .club-mini-stat span {
-            color: rgba(255,255,255,.62);
-            font-size: 10px;
+            display: block;
+            color: rgba(255,255,255,.64);
+            font-size: 8.5px;
             letter-spacing: .12em;
             text-transform: uppercase;
             font-weight: 900;
-            margin-bottom: 6px;
+            margin: 0 0 4px;
         }
 
         .club-mini-stat strong {
+            display: block;
             font-family: var(--club-heading);
-            font-size: clamp(22px, 2.2vw, 30px);
+            font-size: clamp(17px, 1.7vw, 23px);
             line-height: 1;
             font-weight: 900;
             text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .club-teams {
@@ -758,31 +776,34 @@
             }
 
             .club-hero-main {
-                min-height: 350px;
+                min-height: 320px;
             }
 
             .club-hero-side {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 8px;
+                gap: 7px;
             }
 
             .club-mini-stat {
-                min-height: 92px;
-                padding: 12px;
+                min-height: 62px;
+                grid-template-columns: 24px minmax(0, 1fr);
+                gap: 7px;
+                padding: 9px;
             }
 
             .club-mini-stat i {
-                font-size: 17px;
-                margin-bottom: 10px;
+                width: 24px;
+                height: 24px;
+                font-size: 13px;
             }
 
             .club-mini-stat span {
-                font-size: 9px;
-                margin-bottom: 4px;
+                font-size: 7.5px;
+                margin-bottom: 3px;
             }
 
             .club-mini-stat strong {
-                font-size: 22px;
+                font-size: 15px;
             }
 
             .club-team-layout {
@@ -819,9 +840,9 @@
             }
 
             .club-brand {
-                align-items: flex-start;
-                gap: 10px;
-                margin-bottom: 16px;
+                align-items: center;
+                gap: 9px;
+                margin-bottom: 14px;
             }
 
             .club-logo {
@@ -831,9 +852,9 @@
             }
 
             .club-name {
-                font-size: clamp(27px, 8vw, 34px);
-                line-height: .86;
-                letter-spacing: .08em;
+                font-size: clamp(24px, 7.2vw, 30px);
+                line-height: .92;
+                letter-spacing: .07em;
             }
 
             .club-type {
@@ -847,8 +868,8 @@
             }
 
             .club-headline {
-                font-size: clamp(42px, 13vw, 58px);
-                line-height: .82;
+                font-size: clamp(35px, 10.8vw, 46px);
+                line-height: .94;
             }
 
             .club-copy {
@@ -871,22 +892,24 @@
             }
 
             .club-mini-stat {
-                min-height: 78px;
-                border-radius: 15px;
-                padding: 10px;
+                min-height: 58px;
+                border-radius: 13px;
+                padding: 8px;
+                grid-template-columns: 22px minmax(0, 1fr);
             }
 
             .club-mini-stat i {
-                font-size: 15px;
-                margin-bottom: 8px;
+                width: 22px;
+                height: 22px;
+                font-size: 12px;
             }
 
             .club-mini-stat span {
-                font-size: 8px;
+                font-size: 7px;
             }
 
             .club-mini-stat strong {
-                font-size: 17px;
+                font-size: 13px;
                 letter-spacing: .02em;
             }
 

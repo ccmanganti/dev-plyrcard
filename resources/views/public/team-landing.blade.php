@@ -251,7 +251,9 @@
 
     <style>
         :root {
-            --team-primary: {{ $primary }};
+            --team-brand-primary: {{ $primary }};
+            --team-brand-secondary: {{ $secondary }};
+            --team-primary: {{ $autoBorder }};
             --team-secondary: {{ $secondary }};
             --team-accent: {{ $accent }};
             --team-bg: {{ $autoBackground }};
@@ -261,7 +263,7 @@
             --team-text-on-primary: {{ $textOnPrimary }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
-            --app-width: 392px;
+            --app-width: 410px;
         }
 
         * {
@@ -280,7 +282,7 @@
         .team-page {
             position: relative;
             min-height: 100vh;
-            padding: 12px 7px;
+            padding: 10px 7px;
             background:
                 radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--team-glow) 22%, transparent), transparent 30%),
                 radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--team-secondary) 18%, transparent), transparent 28%),
@@ -304,9 +306,9 @@
             z-index: 2;
             width: min(var(--app-width), 100%);
             margin: 0 auto;
-            min-height: calc(100vh - 24px);
+            min-height: calc(100vh - 20px);
             border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.10));
-            border-radius: 20px;
+            border-radius: 18px;
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
                 color-mix(in srgb, var(--team-surface) 92%, transparent);
@@ -365,12 +367,12 @@
 
         .team-hero-card {
             position: relative;
-            border-radius: 14px;
-            border: 1px solid rgba(255,255,255,.11);
+            border-radius: 15px;
+            border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.12));
             overflow: hidden;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 44%, transparent), transparent 50%),
-                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 32%, transparent), transparent 58%),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 18%, transparent), transparent 48%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 24%, transparent), transparent 58%),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
             box-shadow: 0 12px 30px rgba(0,0,0,.36);
         }
@@ -380,9 +382,18 @@
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(90deg, rgba(0,0,0,.82), rgba(0,0,0,.38), rgba(0,0,0,.76)),
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 56%),
-                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 24%, transparent), transparent 62%);
+                linear-gradient(90deg, rgba(0,0,0,.84), rgba(0,0,0,.48), rgba(0,0,0,.82)),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-brand-primary, var(--team-primary)) 26%, transparent), transparent 56%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 22%, transparent), transparent 62%);
+        }
+
+        .team-hero-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, var(--team-primary), var(--team-brand-primary, var(--team-primary)), var(--team-secondary), transparent) top left / 100% 3px no-repeat;
+            pointer-events: none;
+            z-index: 2;
         }
 
         .team-hero-inner {
@@ -393,18 +404,18 @@
 
         .team-brand-row {
             display: grid;
-            grid-template-columns: 66px 1fr;
+            grid-template-columns: 60px 1fr;
             gap: 11px;
             align-items: center;
-            min-height: 82px;
+            min-height: 74px;
         }
 
         .team-logo {
-            width: 66px;
-            height: 66px;
+            width: 58px;
+            height: 58px;
             border-radius: 15px;
             object-fit: contain;
-            background: color-mix(in srgb, var(--team-surface) 64%, transparent);
+            background: rgba(255,255,255,.07);
             border: 1px solid rgba(255,255,255,.13);
             padding: 7px;
         }
@@ -413,7 +424,7 @@
             margin: 0;
             font-family: var(--team-heading);
             font-size: 25px;
-            line-height: .88;
+            line-height: .92;
             letter-spacing: .06em;
             text-transform: uppercase;
             font-weight: 900;
@@ -423,9 +434,9 @@
             margin-top: 6px;
             color: var(--team-primary); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--team-primary) 28%, transparent));
             font-family: var(--team-heading);
-            font-size: 11px;
+            font-size: 10.5px;
             line-height: 1;
-            letter-spacing: .1em;
+            letter-spacing: .16em;
             text-transform: uppercase;
             font-weight: 900;
         }
@@ -435,18 +446,18 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
-            border-radius: 11px;
+            border-radius: 10px;
             overflow: hidden;
             background: rgba(255,255,255,.13);
         }
 
         .team-meta {
-            min-height: 38px;
+            min-height: 36px;
             display: flex;
             align-items: center;
             gap: 7px;
             padding: 6px 8px;
-            background: color-mix(in srgb, var(--team-surface) 64%, transparent);
+            background: rgba(255,255,255,.07);
         }
 
         .team-meta i {
@@ -459,7 +470,7 @@
         .team-meta small {
             display: block;
             color: rgba(255,255,255,.62);
-            font-size: 9px;
+            font-size: 8px;
             line-height: 1;
             margin-bottom: 3px;
         }
@@ -517,7 +528,7 @@
         .squad-title {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: 28px;
+            font-size: 26px;
             line-height: 1;
             letter-spacing: .08em;
             text-transform: uppercase;
@@ -529,7 +540,7 @@
             align-items: center;
             gap: 6px;
             color: rgba(255,255,255,.56);
-            font-size: 12px;
+            font-size: 10.5px;
             font-weight: 700;
         }
 
@@ -542,8 +553,8 @@
 
         .sport-field {
             position: relative;
-            min-height: 386px;
-            padding: 26px 9px;
+            min-height: 350px;
+            padding: 22px 8px;
             overflow: hidden;
             background:
                 repeating-linear-gradient(90deg, rgba(255,255,255,.026) 0 1px, transparent 1px 48px),
@@ -614,12 +625,12 @@
         .squad-grid {
             position: relative;
             z-index: 4;
-            min-height: 332px;
+            min-height: 294px;
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             align-content: center;
             justify-items: center;
-            gap: 19px 7px;
+            gap: 15px 6px;
         }
 
         .player-card {
@@ -1087,7 +1098,31 @@
             }
 
             .sport-field {
-                min-height: 410px;
+                min-height: 340px;
+            }
+
+            .team-brand-row {
+                grid-template-columns: 56px 1fr;
+                min-height: 70px;
+            }
+
+            .team-logo {
+                width: 54px;
+                height: 54px;
+            }
+
+            .team-name {
+                font-size: 24px;
+                line-height: .92;
+            }
+
+            .team-tagline {
+                font-size: 9.5px;
+                letter-spacing: .14em;
+            }
+
+            .squad-grid {
+                min-height: 280px;
             }
 
             .player-panel {
@@ -1101,8 +1136,8 @@
             }
 
             .player-card {
-                width: 66px;
-                min-height: 82px;
+                width: 58px;
+                min-height: 74px;
             }
         }
     </style>
