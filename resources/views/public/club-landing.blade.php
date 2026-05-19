@@ -10,16 +10,15 @@
     @php
         $branding = is_array($club->branding ?? null) ? $club->branding : [];
         $contact = is_array($club->contact_info ?? null) ? $club->contact_info : [];
-        $socials = is_array($club->social_links ?? null) ? $club->social_links : [];
         $sponsors = collect(is_array($club->sponsors_partners ?? null) ? $club->sponsors_partners : []);
 
-        $primary = $branding['primary_color'] ?? $club->primary_color ?? '#ff5c35';
+        $primary = $branding['primary_color'] ?? $club->primary_color ?? '#ff3131';
         $secondary = $branding['secondary_color'] ?? $club->secondary_color ?? '#050505';
         $accent = $branding['accent_color'] ?? $primary;
         $headingFont = $branding['heading_font'] ?? $branding['font_heading'] ?? 'Antonio';
         $bodyFont = $branding['body_font'] ?? $branding['font_body'] ?? 'Inter';
 
-        $normalizeHex = function (?string $hex, string $fallback = '#ff5c35') {
+        $normalizeHex = function (?string $hex, string $fallback = '#ff3131') {
             $hex = trim((string) $hex);
 
             if ($hex === '') {
@@ -84,22 +83,12 @@
         $accent = $normalizeHex($accent, $primary);
 
         $primaryLum = $luminance($primary);
-        $secondaryLum = $luminance($secondary);
-
-        /*
-         * Auto color selection:
-         * - If the brand color is too dark, brighten it for overlays/buttons.
-         * - If the brand color is very light, deepen it for contrast.
-         * - Keep the raw brand color available as --club-brand-raw.
-         */
         $autoAccent = $primaryLum < 0.18
             ? $mixHex($primary, '#FFFFFF', 0.48)
             : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.34) : $primary);
 
         $autoAccentSoft = $mixHex($autoAccent, '#FFFFFF', 0.22);
-        $autoAccentDeep = $mixHex($autoAccent, '#000000', 0.34);
-        $pageBase = $secondaryLum < 0.20 ? '#050506' : '#070707';
-        $surfaceColor = $secondaryLum < 0.20 ? 'rgba(12,12,14,.82)' : 'rgba(7,7,8,.84)';
+        $autoAccentDeep = $mixHex($autoAccent, '#000000', 0.36);
         $textOnAccent = $luminance($autoAccent) > 0.58 ? '#070707' : '#FFFFFF';
 
         $resolveAsset = function ($value, $fallback = null) {
@@ -126,8 +115,8 @@
             asset('images/PLYRCARD-SITE.jpg')
         );
 
-        $headline = $club->landing_page_intro ?: ($branding['headline'] ?? 'Train. Compete. Grow Together.');
-        $content = $club->landing_page_content ?: ($branding['content'] ?? 'A club home for athletes, families, and staff. View teams, connect with coaches, and follow the player pathway.');
+        $headline = $club->landing_page_intro ?: 'Built for the next level.';
+        $content = $club->landing_page_content ?: 'A club home for athletes, families, and staff. View teams, follow the pathway, and connect with the right people.';
 
         $address = $contact['address'] ?? trim(collect([$club->city, $club->state])->filter()->implode(', '));
         $phone = $contact['phone'] ?? null;
@@ -136,19 +125,21 @@
 
         $teamGender = function ($team) {
             $settings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
-            $gender = strtolower((string) ($team->gender ?? $settings['gender'] ?? ''));
-
-            if (str_contains($gender, 'female') || str_contains($gender, 'women') || str_contains($gender, 'girl')) {
-                return 'women';
-            }
-
-            if (str_contains($gender, 'male') || str_contains($gender, 'men') || str_contains($gender, 'boy')) {
-                return 'men';
-            }
-
+            $gender = strtolower((string) ($settings['gender'] ?? $settings['division_gender'] ?? $team->club?->league?->gender ?? ''));
             $name = strtolower((string) $team->name);
 
-            if (str_contains($name, 'women') || str_contains($name, 'girls') || str_contains($name, 'female')) {
+            if (
+                str_contains($gender, 'female')
+                || str_contains($gender, 'women')
+                || str_contains($gender, 'woman')
+                || str_contains($gender, 'girls')
+                || str_contains($gender, 'girl')
+                || str_contains($name, 'women')
+                || str_contains($name, 'woman')
+                || str_contains($name, 'girls')
+                || str_contains($name, 'girl')
+                || str_contains($name, 'female')
+            ) {
                 return 'women';
             }
 
@@ -157,6 +148,7 @@
 
         $mensTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'men')->values();
         $womensTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'women')->values();
+        $teamCount = collect($teams ?? [])->count();
     @endphp
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -165,25 +157,26 @@
 
     <style>
         :root {
-            --club-brand-raw: {{ $primary }};
             --club-primary: {{ $autoAccent }};
             --club-primary-soft: {{ $autoAccentSoft }};
             --club-primary-deep: {{ $autoAccentDeep }};
-            --club-secondary: {{ $secondary }};
-            --club-accent: {{ $autoAccent }};
             --club-text-on-accent: {{ $textOnAccent }};
-            --club-page-base: {{ $pageBase }};
-            --club-surface: {{ $surfaceColor }};
             --club-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --club-body: "{{ $bodyFont }}", "Inter", sans-serif;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
 
         body {
             margin: 0;
             min-height: 100vh;
-            background: var(--club-page-base);
+            background: #020202;
             color: #fff;
             font-family: var(--club-body);
             overflow-x: hidden;
@@ -192,12 +185,10 @@
         .club-page {
             position: relative;
             min-height: 100vh;
-            padding: 18px;
-            display: flex;
-            align-items: center;
             background:
-                radial-gradient(circle at 16% 12%, color-mix(in srgb, var(--club-primary) 28%, transparent), transparent 30%),
-                linear-gradient(135deg, #050505, #111111 52%, #050505);
+                radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--club-primary) 26%, transparent), transparent 30%),
+                radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--club-primary-soft) 14%, transparent), transparent 28%),
+                linear-gradient(180deg, #050505 0%, #010101 100%);
         }
 
         .club-page::before {
@@ -206,9 +197,9 @@
             inset: 0;
             z-index: 0;
             background:
-                linear-gradient(90deg, rgba(0,0,0,.88), rgba(0,0,0,.54), rgba(0,0,0,.86)),
+                linear-gradient(180deg, rgba(0,0,0,.52), rgba(0,0,0,.92)),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
-            opacity: .55;
+            opacity: .46;
             pointer-events: none;
         }
 
@@ -217,78 +208,87 @@
             position: fixed;
             inset: 0;
             z-index: 1;
-            background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 34%, transparent), transparent 40%),
-                radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--club-primary-soft) 18%, transparent), transparent 25%),
-                linear-gradient(180deg, transparent 0%, rgba(0,0,0,.38) 100%);
             pointer-events: none;
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 30%, transparent), transparent 42%),
+                radial-gradient(circle at 50% 105%, rgba(255,255,255,.08), transparent 28%);
         }
 
         .club-shell {
             position: relative;
             z-index: 2;
-            width: min(1280px, 100%);
+            width: min(1180px, calc(100% - 28px));
             margin: 0 auto;
+            min-height: 100vh;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 420px;
+            grid-template-rows: 1fr auto;
+            gap: 18px;
+            padding: clamp(18px, 3vw, 34px) 0;
+        }
+
+        .club-hero {
+            min-height: 580px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
             gap: 18px;
             align-items: stretch;
         }
 
-        .club-main,
-        .club-side,
-        .club-teams {
-            border: 1px solid color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.12));
-            background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 8%, transparent), transparent 38%),
-                var(--club-surface);
-            backdrop-filter: blur(18px);
-            box-shadow:
-                0 24px 80px rgba(0,0,0,.42),
-                inset 0 1px 0 rgba(255,255,255,.05);
-            border-radius: 24px;
-            overflow: hidden;
-        }
-
-        .club-main {
+        .club-hero-main {
             position: relative;
-            min-height: 430px;
-            padding: clamp(22px, 3.4vw, 42px);
             display: flex;
             flex-direction: column;
             justify-content: center;
+            min-height: 520px;
+            padding: clamp(24px, 5vw, 64px);
+            overflow: hidden;
+            border-radius: 30px;
+            border: 1px solid color-mix(in srgb, var(--club-primary) 22%, rgba(255,255,255,.12));
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 12%, transparent), transparent 42%),
+                rgba(8,8,10,.78);
+            backdrop-filter: blur(20px);
+            box-shadow:
+                0 26px 100px rgba(0,0,0,.52),
+                inset 0 1px 0 rgba(255,255,255,.06);
         }
 
-        .club-main::before {
+        .club-hero-main::before {
             content: "";
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--club-primary), transparent);
+            inset: 0;
+            background:
+                linear-gradient(90deg, var(--club-primary), transparent 48%) top left / 100% 4px no-repeat,
+                radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--club-primary) 20%, transparent), transparent 28%);
+            pointer-events: none;
         }
 
         .club-brand {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 14px;
-            margin-bottom: 24px;
+            margin-bottom: clamp(26px, 4vw, 46px);
         }
 
         .club-logo {
-            width: 68px;
-            height: 68px;
-            border-radius: 18px;
+            width: clamp(62px, 8vw, 92px);
+            height: clamp(62px, 8vw, 92px);
+            border-radius: 22px;
             object-fit: contain;
-            background: rgba(255,255,255,.07);
-            border: 1px solid rgba(255,255,255,.12);
             padding: 8px;
+            background: rgba(0,0,0,.38);
+            border: 1px solid rgba(255,255,255,.15);
+            box-shadow: 0 16px 34px rgba(0,0,0,.32);
+        }
+
+        .club-brand-text {
+            min-width: 0;
         }
 
         .club-name {
             font-family: var(--club-heading);
-            font-size: clamp(26px, 3.4vw, 46px);
+            font-size: clamp(28px, 4.5vw, 60px);
             line-height: .9;
             letter-spacing: .12em;
             text-transform: uppercase;
@@ -296,61 +296,67 @@
         }
 
         .club-type {
-            margin-top: 7px;
-            color: var(--club-primary); text-shadow: 0 0 20px color-mix(in srgb, var(--club-primary) 18%, transparent);
+            margin-top: 8px;
+            color: var(--club-primary);
             font-family: var(--club-heading);
             font-size: 13px;
-            letter-spacing: .26em;
+            letter-spacing: .28em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
         .club-kicker {
+            position: relative;
             color: var(--club-primary);
             font-family: var(--club-heading);
-            font-size: clamp(13px, 1.4vw, 17px);
+            font-size: clamp(14px, 1.8vw, 20px);
             letter-spacing: .22em;
             text-transform: uppercase;
             font-weight: 900;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .club-headline {
+            position: relative;
+            max-width: 820px;
             margin: 0;
             font-family: var(--club-heading);
-            font-size: clamp(48px, 7.6vw, 96px);
-            line-height: .86;
-            letter-spacing: .04em;
+            font-size: clamp(58px, 10vw, 132px);
+            line-height: .84;
+            letter-spacing: .035em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
         .club-copy {
-            margin-top: 18px;
+            position: relative;
             max-width: 720px;
+            margin-top: 22px;
             color: rgba(255,255,255,.82);
-            font-size: 16px;
-            line-height: 1.55;
+            font-size: clamp(15px, 1.35vw, 18px);
+            line-height: 1.58;
+            font-weight: 600;
         }
 
         .club-actions {
+            position: relative;
+            margin-top: 26px;
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
-            margin-top: 22px;
         }
 
         .club-action {
-            min-height: 43px;
+            min-height: 44px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 9px;
-            border: 1px solid rgba(255,255,255,.14);
-            border-radius: 12px;
-            padding: 0 17px;
+            border-radius: 13px;
+            padding: 0 18px;
             color: #fff;
-            background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.065);
             text-decoration: none;
             font-family: var(--club-heading);
             font-size: 13px;
@@ -363,94 +369,98 @@
         .club-action:hover {
             transform: translateY(-2px);
             border-color: var(--club-primary);
+            background: rgba(255,255,255,.10);
         }
 
         .club-action.primary {
             background: linear-gradient(135deg, var(--club-primary), var(--club-primary-deep));
             border-color: var(--club-primary);
             color: var(--club-text-on-accent);
-            box-shadow: 0 12px 26px color-mix(in srgb, var(--club-primary) 28%, transparent);
+            box-shadow: 0 14px 30px color-mix(in srgb, var(--club-primary) 32%, transparent);
         }
 
-        .club-side {
+        .club-hero-side {
+            display: grid;
+            gap: 12px;
+            align-content: stretch;
+        }
+
+        .club-mini-stat {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,.12);
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 16%, transparent), transparent 54%),
+                rgba(8,8,10,.74);
+            backdrop-filter: blur(18px);
+            padding: 20px;
+            min-height: 142px;
             display: flex;
             flex-direction: column;
+            justify-content: flex-end;
+            box-shadow: 0 18px 50px rgba(0,0,0,.34);
         }
 
-        .club-side-head,
+        .club-mini-stat i {
+            color: var(--club-primary);
+            font-size: 25px;
+            margin-bottom: 20px;
+        }
+
+        .club-mini-stat span {
+            color: rgba(255,255,255,.62);
+            font-size: 11px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
+
+        .club-mini-stat strong {
+            font-family: var(--club-heading);
+            font-size: clamp(26px, 3vw, 38px);
+            line-height: 1;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .club-teams {
+            margin-top: 18px;
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.12));
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 9%, transparent), transparent 38%),
+                rgba(8,8,10,.78);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 24px 80px rgba(0,0,0,.40);
+        }
+
         .club-teams-head {
             padding: 16px 18px;
-            border-bottom: 1px solid rgba(255,255,255,.1);
+            border-bottom: 1px solid rgba(255,255,255,.10);
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-
-        .club-side-head i,
-        .club-teams-head i {
-            width: 34px;
-            height: 34px;
-            border-radius: 11px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--club-primary);
-            background: rgba(255,255,255,.06);
-            border: 1px solid rgba(255,255,255,.1);
+            justify-content: space-between;
+            gap: 12px;
         }
 
         .club-section-title {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
             font-family: var(--club-heading);
-            font-size: 21px;
+            font-size: 24px;
             letter-spacing: .12em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
-        .club-info-list {
-            display: grid;
-        }
-
-        .club-info-item {
-            min-height: 58px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 18px;
-            border-bottom: 1px solid rgba(255,255,255,.08);
-            color: rgba(255,255,255,.82);
-            font-size: 14px;
-        }
-
-        .club-info-item:last-child {
-            border-bottom: 0;
-        }
-
-        .club-info-item i {
-            width: 22px;
-            text-align: center;
+        .club-section-title i {
             color: var(--club-primary);
-            flex: 0 0 auto;
-        }
-
-        .club-info-item strong {
-            display: block;
-            margin-bottom: 2px;
-            color: #fff;
-            font-family: var(--club-heading);
-            font-size: 13px;
-            letter-spacing: .07em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .club-info-item a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .club-teams {
-            grid-column: 1 / -1;
         }
 
         .club-team-layout {
@@ -461,7 +471,7 @@
 
         .club-gender-tabs {
             padding: 14px;
-            border-right: 1px solid rgba(255,255,255,.1);
+            border-right: 1px solid rgba(255,255,255,.10);
             display: grid;
             gap: 10px;
             align-content: start;
@@ -469,9 +479,9 @@
 
         .club-gender-tab {
             min-height: 72px;
-            border: 1px solid rgba(255,255,255,.12);
-            border-radius: 15px;
-            background: rgba(255,255,255,.055);
+            border: 1px solid rgba(255,255,255,.11);
+            border-radius: 16px;
+            background: rgba(255,255,255,.052);
             color: #fff;
             cursor: pointer;
             padding: 12px;
@@ -483,7 +493,7 @@
         .club-gender-tab.is-active {
             transform: translateX(3px);
             border-color: var(--club-primary);
-            background: color-mix(in srgb, var(--club-primary) 20%, rgba(255,255,255,.055));
+            background: color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.052));
         }
 
         .club-gender-tab strong {
@@ -560,6 +570,7 @@
         .club-team-arrow:hover {
             transform: translateY(-50%) scale(1.06);
             background: var(--club-primary);
+            color: var(--club-text-on-accent);
         }
 
         .club-team-arrow:disabled {
@@ -567,20 +578,15 @@
             pointer-events: none;
         }
 
-        .club-team-arrow.is-left {
-            left: 10px;
-        }
-
-        .club-team-arrow.is-right {
-            right: 10px;
-        }
+        .club-team-arrow.is-left { left: 10px; }
+        .club-team-arrow.is-right { right: 10px; }
 
         .club-team-card {
             scroll-snap-align: start;
             width: 180px;
             min-width: 180px;
             min-height: 176px;
-            border-radius: 16px;
+            border-radius: 18px;
             border: 1px solid rgba(255,255,255,.12);
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 22%, transparent), transparent 52%),
@@ -631,42 +637,131 @@
             font-weight: 800;
         }
 
+        .club-footer {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            border: 1px solid color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.12));
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 10%, transparent), transparent 42%),
+                rgba(8,8,10,.84);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 22px 70px rgba(0,0,0,.42);
+        }
+
+        .club-footer-top {
+            padding: 22px;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr);
+            gap: 22px;
+        }
+
+        .club-footer h2 {
+            margin: 0 0 10px;
+            font-family: var(--club-heading);
+            font-size: clamp(32px, 4vw, 52px);
+            line-height: .9;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .club-footer p {
+            margin: 0;
+            color: rgba(255,255,255,.72);
+            line-height: 1.55;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .club-footer-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .club-footer-item {
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 15px;
+            padding: 11px;
+            background: rgba(255,255,255,.052);
+            border: 1px solid rgba(255,255,255,.09);
+            color: rgba(255,255,255,.80);
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .club-footer-item i {
+            color: var(--club-primary);
+            width: 22px;
+            text-align: center;
+            flex: 0 0 auto;
+        }
+
+        .club-footer-item strong {
+            display: block;
+            color: #fff;
+            font-family: var(--club-heading);
+            font-size: 12px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-weight: 900;
+            margin-bottom: 2px;
+        }
+
+        .club-footer-bottom {
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px 22px;
+            color: rgba(255,255,255,.52);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
         .club-sponsor-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            padding: 12px 18px 16px;
-            border-top: 1px solid rgba(255,255,255,.1);
+            gap: 8px;
         }
 
         .club-sponsor {
-            min-height: 40px;
+            min-height: 32px;
+            border-radius: 999px;
+            padding: 0 12px;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            padding: 0 14px;
-            color: rgba(255,255,255,.74);
-            background: rgba(255,255,255,.055);
-            border: 1px solid rgba(255,255,255,.1);
-            font-size: 12px;
-            font-weight: 900;
-            letter-spacing: .07em;
+            color: rgba(255,255,255,.72);
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.045);
+            font-size: 11px;
+            letter-spacing: .06em;
             text-transform: uppercase;
+            font-weight: 900;
         }
 
         @media (max-width: 980px) {
-            .club-page {
-                align-items: flex-start;
-                padding: 12px;
-            }
-
             .club-shell {
-                grid-template-columns: 1fr;
+                width: min(760px, calc(100% - 22px));
             }
 
-            .club-main {
+            .club-hero {
+                grid-template-columns: 1fr;
                 min-height: auto;
+            }
+
+            .club-hero-main {
+                min-height: 440px;
+            }
+
+            .club-hero-side {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             .club-team-layout {
@@ -674,41 +769,36 @@
             }
 
             .club-gender-tabs {
-                border-right: 0;
-                border-bottom: 1px solid rgba(255,255,255,.1);
                 grid-template-columns: 1fr 1fr;
+                border-right: 0;
+                border-bottom: 1px solid rgba(255,255,255,.10);
             }
 
             .club-team-slider-wrap {
-                min-height: 212px;
+                min-height: 208px;
+            }
+
+            .club-footer-top {
+                grid-template-columns: 1fr;
             }
         }
 
         @media (max-width: 560px) {
-            .club-brand {
-                gap: 11px;
+            .club-shell {
+                width: calc(100% - 18px);
+                padding: 10px 0 18px;
             }
 
-            .club-logo {
-                width: 56px;
-                height: 56px;
-                border-radius: 15px;
-            }
-
-            .club-name {
-                font-size: 24px;
+            .club-hero-main {
+                min-height: 420px;
+                border-radius: 22px;
             }
 
             .club-headline {
-                font-size: 48px;
+                font-size: 52px;
             }
 
-            .club-copy {
-                font-size: 14px;
-            }
-
-            .club-actions {
-                display: grid;
+            .club-hero-side {
                 grid-template-columns: 1fr;
             }
 
@@ -720,6 +810,15 @@
                 padding-left: 50px;
                 padding-right: 50px;
             }
+
+            .club-footer-info {
+                grid-template-columns: 1fr;
+            }
+
+            .club-footer-bottom {
+                align-items: flex-start;
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -727,160 +826,194 @@
 <body>
     <main class="club-page">
         <div class="club-shell">
-            <section class="club-main">
-                <div class="club-brand">
-                    @if($logo)
-                        <img class="club-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
-                    @endif
-
+            <div>
+                <section class="club-hero">
                     <div>
-                        <div class="club-name">{{ $club->name }}</div>
-                        <div class="club-type">Sports Club</div>
+                        <div class="club-hero-main">
+                            <div class="club-brand">
+                                @if($logo)
+                                    <img class="club-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
+                                @endif
+
+                                <div class="club-brand-text">
+                                    <div class="club-name">{{ $club->name }}</div>
+                                    <div class="club-type">Sports Club</div>
+                                </div>
+                            </div>
+
+                            <div class="club-kicker">{{ $headline }}</div>
+                            <h1 class="club-headline">One Club.<br>One Standard.</h1>
+
+                            <div class="club-copy">
+                                {!! nl2br(e($content)) !!}
+                            </div>
+
+                            <div class="club-actions">
+                                <a class="club-action primary" href="#club-teams">
+                                    <i class="fa-solid fa-people-group" aria-hidden="true"></i>
+                                    View Teams
+                                </a>
+
+                                @if($email)
+                                    <a class="club-action" href="mailto:{{ $email }}">
+                                        <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                        Contact
+                                    </a>
+                                @endif
+
+                                @if($mapsUrl)
+                                    <a class="club-action" href="{{ $mapsUrl }}" target="_blank" rel="noopener noreferrer">
+                                        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                        Map
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="club-kicker">{{ $headline }}</div>
-                <h1 class="club-headline">More Than<br>Just A Club</h1>
+                    <aside class="club-hero-side" aria-label="Club highlights">
+                        <div class="club-mini-stat">
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>Teams</span>
+                            <strong>{{ $teamCount }}</strong>
+                        </div>
 
-                <div class="club-copy">
-                    {!! nl2br(e($content)) !!}
-                </div>
-
-                <div class="club-actions">
-                    <a class="club-action primary" href="#club-teams">
-                        <i class="fa-solid fa-people-group" aria-hidden="true"></i>
-                        Teams
-                    </a>
-
-                    @if($email)
-                        <a class="club-action" href="mailto:{{ $email }}">
-                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                            Contact
-                        </a>
-                    @endif
-
-                    @if($mapsUrl)
-                        <a class="club-action" href="{{ $mapsUrl }}" target="_blank" rel="noopener noreferrer">
-                            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
-                            Map
-                        </a>
-                    @endif
-                </div>
-            </section>
-
-            <aside class="club-side">
-                <div class="club-side-head">
-                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                    <div class="club-section-title">Club Info</div>
-                </div>
-
-                <div class="club-info-list">
-                    @if($club->league)
-                        <div class="club-info-item">
+                        <div class="club-mini-stat">
                             <i class="fa-solid fa-trophy" aria-hidden="true"></i>
-                            <div>
-                                <strong>League</strong>
-                                {{ $club->league->name }}
-                            </div>
+                            <span>League</span>
+                            <strong>{{ $club->league?->name ? \Illuminate\Support\Str::of($club->league->name)->limit(12, '') : 'TBD' }}</strong>
                         </div>
-                    @endif
 
-                    @if($address)
-                        <div class="club-info-item">
+                        <div class="club-mini-stat">
                             <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
-                            <div>
-                                <strong>Location</strong>
-                                {{ $address }}
-                            </div>
+                            <span>Location</span>
+                            <strong>{{ $address ? \Illuminate\Support\Str::of($address)->limit(12, '') : 'TBD' }}</strong>
                         </div>
-                    @endif
+                    </aside>
+                </section>
 
-                    @if($phone)
-                        <div class="club-info-item">
-                            <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                            <div>
-                                <strong>Phone</strong>
-                                <a href="tel:{{ preg_replace('/\D+/', '', $phone) }}">{{ $phone }}</a>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if($email)
-                        <div class="club-info-item">
-                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                            <div>
-                                <strong>Email</strong>
-                                <a href="mailto:{{ $email }}">{{ $email }}</a>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            </aside>
-
-            <section class="club-teams" id="club-teams">
-                <div class="club-teams-head">
-                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-                    <div class="club-section-title">Teams</div>
-                </div>
-
-                <div class="club-team-layout">
-                    <div class="club-gender-tabs">
-                        <button class="club-gender-tab is-active" type="button" data-club-team-tab="men">
-                            <strong>Men's</strong>
-                            <span>{{ $mensTeams->count() }} team{{ $mensTeams->count() === 1 ? '' : 's' }}</span>
-                        </button>
-
-                        <button class="club-gender-tab" type="button" data-club-team-tab="women">
-                            <strong>Women's</strong>
-                            <span>{{ $womensTeams->count() }} team{{ $womensTeams->count() === 1 ? '' : 's' }}</span>
-                        </button>
+                <section class="club-teams" id="club-teams">
+                    <div class="club-teams-head">
+                        <h2 class="club-section-title">
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            Teams
+                        </h2>
                     </div>
 
-                    <div class="club-team-slider-wrap">
-                        <button class="club-team-arrow is-left" type="button" data-club-team-scroll="left" aria-label="Scroll teams left">
-                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-                        </button>
+                    <div class="club-team-layout">
+                        <div class="club-gender-tabs">
+                            <button class="club-gender-tab is-active" type="button" data-club-team-tab="men">
+                                <strong>Men's</strong>
+                                <span>{{ $mensTeams->count() }} team{{ $mensTeams->count() === 1 ? '' : 's' }}</span>
+                            </button>
 
-                        <button class="club-team-arrow is-right" type="button" data-club-team-scroll="right" aria-label="Scroll teams right">
-                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-                        </button>
+                            <button class="club-gender-tab" type="button" data-club-team-tab="women">
+                                <strong>Women's</strong>
+                                <span>{{ $womensTeams->count() }} team{{ $womensTeams->count() === 1 ? '' : 's' }}</span>
+                            </button>
+                        </div>
 
-                        <div class="club-team-slider is-active" data-club-team-panel="men">
-                            @foreach($mensTeams as $team)
-                                <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
-                                    <span class="club-team-card-mark">
-                                        <i class="fa-solid fa-users" aria-hidden="true"></i>
-                                    </span>
-                                    <span class="club-team-name">{{ $team->name }}</span>
-                                    <span class="club-team-copy">Open team</span>
-                                </a>
+                        <div class="club-team-slider-wrap">
+                            <button class="club-team-arrow is-left" type="button" data-club-team-scroll="left" aria-label="Scroll teams left">
+                                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                            </button>
+
+                            <button class="club-team-arrow is-right" type="button" data-club-team-scroll="right" aria-label="Scroll teams right">
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+
+                            <div class="club-team-slider is-active" data-club-team-panel="men">
+                                @foreach($mensTeams as $team)
+                                    <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
+                                        <span class="club-team-card-mark">
+                                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="club-team-name">{{ $team->name }}</span>
+                                        <span class="club-team-copy">Open team</span>
+                                    </a>
+                                @endforeach
+                            </div>
+
+                            <div class="club-team-slider" data-club-team-panel="women">
+                                @foreach($womensTeams as $team)
+                                    <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
+                                        <span class="club-team-card-mark">
+                                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="club-team-name">{{ $team->name }}</span>
+                                        <span class="club-team-copy">Open team</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="club-footer">
+                <div class="club-footer-top">
+                    <div>
+                        <h2>{{ $club->name }}</h2>
+                        <p>{!! nl2br(e($content)) !!}</p>
+                    </div>
+
+                    <div class="club-footer-info">
+                        @if($club->league)
+                            <div class="club-footer-item">
+                                <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                                <div>
+                                    <strong>League</strong>
+                                    {{ $club->league->name }}
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($address)
+                            <div class="club-footer-item">
+                                <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                <div>
+                                    <strong>Location</strong>
+                                    {{ $address }}
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($phone)
+                            <a class="club-footer-item" href="tel:{{ preg_replace('/\D+/', '', $phone) }}">
+                                <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                <div>
+                                    <strong>Phone</strong>
+                                    {{ $phone }}
+                                </div>
+                            </a>
+                        @endif
+
+                        @if($email)
+                            <a class="club-footer-item" href="mailto:{{ $email }}">
+                                <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                <div>
+                                    <strong>Email</strong>
+                                    {{ $email }}
+                                </div>
+                            </a>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="club-footer-bottom">
+                    <div>© {{ now()->year }} {{ $club->name }}. Powered by PlyrCard.</div>
+
+                    @if($sponsors->isNotEmpty())
+                        <div class="club-sponsor-row">
+                            @foreach($sponsors as $sponsor)
+                                @if(filled($sponsor['name'] ?? null))
+                                    <span class="club-sponsor">{{ $sponsor['name'] }}</span>
+                                @endif
                             @endforeach
                         </div>
-
-                        <div class="club-team-slider" data-club-team-panel="women">
-                            @foreach($womensTeams as $team)
-                                <a class="club-team-card" href="{{ $team->landingUrl() ?: '#' }}">
-                                    <span class="club-team-card-mark">
-                                        <i class="fa-solid fa-users" aria-hidden="true"></i>
-                                    </span>
-                                    <span class="club-team-name">{{ $team->name }}</span>
-                                    <span class="club-team-copy">Open team</span>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
+                    @endif
                 </div>
-
-                @if($sponsors->isNotEmpty())
-                    <div class="club-sponsor-row">
-                        @foreach($sponsors as $sponsor)
-                            @if(filled($sponsor['name'] ?? null))
-                                <div class="club-sponsor">{{ $sponsor['name'] }}</div>
-                            @endif
-                        @endforeach
-                    </div>
-                @endif
-            </section>
+            </footer>
         </div>
     </main>
 
