@@ -19,6 +19,89 @@
         $headingFont = $branding['heading_font'] ?? $branding['font_heading'] ?? 'Antonio';
         $bodyFont = $branding['body_font'] ?? $branding['font_body'] ?? 'Inter';
 
+        $normalizeHex = function (?string $hex, string $fallback = '#ff5c35') {
+            $hex = trim((string) $hex);
+
+            if ($hex === '') {
+                return $fallback;
+            }
+
+            if (! str_starts_with($hex, '#')) {
+                $hex = '#' . $hex;
+            }
+
+            if (! preg_match('/^#[0-9a-fA-F]{6}$/', $hex)) {
+                return $fallback;
+            }
+
+            return strtoupper($hex);
+        };
+
+        $hexToRgb = function (string $hex) {
+            $hex = ltrim($hex, '#');
+
+            return [
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2)),
+            ];
+        };
+
+        $rgbToHex = function (array $rgb) {
+            return sprintf(
+                '#%02X%02X%02X',
+                max(0, min(255, (int) round($rgb[0]))),
+                max(0, min(255, (int) round($rgb[1]))),
+                max(0, min(255, (int) round($rgb[2])))
+            );
+        };
+
+        $mixHex = function (string $hex, string $mixWith, float $amount) use ($hexToRgb, $rgbToHex) {
+            $a = $hexToRgb($hex);
+            $b = $hexToRgb($mixWith);
+
+            return $rgbToHex([
+                $a[0] + (($b[0] - $a[0]) * $amount),
+                $a[1] + (($b[1] - $a[1]) * $amount),
+                $a[2] + (($b[2] - $a[2]) * $amount),
+            ]);
+        };
+
+        $luminance = function (string $hex) use ($hexToRgb) {
+            [$r, $g, $b] = array_map(fn ($value) => $value / 255, $hexToRgb($hex));
+
+            $convert = function ($channel) {
+                return $channel <= 0.03928
+                    ? $channel / 12.92
+                    : (($channel + 0.055) / 1.055) ** 2.4;
+            };
+
+            return (0.2126 * $convert($r)) + (0.7152 * $convert($g)) + (0.0722 * $convert($b));
+        };
+
+        $primary = $normalizeHex($primary);
+        $secondary = $normalizeHex($secondary, '#050505');
+        $accent = $normalizeHex($accent, $primary);
+
+        $primaryLum = $luminance($primary);
+        $secondaryLum = $luminance($secondary);
+
+        /*
+         * Auto color selection:
+         * - If the brand color is too dark, brighten it for overlays/buttons.
+         * - If the brand color is very light, deepen it for contrast.
+         * - Keep the raw brand color available as --club-brand-raw.
+         */
+        $autoAccent = $primaryLum < 0.18
+            ? $mixHex($primary, '#FFFFFF', 0.48)
+            : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.34) : $primary);
+
+        $autoAccentSoft = $mixHex($autoAccent, '#FFFFFF', 0.22);
+        $autoAccentDeep = $mixHex($autoAccent, '#000000', 0.34);
+        $pageBase = $secondaryLum < 0.20 ? '#050506' : '#070707';
+        $surfaceColor = $secondaryLum < 0.20 ? 'rgba(12,12,14,.82)' : 'rgba(7,7,8,.84)';
+        $textOnAccent = $luminance($autoAccent) > 0.58 ? '#070707' : '#FFFFFF';
+
         $resolveAsset = function ($value, $fallback = null) {
             if (blank($value)) {
                 return $fallback;
@@ -82,9 +165,15 @@
 
     <style>
         :root {
-            --club-primary: {{ $primary }};
+            --club-brand-raw: {{ $primary }};
+            --club-primary: {{ $autoAccent }};
+            --club-primary-soft: {{ $autoAccentSoft }};
+            --club-primary-deep: {{ $autoAccentDeep }};
             --club-secondary: {{ $secondary }};
-            --club-accent: {{ $accent }};
+            --club-accent: {{ $autoAccent }};
+            --club-text-on-accent: {{ $textOnAccent }};
+            --club-page-base: {{ $pageBase }};
+            --club-surface: {{ $surfaceColor }};
             --club-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --club-body: "{{ $bodyFont }}", "Inter", sans-serif;
         }
@@ -94,7 +183,7 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background: #050505;
+            background: var(--club-page-base);
             color: #fff;
             font-family: var(--club-body);
             overflow-x: hidden;
@@ -129,8 +218,9 @@
             inset: 0;
             z-index: 1;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 28%, transparent), transparent 38%),
-                radial-gradient(circle at 78% 18%, rgba(255,255,255,.06), transparent 26%);
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 34%, transparent), transparent 40%),
+                radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--club-primary-soft) 18%, transparent), transparent 25%),
+                linear-gradient(180deg, transparent 0%, rgba(0,0,0,.38) 100%);
             pointer-events: none;
         }
 
@@ -148,20 +238,35 @@
         .club-main,
         .club-side,
         .club-teams {
-            border: 1px solid rgba(255,255,255,.12);
-            background: rgba(8,8,8,.76);
+            border: 1px solid color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.12));
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 8%, transparent), transparent 38%),
+                var(--club-surface);
             backdrop-filter: blur(18px);
-            box-shadow: 0 24px 80px rgba(0,0,0,.42);
+            box-shadow:
+                0 24px 80px rgba(0,0,0,.42),
+                inset 0 1px 0 rgba(255,255,255,.05);
             border-radius: 24px;
             overflow: hidden;
         }
 
         .club-main {
+            position: relative;
             min-height: 430px;
             padding: clamp(22px, 3.4vw, 42px);
             display: flex;
             flex-direction: column;
             justify-content: center;
+        }
+
+        .club-main::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--club-primary), transparent);
         }
 
         .club-brand {
@@ -192,7 +297,7 @@
 
         .club-type {
             margin-top: 7px;
-            color: var(--club-primary);
+            color: var(--club-primary); text-shadow: 0 0 20px color-mix(in srgb, var(--club-primary) 18%, transparent);
             font-family: var(--club-heading);
             font-size: 13px;
             letter-spacing: .26em;
@@ -245,7 +350,7 @@
             border-radius: 12px;
             padding: 0 17px;
             color: #fff;
-            background: rgba(255,255,255,.065);
+            background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
             text-decoration: none;
             font-family: var(--club-heading);
             font-size: 13px;
@@ -261,8 +366,10 @@
         }
 
         .club-action.primary {
-            background: var(--club-primary);
+            background: linear-gradient(135deg, var(--club-primary), var(--club-primary-deep));
             border-color: var(--club-primary);
+            color: var(--club-text-on-accent);
+            box-shadow: 0 12px 26px color-mix(in srgb, var(--club-primary) 28%, transparent);
         }
 
         .club-side {

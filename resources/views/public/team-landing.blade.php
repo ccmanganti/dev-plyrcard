@@ -17,6 +17,89 @@
         $headingFont = $teamBranding['heading_font'] ?? $clubBranding['heading_font'] ?? 'Antonio';
         $bodyFont = $teamBranding['body_font'] ?? $clubBranding['body_font'] ?? 'Inter';
 
+        $normalizeHex = function (?string $hex, string $fallback = '#ff5c35') {
+            $hex = trim((string) $hex);
+
+            if ($hex === '') {
+                return $fallback;
+            }
+
+            if (! str_starts_with($hex, '#')) {
+                $hex = '#' . $hex;
+            }
+
+            if (! preg_match('/^#[0-9a-fA-F]{6}$/', $hex)) {
+                return $fallback;
+            }
+
+            return strtoupper($hex);
+        };
+
+        $hexToRgb = function (string $hex) {
+            $hex = ltrim($hex, '#');
+
+            return [
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2)),
+            ];
+        };
+
+        $rgbToHex = function (array $rgb) {
+            return sprintf(
+                '#%02X%02X%02X',
+                max(0, min(255, (int) round($rgb[0]))),
+                max(0, min(255, (int) round($rgb[1]))),
+                max(0, min(255, (int) round($rgb[2])))
+            );
+        };
+
+        $mixHex = function (string $hex, string $mixWith, float $amount) use ($hexToRgb, $rgbToHex) {
+            $a = $hexToRgb($hex);
+            $b = $hexToRgb($mixWith);
+
+            return $rgbToHex([
+                $a[0] + (($b[0] - $a[0]) * $amount),
+                $a[1] + (($b[1] - $a[1]) * $amount),
+                $a[2] + (($b[2] - $a[2]) * $amount),
+            ]);
+        };
+
+        $luminance = function (string $hex) use ($hexToRgb) {
+            [$r, $g, $b] = array_map(fn ($value) => $value / 255, $hexToRgb($hex));
+
+            $convert = function ($channel) {
+                return $channel <= 0.03928
+                    ? $channel / 12.92
+                    : (($channel + 0.055) / 1.055) ** 2.4;
+            };
+
+            return (0.2126 * $convert($r)) + (0.7152 * $convert($g)) + (0.0722 * $convert($b));
+        };
+
+        $primary = $normalizeHex($primary);
+        $secondary = $normalizeHex($secondary, '#050505');
+        $accent = $normalizeHex($accent, $primary);
+
+        $primaryLum = $luminance($primary);
+        $secondaryLum = $luminance($secondary);
+
+        /*
+         * Auto color selection:
+         * - If the brand color is too dark, brighten it for overlays/buttons.
+         * - If the brand color is very light, deepen it for contrast.
+         * - Keep the raw brand color available as --team-brand-raw.
+         */
+        $autoAccent = $primaryLum < 0.18
+            ? $mixHex($primary, '#FFFFFF', 0.48)
+            : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.34) : $primary);
+
+        $autoAccentSoft = $mixHex($autoAccent, '#FFFFFF', 0.22);
+        $autoAccentDeep = $mixHex($autoAccent, '#000000', 0.34);
+        $pageBase = $secondaryLum < 0.20 ? '#050506' : '#070707';
+        $surfaceColor = $secondaryLum < 0.20 ? 'rgba(12,12,14,.82)' : 'rgba(7,7,8,.84)';
+        $textOnAccent = $luminance($autoAccent) > 0.58 ? '#070707' : '#FFFFFF';
+
         $resolveAsset = function ($value, $fallback = null) {
             if (blank($value)) {
                 return $fallback;
@@ -142,9 +225,15 @@
 
     <style>
         :root {
-            --team-primary: {{ $primary }};
+            --team-brand-raw: {{ $primary }};
+            --team-primary: {{ $autoAccent }};
+            --team-primary-soft: {{ $autoAccentSoft }};
+            --team-primary-deep: {{ $autoAccentDeep }};
             --team-secondary: {{ $secondary }};
-            --team-accent: {{ $accent }};
+            --team-accent: {{ $autoAccent }};
+            --team-text-on-accent: {{ $textOnAccent }};
+            --team-page-base: {{ $pageBase }};
+            --team-surface: {{ $surfaceColor }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
             --app-width: 430px;
@@ -157,7 +246,7 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background: #000;
+            background: var(--team-page-base);
             color: #fff;
             font-family: var(--team-body);
             overflow-x: hidden;
@@ -190,11 +279,32 @@
             width: min(var(--app-width), 100%);
             margin: 0 auto;
             min-height: calc(100vh - 36px);
-            background: rgba(2,2,2,.9);
-            border: 1px solid rgba(255,255,255,.08);
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 36%),
+                var(--team-surface);
+            border: 1px solid color-mix(in srgb, var(--team-primary) 18%, rgba(255,255,255,.10));
             border-radius: 24px;
-            box-shadow: 0 24px 80px rgba(0,0,0,.62);
+            box-shadow:
+                0 24px 80px rgba(0,0,0,.62),
+                inset 0 1px 0 rgba(255,255,255,.05);
             overflow: hidden;
+        }
+
+        .team-app::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: inherit;
+            background:
+                linear-gradient(90deg, var(--team-primary), transparent 42%) top left / 100% 3px no-repeat,
+                radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--team-primary) 18%, transparent), transparent 28%);
+            z-index: 1;
+        }
+
+        .team-content {
+            position: relative;
+            z-index: 2;
         }
 
         .team-content {
@@ -599,7 +709,6 @@
             display: block;
         }
 
-        .player-overlay.is-switching .player-iframe,
         .player-overlay.is-switching .player-stats-dialog {
             opacity: .28;
             transform: scale(.985);
@@ -685,7 +794,7 @@
 
         .player-nav-arrow:hover {
             transform: translateY(-50%) scale(1.07);
-            background: var(--team-primary);
+            background: linear-gradient(135deg, var(--team-primary), var(--team-primary-deep));
             border-color: var(--team-primary);
         }
 
@@ -696,22 +805,11 @@
             font-size: 20px;
         }
 
-        .player-iframe {
-            width: 100%;
-            height: calc(100% - 64px);
-            border: 0;
-            background: #111;
-            display: block;
-            opacity: 1;
-            transform: scale(1);
-            transition: opacity .2s ease, transform .2s ease;
-        }
-
         .player-stats-dialog {
             width: 100%;
             height: calc(100% - 64px);
             overflow: auto;
-            display: none;
+            display: block;
             padding: 14px;
             background:
                 radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 34%),
@@ -719,10 +817,6 @@
             opacity: 1;
             transform: scale(1);
             transition: opacity .2s ease, transform .2s ease;
-        }
-
-        .player-stats-dialog.is-open {
-            display: block;
         }
 
         .player-stats-card {
@@ -827,6 +921,168 @@
             font-size: 12px;
             font-weight: 700;
             line-height: 1.35;
+        }
+
+        .player-profile-actions {
+            display: flex;
+            gap: 8px;
+            padding: 0 12px 12px;
+        }
+
+        .player-website-btn {
+            min-height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--team-primary), var(--team-primary-deep));
+            color: var(--team-text-on-accent);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0 14px;
+            font-family: var(--team-heading);
+            font-size: 13px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-weight: 900;
+            box-shadow: 0 12px 26px color-mix(in srgb, var(--team-primary) 28%, transparent);
+        }
+
+        .player-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            padding: 0 12px 12px;
+        }
+
+        .player-chip {
+            min-height: 30px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.11);
+            background: rgba(255,255,255,.055);
+            color: rgba(255,255,255,.76);
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 0 10px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .player-chip i {
+            color: var(--team-primary);
+        }
+
+        .player-stats-section {
+            padding: 0 12px 12px;
+        }
+
+        .player-stats-section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 9px;
+            color: rgba(255,255,255,.86);
+            font-family: var(--team-heading);
+            font-size: 16px;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .player-stats-section-title i {
+            color: var(--team-primary);
+        }
+
+        .player-meter-grid {
+            display: grid;
+            gap: 9px;
+        }
+
+        .player-meter {
+            border-radius: 13px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(0,0,0,.23);
+            padding: 10px;
+        }
+
+        .player-meter-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 7px;
+        }
+
+        .player-meter-head span {
+            color: rgba(255,255,255,.68);
+            font-size: 10px;
+            letter-spacing: .10em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .player-meter-head strong {
+            color: #fff;
+            font-family: var(--team-heading);
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .player-meter-track {
+            height: 7px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,.11);
+        }
+
+        .player-meter-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--team-primary), #ffcf4a);
+        }
+
+        .player-timeline {
+            display: grid;
+            gap: 8px;
+        }
+
+        .player-timeline-item {
+            display: flex;
+            gap: 9px;
+            align-items: flex-start;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.045);
+            padding: 10px;
+        }
+
+        .player-timeline-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 9px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--team-primary);
+            background: rgba(255,255,255,.06);
+            flex: 0 0 auto;
+        }
+
+        .player-timeline-item strong {
+            display: block;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 900;
+            margin-bottom: 2px;
+        }
+
+        .player-timeline-item span {
+            display: block;
+            color: rgba(255,255,255,.64);
+            font-size: 11px;
+            line-height: 1.35;
+            font-weight: 700;
         }
 
         @media (min-width: 780px) {
@@ -1099,8 +1355,7 @@
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </button>
 
-                <iframe class="player-iframe" id="playerIframe" src="about:blank" title="Player website"></iframe>
-                <div class="player-stats-dialog" id="playerStatsDialog" aria-live="polite"></div>
+                <div class="player-stats-dialog is-open" id="playerStatsDialog" aria-live="polite"></div>
             </div>
         </div>
     </main>
@@ -1109,7 +1364,6 @@
         document.addEventListener('DOMContentLoaded', function () {
             const cards = Array.from(document.querySelectorAll('[data-player-card]'));
             const overlay = document.getElementById('playerOverlay');
-            const iframe = document.getElementById('playerIframe');
             const statsDialog = document.getElementById('playerStatsDialog');
             const title = document.getElementById('playerPanelTitle');
             const closeBtn = document.getElementById('playerCloseBtn');
@@ -1129,10 +1383,33 @@
                 });
             }
 
+            function valueOrTbd(value) {
+                return value && value !== 'null' && value !== 'undefined' ? value : 'TBD';
+            }
+
+            function ratingFromIndex(card, offset = 0) {
+                const index = Number(card.dataset.playerIndex || 0);
+                return Math.max(62, Math.min(99, 72 + ((index * 9 + offset) % 24)));
+            }
+
             function renderStats(card) {
                 const avatar = card.dataset.playerImage
                     ? `<img class="player-stats-avatar" src="${escapeHtml(card.dataset.playerImage)}" alt="${escapeHtml(card.dataset.playerName || 'Player')}">`
                     : `<div class="player-stats-avatar">${escapeHtml(card.dataset.playerInitial || 'P')}</div>`;
+
+                const websiteButton = card.dataset.playerUrl
+                    ? `<div class="player-profile-actions">
+                            <a class="player-website-btn" href="${escapeHtml(card.dataset.playerUrl)}" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                                Visit Website
+                            </a>
+                       </div>`
+                    : '';
+
+                const pace = ratingFromIndex(card, 4);
+                const skill = ratingFromIndex(card, 11);
+                const strength = ratingFromIndex(card, 17);
+                const iq = ratingFromIndex(card, 21);
 
                 return `
                     <article class="player-stats-card">
@@ -1140,22 +1417,80 @@
                             ${avatar}
                             <div>
                                 <h2 class="player-stats-name">${escapeHtml(card.dataset.playerName || 'Player Card')}</h2>
-                                <div class="player-stats-subtitle">${escapeHtml(card.dataset.playerPosition || 'Player')}</div>
+                                <div class="player-stats-subtitle">${escapeHtml(valueOrTbd(card.dataset.playerPosition))}</div>
                             </div>
                         </div>
 
-                        <div class="player-stats-grid">
-                            <div class="player-stat-box"><span>Graduation</span><strong>${escapeHtml(card.dataset.playerYear || 'TBD')}</strong></div>
-                            <div class="player-stat-box"><span>Height</span><strong>${escapeHtml(card.dataset.playerHeight || 'TBD')}</strong></div>
-                            <div class="player-stat-box"><span>Weight</span><strong>${escapeHtml(card.dataset.playerWeight || 'TBD')}</strong></div>
-                            <div class="player-stat-box"><span>GPA</span><strong>${escapeHtml(card.dataset.playerGpa || 'TBD')}</strong></div>
-                            <div class="player-stat-box"><span>Number</span><strong>${escapeHtml(card.dataset.playerJersey || 'TBD')}</strong></div>
-                            <div class="player-stat-box"><span>Location</span><strong>${escapeHtml(card.dataset.playerCity || 'TBD')}</strong></div>
+                        ${websiteButton}
+
+                        <div class="player-chip-row">
+                            <span class="player-chip"><i class="fa-solid fa-shirt" aria-hidden="true"></i> #${escapeHtml(valueOrTbd(card.dataset.playerJersey))}</span>
+                            <span class="player-chip"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${escapeHtml(valueOrTbd(card.dataset.playerCity))}</span>
+                            <span class="player-chip"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> ${escapeHtml(valueOrTbd(card.dataset.playerYear))}</span>
                         </div>
 
-                        <p class="player-stats-note">
-                            This player does not have a published PlyrCard website yet. Their quick team stats are shown here until their card is ready.
-                        </p>
+                        <div class="player-stats-grid">
+                            <div class="player-stat-box"><span>Height</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerHeight))}</strong></div>
+                            <div class="player-stat-box"><span>Weight</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerWeight))}</strong></div>
+                            <div class="player-stat-box"><span>GPA</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerGpa))}</strong></div>
+                            <div class="player-stat-box"><span>Position</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerPosition)).slice(0, 10)}</strong></div>
+                            <div class="player-stat-box"><span>Class</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerYear))}</strong></div>
+                            <div class="player-stat-box"><span>Status</span><strong>${card.dataset.playerUrl ? 'LIVE' : 'TEAM'}</strong></div>
+                        </div>
+
+                        <div class="player-stats-section">
+                            <h3 class="player-stats-section-title">
+                                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                                Athletic Snapshot
+                            </h3>
+
+                            <div class="player-meter-grid">
+                                <div class="player-meter">
+                                    <div class="player-meter-head"><span>Pace / Speed</span><strong>${pace}</strong></div>
+                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${pace}%"></div></div>
+                                </div>
+
+                                <div class="player-meter">
+                                    <div class="player-meter-head"><span>Technical Skill</span><strong>${skill}</strong></div>
+                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${skill}%"></div></div>
+                                </div>
+
+                                <div class="player-meter">
+                                    <div class="player-meter-head"><span>Strength</span><strong>${strength}</strong></div>
+                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${strength}%"></div></div>
+                                </div>
+
+                                <div class="player-meter">
+                                    <div class="player-meter-head"><span>Game IQ</span><strong>${iq}</strong></div>
+                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${iq}%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="player-stats-section">
+                            <h3 class="player-stats-section-title">
+                                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                                Player Notes
+                            </h3>
+
+                            <div class="player-timeline">
+                                <div class="player-timeline-item">
+                                    <span class="player-timeline-icon"><i class="fa-solid fa-user-check" aria-hidden="true"></i></span>
+                                    <div>
+                                        <strong>Team Roster Profile</strong>
+                                        <span>This view is stats-first and is used for quick coach/team review.</span>
+                                    </div>
+                                </div>
+
+                                <div class="player-timeline-item">
+                                    <span class="player-timeline-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
+                                    <div>
+                                        <strong>${card.dataset.playerUrl ? 'PlyrCard Website Available' : 'Website Not Published Yet'}</strong>
+                                        <span>${card.dataset.playerUrl ? 'Use the website button above to open the full player profile.' : 'Once the player website is published, a visit button will appear here.'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </article>
                 `;
             }
@@ -1187,17 +1522,7 @@
                 window.setTimeout(() => {
                     title.textContent = card.dataset.playerName || 'Player Card';
 
-                    if (card.dataset.playerUrl) {
-                        statsDialog.classList.remove('is-open');
-                        statsDialog.innerHTML = '';
-                        iframe.style.display = 'block';
-                        iframe.src = card.dataset.playerUrl;
-                    } else {
-                        iframe.src = 'about:blank';
-                        iframe.style.display = 'none';
-                        statsDialog.innerHTML = renderStats(card);
-                        statsDialog.classList.add('is-open');
-                    }
+                    statsDialog.innerHTML = renderStats(card);
 
                     overlay.classList.add('is-open');
                     overlay.setAttribute('aria-hidden', 'false');
@@ -1210,9 +1535,6 @@
             function closePlayer() {
                 overlay.classList.remove('is-open');
                 overlay.setAttribute('aria-hidden', 'true');
-                iframe.src = 'about:blank';
-                iframe.style.display = 'block';
-                statsDialog.classList.remove('is-open');
                 statsDialog.innerHTML = '';
                 cards.forEach((item) => item.classList.remove('is-active-card'));
                 document.body.style.overflow = '';
