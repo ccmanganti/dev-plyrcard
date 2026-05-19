@@ -11,7 +11,7 @@
         $teamBranding = is_array($team->branding ?? null) ? $team->branding : [];
         $clubBranding = is_array($club?->branding ?? null) ? $club->branding : [];
 
-        $primary = $teamBranding['primary_color'] ?? $clubBranding['primary_color'] ?? $club?->primary_color ?? '#ff5c35';
+        $primary = $teamBranding['primary_color'] ?? $clubBranding['primary_color'] ?? $club?->primary_color ?? '#ff3131';
         $secondary = $teamBranding['secondary_color'] ?? $clubBranding['secondary_color'] ?? $club?->secondary_color ?? '#050505';
         $accent = $teamBranding['accent_color'] ?? $clubBranding['accent_color'] ?? $primary;
         $headingFont = $teamBranding['heading_font'] ?? $clubBranding['heading_font'] ?? 'Antonio';
@@ -49,7 +49,7 @@
         $headCoach = $coaches->first() ?? [];
         $settings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
         $leagueName = $club?->league?->name ?? ($settings['league'] ?? 'League');
-        $subtitle = $team->landing_page_intro ?: ($settings['tagline'] ?? 'Team Details');
+        $subtitle = $team->landing_page_intro ?: ($settings['tagline'] ?? 'We Fly Together');
         $sport = strtolower((string) ($team->sport ?? $settings['sport'] ?? $club?->sport ?? 'soccer'));
 
         $fieldClass = match (true) {
@@ -134,8 +134,6 @@
                 'city' => $player->city ?: 'TBD',
             ];
         })->values();
-
-        $teamAverage = $teamPlayers->count() ? round($teamPlayers->avg('rating')) : 0;
     @endphp
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -149,14 +147,17 @@
             --team-accent: {{ $accent }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
+            --app-width: 430px;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body {
             margin: 0;
             min-height: 100vh;
-            background: #050505;
+            background: #000;
             color: #fff;
             font-family: var(--team-body);
             overflow-x: hidden;
@@ -165,10 +166,10 @@
         .team-page {
             position: relative;
             min-height: 100vh;
-            padding: 16px;
+            padding: 18px 10px;
             background:
-                radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 30%),
-                linear-gradient(135deg, #050505, #101010 54%, #050505);
+                radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 31%),
+                linear-gradient(180deg, #050505 0%, #010101 100%);
         }
 
         .team-page::before {
@@ -177,286 +178,256 @@
             inset: 0;
             z-index: 0;
             background:
-                linear-gradient(90deg, rgba(0,0,0,.88), rgba(0,0,0,.52), rgba(0,0,0,.86)),
+                linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.92)),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
-            opacity: .52;
+            opacity: .36;
             pointer-events: none;
         }
 
-        .team-page::after {
-            content: "";
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-            background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 38%),
-                radial-gradient(circle at 78% 22%, rgba(255,255,255,.06), transparent 28%);
-            pointer-events: none;
-        }
-
-        .team-shell {
+        .team-app {
             position: relative;
             z-index: 2;
-            width: min(1280px, 100%);
-            min-height: calc(100vh - 32px);
+            width: min(var(--app-width), 100%);
             margin: 0 auto;
-            display: grid;
-            grid-template-columns: 350px minmax(0, 1fr);
-            gap: 16px;
-        }
-
-        .team-info,
-        .team-squad {
-            border: 1px solid rgba(255,255,255,.12);
-            background: rgba(8,8,8,.76);
-            backdrop-filter: blur(18px);
-            box-shadow: 0 24px 80px rgba(0,0,0,.42);
+            min-height: calc(100vh - 36px);
+            background: rgba(2,2,2,.9);
+            border: 1px solid rgba(255,255,255,.08);
             border-radius: 24px;
+            box-shadow: 0 24px 80px rgba(0,0,0,.62);
             overflow: hidden;
         }
 
-        .team-info {
-            display: flex;
-            flex-direction: column;
-            min-height: 520px;
+        .team-content {
+            padding: 12px;
         }
 
-        .team-hero {
-            position: relative;
-            min-height: 220px;
-            padding: 20px;
-            display: flex;
-            align-items: flex-end;
-            background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 38%, transparent), transparent 54%),
-                url("{{ $heroImageUrl }}") center/cover no-repeat;
-            overflow: hidden;
-        }
-
-        .team-hero::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.82));
-        }
-
-        .team-hero-content {
-            position: relative;
-            z-index: 2;
-            display: flex;
-            align-items: flex-end;
-            gap: 14px;
-            min-width: 0;
-        }
-
-        .team-logo {
-            width: 74px;
-            height: 74px;
-            border-radius: 18px;
-            object-fit: contain;
-            background: rgba(0,0,0,.48);
-            border: 1px solid rgba(255,255,255,.14);
-            padding: 8px;
-            flex: 0 0 auto;
-        }
-
-        .team-title {
-            margin: 0;
-            font-family: var(--team-heading);
-            font-size: clamp(34px, 4.4vw, 54px);
-            line-height: .86;
-            letter-spacing: .07em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .team-subtitle {
-            margin-top: 6px;
-            color: var(--team-primary);
-            font-family: var(--team-heading);
-            font-size: 15px;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .team-info-body {
-            padding: 14px;
+        .team-top {
+            height: 42px;
             display: grid;
-            gap: 10px;
-        }
-
-        .team-meta {
-            min-height: 54px;
-            display: flex;
+            grid-template-columns: 32px 1fr 32px;
             align-items: center;
-            gap: 11px;
-            padding: 11px 12px;
-            border-radius: 15px;
-            background: rgba(255,255,255,.055);
-            border: 1px solid rgba(255,255,255,.10);
+            margin-bottom: 8px;
         }
 
-        .team-meta i {
-            width: 22px;
-            color: var(--team-primary);
-            text-align: center;
-        }
-
-        .team-meta small {
-            display: block;
-            margin-bottom: 2px;
-            color: rgba(255,255,255,.56);
-            font-size: 10px;
-            letter-spacing: .10em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .team-meta strong {
-            display: block;
+        .team-top-btn {
+            width: 30px;
+            height: 30px;
+            border: 0;
+            background: transparent;
             color: #fff;
-            font-size: 14px;
-            font-weight: 900;
-        }
-
-        .team-contact-grid {
-            display: grid;
-            gap: 9px;
-        }
-
-        .team-contact-btn {
-            min-height: 42px;
-            border-radius: 13px;
-            border: 1px solid rgba(255,255,255,.13);
-            background: rgba(255,255,255,.055);
-            color: #fff;
-            text-decoration: none;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            text-decoration: none;
+            font-size: 18px;
+        }
+
+        .team-top-title {
+            text-align: center;
             font-family: var(--team-heading);
-            font-size: 13px;
-            letter-spacing: .07em;
-            text-transform: uppercase;
-            font-weight: 900;
-            transition: transform .18s ease, border-color .18s ease;
-        }
-
-        .team-contact-btn:hover {
-            transform: translateY(-2px);
-            border-color: var(--team-primary);
-        }
-
-        .team-contact-btn i {
-            color: var(--team-primary);
-        }
-
-        .team-squad {
-            min-height: calc(100vh - 32px);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .team-squad-head {
-            padding: 16px 18px;
-            border-bottom: 1px solid rgba(255,255,255,.10);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .team-squad-title {
-            margin: 0;
-            font-family: var(--team-heading);
-            font-size: 38px;
-            line-height: .9;
+            font-size: 25px;
+            line-height: 1;
             letter-spacing: .08em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
-        .team-squad-hint {
+        .team-hero-card {
+            position: relative;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,.12);
+            overflow: hidden;
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 52%, transparent), transparent 55%),
+                url("{{ $heroImageUrl }}") center/cover no-repeat;
+            box-shadow: 0 14px 34px rgba(0,0,0,.38);
+        }
+
+        .team-hero-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(0,0,0,.82), rgba(0,0,0,.38), rgba(0,0,0,.76)),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 36%, transparent), transparent 60%);
+        }
+
+        .team-hero-inner {
+            position: relative;
+            z-index: 2;
+            padding: 16px;
+        }
+
+        .team-brand-row {
+            display: grid;
+            grid-template-columns: 92px 1fr;
+            gap: 14px;
+            align-items: center;
+            min-height: 116px;
+        }
+
+        .team-logo {
+            width: 92px;
+            height: 92px;
+            border-radius: 18px;
+            object-fit: contain;
+            background: rgba(0,0,0,.45);
+            border: 1px solid rgba(255,255,255,.14);
+            padding: 8px;
+        }
+
+        .team-name {
+            margin: 0;
+            font-family: var(--team-heading);
+            font-size: 40px;
+            line-height: .88;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .team-tagline {
+            margin-top: 7px;
+            color: var(--team-primary);
+            font-family: var(--team-heading);
+            font-size: 17px;
+            line-height: 1;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .team-meta-row {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(255,255,255,.15);
+        }
+
+        .team-meta {
+            min-height: 47px;
             display: flex;
             align-items: center;
             gap: 8px;
+            padding: 8px 10px;
+            background: rgba(0,0,0,.48);
+        }
+
+        .team-meta i {
+            width: 21px;
+            color: rgba(255,255,255,.84);
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .team-meta small {
+            display: block;
             color: rgba(255,255,255,.64);
+            font-size: 10px;
+            line-height: 1;
+            margin-bottom: 3px;
+        }
+
+        .team-meta strong {
+            display: block;
+            color: #fff;
             font-size: 13px;
+            line-height: 1.05;
             font-weight: 800;
         }
 
-        .team-squad-hint i {
-            color: var(--team-primary);
-        }
-
-        .team-stat-strip {
-            padding: 12px 18px;
+        .team-contact-row {
+            margin-top: 11px;
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 10px;
-            border-bottom: 1px solid rgba(255,255,255,.10);
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
         }
 
-        .team-stat {
-            min-height: 64px;
-            border-radius: 15px;
-            background: rgba(255,255,255,.055);
-            border: 1px solid rgba(255,255,255,.10);
-            padding: 11px;
-        }
-
-        .team-stat span {
-            display: block;
-            color: rgba(255,255,255,.56);
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: .10em;
-            font-weight: 900;
-            margin-bottom: 7px;
-        }
-
-        .team-stat strong {
-            display: block;
-            font-family: var(--team-heading);
+        .team-contact-btn {
+            min-height: 41px;
+            border-radius: 11px;
+            border: 1px solid rgba(255,255,255,.15);
+            background: rgba(0,0,0,.44);
             color: #fff;
-            font-size: 22px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+            transition: transform .18s ease, border-color .18s ease, background .18s ease;
+        }
+
+        .team-contact-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--team-primary);
+            background: rgba(255,255,255,.08);
+        }
+
+        .team-contact-btn i {
+            color: var(--team-primary);
+            font-size: 15px;
+        }
+
+        .squad-head {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 22px 0 10px;
+        }
+
+        .squad-title {
+            margin: 0;
+            font-family: var(--team-heading);
+            font-size: 31px;
             line-height: 1;
+            letter-spacing: .08em;
+            text-transform: uppercase;
             font-weight: 900;
+        }
+
+        .squad-hint {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: rgba(255,255,255,.58);
+            font-size: 13px;
+            font-weight: 700;
         }
 
         .field-wrap {
-            flex: 1;
-            min-height: 0;
-            padding: 16px;
-            overflow: auto;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,.08);
+            background: #061f0c;
         }
 
         .sport-field {
             position: relative;
-            min-height: 620px;
-            width: 100%;
-            border-radius: 22px;
+            min-height: 474px;
+            padding: 34px 12px;
             overflow: hidden;
-            padding: 46px 28px;
-            border: 2px solid rgba(255,255,255,.16);
             background:
-                repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 70px),
-                repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 70px),
-                linear-gradient(90deg, #0b471b 0%, #125a25 14%, #0b471b 28%, #125a25 42%, #0b471b 56%, #125a25 70%, #0b471b 84%, #0b471b 100%);
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), inset 0 0 80px rgba(0,0,0,.32);
+                repeating-linear-gradient(90deg, rgba(255,255,255,.028) 0 1px, transparent 1px 52px),
+                repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 52px),
+                linear-gradient(90deg, #062b11 0%, #10461c 14%, #082f12 28%, #10461c 42%, #082f12 56%, #10461c 70%, #082f12 84%, #062b11 100%);
+            box-shadow: inset 0 0 70px rgba(0,0,0,.35);
         }
 
         .sport-field.is-basketball {
             background:
-                linear-gradient(90deg, rgba(0,0,0,.24), rgba(0,0,0,.16)),
-                linear-gradient(90deg, #9f6428, #c88637, #9f6428);
+                linear-gradient(90deg, rgba(0,0,0,.18), rgba(0,0,0,.12)),
+                linear-gradient(90deg, #9f6428, #c88737, #9f6428);
         }
 
         .sport-field.is-football {
             background:
-                repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 2px, transparent 2px 72px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 2px, transparent 2px 58px),
                 linear-gradient(90deg, #0c491c, #155c27, #0c491c);
         }
 
@@ -470,85 +441,80 @@
         .field-line {
             position: absolute;
             pointer-events: none;
-            border-color: rgba(255,255,255,.22);
+            border-color: rgba(255,255,255,.16);
         }
 
         .field-half {
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            border-left: 2px solid rgba(255,255,255,.16);
+            top: 50%;
+            left: 0;
+            right: 0;
+            border-top: 2px solid rgba(255,255,255,.14);
         }
 
         .field-circle {
-            width: 140px;
-            height: 140px;
-            border: 2px solid rgba(255,255,255,.16);
+            width: 92px;
+            height: 92px;
+            border: 2px solid rgba(255,255,255,.14);
             border-radius: 999px;
-            left: calc(50% - 70px);
-            top: calc(50% - 70px);
+            left: calc(50% - 46px);
+            top: calc(50% - 46px);
         }
 
-        .field-box-left,
-        .field-box-right {
-            top: 28%;
-            width: 95px;
-            height: 44%;
-            border: 2px solid rgba(255,255,255,.16);
+        .field-box-top,
+        .field-box-bottom {
+            left: 18%;
+            right: 18%;
+            height: 58px;
+            border: 2px solid rgba(255,255,255,.14);
         }
 
-        .field-box-left { left: 0; border-left: 0; }
-        .field-box-right { right: 0; border-right: 0; }
-
-        .field-goal-left,
-        .field-goal-right {
-            top: 42%;
-            width: 32px;
-            height: 16%;
-            border: 2px solid rgba(255,255,255,.16);
+        .field-box-top {
+            top: 0;
+            border-top: 0;
         }
 
-        .field-goal-left { left: -2px; border-left: 0; }
-        .field-goal-right { right: -2px; border-right: 0; }
+        .field-box-bottom {
+            bottom: 0;
+            border-bottom: 0;
+        }
 
         .squad-grid {
             position: relative;
             z-index: 4;
-            min-height: 520px;
+            min-height: 406px;
             display: grid;
-            grid-template-columns: repeat(5, minmax(92px, 1fr));
-            gap: 26px 14px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             align-content: center;
             justify-items: center;
+            gap: 26px 12px;
         }
 
         .player-card {
             position: relative;
-            width: 100%;
-            max-width: 116px;
-            min-height: 154px;
+            width: 74px;
+            min-height: 104px;
             border: 0;
             color: #0b0b0b;
             background:
-                linear-gradient(145deg, #fff2a5 0%, #e1b74a 34%, #bd8628 67%, #ffe789 100%);
-            box-shadow: 0 12px 24px rgba(0,0,0,.32);
+                linear-gradient(145deg, #fff1a4 0%, #e0b044 36%, #bd8628 66%, #ffe789 100%);
+            box-shadow: 0 10px 18px rgba(0,0,0,.34);
             clip-path: polygon(11% 0, 89% 0, 100% 15%, 100% 86%, 50% 100%, 0 86%, 0 15%);
-            padding: 9px 7px 12px;
+            padding: 6px 5px 8px;
             font-family: var(--team-heading);
             cursor: pointer;
             text-align: left;
-            transition: transform .18s ease, filter .18s ease, outline-color .18s ease;
+            transition: transform .18s ease, filter .18s ease;
         }
 
         .player-card:hover,
         .player-card.is-active-card {
-            transform: translateY(-4px) scale(1.03);
+            transform: translateY(-4px) scale(1.04);
             filter: saturate(1.08);
         }
 
         .player-card.is-active-card {
             outline: 2px solid var(--team-primary);
-            outline-offset: 4px;
+            outline-offset: 3px;
         }
 
         .player-card::before {
@@ -556,8 +522,8 @@
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(135deg, rgba(255,255,255,.42), transparent 38%),
-                radial-gradient(circle at 78% 20%, rgba(255,255,255,.34), transparent 22%);
+                linear-gradient(135deg, rgba(255,255,255,.38), transparent 38%),
+                radial-gradient(circle at 78% 20%, rgba(255,255,255,.30), transparent 22%);
             pointer-events: none;
         }
 
@@ -570,15 +536,15 @@
         }
 
         .player-rating {
-            font-size: 21px;
-            font-weight: 900;
+            font-size: 15px;
             line-height: 1;
+            font-weight: 900;
         }
 
         .player-position {
-            font-size: 11px;
+            font-size: 8.5px;
+            line-height: 1;
             font-weight: 900;
-            line-height: 1.1;
             text-transform: uppercase;
         }
 
@@ -586,23 +552,23 @@
         .player-placeholder {
             position: relative;
             z-index: 1;
-            width: 80%;
+            width: 79%;
             aspect-ratio: 1/1;
             border-radius: 999px;
-            margin: -1px auto 4px;
+            margin: -1px auto 3px;
             object-fit: cover;
             background: rgba(0,0,0,.14);
-            border: 1px solid rgba(0,0,0,.12);
+            border: 1px solid rgba(0,0,0,.1);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
+            font-size: 18px;
             font-weight: 900;
         }
 
         .player-name {
             text-align: center;
-            font-size: 10px;
+            font-size: 7.6px;
             line-height: 1.05;
             font-weight: 900;
             white-space: nowrap;
@@ -612,10 +578,10 @@
 
         .player-tag {
             text-align: center;
-            margin-top: 2px;
-            color: rgba(0,0,0,.66);
-            font-size: 9px;
-            letter-spacing: .06em;
+            color: rgba(0,0,0,.68);
+            margin-top: 1px;
+            font-size: 6.7px;
+            letter-spacing: .04em;
             font-weight: 900;
             text-transform: uppercase;
         }
@@ -862,66 +828,89 @@
             line-height: 1.45;
         }
 
-        @media (max-width: 1080px) {
-            .team-shell {
-                grid-template-columns: 1fr;
-                width: min(760px, 100%);
-            }
-
-            .team-info {
-                min-height: auto;
-            }
-
-            .team-squad {
-                min-height: auto;
+        @media (min-width: 780px) {
+            .team-app {
+                width: min(430px, 100%);
             }
         }
 
-        @media (max-width: 720px) {
+        @media (max-width: 520px) {
             .team-page {
+                padding: 0;
+            }
+
+            .team-app {
+                width: 100%;
+                min-height: 100vh;
+                border-radius: 0;
+                border-left: 0;
+                border-right: 0;
+            }
+
+            .team-content {
                 padding: 10px;
             }
 
-            .team-hero {
-                min-height: 190px;
+            .team-top {
+                height: 38px;
             }
 
-            .team-stat-strip {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                padding: 10px 14px;
+            .team-hero-inner {
+                padding: 14px;
             }
 
-            .team-squad-head {
-                align-items: flex-start;
-                flex-direction: column;
+            .team-brand-row {
+                grid-template-columns: 76px 1fr;
+                min-height: 102px;
+                gap: 12px;
             }
 
-            .field-wrap {
-                padding: 10px;
+            .team-logo {
+                width: 76px;
+                height: 76px;
+                border-radius: 15px;
+            }
+
+            .team-name {
+                font-size: 34px;
+            }
+
+            .team-tagline {
+                font-size: 14px;
+            }
+
+            .team-meta-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .team-contact-row {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 6px;
+            }
+
+            .team-contact-btn {
+                font-size: 10.5px;
+                gap: 5px;
+                min-height: 38px;
+            }
+
+            .team-contact-btn i {
+                font-size: 13px;
             }
 
             .sport-field {
-                min-height: 540px;
-                padding: 36px 15px;
+                min-height: 452px;
+                padding: 32px 10px;
             }
 
             .squad-grid {
-                grid-template-columns: repeat(3, minmax(86px, 1fr));
-                gap: 22px 10px;
+                gap: 24px 9px;
             }
 
             .player-card {
-                max-width: 105px;
-                min-height: 142px;
+                width: 70px;
+                min-height: 99px;
             }
-
-            .player-nav-arrow {
-                width: 42px;
-                height: 60px;
-            }
-
-            .player-nav-arrow.is-left { left: 8px; }
-            .player-nav-arrow.is-right { right: 8px; }
 
             .player-stats-hero {
                 align-items: flex-start;
@@ -931,16 +920,24 @@
             .player-stats-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+
+            .player-nav-arrow {
+                width: 42px;
+                height: 60px;
+            }
+
+            .player-nav-arrow.is-left { left: 8px; }
+            .player-nav-arrow.is-right { right: 8px; }
         }
 
-        @media (max-width: 430px) {
+        @media (max-width: 360px) {
             .squad-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             .player-card {
-                max-width: 112px;
-                min-height: 152px;
+                width: 68px;
+                min-height: 96px;
             }
         }
     </style>
@@ -948,143 +945,129 @@
 
 <body>
     <main class="team-page">
-        <div class="team-shell">
-            <aside class="team-info">
-                <section class="team-hero">
-                    <div class="team-hero-content">
-                        @if($teamLogo)
-                            <img class="team-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
-                        @endif
+        <div class="team-app">
+            <div class="team-content">
+                <div class="team-top">
+                    <a class="team-top-btn" href="{{ $club?->landing_page_slug ? route('clubs.landing', $club->landing_page_slug) : '/' }}" aria-label="Back to club">
+                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    </a>
+                    <div class="team-top-title">Team</div>
+                    <span aria-hidden="true"></span>
+                </div>
 
-                        <div>
-                            <h1 class="team-title">{{ $team->name }}</h1>
-                            <div class="team-subtitle">{{ $subtitle }}</div>
+                <section class="team-hero-card">
+                    <div class="team-hero-inner">
+                        <div class="team-brand-row">
+                            @if($teamLogo)
+                                <img class="team-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
+                            @endif
+
+                            <div>
+                                <h1 class="team-name">{{ $team->name }}</h1>
+                                <div class="team-tagline">{{ $subtitle }}</div>
+                            </div>
                         </div>
+
+                        <div class="team-meta-row">
+                            <div class="team-meta">
+                                <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                                <div>
+                                    <small>League</small>
+                                    <strong>{{ $leagueName }}</strong>
+                                </div>
+                            </div>
+
+                            <div class="team-meta">
+                                <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                                <div>
+                                    <small>Head Coach</small>
+                                    <strong>{{ $headCoach['name'] ?? 'TBA' }}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if(!empty($headCoach['phone']) || !empty($headCoach['email']))
+                            <div class="team-contact-row">
+                                @if(!empty($headCoach['phone']))
+                                    <a class="team-contact-btn" href="sms:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
+                                        <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                                        Text Coach
+                                    </a>
+
+                                    <a class="team-contact-btn" href="tel:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
+                                        <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                        Call Coach
+                                    </a>
+                                @endif
+
+                                @if(!empty($headCoach['email']))
+                                    <a class="team-contact-btn" href="mailto:{{ $headCoach['email'] }}">
+                                        <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                        Email Coach
+                                    </a>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </section>
 
-                <div class="team-info-body">
-                    <div class="team-meta">
-                        <i class="fa-solid fa-trophy" aria-hidden="true"></i>
-                        <div>
-                            <small>League</small>
-                            <strong>{{ $leagueName }}</strong>
+                <section class="squad-section">
+                    <div class="squad-head">
+                        <h2 class="squad-title">Squad</h2>
+                        <div class="squad-hint">
+                            <i class="fa-regular fa-hand-pointer" aria-hidden="true"></i>
+                            Tap a player card for full stats
                         </div>
                     </div>
 
-                    <div class="team-meta">
-                        <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
-                        <div>
-                            <small>Head Coach</small>
-                            <strong>{{ $headCoach['name'] ?? 'TBA' }}</strong>
+                    <div class="field-wrap">
+                        <div class="sport-field {{ $fieldClass }}">
+                            <div class="field-line field-half"></div>
+                            <div class="field-line field-circle"></div>
+                            <div class="field-line field-box-top"></div>
+                            <div class="field-line field-box-bottom"></div>
+
+                            <div class="squad-grid">
+                                @forelse($teamPlayers as $player)
+                                    <button
+                                        type="button"
+                                        class="player-card"
+                                        data-player-card
+                                        data-player-index="{{ $player['index'] }}"
+                                        data-player-name="{{ $player['name'] }}"
+                                        data-player-url="{{ $player['url'] }}"
+                                        data-player-initial="{{ $player['initial'] }}"
+                                        data-player-image="{{ $player['image_url'] }}"
+                                        data-player-position="{{ $player['stats_position'] }}"
+                                        data-player-year="{{ $player['year'] }}"
+                                        data-player-height="{{ $player['height'] }}"
+                                        data-player-weight="{{ $player['weight'] }}"
+                                        data-player-gpa="{{ $player['gpa'] }}"
+                                        data-player-jersey="{{ $player['jersey'] }}"
+                                        data-player-city="{{ $player['city'] }}"
+                                    >
+                                        <div class="player-rating">{{ $player['rating'] }}</div>
+                                        <div class="player-position">{{ $player['position'] }}</div>
+
+                                        @if($player['image_url'])
+                                            <img class="player-img" src="{{ $player['image_url'] }}" alt="{{ $player['name'] }}">
+                                        @else
+                                            <div class="player-placeholder">{{ $player['initial'] }}</div>
+                                        @endif
+
+                                        <div class="player-name">{{ $player['initial'] }}. {{ $player['last_name'] }}</div>
+                                        <div class="player-tag">PlyrCard</div>
+                                    </button>
+                                @empty
+                                    <div style="grid-column:1/-1;color:rgba(255,255,255,.68);font-weight:800;text-align:center;padding:28px;">
+                                        Squad players will appear once they are assigned to this team.
+                                    </div>
+                                @endforelse
+                            </div>
                         </div>
                     </div>
-
-                    @if(!empty($headCoach['phone']) || !empty($headCoach['email']))
-                        <div class="team-contact-grid">
-                            @if(!empty($headCoach['phone']))
-                                <a class="team-contact-btn" href="sms:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
-                                    <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
-                                    Text Coach
-                                </a>
-
-                                <a class="team-contact-btn" href="tel:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
-                                    <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                                    Call Coach
-                                </a>
-                            @endif
-
-                            @if(!empty($headCoach['email']))
-                                <a class="team-contact-btn" href="mailto:{{ $headCoach['email'] }}">
-                                    <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                                    Email Coach
-                                </a>
-                            @endif
-                        </div>
-                    @endif
-                </div>
-            </aside>
-
-            <section class="team-squad">
-                <header class="team-squad-head">
-                    <h2 class="team-squad-title">Squad</h2>
-                    <div class="team-squad-hint">
-                        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
-                        Select a player card
-                    </div>
-                </header>
-
-                <div class="team-stat-strip">
-                    <div class="team-stat">
-                        <span>Players</span>
-                        <strong>{{ $teamPlayers->count() }}</strong>
-                    </div>
-
-                    <div class="team-stat">
-                        <span>Avg Card</span>
-                        <strong>{{ $teamAverage ?: 'TBD' }}</strong>
-                    </div>
-
-                    <div class="team-stat">
-                        <span>League</span>
-                        <strong>{{ \Illuminate\Support\Str::of($leagueName)->limit(10, '') }}</strong>
-                    </div>
-
-                    <div class="team-stat">
-                        <span>Coach</span>
-                        <strong>{{ \Illuminate\Support\Str::of($headCoach['name'] ?? 'TBA')->limit(10, '') }}</strong>
-                    </div>
-                </div>
-
-                <div class="field-wrap">
-                    <div class="sport-field {{ $fieldClass }}">
-                        <div class="field-line field-half"></div>
-                        <div class="field-line field-circle"></div>
-                        <div class="field-line field-box-left"></div>
-                        <div class="field-line field-box-right"></div>
-                        <div class="field-line field-goal-left"></div>
-                        <div class="field-line field-goal-right"></div>
-
-                        <div class="squad-grid">
-                            @forelse($teamPlayers as $player)
-                                <button
-                                    type="button"
-                                    class="player-card"
-                                    data-player-card
-                                    data-player-index="{{ $player['index'] }}"
-                                    data-player-name="{{ $player['name'] }}"
-                                    data-player-url="{{ $player['url'] }}"
-                                    data-player-initial="{{ $player['initial'] }}"
-                                    data-player-image="{{ $player['image_url'] }}"
-                                    data-player-position="{{ $player['stats_position'] }}"
-                                    data-player-year="{{ $player['year'] }}"
-                                    data-player-height="{{ $player['height'] }}"
-                                    data-player-weight="{{ $player['weight'] }}"
-                                    data-player-gpa="{{ $player['gpa'] }}"
-                                    data-player-jersey="{{ $player['jersey'] }}"
-                                    data-player-city="{{ $player['city'] }}"
-                                >
-                                    <div class="player-rating">{{ $player['rating'] }}</div>
-                                    <div class="player-position">{{ $player['position'] }}</div>
-
-                                    @if($player['image_url'])
-                                        <img class="player-img" src="{{ $player['image_url'] }}" alt="{{ $player['name'] }}">
-                                    @else
-                                        <div class="player-placeholder">{{ $player['initial'] }}</div>
-                                    @endif
-
-                                    <div class="player-name">{{ $player['initial'] }}. {{ $player['last_name'] }}</div>
-                                    <div class="player-tag">PlyrCard</div>
-                                </button>
-                            @empty
-                                <div style="grid-column:1/-1;color:rgba(255,255,255,.68);font-weight:800;text-align:center;padding:28px;">
-                                    Squad players will appear once they are assigned to this team.
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
 
         <div class="player-overlay" id="playerOverlay" aria-hidden="true">
