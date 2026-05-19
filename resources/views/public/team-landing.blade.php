@@ -712,10 +712,10 @@
             height: calc(100% - 64px);
             overflow: auto;
             display: none;
-            padding: clamp(18px, 3vw, 34px);
+            padding: 14px;
             background:
-                radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--team-primary) 28%, transparent), transparent 34%),
-                linear-gradient(180deg, #080808, #020202);
+                radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 34%),
+                linear-gradient(180deg, #070707, #020202);
             opacity: 1;
             transform: scale(1);
             transition: opacity .2s ease, transform .2s ease;
@@ -726,30 +726,30 @@
         }
 
         .player-stats-card {
-            max-width: 720px;
+            max-width: 430px;
             margin: 0 auto;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,.14);
-            background: rgba(255,255,255,.055);
-            box-shadow: 0 26px 70px rgba(0,0,0,.42);
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.052);
+            box-shadow: 0 18px 48px rgba(0,0,0,.40);
             overflow: hidden;
         }
 
         .player-stats-hero {
-            min-height: 190px;
-            padding: 24px;
+            min-height: 118px;
+            padding: 14px;
             display: flex;
-            align-items: flex-end;
-            gap: 18px;
+            align-items: center;
+            gap: 12px;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 40%, transparent), transparent 58%),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 34%, transparent), transparent 58%),
                 rgba(255,255,255,.04);
         }
 
         .player-stats-avatar {
-            width: 96px;
-            height: 96px;
-            border-radius: 22px;
+            width: 72px;
+            height: 72px;
+            border-radius: 17px;
             object-fit: cover;
             background: rgba(0,0,0,.35);
             border: 1px solid rgba(255,255,255,.14);
@@ -757,7 +757,7 @@
             align-items: center;
             justify-content: center;
             font-family: var(--team-heading);
-            font-size: 38px;
+            font-size: 30px;
             font-weight: 900;
             color: #fff;
             flex: 0 0 auto;
@@ -766,18 +766,18 @@
         .player-stats-name {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: clamp(34px, 5.4vw, 60px);
+            font-size: clamp(28px, 7vw, 42px);
             line-height: .9;
-            letter-spacing: .06em;
+            letter-spacing: .055em;
             text-transform: uppercase;
             font-weight: 900;
         }
 
         .player-stats-subtitle {
-            margin-top: 8px;
+            margin-top: 6px;
             color: var(--team-primary);
             font-family: var(--team-heading);
-            font-size: 16px;
+            font-size: 13px;
             letter-spacing: .12em;
             text-transform: uppercase;
             font-weight: 900;
@@ -786,46 +786,47 @@
         .player-stats-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            padding: 16px;
+            gap: 8px;
+            padding: 12px;
         }
 
         .player-stat-box {
-            min-height: 84px;
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,.12);
+            min-height: 66px;
+            border-radius: 13px;
+            border: 1px solid rgba(255,255,255,.11);
             background: rgba(0,0,0,.26);
-            padding: 13px;
+            padding: 10px;
         }
 
         .player-stat-box span {
             display: block;
             color: rgba(255,255,255,.58);
-            font-size: 10px;
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: .11em;
+            letter-spacing: .10em;
             font-weight: 900;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .player-stat-box strong {
             display: block;
             color: #fff;
             font-family: var(--team-heading);
-            font-size: 22px;
+            font-size: 18px;
             line-height: 1;
             font-weight: 900;
         }
 
         .player-stats-note {
-            margin: 0 16px 16px;
-            padding: 14px;
-            border-radius: 16px;
-            background: color-mix(in srgb, var(--team-primary) 16%, rgba(255,255,255,.05));
-            border: 1px solid color-mix(in srgb, var(--team-primary) 36%, rgba(255,255,255,.12));
-            color: rgba(255,255,255,.78);
+            margin: 0 12px 12px;
+            padding: 11px;
+            border-radius: 13px;
+            background: color-mix(in srgb, var(--team-primary) 14%, rgba(255,255,255,.05));
+            border: 1px solid color-mix(in srgb, var(--team-primary) 32%, rgba(255,255,255,.12));
+            color: rgba(255,255,255,.74);
+            font-size: 12px;
             font-weight: 700;
-            line-height: 1.45;
+            line-height: 1.35;
         }
 
         @media (min-width: 780px) {
@@ -913,12 +914,12 @@
             }
 
             .player-stats-hero {
-                align-items: flex-start;
-                flex-direction: column;
+                align-items: center;
+                flex-direction: row;
             }
 
             .player-stats-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             .player-nav-arrow {
@@ -938,6 +939,15 @@
             .player-card {
                 width: 68px;
                 min-height: 96px;
+            }
+
+            .player-stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .player-stats-avatar {
+                width: 64px;
+                height: 64px;
             }
         }
     </style>
