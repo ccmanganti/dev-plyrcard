@@ -261,7 +261,7 @@
             --team-text-on-primary: {{ $textOnPrimary }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
-            --app-width: 410px;
+            --app-width: 392px;
         }
 
         * {
@@ -280,7 +280,7 @@
         .team-page {
             position: relative;
             min-height: 100vh;
-            padding: 14px 8px;
+            padding: 12px 7px;
             background:
                 radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--team-glow) 22%, transparent), transparent 30%),
                 radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--team-secondary) 18%, transparent), transparent 28%),
@@ -304,9 +304,9 @@
             z-index: 2;
             width: min(var(--app-width), 100%);
             margin: 0 auto;
-            min-height: calc(100vh - 28px);
+            min-height: calc(100vh - 24px);
             border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.10));
-            border-radius: 22px;
+            border-radius: 20px;
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
                 color-mix(in srgb, var(--team-surface) 92%, transparent);
@@ -329,15 +329,15 @@
         .team-content {
             position: relative;
             z-index: 2;
-            padding: 10px;
+            padding: 9px;
         }
 
         .team-top {
-            height: 36px;
+            height: 34px;
             display: grid;
             grid-template-columns: 30px 1fr 30px;
             align-items: center;
-            margin-bottom: 7px;
+            margin-bottom: 6px;
         }
 
         .team-top-btn {
@@ -356,7 +356,7 @@
         .team-top-title {
             text-align: center;
             font-family: var(--team-heading);
-            font-size: 23px;
+            font-size: 22px;
             line-height: 1;
             letter-spacing: .08em;
             text-transform: uppercase;
@@ -365,7 +365,7 @@
 
         .team-hero-card {
             position: relative;
-            border-radius: 15px;
+            border-radius: 14px;
             border: 1px solid rgba(255,255,255,.11);
             overflow: hidden;
             background:
@@ -388,20 +388,20 @@
         .team-hero-inner {
             position: relative;
             z-index: 2;
-            padding: 13px;
+            padding: 11px;
         }
 
         .team-brand-row {
             display: grid;
-            grid-template-columns: 72px 1fr;
+            grid-template-columns: 66px 1fr;
             gap: 11px;
             align-items: center;
-            min-height: 92px;
+            min-height: 82px;
         }
 
         .team-logo {
-            width: 72px;
-            height: 72px;
+            width: 66px;
+            height: 66px;
             border-radius: 15px;
             object-fit: contain;
             background: color-mix(in srgb, var(--team-surface) 64%, transparent);
@@ -412,7 +412,7 @@
         .team-name {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: 31px;
+            font-size: 25px;
             line-height: .88;
             letter-spacing: .06em;
             text-transform: uppercase;
@@ -421,9 +421,9 @@
 
         .team-tagline {
             margin-top: 6px;
-            color: var(--team-primary);
+            color: var(--team-primary); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--team-primary) 28%, transparent));
             font-family: var(--team-heading);
-            font-size: 13px;
+            font-size: 11px;
             line-height: 1;
             letter-spacing: .1em;
             text-transform: uppercase;
@@ -431,7 +431,7 @@
         }
 
         .team-meta-row {
-            margin-top: 10px;
+            margin-top: 8px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
@@ -441,11 +441,11 @@
         }
 
         .team-meta {
-            min-height: 43px;
+            min-height: 38px;
             display: flex;
             align-items: center;
             gap: 7px;
-            padding: 7px 9px;
+            padding: 6px 8px;
             background: color-mix(in srgb, var(--team-surface) 64%, transparent);
         }
 
@@ -467,21 +467,21 @@
         .team-meta strong {
             display: block;
             color: #fff;
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.05;
             font-weight: 800;
         }
 
         .team-contact-row {
-            margin-top: 9px;
+            margin-top: 7px;
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 6px;
         }
 
         .team-contact-btn {
-            min-height: 36px;
-            border-radius: 10px;
+            min-height: 34px;
+            border-radius: 9px;
             border: 1px solid rgba(255,255,255,.14);
             background: color-mix(in srgb, var(--team-surface) 58%, transparent);
             color: #fff;
@@ -490,7 +490,7 @@
             align-items: center;
             justify-content: center;
             gap: 5px;
-            font-size: 10.5px;
+            font-size: 10px;
             font-weight: 800;
             white-space: nowrap;
             transition: transform .18s ease, border-color .18s ease, background .18s ease;
@@ -511,7 +511,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin: 17px 0 8px;
+            margin: 14px 0 7px;
         }
 
         .squad-title {
@@ -542,8 +542,8 @@
 
         .sport-field {
             position: relative;
-            min-height: 420px;
-            padding: 30px 10px;
+            min-height: 386px;
+            padding: 26px 9px;
             overflow: hidden;
             background:
                 repeating-linear-gradient(90deg, rgba(255,255,255,.026) 0 1px, transparent 1px 48px),
@@ -614,18 +614,18 @@
         .squad-grid {
             position: relative;
             z-index: 4;
-            min-height: 360px;
+            min-height: 332px;
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             align-content: center;
             justify-items: center;
-            gap: 22px 8px;
+            gap: 19px 7px;
         }
 
         .player-card {
             position: relative;
-            width: 68px;
-            min-height: 94px;
+            width: 64px;
+            min-height: 89px;
             border: 0;
             color: #0b0b0b;
             background:
@@ -669,13 +669,13 @@
         }
 
         .player-number {
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1;
             font-weight: 900;
         }
 
         .player-position {
-            font-size: 8.4px;
+            font-size: 8px;
             line-height: 1;
             font-weight: 900;
             text-transform: uppercase;
@@ -695,13 +695,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 900;
         }
 
         .player-name {
             text-align: center;
-            font-size: 7.4px;
+            font-size: 7.1px;
             line-height: 1.05;
             font-weight: 900;
             white-space: nowrap;
@@ -713,7 +713,7 @@
             text-align: center;
             color: rgba(0,0,0,.68);
             margin-top: 1px;
-            font-size: 6.5px;
+            font-size: 6.2px;
             letter-spacing: .04em;
             font-weight: 900;
             text-transform: uppercase;
@@ -780,7 +780,7 @@
         }
 
         .player-panel-btn {
-            min-height: 36px;
+            min-height: 34px;
             border: 1px solid rgba(255,255,255,.15);
             border-radius: 999px;
             background: rgba(255,255,255,.07);
@@ -919,7 +919,7 @@
         .player-website-btn {
             min-height: 37px;
             border-radius: 11px;
-            background: linear-gradient(135deg, var(--team-primary), var(--team-secondary));
+            background: linear-gradient(135deg, var(--team-primary), var(--team-brand-primary, var(--team-secondary)));
             color: var(--team-text-on-primary);
             text-decoration: none;
             display: inline-flex;
@@ -1102,7 +1102,7 @@
 
             .player-card {
                 width: 66px;
-                min-height: 92px;
+                min-height: 82px;
             }
         }
     </style>
