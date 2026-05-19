@@ -17,7 +17,7 @@
         $headingFont = $teamBranding['heading_font'] ?? $clubBranding['heading_font'] ?? 'Antonio';
         $bodyFont = $teamBranding['body_font'] ?? $clubBranding['body_font'] ?? 'Inter';
 
-        $normalizeHex = function (?string $hex, string $fallback = '#ff5c35') {
+        $normalizeHex = function (?string $hex, string $fallback = '#ff3131') {
             $hex = trim((string) $hex);
 
             if ($hex === '') {
@@ -84,21 +84,17 @@
         $primaryLum = $luminance($primary);
         $secondaryLum = $luminance($secondary);
 
-        /*
-         * Auto color selection:
-         * - If the brand color is too dark, brighten it for overlays/buttons.
-         * - If the brand color is very light, deepen it for contrast.
-         * - Keep the raw brand color available as --team-brand-raw.
-         */
-        $autoAccent = $primaryLum < 0.18
-            ? $mixHex($primary, '#FFFFFF', 0.48)
-            : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.34) : $primary);
+        $autoBackground = ($primaryLum < 0.28 && $secondaryLum < 0.28)
+            ? $mixHex($secondary, '#FFFFFF', 0.075)
+            : (($primaryLum > 0.62 || $secondaryLum > 0.62) ? '#050506' : '#070708');
 
-        $autoAccentSoft = $mixHex($autoAccent, '#FFFFFF', 0.22);
-        $autoAccentDeep = $mixHex($autoAccent, '#000000', 0.34);
-        $pageBase = $secondaryLum < 0.20 ? '#050506' : '#070707';
-        $surfaceColor = $secondaryLum < 0.20 ? 'rgba(12,12,14,.82)' : 'rgba(7,7,8,.84)';
-        $textOnAccent = $luminance($autoAccent) > 0.58 ? '#070707' : '#FFFFFF';
+        $autoSurface = ($primaryLum < 0.28 && $secondaryLum < 0.28)
+            ? $mixHex($secondary, '#FFFFFF', 0.12)
+            : (($primaryLum > 0.62 || $secondaryLum > 0.62) ? '#0A0A0C' : $mixHex($secondary, '#000000', 0.24));
+
+        $autoBorder = ($primaryLum < 0.22) ? $mixHex($primary, '#FFFFFF', 0.46) : $primary;
+        $autoGlow = ($primaryLum < 0.22) ? $mixHex($primary, '#FFFFFF', 0.32) : $primary;
+        $textOnPrimary = $primaryLum > 0.58 ? '#070707' : '#FFFFFF';
 
         $resolveAsset = function ($value, $fallback = null) {
             if (blank($value)) {
@@ -177,12 +173,23 @@
             return $map[$short] ?? \Illuminate\Support\Str::of($short)->limit(3, '')->toString();
         };
 
-        $teamPlayers = collect($players ?? [])->map(function ($player, $index) use ($resolveAsset, $formatPosition) {
+        $formatPositionFull = function ($value) {
+            if (is_array($value)) {
+                return collect($value)
+                    ->filter()
+                    ->map(fn ($item) => str((string) $item)->replace('_', ' ')->title())
+                    ->implode(', ');
+            }
+
+            return str((string) $value)->replace('_', ' ')->title()->toString();
+        };
+
+        $teamPlayers = collect($players ?? [])->map(function ($player, $index) use ($resolveAsset, $formatPosition, $formatPositionFull) {
             $playerName = trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? ''));
             $lastName = $player->last_name ?: $playerName;
             $initial = strtoupper(substr($player->first_name ?: $playerName ?: 'P', 0, 1));
-            $position = $formatPosition($player->position ?? '');
-            $rating = max(70, min(99, 82 + (($index * 7) % 10)));
+            $positionShort = $formatPosition($player->position ?? '');
+            $positionFull = $formatPositionFull($player->position ?? '') ?: 'Player';
 
             $image = $player->player_image ?: $player->plyrcard_image ?: $player->youtube_thumbnail;
             $imageUrl = $resolveAsset($image);
@@ -194,9 +201,14 @@
                     : url('/' . ltrim($website->slug, '/')))
                 : '';
 
-            $statsPosition = is_array($player->position ?? null)
-                ? collect($player->position)->map(fn ($item) => str($item)->replace('_', ' ')->title())->implode(', ')
-                : str((string) ($player->position ?? ''))->replace('_', ' ')->title();
+            $birth = $player->birth ?? null;
+            $age = null;
+
+            try {
+                $age = $birth ? \Carbon\Carbon::parse($birth)->age : null;
+            } catch (\Throwable $e) {
+                $age = null;
+            }
 
             return [
                 'model' => $player,
@@ -204,17 +216,31 @@
                 'name' => $playerName ?: 'Player Card',
                 'last_name' => $lastName ?: 'Player',
                 'initial' => $initial,
-                'position' => $position,
-                'rating' => $rating,
+                'position_short' => $positionShort,
+                'position_full' => $positionFull,
                 'image_url' => $imageUrl,
                 'url' => $playerUrl,
-                'stats_position' => $statsPosition ?: 'Player',
-                'year' => $player->year ?: 'TBD',
-                'height' => $player->height ?: 'TBD',
-                'weight' => $player->weight ?: 'TBD',
-                'gpa' => $player->gpa ?: 'TBD',
-                'jersey' => $player->jersey_number ?: 'TBD',
-                'city' => $player->city ?: 'TBD',
+                'jersey' => $player->jersey_number ?: '',
+                'year' => $player->year ?: '',
+                'height' => $player->height ?: '',
+                'weight' => $player->weight ?: '',
+                'gpa' => $player->gpa ?: '',
+                'dominant_foot' => $player->dominant_foot ? str((string) $player->dominant_foot)->replace('_', ' ')->title()->toString() : '',
+                'gender' => $player->gender ? str((string) $player->gender)->replace('_', ' ')->title()->toString() : '',
+                'birth' => $birth ? (string) $birth : '',
+                'age' => $age ?: '',
+                'city' => $player->city ?: '',
+                'state' => $player->state ?: '',
+                'sport' => $player->sport ? str((string) $player->sport)->replace('_', ' ')->title()->toString() : '',
+                'school' => $player->school?->name ?? '',
+                'league' => $player->league?->name ?? '',
+                'club' => $player->club?->name ?? '',
+                'team_name' => $player->team_name ?: '',
+                'national_team' => $player->nationalTeam?->name ?? '',
+                'national_team_period' => $player->national_team_period ?: '',
+                'club_coach' => $player->club_coach ?: '',
+                'club_coach_email' => $player->club_coach_email ?: '',
+                'club_coach_phone' => $player->club_coach_phone ?: '',
             ];
         })->values();
     @endphp
@@ -225,18 +251,17 @@
 
     <style>
         :root {
-            --team-brand-raw: {{ $primary }};
-            --team-primary: {{ $autoAccent }};
-            --team-primary-soft: {{ $autoAccentSoft }};
-            --team-primary-deep: {{ $autoAccentDeep }};
+            --team-primary: {{ $primary }};
             --team-secondary: {{ $secondary }};
-            --team-accent: {{ $autoAccent }};
-            --team-text-on-accent: {{ $textOnAccent }};
-            --team-page-base: {{ $pageBase }};
-            --team-surface: {{ $surfaceColor }};
+            --team-accent: {{ $accent }};
+            --team-bg: {{ $autoBackground }};
+            --team-surface: {{ $autoSurface }};
+            --team-border: {{ $autoBorder }};
+            --team-glow: {{ $autoGlow }};
+            --team-text-on-primary: {{ $textOnPrimary }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
-            --app-width: 430px;
+            --app-width: 410px;
         }
 
         * {
@@ -246,7 +271,7 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background: var(--team-page-base);
+            background: var(--team-bg);
             color: #fff;
             font-family: var(--team-body);
             overflow-x: hidden;
@@ -255,10 +280,11 @@
         .team-page {
             position: relative;
             min-height: 100vh;
-            padding: 18px 10px;
+            padding: 14px 8px;
             background:
-                radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 31%),
-                linear-gradient(180deg, #050505 0%, #010101 100%);
+                radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--team-glow) 22%, transparent), transparent 30%),
+                radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--team-secondary) 18%, transparent), transparent 28%),
+                linear-gradient(180deg, var(--team-bg) 0%, #010101 100%);
         }
 
         .team-page::before {
@@ -267,9 +293,9 @@
             inset: 0;
             z-index: 0;
             background:
-                linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.92)),
+                linear-gradient(180deg, rgba(0,0,0,.68), rgba(0,0,0,.90)),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
-            opacity: .36;
+            opacity: .34;
             pointer-events: none;
         }
 
@@ -278,50 +304,45 @@
             z-index: 2;
             width: min(var(--app-width), 100%);
             margin: 0 auto;
-            min-height: calc(100vh - 36px);
+            min-height: calc(100vh - 28px);
+            border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.10));
+            border-radius: 22px;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 36%),
-                var(--team-surface);
-            border: 1px solid color-mix(in srgb, var(--team-primary) 18%, rgba(255,255,255,.10));
-            border-radius: 24px;
-            box-shadow:
-                0 24px 80px rgba(0,0,0,.62),
-                inset 0 1px 0 rgba(255,255,255,.05);
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
+                color-mix(in srgb, var(--team-surface) 92%, transparent);
+            box-shadow: 0 20px 70px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.045);
             overflow: hidden;
         }
 
-        .team-app::before {
+        .team-app::after {
             content: "";
             position: absolute;
-            inset: 0;
+            z-index: 3;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
             pointer-events: none;
-            border-radius: inherit;
-            background:
-                linear-gradient(90deg, var(--team-primary), transparent 42%) top left / 100% 3px no-repeat,
-                radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--team-primary) 18%, transparent), transparent 28%);
-            z-index: 1;
+            background: linear-gradient(90deg, var(--team-primary), var(--team-secondary), transparent);
         }
 
         .team-content {
             position: relative;
             z-index: 2;
-        }
-
-        .team-content {
-            padding: 12px;
+            padding: 10px;
         }
 
         .team-top {
-            height: 42px;
+            height: 36px;
             display: grid;
-            grid-template-columns: 32px 1fr 32px;
+            grid-template-columns: 30px 1fr 30px;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 7px;
         }
 
         .team-top-btn {
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             border: 0;
             background: transparent;
             color: #fff;
@@ -329,13 +350,13 @@
             align-items: center;
             justify-content: center;
             text-decoration: none;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .team-top-title {
             text-align: center;
             font-family: var(--team-heading);
-            font-size: 25px;
+            font-size: 23px;
             line-height: 1;
             letter-spacing: .08em;
             text-transform: uppercase;
@@ -344,13 +365,14 @@
 
         .team-hero-card {
             position: relative;
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,.11);
             overflow: hidden;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 52%, transparent), transparent 55%),
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 44%, transparent), transparent 50%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 32%, transparent), transparent 58%),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
-            box-shadow: 0 14px 34px rgba(0,0,0,.38);
+            box-shadow: 0 12px 30px rgba(0,0,0,.36);
         }
 
         .team-hero-card::before {
@@ -359,37 +381,38 @@
             inset: 0;
             background:
                 linear-gradient(90deg, rgba(0,0,0,.82), rgba(0,0,0,.38), rgba(0,0,0,.76)),
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 36%, transparent), transparent 60%);
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 56%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 24%, transparent), transparent 62%);
         }
 
         .team-hero-inner {
             position: relative;
             z-index: 2;
-            padding: 16px;
+            padding: 13px;
         }
 
         .team-brand-row {
             display: grid;
-            grid-template-columns: 92px 1fr;
-            gap: 14px;
+            grid-template-columns: 72px 1fr;
+            gap: 11px;
             align-items: center;
-            min-height: 116px;
+            min-height: 92px;
         }
 
         .team-logo {
-            width: 92px;
-            height: 92px;
-            border-radius: 18px;
+            width: 72px;
+            height: 72px;
+            border-radius: 15px;
             object-fit: contain;
-            background: rgba(0,0,0,.45);
-            border: 1px solid rgba(255,255,255,.14);
-            padding: 8px;
+            background: color-mix(in srgb, var(--team-surface) 64%, transparent);
+            border: 1px solid rgba(255,255,255,.13);
+            padding: 7px;
         }
 
         .team-name {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: 40px;
+            font-size: 31px;
             line-height: .88;
             letter-spacing: .06em;
             text-transform: uppercase;
@@ -397,10 +420,10 @@
         }
 
         .team-tagline {
-            margin-top: 7px;
+            margin-top: 6px;
             color: var(--team-primary);
             font-family: var(--team-heading);
-            font-size: 17px;
+            font-size: 13px;
             line-height: 1;
             letter-spacing: .1em;
             text-transform: uppercase;
@@ -408,35 +431,35 @@
         }
 
         .team-meta-row {
-            margin-top: 12px;
+            margin-top: 10px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
-            border-radius: 12px;
+            border-radius: 11px;
             overflow: hidden;
-            background: rgba(255,255,255,.15);
+            background: rgba(255,255,255,.13);
         }
 
         .team-meta {
-            min-height: 47px;
+            min-height: 43px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            background: rgba(0,0,0,.48);
+            gap: 7px;
+            padding: 7px 9px;
+            background: color-mix(in srgb, var(--team-surface) 64%, transparent);
         }
 
         .team-meta i {
-            width: 21px;
+            width: 19px;
             color: rgba(255,255,255,.84);
             text-align: center;
-            font-size: 16px;
+            font-size: 14px;
         }
 
         .team-meta small {
             display: block;
-            color: rgba(255,255,255,.64);
-            font-size: 10px;
+            color: rgba(255,255,255,.62);
+            font-size: 9px;
             line-height: 1;
             margin-bottom: 3px;
         }
@@ -444,30 +467,30 @@
         .team-meta strong {
             display: block;
             color: #fff;
-            font-size: 13px;
+            font-size: 12px;
             line-height: 1.05;
             font-weight: 800;
         }
 
         .team-contact-row {
-            margin-top: 11px;
+            margin-top: 9px;
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 8px;
+            gap: 6px;
         }
 
         .team-contact-btn {
-            min-height: 41px;
-            border-radius: 11px;
-            border: 1px solid rgba(255,255,255,.15);
-            background: rgba(0,0,0,.44);
+            min-height: 36px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: color-mix(in srgb, var(--team-surface) 58%, transparent);
             color: #fff;
             text-decoration: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            font-size: 12px;
+            gap: 5px;
+            font-size: 10.5px;
             font-weight: 800;
             white-space: nowrap;
             transition: transform .18s ease, border-color .18s ease, background .18s ease;
@@ -475,26 +498,26 @@
 
         .team-contact-btn:hover {
             transform: translateY(-2px);
-            border-color: var(--team-primary);
+            border-color: var(--team-border);
             background: rgba(255,255,255,.08);
         }
 
         .team-contact-btn i {
             color: var(--team-primary);
-            font-size: 15px;
+            font-size: 13px;
         }
 
         .squad-head {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin: 22px 0 10px;
+            gap: 12px;
+            margin: 17px 0 8px;
         }
 
         .squad-title {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: 31px;
+            font-size: 28px;
             line-height: 1;
             letter-spacing: .08em;
             text-transform: uppercase;
@@ -504,9 +527,9 @@
         .squad-hint {
             display: flex;
             align-items: center;
-            gap: 7px;
-            color: rgba(255,255,255,.58);
-            font-size: 13px;
+            gap: 6px;
+            color: rgba(255,255,255,.56);
+            font-size: 12px;
             font-weight: 700;
         }
 
@@ -519,14 +542,14 @@
 
         .sport-field {
             position: relative;
-            min-height: 474px;
-            padding: 34px 12px;
+            min-height: 420px;
+            padding: 30px 10px;
             overflow: hidden;
             background:
-                repeating-linear-gradient(90deg, rgba(255,255,255,.028) 0 1px, transparent 1px 52px),
-                repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 52px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,.026) 0 1px, transparent 1px 48px),
+                repeating-linear-gradient(0deg, rgba(255,255,255,.016) 0 1px, transparent 1px 48px),
                 linear-gradient(90deg, #062b11 0%, #10461c 14%, #082f12 28%, #10461c 42%, #082f12 56%, #10461c 70%, #082f12 84%, #062b11 100%);
-            box-shadow: inset 0 0 70px rgba(0,0,0,.35);
+            box-shadow: inset 0 0 60px rgba(0,0,0,.35);
         }
 
         .sport-field.is-basketball {
@@ -537,7 +560,7 @@
 
         .sport-field.is-football {
             background:
-                repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 2px, transparent 2px 58px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 2px, transparent 2px 56px),
                 linear-gradient(90deg, #0c491c, #155c27, #0c491c);
         }
 
@@ -551,31 +574,31 @@
         .field-line {
             position: absolute;
             pointer-events: none;
-            border-color: rgba(255,255,255,.16);
+            border-color: rgba(255,255,255,.15);
         }
 
         .field-half {
             top: 50%;
             left: 0;
             right: 0;
-            border-top: 2px solid rgba(255,255,255,.14);
+            border-top: 2px solid rgba(255,255,255,.13);
         }
 
         .field-circle {
-            width: 92px;
-            height: 92px;
-            border: 2px solid rgba(255,255,255,.14);
+            width: 82px;
+            height: 82px;
+            border: 2px solid rgba(255,255,255,.13);
             border-radius: 999px;
-            left: calc(50% - 46px);
-            top: calc(50% - 46px);
+            left: calc(50% - 41px);
+            top: calc(50% - 41px);
         }
 
         .field-box-top,
         .field-box-bottom {
-            left: 18%;
-            right: 18%;
-            height: 58px;
-            border: 2px solid rgba(255,255,255,.14);
+            left: 19%;
+            right: 19%;
+            height: 54px;
+            border: 2px solid rgba(255,255,255,.13);
         }
 
         .field-box-top {
@@ -591,23 +614,23 @@
         .squad-grid {
             position: relative;
             z-index: 4;
-            min-height: 406px;
+            min-height: 360px;
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             align-content: center;
             justify-items: center;
-            gap: 26px 12px;
+            gap: 22px 8px;
         }
 
         .player-card {
             position: relative;
-            width: 74px;
-            min-height: 104px;
+            width: 68px;
+            min-height: 94px;
             border: 0;
             color: #0b0b0b;
             background:
                 linear-gradient(145deg, #fff1a4 0%, #e0b044 36%, #bd8628 66%, #ffe789 100%);
-            box-shadow: 0 10px 18px rgba(0,0,0,.34);
+            box-shadow: 0 9px 16px rgba(0,0,0,.34);
             clip-path: polygon(11% 0, 89% 0, 100% 15%, 100% 86%, 50% 100%, 0 86%, 0 15%);
             padding: 6px 5px 8px;
             font-family: var(--team-heading);
@@ -618,12 +641,12 @@
 
         .player-card:hover,
         .player-card.is-active-card {
-            transform: translateY(-4px) scale(1.04);
+            transform: translateY(-3px) scale(1.04);
             filter: saturate(1.08);
         }
 
         .player-card.is-active-card {
-            outline: 2px solid var(--team-primary);
+            outline: 2px solid var(--team-border);
             outline-offset: 3px;
         }
 
@@ -637,7 +660,7 @@
             pointer-events: none;
         }
 
-        .player-rating,
+        .player-number,
         .player-position,
         .player-name,
         .player-tag {
@@ -645,14 +668,14 @@
             z-index: 2;
         }
 
-        .player-rating {
+        .player-number {
             font-size: 15px;
             line-height: 1;
             font-weight: 900;
         }
 
         .player-position {
-            font-size: 8.5px;
+            font-size: 8.4px;
             line-height: 1;
             font-weight: 900;
             text-transform: uppercase;
@@ -662,7 +685,7 @@
         .player-placeholder {
             position: relative;
             z-index: 1;
-            width: 79%;
+            width: 78%;
             aspect-ratio: 1/1;
             border-radius: 999px;
             margin: -1px auto 3px;
@@ -672,13 +695,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 900;
         }
 
         .player-name {
             text-align: center;
-            font-size: 7.6px;
+            font-size: 7.4px;
             line-height: 1.05;
             font-weight: 900;
             white-space: nowrap;
@@ -690,7 +713,7 @@
             text-align: center;
             color: rgba(0,0,0,.68);
             margin-top: 1px;
-            font-size: 6.7px;
+            font-size: 6.5px;
             letter-spacing: .04em;
             font-weight: 900;
             text-transform: uppercase;
@@ -718,13 +741,15 @@
             position: absolute;
             top: 0;
             right: 0;
-            width: min(100%, 1040px);
+            width: min(100%, 520px);
             height: 100%;
-            background: #050505;
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
+                #050505;
             border-left: 1px solid rgba(255,255,255,.14);
-            box-shadow: -34px 0 90px rgba(0,0,0,.62);
+            box-shadow: -30px 0 80px rgba(0,0,0,.62);
             transform: translateX(100%);
-            animation: playerPanelIn .25s ease forwards;
+            animation: playerPanelIn .24s ease forwards;
         }
 
         @keyframes playerPanelIn {
@@ -732,14 +757,14 @@
         }
 
         .player-panel-bar {
-            height: 64px;
+            height: 56px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-            padding: 0 14px;
-            background: rgba(0,0,0,.94);
-            border-bottom: 1px solid rgba(255,255,255,.12);
+            gap: 10px;
+            padding: 0 12px;
+            background: rgba(0,0,0,.92);
+            border-bottom: 1px solid rgba(255,255,255,.11);
         }
 
         .player-panel-title {
@@ -748,28 +773,29 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             font-family: var(--team-heading);
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 900;
             letter-spacing: .08em;
             text-transform: uppercase;
         }
 
         .player-panel-btn {
-            min-height: 40px;
-            border: 1px solid rgba(255,255,255,.16);
+            min-height: 36px;
+            border: 1px solid rgba(255,255,255,.15);
             border-radius: 999px;
             background: rgba(255,255,255,.07);
             color: #fff;
             cursor: pointer;
-            padding: 0 14px;
+            padding: 0 12px;
             font-family: var(--team-heading);
+            font-size: 12px;
             font-weight: 900;
             letter-spacing: .06em;
             text-transform: uppercase;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 7px;
+            gap: 6px;
         }
 
         .player-nav-arrow {
@@ -777,8 +803,8 @@
             z-index: 8;
             top: 50%;
             transform: translateY(-50%);
-            width: 50px;
-            height: 70px;
+            width: 42px;
+            height: 58px;
             border-radius: 999px;
             border: 1px solid rgba(255,255,255,.18);
             background: rgba(0,0,0,.64);
@@ -787,63 +813,70 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 18px 44px rgba(0,0,0,.46);
+            box-shadow: 0 16px 38px rgba(0,0,0,.44);
             backdrop-filter: blur(16px);
             transition: transform .18s ease, background .18s ease, border-color .18s ease;
         }
 
         .player-nav-arrow:hover {
-            transform: translateY(-50%) scale(1.07);
-            background: linear-gradient(135deg, var(--team-primary), var(--team-primary-deep));
-            border-color: var(--team-primary);
+            transform: translateY(-50%) scale(1.06);
+            background: var(--team-primary);
+            color: var(--team-text-on-primary);
+            border-color: var(--team-border);
         }
 
-        .player-nav-arrow.is-left { left: 12px; }
-        .player-nav-arrow.is-right { right: 12px; }
-
-        .player-nav-arrow i {
-            font-size: 20px;
-        }
+        .player-nav-arrow.is-left { left: 8px; }
+        .player-nav-arrow.is-right { right: 8px; }
 
         .player-stats-dialog {
             width: 100%;
-            height: calc(100% - 64px);
+            height: calc(100% - 56px);
             overflow: auto;
             display: block;
-            padding: 14px;
+            padding: 12px;
             background:
-                radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--team-primary) 22%, transparent), transparent 34%),
+                radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--team-glow) 20%, transparent), transparent 34%),
                 linear-gradient(180deg, #070707, #020202);
             opacity: 1;
             transform: scale(1);
             transition: opacity .2s ease, transform .2s ease;
         }
 
+        .player-stats-dialog::-webkit-scrollbar {
+            width: 7px;
+        }
+
+        .player-stats-dialog::-webkit-scrollbar-thumb {
+            background: var(--team-primary);
+            border-radius: 999px;
+        }
+
         .player-stats-card {
-            max-width: 430px;
+            max-width: 390px;
             margin: 0 auto;
-            border-radius: 18px;
-            border: 1px solid rgba(255,255,255,.12);
-            background: rgba(255,255,255,.052);
-            box-shadow: 0 18px 48px rgba(0,0,0,.40);
+            border-radius: 17px;
+            border: 1px solid rgba(255,255,255,.11);
+            background: rgba(255,255,255,.05);
+            box-shadow: 0 16px 44px rgba(0,0,0,.38);
             overflow: hidden;
         }
 
         .player-stats-hero {
-            min-height: 118px;
-            padding: 14px;
+            min-height: 104px;
+            padding: 12px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 11px;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 34%, transparent), transparent 58%),
-                rgba(255,255,255,.04);
+                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 56%),
+                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 22%, transparent), transparent 62%),
+                rgba(255,255,255,.035);
         }
 
         .player-stats-avatar {
-            width: 72px;
-            height: 72px;
-            border-radius: 17px;
+            width: 64px;
+            height: 64px;
+            border-radius: 15px;
             object-fit: cover;
             background: rgba(0,0,0,.35);
             border: 1px solid rgba(255,255,255,.14);
@@ -851,7 +884,7 @@
             align-items: center;
             justify-content: center;
             font-family: var(--team-heading);
-            font-size: 30px;
+            font-size: 27px;
             font-weight: 900;
             color: #fff;
             flex: 0 0 auto;
@@ -860,7 +893,7 @@
         .player-stats-name {
             margin: 0;
             font-family: var(--team-heading);
-            font-size: clamp(28px, 7vw, 42px);
+            font-size: clamp(26px, 6vw, 38px);
             line-height: .9;
             letter-spacing: .055em;
             text-transform: uppercase;
@@ -868,104 +901,58 @@
         }
 
         .player-stats-subtitle {
-            margin-top: 6px;
+            margin-top: 5px;
             color: var(--team-primary);
             font-family: var(--team-heading);
-            font-size: 13px;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .player-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 8px;
-            padding: 12px;
-        }
-
-        .player-stat-box {
-            min-height: 66px;
-            border-radius: 13px;
-            border: 1px solid rgba(255,255,255,.11);
-            background: rgba(0,0,0,.26);
-            padding: 10px;
-        }
-
-        .player-stat-box span {
-            display: block;
-            color: rgba(255,255,255,.58);
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: .10em;
-            font-weight: 900;
-            margin-bottom: 6px;
-        }
-
-        .player-stat-box strong {
-            display: block;
-            color: #fff;
-            font-family: var(--team-heading);
-            font-size: 18px;
-            line-height: 1;
-            font-weight: 900;
-        }
-
-        .player-stats-note {
-            margin: 0 12px 12px;
-            padding: 11px;
-            border-radius: 13px;
-            background: color-mix(in srgb, var(--team-primary) 14%, rgba(255,255,255,.05));
-            border: 1px solid color-mix(in srgb, var(--team-primary) 32%, rgba(255,255,255,.12));
-            color: rgba(255,255,255,.74);
             font-size: 12px;
-            font-weight: 700;
-            line-height: 1.35;
+            letter-spacing: .11em;
+            text-transform: uppercase;
+            font-weight: 900;
         }
 
         .player-profile-actions {
             display: flex;
             gap: 8px;
-            padding: 0 12px 12px;
+            padding: 0 10px 10px;
         }
 
         .player-website-btn {
-            min-height: 40px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--team-primary), var(--team-primary-deep));
-            color: var(--team-text-on-accent);
+            min-height: 37px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, var(--team-primary), var(--team-secondary));
+            color: var(--team-text-on-primary);
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 0 14px;
+            gap: 7px;
+            padding: 0 12px;
             font-family: var(--team-heading);
-            font-size: 13px;
+            font-size: 12px;
             letter-spacing: .08em;
             text-transform: uppercase;
             font-weight: 900;
-            box-shadow: 0 12px 26px color-mix(in srgb, var(--team-primary) 28%, transparent);
+            box-shadow: 0 10px 22px color-mix(in srgb, var(--team-primary) 26%, transparent);
         }
 
         .player-chip-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 7px;
-            padding: 0 12px 12px;
+            gap: 6px;
+            padding: 0 10px 10px;
         }
 
         .player-chip {
-            min-height: 30px;
+            min-height: 28px;
             border-radius: 999px;
-            border: 1px solid rgba(255,255,255,.11);
-            background: rgba(255,255,255,.055);
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.05);
             color: rgba(255,255,255,.76);
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            padding: 0 10px;
-            font-size: 11px;
+            gap: 6px;
+            padding: 0 9px;
+            font-size: 10.5px;
             font-weight: 800;
         }
 
@@ -973,18 +960,53 @@
             color: var(--team-primary);
         }
 
+        .player-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px;
+            padding: 10px;
+        }
+
+        .player-stat-box {
+            min-height: 58px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(0,0,0,.24);
+            padding: 9px;
+        }
+
+        .player-stat-box span {
+            display: block;
+            color: rgba(255,255,255,.56);
+            font-size: 8.8px;
+            text-transform: uppercase;
+            letter-spacing: .10em;
+            font-weight: 900;
+            margin-bottom: 5px;
+        }
+
+        .player-stat-box strong {
+            display: block;
+            color: #fff;
+            font-family: var(--team-heading);
+            font-size: 17px;
+            line-height: 1;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
         .player-stats-section {
-            padding: 0 12px 12px;
+            padding: 0 10px 10px;
         }
 
         .player-stats-section-title {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin: 0 0 9px;
+            gap: 7px;
+            margin: 0 0 8px;
             color: rgba(255,255,255,.86);
             font-family: var(--team-heading);
-            font-size: 16px;
+            font-size: 15px;
             letter-spacing: .09em;
             text-transform: uppercase;
             font-weight: 900;
@@ -994,73 +1016,26 @@
             color: var(--team-primary);
         }
 
-        .player-meter-grid {
+        .player-info-list {
             display: grid;
-            gap: 9px;
+            gap: 7px;
         }
 
-        .player-meter {
-            border-radius: 13px;
-            border: 1px solid rgba(255,255,255,.10);
-            background: rgba(0,0,0,.23);
-            padding: 10px;
-        }
-
-        .player-meter-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 7px;
-        }
-
-        .player-meter-head span {
-            color: rgba(255,255,255,.68);
-            font-size: 10px;
-            letter-spacing: .10em;
-            text-transform: uppercase;
-            font-weight: 900;
-        }
-
-        .player-meter-head strong {
-            color: #fff;
-            font-family: var(--team-heading);
-            font-size: 18px;
-            line-height: 1;
-        }
-
-        .player-meter-track {
-            height: 7px;
-            border-radius: 999px;
-            overflow: hidden;
-            background: rgba(255,255,255,.11);
-        }
-
-        .player-meter-fill {
-            height: 100%;
-            border-radius: inherit;
-            background: linear-gradient(90deg, var(--team-primary), #ffcf4a);
-        }
-
-        .player-timeline {
-            display: grid;
-            gap: 8px;
-        }
-
-        .player-timeline-item {
-            display: flex;
-            gap: 9px;
-            align-items: flex-start;
-            border-radius: 12px;
+        .player-info-item {
+            min-height: 42px;
+            border-radius: 11px;
             border: 1px solid rgba(255,255,255,.10);
             background: rgba(255,255,255,.045);
-            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
         }
 
-        .player-timeline-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 9px;
+        .player-info-item i {
+            width: 22px;
+            height: 22px;
+            border-radius: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1069,25 +1044,28 @@
             flex: 0 0 auto;
         }
 
-        .player-timeline-item strong {
+        .player-info-item span {
             display: block;
-            color: #fff;
-            font-size: 12px;
+            color: rgba(255,255,255,.58);
+            font-size: 9px;
+            letter-spacing: .10em;
+            text-transform: uppercase;
             font-weight: 900;
             margin-bottom: 2px;
         }
 
-        .player-timeline-item span {
+        .player-info-item strong {
             display: block;
-            color: rgba(255,255,255,.64);
-            font-size: 11px;
-            line-height: 1.35;
-            font-weight: 700;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 850;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
         }
 
-        @media (min-width: 780px) {
+        @media (min-width: 720px) {
             .team-app {
-                width: min(430px, 100%);
+                width: min(410px, 100%);
             }
         }
 
@@ -1105,86 +1083,16 @@
             }
 
             .team-content {
-                padding: 10px;
-            }
-
-            .team-top {
-                height: 38px;
-            }
-
-            .team-hero-inner {
-                padding: 14px;
-            }
-
-            .team-brand-row {
-                grid-template-columns: 76px 1fr;
-                min-height: 102px;
-                gap: 12px;
-            }
-
-            .team-logo {
-                width: 76px;
-                height: 76px;
-                border-radius: 15px;
-            }
-
-            .team-name {
-                font-size: 34px;
-            }
-
-            .team-tagline {
-                font-size: 14px;
-            }
-
-            .team-meta-row {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .team-contact-row {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 6px;
-            }
-
-            .team-contact-btn {
-                font-size: 10.5px;
-                gap: 5px;
-                min-height: 38px;
-            }
-
-            .team-contact-btn i {
-                font-size: 13px;
+                padding: 9px;
             }
 
             .sport-field {
-                min-height: 452px;
-                padding: 32px 10px;
+                min-height: 410px;
             }
 
-            .squad-grid {
-                gap: 24px 9px;
+            .player-panel {
+                width: 100%;
             }
-
-            .player-card {
-                width: 70px;
-                min-height: 99px;
-            }
-
-            .player-stats-hero {
-                align-items: center;
-                flex-direction: row;
-            }
-
-            .player-stats-grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
-
-            .player-nav-arrow {
-                width: 42px;
-                height: 60px;
-            }
-
-            .player-nav-arrow.is-left { left: 8px; }
-            .player-nav-arrow.is-right { right: 8px; }
         }
 
         @media (max-width: 360px) {
@@ -1193,17 +1101,8 @@
             }
 
             .player-card {
-                width: 68px;
-                min-height: 96px;
-            }
-
-            .player-stats-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .player-stats-avatar {
-                width: 64px;
-                height: 64px;
+                width: 66px;
+                min-height: 92px;
             }
         }
     </style>
@@ -1257,19 +1156,19 @@
                                 @if(!empty($headCoach['phone']))
                                     <a class="team-contact-btn" href="sms:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
                                         <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
-                                        Text Coach
+                                        Text
                                     </a>
 
                                     <a class="team-contact-btn" href="tel:{{ preg_replace('/\D+/', '', $headCoach['phone']) }}">
                                         <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                                        Call Coach
+                                        Call
                                     </a>
                                 @endif
 
                                 @if(!empty($headCoach['email']))
                                     <a class="team-contact-btn" href="mailto:{{ $headCoach['email'] }}">
                                         <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                                        Email Coach
+                                        Email
                                     </a>
                                 @endif
                             </div>
@@ -1282,7 +1181,7 @@
                         <h2 class="squad-title">Squad</h2>
                         <div class="squad-hint">
                             <i class="fa-regular fa-hand-pointer" aria-hidden="true"></i>
-                            Tap a player card for full stats
+                            Tap for player info
                         </div>
                     </div>
 
@@ -1304,16 +1203,32 @@
                                         data-player-url="{{ $player['url'] }}"
                                         data-player-initial="{{ $player['initial'] }}"
                                         data-player-image="{{ $player['image_url'] }}"
-                                        data-player-position="{{ $player['stats_position'] }}"
+                                        data-player-position="{{ $player['position_full'] }}"
+                                        data-player-position-short="{{ $player['position_short'] }}"
                                         data-player-year="{{ $player['year'] }}"
                                         data-player-height="{{ $player['height'] }}"
                                         data-player-weight="{{ $player['weight'] }}"
                                         data-player-gpa="{{ $player['gpa'] }}"
                                         data-player-jersey="{{ $player['jersey'] }}"
+                                        data-player-dominant-foot="{{ $player['dominant_foot'] }}"
+                                        data-player-gender="{{ $player['gender'] }}"
+                                        data-player-birth="{{ $player['birth'] }}"
+                                        data-player-age="{{ $player['age'] }}"
                                         data-player-city="{{ $player['city'] }}"
+                                        data-player-state="{{ $player['state'] }}"
+                                        data-player-sport="{{ $player['sport'] }}"
+                                        data-player-school="{{ $player['school'] }}"
+                                        data-player-league="{{ $player['league'] }}"
+                                        data-player-club="{{ $player['club'] }}"
+                                        data-player-team="{{ $player['team_name'] }}"
+                                        data-player-national-team="{{ $player['national_team'] }}"
+                                        data-player-national-team-period="{{ $player['national_team_period'] }}"
+                                        data-player-club-coach="{{ $player['club_coach'] }}"
+                                        data-player-club-coach-email="{{ $player['club_coach_email'] }}"
+                                        data-player-club-coach-phone="{{ $player['club_coach_phone'] }}"
                                     >
-                                        <div class="player-rating">{{ $player['rating'] }}</div>
-                                        <div class="player-position">{{ $player['position'] }}</div>
+                                        <div class="player-number">{{ $player['jersey'] ?: '#' }}</div>
+                                        <div class="player-position">{{ $player['position_short'] }}</div>
 
                                         @if($player['image_url'])
                                             <img class="player-img" src="{{ $player['image_url'] }}" alt="{{ $player['name'] }}">
@@ -1355,7 +1270,7 @@
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </button>
 
-                <div class="player-stats-dialog is-open" id="playerStatsDialog" aria-live="polite"></div>
+                <div class="player-stats-dialog" id="playerStatsDialog" aria-live="polite"></div>
             </div>
         </div>
     </main>
@@ -1383,13 +1298,40 @@
                 });
             }
 
-            function valueOrTbd(value) {
-                return value && value !== 'null' && value !== 'undefined' ? value : 'TBD';
+            function cleanValue(value) {
+                if (!value || value === 'null' || value === 'undefined' || value === 'TBD') {
+                    return '';
+                }
+
+                return String(value);
             }
 
-            function ratingFromIndex(card, offset = 0) {
-                const index = Number(card.dataset.playerIndex || 0);
-                return Math.max(62, Math.min(99, 72 + ((index * 9 + offset) % 24)));
+            function statBox(label, value) {
+                const clean = cleanValue(value);
+
+                if (!clean) {
+                    return '';
+                }
+
+                return `<div class="player-stat-box"><span>${escapeHtml(label)}</span><strong>${escapeHtml(clean)}</strong></div>`;
+            }
+
+            function infoItem(icon, label, value) {
+                const clean = cleanValue(value);
+
+                if (!clean) {
+                    return '';
+                }
+
+                return `
+                    <div class="player-info-item">
+                        <i class="fa-solid ${icon}" aria-hidden="true"></i>
+                        <div>
+                            <span>${escapeHtml(label)}</span>
+                            <strong>${escapeHtml(clean)}</strong>
+                        </div>
+                    </div>
+                `;
             }
 
             function renderStats(card) {
@@ -1397,7 +1339,7 @@
                     ? `<img class="player-stats-avatar" src="${escapeHtml(card.dataset.playerImage)}" alt="${escapeHtml(card.dataset.playerName || 'Player')}">`
                     : `<div class="player-stats-avatar">${escapeHtml(card.dataset.playerInitial || 'P')}</div>`;
 
-                const websiteButton = card.dataset.playerUrl
+                const websiteButton = cleanValue(card.dataset.playerUrl)
                     ? `<div class="player-profile-actions">
                             <a class="player-website-btn" href="${escapeHtml(card.dataset.playerUrl)}" target="_blank" rel="noopener noreferrer">
                                 <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
@@ -1406,10 +1348,37 @@
                        </div>`
                     : '';
 
-                const pace = ratingFromIndex(card, 4);
-                const skill = ratingFromIndex(card, 11);
-                const strength = ratingFromIndex(card, 17);
-                const iq = ratingFromIndex(card, 21);
+                const chips = [
+                    cleanValue(card.dataset.playerJersey) ? `<span class="player-chip"><i class="fa-solid fa-shirt" aria-hidden="true"></i> #${escapeHtml(card.dataset.playerJersey)}</span>` : '',
+                    cleanValue(card.dataset.playerCity) ? `<span class="player-chip"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${escapeHtml(card.dataset.playerCity)}${cleanValue(card.dataset.playerState) ? ', ' + escapeHtml(card.dataset.playerState) : ''}</span>` : '',
+                    cleanValue(card.dataset.playerYear) ? `<span class="player-chip"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> ${escapeHtml(card.dataset.playerYear)}</span>` : '',
+                ].filter(Boolean).join('');
+
+                const physicalStats = [
+                    statBox('Height', card.dataset.playerHeight),
+                    statBox('Weight', card.dataset.playerWeight),
+                    statBox('GPA', card.dataset.playerGpa),
+                    statBox('Age', card.dataset.playerAge),
+                    statBox('Class', card.dataset.playerYear),
+                    statBox('Foot', card.dataset.playerDominantFoot),
+                ].filter(Boolean).join('');
+
+                const teamInfo = [
+                    infoItem('fa-futbol', 'Sport', card.dataset.playerSport),
+                    infoItem('fa-location-dot', 'Position', card.dataset.playerPosition),
+                    infoItem('fa-school', 'School', card.dataset.playerSchool),
+                    infoItem('fa-trophy', 'League', card.dataset.playerLeague),
+                    infoItem('fa-shield-halved', 'Club', card.dataset.playerClub),
+                    infoItem('fa-users', 'Team', card.dataset.playerTeam),
+                    infoItem('fa-flag', 'National Team', card.dataset.playerNationalTeam),
+                    infoItem('fa-calendar-days', 'National Team Period', card.dataset.playerNationalTeamPeriod),
+                ].filter(Boolean).join('');
+
+                const coachInfo = [
+                    infoItem('fa-user-tie', 'Club Coach', card.dataset.playerClubCoach),
+                    infoItem('fa-envelope', 'Coach Email', card.dataset.playerClubCoachEmail),
+                    infoItem('fa-phone', 'Coach Phone', card.dataset.playerClubCoachPhone),
+                ].filter(Boolean).join('');
 
                 return `
                     <article class="player-stats-card">
@@ -1417,80 +1386,35 @@
                             ${avatar}
                             <div>
                                 <h2 class="player-stats-name">${escapeHtml(card.dataset.playerName || 'Player Card')}</h2>
-                                <div class="player-stats-subtitle">${escapeHtml(valueOrTbd(card.dataset.playerPosition))}</div>
+                                <div class="player-stats-subtitle">${escapeHtml(cleanValue(card.dataset.playerPosition) || 'Player')}</div>
                             </div>
                         </div>
 
                         ${websiteButton}
 
-                        <div class="player-chip-row">
-                            <span class="player-chip"><i class="fa-solid fa-shirt" aria-hidden="true"></i> #${escapeHtml(valueOrTbd(card.dataset.playerJersey))}</span>
-                            <span class="player-chip"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${escapeHtml(valueOrTbd(card.dataset.playerCity))}</span>
-                            <span class="player-chip"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> ${escapeHtml(valueOrTbd(card.dataset.playerYear))}</span>
-                        </div>
+                        ${chips ? `<div class="player-chip-row">${chips}</div>` : ''}
 
-                        <div class="player-stats-grid">
-                            <div class="player-stat-box"><span>Height</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerHeight))}</strong></div>
-                            <div class="player-stat-box"><span>Weight</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerWeight))}</strong></div>
-                            <div class="player-stat-box"><span>GPA</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerGpa))}</strong></div>
-                            <div class="player-stat-box"><span>Position</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerPosition)).slice(0, 10)}</strong></div>
-                            <div class="player-stat-box"><span>Class</span><strong>${escapeHtml(valueOrTbd(card.dataset.playerYear))}</strong></div>
-                            <div class="player-stat-box"><span>Status</span><strong>${card.dataset.playerUrl ? 'LIVE' : 'TEAM'}</strong></div>
-                        </div>
+                        ${physicalStats ? `<div class="player-stats-grid">${physicalStats}</div>` : ''}
 
-                        <div class="player-stats-section">
-                            <h3 class="player-stats-section-title">
-                                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
-                                Athletic Snapshot
-                            </h3>
-
-                            <div class="player-meter-grid">
-                                <div class="player-meter">
-                                    <div class="player-meter-head"><span>Pace / Speed</span><strong>${pace}</strong></div>
-                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${pace}%"></div></div>
-                                </div>
-
-                                <div class="player-meter">
-                                    <div class="player-meter-head"><span>Technical Skill</span><strong>${skill}</strong></div>
-                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${skill}%"></div></div>
-                                </div>
-
-                                <div class="player-meter">
-                                    <div class="player-meter-head"><span>Strength</span><strong>${strength}</strong></div>
-                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${strength}%"></div></div>
-                                </div>
-
-                                <div class="player-meter">
-                                    <div class="player-meter-head"><span>Game IQ</span><strong>${iq}</strong></div>
-                                    <div class="player-meter-track"><div class="player-meter-fill" style="width:${iq}%"></div></div>
-                                </div>
+                        ${teamInfo ? `
+                            <div class="player-stats-section">
+                                <h3 class="player-stats-section-title">
+                                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                    Player Details
+                                </h3>
+                                <div class="player-info-list">${teamInfo}</div>
                             </div>
-                        </div>
+                        ` : ''}
 
-                        <div class="player-stats-section">
-                            <h3 class="player-stats-section-title">
-                                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
-                                Player Notes
-                            </h3>
-
-                            <div class="player-timeline">
-                                <div class="player-timeline-item">
-                                    <span class="player-timeline-icon"><i class="fa-solid fa-user-check" aria-hidden="true"></i></span>
-                                    <div>
-                                        <strong>Team Roster Profile</strong>
-                                        <span>This view is stats-first and is used for quick coach/team review.</span>
-                                    </div>
-                                </div>
-
-                                <div class="player-timeline-item">
-                                    <span class="player-timeline-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
-                                    <div>
-                                        <strong>${card.dataset.playerUrl ? 'PlyrCard Website Available' : 'Website Not Published Yet'}</strong>
-                                        <span>${card.dataset.playerUrl ? 'Use the website button above to open the full player profile.' : 'Once the player website is published, a visit button will appear here.'}</span>
-                                    </div>
-                                </div>
+                        ${coachInfo ? `
+                            <div class="player-stats-section">
+                                <h3 class="player-stats-section-title">
+                                    <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                                    Coach Contact
+                                </h3>
+                                <div class="player-info-list">${coachInfo}</div>
                             </div>
-                        </div>
+                        ` : ''}
                     </article>
                 `;
             }
@@ -1521,15 +1445,13 @@
 
                 window.setTimeout(() => {
                     title.textContent = card.dataset.playerName || 'Player Card';
-
                     statsDialog.innerHTML = renderStats(card);
-
                     overlay.classList.add('is-open');
                     overlay.setAttribute('aria-hidden', 'false');
                     document.body.style.overflow = 'hidden';
 
                     window.setTimeout(() => overlay.classList.remove('is-switching'), 80);
-                }, alreadyOpen ? 130 : 0);
+                }, alreadyOpen ? 120 : 0);
             }
 
             function closePlayer() {
