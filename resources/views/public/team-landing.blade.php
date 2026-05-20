@@ -413,14 +413,15 @@
             min-height: 74px;
         }
 
-        .team-logo {
+                .team-logo {
             width: 58px;
             height: 58px;
-            border-radius: 15px;
             object-fit: contain;
-            background: rgba(255,255,255,.07);
-            border: 1px solid rgba(255,255,255,.13);
-            padding: 7px;
+            background: transparent;
+            border: 0;
+            padding: 0;
+            border-radius: 0;
+            box-shadow: none;
         }
 
         .team-name {
@@ -1116,8 +1117,13 @@
             }
 
             .team-logo {
-                width: 54px;
-                height: 54px;
+                width: 50px;
+                height: 50px;
+                border-radius: 0;
+                padding: 0;
+                background: transparent;
+                border: 0;
+                box-shadow: none;
             }
 
             .team-name {
@@ -1148,6 +1154,13 @@
                 width: 58px;
                 min-height: 74px;
             }
+        }
+        .team-logo {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
         }
     </style>
 </head>

@@ -320,14 +320,15 @@
             max-width: 680px;
         }
 
-        .club-logo {
-            width: clamp(56px, 6.4vw, 72px);
-            height: clamp(56px, 6.4vw, 72px);
-            border-radius: 17px;
+                .club-logo {
+            width: clamp(54px, 6vw, 70px);
+            height: clamp(54px, 6vw, 70px);
             object-fit: contain;
-            padding: 8px;
-            background: color-mix(in srgb, var(--club-surface-raised) 86%, transparent);
-            border: 1px solid color-mix(in srgb, var(--club-primary) 28%, rgba(255,255,255,.14));
+            padding: 0;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            border-radius: 0;
         }
 
                 .club-name {
@@ -886,9 +887,13 @@
             }
 
             .club-logo {
-                width: 54px;
-                height: 54px;
-                border-radius: 14px;
+                width: 48px;
+                height: 48px;
+                border-radius: 0;
+                padding: 0;
+                background: transparent;
+                border: 0;
+                box-shadow: none;
             }
 
             .club-name {
@@ -1150,6 +1155,13 @@
             }
         }
 
+        .club-logo {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+        }
     </style>
 </head>
 
