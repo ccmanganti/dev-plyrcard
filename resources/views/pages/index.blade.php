@@ -7,7 +7,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  @include('partials.plyrcard-csrf-meta')
+  
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="PLYRCARD — Your Game. Your Brand. One Card. The premium recruiting card for serious athletes." />

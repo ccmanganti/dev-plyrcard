@@ -5,7 +5,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 @endonce
 
-@include('partials.plyrcard-drawer-csrf-guard')
 
 @php
     use App\Models\Website;
