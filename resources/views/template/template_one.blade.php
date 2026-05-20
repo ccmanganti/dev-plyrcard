@@ -391,9 +391,28 @@ HTML;
         ? $user->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)))->values()
         : collect();
 
+    $playerHasFree = $playerRoleNames->contains('free')
+        || ($user && method_exists($user, 'hasRole') && $user->hasRole('Free'));
+
+    $playerHasPlyrPlus = $playerRoleNames->contains('plyr plus')
+        || $playerRoleNames->contains('plyrplus')
+        || $playerRoleNames->contains('plyr-plus')
+        || ($user && method_exists($user, 'hasRole') && $user->hasRole('Plyr Plus'));
+
     $playerHasMyJourney = $playerRoleNames->contains('my journey')
         || $playerRoleNames->contains('myjourney')
+        || $playerRoleNames->contains('my-journey')
         || ($user && method_exists($user, 'hasRole') && $user->hasRole('My Journey'));
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile Tabs Visibility
+    |--------------------------------------------------------------------------
+    | Free-only players should only show the About Me section.
+    | Players with Plyr Plus or My Journey can see the full tabbed profile.
+    */
+    $playerCanViewFullProfileTabs = $playerHasPlyrPlus || $playerHasMyJourney;
+    $playerIsFreeOnly = $playerHasFree && ! $playerCanViewFullProfileTabs;
 
     $articleSectionType = $playerHasMyJourney
         ? strtolower((string) ($website->article_section_type ?: 'follow_me'))
@@ -1955,35 +1974,37 @@ HTML;
 
     <div class="relative z-30 flex flex-col md:flex-row h-auto w-full">
         <div class="w-full md:w-8/12 min-w-0">
-            <div id="tabs" class="flex w-full overflow-x-auto whitespace-nowrap no-scrollbar -mt-12">
-                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center is-active"
-                        style="background: {{ $secondary }}; color: {{ $onSecondary }};"
-                        data-tab="about">
-                    ABOUT ME
-                </button>
+            @if($playerCanViewFullProfileTabs)
+                <div id="tabs" class="flex w-full overflow-x-auto whitespace-nowrap no-scrollbar -mt-12">
+                    <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center is-active"
+                            style="background: {{ $secondary }}; color: {{ $onSecondary }};"
+                            data-tab="about">
+                        ABOUT ME
+                    </button>
 
-                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
-                        style="background: {{ $primary }}; color: {{ $onPrimary }};"
-                        data-tab="schedule">
-                    SCHEDULE
-                </button>
-
-                <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
-                        style="background: {{ $primary }}; color: {{ $onPrimary }};"
-                        data-tab="highlights">
-                    HIGHLIGHTS
-                </button>
-
-                @if($hasAnyAccolades)
                     <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
                             style="background: {{ $primary }}; color: {{ $onPrimary }};"
-                            data-tab="accolades">
-                        ACCOLADES
+                            data-tab="schedule">
+                        SCHEDULE
                     </button>
-                @endif
-            </div>
 
-            <div class="bg-white">
+                    <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
+                            style="background: {{ $primary }}; color: {{ $onPrimary }};"
+                            data-tab="highlights">
+                        HIGHLIGHTS
+                    </button>
+
+                    @if($hasAnyAccolades)
+                        <button class="tab-btn flex-shrink-0 px-5 py-3 font-semibold text-center"
+                                style="background: {{ $primary }}; color: {{ $onPrimary }};"
+                                data-tab="accolades">
+                            ACCOLADES
+                        </button>
+                    @endif
+                </div>
+            @endif
+
+            <div class="bg-white {{ $playerCanViewFullProfileTabs ? '' : 'md:mt-0' }}">
                 <div id="tab-about" class="tab-content">
                     <div class="p-6 md:p-10">
                         <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
@@ -2054,7 +2075,8 @@ HTML;
                     @endif
                 </div>
 
-                <div id="tab-schedule" class="tab-content hidden p-6 md:p-10">
+                @if($playerCanViewFullProfileTabs)
+                    <div id="tab-schedule" class="tab-content hidden p-6 md:p-10">
                     <h2 class="text-3xl md:text-4xl font-heading tracking-[0.17em] min-h-[2.5rem]" style="color: {{ $text1 }};">
                         {{ $scheduleHeadline }}
                     </h2>
@@ -2200,6 +2222,7 @@ HTML;
                             </div>
                         @endif
                     </div>
+                @endif
                 @endif
             </div>
         </div>
