@@ -13,6 +13,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -21,6 +22,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -46,122 +49,146 @@ class TeamResource extends Resource
         return $schema
             ->columns(1)
             ->components([
-                Section::make('Team Information')
-                    ->columns(2)
-                    ->schema([
-                        TextInput::make('name')
-                            ->label('Team Name')
-                            ->required()
-                            ->maxLength(255),
-
-                        Select::make('club_id')
-                            ->label('Club')
-                            ->options(fn (): array => Club::query()
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-
-                        Select::make('team_settings.gender')
-                            ->label('Team Category')
-                            ->options([
-                                'mens' => "Men's",
-                                'womens' => "Women's",
-                            ])
-                            ->native(false)
-                            ->required(),
-
-                        TextInput::make('team_settings.sport')
-                            ->label('Sport')
-                            ->placeholder('Soccer')
-                            ->maxLength(255),
-
-                        FileUpload::make('logo')
-                            ->label('Team Logo')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('team-logos')
-                            ->visibility('public'),
-
-                        FileUpload::make('hero_image')
-                            ->label('Hero Image')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('team-landing')
-                            ->visibility('public'),
-
-                        FileUpload::make('background_image')
-                            ->label('Background Image')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('team-landing')
-                            ->visibility('public'),
-                    ]),
-
-                Section::make('Landing Page')
-                    ->columns(3)
-                    ->schema([
-                        Toggle::make('has_landing_page')
-                            ->label('Enable')
-                            ->default(false),
-
-                        Toggle::make('landing_page_is_published')
-                            ->label('Published')
-                            ->default(false),
-
-                        TextInput::make('landing_page_slug')
-                            ->label('URI Slug')
-                            ->placeholder('team-name')
-                            ->maxLength(255),
-
-                        Textarea::make('landing_page_intro')
-                            ->label('Intro / Tagline')
-                            ->rows(2)
-                            ->columnSpanFull(),
-
-                        Textarea::make('landing_page_content')
-                            ->label('Description')
-                            ->rows(4)
-                            ->columnSpanFull(),
-                    ]),
-
-                Section::make('Coach Contact')
-                    ->schema([
-                        Repeater::make('coaching_staff')
-                            ->label('Coaches')
-                            ->addActionLabel('Add Coach')
-                            ->reorderable()
-                            ->collapsed()
-                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? 'Coach')
+                Tabs::make('Team Setup')
+                    ->persistTabInQueryString()
+                    ->tabs([
+                        Tab::make('Basic Information')
+                            ->icon(Heroicon::OutlinedInformationCircle)
                             ->schema([
-                                TextInput::make('name')
-                                    ->label('Name')
-                                    ->maxLength(255),
+                                Section::make('Team Details')
+                                    ->columns(2)
+                                    ->schema([
+                                        TextInput::make('name')
+                                            ->label('Team Name')
+                                            ->required()
+                                            ->maxLength(255),
 
-                                TextInput::make('role')
-                                    ->label('Role')
-                                    ->placeholder('Head Coach')
-                                    ->maxLength(255),
+                                        Select::make('club_id')
+                                            ->label('Club')
+                                            ->options(fn (): array => Club::query()
+                                                ->orderBy('name')
+                                                ->pluck('name', 'id')
+                                                ->all())
+                                            ->searchable()
+                                            ->preload()
+                                            ->required(),
 
-                                TextInput::make('email')
-                                    ->label('Email')
-                                    ->email()
-                                    ->maxLength(255),
+                                        Select::make('team_settings.gender')
+                                            ->label('Team Category')
+                                            ->options([
+                                                'mens' => "Men's",
+                                                'womens' => "Women's",
+                                            ])
+                                            ->native(false)
+                                            ->required(),
 
-                                TextInput::make('phone')
-                                    ->label('Phone')
-                                    ->tel()
-                                    ->maxLength(255),
-                            ])
-                            ->columns(2),
+                                        TextInput::make('team_settings.sport')
+                                            ->label('Sport')
+                                            ->placeholder('Soccer')
+                                            ->maxLength(255),
+
+                                        FileUpload::make('logo')
+                                            ->label('Team Logo')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disk('public')
+                                            ->directory('team-logos')
+                                            ->visibility('public'),
+
+                                        FileUpload::make('background_image')
+                                            ->label('Featured Background Image')
+                                            ->helperText('Optional. If empty, the team page uses the club background image or images/PLYRCARD-SITE.jpg.')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disk('public')
+                                            ->directory('team-landing')
+                                            ->visibility('public'),
+
+                                        ColorPicker::make('branding.primary_color')
+                                            ->label('Primary Color Override')
+                                            ->helperText('Optional. Leave blank to use the club primary color.'),
+
+                                        ColorPicker::make('branding.secondary_color')
+                                            ->label('Secondary Color Override')
+                                            ->helperText('Optional. Leave blank to use the club secondary color.'),
+                                    ]),
+                            ]),
+
+                        Tab::make('Website Publishing')
+                            ->icon(Heroicon::OutlinedGlobeAlt)
+                            ->schema([
+                                Section::make('Publishing')
+                                    ->columns(3)
+                                    ->schema([
+                                        Toggle::make('has_landing_page')
+                                            ->label('Enable Team Page')
+                                            ->default(false),
+
+                                        Toggle::make('landing_page_is_published')
+                                            ->label('Published')
+                                            ->default(false),
+
+                                        TextInput::make('landing_page_slug')
+                                            ->label('URI Slug')
+                                            ->placeholder('team-name')
+                                            ->helperText('Used for /clubs/{club}/teams/{mens|womens}/{slug}. Leave blank to auto-generate from the team name.')
+                                            ->maxLength(255),
+                                    ]),
+                            ]),
+
+                        Tab::make('Coaches')
+                            ->icon(Heroicon::OutlinedUserGroup)
+                            ->schema([
+                                Section::make('Coach Names & Contact')
+                                    ->schema([
+                                        Repeater::make('coaching_staff')
+                                            ->label('Coaches')
+                                            ->addActionLabel('Add Coach')
+                                            ->reorderable()
+                                            ->collapsed()
+                                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? 'Coach')
+                                            ->schema([
+                                                TextInput::make('name')
+                                                    ->label('Coach Name')
+                                                    ->maxLength(255),
+
+                                                TextInput::make('role')
+                                                    ->label('Role')
+                                                    ->placeholder('Head Coach')
+                                                    ->maxLength(255),
+
+                                                TextInput::make('email')
+                                                    ->label('Email')
+                                                    ->email()
+                                                    ->maxLength(255),
+
+                                                TextInput::make('phone')
+                                                    ->label('Phone')
+                                                    ->tel()
+                                                    ->maxLength(255),
+                                            ])
+                                            ->columns(2),
+                                    ]),
+                            ]),
+
+                        Tab::make('Basic Page Info')
+                            ->icon(Heroicon::OutlinedDocumentText)
+                            ->schema([
+                                Section::make('Optional Basic Description')
+                                    ->schema([
+                                        Textarea::make('landing_page_intro')
+                                            ->label('Short Team Tagline')
+                                            ->helperText('Optional short line shown under the team name.')
+                                            ->rows(2),
+
+                                        Textarea::make('landing_page_content')
+                                            ->label('Team Description')
+                                            ->helperText('Optional basic description only. No layout manipulation.')
+                                            ->rows(4),
+                                    ]),
+                            ]),
                     ]),
             ]);
     }

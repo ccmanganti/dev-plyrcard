@@ -25,6 +25,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -52,146 +54,190 @@ class ClubResource extends Resource
         return $schema
             ->columns(1)
             ->components([
-                Section::make('Club Information')
-                    ->columns(2)
-                    ->schema([
-                        TextInput::make('name')
-                            ->label('Club Name')
-                            ->required()
-                            ->maxLength(255),
-
-                        Select::make('league_id')
-                            ->label('League')
-                            ->options(fn (): array => League::query()
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->searchable()
-                            ->preload()
-                            ->nullable(),
-
-                        Select::make('conference_id')
-                            ->label('Conference')
-                            ->options(fn (): array => Conference::query()
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->searchable()
-                            ->preload()
-                            ->nullable(),
-
-                        TextInput::make('city')
-                            ->label('City')
-                            ->maxLength(255),
-
-                        TextInput::make('state')
-                            ->label('State')
-                            ->maxLength(255),
-
-                        FileUpload::make('logo')
-                            ->label('Club Logo')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('club-logos')
-                            ->visibility('public'),
-
-                        FileUpload::make('hero_image')
-                            ->label('Hero Image')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('club-landing')
-                            ->visibility('public'),
-
-                        FileUpload::make('background_image')
-                            ->label('Background Image')
-                            ->image()
-                            ->downloadable()
-                            ->imageEditor()
-                            ->disk('public')
-                            ->directory('club-landing')
-                            ->visibility('public'),
-
-                        ColorPicker::make('primary_color')
-                            ->label('Primary Color'),
-
-                        ColorPicker::make('secondary_color')
-                            ->label('Secondary Color'),
-                    ]),
-
-                Section::make('Landing Page')
-                    ->columns(3)
-                    ->schema([
-                        Toggle::make('has_landing_page')
-                            ->label('Enable')
-                            ->default(false),
-
-                        Toggle::make('landing_page_is_published')
-                            ->label('Published')
-                            ->default(false),
-
-                        TextInput::make('landing_page_slug')
-                            ->label('URI Slug')
-                            ->placeholder('club-name')
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(255),
-
-                        Textarea::make('landing_page_intro')
-                            ->label('Intro / Tagline')
-                            ->rows(2)
-                            ->columnSpanFull(),
-
-                        Textarea::make('landing_page_content')
-                            ->label('Description')
-                            ->rows(5)
-                            ->columnSpanFull(),
-                    ]),
-
-                Section::make('Footer Contact Information')
-                    ->columns(2)
-                    ->schema([
-                        TextInput::make('contact_info.address')
-                            ->label('Address')
-                            ->maxLength(255),
-
-                        TextInput::make('contact_info.maps_url')
-                            ->label('Google Maps URL')
-                            ->url()
-                            ->maxLength(255),
-
-                        TextInput::make('contact_info.phone')
-                            ->label('Phone')
-                            ->tel()
-                            ->maxLength(255),
-
-                        TextInput::make('contact_info.email')
-                            ->label('Email')
-                            ->email()
-                            ->maxLength(255),
-                    ]),
-
-                Section::make('Sponsors / Partners')
-                    ->schema([
-                        Repeater::make('sponsors_partners')
-                            ->label('Sponsors / Partners')
-                            ->addActionLabel('Add Sponsor')
-                            ->reorderable()
-                            ->collapsed()
-                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? 'Sponsor')
+                Tabs::make('Club Setup')
+                    ->persistTabInQueryString()
+                    ->tabs([
+                        Tab::make('Basic Information')
+                            ->icon(Heroicon::OutlinedInformationCircle)
                             ->schema([
-                                TextInput::make('name')
-                                    ->label('Name')
-                                    ->maxLength(255),
+                                Section::make('Club Details')
+                                    ->columns(2)
+                                    ->schema([
+                                        TextInput::make('name')
+                                            ->label('Club Name')
+                                            ->required()
+                                            ->maxLength(255),
 
-                                TextInput::make('url')
-                                    ->label('URL')
-                                    ->url()
-                                    ->maxLength(255),
-                            ])
-                            ->columns(2),
+                                        Select::make('league_id')
+                                            ->label('League')
+                                            ->options(fn (): array => League::query()
+                                                ->orderBy('name')
+                                                ->pluck('name', 'id')
+                                                ->all())
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable(),
+
+                                        Select::make('conference_id')
+                                            ->label('Conference')
+                                            ->options(fn (): array => Conference::query()
+                                                ->orderBy('name')
+                                                ->pluck('name', 'id')
+                                                ->all())
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable(),
+
+                                        TextInput::make('city')
+                                            ->label('City')
+                                            ->maxLength(255),
+
+                                        TextInput::make('state')
+                                            ->label('State')
+                                            ->maxLength(255),
+
+                                        FileUpload::make('logo')
+                                            ->label('Club Logo')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disk('public')
+                                            ->directory('club-logos')
+                                            ->visibility('public'),
+
+                                        FileUpload::make('background_image')
+                                            ->label('Featured Background Image')
+                                            ->helperText('Optional. If empty, the club landing page uses images/PLYRCARD-SITE.jpg.')
+                                            ->image()
+                                            ->downloadable()
+                                            ->imageEditor()
+                                            ->disk('public')
+                                            ->directory('club-landing')
+                                            ->visibility('public'),
+
+                                        ColorPicker::make('primary_color')
+                                            ->label('Primary Color'),
+
+                                        ColorPicker::make('secondary_color')
+                                            ->label('Secondary Color'),
+                                    ]),
+                            ]),
+
+                        Tab::make('Website Publishing')
+                            ->icon(Heroicon::OutlinedGlobeAlt)
+                            ->schema([
+                                Section::make('Publishing')
+                                    ->columns(3)
+                                    ->schema([
+                                        Toggle::make('has_landing_page')
+                                            ->label('Enable Club Page')
+                                            ->default(false),
+
+                                        Toggle::make('landing_page_is_published')
+                                            ->label('Published')
+                                            ->default(false),
+
+                                        TextInput::make('landing_page_slug')
+                                            ->label('URI Slug')
+                                            ->placeholder('club-name')
+                                            ->helperText('Used for /clubs/{slug}. Leave blank to auto-generate from the club name.')
+                                            ->unique(ignoreRecord: true)
+                                            ->maxLength(255),
+                                    ]),
+                            ]),
+
+                        Tab::make('Contact / Address')
+                            ->icon(Heroicon::OutlinedMapPin)
+                            ->schema([
+                                Section::make('Basic Address & Contact')
+                                    ->columns(2)
+                                    ->schema([
+                                        TextInput::make('contact_info.address')
+                                            ->label('Address')
+                                            ->maxLength(255),
+
+                                        TextInput::make('contact_info.maps_url')
+                                            ->label('Google Maps URL')
+                                            ->url()
+                                            ->maxLength(255),
+
+                                        TextInput::make('contact_info.phone')
+                                            ->label('Phone')
+                                            ->tel()
+                                            ->maxLength(255),
+
+                                        TextInput::make('contact_info.email')
+                                            ->label('Email')
+                                            ->email()
+                                            ->maxLength(255),
+
+                                        Textarea::make('landing_page_content')
+                                            ->label('Club Description')
+                                            ->helperText('Shown in the footer and basic club description areas.')
+                                            ->rows(4)
+                                            ->columnSpanFull(),
+                                    ]),
+                            ]),
+
+                        Tab::make('Coaches')
+                            ->icon(Heroicon::OutlinedUserGroup)
+                            ->schema([
+                                Section::make('Coach Names')
+                                    ->schema([
+                                        Repeater::make('coaching_staff')
+                                            ->label('Coaches')
+                                            ->addActionLabel('Add Coach')
+                                            ->reorderable()
+                                            ->collapsed()
+                                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? 'Coach')
+                                            ->schema([
+                                                TextInput::make('name')
+                                                    ->label('Coach Name')
+                                                    ->maxLength(255),
+
+                                                TextInput::make('role')
+                                                    ->label('Role')
+                                                    ->placeholder('Head Coach')
+                                                    ->maxLength(255),
+
+                                                TextInput::make('email')
+                                                    ->label('Email')
+                                                    ->email()
+                                                    ->maxLength(255),
+
+                                                TextInput::make('phone')
+                                                    ->label('Phone')
+                                                    ->tel()
+                                                    ->maxLength(255),
+                                            ])
+                                            ->columns(2),
+                                    ]),
+                            ]),
+
+                        Tab::make('Sponsors')
+                            ->icon(Heroicon::OutlinedStar)
+                            ->schema([
+                                Section::make('Sponsors / Partners')
+                                    ->schema([
+                                        Repeater::make('sponsors_partners')
+                                            ->label('Sponsors / Partners')
+                                            ->addActionLabel('Add Sponsor')
+                                            ->reorderable()
+                                            ->collapsed()
+                                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? 'Sponsor')
+                                            ->schema([
+                                                TextInput::make('name')
+                                                    ->label('Sponsor Name')
+                                                    ->maxLength(255),
+
+                                                TextInput::make('url')
+                                                    ->label('Sponsor URL')
+                                                    ->url()
+                                                    ->maxLength(255),
+                                            ])
+                                            ->columns(2),
+                                    ]),
+                            ]),
                     ]),
             ]);
     }
