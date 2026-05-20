@@ -208,20 +208,39 @@ Route::post('/onboarding/complete', function (Request $request) {
 | custom domain receive its own owner/session access.
 |
 */
+Route::get('/csrf-token', function () {
+    return response()->json([
+        'success' => true,
+        'csrf_token' => csrf_token(),
+    ]);
+})->name('csrf-token');
 
 Route::post('/locker-room/login', function (Request $request) {
+    $expectsJson = $request->expectsJson() || $request->ajax();
+
     $credentials = $request->validate([
         'email' => ['required', 'email'],
         'password' => ['required', 'string'],
     ]);
 
     if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        if ($expectsJson) {
+            return response()->json([
+                'success' => false,
+                'message' => 'These credentials do not match our records.',
+                'errors' => [
+                    'email' => ['These credentials do not match our records.'],
+                ],
+            ], 422);
+        }
+
         return back()
             ->withErrors(['email' => 'These credentials do not match our records.'])
             ->onlyInput('email');
     }
 
     $request->session()->regenerate();
+    $request->session()->regenerateToken();
 
     $user = Auth::user();
 
@@ -232,19 +251,26 @@ Route::post('/locker-room/login', function (Request $request) {
         ->latest('updated_at')
         ->first();
 
-    if (! $website) {
-        return redirect('/');
+    $redirectUrl = url('/');
+
+    if ($website) {
+        if (! blank($website->domain)) {
+            $redirectUrl = route('locker-room.website.visit', $website);
+        } elseif (! blank($website->slug)) {
+            $redirectUrl = url('/' . ltrim($website->slug, '/'));
+        }
     }
 
-    if (! blank($website->domain)) {
-        return redirect()->route('locker-room.website.visit', $website);
+    if ($expectsJson) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Signed in successfully.',
+            'redirect_url' => $redirectUrl,
+            'csrf_token' => csrf_token(),
+        ]);
     }
 
-    if (! blank($website->slug)) {
-        return redirect('/' . ltrim($website->slug, '/'));
-    }
-
-    return redirect('/');
+    return redirect()->to($redirectUrl);
 })->name('plyrcard.drawer-login');
 
 /*

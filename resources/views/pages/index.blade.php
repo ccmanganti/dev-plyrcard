@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="PLYRCARD — Your Game. Your Brand. One Card. The premium recruiting card for serious athletes." />
   <title>PLYRCARD — Own Your Journey</title>
-  
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <!-- Antonio + Inter from Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1850,6 +1850,7 @@
     }
 
   </style>
+
 </head>
 <body>
 <!-- ════════════════════════════════════════════════════════

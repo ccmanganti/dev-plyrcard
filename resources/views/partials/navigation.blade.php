@@ -4028,18 +4028,113 @@
       });
     }
 
+    function getPlyrCsrfToken() {
+      return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || document.querySelector('input[name="_token"]')?.value
+        || '';
+    }
+
+    function setPlyrCsrfToken(token) {
+      if (!token) {
+        return;
+      }
+
+      document.querySelectorAll('input[name="_token"]').forEach((input) => {
+        input.value = token;
+      });
+
+      let meta = document.querySelector('meta[name="csrf-token"]');
+
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'csrf-token');
+        document.head.appendChild(meta);
+      }
+
+      meta.setAttribute('content', token);
+    }
+
+    async function refreshPlyrCsrfToken() {
+      try {
+        const response = await fetch('/csrf-token', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+
+        if (!response.ok) {
+          return null;
+        }
+
+        const payload = await response.json();
+        const token = payload?.csrf_token || null;
+
+        if (token) {
+          setPlyrCsrfToken(token);
+        }
+
+        return token;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    async function submitPlyrDrawerLogin(form, formData) {
+      const token = formData.get('_token') || getPlyrCsrfToken();
+
+      return fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+
+        /*
+        * This matters.
+        * The login route should return JSON with redirect_url.
+        * We do not want fetch to follow a custom-domain redirect.
+        */
+        redirect: 'manual',
+
+        headers: {
+          'X-CSRF-TOKEN': token,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        },
+      });
+    }
+
     function bindLoadingForms() {
-      qa('[data-plyrcard-login-form]').forEach(form => {
-        if (form.dataset.plyrLoginBound) return;
+      qa('[data-plyrcard-login-form]').forEach((form) => {
+        if (form.dataset.plyrLoginBound) {
+          return;
+        }
+
         form.dataset.plyrLoginBound = '1';
-        form.addEventListener('submit', async event => {
+
+        form.addEventListener('submit', async (event) => {
           event.preventDefault();
-          if (!validateDrawerForm(form)) return;
+
+          if (!validateDrawerForm(form)) {
+            return;
+          }
 
           const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
           const originalHtml = submitButton ? submitButton.innerHTML : '';
+          const action = form.getAttribute('action') || '';
+
+          if (!action || action === '#') {
+            showAlert('The login form is not connected yet.', true);
+            return;
+          }
+
           const formData = new FormData(form);
-          const token = formData.get('_token') || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+          if (!formData.get('_token')) {
+            formData.set('_token', getPlyrCsrfToken());
+          }
 
           if (submitButton) {
             submitButton.disabled = true;
@@ -4048,32 +4143,63 @@
           }
 
           try {
-            const response = await fetch(form.action, {
-              method: 'POST',
-              body: formData,
-              credentials: 'include',
-              headers: {
-                'X-CSRF-TOKEN': token,
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json',
-              },
-            });
+            let response = await submitPlyrDrawerLogin(form, formData);
+
+            /*
+            * If the public page was cached, the drawer was open too long,
+            * or the session token changed, Laravel returns 419.
+            * Refresh CSRF once, update the hidden _token field, and retry once.
+            */
+            if (response.status === 419) {
+              const freshToken = await refreshPlyrCsrfToken();
+
+              if (freshToken) {
+                formData.set('_token', freshToken);
+                response = await submitPlyrDrawerLogin(form, formData);
+              }
+            }
 
             let payload = null;
-            try { payload = await response.clone().json(); } catch (error) {}
+
+            try {
+              payload = await response.clone().json();
+            } catch (error) {
+              payload = null;
+            }
 
             if (!response.ok || payload?.success === false) {
-              const message = payload?.message || Object.values(payload?.errors || {}).flat()[0] || 'The email or password is incorrect.';
+              const message =
+                payload?.message
+                || Object.values(payload?.errors || {}).flat()[0]
+                || (response.status === 419
+                  ? 'Your login session expired. Please refresh the page and try again.'
+                  : 'The email or password is incorrect.');
+
               const emailField = form.querySelector('[name="email"]');
-              addFieldError(emailField, message);
+
+              if (emailField && typeof addFieldError === 'function') {
+                addFieldError(emailField, message);
+              }
+
               showAlert(message, true);
               return;
             }
 
+            if (payload?.csrf_token) {
+              setPlyrCsrfToken(payload.csrf_token);
+            }
+
             showAlert(payload?.message || form.dataset.successMessage || 'Signed in successfully.');
+
             window.setTimeout(() => {
+              /*
+              * This is the CORS fix.
+              * The login route returns JSON with redirect_url.
+              * Then the browser navigates normally.
+              * fetch does not follow the redirect to the custom domain.
+              */
               window.location.assign(payload?.redirect_url || '/');
-            }, 280);
+            }, 250);
           } catch (error) {
             showAlert('Unable to sign in right now. Please try again.', true);
           } finally {
@@ -4086,43 +4212,21 @@
         });
       });
 
-      qa('[data-plyrcard-loading-form]').forEach(form => {
-        if (form.dataset.plyrLoadingBound) return;
-        form.dataset.plyrLoadingBound = '1';
-        form.addEventListener('submit', event => {
-          event.preventDefault();
-          if (!validateDrawerForm(form)) return;
-          const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
-          if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.classList.add('is-loading');
-            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Loading...';
-          }
-          form.submit();
-        });
-      });
+      qa('[data-plyrcard-loading-form]').forEach((form) => {
+        if (form.dataset.plyrLoadingBound) {
+          return;
+        }
 
-      qa('[data-plyrcard-mock-form]').forEach(form => {
-        if (form.dataset.plyrMockBound) return;
-        form.dataset.plyrMockBound = '1';
-        form.addEventListener('submit', event => {
-          event.preventDefault();
-          if (!validateDrawerForm(form)) return;
+        form.dataset.plyrLoadingBound = '1';
+
+        form.addEventListener('submit', () => {
           const submitButton = form.querySelector('button[type="submit"], .plyrcard-submit-btn[type="submit"]');
-          const originalHtml = submitButton ? submitButton.innerHTML : '';
+
           if (submitButton) {
             submitButton.disabled = true;
             submitButton.classList.add('is-loading');
-            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Saving...';
+            submitButton.innerHTML = '<span class="plyrcard-btn-spinner" aria-hidden="true"></span> Sending...';
           }
-          window.setTimeout(() => {
-            showAlert(form.dataset.successMessage || 'Saved.');
-            if (submitButton) {
-              submitButton.disabled = false;
-              submitButton.classList.remove('is-loading');
-              submitButton.innerHTML = originalHtml;
-            }
-          }, 500);
         });
       });
     }
