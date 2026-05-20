@@ -7,12 +7,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
+  @include('partials.plyrcard-csrf-meta')
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="PLYRCARD — Your Game. Your Brand. One Card. The premium recruiting card for serious athletes." />
   <title>PLYRCARD — Own Your Journey</title>
-
+  
   <!-- Antonio + Inter from Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
