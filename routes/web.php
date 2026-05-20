@@ -79,19 +79,45 @@ Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
 |
 | Keep these ABOVE the catch-all /{websiteName} route.
 |
-| Final structure:
+| Current public structure:
+|
 | /clubs/{clubSlug}
+| /clubs/{clubSlug}/teams/boys/{teamSlug}
+| /clubs/{clubSlug}/teams/girls/{teamSlug}
+|
+| Legacy accepted team gender segments:
+|
 | /clubs/{clubSlug}/teams/mens/{teamSlug}
 | /clubs/{clubSlug}/teams/womens/{teamSlug}
+|
+| The controller should normalize:
+| mens   -> boys
+| womens -> girls
 |
 */
 
 Route::get('/clubs/{clubSlug}', [PublicClubTeamController::class, 'club'])
     ->name('clubs.landing');
 
+Route::post('/clubs/{clubSlug}/coach-check-in', [PublicClubTeamController::class, 'coachCheckIn'])
+    ->name('clubs.coach-check-in');
+
+Route::post('/clubs/{clubSlug}/coach-check-out', [PublicClubTeamController::class, 'coachCheckOut'])
+    ->name('clubs.coach-check-out');
+
 Route::get('/clubs/{clubSlug}/teams/{gender}/{teamSlug}', [PublicClubTeamController::class, 'team'])
-    ->whereIn('gender', ['mens', 'womens'])
+    ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
     ->name('clubs.teams.landing');
+
+Route::post('/clubs/{clubSlug}/teams/{gender}/{teamSlug}/players/{player}/save', [PublicClubTeamController::class, 'savePlayer'])
+    ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
+    ->whereNumber('player')
+    ->name('clubs.teams.players.save');
+
+Route::delete('/clubs/{clubSlug}/teams/{gender}/{teamSlug}/players/{player}/save', [PublicClubTeamController::class, 'unsavePlayer'])
+    ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
+    ->whereNumber('player')
+    ->name('clubs.teams.players.unsave');
 
 /*
 |--------------------------------------------------------------------------
@@ -208,6 +234,7 @@ Route::post('/onboarding/complete', function (Request $request) {
 | custom domain receive its own owner/session access.
 |
 */
+
 Route::get('/csrf-token', function () {
     return response()->json([
         'success' => true,
