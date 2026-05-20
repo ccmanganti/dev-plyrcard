@@ -112,12 +112,12 @@ Route::get('/clubs/{clubSlug}/teams/{gender}/{teamSlug}', [PublicClubTeamControl
 Route::post('/clubs/{clubSlug}/teams/{gender}/{teamSlug}/players/{player}/save', [PublicClubTeamController::class, 'savePlayer'])
     ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
     ->whereNumber('player')
-    ->name('clubs.teams.players.save');
+    ->name('clubs.coach-save-player');
 
 Route::delete('/clubs/{clubSlug}/teams/{gender}/{teamSlug}/players/{player}/save', [PublicClubTeamController::class, 'unsavePlayer'])
     ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
     ->whereNumber('player')
-    ->name('clubs.teams.players.unsave');
+    ->name('clubs.coach-unsave-player');
 
 /*
 |--------------------------------------------------------------------------
