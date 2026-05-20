@@ -253,13 +253,14 @@
             padding: 14px 0;
         }
 
-                .club-card {
-            border: 1px solid color-mix(in srgb, var(--club-border) 32%, rgba(255,255,255,.11));
+                        .club-card {
+            border: 0;
+            border-top: 1px solid color-mix(in srgb, var(--club-border) 26%, rgba(255,255,255,.10));
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-brand-primary) 10%, transparent), transparent 44%),
-                color-mix(in srgb, var(--club-surface) 91%, transparent);
-            backdrop-filter: blur(16px);
-            box-shadow: 0 14px 38px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.045);
+                linear-gradient(135deg, color-mix(in srgb, var(--club-brand-primary) 8%, transparent), transparent 42%),
+                color-mix(in srgb, var(--club-surface) 86%, transparent);
+            backdrop-filter: blur(14px);
+            box-shadow: none;
         }
 
         .club-hero {
@@ -268,12 +269,12 @@
             gap: 10px;
         }
 
-        .club-hero-main {
+                .club-hero-main {
             position: relative;
-            min-height: 355px;
-            border-radius: 22px;
+            min-height: 340px;
+            border-radius: 8px;
             overflow: hidden;
-            padding: clamp(20px, 3.4vw, 36px);
+            padding: clamp(20px, 3.2vw, 34px);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -431,27 +432,28 @@
             gap: 8px;
         }
 
-                        .club-mini-stat {
-            min-height: 76px;
-            border-radius: 12px;
-            padding: 10px 11px;
+                                .club-mini-stat {
+            min-height: 68px;
+            border-radius: 6px;
+            padding: 9px 10px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             gap: 7px;
+            border-left: 3px solid var(--club-primary);
         }
 
-                        .club-mini-stat i {
-            width: 22px;
-            height: 22px;
-            border-radius: 7px;
+                                .club-mini-stat i {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: var(--club-primary);
-            font-size: 11px;
-            background: rgba(255,255,255,.06);
-            filter: drop-shadow(0 0 10px color-mix(in srgb, var(--club-primary) 24%, transparent));
+            font-size: 10px;
+            background: transparent;
+            filter: none;
             margin: 0;
             flex: 0 0 auto;
         }
@@ -489,10 +491,10 @@
             word-break: normal;
         }
 
-        .club-teams {
+                .club-teams {
             position: relative;
             margin-top: 12px;
-            border-radius: 20px;
+            border-radius: 8px;
             overflow: hidden;
         }
 
@@ -531,23 +533,24 @@
             align-content: start;
         }
 
-        .club-gender-tab {
-            min-height: 58px;
-            border: 1px solid rgba(255,255,255,.10);
-            border-radius: 13px;
-            background: rgba(255,255,255,.05);
+                .club-gender-tab {
+            min-height: 52px;
+            border: 0;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            border-radius: 0;
+            background: rgba(255,255,255,.035);
             color: #fff;
             cursor: pointer;
-            padding: 9px 10px;
+            padding: 8px 10px;
             text-align: left;
-            transition: transform .18s ease, background .18s ease, border-color .18s ease;
+            transition: background .18s ease, border-color .18s ease;
         }
 
-        .club-gender-tab:hover,
+                .club-gender-tab:hover,
         .club-gender-tab.is-active {
-            transform: translateX(2px);
+            transform: none;
             border-color: var(--club-border);
-            background: color-mix(in srgb, var(--club-primary) 18%, rgba(255,255,255,.055));
+            background: color-mix(in srgb, var(--club-primary) 16%, rgba(255,255,255,.045));
         }
 
         .club-gender-tab strong {
@@ -635,25 +638,26 @@
         .club-team-arrow.is-left { left: 8px; }
         .club-team-arrow.is-right { right: 8px; }
 
-        .club-team-card {
+                .club-team-card {
             scroll-snap-align: start;
-            width: 142px;
-            min-width: 142px;
-            min-height: 138px;
-            border-radius: 15px;
-            border: 1px solid rgba(255,255,255,.11);
+            width: 138px;
+            min-width: 138px;
+            min-height: 126px;
+            border-radius: 6px;
+            border: 0;
+            border-left: 3px solid var(--club-primary);
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 18%, transparent), transparent 50%),
-                rgba(255,255,255,.05);
+                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 13%, transparent), transparent 50%),
+                rgba(255,255,255,.045);
             color: #fff;
             text-decoration: none;
-            padding: 11px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
             position: relative;
             overflow: hidden;
-            transition: transform .18s ease, border-color .18s ease;
+            transition: transform .18s ease, background .18s ease;
         }
 
         .club-team-card:hover {
@@ -661,18 +665,18 @@
             border-color: var(--club-border);
         }
 
-        .club-team-card-mark {
+                .club-team-card-mark {
             position: absolute;
-            top: 9px;
-            right: 9px;
-            width: 30px;
-            height: 30px;
-            border-radius: 9px;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: var(--club-primary);
-            background: rgba(0,0,0,.32);
+            background: rgba(255,255,255,.05);
         }
 
         .club-team-name {
@@ -691,15 +695,15 @@
             font-weight: 800;
         }
 
-                .club-footer {
+                        .club-footer {
             position: relative;
-            border-radius: 10px;
+            border-radius: 0;
             overflow: hidden;
             margin-top: 2px;
-            border-left: 0;
-            border-right: 0;
+            border: 0;
+            border-top: 1px solid rgba(255,255,255,.10);
             background:
-                linear-gradient(180deg, color-mix(in srgb, var(--club-surface) 86%, transparent), rgba(0,0,0,.90));
+                linear-gradient(180deg, color-mix(in srgb, var(--club-surface) 80%, transparent), rgba(0,0,0,.92));
             box-shadow: none;
         }
 
@@ -735,15 +739,16 @@
             gap: 7px;
         }
 
-                .club-footer-item {
-            min-height: 40px;
+                        .club-footer-item {
+            min-height: 38px;
             display: flex;
             align-items: center;
             gap: 7px;
-            border-radius: 8px;
-            padding: 7px;
-            background: rgba(255,255,255,.035);
-            border: 1px solid rgba(255,255,255,.07);
+            border-radius: 0;
+            padding: 7px 0;
+            background: transparent;
+            border: 0;
+            border-bottom: 1px solid rgba(255,255,255,.06);
             color: rgba(255,255,255,.76);
             text-decoration: none;
             font-size: 10.5px;
@@ -1428,3 +1433,23 @@
     </script>
 </body>
 </html>
+
+<style>
+@media (max-width: 560px) {
+    .club-hero-main,
+    .club-teams {
+        border-radius: 6px !important;
+    }
+
+    .club-mini-stat {
+        border-radius: 5px !important;
+        border-left: 2px solid var(--club-primary) !important;
+    }
+
+    .club-gender-tab,
+    .club-team-card,
+    .club-footer-item {
+        border-radius: 0 !important;
+    }
+}
+</style>

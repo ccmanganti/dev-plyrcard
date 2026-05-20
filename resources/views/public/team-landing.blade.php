@@ -301,18 +301,18 @@
             pointer-events: none;
         }
 
-        .team-app {
+                .team-app {
             position: relative;
             z-index: 2;
             width: min(var(--app-width), 100%);
             margin: 0 auto;
             min-height: calc(100vh - 20px);
-            border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.10));
-            border-radius: 18px;
+            border: 0;
+            border-top: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.10));
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
                 color-mix(in srgb, var(--team-surface) 92%, transparent);
-            box-shadow: 0 20px 70px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.045);
+            box-shadow: none;
             overflow: hidden;
         }
 
@@ -365,15 +365,18 @@
             font-weight: 900;
         }
 
-        .team-hero-card {
+                .team-hero-card {
             position: relative;
-            border-radius: 12px;
-            border: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.12));
+            border-radius: 6px;
+            border: 0;
+            border-top: 1px solid color-mix(in srgb, var(--team-border) 26%, rgba(255,255,255,.12));
             overflow: hidden;
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 18%, transparent), transparent 48%),
                 linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 24%, transparent), transparent 58%),
                 url("{{ $heroImageUrl }}") center/cover no-repeat;
+            box-shadow: none;
+        }}") center/cover no-repeat;
             box-shadow: 0 12px 30px rgba(0,0,0,.36);
         }
 
@@ -441,23 +444,23 @@
             font-weight: 900;
         }
 
-        .team-meta-row {
+                .team-meta-row {
             margin-top: 8px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
-            border-radius: 8px;
+            border-radius: 0;
             overflow: hidden;
-            background: rgba(255,255,255,.13);
+            background: rgba(255,255,255,.10);
         }
 
-        .team-meta {
+                .team-meta {
             min-height: 36px;
             display: flex;
             align-items: center;
             gap: 7px;
             padding: 6px 8px;
-            background: rgba(255,255,255,.07);
+            background: rgba(255,255,255,.055);
         }
 
         .team-meta i {
@@ -490,11 +493,12 @@
             gap: 6px;
         }
 
-        .team-contact-btn {
-            min-height: 34px;
-            border-radius: 9px;
-            border: 1px solid rgba(255,255,255,.14);
-            background: color-mix(in srgb, var(--team-surface) 58%, transparent);
+                .team-contact-btn {
+            min-height: 32px;
+            border-radius: 0;
+            border: 0;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.045);
             color: #fff;
             text-decoration: none;
             display: flex;
@@ -504,7 +508,7 @@
             font-size: 10px;
             font-weight: 800;
             white-space: nowrap;
-            transition: transform .18s ease, border-color .18s ease, background .18s ease;
+            transition: background .18s ease, border-color .18s ease;
         }
 
         .team-contact-btn:hover {
@@ -544,10 +548,11 @@
             font-weight: 700;
         }
 
-        .field-wrap {
-            border-radius: 12px;
+                .field-wrap {
+            border-radius: 4px;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,.08);
+            border: 0;
+            border-top: 1px solid rgba(255,255,255,.08);
             background: #061f0c;
         }
 
@@ -748,7 +753,7 @@
             transform: scale(.985);
         }
 
-        .player-panel {
+                .player-panel {
             position: absolute;
             top: 0;
             right: 0;
@@ -757,8 +762,8 @@
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 7%, transparent), transparent 34%),
                 #050505;
-            border-left: 1px solid rgba(255,255,255,.14);
-            box-shadow: -30px 0 80px rgba(0,0,0,.62);
+            border-left: 1px solid rgba(255,255,255,.10);
+            box-shadow: -18px 0 48px rgba(0,0,0,.50);
             transform: translateX(100%);
             animation: playerPanelIn .24s ease forwards;
         }
@@ -862,13 +867,14 @@
             border-radius: 999px;
         }
 
-                .player-stats-card {
+                        .player-stats-card {
             max-width: 380px;
             margin: 0 auto;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,.10);
-            background: rgba(255,255,255,.045);
-            box-shadow: 0 12px 30px rgba(0,0,0,.34);
+            border-radius: 0;
+            border: 0;
+            border-top: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.035);
+            box-shadow: none;
             overflow: hidden;
         }
 
@@ -883,18 +889,18 @@
                 rgba(255,255,255,.032);
         }
 
-        .player-stats-avatar {
-            width: 64px;
-            height: 64px;
-            border-radius: 15px;
+                .player-stats-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
             object-fit: cover;
             background: rgba(0,0,0,.35);
-            border: 1px solid rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.12);
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: var(--team-heading);
-            font-size: 27px;
+            font-size: 25px;
             font-weight: 900;
             color: #fff;
             flex: 0 0 auto;
@@ -926,9 +932,9 @@
             padding: 12px 12px 4px;
         }
 
-        .player-website-btn {
-            min-height: 37px;
-            border-radius: 9px;
+                .player-website-btn {
+            min-height: 34px;
+            border-radius: 3px;
             background: linear-gradient(135deg, var(--team-primary), var(--team-brand-primary, var(--team-secondary)));
             color: var(--team-text-on-primary);
             text-decoration: none;
@@ -942,7 +948,7 @@
             letter-spacing: .08em;
             text-transform: uppercase;
             font-weight: 900;
-            box-shadow: 0 10px 22px color-mix(in srgb, var(--team-primary) 26%, transparent);
+            box-shadow: none;
         }
 
                 .player-chip-row {
@@ -952,16 +958,17 @@
             padding: 8px 12px 10px;
         }
 
-        .player-chip {
-            min-height: 28px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,.10);
-            background: rgba(255,255,255,.05);
+                .player-chip {
+            min-height: 26px;
+            border-radius: 0;
+            border: 0;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            background: transparent;
             color: rgba(255,255,255,.76);
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 0 9px;
+            padding: 0 4px;
             font-size: 10.5px;
             font-weight: 800;
         }
@@ -977,12 +984,13 @@
             padding: 10px;
         }
 
-        .player-stat-box {
-            min-height: 58px;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,.10);
-            background: rgba(0,0,0,.24);
-            padding: 9px;
+                .player-stat-box {
+            min-height: 54px;
+            border-radius: 0;
+            border: 0;
+            border-left: 2px solid var(--team-primary);
+            background: rgba(255,255,255,.035);
+            padding: 8px;
         }
 
         .player-stat-box span {
@@ -1032,26 +1040,27 @@
             gap: 7px;
         }
 
-                .player-info-item {
-            min-height: 40px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,.09);
-            background: rgba(255,255,255,.035);
+                        .player-info-item {
+            min-height: 38px;
+            border-radius: 0;
+            border: 0;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            background: transparent;
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px;
+            padding: 8px 2px;
         }
 
-        .player-info-item i {
-            width: 22px;
-            height: 22px;
-            border-radius: 8px;
+                .player-info-item i {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: var(--team-primary);
-            background: rgba(255,255,255,.06);
+            background: transparent;
             flex: 0 0 auto;
         }
 
@@ -1580,3 +1589,20 @@
     </script>
 </body>
 </html>
+
+<style>
+@media (max-width: 560px) {
+    .team-hero-card,
+    .field-wrap,
+    .player-stats-card,
+    .player-stat-box,
+    .player-info-item,
+    .team-contact-btn {
+        border-radius: 0 !important;
+    }
+
+    .team-app {
+        border-radius: 0 !important;
+    }
+}
+</style>
