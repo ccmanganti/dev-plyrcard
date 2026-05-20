@@ -99,11 +99,11 @@ Route::get('/preview/{website}', [PublicWebsiteController::class, 'preview'])
 Route::get('/clubs/{clubSlug}', [PublicClubTeamController::class, 'club'])
     ->name('clubs.landing');
 
-Route::post('/clubs/{clubSlug}/coach-check-in', [PublicClubTeamController::class, 'coachCheckIn'])
-    ->name('clubs.coach-check-in');
+Route::post('/clubs/{clubSlug}/coach-checkin', [PublicClubTeamController::class, 'coachCheckIn'])
+    ->name('clubs.coach-checkin');
 
-Route::post('/clubs/{clubSlug}/coach-check-out', [PublicClubTeamController::class, 'coachCheckOut'])
-    ->name('clubs.coach-check-out');
+Route::post('/clubs/{clubSlug}/coach-checkout', [PublicClubTeamController::class, 'coachCheckOut'])
+    ->name('clubs.coach-checkout');
 
 Route::get('/clubs/{clubSlug}/teams/{gender}/{teamSlug}', [PublicClubTeamController::class, 'team'])
     ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
