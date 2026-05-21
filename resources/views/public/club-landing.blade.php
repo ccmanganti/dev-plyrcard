@@ -921,7 +921,330 @@
             .club-stat strong{ font-size:11px !important; }
         }
 
-    </style>
+    
+
+        /*
+        |--------------------------------------------------------------------------
+        | PLYRCard app polish pass
+        |--------------------------------------------------------------------------
+        | Inspired by plyrcard.com: black surface, compact athletic type,
+        | high-contrast cards, and app-like spacing.
+        */
+        .club-page{
+            background:
+                radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--club-readable-primary) 18%, transparent), transparent 34%),
+                #030304 !important;
+        }
+
+        .club-hero,
+        .club-section,
+        .club-footer,
+        .club-stats{
+            width:min(430px, 100%) !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }
+
+        .club-hero{
+            min-height:0 !important;
+            padding:12px !important;
+            align-items:stretch !important;
+            background:#050506 !important;
+        }
+
+        .club-hero-bg{
+            border-radius:24px !important;
+            overflow:hidden !important;
+        }
+
+        .club-hero::before{
+            inset:12px !important;
+            border-radius:24px !important;
+            background:
+                radial-gradient(circle at 12% 6%, color-mix(in srgb, var(--club-primary) 54%, transparent), transparent 31%),
+                radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--club-secondary) 42%, transparent), transparent 34%),
+                linear-gradient(100deg, color-mix(in srgb, var(--club-primary) 56%, rgba(0,0,0,.92)) 0%, rgba(0,0,0,.78) 54%, color-mix(in srgb, var(--club-secondary) 52%, rgba(0,0,0,.92)) 100%) !important;
+            opacity:.98 !important;
+        }
+
+        .club-hero::after{
+            inset:12px !important;
+            border-radius:24px !important;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.84)),
+                linear-gradient(90deg, rgba(255,255,255,.06), transparent 44%) !important;
+        }
+
+        .club-hero-inner{
+            min-height:330px !important;
+            display:flex !important;
+            align-items:flex-end !important;
+            padding:18px !important;
+        }
+
+        .club-hero-copy{
+            width:100% !important;
+        }
+
+        .club-brand{
+            margin-bottom:16px !important;
+            gap:10px !important;
+        }
+
+        .club-logo{
+            width:48px !important;
+            height:48px !important;
+            object-fit:contain !important;
+        }
+
+        .league-logo{
+            max-width:58px !important;
+            max-height:34px !important;
+            margin-left:auto !important;
+        }
+
+        .club-type{
+            font-size:8px !important;
+            letter-spacing:.18em !important;
+            color:rgba(255,255,255,.78) !important;
+        }
+
+        .club-name{
+            font-size:22px !important;
+            line-height:.92 !important;
+            letter-spacing:.055em !important;
+            max-width:250px !important;
+        }
+
+        .club-kicker{
+            font-size:9px !important;
+            line-height:1.1 !important;
+            letter-spacing:.16em !important;
+            margin-bottom:7px !important;
+            color:var(--club-readable-primary) !important;
+            filter:drop-shadow(0 0 10px rgba(0,0,0,.55));
+        }
+
+        .club-headline{
+            font-size:34px !important;
+            line-height:.92 !important;
+            letter-spacing:.025em !important;
+            max-width:340px !important;
+        }
+
+        .club-copy{
+            max-width:320px !important;
+            margin-top:11px !important;
+            font-size:11.5px !important;
+            line-height:1.45 !important;
+            color:rgba(255,255,255,.84) !important;
+            font-weight:700 !important;
+        }
+
+        .club-actions{
+            margin-top:14px !important;
+            gap:8px !important;
+        }
+
+        .club-action,
+        .coach-open-btn{
+            min-height:36px !important;
+            border-radius:12px !important;
+            padding:0 12px !important;
+            font-size:10px !important;
+            letter-spacing:.09em !important;
+            background:rgba(255,255,255,.075) !important;
+            border:1px solid rgba(255,255,255,.10) !important;
+            color:#fff !important;
+        }
+
+        .club-action.primary,
+        .coach-open-btn{
+            background:linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 72%, #111), color-mix(in srgb, var(--club-secondary) 72%, #111)) !important;
+            color:#fff !important;
+        }
+
+        .club-stats{
+            display:grid !important;
+            grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+            gap:8px !important;
+            padding:8px 12px 2px !important;
+            background:#050506 !important;
+        }
+
+        .club-stat{
+            min-height:76px !important;
+            padding:9px 7px !important;
+            border:0 !important;
+            border-radius:16px !important;
+            background:
+                linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+                #101114 !important;
+            box-shadow:none !important;
+        }
+
+        .club-stat i{
+            font-size:13px !important;
+            margin-bottom:6px !important;
+            color:var(--club-readable-primary) !important;
+            opacity:.95 !important;
+        }
+
+        .club-stat span{
+            font-size:6.8px !important;
+            line-height:1 !important;
+            letter-spacing:.12em !important;
+            color:rgba(255,255,255,.58) !important;
+        }
+
+        .club-stat strong{
+            margin-top:5px !important;
+            font-size:clamp(10px, 2.9vw, 13px) !important;
+            line-height:1.03 !important;
+            letter-spacing:.025em !important;
+            color:#fff !important;
+            overflow-wrap:anywhere !important;
+        }
+
+        .club-section{
+            padding:14px 12px 20px !important;
+            background:#050506 !important;
+        }
+
+        .section-head{
+            align-items:center !important;
+            gap:10px !important;
+            margin-bottom:10px !important;
+        }
+
+        .section-kicker,
+        .club-section-kicker{
+            font-size:8px !important;
+            letter-spacing:.18em !important;
+            color:var(--club-readable-primary) !important;
+        }
+
+        .section-title,
+        .club-section-title{
+            font-size:22px !important;
+            line-height:1 !important;
+            letter-spacing:.08em !important;
+        }
+
+        .team-tabs{
+            gap:6px !important;
+        }
+
+        .team-tab{
+            min-height:34px !important;
+            border-radius:11px !important;
+            font-size:10px !important;
+            padding:0 10px !important;
+            background:#111216 !important;
+            border:1px solid rgba(255,255,255,.08) !important;
+            color:rgba(255,255,255,.78) !important;
+        }
+
+        .team-tab.is-active{
+            background:linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 52%, #111), color-mix(in srgb, var(--club-secondary) 42%, #111)) !important;
+            color:#fff !important;
+        }
+
+        .team-grid{
+            gap:8px !important;
+        }
+
+        .team-card{
+            min-height:82px !important;
+            border-radius:17px !important;
+            background:#111216 !important;
+            border:1px solid rgba(255,255,255,.08) !important;
+            overflow:hidden !important;
+        }
+
+        .team-card::before{
+            background:linear-gradient(90deg, rgba(0,0,0,.70), rgba(0,0,0,.32)) !important;
+        }
+
+        .team-card-content{
+            padding:10px !important;
+            min-height:82px !important;
+            justify-content:center !important;
+        }
+
+        .team-card-logo,
+        .club-team-logo{
+            width:36px !important;
+            height:36px !important;
+        }
+
+        .team-card-league-logo{
+            max-width:40px !important;
+            max-height:26px !important;
+        }
+
+        .team-card-name,
+        .club-team-name{
+            font-size:15px !important;
+            line-height:.98 !important;
+            letter-spacing:.06em !important;
+        }
+
+        .team-card-copy,
+        .club-team-copy{
+            font-size:8.5px !important;
+            color:rgba(255,255,255,.62) !important;
+        }
+
+        .coach-modal-card{
+            width:min(390px, calc(100% - 24px)) !important;
+            border-radius:22px !important;
+            background:#08090b !important;
+        }
+
+        .coach-modal-head{
+            min-height:48px !important;
+            border-bottom:1px solid rgba(255,255,255,.08) !important;
+        }
+
+        .coach-modal-title{
+            font-size:17px !important;
+            letter-spacing:.08em !important;
+        }
+
+        .coach-field label{
+            font-size:8px !important;
+            letter-spacing:.14em !important;
+        }
+
+        .coach-field input{
+            height:38px !important;
+            border-radius:12px !important;
+            font-size:12px !important;
+        }
+
+        .coach-submit{
+            min-height:38px !important;
+            border-radius:12px !important;
+            font-size:10px !important;
+        }
+
+        .club-footer{
+            width:min(430px, 100%) !important;
+            padding:14px 12px 18px !important;
+            background:#050506 !important;
+        }
+
+        .club-footer h2{
+            font-size:18px !important;
+        }
+
+        .club-footer p,
+        .club-footer-item{
+            font-size:10.5px !important;
+            line-height:1.35 !important;
+        }
+</style>
 </head>
 
 <body>

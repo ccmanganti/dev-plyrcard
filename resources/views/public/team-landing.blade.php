@@ -1328,7 +1328,343 @@
             .mobile-meta-label,.mobile-meta-value{ font-size:11.5px; }
         }
 
-    </style>
+    
+
+        /*
+        |--------------------------------------------------------------------------
+        | PLYRCard app polish pass
+        |--------------------------------------------------------------------------
+        */
+        body{
+            background:#030304 !important;
+        }
+
+        .team-page{
+            background:
+                radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--team-readable-primary) 18%, transparent), transparent 34%),
+                #030304 !important;
+            padding:0 !important;
+        }
+
+        .team-app{
+            width:min(430px, 100%) !important;
+            min-height:100vh !important;
+            margin:0 auto !important;
+            background:#050506 !important;
+            box-shadow:0 0 0 1px rgba(255,255,255,.04) !important;
+            border:0 !important;
+        }
+
+        .team-content{
+            padding:10px 10px 22px !important;
+        }
+
+        .team-top{
+            height:42px !important;
+            grid-template-columns:36px 1fr 36px !important;
+            margin-bottom:8px !important;
+        }
+
+        .team-top-title{
+            font-size:17px !important;
+            letter-spacing:.10em !important;
+        }
+
+        .team-top-btn{
+            width:34px !important;
+            height:34px !important;
+            border-radius:12px !important;
+            background:#111216 !important;
+        }
+
+        .team-hero{
+            min-height:188px !important;
+            border-radius:22px !important;
+            overflow:hidden !important;
+            background:#111216 !important;
+        }
+
+        .team-hero::before{
+            background:
+                radial-gradient(circle at 14% 6%, color-mix(in srgb, var(--team-primary) 56%, transparent), transparent 32%),
+                radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--team-secondary) 46%, transparent), transparent 34%),
+                linear-gradient(100deg, color-mix(in srgb, var(--team-primary) 58%, rgba(0,0,0,.90)) 0%, rgba(0,0,0,.72) 55%, color-mix(in srgb, var(--team-secondary) 58%, rgba(0,0,0,.92)) 100%) !important;
+            opacity:.98 !important;
+        }
+
+        .team-hero::after{
+            background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(0,0,0,.76)) !important;
+        }
+
+        .team-hero-inner{
+            padding:14px !important;
+            min-height:188px !important;
+            display:flex !important;
+            align-items:flex-end !important;
+        }
+
+        .team-brand-row{
+            grid-template-columns:48px 1fr !important;
+            gap:10px !important;
+            align-items:end !important;
+        }
+
+        .team-logo{
+            width:48px !important;
+            height:48px !important;
+            object-fit:contain !important;
+        }
+
+        .team-kicker{
+            font-size:8px !important;
+            letter-spacing:.18em !important;
+            color:var(--team-readable-primary) !important;
+        }
+
+        .team-name{
+            font-size:24px !important;
+            line-height:.92 !important;
+            letter-spacing:.055em !important;
+        }
+
+        .team-subtitle{
+            margin-top:5px !important;
+            font-size:10px !important;
+            line-height:1.15 !important;
+            color:rgba(255,255,255,.72) !important;
+        }
+
+        .team-meta-strip{
+            grid-template-columns:1fr 1fr !important;
+            gap:8px !important;
+            margin:9px 0 !important;
+        }
+
+        .team-meta{
+            min-height:58px !important;
+            padding:9px !important;
+            border-radius:16px !important;
+            background:#111216 !important;
+            border:1px solid rgba(255,255,255,.07) !important;
+        }
+
+        .team-meta i{
+            font-size:13px !important;
+            color:var(--team-readable-primary) !important;
+        }
+
+        .team-meta span{
+            font-size:7px !important;
+            letter-spacing:.13em !important;
+            color:rgba(255,255,255,.55) !important;
+        }
+
+        .team-meta strong{
+            font-size:11px !important;
+            line-height:1.1 !important;
+            color:#fff !important;
+        }
+
+        .coach-session-bar{
+            border-radius:16px !important;
+            min-height:48px !important;
+            padding:9px 10px !important;
+            background:#111216 !important;
+            border:1px solid rgba(255,255,255,.07) !important;
+        }
+
+        .coach-session-bar strong{
+            font-size:10px !important;
+        }
+
+        .coach-session-bar span{
+            font-size:9px !important;
+        }
+
+        .coach-open-btn{
+            min-height:36px !important;
+            padding:0 12px !important;
+            border-radius:12px !important;
+            font-size:10px !important;
+            letter-spacing:.09em !important;
+            background:linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 68%, #111), color-mix(in srgb, var(--team-secondary) 68%, #111)) !important;
+            color:#fff !important;
+            border:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .squad-section{
+            padding:12px 0 0 !important;
+        }
+
+        .squad-head{
+            align-items:center !important;
+            margin:0 2px 9px !important;
+        }
+
+        .squad-title{
+            font-size:22px !important;
+            letter-spacing:.08em !important;
+        }
+
+        .squad-sort{
+            font-size:8px !important;
+            letter-spacing:.11em !important;
+            color:rgba(255,255,255,.54) !important;
+        }
+
+        .player-list{
+            gap:7px !important;
+        }
+
+        .player-row{
+            min-height:64px !important;
+            grid-template-columns:52px minmax(0, 1fr) auto !important;
+            gap:9px !important;
+            padding:7px 8px !important;
+            border-radius:17px !important;
+            background:#111216 !important;
+            border:1px solid rgba(255,255,255,.07) !important;
+            border-left:0 !important;
+        }
+
+        .player-row:hover,
+        .player-row.is-active{
+            transform:translateY(-1px) !important;
+            background:
+                linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 16%, transparent), transparent 54%),
+                #15161b !important;
+            border-color:color-mix(in srgb, var(--team-readable-primary) 42%, rgba(255,255,255,.10)) !important;
+        }
+
+        .player-media{
+            width:48px !important;
+            height:48px !important;
+            border:0 !important;
+            box-shadow:none !important;
+            background:#1c1d22 !important;
+        }
+
+        .player-media.is-card{
+            width:48px !important;
+            height:56px !important;
+            border-radius:10px !important;
+        }
+
+        .player-media.is-portrait{
+            border-radius:999px !important;
+        }
+
+        .player-media img{
+            border:0 !important;
+            box-shadow:none !important;
+        }
+
+        .player-free-shape{
+            width:42px !important;
+            height:42px !important;
+            border:0 !important;
+            box-shadow:none !important;
+        }
+
+        .player-row-name{
+            font-size:14px !important;
+            line-height:1 !important;
+            letter-spacing:.055em !important;
+        }
+
+        .player-row-meta{
+            margin-top:5px !important;
+            gap:4px 7px !important;
+            font-size:8px !important;
+            color:rgba(255,255,255,.58) !important;
+        }
+
+        .player-number-pill{
+            min-width:38px !important;
+            height:30px !important;
+            padding:0 7px !important;
+            border-radius:11px !important;
+            font-size:13px !important;
+            background:color-mix(in srgb, var(--team-readable-primary) 16%, #14151a) !important;
+            color:#fff !important;
+        }
+
+        .player-panel{
+            width:min(430px, 100%) !important;
+            background:#050506 !important;
+        }
+
+        .player-panel-bar{
+            height:52px !important;
+            padding:0 10px !important;
+            background:#050506 !important;
+            border-bottom:1px solid rgba(255,255,255,.08) !important;
+        }
+
+        .player-panel-title{
+            font-size:16px !important;
+            letter-spacing:.10em !important;
+        }
+
+        .player-panel-btn{
+            min-height:34px !important;
+            border-radius:12px !important;
+            font-size:10px !important;
+            background:#15161a !important;
+        }
+
+        .player-nav-arrow{
+            z-index:120 !important;
+            width:38px !important;
+            height:54px !important;
+            border-radius:13px !important;
+            background:rgba(0,0,0,.72) !important;
+        }
+
+        .player-nav-arrow.is-left{ left:6px !important; }
+        .player-nav-arrow.is-right{ right:6px !important; }
+
+        .coach-modal-card{
+            width:min(390px, calc(100% - 24px)) !important;
+            border-radius:22px !important;
+            background:#08090b !important;
+        }
+
+        .coach-modal-head{
+            min-height:48px !important;
+            border-bottom:1px solid rgba(255,255,255,.08) !important;
+        }
+
+        .coach-modal-title{
+            font-size:17px !important;
+            letter-spacing:.08em !important;
+        }
+
+        .coach-field label{
+            font-size:8px !important;
+            letter-spacing:.14em !important;
+        }
+
+        .coach-field input{
+            height:38px !important;
+            border-radius:12px !important;
+            font-size:12px !important;
+        }
+
+        .coach-submit{
+            min-height:38px !important;
+            border-radius:12px !important;
+            font-size:10px !important;
+        }
+
+        @media (max-width:520px){
+            .team-app{ width:100% !important; }
+            .team-content{ padding:8px 8px 20px !important; }
+            .team-hero{ border-radius:20px !important; }
+            .team-name{ font-size:22px !important; }
+            .player-row{ min-height:62px !important; }
+        }
+</style>
 </head>
 <body>
     <main class="team-page">
@@ -1806,4 +2142,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
