@@ -136,7 +136,7 @@
         img{display:block;max-width:100%}
         .site{min-height:100vh;background:radial-gradient(circle at 78% -8%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 30%), #050506}
         .wrap{width:min(1180px, calc(100% - 32px));margin:0 auto}
-        .nav{height:58px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);animation:fadeDown .55s ease both}
+        .nav{height:58px;display:flex;align-items:center;justify-content:space-between;gap:16px;animation:fadeDown .55s ease both}
         .nav-brand{display:flex;align-items:center;gap:10px;min-width:0}
         .nav-brand img{width:30px;height:30px;object-fit:contain}
         .nav-brand span{font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -149,7 +149,7 @@
         .nav-link:hover{color:#fff}
         .coach-btn{height:38px;border:0;border-left:2px solid var(--brand-readable);background:color-mix(in srgb, var(--brand) 26%, #060708);color:#fff;padding:0 16px;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
         .coach-btn:hover{filter:brightness(1.12)}
-        .hero{position:relative;isolation:isolate;min-height:clamp(560px, 68vh, 720px);display:grid;align-items:end;overflow:hidden;border-bottom:1px solid var(--line);background:#050506}
+        .hero{position:relative;isolation:isolate;min-height:clamp(560px, 68vh, 720px);display:grid;align-items:end;overflow:hidden;background:#050506}
         .hero:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg, color-mix(in srgb, var(--brand) 42%, transparent) 0%, transparent 42%, color-mix(in srgb, var(--brand) 20%, transparent) 100%);mix-blend-mode:screen;opacity:.62}
         .hero-bg{position:absolute;inset:0;z-index:-2;background:url("{{ $heroImageUrl }}") center/cover no-repeat;filter:saturate(1.14) contrast(1.04) brightness(.93)}
         .hero-bg:after{content:"";position:absolute;inset:0;background:
@@ -750,7 +750,9 @@
                                     <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
-                            @php($journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values())
+                            @php
+                                $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
+                            @endphp
                             @if($journeyCards->isNotEmpty())
                                 <div class="team-card-player-stack" aria-hidden="true">
                                     @foreach($journeyCards as $journeyIndex => $journeyCard)
@@ -796,7 +798,9 @@
                                     <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
-                            @php($journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values())
+                            @php
+                                $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
+                            @endphp
                             @if($journeyCards->isNotEmpty())
                                 <div class="team-card-player-stack" aria-hidden="true">
                                     @foreach($journeyCards as $journeyIndex => $journeyCard)
