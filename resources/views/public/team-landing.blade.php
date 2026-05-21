@@ -2285,6 +2285,235 @@
 @media(max-width:640px){.team-hero{min-height:310px !important;padding:20px 16px !important}.team-name{font-size:34px !important}.team-copy{font-size:11.5px !important}.player-list-row{min-height:60px !important}}
 </style>
 
+
+<style>
+/* === FINAL CLEAN TEAM MOBILE-WEBSITE RESET === */
+body{ background:#111 !important; }
+.team-page{
+    width:min(430px, 100%) !important;
+    margin:0 auto !important;
+    background:#050506 !important;
+    color:#fff !important;
+    border-left:1px solid rgba(255,255,255,.06) !important;
+    border-right:1px solid rgba(255,255,255,.06) !important;
+    box-shadow:none !important;
+}
+.team-app,.team-shell{
+    width:100% !important;
+    max-width:none !important;
+    margin:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+}
+.team-top{
+    height:44px !important;
+    margin:0 !important;
+    padding:0 12px !important;
+    background:#050506 !important;
+    border-bottom:1px solid rgba(255,255,255,.10) !important;
+}
+.team-top-title{ font-size:17px !important; letter-spacing:.09em !important; }
+.team-hero{
+    position:relative !important;
+    min-height:0 !important;
+    height:auto !important;
+    padding:0 !important;
+    margin:0 !important;
+    overflow:hidden !important;
+    border-bottom:1px solid rgba(255,255,255,.10) !important;
+    background:#050506 !important;
+}
+.team-hero-bg{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    object-fit:cover !important;
+    object-position:center !important;
+    opacity:.82 !important;
+    filter:saturate(1.04) contrast(1.02) brightness(.96) !important;
+}
+.team-hero::before{
+    content:"" !important;
+    position:absolute !important;
+    inset:0 !important;
+    z-index:1 !important;
+    background:
+        linear-gradient(90deg, rgba(0,0,0,.70) 0%, rgba(0,0,0,.43) 48%, rgba(0,0,0,.64) 100%),
+        linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 30%, transparent), transparent 54%),
+        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.32)) !important;
+    opacity:1 !important;
+}
+.team-hero::after{
+    content:"" !important;
+    position:absolute !important;
+    left:0 !important; right:0 !important; bottom:0 !important;
+    height:2px !important;
+    z-index:2 !important;
+    background:linear-gradient(90deg, var(--team-readable-accent, var(--team-primary)), transparent) !important;
+}
+.team-hero-inner{
+    position:relative !important;
+    z-index:3 !important;
+    width:100% !important;
+    max-width:none !important;
+    min-height:0 !important;
+    display:block !important;
+    padding:34px 22px 26px !important;
+    margin:0 !important;
+}
+.team-brand-row,.team-brand{
+    display:grid !important;
+    grid-template-columns:48px minmax(0,1fr) 44px !important;
+    align-items:center !important;
+    gap:11px !important;
+    margin:0 0 16px !important;
+}
+.team-logo,.league-logo{
+    width:42px !important;
+    height:42px !important;
+    object-fit:contain !important;
+    border:0 !important;
+    background:transparent !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    padding:0 !important;
+}
+.team-kicker,.team-tagline{
+    color:var(--team-readable-accent, var(--team-primary)) !important;
+    font-family:var(--team-heading) !important;
+    font-size:9px !important;
+    letter-spacing:.16em !important;
+    line-height:1 !important;
+    font-weight:900 !important;
+    text-transform:uppercase !important;
+    margin:0 0 7px !important;
+}
+.team-name{
+    color:#fff !important;
+    font-family:var(--team-heading) !important;
+    font-size:clamp(31px, 9vw, 41px) !important;
+    line-height:.88 !important;
+    letter-spacing:-.01em !important;
+    text-transform:uppercase !important;
+    font-weight:900 !important;
+    margin:0 !important;
+    max-width:330px !important;
+}
+.team-copy,.team-subtitle{
+    color:rgba(255,255,255,.85) !important;
+    font-size:12.5px !important;
+    line-height:1.42 !important;
+    font-weight:800 !important;
+    max-width:330px !important;
+    margin:12px 0 0 !important;
+}
+.team-hero-actions{ margin-top:16px !important; gap:8px !important; }
+.team-action,.coach-open-btn{
+    min-height:36px !important;
+    border-radius:0 !important;
+    border:0 !important;
+    border-left:2px solid var(--team-readable-accent, var(--team-primary)) !important;
+    background:rgba(0,0,0,.48) !important;
+    color:#fff !important;
+    padding:0 12px !important;
+    font-family:var(--team-heading) !important;
+    font-size:9px !important;
+    letter-spacing:.08em !important;
+    text-transform:uppercase !important;
+    font-weight:900 !important;
+    box-shadow:none !important;
+}
+.squad-section,.roster-section{
+    width:100% !important;
+    max-width:none !important;
+    margin:0 !important;
+    padding:22px 18px 38px !important;
+    background:#050506 !important;
+}
+.squad-head,.roster-head{
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:space-between !important;
+    gap:12px !important;
+    margin:0 0 13px !important;
+}
+.squad-title,.roster-title{
+    color:#fff !important;
+    font-family:var(--team-heading) !important;
+    font-size:28px !important;
+    line-height:.92 !important;
+    letter-spacing:.04em !important;
+    margin:0 !important;
+}
+.squad-sort,.roster-subtitle{
+    color:rgba(255,255,255,.58) !important;
+    font-size:9px !important;
+    letter-spacing:.10em !important;
+}
+.player-list{ gap:8px !important; }
+.player-list-row,.roster-row{
+    min-height:66px !important;
+    padding:9px 0 !important;
+    border-radius:0 !important;
+    border:0 !important;
+    border-bottom:1px solid rgba(255,255,255,.10) !important;
+    background:transparent !important;
+    box-shadow:none !important;
+}
+.player-list-row:hover,.roster-row:hover{ background:rgba(255,255,255,.035) !important; }
+.player-list-avatar,.roster-avatar,.player-list-avatar img,.roster-avatar img,.player-list-placeholder,.roster-placeholder{
+    width:48px !important;
+    height:48px !important;
+    border-radius:999px !important;
+    border:0 !important;
+    box-shadow:none !important;
+    background:#15161a !important;
+    object-fit:cover !important;
+}
+.player-list-card-image,.roster-card-image{
+    width:40px !important;
+    height:52px !important;
+    border-radius:0 !important;
+    object-fit:cover !important;
+    border:0 !important;
+    box-shadow:none !important;
+}
+.player-list-name,.roster-name{
+    color:#fff !important;
+    font-family:var(--team-heading) !important;
+    font-size:15px !important;
+    line-height:1 !important;
+    letter-spacing:.03em !important;
+    font-weight:900 !important;
+}
+.player-list-meta,.player-list-detail,.roster-meta,.roster-detail{
+    color:rgba(255,255,255,.64) !important;
+    font-size:9px !important;
+    line-height:1.2 !important;
+    font-weight:800 !important;
+}
+.player-panel{ background:#050506 !important; }
+.player-panel-bar{
+    height:50px !important;
+    background:#050506 !important;
+    border-bottom:1px solid rgba(255,255,255,.10) !important;
+}
+.player-panel-title{ font-size:17px !important; }
+.player-panel-btn{ min-height:34px !important; border-radius:0 !important; }
+.coach-modal-card,.player-stats-card,.player-modal-card{
+    border-radius:0 !important;
+    box-shadow:none !important;
+}
+@media(max-width:440px){
+    .team-page{ width:100% !important; border:0 !important; }
+    .team-hero-inner{ padding:32px 20px 24px !important; }
+    .team-name{ font-size:38px !important; }
+    .squad-section,.roster-section{ padding:20px 16px 36px !important; }
+}
+</style>
+
 </head>
 <body>
     <main class="team-page">
