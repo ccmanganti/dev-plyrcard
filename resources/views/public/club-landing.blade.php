@@ -2185,6 +2185,336 @@
 }
 </style>
 
+
+<style>
+/* --------------------------------------------------------------------------
+   PLYRCARD CLEAN REFRACTOR V2
+   Goal: brighter hero image, tighter spacing, clean website/app navigation.
+-------------------------------------------------------------------------- */
+:root{
+    --club-ink:#f7f7f7;
+    --club-muted-clean:rgba(255,255,255,.72);
+    --club-line-clean:rgba(255,255,255,.09);
+}
+
+body{
+    background:#050506 !important;
+}
+
+.club-page{
+    background:#050506 !important;
+}
+
+.club-hero{
+    position:relative !important;
+    min-height:clamp(360px, 52vh, 520px) !important;
+    padding:clamp(24px, 4vw, 46px) clamp(20px, 4vw, 48px) !important;
+    display:flex !important;
+    align-items:center !important;
+    border:0 !important;
+    overflow:hidden !important;
+    isolation:isolate !important;
+}
+
+.club-hero-bg{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    object-fit:cover !important;
+    object-position:center 42% !important;
+    opacity:.72 !important;
+    filter:saturate(1.1) contrast(1.05) brightness(.92) !important;
+    transform:scale(1.01) !important;
+    z-index:0 !important;
+}
+
+.club-hero::before{
+    content:"" !important;
+    position:absolute !important;
+    inset:0 !important;
+    z-index:1 !important;
+    opacity:1 !important;
+    background:
+        linear-gradient(90deg,
+            color-mix(in srgb, var(--club-primary) 24%, rgba(0,0,0,.68)) 0%,
+            rgba(0,0,0,.46) 42%,
+            rgba(0,0,0,.36) 72%,
+            rgba(0,0,0,.56) 100%
+        ),
+        radial-gradient(circle at 16% 42%, color-mix(in srgb, var(--club-primary) 20%, transparent), transparent 38%) !important;
+    pointer-events:none !important;
+}
+
+.club-hero::after{
+    content:"" !important;
+    position:absolute !important;
+    inset:0 !important;
+    z-index:2 !important;
+    opacity:1 !important;
+    background:
+        linear-gradient(180deg, rgba(0,0,0,.04) 0%, rgba(0,0,0,.08) 48%, rgba(0,0,0,.42) 100%),
+        linear-gradient(90deg, var(--club-readable-accent, var(--club-primary)) 0 2px, transparent 2px 100%) !important;
+    pointer-events:none !important;
+}
+
+.club-hero-inner{
+    position:relative !important;
+    z-index:3 !important;
+    width:min(1040px, 100%) !important;
+    margin:0 auto !important;
+    display:block !important;
+}
+
+.club-brand{
+    width:min(610px,100%) !important;
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) auto !important;
+    align-items:center !important;
+    gap:13px !important;
+    margin:0 0 14px !important;
+}
+
+.club-logo,
+.league-logo{
+    width:46px !important;
+    height:46px !important;
+    object-fit:contain !important;
+    background:transparent !important;
+    border:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    padding:0 !important;
+}
+
+.club-type{
+    margin:0 0 5px !important;
+    color:rgba(255,255,255,.78) !important;
+    font-size:9px !important;
+    line-height:1 !important;
+    letter-spacing:.24em !important;
+    font-weight:900 !important;
+}
+
+.club-name{
+    color:#fff !important;
+    font-size:clamp(25px, 4.7vw, 42px) !important;
+    line-height:.91 !important;
+    letter-spacing:.035em !important;
+    text-shadow:0 2px 18px rgba(0,0,0,.28) !important;
+    max-width:560px !important;
+}
+
+.club-kicker{
+    margin:0 0 8px !important;
+    color:var(--club-readable-accent, var(--club-primary)) !important;
+    font-size:9.5px !important;
+    line-height:1 !important;
+    letter-spacing:.20em !important;
+    opacity:1 !important;
+    font-weight:900 !important;
+}
+
+.club-headline{
+    margin:0 !important;
+    color:#fff !important;
+    font-size:clamp(38px, 7vw, 72px) !important;
+    line-height:.88 !important;
+    letter-spacing:.012em !important;
+    max-width:690px !important;
+    text-shadow:0 4px 22px rgba(0,0,0,.28) !important;
+}
+
+.club-copy{
+    margin:12px 0 0 !important;
+    max-width:600px !important;
+    color:rgba(255,255,255,.88) !important;
+    font-size:clamp(12px, 1.8vw, 14px) !important;
+    line-height:1.48 !important;
+    font-weight:760 !important;
+    text-shadow:0 2px 12px rgba(0,0,0,.22) !important;
+}
+
+.club-actions{
+    margin-top:16px !important;
+    display:flex !important;
+    gap:8px !important;
+    flex-wrap:wrap !important;
+}
+
+.club-action,
+.coach-open-btn{
+    min-height:36px !important;
+    border-radius:0 !important;
+    padding:0 13px !important;
+    background:var(--club-readable-accent, var(--club-primary)) !important;
+    color:#050506 !important;
+    border:0 !important;
+    box-shadow:none !important;
+    font-size:10px !important;
+    letter-spacing:.08em !important;
+    font-weight:950 !important;
+}
+
+.club-stats{
+    width:min(1040px, 100%) !important;
+    margin:0 auto !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    background:#09090a !important;
+    border-top:1px solid var(--club-line-clean) !important;
+    border-bottom:1px solid var(--club-line-clean) !important;
+    gap:0 !important;
+}
+
+.club-stat{
+    min-height:62px !important;
+    padding:10px 12px !important;
+    border:0 !important;
+    border-right:1px solid var(--club-line-clean) !important;
+    background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008)) !important;
+}
+
+.club-stat:last-child{border-right:0 !important;}
+.club-stat i{
+    color:var(--club-readable-accent, var(--club-primary)) !important;
+    font-size:13px !important;
+    margin:0 0 6px !important;
+    opacity:.95 !important;
+}
+.club-stat span{
+    display:block !important;
+    color:rgba(255,255,255,.58) !important;
+    font-size:7px !important;
+    line-height:1 !important;
+    letter-spacing:.13em !important;
+    margin:0 0 5px !important;
+    font-weight:900 !important;
+}
+.club-stat strong{
+    display:block !important;
+    color:#fff !important;
+    font-size:clamp(10px, 1.65vw, 14px) !important;
+    line-height:1.08 !important;
+    letter-spacing:.015em !important;
+    font-weight:950 !important;
+    text-wrap:balance !important;
+}
+
+.club-section,
+.club-info-band,
+.club-footer{
+    width:min(1040px, 100%) !important;
+    margin:0 auto !important;
+}
+
+.club-section{
+    padding:24px 20px 34px !important;
+}
+
+.section-head{margin-bottom:14px !important;}
+.section-kicker,
+.club-section-kicker{
+    color:var(--club-readable-accent, var(--club-primary)) !important;
+    font-size:9px !important;
+    letter-spacing:.22em !important;
+}
+.section-title,
+.club-section-title{
+    color:#fff !important;
+    font-size:clamp(28px, 4.2vw, 44px) !important;
+    line-height:.9 !important;
+}
+
+.club-gender-tabs,
+.team-grid,
+.club-info-grid{
+    border-radius:0 !important;
+    box-shadow:none !important;
+}
+
+.club-gender-tab,
+.team-card,
+.team-card-content,
+.club-footer-item,
+.club-info-card{
+    border-radius:0 !important;
+    box-shadow:none !important;
+}
+
+@media (max-width:640px){
+    .club-hero{
+        min-height:360px !important;
+        padding:22px 18px 22px !important;
+        align-items:center !important;
+    }
+
+    .club-hero-bg{
+        opacity:.76 !important;
+        object-position:center 38% !important;
+    }
+
+    .club-hero::before{
+        background:
+            linear-gradient(90deg,
+                color-mix(in srgb, var(--club-primary) 25%, rgba(0,0,0,.66)) 0%,
+                rgba(0,0,0,.46) 48%,
+                rgba(0,0,0,.42) 100%
+            ),
+            radial-gradient(circle at 18% 45%, color-mix(in srgb, var(--club-primary) 18%, transparent), transparent 42%) !important;
+    }
+
+    .club-brand{
+        gap:10px !important;
+        margin-bottom:12px !important;
+    }
+
+    .club-logo,
+    .league-logo{
+        width:38px !important;
+        height:38px !important;
+    }
+
+    .club-type{
+        font-size:7.7px !important;
+        letter-spacing:.20em !important;
+    }
+
+    .club-name{
+        font-size:24px !important;
+        line-height:.92 !important;
+        max-width:250px !important;
+    }
+
+    .club-kicker{
+        font-size:8px !important;
+        letter-spacing:.18em !important;
+        margin-bottom:7px !important;
+    }
+
+    .club-headline{
+        font-size:34px !important;
+        line-height:.88 !important;
+        max-width:330px !important;
+    }
+
+    .club-copy{
+        max-width:340px !important;
+        font-size:11.5px !important;
+        line-height:1.42 !important;
+        margin-top:10px !important;
+    }
+
+    .club-actions{margin-top:14px !important;}
+    .club-action,.coach-open-btn{min-height:34px !important;font-size:9px !important;padding:0 11px !important;}
+    .club-stat{min-height:58px !important;padding:9px 7px !important;}
+    .club-stat i{font-size:12px !important;margin-bottom:5px !important;}
+    .club-stat span{font-size:6.2px !important;letter-spacing:.11em !important;}
+    .club-stat strong{font-size:9px !important;line-height:1.08 !important;}
+    .club-section{padding:22px 14px 30px !important;}
+}
+</style>
+
 </head>
 
 <body>

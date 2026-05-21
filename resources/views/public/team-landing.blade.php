@@ -2264,6 +2264,27 @@
 }
 </style>
 
+
+<style>
+/* PLYRCARD CLEAN REFRACTOR V2 - team page compact website polish */
+.team-page{background:#050506 !important;}
+.team-hero{min-height:clamp(300px,44vh,430px) !important;padding:22px 18px !important;overflow:hidden !important;}
+.team-hero-bg{opacity:.76 !important;filter:saturate(1.08) contrast(1.04) brightness(.92) !important;}
+.team-hero::before{background:linear-gradient(90deg,color-mix(in srgb,var(--team-primary) 24%,rgba(0,0,0,.68)) 0%,rgba(0,0,0,.46) 48%,rgba(0,0,0,.42) 100%) !important;opacity:1 !important;}
+.team-hero::after{background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.38)),linear-gradient(90deg,var(--team-readable-accent,var(--team-primary)) 0 2px,transparent 2px 100%) !important;opacity:1 !important;}
+.team-brand{gap:10px !important;margin-bottom:12px !important;}
+.team-logo,.team-league-logo{width:40px !important;height:40px !important;border:0 !important;border-radius:0 !important;background:transparent !important;box-shadow:none !important;padding:0 !important;}
+.team-name{font-size:clamp(28px,7vw,46px) !important;line-height:.88 !important;}
+.team-kicker{font-size:8px !important;letter-spacing:.18em !important;color:var(--team-readable-accent,var(--team-primary)) !important;}
+.team-copy{font-size:12px !important;line-height:1.42 !important;max-width:360px !important;color:rgba(255,255,255,.86) !important;}
+.roster-section{padding-top:18px !important;}
+.player-list-row,.player-modal-card,.coach-card,.team-stat{border-radius:0 !important;box-shadow:none !important;}
+.player-list-row{min-height:64px !important;padding:9px 10px !important;}
+.player-list-name{font-size:15px !important;line-height:1 !important;}
+.player-list-meta{font-size:9px !important;}
+@media(max-width:640px){.team-hero{min-height:310px !important;padding:20px 16px !important}.team-name{font-size:34px !important}.team-copy{font-size:11.5px !important}.player-list-row{min-height:60px !important}}
+</style>
+
 </head>
 <body>
     <main class="team-page">
