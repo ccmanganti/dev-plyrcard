@@ -155,11 +155,13 @@
                 $isPremium = $hasPlyrPlus || $hasMyJourney;
                 $isFreeOnly = $roleNames->contains('free') && ! $isPremium;
 
-                $premiumCardImage = $resolveAsset($player->plyrcard_image ?: $player->player_image ?: $player->action_image ?: null);
-                $listImage = $isPremium ? $premiumCardImage : null;
+                $playerCardImage = $isPremium ? $resolveAsset($player->plyrcard_image ?: null) : null;
+                $portraitImage = $resolveAsset($player->player_image ?: $player->action_image ?: $player->youtube_thumbnail ?: null);
+                $listImage = $playerCardImage ?: $portraitImage;
+                $listImageType = $playerCardImage ? 'card' : ($portraitImage ? 'portrait' : 'placeholder');
 
-                $mobileHeroImageUrl = $isPremium ? $resolveAsset($player->mobile_hero_image ?: null) : null;
-                $playerImageUrl = $isPremium ? $resolveAsset($player->player_image ?: $player->action_image ?: $player->plyrcard_image ?: null) : null;
+                $mobileHeroImageUrl = $resolveAsset($player->mobile_hero_image ?: null);
+                $playerImageUrl = $resolveAsset($player->player_image ?: $player->action_image ?: $player->plyrcard_image ?: null);
                 $nationalLogoUrl = $resolveAsset($player->nationalTeam?->logo ?? $player->national_team_image ?? null);
 
                 $website = $player->websites->first();
@@ -191,6 +193,7 @@
                     'isFreeOnly' => $isFreeOnly,
                     'isSaved' => in_array((int) $player->id, $savedPlayerIds, true),
                     'listImage' => $listImage,
+                    'listImageType' => $listImageType,
                     'mobileHeroImage' => $mobileHeroImageUrl,
                     'playerImage' => $playerImageUrl,
                     'clubLogo' => $clubLogo,
@@ -332,10 +335,10 @@
             inset:0;
             z-index:1;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 72%, transparent), transparent 48%),
-                linear-gradient(215deg, color-mix(in srgb, var(--team-secondary) 76%, transparent), transparent 58%),
-                linear-gradient(180deg, rgba(0,0,0,.36), rgba(0,0,0,.82));
-            mix-blend-mode:multiply;
+                radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--team-primary) 58%, transparent), transparent 30%),
+                linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 82%, rgba(0,0,0,.72)) 0%, rgba(0,0,0,.72) 48%, color-mix(in srgb, var(--team-secondary) 76%, rgba(0,0,0,.70)) 100%),
+                linear-gradient(180deg, rgba(0,0,0,.16), rgba(0,0,0,.86));
+            opacity:.94;
         }
 
         .team-hero::after{
@@ -343,7 +346,7 @@
             position:absolute;
             inset:0;
             z-index:2;
-            background:linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.78));
+            background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.70));
         }
 
         .team-hero-inner{
@@ -524,20 +527,33 @@
 
         .player-media{
             width:64px;
-            height:72px;
-            border-radius:10px;
+            height:64px;
+            border-radius:999px;
             overflow:hidden;
             display:flex;
             align-items:center;
             justify-content:center;
             background:rgba(0,0,0,.34);
             flex:0 0 auto;
+            border:0;
+            box-shadow:none;
+        }
+
+        .player-media.is-card{
+            height:72px;
+            border-radius:10px;
+        }
+
+        .player-media.is-portrait{
+            border-radius:999px;
         }
 
         .player-media img{
             width:100%;
             height:100%;
             object-fit:cover;
+            border:0;
+            box-shadow:none;
         }
 
         .player-free-shape{
@@ -548,7 +564,8 @@
                 radial-gradient(circle at 50% 36%, rgba(255,255,255,.96) 0 18%, transparent 19%),
                 radial-gradient(circle at 50% 84%, rgba(255,255,255,.90) 0 30%, transparent 31%),
                 color-mix(in srgb, var(--team-primary) 42%, #171717);
-            box-shadow:inset 0 0 0 2px rgba(255,255,255,.14);
+            box-shadow:none;
+            border:0;
         }
 
         .player-row-name{
@@ -604,7 +621,9 @@
             position:absolute;
             inset:0 0 0 auto;
             width:min(100%, 470px);
+            height:100%;
             background:#030304;
+            overflow:hidden;
             transform:translateX(100%);
             animation:panelIn .22s ease forwards;
         }
@@ -612,6 +631,8 @@
         @keyframes panelIn{ to{ transform:translateX(0); } }
 
         .player-panel-bar{
+            position:relative;
+            z-index:100;
             height:54px;
             display:flex;
             align-items:center;
@@ -657,20 +678,31 @@
         .player-nav-arrow{
             position:absolute;
             top:50%;
-            z-index:6;
-            width:34px;
-            height:54px;
+            z-index:90;
+            width:42px;
+            height:56px;
             border:0;
-            border-radius:10px;
-            background:rgba(0,0,0,.58);
+            border-radius:12px;
+            background:rgba(0,0,0,.76);
             color:#fff;
             cursor:pointer;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            box-shadow:0 12px 28px rgba(0,0,0,.38);
+            backdrop-filter:blur(12px);
+            transform:translateY(-50%);
+            transition:transform .18s ease, background .18s ease, opacity .18s ease;
         }
 
-        .player-nav-arrow:hover{ background:var(--team-primary); }
+        .player-nav-arrow:hover{
+            background:var(--team-primary);
+            color:var(--team-text-on-primary);
+            transform:translateY(-50%) scale(1.06);
+        }
 
-        .player-nav-arrow.is-left{ left:6px; }
-        .player-nav-arrow.is-right{ right:6px; }
+        .player-nav-arrow.is-left{ left:10px; }
+        .player-nav-arrow.is-right{ right:10px; }
 
         /*
         |--------------------------------------------------------------------------
@@ -681,6 +713,8 @@
         | Script fonts, same image staging, info cards, logo rows, and spacing.
         */
         .player-dialog{
+            position:relative;
+            z-index:1;
             height:calc(100% - 54px);
             overflow:auto;
             padding:0 4px 28px;
@@ -689,6 +723,7 @@
 
         .mobile-card{
             position:relative;
+            z-index:2;
             width:390px;
             max-width:100%;
             aspect-ratio:390 / 680;
@@ -1042,6 +1077,98 @@
             cursor:default;
         }
 
+
+        .coach-open-btn{
+            min-height:42px;
+            border:0;
+            padding:0 14px;
+            margin:12px 10px 0;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            background:linear-gradient(135deg, var(--team-primary), var(--team-secondary));
+            color:#fff;
+            font-family:var(--team-heading);
+            font-size:12px;
+            letter-spacing:.10em;
+            text-transform:uppercase;
+            font-weight:900;
+            cursor:pointer;
+        }
+
+        .coach-modal{
+            position:fixed;
+            inset:0;
+            z-index:1200;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            padding:18px;
+            background:rgba(0,0,0,.74);
+            backdrop-filter:blur(12px);
+        }
+
+        .coach-modal.is-open{ display:flex; }
+
+        .coach-modal-card{
+            width:min(430px, 100%);
+            background:#070708;
+            color:#fff;
+            box-shadow:0 24px 60px rgba(0,0,0,.48);
+            overflow:hidden;
+        }
+
+        .coach-modal-head{
+            min-height:54px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            padding:0 14px;
+            background:linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 34%, #000), #050506);
+        }
+
+        .coach-modal-title{
+            font-family:var(--team-heading);
+            font-size:22px;
+            line-height:1;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            font-weight:900;
+        }
+
+        .coach-close-btn{
+            border:0;
+            background:rgba(255,255,255,.10);
+            color:#fff;
+            min-height:34px;
+            border-radius:999px;
+            padding:0 12px;
+            font-family:var(--team-heading);
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            font-weight:900;
+            cursor:pointer;
+        }
+
+        .coach-modal-body{ padding:16px; }
+
+        .coach-modal-copy{
+            margin:0 0 14px;
+            color:rgba(255,255,255,.68);
+            font-size:13px;
+            line-height:1.45;
+            font-weight:650;
+        }
+
+        .coach-form{ display:grid; gap:10px; }
+        .coach-field{ display:grid; gap:5px; }
+        .coach-field label{ color:rgba(255,255,255,.62); font-size:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:900; }
+        .coach-field input{ width:100%; height:44px; border:0; outline:0; padding:0 12px; background:rgba(255,255,255,.10); color:#fff; font-weight:750; }
+        .coach-field input::placeholder{ color:rgba(255,255,255,.38); }
+        .coach-submit{ min-height:44px; border:0; background:linear-gradient(135deg, var(--team-primary), var(--team-secondary)); color:#fff; font-family:var(--team-heading); font-size:13px; letter-spacing:.10em; text-transform:uppercase; font-weight:900; cursor:pointer; }
+
         .empty-squad{
             padding:22px;
             color:rgba(255,255,255,.68);
@@ -1109,8 +1236,16 @@
                         <strong>Coach checked in</strong>
                         <span>{{ $coachSession['name'] ?? 'Coach' }} · {{ count($savedPlayerIds) }} saved</span>
                     </div>
-                    <i class="fa-solid fa-circle-check" style="color:var(--team-primary)" aria-hidden="true"></i>
+                    <button class="coach-open-btn" type="button" data-open-coach-modal>
+                        <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                        Coach Info
+                    </button>
                 </div>
+            @else
+                <button class="coach-open-btn" type="button" data-open-coach-modal>
+                    <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                    Coach Check In
+                </button>
             @endif
 
             <section class="squad-section">
@@ -1130,7 +1265,7 @@
                             data-player-card
                             data-player='@json($player)'
                         >
-                            <span class="player-media">
+                            <span class="player-media {{ $player['listImageType'] === 'card' ? 'is-card' : 'is-portrait' }}">
                                 @if($player['listImage'])
                                     <img src="{{ $player['listImage'] }}" alt="{{ $player['name'] }}">
                                 @else
@@ -1154,6 +1289,47 @@
                     @endforelse
                 </div>
             </section>
+        </div>
+
+        <div class="coach-modal" id="coachModal" aria-hidden="true">
+            <div class="coach-modal-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
+                <div class="coach-modal-head">
+                    <div class="coach-modal-title" id="coachModalTitle">Coach Check In</div>
+                    <button class="coach-close-btn" type="button" data-close-coach-modal>
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        Close
+                    </button>
+                </div>
+                <div class="coach-modal-body">
+                    @if($coachSession)
+                        <p class="coach-modal-copy">
+                            You are checked in as <strong>{{ $coachSession['name'] ?? 'Coach' }}</strong>. Saved players stay in this temporary browser session.
+                        </p>
+                    @else
+                        <p class="coach-modal-copy">Check in to save player information while reviewing this team.</p>
+                        <form class="coach-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">
+                            @csrf
+                            <div class="coach-field">
+                                <label for="team_coach_school">School</label>
+                                <input id="team_coach_school" name="school" type="text" placeholder="School name" required>
+                            </div>
+                            <div class="coach-field">
+                                <label for="team_coach_name">Name</label>
+                                <input id="team_coach_name" name="name" type="text" placeholder="Coach name" required>
+                            </div>
+                            <div class="coach-field">
+                                <label for="team_coach_title">Title</label>
+                                <input id="team_coach_title" name="title" type="text" placeholder="Head Coach, Assistant Coach..." required>
+                            </div>
+                            <div class="coach-field">
+                                <label for="team_coach_email">Email</label>
+                                <input id="team_coach_email" name="email" type="email" placeholder="coach@school.edu" required>
+                            </div>
+                            <button class="coach-submit" type="submit">Check In</button>
+                        </form>
+                    @endif
+                </div>
+            </div>
         </div>
 
         <div class="player-overlay" id="playerOverlay" aria-hidden="true">
@@ -1202,6 +1378,9 @@
             const cards = Array.from(document.querySelectorAll('[data-player-card]'));
             const overlay = document.getElementById('playerOverlay');
             const dialog = document.getElementById('playerDialog');
+            const coachModal = document.getElementById('coachModal');
+            const coachOpenButtons = document.querySelectorAll('[data-open-coach-modal]');
+            const coachCloseButtons = document.querySelectorAll('[data-close-coach-modal]');
             const title = document.getElementById('playerPanelTitle');
             const closeBtn = document.getElementById('playerCloseBtn');
             const nextBtn = document.getElementById('playerNextBtn');
@@ -1211,6 +1390,22 @@
             const unsaveUrlTemplate = @json($coachUnsavePlayerUrlTemplate);
             const coachCheckedIn = @json((bool) $coachSession);
             let activeIndex = 0;
+
+            function openCoachModal() {
+                coachModal?.classList.add('is-open');
+                coachModal?.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeCoachModal() {
+                coachModal?.classList.remove('is-open');
+                coachModal?.setAttribute('aria-hidden', 'true');
+            }
+
+            coachOpenButtons.forEach((button) => button.addEventListener('click', openCoachModal));
+            coachCloseButtons.forEach((button) => button.addEventListener('click', closeCoachModal));
+            coachModal?.addEventListener('click', (event) => {
+                if (event.target === coachModal) closeCoachModal();
+            });
 
             function escapeHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, function (char) {

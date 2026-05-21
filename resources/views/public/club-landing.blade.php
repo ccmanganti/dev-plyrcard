@@ -122,10 +122,8 @@
             return $resolveAsset($team->logo ?: $club?->logo);
         };
 
-        $coachSessionKey = 'club_coach_checkin_' . $club->id;
-        $savedPlayersKey = 'club_saved_players_' . $club->id;
-        $coachSession = session($coachSessionKey);
-        $savedPlayers = collect(session($savedPlayersKey, []))->unique('player_id')->values();
+        $coachSession = $coachCheckIn ?? session('coach_checkin');
+        $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
     @endphp
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -192,10 +190,11 @@
             inset:0;
             z-index:1;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 70%, transparent), transparent 46%),
-                linear-gradient(215deg, color-mix(in srgb, var(--club-secondary) 78%, transparent), transparent 58%),
-                linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.84));
-            mix-blend-mode:multiply;
+                radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--club-primary) 64%, transparent), transparent 28%),
+                radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--club-primary) 42%, transparent), transparent 26%),
+                linear-gradient(90deg, color-mix(in srgb, var(--club-primary) 78%, rgba(0,0,0,.76)) 0%, rgba(0,0,0,.70) 50%, color-mix(in srgb, var(--club-secondary) 72%, rgba(0,0,0,.80)) 100%),
+                linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.86));
+            opacity:.95;
         }
 
         .club-hero::after{
@@ -203,7 +202,7 @@
             position:absolute;
             inset:0;
             z-index:2;
-            background:linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.88));
+            background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.82));
         }
 
         .club-hero-inner{
@@ -212,7 +211,7 @@
             width:min(1120px, 100%);
             margin:0 auto;
             display:grid;
-            grid-template-columns:minmax(0, 1fr) minmax(270px, 360px);
+            grid-template-columns:minmax(0, 1fr);
             gap:clamp(22px, 4vw, 48px);
             align-items:end;
         }
@@ -447,10 +446,50 @@
             font-weight:800;
         }
 
+
+        .coach-open-btn{
+            min-height:42px;
+            border:0;
+            padding:0 15px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            background:linear-gradient(135deg, var(--club-primary), var(--club-secondary));
+            color:#fff;
+            font-family:var(--club-heading);
+            font-size:12px;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            font-weight:900;
+            cursor:pointer;
+        }
+
+        .coach-modal{
+            position:fixed;
+            inset:0;
+            z-index:1200;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            padding:18px;
+            background:rgba(0,0,0,.74);
+            backdrop-filter:blur(12px);
+        }
+        .coach-modal.is-open{ display:flex; }
+        .coach-modal-card{ width:min(430px, 100%); background:#070708; color:#fff; box-shadow:0 24px 60px rgba(0,0,0,.48); overflow:hidden; }
+        .coach-modal-head{ min-height:54px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 14px; background:linear-gradient(135deg, color-mix(in srgb, var(--club-primary) 34%, #000), #050506); }
+        .coach-modal-title{ font-family:var(--club-heading); font-size:22px; line-height:1; letter-spacing:.08em; text-transform:uppercase; font-weight:900; }
+        .coach-close-btn{ border:0; background:rgba(255,255,255,.10); color:#fff; min-height:34px; border-radius:999px; padding:0 12px; font-family:var(--club-heading); letter-spacing:.08em; text-transform:uppercase; font-weight:900; cursor:pointer; }
+        .coach-modal-body{ padding:16px; }
+        .coach-modal-copy{ margin:0 0 14px; color:rgba(255,255,255,.68); font-size:13px; line-height:1.45; font-weight:650; }
+
         .club-stats{
             display:grid;
-            grid-template-columns:repeat(3, minmax(0, 1fr));
+            grid-template-columns:minmax(0, 1fr);
             background:#070708;
+            width:min(1120px, calc(100% - 28px));
+            margin:0 auto;
         }
 
         .club-stat{
@@ -814,22 +853,39 @@
                                 Map
                             </a>
                         @endif
+
+                        <button class="coach-open-btn" type="button" data-open-coach-modal>
+                            <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                            {{ $coachSession ? 'Coach Info' : 'Coach Check In' }}
+                        </button>
                     </div>
                 </div>
 
-                <aside class="coach-checkin" aria-label="Coach check in">
+
+            </div>
+        </section>
+
+
+        <div class="coach-modal" id="coachModal" aria-hidden="true">
+            <div class="coach-modal-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
+                <div class="coach-modal-head">
+                    <div class="coach-modal-title" id="coachModalTitle">Coach Check In</div>
+                    <button class="coach-close-btn" type="button" data-close-coach-modal>
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        Close
+                    </button>
+                </div>
+                <div class="coach-modal-body">
                     @if($coachSession)
                         <div class="coach-session">
                             <strong>Checked In</strong>
                             <span>{{ $coachSession['name'] ?? 'Coach' }} · {{ $coachSession['title'] ?? 'Coach' }}</span>
                             <span>{{ $coachSession['school'] ?? '' }}</span>
-
                             <div class="coach-saved">
                                 <div class="coach-saved-title">
                                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
                                     Saved Players
                                 </div>
-
                                 <div class="coach-saved-list">
                                     @forelse($savedPlayers as $saved)
                                         <a class="coach-saved-item" href="{{ $saved['player_url'] ?? '#club-teams' }}">
@@ -837,48 +893,25 @@
                                             <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
                                         </a>
                                     @empty
-                                        <div style="color:rgba(255,255,255,.62);font-size:12px;font-weight:800;">
-                                            Saved players will appear here after you tap the plus icon on a player card.
-                                        </div>
+                                        <div style="color:rgba(255,255,255,.62);font-size:12px;font-weight:800;">Saved players will appear after you tap the plus icon on a player card.</div>
                                     @endforelse
                                 </div>
                             </div>
                         </div>
                     @else
-                        <h2>Coach Check In</h2>
-                        <p>Check in to save player information while viewing team rosters.</p>
-
+                        <p class="coach-modal-copy">Check in to save player information while viewing team rosters.</p>
                         <form class="coach-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">
                             @csrf
-
-                            <div class="coach-field">
-                                <label for="coach_school">School</label>
-                                <input id="coach_school" name="school" type="text" placeholder="School name" required>
-                            </div>
-
-                            <div class="coach-field">
-                                <label for="coach_name">Name</label>
-                                <input id="coach_name" name="name" type="text" placeholder="Coach name" required>
-                            </div>
-
-                            <div class="coach-field">
-                                <label for="coach_title">Title</label>
-                                <input id="coach_title" name="title" type="text" placeholder="Head Coach, Assistant Coach..." required>
-                            </div>
-
-                            <div class="coach-field">
-                                <label for="coach_email">Email</label>
-                                <input id="coach_email" name="email" type="email" placeholder="coach@school.edu" required>
-                            </div>
-
-                            <button class="coach-submit" type="submit">
-                                Check In
-                            </button>
+                            <div class="coach-field"><label for="coach_school">School</label><input id="coach_school" name="school" type="text" placeholder="School name" required></div>
+                            <div class="coach-field"><label for="coach_name">Name</label><input id="coach_name" name="name" type="text" placeholder="Coach name" required></div>
+                            <div class="coach-field"><label for="coach_title">Title</label><input id="coach_title" name="title" type="text" placeholder="Head Coach, Assistant Coach..." required></div>
+                            <div class="coach-field"><label for="coach_email">Email</label><input id="coach_email" name="email" type="email" placeholder="coach@school.edu" required></div>
+                            <button class="coach-submit" type="submit">Check In</button>
                         </form>
                     @endif
-                </aside>
+                </div>
             </div>
-        </section>
+        </div>
 
         <section class="club-stats" aria-label="Club highlights">
             <div class="club-stat">
