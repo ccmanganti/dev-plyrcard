@@ -28,9 +28,49 @@ class PublicClubTeamController extends Controller
             ->orderBy('name')
             ->get();
 
+        $teamNames = $teams->pluck('name')->filter()->values();
+
+        $journeyPlayers = User::query()
+            ->with(['websites' => function ($query) {
+                $query
+                    ->where('is_active', true)
+                    ->where('is_published', true)
+                    ->latest('updated_at');
+            }])
+            ->where('club_id', $club->id)
+            ->whereIn('team_name', $teamNames)
+            ->whereNotNull('plyrcard_image')
+            ->where('plyrcard_image', '!=', '')
+            ->whereHas('roles', function ($query) {
+                $query->whereIn('name', ['My Journey', 'my journey', 'My-Journey', 'my-journey']);
+            })
+            ->get()
+            ->groupBy(fn ($player) => (string) $player->team_name)
+            ->map(function ($group) {
+                return $group->shuffle()->map(function ($player) {
+                    $website = $player->websites->first();
+
+                    return [
+                        'id' => $player->id,
+                        'name' => trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? '')),
+                        'image' => $player->plyrcard_image,
+                        'website_url' => $website
+                            ? (filled($website->domain)
+                                ? 'https://' . preg_replace('/^https?:\/\//', '', $website->domain)
+                                : url('/' . ltrim($website->slug, '/')))
+                            : null,
+                    ];
+                })->values();
+            });
+
+        $teamJourneyCards = $teams->mapWithKeys(function ($team) use ($journeyPlayers) {
+            return [$team->id => $journeyPlayers->get((string) $team->name, collect())->all()];
+        })->all();
+
         return view('public.club-landing', [
             'club' => $club,
             'teams' => $teams,
+            'teamJourneyCards' => $teamJourneyCards,
             'coachCheckIn' => session('coach_checkin'),
             'savedPlayers' => session('coach_saved_players', []),
         ]);
