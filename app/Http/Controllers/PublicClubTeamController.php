@@ -8,7 +8,6 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class PublicClubTeamController extends Controller
@@ -430,26 +429,200 @@ class PublicClubTeamController extends Controller
         Club $club,
         Team $team
     ): void {
-        if (blank($coachEmail)) {
+        $coachEmail = strtolower(trim($coachEmail));
+
+        if (! filter_var($coachEmail, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
-        $subjectPlayerName = $savedPlayer['player_name'] ?: 'Player';
+        /*
+        |--------------------------------------------------------------------------
+        | Native Domain Mail
+        |--------------------------------------------------------------------------
+        |
+        | This intentionally does NOT depend on Laravel SMTP/.env mail settings.
+        | It works like the sample RSVP script: PHP's native mail() sends using
+        | a domain sender/envelope sender from plyrcard.com.
+        |
+        | Note: the hosting server still has to allow PHP mail(). For best
+        | deliverability, support@plyrcard.com should exist and the domain should
+        | have SPF/DKIM configured by the host/email provider.
+        |
+        */
 
-        Mail::send('emails.coach-saved-player', [
+        $fromEmail = 'support@plyrcard.com';
+        $fromName = 'PlyrCard';
+        $subjectPlayerName = $savedPlayer['player_name'] ?: 'Player';
+        $subject = "Saved Player: {$subjectPlayerName} - {$club->name}";
+
+        $replyTo = $player->email
+            ?: $player->personal_email
+            ?: $player->parent_email
+            ?: $player->club_coach_email
+            ?: $fromEmail;
+
+        $htmlBody = view('emails.coach-saved-player', [
             'coach' => $coachCheckIn,
             'savedPlayer' => $savedPlayer,
             'player' => $player,
             'club' => $club,
             'team' => $team,
-        ], function ($message) use ($coachEmail, $coachCheckIn, $subjectPlayerName, $club, $player) {
-            $message->to($coachEmail, $coachCheckIn['name'] ?? null)
-                ->subject("Saved Player: {$subjectPlayerName} - {$club->name}");
+        ])->render();
 
-            $replyTo = $player->email ?: $player->personal_email ?: $player->parent_email ?: $player->club_coach_email;
-            if (filled($replyTo)) {
-                $message->replyTo($replyTo, $subjectPlayerName);
-            }
-        });
+        $textBody = $this->buildSavedPlayerTextEmail(
+            $coachCheckIn,
+            $savedPlayer,
+            $player,
+            $club,
+            $team
+        );
+
+        $sent = $this->sendNativeMultipartMail(
+            to: $coachEmail,
+            subject: $subject,
+            textBody: $textBody,
+            htmlBody: $htmlBody,
+            fromEmail: $fromEmail,
+            fromName: $fromName,
+            replyTo: $replyTo,
+            envelopeFrom: $fromEmail
+        );
+
+        if (! $sent) {
+            logger()->warning('Coach saved player native email failed.', [
+                'to' => $coachEmail,
+                'from' => $fromEmail,
+                'player_id' => $player->id,
+                'club_id' => $club->id,
+                'team_id' => $team->id,
+            ]);
+        }
     }
+
+    protected function sendNativeMultipartMail(
+        string $to,
+        string $subject,
+        string $textBody,
+        string $htmlBody,
+        string $fromEmail = 'support@plyrcard.com',
+        string $fromName = 'PlyrCard',
+        string $replyTo = 'support@plyrcard.com',
+        string $envelopeFrom = 'support@plyrcard.com'
+    ): bool {
+        $to = trim($to);
+        $fromEmail = trim($fromEmail);
+        $replyTo = trim($replyTo);
+        $envelopeFrom = trim($envelopeFrom);
+
+        if (! filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        if (! filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            $fromEmail = 'support@plyrcard.com';
+        }
+
+        if (! filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            $replyTo = $fromEmail;
+        }
+
+        if (! filter_var($envelopeFrom, FILTER_VALIDATE_EMAIL)) {
+            $envelopeFrom = $fromEmail;
+        }
+
+        $safeFromName = $this->sanitizeMailHeader($fromName ?: 'PlyrCard');
+        $safeSubject = $this->sanitizeMailHeader($subject ?: 'Saved Player Information');
+        $safeReplyTo = $this->sanitizeMailHeader($replyTo);
+
+        $boundary = 'plyrcard_' . md5(uniqid((string) mt_rand(), true));
+
+        $headers = [
+            'MIME-Version: 1.0',
+            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+            'From: ' . $safeFromName . ' <' . $fromEmail . '>',
+            'Reply-To: ' . $safeReplyTo,
+            'X-Mailer: PHP/' . phpversion(),
+        ];
+
+        $message = "--{$boundary}\r\n"
+            . "Content-Type: text/plain; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $textBody . "\r\n"
+            . "--{$boundary}\r\n"
+            . "Content-Type: text/html; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $htmlBody . "\r\n"
+            . "--{$boundary}--";
+
+        $headerString = implode("\r\n", $headers);
+
+        $sent = @mail($to, $safeSubject, $message, $headerString, '-f' . $envelopeFrom);
+
+        if (! $sent) {
+            $sent = @mail($to, $safeSubject, $message, $headerString);
+        }
+
+        return (bool) $sent;
+    }
+
+    protected function sanitizeMailHeader(string $value): string
+    {
+        return trim(str_replace(["\r", "\n"], ' ', $value));
+    }
+
+    protected function buildSavedPlayerTextEmail(
+        array $coachCheckIn,
+        array $savedPlayer,
+        User $player,
+        Club $club,
+        Team $team
+    ): string {
+        $lines = [
+            'PlyrCard Saved Player',
+            '',
+            'Coach:',
+            'Name: ' . ($coachCheckIn['name'] ?? ''),
+            'School: ' . ($coachCheckIn['school'] ?? ''),
+            'Title: ' . ($coachCheckIn['title'] ?? ''),
+            'Email: ' . ($coachCheckIn['email'] ?? ''),
+            '',
+            'Player:',
+            'Name: ' . ($savedPlayer['player_name'] ?? ''),
+            'Jersey: ' . ($savedPlayer['jersey_number'] ?? ''),
+            'Position: ' . ($savedPlayer['position'] ?? ''),
+            'Class: ' . ($savedPlayer['year'] ?? ''),
+            'Height: ' . ($savedPlayer['height'] ?? ''),
+            'Weight: ' . ($savedPlayer['weight'] ?? ''),
+            'GPA: ' . ($savedPlayer['gpa'] ?? ''),
+            'Location: ' . trim(($savedPlayer['city'] ?? '') . ', ' . ($savedPlayer['state'] ?? ''), ', '),
+            '',
+            'Program:',
+            'Club: ' . ($club->name ?? ''),
+            'Team: ' . ($team->name ?? ''),
+            'League: ' . ($club->league?->name ?? ''),
+            '',
+            'Website:',
+            ($savedPlayer['website_url'] ?? '') ?: 'No published website available.',
+            '',
+            'Contact:',
+            'Player Email: ' . (($savedPlayer['player_email'] ?? '') ?: 'N/A'),
+            'Personal Email: ' . (($savedPlayer['player_personal_email'] ?? '') ?: 'N/A'),
+            'Phone: ' . (($savedPlayer['player_phone'] ?? '') ?: 'N/A'),
+            '',
+            'Parent / Guardian:',
+            'Parent: ' . (($savedPlayer['parent'] ?? '') ?: 'N/A'),
+            'Parent Email: ' . (($savedPlayer['parent_email'] ?? '') ?: 'N/A'),
+            'Parent Phone: ' . (($savedPlayer['parent_phone'] ?? '') ?: 'N/A'),
+            '',
+            'Coach Contact:',
+            'Club Coach: ' . (($savedPlayer['club_coach'] ?? '') ?: 'N/A'),
+            'Club Coach Email: ' . (($savedPlayer['club_coach_email'] ?? '') ?: 'N/A'),
+            'Club Coach Phone: ' . (($savedPlayer['club_coach_phone'] ?? '') ?: 'N/A'),
+            '',
+            'Saved At: ' . (($savedPlayer['saved_at'] ?? '') ?: now()->toDateTimeString()),
+        ];
+
+        return implode("\n", $lines);
+    }
+
 }
