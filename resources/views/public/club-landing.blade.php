@@ -744,7 +744,33 @@
             }
         }
 
-    </style>
+    
+
+        /* FINAL FIX: make the club info/facts box full-bleed across the hero */
+        .hero .hero-side{
+            width:100vw !important;
+            max-width:none !important;
+            margin-left:calc(50% - 50vw) !important;
+            margin-right:calc(50% - 50vw) !important;
+            border-left:0 !important;
+            border-right:0 !important;
+            border-radius:0 !important;
+        }
+        @media (min-width:901px){
+            .hero .hero-side{
+                width:100% !important;
+                margin-left:0 !important;
+                margin-right:0 !important;
+            }
+        }
+        @media (max-width:900px){
+            .hero .hero-side{
+                width:100vw !important;
+                margin-left:calc(50% - 50vw) !important;
+                margin-right:calc(50% - 50vw) !important;
+            }
+        }
+</style>
 </head>
 <body>
     <main class="site">
