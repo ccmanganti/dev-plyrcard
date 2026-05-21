@@ -708,6 +708,196 @@
             .team-name{font-size:40px !important;}
         }
 
+
+        /* TRUE FINAL MOBILE HERO FIX: one back link, logos in hero corners, no wasted space */
+        .team-main-polished .back{
+            display:none !important;
+        }
+
+        @media(max-width:900px){
+            .mobile-back-row{
+                display:block !important;
+                position:absolute !important;
+                top:66px !important;
+                left:0 !important;
+                right:0 !important;
+                z-index:60 !important;
+                padding:12px 20px 0 !important;
+                background:transparent !important;
+                border:0 !important;
+                box-shadow:none !important;
+                pointer-events:none !important;
+            }
+            .page-back-mobile{
+                background:transparent !important;
+                border:0 !important;
+                box-shadow:none !important;
+                padding:0 !important;
+                margin:0 !important;
+                color:rgba(255,255,255,.88) !important;
+                font-size:10px !important;
+                letter-spacing:.14em !important;
+                text-shadow:0 2px 12px rgba(0,0,0,.55) !important;
+                pointer-events:auto !important;
+            }
+
+            .hero{
+                min-height:330px !important;
+                height:330px !important;
+                display:block !important;
+                overflow:hidden !important;
+            }
+            .hero-bg{
+                background-position:center 40% !important;
+            }
+            .hero-bg:after{
+                background:
+                    linear-gradient(90deg,
+                        color-mix(in srgb,var(--brand) 68%,rgba(0,0,0,.52)) 0%,
+                        color-mix(in srgb,var(--brand) 28%,rgba(0,0,0,.22)) 52%,
+                        color-mix(in srgb,var(--brand) 58%,rgba(0,0,0,.58)) 100%),
+                    linear-gradient(180deg,rgba(0,0,0,.10) 0%,rgba(0,0,0,.06) 42%,color-mix(in srgb,var(--brand) 42%,rgba(0,0,0,.72)) 100%) !important;
+            }
+            .hero-inner{
+                position:relative !important;
+                width:100% !important;
+                min-height:330px !important;
+                height:330px !important;
+                padding:0 20px 18px !important;
+                display:flex !important;
+                align-items:flex-start !important;
+                justify-content:flex-start !important;
+            }
+            .team-main-polished{
+                width:100% !important;
+                display:grid !important;
+                grid-template-columns:1fr !important;
+                gap:12px !important;
+                padding:0 !important;
+                margin:0 !important;
+                align-content:start !important;
+            }
+
+            .team-hero-identity{
+                display:block !important;
+                position:static !important;
+                padding:0 !important;
+                margin:0 !important;
+                min-height:0 !important;
+            }
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{
+                position:absolute !important;
+                top:70px !important;
+                z-index:9 !important;
+                width:50px !important;
+                height:50px !important;
+                object-fit:contain !important;
+            }
+            .team-hero-identity .identity-logo{
+                left:20px !important;
+                justify-self:auto !important;
+            }
+            .team-hero-identity .identity-league{
+                right:20px !important;
+                justify-self:auto !important;
+            }
+
+            .hero-info-strip{
+                order:1 !important;
+                display:grid !important;
+                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                gap:8px !important;
+                margin:132px 0 0 !important;
+                padding:0 !important;
+                border:0 !important;
+            }
+            .hero-info-strip span{
+                min-height:48px !important;
+                padding:0 8px !important;
+                justify-content:center !important;
+                text-align:center !important;
+                font-size:10px !important;
+                line-height:1.02 !important;
+                letter-spacing:.055em !important;
+                background:rgba(255,255,255,.15) !important;
+                border:1px solid rgba(255,255,255,.13) !important;
+                border-left:2px solid rgba(255,255,255,.45) !important;
+                backdrop-filter:blur(14px) !important;
+                color:#fff !important;
+            }
+            .hero-info-strip span i{
+                display:inline-block !important;
+                font-size:14px !important;
+                margin-right:6px !important;
+                color:var(--brand-readable) !important;
+            }
+
+            .team-title-stack{
+                order:2 !important;
+                position:relative !important;
+                z-index:8 !important;
+                width:100% !important;
+                margin:12px auto 0 !important;
+                padding:12px 0 0 !important;
+                border-top:1px solid rgba(255,255,255,.16) !important;
+                text-align:left !important;
+                padding-left:66px !important;
+                padding-right:62px !important;
+            }
+            .team-title-stack .label{
+                font-size:9px !important;
+                line-height:1.05 !important;
+                letter-spacing:.15em !important;
+                margin:0 0 7px !important;
+                color:rgba(255,255,255,.78) !important;
+                white-space:nowrap !important;
+                overflow:hidden !important;
+                text-overflow:ellipsis !important;
+            }
+            .team-name{
+                font-size:42px !important;
+                line-height:.9 !important;
+                letter-spacing:.01em !important;
+                margin:0 !important;
+                white-space:nowrap !important;
+            }
+            .section{
+                padding-top:34px !important;
+            }
+        }
+
+        @media(max-width:420px){
+            .hero,
+            .hero-inner{
+                min-height:318px !important;
+                height:318px !important;
+            }
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{
+                top:68px !important;
+                width:44px !important;
+                height:44px !important;
+            }
+            .hero-info-strip{
+                margin-top:124px !important;
+                gap:6px !important;
+            }
+            .hero-info-strip span{
+                min-height:44px !important;
+                font-size:9px !important;
+                padding:0 6px !important;
+            }
+            .team-title-stack{
+                margin-top:11px !important;
+                padding-left:56px !important;
+                padding-right:54px !important;
+            }
+            .team-name{
+                font-size:39px !important;
+            }
+        }
+
     </style>
 </head>
 <body>
