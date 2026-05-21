@@ -1100,7 +1100,12 @@
             const nextBtn = document.getElementById('playerNextBtn');
             const prevBtn = document.getElementById('playerPrevBtn');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            const saveUrl = @json(route('clubs.coach-save-player', ['clubSlug' => $club->landing_page_slug]));
+            const saveUrlTemplate = @json(route('clubs.coach-save-player', [
+                'clubSlug' => $club->landing_page_slug,
+                'gender' => request()->route('gender') ?? $team->landingGenderSegment(),
+                'teamSlug' => $team->landing_page_slug,
+                'player' => '__PLAYER__',
+            ]));
             const coachCheckedIn = @json((bool) $coachSession);
             let activeIndex = 0;
 
@@ -1313,6 +1318,9 @@
                 button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
 
                 try {
+                    const playerId = button.getAttribute('data-save-player');
+                    const saveUrl = saveUrlTemplate.replace('__PLAYER__', encodeURIComponent(playerId));
+
                     const response = await fetch(saveUrl, {
                         method: 'POST',
                         headers: {
