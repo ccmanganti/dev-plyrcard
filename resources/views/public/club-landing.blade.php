@@ -1244,6 +1244,405 @@
             font-size:10.5px !important;
             line-height:1.35 !important;
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clean PLYRCard website pass - no bubbles, no cardy backgrounds
+        |--------------------------------------------------------------------------
+        | Full-width website rhythm inspired by plyrcard.com: dark stage, sharp
+        | editorial sections, clean navigation, strong imagery, compact type.
+        */
+        body{
+            background:#030303 !important;
+        }
+
+        .club-page{
+            background:#030303 !important;
+        }
+
+        .club-hero,
+        .club-stats,
+        .club-section,
+        .club-info-band,
+        .club-footer{
+            width:min(1180px, calc(100% - 32px)) !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }
+
+        .club-hero{
+            margin-top:16px !important;
+            min-height:560px !important;
+            padding:0 !important;
+            background:#050505 !important;
+            border-radius:0 !important;
+            border:0 !important;
+            border-bottom:1px solid rgba(255,255,255,.12) !important;
+            overflow:hidden !important;
+            align-items:flex-end !important;
+        }
+
+        .club-hero-bg{
+            border-radius:0 !important;
+            opacity:.58 !important;
+            filter:saturate(1.08) contrast(1.04) !important;
+        }
+
+        .club-hero::before{
+            inset:0 !important;
+            border-radius:0 !important;
+            background:
+                linear-gradient(100deg,
+                    color-mix(in srgb, var(--club-primary) 70%, rgba(0,0,0,.84)) 0%,
+                    rgba(0,0,0,.72) 45%,
+                    color-mix(in srgb, var(--club-secondary) 62%, rgba(0,0,0,.86)) 100%) !important;
+            opacity:.92 !important;
+        }
+
+        .club-hero::after{
+            inset:0 !important;
+            border-radius:0 !important;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.12) 0%, rgba(0,0,0,.28) 42%, rgba(0,0,0,.88) 100%),
+                linear-gradient(90deg, rgba(255,255,255,.05), transparent 48%) !important;
+        }
+
+        .club-hero-inner{
+            min-height:560px !important;
+            width:100% !important;
+            display:flex !important;
+            align-items:flex-end !important;
+            padding:clamp(24px, 4vw, 48px) !important;
+        }
+
+        .club-brand{
+            margin-bottom:24px !important;
+            gap:14px !important;
+        }
+
+        .club-logo{
+            width:clamp(56px, 7vw, 92px) !important;
+            height:clamp(56px, 7vw, 92px) !important;
+            object-fit:contain !important;
+        }
+
+        .league-logo{
+            max-width:92px !important;
+            max-height:48px !important;
+            margin-left:0 !important;
+        }
+
+        .club-type{
+            font-size:10px !important;
+            letter-spacing:.22em !important;
+            color:rgba(255,255,255,.70) !important;
+        }
+
+        .club-name{
+            max-width:760px !important;
+            font-size:clamp(30px, 5.8vw, 70px) !important;
+            line-height:.9 !important;
+            letter-spacing:.045em !important;
+        }
+
+        .club-kicker{
+            font-size:clamp(10px, 1.2vw, 13px) !important;
+            letter-spacing:.18em !important;
+            color:var(--club-readable-primary) !important;
+            margin-bottom:10px !important;
+        }
+
+        .club-headline{
+            max-width:780px !important;
+            font-size:clamp(38px, 7vw, 86px) !important;
+            line-height:.88 !important;
+            letter-spacing:.01em !important;
+        }
+
+        .club-copy{
+            max-width:620px !important;
+            margin-top:16px !important;
+            font-size:clamp(12px, 1.15vw, 15px) !important;
+            line-height:1.55 !important;
+            color:rgba(255,255,255,.82) !important;
+            font-weight:650 !important;
+        }
+
+        .club-actions{
+            margin-top:20px !important;
+            gap:10px !important;
+        }
+
+        .club-action,
+        .coach-open-btn,
+        .coach-close-btn,
+        .coach-submit,
+        .team-tab{
+            border-radius:0 !important;
+            box-shadow:none !important;
+        }
+
+        .club-action,
+        .coach-open-btn{
+            min-height:38px !important;
+            padding:0 14px !important;
+            font-size:10.5px !important;
+            background:transparent !important;
+            border:1px solid rgba(255,255,255,.22) !important;
+            color:#fff !important;
+        }
+
+        .club-action.primary,
+        .coach-open-btn{
+            background:var(--club-primary) !important;
+            border-color:var(--club-primary) !important;
+            color:var(--club-on-primary) !important;
+        }
+
+        .club-stats{
+            display:grid !important;
+            grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+            gap:0 !important;
+            padding:0 !important;
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .club-stat{
+            min-height:96px !important;
+            padding:16px 14px !important;
+            border:0 !important;
+            border-right:1px solid rgba(255,255,255,.10) !important;
+            border-radius:0 !important;
+            background:#050505 !important;
+            box-shadow:none !important;
+        }
+
+        .club-stat:last-child{ border-right:0 !important; }
+
+        .club-stat i{
+            color:var(--club-readable-primary) !important;
+            font-size:16px !important;
+            margin-bottom:9px !important;
+        }
+
+        .club-stat span{
+            font-size:8px !important;
+            letter-spacing:.18em !important;
+            color:rgba(255,255,255,.54) !important;
+        }
+
+        .club-stat strong{
+            font-size:clamp(12px, 1.7vw, 18px) !important;
+            line-height:1.05 !important;
+            color:#fff !important;
+        }
+
+        .club-section{
+            padding:34px 0 44px !important;
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .section-head{
+            margin-bottom:18px !important;
+            padding:0 !important;
+        }
+
+        .section-kicker,
+        .club-section-kicker{
+            font-size:9px !important;
+            letter-spacing:.20em !important;
+            color:var(--club-readable-primary) !important;
+        }
+
+        .section-title,
+        .club-section-title{
+            font-size:clamp(26px, 4vw, 46px) !important;
+            line-height:.92 !important;
+            letter-spacing:.055em !important;
+        }
+
+        .team-tabs{
+            display:flex !important;
+            gap:0 !important;
+            border:1px solid rgba(255,255,255,.12) !important;
+            width:max-content !important;
+        }
+
+        .team-tab{
+            min-height:38px !important;
+            padding:0 18px !important;
+            background:#050505 !important;
+            border:0 !important;
+            border-right:1px solid rgba(255,255,255,.12) !important;
+            color:rgba(255,255,255,.72) !important;
+        }
+
+        .team-tab:last-child{ border-right:0 !important; }
+
+        .team-tab.is-active{
+            background:var(--club-primary) !important;
+            color:var(--club-on-primary) !important;
+        }
+
+        .team-grid{
+            display:grid !important;
+            grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+            gap:14px !important;
+        }
+
+        .team-card{
+            min-height:220px !important;
+            border-radius:0 !important;
+            border:0 !important;
+            border-bottom:1px solid rgba(255,255,255,.14) !important;
+            background:#090909 !important;
+            box-shadow:none !important;
+        }
+
+        .team-card::before{
+            background:
+                linear-gradient(90deg, rgba(0,0,0,.82), rgba(0,0,0,.36) 58%, rgba(0,0,0,.72)) !important;
+        }
+
+        .team-card::after{ display:none !important; }
+
+        .team-card-content{
+            min-height:220px !important;
+            padding:20px !important;
+            justify-content:flex-end !important;
+        }
+
+        .team-card-logo,
+        .club-team-logo{
+            width:46px !important;
+            height:46px !important;
+        }
+
+        .team-card-name,
+        .club-team-name{
+            font-size:clamp(20px, 2.8vw, 32px) !important;
+        }
+
+        .team-card-copy,
+        .club-team-copy{
+            font-size:10px !important;
+            color:rgba(255,255,255,.64) !important;
+        }
+
+        .club-info-band{
+            padding:38px 0 !important;
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .club-info-grid{
+            grid-template-columns:minmax(0, .85fr) minmax(0, 1.15fr) !important;
+            gap:30px !important;
+        }
+
+        .club-info-grid h2{
+            font-size:clamp(24px, 3.7vw, 44px) !important;
+        }
+
+        .club-info-grid p,
+        .club-footer p,
+        .club-footer-item{
+            font-size:13px !important;
+            line-height:1.55 !important;
+            color:rgba(255,255,255,.72) !important;
+        }
+
+        .club-footer{
+            padding:28px 0 34px !important;
+            background:#050505 !important;
+        }
+
+        .club-footer h2{ font-size:24px !important; }
+
+        .club-footer-item,
+        .club-sponsor{
+            border-radius:0 !important;
+            background:transparent !important;
+            border-color:rgba(255,255,255,.10) !important;
+        }
+
+        .coach-modal-card{
+            border-radius:0 !important;
+            background:#060606 !important;
+            border:1px solid rgba(255,255,255,.14) !important;
+            box-shadow:0 24px 80px rgba(0,0,0,.55) !important;
+        }
+
+        .coach-modal-head{
+            background:#080808 !important;
+            border-bottom:1px solid rgba(255,255,255,.12) !important;
+        }
+
+        .coach-field input{
+            border-radius:0 !important;
+            background:#0d0d0d !important;
+            border:1px solid rgba(255,255,255,.14) !important;
+        }
+
+        @media (max-width:760px){
+            .club-hero,
+            .club-stats,
+            .club-section,
+            .club-info-band,
+            .club-footer{
+                width:100% !important;
+            }
+
+            .club-hero{
+                margin-top:0 !important;
+                min-height:520px !important;
+            }
+
+            .club-hero-inner{
+                min-height:520px !important;
+                padding:22px 16px !important;
+            }
+
+            .club-brand{ margin-bottom:18px !important; }
+            .club-name{ font-size:28px !important; }
+            .club-headline{ font-size:42px !important; }
+            .club-copy{ font-size:12px !important; max-width:94% !important; }
+
+            .club-stats{
+                grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+            }
+
+            .club-stat{
+                min-height:74px !important;
+                padding:10px 7px !important;
+            }
+
+            .club-stat i{ font-size:13px !important; margin-bottom:6px !important; }
+            .club-stat span{ font-size:6.8px !important; letter-spacing:.12em !important; }
+            .club-stat strong{ font-size:10px !important; }
+
+            .club-section,
+            .club-info-band,
+            .club-footer{
+                padding-left:14px !important;
+                padding-right:14px !important;
+            }
+
+            .section-head{
+                flex-direction:column !important;
+                align-items:flex-start !important;
+            }
+
+            .team-tabs{ width:100% !important; }
+            .team-tab{ flex:1 !important; padding:0 10px !important; }
+            .team-grid{ grid-template-columns:1fr !important; gap:10px !important; }
+            .team-card{ min-height:150px !important; }
+            .team-card-content{ min-height:150px !important; padding:14px !important; }
+            .club-info-grid{ grid-template-columns:1fr !important; gap:18px !important; }
+        }
 </style>
 </head>
 

@@ -1664,6 +1664,374 @@
             .team-name{ font-size:22px !important; }
             .player-row{ min-height:62px !important; }
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clean PLYRCard website pass - no bubbles, no cardy backgrounds
+        |--------------------------------------------------------------------------
+        | Keeps navigation easy on mobile while removing rounded bubble UI.
+        */
+        body{ background:#030303 !important; }
+
+        .team-page{
+            background:#030303 !important;
+            padding:0 !important;
+        }
+
+        .team-app{
+            width:100% !important;
+            max-width:none !important;
+            margin:0 !important;
+            min-height:100vh !important;
+            background:#050505 !important;
+            box-shadow:none !important;
+            border:0 !important;
+        }
+
+        .team-top{
+            height:56px !important;
+            width:min(1180px, calc(100% - 32px)) !important;
+            margin:0 auto !important;
+            padding:0 !important;
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+            backdrop-filter:none !important;
+        }
+
+        .team-top-btn{
+            width:40px !important;
+            height:40px !important;
+            border-radius:0 !important;
+            background:transparent !important;
+            border:1px solid rgba(255,255,255,.16) !important;
+        }
+
+        .team-top-title{
+            font-size:18px !important;
+            letter-spacing:.12em !important;
+        }
+
+        .team-content{
+            width:min(1180px, calc(100% - 32px)) !important;
+            margin:0 auto !important;
+            padding:0 0 48px !important;
+        }
+
+        .team-hero{
+            min-height:470px !important;
+            border-radius:0 !important;
+            background:#050505 !important;
+            border:0 !important;
+            border-bottom:1px solid rgba(255,255,255,.12) !important;
+            overflow:hidden !important;
+        }
+
+        .team-hero::before{
+            background:
+                linear-gradient(100deg,
+                    color-mix(in srgb, var(--team-primary) 70%, rgba(0,0,0,.84)) 0%,
+                    rgba(0,0,0,.72) 48%,
+                    color-mix(in srgb, var(--team-secondary) 62%, rgba(0,0,0,.86)) 100%) !important;
+            opacity:.92 !important;
+        }
+
+        .team-hero::after{
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.12) 0%, rgba(0,0,0,.32) 46%, rgba(0,0,0,.88) 100%),
+                linear-gradient(90deg, rgba(255,255,255,.05), transparent 48%) !important;
+        }
+
+        .team-hero-inner{
+            min-height:470px !important;
+            padding:clamp(24px, 4vw, 46px) !important;
+            justify-content:flex-end !important;
+        }
+
+        .team-brand-row{
+            gap:14px !important;
+            margin-bottom:22px !important;
+        }
+
+        .team-logo{
+            width:clamp(56px, 7vw, 92px) !important;
+            height:clamp(56px, 7vw, 92px) !important;
+        }
+
+        .team-kicker{
+            font-size:10px !important;
+            letter-spacing:.20em !important;
+            color:var(--team-readable-primary) !important;
+        }
+
+        .team-name{
+            font-size:clamp(42px, 7vw, 84px) !important;
+            line-height:.88 !important;
+            letter-spacing:.015em !important;
+        }
+
+        .team-subtitle{
+            max-width:620px !important;
+            margin-top:14px !important;
+            font-size:clamp(12px, 1.15vw, 15px) !important;
+            line-height:1.55 !important;
+            color:rgba(255,255,255,.80) !important;
+        }
+
+        .team-meta-strip{
+            width:100% !important;
+            display:grid !important;
+            grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+            gap:0 !important;
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .team-meta{
+            min-height:92px !important;
+            padding:18px !important;
+            border-radius:0 !important;
+            background:#050505 !important;
+            border:0 !important;
+            border-right:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .team-meta:last-child{ border-right:0 !important; }
+
+        .team-meta i{ color:var(--team-readable-primary) !important; }
+        .team-meta span{ font-size:8px !important; letter-spacing:.18em !important; color:rgba(255,255,255,.54) !important; }
+        .team-meta strong{ font-size:clamp(13px, 1.6vw, 18px) !important; color:#fff !important; }
+
+        .coach-session-bar{
+            margin:18px 0 0 !important;
+            min-height:52px !important;
+            border-radius:0 !important;
+            background:#050505 !important;
+            border:1px solid rgba(255,255,255,.12) !important;
+            border-left:3px solid var(--team-primary) !important;
+        }
+
+        .coach-open-btn,
+        .coach-submit,
+        .coach-close-btn,
+        .player-panel-btn,
+        .player-nav-arrow{
+            border-radius:0 !important;
+            box-shadow:none !important;
+        }
+
+        .coach-open-btn{
+            background:var(--team-primary) !important;
+            color:var(--team-on-primary) !important;
+            border:1px solid var(--team-primary) !important;
+        }
+
+        .squad-section{
+            padding:34px 0 48px !important;
+        }
+
+        .squad-head{
+            margin:0 0 18px !important;
+            padding:0 !important;
+            align-items:flex-end !important;
+        }
+
+        .squad-title{
+            font-size:clamp(30px, 4.4vw, 52px) !important;
+            letter-spacing:.05em !important;
+        }
+
+        .squad-sort{
+            font-size:9px !important;
+            letter-spacing:.16em !important;
+        }
+
+        .player-list{
+            display:grid !important;
+            grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+            gap:0 !important;
+            border-top:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .player-row{
+            min-height:92px !important;
+            grid-template-columns:64px minmax(0, 1fr) auto !important;
+            gap:14px !important;
+            padding:14px 16px !important;
+            border-radius:0 !important;
+            background:#050505 !important;
+            border:0 !important;
+            border-right:1px solid rgba(255,255,255,.08) !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+            border-left:0 !important;
+        }
+
+        .player-row:nth-child(2n){ border-right:0 !important; }
+
+        .player-row:hover,
+        .player-row.is-active{
+            transform:none !important;
+            background:
+                linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 18%, transparent), transparent 54%),
+                #080808 !important;
+            border-color:rgba(255,255,255,.14) !important;
+        }
+
+        .player-media{
+            width:58px !important;
+            height:58px !important;
+            border-radius:0 !important;
+            background:#101010 !important;
+            border:0 !important;
+            box-shadow:none !important;
+        }
+
+        .player-media.is-card{
+            width:48px !important;
+            height:64px !important;
+            border-radius:0 !important;
+        }
+
+        .player-media.is-portrait{
+            border-radius:999px !important;
+            background:transparent !important;
+        }
+
+        .player-media img{
+            border:0 !important;
+            box-shadow:none !important;
+        }
+
+        .player-free-shape{
+            border:0 !important;
+            box-shadow:none !important;
+        }
+
+        .player-row-name{
+            font-size:clamp(16px, 2.1vw, 22px) !important;
+            letter-spacing:.04em !important;
+        }
+
+        .player-row-meta{
+            font-size:10px !important;
+            color:rgba(255,255,255,.60) !important;
+        }
+
+        .player-number-pill{
+            min-width:40px !important;
+            height:auto !important;
+            border-radius:0 !important;
+            padding:0 !important;
+            background:transparent !important;
+            color:var(--team-readable-primary) !important;
+            font-size:clamp(20px, 3vw, 32px) !important;
+        }
+
+        .player-panel{
+            width:min(470px, 100%) !important;
+            background:#050505 !important;
+        }
+
+        .player-panel-bar{
+            background:#050505 !important;
+            border-bottom:1px solid rgba(255,255,255,.10) !important;
+        }
+
+        .player-nav-arrow{
+            z-index:140 !important;
+            background:rgba(0,0,0,.78) !important;
+            border:1px solid rgba(255,255,255,.16) !important;
+        }
+
+        .coach-modal-card{
+            border-radius:0 !important;
+            background:#060606 !important;
+            border:1px solid rgba(255,255,255,.14) !important;
+            box-shadow:0 24px 80px rgba(0,0,0,.55) !important;
+        }
+
+        .coach-modal-head{
+            background:#080808 !important;
+            border-bottom:1px solid rgba(255,255,255,.12) !important;
+        }
+
+        .coach-field input{
+            border-radius:0 !important;
+            background:#0d0d0d !important;
+            border:1px solid rgba(255,255,255,.14) !important;
+        }
+
+        @media (max-width:760px){
+            .team-top,
+            .team-content{
+                width:100% !important;
+            }
+
+            .team-top{
+                padding:0 12px !important;
+            }
+
+            .team-content{
+                padding:0 0 28px !important;
+            }
+
+            .team-hero{
+                min-height:430px !important;
+            }
+
+            .team-hero-inner{
+                min-height:430px !important;
+                padding:22px 16px !important;
+            }
+
+            .team-name{ font-size:42px !important; }
+            .team-subtitle{ font-size:12px !important; max-width:94% !important; }
+
+            .team-meta-strip{
+                grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .team-meta{
+                min-height:74px !important;
+                padding:12px !important;
+            }
+
+            .squad-section{
+                padding:28px 14px 32px !important;
+            }
+
+            .squad-head{
+                flex-direction:column !important;
+                align-items:flex-start !important;
+                gap:4px !important;
+            }
+
+            .player-list{
+                grid-template-columns:1fr !important;
+            }
+
+            .player-row{
+                min-height:74px !important;
+                grid-template-columns:54px minmax(0, 1fr) auto !important;
+                padding:10px 0 !important;
+                gap:10px !important;
+                border-right:0 !important;
+            }
+
+            .player-media{
+                width:48px !important;
+                height:48px !important;
+            }
+
+            .player-media.is-card{
+                width:42px !important;
+                height:56px !important;
+            }
+
+            .player-row-name{ font-size:16px !important; }
+            .player-row-meta{ font-size:9px !important; }
+            .player-number-pill{ font-size:20px !important; }
+        }
 </style>
 </head>
 <body>
@@ -2142,4 +2510,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
