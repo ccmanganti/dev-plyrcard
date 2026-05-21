@@ -161,9 +161,9 @@
         .identity{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;margin-bottom:18px;max-width:760px}
         .identity-logo{width:66px;height:66px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 10px 18px rgba(0,0,0,.28))}
         .identity-league{width:60px;height:60px;object-fit:contain;margin-left:0;flex:0 0 auto;filter:drop-shadow(0 10px 18px rgba(0,0,0,.28))}
-        .club-title-stack{min-width:0;display:grid;gap:7px}
+        .club-title-stack{min-width:0;display:grid;gap:7px;max-width:min(600px,100%)}
         .club-label{font-family:var(--heading);font-size:11px;line-height:1;letter-spacing:.24em;text-transform:uppercase;font-weight:900;color:var(--brand-readable);text-shadow:0 8px 18px rgba(0,0,0,.35)}
-        .club-name{font-family:var(--heading);font-size:clamp(44px, 5.6vw, 78px);line-height:.9;letter-spacing:.012em;text-transform:uppercase;font-weight:900;text-wrap:balance;text-shadow:0 16px 38px rgba(0,0,0,.42);max-width:720px}
+        .club-name{font-family:var(--heading);font-size:clamp(40px, 4.8vw, 66px);line-height:.92;letter-spacing:.006em;text-transform:uppercase;font-weight:900;text-wrap:balance;text-shadow:0 16px 38px rgba(0,0,0,.42);max-width:640px}
         .club-copy{margin:14px 0 0;max-width:660px;color:rgba(255,255,255,.88);font-size:14px;line-height:1.5;font-weight:800;text-shadow:0 8px 20px rgba(0,0,0,.32)}
         .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.hero-actions .coach-btn{height:42px}
         .hero-side{display:grid;gap:1px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.12);animation:fadeUp .7s ease both .18s}
@@ -178,7 +178,7 @@
         .footer{padding:28px 0;color:var(--muted);font-size:12px;font-weight:750}.footer-grid{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}.footer a{color:#fff}
         .modal{position:fixed;inset:0;z-index:2000;display:none;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);padding:18px;align-items:center;justify-content:center}.modal.is-open{display:flex}.modal-card{width:min(460px,100%);background:#08080a;border:1px solid var(--line);box-shadow:0 28px 80px rgba(0,0,0,.52);animation:popIn .22s ease both}.modal-head{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}.modal-title{font-family:var(--heading);font-size:18px;text-transform:uppercase;font-weight:900;letter-spacing:.1em}.modal-close{border:0;background:rgba(255,255,255,.08);color:#fff;width:34px;height:34px;cursor:pointer}.modal-body{padding:16px}.coach-status{border-left:2px solid var(--brand-readable);padding:10px 12px;margin-bottom:12px;background:rgba(255,255,255,.045);font-size:12px;color:var(--muted)}.coach-form{display:grid;gap:10px}.coach-form label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.coach-form input{height:42px;border:1px solid var(--line);background:#0d0d10;color:#fff;padding:0 12px;font:inherit}.coach-submit{height:44px;border:0;background:var(--brand);color:var(--brand-on);font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.coach-out{height:40px;border:1px solid var(--line);background:transparent;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;width:100%;margin-top:10px}
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}@keyframes popIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:16px;padding:62px 22px 0}.identity{grid-template-columns:52px minmax(0,1fr) 52px;gap:12px;margin-bottom:12px}.identity-logo{width:50px;height:50px}.identity-league{width:50px;height:50px}.club-label{font-size:9px;letter-spacing:.22em}.club-name{font-size:clamp(35px, 10.6vw, 46px);line-height:.88;max-width:100%}.club-copy{font-size:13px;margin-top:12px;line-height:1.45}.hero-actions{margin-top:18px}.hero-side{border-left:0;border-right:0;margin:26px -22px 0}
+        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:16px;padding:54px 22px 0}.identity{grid-template-columns:54px minmax(0,1fr) 54px;gap:13px;margin-bottom:12px;align-items:center}.identity-logo{width:50px;height:50px}.identity-league{width:50px;height:50px}.club-label{font-size:9px;letter-spacing:.22em}.club-name{font-size:clamp(30px, 8.8vw, 40px);line-height:.94;max-width:100%;letter-spacing:.004em}.club-copy{font-size:13px;margin-top:12px;line-height:1.45}.hero-actions{display:none}.hero-side{border-left:0;border-right:0;margin:26px -22px 0}
             .hero-side.facts-count-1{grid-template-columns:1fr}
             .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr))}
             .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -216,10 +216,6 @@
                     @if($clubContent)
                         <div class="club-copy">{!! nl2br(e($clubContent)) !!}</div>
                     @endif
-                    <div class="hero-actions">
-                        <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
-                        @if($mapsUrl)<a class="coach-btn" href="{{ $mapsUrl }}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-location-dot"></i> Map</a>@endif
-                    </div>
                 </div>
 
                 <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
