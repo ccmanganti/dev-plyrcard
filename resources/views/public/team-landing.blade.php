@@ -262,13 +262,24 @@
         .player-roster-copy{min-width:0}
         .player-roster-meta{
             display:grid;
-            grid-template-columns:repeat(3,max-content);
-            gap:8px;
+            gap:4px;
             margin-top:7px;
             color:var(--muted);
             font-size:11px;
             font-weight:900;
             white-space:nowrap;
+        }
+        .player-roster-position{
+            display:block;
+            max-width:100%;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            color:rgba(255,255,255,.82);
+            text-transform:uppercase;
+        }
+        .player-roster-academic{
+            display:block;
+            color:var(--muted);
         }
         .player-row-arrow{color:var(--brand-readable);font-size:15px;display:grid;place-items:center}
         .player-row-polished .avatar{border:0;box-shadow:none}
@@ -282,7 +293,7 @@
             .team-name{font-size:46px}
             .player-row.player-row-polished{grid-template-columns:58px 58px minmax(0,1fr) 18px;gap:10px;padding:11px 10px}
             .player-jersey-big{font-size:30px;text-align:left}
-            .player-roster-meta{grid-template-columns:1fr;gap:3px;font-size:10px;margin-top:5px}
+            .player-roster-meta{gap:3px;font-size:10px;margin-top:5px}.player-roster-academic{white-space:nowrap}.player-roster-position{white-space:nowrap}
             .player-row-polished .player-name{font-size:18px}
             .player-row-arrow{font-size:13px}
         }
@@ -1430,9 +1441,16 @@
                         <div class="player-roster-copy">
                             <div class="player-name">{{ $player['name'] }}</div>
                             <div class="player-roster-meta">
-                                @if($player['position'])<span>{{ $player['position'] }}</span>@endif
-                                @if($player['gpa'])<span>{{ $player['gpa'] }} GPA</span>@endif
-                                @if($player['year'])<span>Class {{ $player['year'] }}</span>@endif
+                                @if($player['position'])
+                                    <span class="player-roster-position">{{ $player['position'] }}</span>
+                                @endif
+                                @if($player['year'] || $player['gpa'])
+                                    <span class="player-roster-academic">
+                                        @if($player['year'])Class {{ $player['year'] }}@endif
+                                        @if($player['year'] && $player['gpa']) <span aria-hidden="true">|</span> @endif
+                                        @if($player['gpa']){{ $player['gpa'] }} GPA@endif
+                                    </span>
+                                @endif
                             </div>
                             @if(in_array((int) $player['id'], $savedIds, true))<div class="player-save-mini">Saved by coach</div>@endif
                         </div>
