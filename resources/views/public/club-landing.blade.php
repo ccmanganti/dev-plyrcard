@@ -97,6 +97,16 @@
         $teamCount = collect($teams ?? [])->count();
         $coachSession = $coachCheckIn ?? session('coach_checkin');
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
+        $clubFacts = collect([
+            ['icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $teamCount],
+            ['icon' => 'fa-trophy', 'label' => 'League', 'value' => $club->league?->name ?: 'TBD'],
+            ['icon' => 'fa-location-dot', 'label' => 'Location', 'value' => $address ?: 'TBD'],
+        ]);
+
+        if ($coachName && $coachName !== 'Coach info') {
+            $clubFacts->push(['icon' => 'fa-user-tie', 'label' => 'Coach', 'value' => $coachName]);
+        }
+
     @endphp
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -130,6 +140,10 @@
         .nav-brand{display:flex;align-items:center;gap:10px;min-width:0}
         .nav-brand img{width:30px;height:30px;object-fit:contain}
         .nav-brand span{font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .plyrcard-brand{gap:0;line-height:1;letter-spacing:-.02em}
+        .plyrcard-brand span{font-family:var(--heading);font-size:24px;font-weight:900;letter-spacing:-.045em;overflow:visible;text-overflow:clip}
+        .plyrcard-brand .plyr-word{color:#fff}
+        .plyrcard-brand .card-word{color:#ff6a00;margin-left:0}
         .nav-actions{display:flex;align-items:center;gap:12px}
         .nav-link{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
         .nav-link:hover{color:#fff}
@@ -137,7 +151,10 @@
         .coach-btn:hover{filter:brightness(1.12)}
         .hero{position:relative;isolation:isolate;min-height:clamp(480px, 68vh, 720px);display:grid;align-items:end;overflow:hidden;border-bottom:1px solid var(--line)}
         .hero-bg{position:absolute;inset:0;z-index:-2;background:url("{{ $heroImageUrl }}") center/cover no-repeat;filter:saturate(1.04) contrast(1.02)}
-        .hero-bg:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg, rgba(0,0,0,.78) 0%, rgba(0,0,0,.42) 48%, rgba(0,0,0,.72) 100%),linear-gradient(180deg, rgba(0,0,0,.20) 0%, rgba(0,0,0,.18) 46%, rgba(0,0,0,.88) 100%),linear-gradient(135deg, color-mix(in srgb, var(--brand) 32%, transparent), transparent 54%)}
+        .hero-bg:after{content:"";position:absolute;inset:0;background:
+            linear-gradient(90deg, color-mix(in srgb, var(--brand) 58%, rgba(0,0,0,.50)) 0%, rgba(0,0,0,.22) 46%, color-mix(in srgb, var(--brand) 35%, rgba(0,0,0,.48)) 100%),
+            linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.10) 45%, rgba(0,0,0,.62) 100%),
+            radial-gradient(circle at 18% 40%, color-mix(in srgb, var(--brand) 38%, transparent), transparent 34%)}
         .hero-inner{display:grid;grid-template-columns:minmax(0, .92fr) minmax(310px, .48fr);gap:36px;align-items:end;padding:64px 0 34px}
         .hero-main{max-width:700px;animation:fadeUp .7s ease both .08s}
         .identity{display:flex;align-items:center;gap:18px;margin-bottom:24px}
@@ -159,7 +176,11 @@
         .footer{padding:28px 0;color:var(--muted);font-size:12px;font-weight:750}.footer-grid{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}.footer a{color:#fff}
         .modal{position:fixed;inset:0;z-index:2000;display:none;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);padding:18px;align-items:center;justify-content:center}.modal.is-open{display:flex}.modal-card{width:min(460px,100%);background:#08080a;border:1px solid var(--line);box-shadow:0 28px 80px rgba(0,0,0,.52);animation:popIn .22s ease both}.modal-head{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}.modal-title{font-family:var(--heading);font-size:18px;text-transform:uppercase;font-weight:900;letter-spacing:.1em}.modal-close{border:0;background:rgba(255,255,255,.08);color:#fff;width:34px;height:34px;cursor:pointer}.modal-body{padding:16px}.coach-status{border-left:2px solid var(--brand-readable);padding:10px 12px;margin-bottom:12px;background:rgba(255,255,255,.045);font-size:12px;color:var(--muted)}.coach-form{display:grid;gap:10px}.coach-form label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.coach-form input{height:42px;border:1px solid var(--line);background:#0d0d10;color:#fff;padding:0 12px;font:inherit}.coach-submit{height:44px;border:0;background:var(--brand);color:var(--brand-on);font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.coach-out{height:40px;border:1px solid var(--line);background:transparent;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;width:100%;margin-top:10px}
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}@keyframes popIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:18px;padding:86px 24px 0}.identity{gap:12px;margin-bottom:18px}.identity-logo{width:52px;height:52px}.identity-league{width:52px;height:52px}.club-label{font-size:10px}.club-name{font-size:44px}.club-copy{font-size:14px;margin-top:14px}.hero-side{grid-template-columns:repeat(3,minmax(0,1fr));border-left:0;border-right:0;margin:34px -24px 0}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:34px 18px}.section-head{display:block}.team-switch{margin-top:14px}.teams-panel.is-active{grid-template-columns:1fr}.team-card{min-height:128px}.footer{padding:24px 18px}.nav-actions .coach-btn{padding:0 12px;font-size:11px}}
+        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:18px;padding:86px 24px 0}.identity{gap:12px;margin-bottom:18px}.identity-logo{width:52px;height:52px}.identity-league{width:52px;height:52px}.club-label{font-size:10px}.club-name{font-size:44px}.club-copy{font-size:14px;margin-top:14px}.hero-side{border-left:0;border-right:0;margin:34px -24px 0}
+            .hero-side.facts-count-1{grid-template-columns:1fr}
+            .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+            .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+            .hero-side.facts-count-4{grid-template-columns:repeat(2,minmax(0,1fr))}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:34px 18px}.section-head{display:block}.team-switch{margin-top:14px}.teams-panel.is-active{grid-template-columns:1fr}.team-card{min-height:128px}.footer{padding:24px 18px}.nav-actions .coach-btn{padding:0 12px;font-size:11px}}
         @media (min-width:901px){.site{padding-bottom:28px}.hero{margin:0 auto}.section{animation:fadeUp .7s ease both}.club-page-frame{width:min(1180px, calc(100% - 32px));margin:0 auto}.hero .wrap{width:min(1180px, calc(100% - 32px))}}
     </style>
 </head>
@@ -167,9 +188,8 @@
     <main class="site">
         <div class="club-page-frame">
             <nav class="nav">
-                <a class="nav-brand" href="{{ route('clubs.landing', $club->landing_page_slug) }}">
-                    @if($logo)<img src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
-                    <span>{{ $club->name }}</span>
+                <a class="nav-brand plyrcard-brand" href="{{ url('/') }}" aria-label="PlyrCard home">
+                    <span class="plyr-word">PLYR</span><span class="card-word">CARD</span>
                 </a>
                 <div class="nav-actions">
                     <a class="nav-link" href="#teams">Teams</a>
@@ -200,11 +220,16 @@
                     </div>
                 </div>
 
-                <aside class="hero-side" aria-label="Club information">
-                    <div class="fact"><i class="fa-solid fa-shield-halved"></i><div><span>Teams</span><strong>{{ $teamCount }}</strong></div></div>
-                    <div class="fact"><i class="fa-solid fa-trophy"></i><div><span>League</span><strong>{{ $club->league?->name ?: 'TBD' }}</strong></div></div>
-                    <div class="fact"><i class="fa-solid fa-location-dot"></i><div><span>Location</span><strong>{{ $address ?: 'TBD' }}</strong></div></div>
-                    @if($coachName && $coachName !== 'Coach info')<div class="fact"><i class="fa-solid fa-user-tie"></i><div><span>Coach</span><strong>{{ $coachName }}</strong></div></div>@endif
+                <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
+                    @foreach($clubFacts as $fact)
+                        <div class="fact">
+                            <i class="fa-solid {{ $fact['icon'] }}"></i>
+                            <div>
+                                <span>{{ $fact['label'] }}</span>
+                                <strong>{{ $fact['value'] }}</strong>
+                            </div>
+                        </div>
+                    @endforeach
                 </aside>
             </div>
         </section>
