@@ -248,6 +248,73 @@
             .team-card-name{font-size:34px}
         }
 
+
+        /* Final spacing/logo refinement */
+        .hero-inner{
+            align-items:center;
+            padding:42px 0 34px;
+            min-height:clamp(520px, 64vh, 660px);
+        }
+        .hero-main{
+            position:relative;
+            width:100%;
+            max-width:820px;
+            padding-top:92px;
+        }
+        .identity.identity-stacked{
+            position:relative;
+            gap:20px;
+            max-width:820px;
+        }
+        .club-logo-row{
+            position:absolute;
+            top:0;
+            left:0;
+            right:0;
+            width:100%;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            pointer-events:none;
+        }
+        .identity-stacked .identity-logo,
+        .identity-stacked .identity-league{
+            width:74px;
+            height:74px;
+            margin:0;
+        }
+        .club-title-stack{
+            width:min(650px, calc(100% - 168px));
+            margin:0 auto;
+            text-align:left;
+        }
+        .identity-stacked .club-name{
+            font-size:clamp(42px,4.8vw,68px);
+            line-height:.9;
+        }
+        .club-copy{
+            width:min(650px, calc(100% - 168px));
+            margin:14px auto 0;
+        }
+        @media (max-width:900px){
+            .hero{min-height:clamp(500px,64vh,620px)}
+            .hero-inner{min-height:clamp(500px,64vh,620px);align-items:center;padding:28px 22px 22px}
+            .hero-main{padding-top:76px}
+            .club-logo-row{top:0}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:54px;height:54px}
+            .club-title-stack{width:calc(100% - 122px);margin:0 auto;text-align:left}
+            .identity-stacked .club-name{font-size:clamp(32px,9vw,43px);line-height:.91}
+            .club-copy{width:calc(100% - 122px);margin:12px auto 0;font-size:12.5px;line-height:1.42}
+            .hero-side{margin:22px -22px 0}
+        }
+        @media (max-width:420px){
+            .club-title-stack,.club-copy{width:calc(100% - 104px)}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:46px;height:46px}
+            .identity-stacked .club-name{font-size:clamp(29px,8.7vw,38px)}
+        }
+
     </style>
 </head>
 <body>
