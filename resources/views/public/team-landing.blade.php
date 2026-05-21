@@ -2032,6 +2032,52 @@
             .player-row-meta{ font-size:9px !important; }
             .player-number-pill{ font-size:20px !important; }
         }
+
+/* --------------------------------------------------------------------------
+   Clean website/app layout correction - no bubble UI
+-------------------------------------------------------------------------- */
+.team-page{ background:#050506 !important; }
+.team-hero{
+    min-height:clamp(430px, 62vh, 620px) !important;
+    padding:clamp(20px,4vw,50px) !important;
+}
+.team-hero::before{
+    background:
+        linear-gradient(90deg,
+            color-mix(in srgb, var(--team-primary) 30%, rgba(0,0,0,.90)) 0%,
+            rgba(0,0,0,.76) 46%,
+            color-mix(in srgb, var(--team-secondary) 24%, rgba(0,0,0,.88)) 100%),
+        linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.90)) !important;
+}
+.team-hero-inner{ width:min(1060px,100%) !important; }
+.team-topline{ font-size:10px !important; letter-spacing:.18em !important; color:var(--team-readable-primary) !important; }
+.team-title{ font-size:clamp(42px,7vw,86px) !important; line-height:.88 !important; }
+.team-subtitle{ max-width:560px !important; font-size:14px !important; line-height:1.5 !important; }
+.roster-section{ width:min(1060px, calc(100% - 28px)) !important; padding:32px 0 48px !important; }
+.roster-row{ border-radius:0 !important; border-left:0 !important; border-right:0 !important; background:#0b0b0c !important; }
+.roster-avatar,.roster-avatar img,.roster-placeholder{
+    border:0 !important;
+    box-shadow:none !important;
+}
+.roster-avatar{
+    background:transparent !important;
+}
+.roster-card-image{
+    border-radius:0 !important;
+}
+.roster-name{ font-size:18px !important; }
+.roster-meta,.roster-detail{ font-size:11px !important; }
+@media(max-width:640px){
+    .team-hero{ min-height:430px !important; align-items:flex-end !important; padding:22px 20px 28px !important; }
+    .team-title{ font-size:38px !important; }
+    .team-subtitle{ font-size:12.25px !important; }
+    .roster-section{ width:calc(100% - 24px) !important; padding-top:26px !important; }
+    .roster-row{ min-height:70px !important; padding:10px 0 !important; }
+    .roster-avatar{ width:52px !important; height:52px !important; }
+    .roster-name{ font-size:15px !important; }
+    .roster-meta,.roster-detail{ font-size:9.5px !important; }
+}
+
 </style>
 </head>
 <body>
