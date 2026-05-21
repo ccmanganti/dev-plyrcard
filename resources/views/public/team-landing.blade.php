@@ -1370,6 +1370,29 @@
             }
         }
 
+
+
+        /* Final patch: remove the thin divider lines around the hero/back row. */
+        .hero,
+        .hero-inner,
+        .team-main-polished,
+        .team-hero-identity,
+        .mobile-back-row {
+            border: 0 !important;
+            border-top: 0 !important;
+            border-bottom: 0 !important;
+        }
+
+        .team-hero-identity::before,
+        .team-hero-identity::after,
+        .hero::before,
+        .hero::after,
+        .mobile-back-row::before,
+        .mobile-back-row::after {
+            display: none !important;
+            content: none !important;
+        }
+
 </style>
 </head>
 <body>
@@ -1428,37 +1451,50 @@
                 </div>
             </div>
             <div class="roster">
-                @forelse($playerRows as $player)
-                    <button class="player-row player-row-polished" type="button" data-player-card data-player-index="{{ $player['index'] }}" data-player='@json($player)'>
-                        @if($player['portrait_image'])
-                            <img class="avatar" src="{{ $player['portrait_image'] }}" alt="{{ $player['name'] }} portrait">
-                        @elseif($player['card_image'])
-                            <img class="avatar card-img" src="{{ $player['card_image'] }}" alt="{{ $player['name'] }} card">
-                        @else
-                            <div class="avatar"><i class="fa-solid fa-user"></i></div>
-                        @endif
-                        <div class="player-jersey-big">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</div>
-                        <div class="player-roster-copy">
-                            <div class="player-name">{{ $player['name'] }}</div>
-                            <div class="player-roster-meta">
-                                @if($player['position'])
-                                    <span class="player-roster-position">{{ $player['position'] }}</span>
-                                @endif
-                                @if($player['year'] || $player['gpa'])
-                                    <span class="player-roster-academic">
-                                        @if($player['year'])Class {{ $player['year'] }}@endif
-                                        @if($player['year'] && $player['gpa']) <span aria-hidden="true">|</span> @endif
-                                        @if($player['gpa']){{ $player['gpa'] }} GPA@endif
-                                    </span>
+                @if($playerRows->isNotEmpty())
+                    @foreach($playerRows as $player)
+                        <button class="player-row player-row-polished" type="button" data-player-card data-player-index="{{ $player['index'] }}" data-player='@json($player)'>
+                            @if($player['portrait_image'])
+                                <img class="avatar" src="{{ $player['portrait_image'] }}" alt="{{ $player['name'] }} portrait">
+                            @elseif($player['card_image'])
+                                <img class="avatar card-img" src="{{ $player['card_image'] }}" alt="{{ $player['name'] }} card">
+                            @else
+                                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                            @endif
+
+                            <div class="player-jersey-big">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</div>
+
+                            <div class="player-roster-copy">
+                                <div class="player-name">{{ $player['name'] }}</div>
+
+                                <div class="player-roster-meta">
+                                    @if($player['position'])
+                                        <span class="player-roster-position">{{ $player['position'] }}</span>
+                                    @endif
+
+                                    @php
+                                        $academicLine = collect([
+                                            filled($player['year'] ?? null) ? 'Class ' . $player['year'] : null,
+                                            filled($player['gpa'] ?? null) ? $player['gpa'] . ' GPA' : null,
+                                        ])->filter()->implode(' | ');
+                                    @endphp
+
+                                    @if(filled($academicLine))
+                                        <span class="player-roster-academic">{{ $academicLine }}</span>
+                                    @endif
+                                </div>
+
+                                @if(in_array((int) $player['id'], $savedIds, true))
+                                    <div class="player-save-mini">Saved by coach</div>
                                 @endif
                             </div>
-                            @if(in_array((int) $player['id'], $savedIds, true))<div class="player-save-mini">Saved by coach</div>@endif
-                        </div>
-                        <div class="player-row-arrow"><i class="fa-solid fa-chevron-right"></i></div>
-                    </button>
-                @empty
+
+                            <div class="player-row-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                        </button>
+                    @endforeach
+                @else
                     <div class="empty">Players will appear once they are assigned to this team.</div>
-                @endforelse
+                @endif
             </div>
         </div>
     </section>
