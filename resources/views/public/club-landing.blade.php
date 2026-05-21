@@ -149,21 +149,23 @@
         .nav-link:hover{color:#fff}
         .coach-btn{height:38px;border:0;border-left:2px solid var(--brand-readable);background:color-mix(in srgb, var(--brand) 26%, #060708);color:#fff;padding:0 16px;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
         .coach-btn:hover{filter:brightness(1.12)}
-        .hero{position:relative;isolation:isolate;min-height:clamp(480px, 68vh, 720px);display:grid;align-items:end;overflow:hidden;border-bottom:1px solid var(--line)}
-        .hero-bg{position:absolute;inset:0;z-index:-2;background:url("{{ $heroImageUrl }}") center/cover no-repeat;filter:saturate(1.04) contrast(1.02)}
+        .hero{position:relative;isolation:isolate;min-height:clamp(500px, 66vh, 710px);display:grid;align-items:end;overflow:hidden;border-bottom:1px solid var(--line);background:#050506}
+        .hero:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg, color-mix(in srgb, var(--brand) 42%, transparent) 0%, transparent 42%, color-mix(in srgb, var(--brand) 20%, transparent) 100%);mix-blend-mode:screen;opacity:.62}
+        .hero-bg{position:absolute;inset:0;z-index:-2;background:url("{{ $heroImageUrl }}") center/cover no-repeat;filter:saturate(1.14) contrast(1.04) brightness(.93)}
         .hero-bg:after{content:"";position:absolute;inset:0;background:
-            linear-gradient(90deg, color-mix(in srgb, var(--brand) 58%, rgba(0,0,0,.50)) 0%, rgba(0,0,0,.22) 46%, color-mix(in srgb, var(--brand) 35%, rgba(0,0,0,.48)) 100%),
-            linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.10) 45%, rgba(0,0,0,.62) 100%),
-            radial-gradient(circle at 18% 40%, color-mix(in srgb, var(--brand) 38%, transparent), transparent 34%)}
-        .hero-inner{display:grid;grid-template-columns:minmax(0, .92fr) minmax(310px, .48fr);gap:36px;align-items:end;padding:64px 0 34px}
-        .hero-main{max-width:700px;animation:fadeUp .7s ease both .08s}
-        .identity{display:flex;align-items:center;gap:18px;margin-bottom:24px}
-        .identity-logo{width:74px;height:74px;object-fit:contain;flex:0 0 auto}
-        .identity-league{width:66px;height:66px;object-fit:contain;margin-left:auto;flex:0 0 auto}
-        .club-label{font-family:var(--heading);font-size:12px;line-height:1;letter-spacing:.24em;text-transform:uppercase;font-weight:900;color:var(--brand-readable);margin-bottom:8px}
-        .club-name{font-family:var(--heading);font-size:clamp(42px, 6.5vw, 92px);line-height:.88;letter-spacing:.015em;text-transform:uppercase;font-weight:900;text-wrap:balance;text-shadow:0 16px 38px rgba(0,0,0,.38)}
-        .club-copy{margin:20px 0 0;max-width:620px;color:rgba(255,255,255,.82);font-size:15px;line-height:1.55;font-weight:750}
-        .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}.hero-actions .coach-btn{height:44px}
+            linear-gradient(90deg, color-mix(in srgb, var(--brand) 64%, rgba(0,0,0,.28)) 0%, color-mix(in srgb, var(--brand) 34%, rgba(0,0,0,.18)) 38%, rgba(0,0,0,.18) 62%, color-mix(in srgb, var(--brand) 42%, rgba(0,0,0,.28)) 100%),
+            linear-gradient(180deg, rgba(0,0,0,.10) 0%, rgba(0,0,0,.12) 44%, rgba(0,0,0,.46) 100%),
+            radial-gradient(circle at 28% 48%, color-mix(in srgb, var(--brand) 48%, transparent), transparent 39%)}
+        .hero-inner{display:grid;grid-template-columns:minmax(0, .95fr) minmax(320px, .46fr);gap:32px;align-items:end;padding:58px 0 30px}
+        .hero-main{max-width:760px;animation:fadeUp .7s ease both .08s}
+        .identity{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;margin-bottom:18px;max-width:760px}
+        .identity-logo{width:66px;height:66px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 10px 18px rgba(0,0,0,.28))}
+        .identity-league{width:60px;height:60px;object-fit:contain;margin-left:0;flex:0 0 auto;filter:drop-shadow(0 10px 18px rgba(0,0,0,.28))}
+        .club-title-stack{min-width:0;display:grid;gap:7px}
+        .club-label{font-family:var(--heading);font-size:11px;line-height:1;letter-spacing:.24em;text-transform:uppercase;font-weight:900;color:var(--brand-readable);text-shadow:0 8px 18px rgba(0,0,0,.35)}
+        .club-name{font-family:var(--heading);font-size:clamp(44px, 5.6vw, 78px);line-height:.9;letter-spacing:.012em;text-transform:uppercase;font-weight:900;text-wrap:balance;text-shadow:0 16px 38px rgba(0,0,0,.42);max-width:720px}
+        .club-copy{margin:14px 0 0;max-width:660px;color:rgba(255,255,255,.88);font-size:14px;line-height:1.5;font-weight:800;text-shadow:0 8px 20px rgba(0,0,0,.32)}
+        .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.hero-actions .coach-btn{height:42px}
         .hero-side{display:grid;gap:1px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.12);animation:fadeUp .7s ease both .18s}
         .fact{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:center;background:rgba(5,5,6,.72);padding:16px 18px;backdrop-filter:blur(16px)}
         .fact i{color:var(--brand-readable);font-size:17px;text-align:center}.fact span{display:block;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}.fact strong{display:block;font-family:var(--heading);font-size:18px;line-height:1.04;text-transform:uppercase;letter-spacing:.02em}
@@ -176,7 +178,7 @@
         .footer{padding:28px 0;color:var(--muted);font-size:12px;font-weight:750}.footer-grid{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}.footer a{color:#fff}
         .modal{position:fixed;inset:0;z-index:2000;display:none;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);padding:18px;align-items:center;justify-content:center}.modal.is-open{display:flex}.modal-card{width:min(460px,100%);background:#08080a;border:1px solid var(--line);box-shadow:0 28px 80px rgba(0,0,0,.52);animation:popIn .22s ease both}.modal-head{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}.modal-title{font-family:var(--heading);font-size:18px;text-transform:uppercase;font-weight:900;letter-spacing:.1em}.modal-close{border:0;background:rgba(255,255,255,.08);color:#fff;width:34px;height:34px;cursor:pointer}.modal-body{padding:16px}.coach-status{border-left:2px solid var(--brand-readable);padding:10px 12px;margin-bottom:12px;background:rgba(255,255,255,.045);font-size:12px;color:var(--muted)}.coach-form{display:grid;gap:10px}.coach-form label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.coach-form input{height:42px;border:1px solid var(--line);background:#0d0d10;color:#fff;padding:0 12px;font:inherit}.coach-submit{height:44px;border:0;background:var(--brand);color:var(--brand-on);font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.coach-out{height:40px;border:1px solid var(--line);background:transparent;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;width:100%;margin-top:10px}
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}@keyframes popIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:18px;padding:86px 24px 0}.identity{gap:12px;margin-bottom:18px}.identity-logo{width:52px;height:52px}.identity-league{width:52px;height:52px}.club-label{font-size:10px}.club-name{font-size:44px}.club-copy{font-size:14px;margin-top:14px}.hero-side{border-left:0;border-right:0;margin:34px -24px 0}
+        @media (max-width:900px){.wrap{width:100%}.nav{padding:0 16px}.nav-link{display:none}.hero{min-height:auto}.hero-inner{grid-template-columns:1fr;gap:16px;padding:62px 22px 0}.identity{grid-template-columns:52px minmax(0,1fr) 52px;gap:12px;margin-bottom:12px}.identity-logo{width:50px;height:50px}.identity-league{width:50px;height:50px}.club-label{font-size:9px;letter-spacing:.22em}.club-name{font-size:clamp(35px, 10.6vw, 46px);line-height:.88;max-width:100%}.club-copy{font-size:13px;margin-top:12px;line-height:1.45}.hero-actions{margin-top:18px}.hero-side{border-left:0;border-right:0;margin:26px -22px 0}
             .hero-side.facts-count-1{grid-template-columns:1fr}
             .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr))}
             .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -205,7 +207,7 @@
                 <div class="hero-main">
                     <div class="identity">
                         @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
-                        <div style="min-width:0">
+                        <div class="club-title-stack">
                             <div class="club-label">Sports Club</div>
                             <h1 class="club-name">{{ $club->name }}</h1>
                         </div>
