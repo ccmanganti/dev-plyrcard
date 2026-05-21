@@ -334,6 +334,89 @@
             .team-name{font-size:clamp(38px,11vw,50px)}
         }
 
+
+        /* Revision: pull team hero content up, use hero space, keep info before team name */
+        .hero{
+            min-height:clamp(500px, 60vh, 650px) !important;
+            align-items:center !important;
+        }
+        .hero-inner{
+            min-height:clamp(430px, 52vh, 560px) !important;
+            align-items:center !important;
+            padding:38px 0 34px !important;
+        }
+        .team-main-polished{
+            display:grid !important;
+            align-content:center !important;
+            gap:18px !important;
+            min-height:auto !important;
+            width:min(880px,100%) !important;
+            transform:translateY(-8px) !important;
+        }
+        .hero-info-strip{
+            margin:0 !important;
+            width:min(620px,100%) !important;
+        }
+        .team-hero-identity{
+            margin-top:0 !important;
+            padding-top:18px !important;
+            grid-template-columns:72px minmax(0,1fr) 66px !important;
+            max-width:760px !important;
+        }
+        .team-title-stack .label{
+            font-size:11px !important;
+            letter-spacing:.18em !important;
+            color:rgba(255,255,255,.86) !important;
+            margin-bottom:5px !important;
+        }
+        .team-name{
+            font-size:clamp(54px, 6vw, 78px) !important;
+            line-height:.88 !important;
+            letter-spacing:.01em !important;
+        }
+        .team-copy{display:none !important;}
+        @media(max-width:900px){
+            .hero{min-height:470px !important;}
+            .hero-inner{
+                min-height:410px !important;
+                padding:58px 22px 22px !important;
+                align-items:center !important;
+            }
+            .team-main-polished{
+                min-height:0 !important;
+                transform:translateY(-4px) !important;
+                gap:14px !important;
+            }
+            .hero-info-strip{
+                display:grid !important;
+                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                gap:6px !important;
+                width:100% !important;
+            }
+            .hero-info-strip span{
+                min-height:30px !important;
+                padding:0 6px !important;
+                font-size:7.8px !important;
+                justify-content:center !important;
+                text-align:center !important;
+            }
+            .team-hero-identity{
+                grid-template-columns:50px minmax(0,1fr) 50px !important;
+                gap:12px !important;
+                padding-top:15px !important;
+            }
+            .identity-logo,.identity-league{width:50px !important;height:50px !important;}
+            .team-title-stack .label{font-size:9px !important;letter-spacing:.14em !important;white-space:normal !important;}
+            .team-name{font-size:clamp(40px, 11vw, 52px) !important;line-height:.9 !important;}
+        }
+        @media(max-width:420px){
+            .hero{min-height:450px !important;}
+            .hero-inner{min-height:390px !important;padding:54px 18px 18px !important;}
+            .team-hero-identity{grid-template-columns:46px minmax(0,1fr) 46px !important;}
+            .identity-logo,.identity-league{width:46px !important;height:46px !important;}
+            .team-name{font-size:clamp(36px, 10vw, 48px) !important;}
+        }
+
     </style>
 </head>
 <body>

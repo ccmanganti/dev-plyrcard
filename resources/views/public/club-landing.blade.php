@@ -315,6 +315,104 @@
             .identity-stacked .club-name{font-size:clamp(29px,8.7vw,38px)}
         }
 
+
+        /* Revision: normal logo row + separate title row, pull hero content up and use space */
+        .hero{
+            min-height:clamp(500px, 60vh, 620px) !important;
+            align-items:center !important;
+        }
+        .hero-inner{
+            display:grid !important;
+            grid-template-columns:minmax(0, 1fr) minmax(280px, 360px) !important;
+            gap:34px !important;
+            align-items:center !important;
+            min-height:clamp(440px, 54vh, 560px) !important;
+            padding:34px 0 28px !important;
+        }
+        .hero-main{
+            max-width:760px !important;
+            width:100% !important;
+            padding-top:0 !important;
+        }
+        .identity.identity-stacked{
+            position:relative !important;
+            display:grid !important;
+            grid-template-columns:1fr !important;
+            gap:18px !important;
+            max-width:760px !important;
+            margin:0 !important;
+        }
+        .club-logo-row{
+            position:relative !important;
+            top:auto !important;
+            left:auto !important;
+            right:auto !important;
+            width:100% !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:space-between !important;
+            gap:18px !important;
+            pointer-events:none !important;
+            margin:0 0 2px !important;
+        }
+        .identity-stacked .identity-logo,
+        .identity-stacked .identity-league{
+            width:70px !important;
+            height:70px !important;
+            margin:0 !important;
+        }
+        .club-title-stack{
+            width:100% !important;
+            max-width:680px !important;
+            margin:0 !important;
+            text-align:left !important;
+        }
+        .identity-stacked .club-name{
+            font-size:clamp(42px, 4.65vw, 64px) !important;
+            line-height:.91 !important;
+            max-width:680px !important;
+        }
+        .club-copy{
+            width:100% !important;
+            max-width:640px !important;
+            margin:14px 0 0 !important;
+        }
+        .hero-side{
+            align-self:stretch !important;
+            min-height:0 !important;
+        }
+        .hero-side.facts-count-4{grid-template-columns:1fr 1fr !important;}
+        .hero-side.facts-count-3{grid-template-columns:1fr !important;}
+        .fact{min-height:0 !important;}
+        @media (max-width:900px){
+            .hero{min-height:455px !important;}
+            .hero-inner{
+                grid-template-columns:1fr !important;
+                gap:20px !important;
+                min-height:455px !important;
+                padding:32px 22px 0 !important;
+                align-content:center !important;
+            }
+            .identity.identity-stacked{gap:14px !important;}
+            .club-logo-row{margin-bottom:0 !important;}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:54px !important;height:54px !important;}
+            .club-title-stack{width:100% !important;max-width:100% !important;}
+            .identity-stacked .club-name{font-size:clamp(34px, 9.2vw, 44px) !important;line-height:.92 !important;}
+            .club-copy{display:none !important;}
+            .hero-side{margin:18px -22px 0 !important;align-self:auto !important;}
+            .hero-side.facts-count-4{grid-template-columns:repeat(2, minmax(0,1fr)) !important;}
+            .hero-side.facts-count-3{grid-template-columns:repeat(3, minmax(0,1fr)) !important;}
+            .fact{padding:12px 14px !important;}
+        }
+        @media (max-width:420px){
+            .hero{min-height:440px !important;}
+            .hero-inner{min-height:440px !important;padding:28px 18px 0 !important;}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:48px !important;height:48px !important;}
+            .identity-stacked .club-name{font-size:clamp(31px, 8.5vw, 39px) !important;}
+        }
+
     </style>
 </head>
 <body>
