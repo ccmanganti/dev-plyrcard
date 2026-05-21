@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class PublicClubTeamController extends Controller
@@ -52,16 +53,6 @@ class PublicClubTeamController extends Controller
             ->where('has_landing_page', true)
             ->where('landing_page_is_published', true)
             ->firstOrFail();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Gender Segment Guard
-        |--------------------------------------------------------------------------
-        |
-        | New URLs use boys/girls.
-        | Old URLs using mens/womens are still accepted and normalized.
-        |
-        */
 
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
         $teamGender = $this->normalizeLandingGenderSegment($team->landingGenderSegment());
@@ -134,10 +125,7 @@ class PublicClubTeamController extends Controller
 
         session()->put('coach_saved_players', session('coach_saved_players', []));
 
-        return back()->with(
-            'coach_checkin_success',
-            'You are checked in. You can now save players while reviewing the team.'
-        );
+        return back()->with('coach_checkin_success', 'You are checked in. You can now save players while reviewing this club.');
     }
 
     public function coachCheckOut(Request $request, string $clubSlug): RedirectResponse
@@ -198,7 +186,10 @@ class PublicClubTeamController extends Controller
             ]);
         }
 
+        $player->loadMissing(['school', 'club.league', 'league', 'nationalTeam', 'websites']);
+
         $coachEmail = strtolower((string) ($coachCheckIn['email'] ?? ''));
+        $playerUrl = $this->playerWebsiteUrl($player);
 
         $savedPlayers = collect(session('coach_saved_players', []));
 
@@ -209,67 +200,87 @@ class PublicClubTeamController extends Controller
                 && strtolower((string) ($saved['coach_email'] ?? '')) === $coachEmail;
         });
 
+        $savedPayload = [
+            'player_id' => $player->id,
+            'player_name' => trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? '')),
+            'player_email' => $player->email,
+            'player_personal_email' => $player->personal_email,
+            'player_phone' => $player->phone,
+            'player_url' => $playerUrl,
+
+            'parent' => $player->parent,
+            'parent_email' => $player->parent_email,
+            'parent_phone' => $player->parent_phone,
+
+            'sec_parent' => $player->sec_parent,
+            'sec_parent_email' => $player->sec_parent_email,
+            'sec_parent_phone' => $player->sec_parent_phone,
+
+            'club_coach' => $player->club_coach,
+            'club_coach_email' => $player->club_coach_email,
+            'club_coach_phone' => $player->club_coach_phone,
+
+            'jersey_number' => $player->jersey_number,
+            'position' => is_array($player->position)
+                ? implode(', ', array_filter($player->position))
+                : $player->position,
+            'year' => $player->year,
+            'height' => $player->height,
+            'weight' => $player->weight,
+            'gpa' => $player->gpa,
+            'city' => $player->city,
+            'state' => $player->state,
+            'school' => $player->school?->name,
+            'sport' => $player->sport,
+
+            'club_id' => $club->id,
+            'club_name' => $club->name,
+            'team_id' => $team->id,
+            'team_name' => $team->name,
+            'league_name' => $club->league?->name,
+
+            'coach_email' => $coachEmail,
+            'coach_name' => $coachCheckIn['name'] ?? '',
+            'coach_school' => $coachCheckIn['school'] ?? '',
+            'coach_title' => $coachCheckIn['title'] ?? '',
+
+            'saved_at' => now()->toDateTimeString(),
+        ];
+
         if (! $alreadySaved) {
-            $savedPlayers->push([
-                'player_id' => $player->id,
-                'player_name' => trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? '')),
-                'player_email' => $player->email,
-                'player_personal_email' => $player->personal_email,
-                'player_phone' => $player->phone,
-
-                'parent' => $player->parent,
-                'parent_email' => $player->parent_email,
-                'parent_phone' => $player->parent_phone,
-
-                'sec_parent' => $player->sec_parent,
-                'sec_parent_email' => $player->sec_parent_email,
-                'sec_parent_phone' => $player->sec_parent_phone,
-
-                'club_coach' => $player->club_coach,
-                'club_coach_email' => $player->club_coach_email,
-                'club_coach_phone' => $player->club_coach_phone,
-
-                'jersey_number' => $player->jersey_number,
-                'position' => is_array($player->position)
-                    ? implode(', ', array_filter($player->position))
-                    : $player->position,
-                'year' => $player->year,
-                'height' => $player->height,
-                'weight' => $player->weight,
-                'gpa' => $player->gpa,
-                'city' => $player->city,
-                'state' => $player->state,
-                'school' => $player->school?->name,
-
-                'club_id' => $club->id,
-                'club_name' => $club->name,
-                'team_id' => $team->id,
-                'team_name' => $team->name,
-
-                'coach_email' => $coachEmail,
-                'coach_name' => $coachCheckIn['name'] ?? '',
-                'coach_school' => $coachCheckIn['school'] ?? '',
-                'coach_title' => $coachCheckIn['title'] ?? '',
-
-                'saved_at' => now()->toDateTimeString(),
-            ]);
+            $savedPlayers->push($savedPayload);
+            session(['coach_saved_players' => $savedPlayers->values()->all()]);
         }
 
-        session(['coach_saved_players' => $savedPlayers->values()->all()]);
+        $emailSent = false;
+        $emailError = null;
+
+        if (! $alreadySaved) {
+            try {
+                $this->sendSavedPlayerEmail($coachEmail, $coachCheckIn, $savedPayload, $player, $club, $team);
+                $emailSent = true;
+            } catch (\Throwable $exception) {
+                report($exception);
+                $emailError = 'Player was saved, but the email could not be sent.';
+            }
+        }
+
+        $message = $alreadySaved
+            ? 'Player already saved.'
+            : ($emailSent ? 'Player saved and emailed to the coach.' : ($emailError ?: 'Player saved.'));
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => $alreadySaved ? 'Player already saved.' : 'Player saved.',
+                'message' => $message,
+                'email_sent' => $emailSent,
                 'saved_count' => $savedPlayers->count(),
                 'player_id' => $player->id,
+                'saved_player' => $savedPayload,
             ]);
         }
 
-        return back()->with(
-            'player_save_success',
-            $alreadySaved ? 'Player already saved.' : 'Player saved.'
-        );
+        return back()->with('player_save_success', $message);
     }
 
     public function unsavePlayer(
@@ -325,18 +336,6 @@ class PublicClubTeamController extends Controller
 
     protected function playersForTeam(Team $team, Club $club)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Squad Lookup
-        |--------------------------------------------------------------------------
-        |
-        | Your current app stores the player's selected team in users.team_name.
-        | This stays compatible without requiring a team_id column on users.
-        |
-        | Players are sorted by jersey number first by default.
-        |
-        */
-
         return User::query()
             ->with([
                 'school',
@@ -400,5 +399,57 @@ class PublicClubTeamController extends Controller
             && strcasecmp($playerTeamName, $teamName) === 0
         )
         || strcasecmp($playerTeamName, $teamName) === 0;
+    }
+
+    protected function playerWebsiteUrl(User $player): ?string
+    {
+        $website = $player->websites
+            ? $player->websites->firstWhere('is_published', true) ?: $player->websites->first()
+            : null;
+
+        if (! $website) {
+            return null;
+        }
+
+        if (filled($website->domain)) {
+            return 'https://' . preg_replace('/^https?:\/\//', '', (string) $website->domain);
+        }
+
+        if (filled($website->slug)) {
+            return url('/' . ltrim((string) $website->slug, '/'));
+        }
+
+        return null;
+    }
+
+    protected function sendSavedPlayerEmail(
+        string $coachEmail,
+        array $coachCheckIn,
+        array $savedPlayer,
+        User $player,
+        Club $club,
+        Team $team
+    ): void {
+        if (blank($coachEmail)) {
+            return;
+        }
+
+        $subjectPlayerName = $savedPlayer['player_name'] ?: 'Player';
+
+        Mail::send('emails.coach-saved-player', [
+            'coach' => $coachCheckIn,
+            'savedPlayer' => $savedPlayer,
+            'player' => $player,
+            'club' => $club,
+            'team' => $team,
+        ], function ($message) use ($coachEmail, $coachCheckIn, $subjectPlayerName, $club, $player) {
+            $message->to($coachEmail, $coachCheckIn['name'] ?? null)
+                ->subject("Saved Player: {$subjectPlayerName} - {$club->name}");
+
+            $replyTo = $player->email ?: $player->personal_email ?: $player->parent_email ?: $player->club_coach_email;
+            if (filled($replyTo)) {
+                $message->replyTo($replyTo, $subjectPlayerName);
+            }
+        });
     }
 }

@@ -1239,6 +1239,95 @@
             .team-app{ width:100%; }
             .player-panel{ width:100%; }
         }
+    
+
+        /*
+        |--------------------------------------------------------------------------
+        | Compact mobile-app tuning
+        |--------------------------------------------------------------------------
+        */
+        :root{ --app-width:390px; }
+        .team-top{ height:44px; grid-template-columns:40px 1fr 40px; }
+        .team-top-btn{ width:32px; height:32px; }
+        .team-top-title{ font-size:18px; letter-spacing:.085em; }
+        .team-hero{ min-height:214px; }
+        .team-hero-inner{ padding:14px 14px 16px; }
+        .team-logo{ width:48px; height:48px; }
+        .team-kicker{ font-size:9px; letter-spacing:.14em; }
+        .team-name{ font-size:26px; line-height:.94; letter-spacing:.045em; }
+        .team-subtitle{ font-size:10px; letter-spacing:.12em; }
+        .team-meta-strip{ gap:6px; padding:8px 10px; }
+        .team-meta{ min-height:48px; padding:8px; gap:7px; }
+        .team-meta i{ font-size:13px; width:20px; }
+        .team-meta span{ font-size:7px; letter-spacing:.10em; }
+        .team-meta strong{ font-size:10.5px; line-height:1.05; }
+        .coach-session-bar{ margin:8px 10px 0; padding:8px 9px; }
+        .coach-session-bar strong{ font-size:10px; }
+        .coach-session-bar span{ font-size:9px; }
+        .coach-open-btn{ min-height:36px; margin:9px 10px 0; padding:0 11px; gap:6px; font-size:10.5px; letter-spacing:.09em; }
+        .squad-section{ padding:10px; }
+        .squad-head{ margin-bottom:8px; }
+        .squad-title{ font-size:21px; letter-spacing:.075em; }
+        .squad-sort{ font-size:9px; }
+        .player-list{ gap:6px; }
+        .player-row{ min-height:66px; padding:7px 8px; grid-template-columns:54px 1fr auto; gap:9px; }
+        .player-media{ width:50px; height:50px; border-radius:999px; }
+        .player-media.is-card{ width:44px; height:58px; border-radius:5px; }
+        .player-row-name{ font-size:15px; letter-spacing:.045em; }
+        .player-row-meta{ font-size:9px; gap:5px 7px; }
+        .player-number-pill{ min-width:36px; height:30px; font-size:15px; }
+        .player-panel-bar{ height:48px; padding:0 9px; }
+        .player-panel-title{ font-size:17px; letter-spacing:.075em; }
+        .player-panel-btn{ min-height:31px; padding:0 10px; font-size:10.5px; }
+        .player-nav-arrow{ z-index:80; width:38px; height:50px; }
+        .player-nav-arrow.is-left{ left:6px; }
+        .player-nav-arrow.is-right{ right:6px; }
+        .player-dialog{ height:calc(100% - 48px); padding:0 4px 24px; }
+        .mobile-card{ width:360px; aspect-ratio:390 / 680; }
+        .mobile-card-override{ width:360px; }
+        .mobile-bg-number{ top:150px; font-size:218px; letter-spacing:-15px; }
+        .mobile-top{ padding:10px 14px 0; }
+        .mobile-logo-row{ min-height:34px; }
+        .mobile-logo-row img{ max-height:33px; }
+        .mobile-head{ margin-top:16px; min-height:392px; }
+        .mobile-name-box{ margin-top:-24px; }
+        .mobile-jersey{ font-size:33px; }
+        .mobile-first{ font-size:39px; }
+        .mobile-last{ font-size:49px; }
+        .mobile-position{ margin-top:9px; font-size:19px; }
+        .mobile-signature{ top:160px; font-size:92px; }
+        .mobile-player-stage{ height:392px; right:-9px; }
+        .mobile-info-grid{ left:6px; right:6px; bottom:62px; gap:6px; }
+        .mobile-stat-card{ min-height:210px; padding:9px 9px 10px; border-radius:7px; }
+        .mobile-big-row{ gap:5px; margin-bottom:10px; }
+        .mobile-big-value{ font-size:64px; }
+        .mobile-big-label{ font-size:20px; padding-bottom:7px; }
+        .mobile-org-list{ gap:9px; }
+        .mobile-org-row{ grid-template-columns:34px 1fr; gap:8px; }
+        .mobile-org-row img,.mobile-org-fallback{ width:34px; height:34px; }
+        .mobile-org-title{ font-size:15px; }
+        .mobile-org-value{ font-size:10.5px; }
+        .mobile-class-row{ margin-bottom:11px; }
+        .mobile-class-year{ font-size:54px; }
+        .mobile-class-label{ font-size:20px; padding-bottom:6px; }
+        .mobile-meta{ gap:8px; }
+        .mobile-meta-row{ gap:7px; }
+        .mobile-meta-label,.mobile-meta-value{ font-size:12.5px; }
+        .player-actions{ width:min(360px, 100%); gap:6px; margin-top:8px; }
+        .player-action{ min-height:36px; font-size:10.5px; }
+        .coach-modal-head{ min-height:48px; padding:0 12px; }
+        .coach-modal-title{ font-size:18px; }
+        .coach-modal-body{ padding:14px; }
+        .coach-modal-copy{ font-size:12px; }
+        .coach-field input{ height:40px; }
+        .coach-submit{ min-height:40px; font-size:11.5px; }
+        @media (max-width:380px){
+            .mobile-card,.mobile-card-override{ width:340px; }
+            .mobile-big-value{ font-size:58px; }
+            .mobile-class-year{ font-size:48px; }
+            .mobile-meta-label,.mobile-meta-value{ font-size:11.5px; }
+        }
+
     </style>
 </head>
 <body>
