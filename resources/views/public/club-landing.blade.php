@@ -174,7 +174,7 @@
                 <div class="nav-actions">
                     <a class="nav-link" href="#teams">Teams</a>
                     @if($email)<a class="nav-link" href="mailto:{{ $email }}">Contact</a>@endif
-                    <button class="coach-btn" type="button" data-open-coach><i class="fa-solid fa-user-tie"></i> Coach Info</button>
+                    <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
                 </div>
             </nav>
         </div>
@@ -195,7 +195,7 @@
                         <div class="club-copy">{!! nl2br(e($clubContent)) !!}</div>
                     @endif
                     <div class="hero-actions">
-                        <button class="coach-btn" type="button" data-open-coach><i class="fa-solid fa-user-tie"></i> Coach Info</button>
+                        <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
                         @if($mapsUrl)<a class="coach-btn" href="{{ $mapsUrl }}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-location-dot"></i> Map</a>@endif
                     </div>
                 </div>
@@ -265,7 +265,7 @@
 
     <div class="modal" id="coachModal" aria-hidden="true">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
-            <div class="modal-head"><div class="modal-title" id="coachModalTitle">Coach Info</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-head"><div class="modal-title" id="coachModalTitle">{{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
             <div class="modal-body">
                 @if($coachSession)
                     <div class="coach-status">Checked in as <strong>{{ $coachSession['name'] ?? 'Coach' }}</strong>{{ filled($coachSession['school'] ?? null) ? ' / ' . $coachSession['school'] : '' }}.</div>

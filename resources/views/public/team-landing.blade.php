@@ -219,7 +219,7 @@
             </div>
             <div class="nav-actions">
                 <a class="nav-link" href="#roster">Roster</a>
-                <button class="btn" type="button" data-open-coach><i class="fa-solid fa-user-tie"></i> Coach Info</button>
+                <button class="btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
             </div>
         </nav>
     </div>
@@ -293,7 +293,7 @@
 
 <div class="modal" id="coachModal" aria-hidden="true">
     <div class="coach-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
-        <div class="modal-head"><div class="modal-title" id="coachModalTitle">Coach Info</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-head"><div class="modal-title" id="coachModalTitle">{{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
         <div class="modal-body">
             @if($coachSession)
                 <div class="coach-status">Checked in as <strong>{{ $coachSession['name'] ?? 'Coach' }}</strong>{{ filled($coachSession['school'] ?? null) ? ' / ' . $coachSession['school'] : '' }}.</div>
