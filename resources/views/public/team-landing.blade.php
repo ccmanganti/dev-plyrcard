@@ -898,7 +898,199 @@
             }
         }
 
-    </style>
+    
+
+        /* HARD FINAL TEAM MOBILE HERO FIX - clean back row, corner logos, compact hero */
+        @media (max-width:900px){
+            .mobile-back-row{
+                display:block !important;
+                position:relative !important;
+                top:auto !important;
+                left:auto !important;
+                right:auto !important;
+                z-index:25 !important;
+                width:100% !important;
+                padding:10px 18px 2px !important;
+                margin:0 !important;
+                background:transparent !important;
+                border:0 !important;
+                pointer-events:none !important;
+            }
+
+            .page-back-mobile{
+                display:inline-flex !important;
+                align-items:center !important;
+                gap:7px !important;
+                padding:0 !important;
+                margin:0 !important;
+                background:transparent !important;
+                border:0 !important;
+                box-shadow:none !important;
+                color:rgba(255,255,255,.86) !important;
+                font-family:var(--heading) !important;
+                font-size:10px !important;
+                line-height:1 !important;
+                font-weight:900 !important;
+                letter-spacing:.14em !important;
+                text-transform:uppercase !important;
+                text-shadow:0 2px 14px rgba(0,0,0,.58) !important;
+                pointer-events:auto !important;
+            }
+
+            .team-main-polished .back,
+            .hero .back{
+                display:none !important;
+            }
+
+            .hero{
+                min-height:318px !important;
+                height:318px !important;
+                display:block !important;
+                overflow:hidden !important;
+                border-bottom:1px solid var(--line) !important;
+            }
+
+            .hero-bg{
+                background-position:center 40% !important;
+            }
+
+            .hero-bg:after{
+                background:
+                    linear-gradient(90deg,
+                        color-mix(in srgb,var(--brand) 58%,rgba(0,0,0,.46)) 0%,
+                        color-mix(in srgb,var(--brand) 30%,rgba(0,0,0,.22)) 48%,
+                        color-mix(in srgb,var(--brand) 52%,rgba(0,0,0,.46)) 100%),
+                    linear-gradient(180deg,rgba(0,0,0,.04) 0%,rgba(0,0,0,.10) 48%,color-mix(in srgb,var(--brand) 48%,rgba(0,0,0,.44)) 100%) !important;
+            }
+
+            .hero-inner{
+                display:block !important;
+                position:relative !important;
+                min-height:318px !important;
+                height:318px !important;
+                padding:0 18px !important;
+                margin:0 !important;
+            }
+
+            .team-main-polished{
+                position:relative !important;
+                min-height:318px !important;
+                height:318px !important;
+                display:block !important;
+                padding:12px 0 0 !important;
+            }
+
+            .hero-info-strip{
+                position:relative !important;
+                z-index:6 !important;
+                display:grid !important;
+                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                gap:8px !important;
+                margin:4px 0 22px !important;
+                padding:0 !important;
+                border:0 !important;
+            }
+
+            .hero-info-strip span{
+                min-height:48px !important;
+                display:flex !important;
+                align-items:center !important;
+                justify-content:center !important;
+                gap:7px !important;
+                padding:0 8px !important;
+                border:1px solid rgba(255,255,255,.24) !important;
+                background:rgba(255,255,255,.12) !important;
+                backdrop-filter:blur(14px) !important;
+                font-size:10px !important;
+                line-height:1.05 !important;
+                font-weight:900 !important;
+                letter-spacing:.04em !important;
+                color:#fff !important;
+                text-align:center !important;
+            }
+
+            .hero-info-strip span i{
+                font-size:13px !important;
+                color:rgba(255,255,255,.84) !important;
+            }
+
+            .team-hero-identity{
+                position:relative !important;
+                z-index:5 !important;
+                display:block !important;
+                min-height:116px !important;
+                margin:0 !important;
+                padding:24px 68px 0 !important;
+                border-top:1px solid rgba(255,255,255,.18) !important;
+                max-width:none !important;
+            }
+
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{
+                position:absolute !important;
+                top:28px !important;
+                width:52px !important;
+                height:52px !important;
+                object-fit:contain !important;
+                z-index:7 !important;
+                margin:0 !important;
+            }
+
+            .team-hero-identity .identity-logo{
+                left:0 !important;
+                justify-self:auto !important;
+            }
+
+            .team-hero-identity .identity-league{
+                right:0 !important;
+                justify-self:auto !important;
+            }
+
+            .team-title-stack{
+                position:relative !important;
+                z-index:8 !important;
+                min-width:0 !important;
+                text-align:left !important;
+            }
+
+            .team-title-stack .label,
+            .team-hero-identity .label{
+                margin:0 0 8px !important;
+                color:rgba(255,255,255,.76) !important;
+                font-size:9px !important;
+                line-height:1 !important;
+                letter-spacing:.18em !important;
+                white-space:nowrap !important;
+                overflow:hidden !important;
+                text-overflow:ellipsis !important;
+            }
+
+            .team-name{
+                margin:0 !important;
+                font-size:42px !important;
+                line-height:.88 !important;
+                letter-spacing:.015em !important;
+                text-shadow:0 14px 32px rgba(0,0,0,.36) !important;
+                white-space:nowrap !important;
+            }
+
+            #roster.section{
+                padding-top:32px !important;
+            }
+        }
+
+        @media (max-width:420px){
+            .hero{height:304px !important;min-height:304px !important;}
+            .hero-inner,.team-main-polished{height:304px !important;min-height:304px !important;}
+            .hero-info-strip{gap:6px !important;margin-bottom:18px !important;}
+            .hero-info-strip span{min-height:44px !important;font-size:9px !important;padding:0 5px !important;}
+            .team-hero-identity{padding:22px 58px 0 !important;}
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{width:46px !important;height:46px !important;top:26px !important;}
+            .team-name{font-size:38px !important;}
+        }
+
+</style>
 </head>
 <body>
 <main class="site">
@@ -927,8 +1119,6 @@
         <div class="hero-bg"></div>
         <div class="wrap hero-inner">
             <div class="team-main team-main-polished">
-                <a class="back" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : '/' }}"><i class="fa-solid fa-chevron-left"></i> Back to club</a>
-
                 <div class="hero-info-strip" aria-label="Basic team information">
                     <span><i class="fa-solid fa-users"></i> {{ $playerRows->count() }} Players</span>
                     <span><i class="fa-solid fa-trophy"></i> {{ $leagueName }}</span>
