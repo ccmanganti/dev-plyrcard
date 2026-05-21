@@ -32,6 +32,64 @@
         $secondary = $normalizeHex($secondary, '#050505');
         $accent = $normalizeHex($accent, $primary);
 
+        $hexToRgb = function (string $hex) {
+            $hex = ltrim($hex, '#');
+
+            return [
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2)),
+            ];
+        };
+
+        $rgbToHex = function (array $rgb) {
+            return sprintf(
+                '#%02X%02X%02X',
+                max(0, min(255, (int) round($rgb[0]))),
+                max(0, min(255, (int) round($rgb[1]))),
+                max(0, min(255, (int) round($rgb[2])))
+            );
+        };
+
+        $mixHex = function (string $hex, string $mixWith, float $amount) use ($hexToRgb, $rgbToHex) {
+            $a = $hexToRgb($hex);
+            $b = $hexToRgb($mixWith);
+
+            return $rgbToHex([
+                $a[0] + (($b[0] - $a[0]) * $amount),
+                $a[1] + (($b[1] - $a[1]) * $amount),
+                $a[2] + (($b[2] - $a[2]) * $amount),
+            ]);
+        };
+
+        $luminance = function (string $hex) use ($hexToRgb) {
+            [$r, $g, $b] = array_map(fn ($value) => $value / 255, $hexToRgb($hex));
+
+            $convert = function ($channel) {
+                return $channel <= 0.03928
+                    ? $channel / 12.92
+                    : (($channel + 0.055) / 1.055) ** 2.4;
+            };
+
+            return (0.2126 * $convert($r)) + (0.7152 * $convert($g)) + (0.0722 * $convert($b));
+        };
+
+        $primaryLum = $luminance($primary);
+        $secondaryLum = $luminance($secondary);
+
+        $readablePrimary = $primaryLum < 0.28
+            ? $mixHex($primary, '#FFFFFF', 0.58)
+            : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.38) : $primary);
+
+        $readableSecondary = $secondaryLum < 0.28
+            ? $mixHex($secondary, '#FFFFFF', 0.55)
+            : ($secondaryLum > 0.72 ? $mixHex($secondary, '#000000', 0.38) : $secondary);
+
+        $onPrimary = $primaryLum > 0.58 ? '#071018' : '#FFFFFF';
+        $onSecondary = $secondaryLum > 0.58 ? '#071018' : '#FFFFFF';
+        $mutedOnDark = '#D7DCE4';
+        $softOnDark = '#F4F7FB';
+
         $resolveAsset = function ($value, $fallback = null) {
             if (blank($value)) return $fallback;
 
@@ -135,14 +193,19 @@
             --club-primary: {{ $primary }};
             --club-secondary: {{ $secondary }};
             --club-accent: {{ $accent }};
+            --club-readable-primary: {{ $readablePrimary }};
+            --club-readable-secondary: {{ $readableSecondary }};
+            --club-on-primary: {{ $onPrimary }};
+            --club-on-secondary: {{ $onSecondary }};
+            --club-soft-text: {{ $softOnDark }};
+            --club-muted-text: {{ $mutedOnDark }};
             --club-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --club-body: "{{ $bodyFont }}", "Inter", sans-serif;
             --club-bg:#050506;
             --club-surface:#111114;
             --club-surface-2:#17171b;
             --club-line:rgba(255,255,255,.10);
-            --club-muted:rgba(255,255,255,.68);
-            --club-on-primary:#fff;
+            --club-muted:rgba(255,255,255,.72);
         }
 
         *{ box-sizing:border-box; }
@@ -240,7 +303,7 @@
         }
 
         .club-type{
-            color:rgba(255,255,255,.76);
+            color:var(--club-muted-text);
             font-size:12px;
             letter-spacing:.20em;
             text-transform:uppercase;
@@ -258,7 +321,7 @@
         }
 
         .club-kicker{
-            color:var(--club-primary);
+            color:var(--club-readable-primary);
             font-family:var(--club-heading);
             font-size:clamp(13px, 1.6vw, 20px);
             letter-spacing:.16em;
@@ -282,7 +345,7 @@
         .club-copy{
             margin-top:20px;
             max-width:720px;
-            color:rgba(255,255,255,.80);
+            color:var(--club-soft-text);
             font-size:clamp(14px, 1.35vw, 17px);
             line-height:1.55;
             font-weight:650;
@@ -422,7 +485,7 @@
             letter-spacing:.12em;
             text-transform:uppercase;
             font-weight:900;
-            color:var(--club-primary);
+            color:var(--club-readable-primary);
             margin-bottom:9px;
         }
 
@@ -486,15 +549,15 @@
 
         .club-stats{
             display:grid;
-            grid-template-columns:minmax(0, 1fr);
+            grid-template-columns:repeat(3, minmax(0, 1fr));
             background:#070708;
             width:min(1120px, calc(100% - 28px));
             margin:0 auto;
         }
 
         .club-stat{
-            min-height:118px;
-            padding:18px;
+            min-height:104px;
+            padding:14px 12px;
             display:flex;
             flex-direction:column;
             justify-content:center;
@@ -504,14 +567,14 @@
         }
 
         .club-stat i{
-            color:var(--club-primary);
+            color:var(--club-readable-primary);
             font-size:22px;
             margin-bottom:12px;
         }
 
         .club-stat span{
             display:block;
-            color:rgba(255,255,255,.58);
+            color:var(--club-muted-text);
             font-size:10px;
             letter-spacing:.12em;
             text-transform:uppercase;
@@ -552,7 +615,7 @@
         }
 
         .section-kicker{
-            color:var(--club-primary);
+            color:var(--club-readable-primary);
             font-size:11px;
             letter-spacing:.16em;
             text-transform:uppercase;
@@ -734,7 +797,7 @@
         }
 
         .footer-item i{
-            color:var(--club-primary);
+            color:var(--club-readable-primary);
             width:20px;
             text-align:center;
         }
@@ -779,7 +842,7 @@
             align-items:center;
             padding:0 9px;
             background:rgba(255,255,255,.08);
-            color:rgba(255,255,255,.78);
+            color:var(--club-soft-text);
             font-size:10px;
             letter-spacing:.08em;
             text-transform:uppercase;
@@ -789,7 +852,7 @@
         @media (max-width:860px){
             .club-hero{ min-height:auto; padding:24px 14px; }
             .club-hero-inner{ grid-template-columns:1fr; }
-            .club-stats{ grid-template-columns:1fr 1fr 1fr; }
+            .club-stats{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
             .section-head{ align-items:flex-start; flex-direction:column; }
             .team-grid{ grid-template-columns:1fr; }
             .club-info-grid{ grid-template-columns:1fr; }
@@ -800,8 +863,11 @@
             .club-logo{ width:62px; height:62px; }
             .league-logo{ max-width:90px; max-height:44px; }
             .club-headline{ font-size:52px; }
-            .club-stats{ grid-template-columns:1fr; }
-            .club-stat{ min-height:86px; }
+            .club-stats{ grid-template-columns:repeat(3, minmax(0, 1fr)); width:calc(100% - 20px); }
+            .club-stat{ min-height:86px; padding:10px 8px; }
+            .club-stat i{ font-size:16px; margin-bottom:8px; }
+            .club-stat span{ font-size:8px; margin-bottom:5px; }
+            .club-stat strong{ font-size:clamp(13px, 4vw, 18px); line-height:1; }
             .team-tabs{ width:100%; display:grid; grid-template-columns:1fr 1fr; }
             .team-tab{ width:100%; }
             .team-card{ min-height:230px; }

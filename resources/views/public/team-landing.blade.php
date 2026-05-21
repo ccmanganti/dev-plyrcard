@@ -35,6 +35,60 @@
         $secondary = $normalizeHex($secondary, '#050505');
         $accent = $normalizeHex($accent, $primary);
 
+        $hexToRgb = function (string $hex) {
+            $hex = ltrim($hex, '#');
+
+            return [
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2)),
+            ];
+        };
+
+        $rgbToHex = function (array $rgb) {
+            return sprintf(
+                '#%02X%02X%02X',
+                max(0, min(255, (int) round($rgb[0]))),
+                max(0, min(255, (int) round($rgb[1]))),
+                max(0, min(255, (int) round($rgb[2])))
+            );
+        };
+
+        $mixHex = function (string $hex, string $mixWith, float $amount) use ($hexToRgb, $rgbToHex) {
+            $a = $hexToRgb($hex);
+            $b = $hexToRgb($mixWith);
+
+            return $rgbToHex([
+                $a[0] + (($b[0] - $a[0]) * $amount),
+                $a[1] + (($b[1] - $a[1]) * $amount),
+                $a[2] + (($b[2] - $a[2]) * $amount),
+            ]);
+        };
+
+        $luminance = function (string $hex) use ($hexToRgb) {
+            [$r, $g, $b] = array_map(fn ($value) => $value / 255, $hexToRgb($hex));
+
+            $convert = function ($channel) {
+                return $channel <= 0.03928
+                    ? $channel / 12.92
+                    : (($channel + 0.055) / 1.055) ** 2.4;
+            };
+
+            return (0.2126 * $convert($r)) + (0.7152 * $convert($g)) + (0.0722 * $convert($b));
+        };
+
+        $primaryLum = $luminance($primary);
+        $secondaryLum = $luminance($secondary);
+        $readablePrimary = $primaryLum < 0.28
+            ? $mixHex($primary, '#FFFFFF', 0.58)
+            : ($primaryLum > 0.72 ? $mixHex($primary, '#000000', 0.38) : $primary);
+        $readableSecondary = $secondaryLum < 0.28
+            ? $mixHex($secondary, '#FFFFFF', 0.55)
+            : ($secondaryLum > 0.72 ? $mixHex($secondary, '#000000', 0.38) : $secondary);
+        $onPrimary = $primaryLum > 0.58 ? '#071018' : '#FFFFFF';
+        $softOnDark = '#F4F7FB';
+        $mutedOnDark = '#D7DCE4';
+
         $resolveAsset = function ($value, $fallback = null) {
             if (blank($value)) return $fallback;
 
@@ -242,13 +296,17 @@
             --team-primary: {{ $primary }};
             --team-secondary: {{ $secondary }};
             --team-accent: {{ $accent }};
+            --team-readable-primary: {{ $readablePrimary }};
+            --team-readable-secondary: {{ $readableSecondary }};
+            --team-on-primary: {{ $onPrimary }};
+            --team-soft-text: {{ $softOnDark }};
+            --team-muted-text: {{ $mutedOnDark }};
             --team-heading: "{{ $headingFont }}", "Antonio", sans-serif;
             --team-body: "{{ $bodyFont }}", "Inter", sans-serif;
             --team-bg: #050506;
             --team-surface: #111114;
             --team-line: rgba(255,255,255,.10);
-            --team-muted: rgba(255,255,255,.66);
-            --team-on-primary: #ffffff;
+            --team-muted: rgba(255,255,255,.72);
             --app-width: 430px;
         }
 
@@ -397,7 +455,7 @@
         .team-subtitle{
             margin-top:8px;
             max-width:330px;
-            color:rgba(255,255,255,.78);
+            color:var(--team-soft-text);
             font-size:13px;
             line-height:1.45;
             font-weight:700;
@@ -419,11 +477,11 @@
             gap:10px;
         }
 
-        .team-meta i{ color:var(--team-primary); width:18px; text-align:center; }
+        .team-meta i{ color:var(--team-readable-primary); width:18px; text-align:center; }
 
         .team-meta span{
             display:block;
-            color:rgba(255,255,255,.60);
+            color:var(--team-muted-text);
             font-size:8px;
             text-transform:uppercase;
             letter-spacing:.14em;
@@ -459,7 +517,7 @@
         }
 
         .coach-session-bar span{
-            color:rgba(255,255,255,.64);
+            color:var(--team-muted-text);
             font-size:11px;
             font-weight:700;
         }
@@ -485,7 +543,7 @@
         }
 
         .squad-sort{
-            color:rgba(255,255,255,.62);
+            color:var(--team-muted-text);
             font-size:10px;
             font-weight:800;
             letter-spacing:.08em;
@@ -519,7 +577,7 @@
         .player-row:hover,
         .player-row.is-active{
             transform:translateY(-1px);
-            border-left-color:var(--team-primary);
+            border-left-color:var(--team-readable-primary);
             background:
                 linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 24%, transparent), transparent 48%),
                 rgba(255,255,255,.09);
@@ -582,7 +640,7 @@
 
         .player-row-meta{
             margin-top:6px;
-            color:rgba(255,255,255,.68);
+            color:var(--team-muted-text);
             display:flex;
             flex-wrap:wrap;
             gap:6px 10px;
@@ -600,7 +658,7 @@
             min-width:44px;
             text-align:right;
             font-family:var(--team-heading);
-            color:var(--team-primary);
+            color:var(--team-readable-primary);
             font-size:28px;
             line-height:1;
             font-weight:900;
@@ -1073,7 +1131,7 @@
 
         .player-action.is-saved{
             background:rgba(255,255,255,.16);
-            color:rgba(255,255,255,.68);
+            color:var(--team-muted-text);
             cursor:default;
         }
 
@@ -1156,7 +1214,7 @@
 
         .coach-modal-copy{
             margin:0 0 14px;
-            color:rgba(255,255,255,.68);
+            color:var(--team-muted-text);
             font-size:13px;
             line-height:1.45;
             font-weight:650;
@@ -1164,14 +1222,14 @@
 
         .coach-form{ display:grid; gap:10px; }
         .coach-field{ display:grid; gap:5px; }
-        .coach-field label{ color:rgba(255,255,255,.62); font-size:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:900; }
+        .coach-field label{ color:var(--team-muted-text); font-size:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:900; }
         .coach-field input{ width:100%; height:44px; border:0; outline:0; padding:0 12px; background:rgba(255,255,255,.10); color:#fff; font-weight:750; }
         .coach-field input::placeholder{ color:rgba(255,255,255,.38); }
         .coach-submit{ min-height:44px; border:0; background:linear-gradient(135deg, var(--team-primary), var(--team-secondary)); color:#fff; font-family:var(--team-heading); font-size:13px; letter-spacing:.10em; text-transform:uppercase; font-weight:900; cursor:pointer; }
 
         .empty-squad{
             padding:22px;
-            color:rgba(255,255,255,.68);
+            color:var(--team-muted-text);
             background:rgba(255,255,255,.06);
             font-weight:800;
             text-align:center;
