@@ -128,10 +128,10 @@
         $subtitle = $team->landing_page_intro ?: ($settings['tagline'] ?? 'Player roster and recruiting information.');
         $leagueName = $club?->league?->name ?? ($settings['league'] ?? 'League');
 
-        $coachSessionKey = 'club_coach_checkin_' . $club->id;
-        $savedPlayersKey = 'club_saved_players_' . $club->id;
-        $coachSession = session($coachSessionKey);
-        $savedPlayerIds = collect(session($savedPlayersKey, []))->pluck('player_id')->map(fn ($id) => (int) $id)->values()->all();
+        $coachSession = $coachCheckIn ?? session('coach_checkin');
+        $savedPlayersForClub = collect($savedPlayers ?? session('coach_saved_players', []))
+            ->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id);
+        $savedPlayerIds = $savedPlayersForClub->pluck('player_id')->map(fn ($id) => (int) $id)->values()->all();
 
         $teamPlayers = collect($players ?? [])
             ->sortBy([
@@ -1090,6 +1090,24 @@
         </div>
     </main>
 
+    @php
+        $currentGenderSegment = request()->route('gender') ?? $team->landingGenderSegment();
+
+        $coachSavePlayerUrlTemplate = route('clubs.coach-save-player', [
+            'clubSlug' => $club->landing_page_slug,
+            'gender' => $currentGenderSegment,
+            'teamSlug' => $team->landing_page_slug,
+            'player' => '__PLAYER_ID__',
+        ]);
+
+        $coachUnsavePlayerUrlTemplate = route('clubs.coach-unsave-player', [
+            'clubSlug' => $club->landing_page_slug,
+            'gender' => $currentGenderSegment,
+            'teamSlug' => $team->landing_page_slug,
+            'player' => '__PLAYER_ID__',
+        ]);
+    @endphp
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const cards = Array.from(document.querySelectorAll('[data-player-card]'));
@@ -1100,12 +1118,8 @@
             const nextBtn = document.getElementById('playerNextBtn');
             const prevBtn = document.getElementById('playerPrevBtn');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            const saveUrlTemplate = @json(route('clubs.coach-save-player', [
-                'clubSlug' => $club->landing_page_slug,
-                'gender' => request()->route('gender') ?? $team->landingGenderSegment(),
-                'teamSlug' => $team->landing_page_slug,
-                'player' => '__PLAYER__',
-            ]));
+            const saveUrlTemplate = @json($coachSavePlayerUrlTemplate);
+            const unsaveUrlTemplate = @json($coachUnsavePlayerUrlTemplate);
             const coachCheckedIn = @json((bool) $coachSession);
             let activeIndex = 0;
 
@@ -1319,7 +1333,7 @@
 
                 try {
                     const playerId = button.getAttribute('data-save-player');
-                    const saveUrl = saveUrlTemplate.replace('__PLAYER__', encodeURIComponent(playerId));
+                    const saveUrl = saveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(playerId));
 
                     const response = await fetch(saveUrl, {
                         method: 'POST',
