@@ -205,7 +205,7 @@
                     'weight' => trim((string) ($player->weight ?? '')),
                     'gpa' => trim((string) ($player->gpa ?? '')),
                     'dominantFoot' => $player->dominant_foot ? str((string) $player->dominant_foot)->replace('_', ' ')->title()->toString() : '',
-                    'birth' => $player->birth ? Carbon::parse($player->birth)->format('M j, Y') : '',
+                    'birth' => $player->birth ? strtoupper(Carbon::parse($player->birth)->format('F j, Y')) : '',
                     'maxSpeed' => trim((string) ($player->max_speed ?? '')),
                     'sport' => $player->sport ? str((string) $player->sport)->replace('_', ' ')->title()->toString() : '',
                     'school' => $player->school?->name ?? '',
@@ -229,10 +229,12 @@
     @endphp
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700|inter:400,500,600,700,800,900" rel="stylesheet">
+    <link href="https://fonts.bunny.net/css?family=antonio:300,400,500,600,700|iceberg:400|inter:400,500,600,700,800,900" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Luxurious+Script&display=swap');
+
         :root{
             --team-primary: {{ $primary }};
             --team-secondary: {{ $secondary }};
@@ -670,26 +672,48 @@
         .player-nav-arrow.is-left{ left:6px; }
         .player-nav-arrow.is-right{ right:6px; }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Player Website Mobile Card
+        |--------------------------------------------------------------------------
+        | These styles intentionally mirror the dynamic mobile hero template used on
+        | player websites: 390 x 680 design frame, Antonio / Iceberg / Luxurious
+        | Script fonts, same image staging, info cards, logo rows, and spacing.
+        */
+        .player-dialog{
+            height:calc(100% - 54px);
+            overflow:auto;
+            padding:0 4px 28px;
+            background:#030304;
+        }
+
         .mobile-card{
             position:relative;
-            width:min(390px, 100%);
+            width:390px;
+            max-width:100%;
+            aspect-ratio:390 / 680;
+            min-height:auto;
             margin:0 auto;
-            min-height:680px;
             overflow:hidden;
             background:var(--team-primary);
             color:#fff;
+            --mobile-card-heading:"Antonio", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            --mobile-card-number:"Iceberg", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
         }
 
         .mobile-card-override{
-            width:min(390px, 100%);
+            width:390px;
+            max-width:100%;
             margin:0 auto;
             background:var(--team-primary);
+            overflow:hidden;
         }
 
         .mobile-card-override img{
             display:block;
             width:100%;
             height:auto;
+            object-fit:cover;
         }
 
         .mobile-bg-number{
@@ -698,11 +722,12 @@
             top:170px;
             z-index:1;
             letter-spacing:-18px;
-            font-family:"Iceberg", var(--team-heading);
+            font-family:var(--mobile-card-number);
             font-size:250px;
             line-height:.8;
             color:rgba(255,255,255,.10);
             pointer-events:none;
+            user-select:none;
         }
 
         .mobile-top{
@@ -713,6 +738,7 @@
 
         .mobile-logo-row{
             display:flex;
+            align-items:center;
             justify-content:flex-end;
             min-height:40px;
         }
@@ -735,11 +761,18 @@
             width:58%;
         }
 
+        .mobile-name-box{
+            margin-top:-30px;
+            width:100%;
+            position:relative;
+            z-index:5;
+        }
+
         .mobile-jersey,
         .mobile-first,
         .mobile-last,
         .mobile-position{
-            font-family:var(--team-heading);
+            font-family:var(--mobile-card-heading);
             text-transform:uppercase;
             color:#fff;
         }
@@ -749,27 +782,29 @@
             line-height:.9;
             font-weight:700;
             letter-spacing:-.04em;
+            margin-bottom:2px;
         }
 
         .mobile-first{
             font-size:45px;
             line-height:1;
-            font-weight:900;
+            font-weight:800;
             letter-spacing:-.05em;
         }
 
         .mobile-last{
             font-size:56px;
             line-height:.86;
-            font-weight:900;
+            font-weight:800;
             letter-spacing:-.05em;
+            margin-top:2px;
         }
 
         .mobile-position{
             margin-top:12px;
             font-size:22px;
             line-height:.95;
-            font-weight:800;
+            font-weight:700;
         }
 
         .mobile-signature{
@@ -777,12 +812,13 @@
             left:8px;
             top:180px;
             z-index:1;
-            font-size:92px;
+            font-size:110px;
             line-height:1;
             color:rgba(255,255,255,.14);
-            font-family:cursive;
+            font-family:"Luxurious Script", cursive;
             transform:rotate(-7deg);
             pointer-events:none;
+            user-select:none;
         }
 
         .mobile-player-stage{
@@ -795,6 +831,7 @@
             display:flex;
             align-items:flex-end;
             justify-content:center;
+            overflow:visible;
             pointer-events:none;
         }
 
@@ -802,6 +839,7 @@
             width:auto;
             height:100%;
             max-width:none;
+            display:block;
             object-fit:contain;
             object-position:bottom center;
             filter:drop-shadow(0 14px 24px rgba(0,0,0,.20));
@@ -816,6 +854,7 @@
             display:grid;
             grid-template-columns:1fr 1fr;
             gap:6px;
+            align-items:stretch;
         }
 
         .mobile-stat-card{
@@ -826,39 +865,48 @@
             padding:10px 10px 12px;
             box-shadow:0 8px 20px rgba(0,0,0,.08);
             overflow:hidden;
+            position:relative;
+            display:flex;
+            flex-direction:column;
+            justify-content:flex-start;
         }
 
-        .mobile-big-row,
-        .mobile-class-row{
+        .mobile-big-row{
             display:flex;
             align-items:flex-end;
             gap:6px;
             margin-bottom:12px;
             line-height:.8;
+            flex-wrap:nowrap;
         }
 
-        .mobile-big-value,
-        .mobile-class-year{
-            font-family:var(--team-heading);
-            font-size:68px;
+        .mobile-big-value{
+            font-family:var(--mobile-card-heading);
+            font-size:76px;
             line-height:.8;
             font-weight:900;
             letter-spacing:-.05em;
             color:#000;
+            flex:0 1 auto;
+            min-width:0;
         }
 
-        .mobile-big-label,
-        .mobile-class-label{
-            font-family:var(--team-heading);
-            font-size:22px;
+        .mobile-big-label{
+            font-family:var(--mobile-card-heading);
+            font-size:24px;
             line-height:.9;
             font-weight:900;
             text-transform:uppercase;
             color:#000;
-            padding-bottom:8px;
+            padding-bottom:9px;
+            white-space:nowrap;
+            flex:0 0 auto;
         }
 
-        .mobile-org-list{ display:grid; gap:12px; }
+        .mobile-org-list{
+            display:grid;
+            gap:12px;
+        }
 
         .mobile-org-row{
             display:grid;
@@ -875,7 +923,7 @@
         }
 
         .mobile-org-title{
-            font-family:var(--team-heading);
+            font-family:var(--mobile-card-heading);
             font-size:18px;
             line-height:.95;
             font-weight:900;
@@ -885,11 +933,45 @@
 
         .mobile-org-value{
             margin-top:2px;
-            font-family:var(--team-heading);
+            font-family:var(--mobile-card-heading);
             font-size:12px;
             line-height:1.05;
-            font-weight:600;
+            font-weight:500;
             color:#111;
+            text-transform:none;
+        }
+
+        .mobile-class-row{
+            display:flex;
+            align-items:flex-end;
+            justify-content:space-between;
+            gap:4px;
+            flex-wrap:nowrap;
+            margin-bottom:14px;
+            min-width:0;
+        }
+
+        .mobile-class-year{
+            font-family:var(--mobile-card-heading);
+            font-size:64px;
+            line-height:.8;
+            font-weight:900;
+            letter-spacing:-.045em;
+            color:#000;
+            flex:0 1 auto;
+            min-width:0;
+        }
+
+        .mobile-class-label{
+            font-family:var(--mobile-card-heading);
+            font-size:24px;
+            line-height:.9;
+            font-weight:900;
+            text-transform:uppercase;
+            color:#000;
+            padding-bottom:8px;
+            white-space:nowrap;
+            flex:0 0 auto;
         }
 
         .mobile-meta{
@@ -905,17 +987,24 @@
             align-items:baseline;
         }
 
-        .mobile-meta-label,
-        .mobile-meta-value{
-            font-family:var(--team-heading);
+        .mobile-meta-label{
+            font-family:var(--mobile-card-heading);
             font-size:15px;
             line-height:1;
+            font-weight:500;
             text-transform:uppercase;
             color:#111;
         }
 
-        .mobile-meta-label{ font-weight:600; }
-        .mobile-meta-value{ font-weight:900; text-align:right; }
+        .mobile-meta-value{
+            font-family:var(--mobile-card-heading);
+            font-size:15px;
+            line-height:1;
+            font-weight:800;
+            text-transform:uppercase;
+            color:#111;
+            text-align:right;
+        }
 
         .player-actions{
             width:min(390px, 100%);
@@ -1184,9 +1273,9 @@
                 const bgNumber = clean(player.jersey, '00');
 
                 const orgRows = [
-                    orgRow('National Team', player.nationalTeam, player.nationalLogo),
-                    orgRow('Club', player.club, player.clubLogo),
-                    orgRow('League', player.league, player.leagueLogo),
+                    orgRow('NATIONAL TEAM', player.nationalTeam, player.nationalLogo),
+                    orgRow('CLUB', player.club, player.clubLogo),
+                    orgRow('LEAGUE', player.league, player.leagueLogo),
                 ].filter(Boolean).join('');
 
                 return `
@@ -1200,10 +1289,12 @@
 
                             <div class="mobile-head">
                                 <div class="mobile-name-wrap">
-                                    ${jersey ? `<div class="mobile-jersey">${escapeHtml(jersey)}</div>` : ''}
-                                    <div class="mobile-first">${escapeHtml(first)}</div>
-                                    <div class="mobile-last">${escapeHtml(last)}</div>
-                                    <div class="mobile-position">${escapeHtml(clean(player.positionShort, 'POSITION'))}</div>
+                                    <div class="mobile-name-box">
+                                        ${jersey ? `<div class="mobile-jersey">${escapeHtml(jersey)}</div>` : ''}
+                                        <div class="mobile-first">${escapeHtml(first)}</div>
+                                        <div class="mobile-last">${escapeHtml(last)}</div>
+                                        <div class="mobile-position">${escapeHtml(clean(player.positionShort, 'POSITION'))}</div>
+                                    </div>
                                     <div class="mobile-signature">${escapeHtml(clean(player.firstName, 'Name'))}</div>
                                 </div>
 
@@ -1229,12 +1320,12 @@
                                 </div>
 
                                 <div class="mobile-meta">
-                                    <div class="mobile-meta-row"><div class="mobile-meta-label">Height:</div><div class="mobile-meta-value">${escapeHtml(clean(player.height, '--'))}</div></div>
-                                    <div class="mobile-meta-row"><div class="mobile-meta-label">Weight:</div><div class="mobile-meta-value">${escapeHtml(clean(player.weight, '--'))}</div></div>
-                                    <div class="mobile-meta-row"><div class="mobile-meta-label">Max Speed:</div><div class="mobile-meta-value">${escapeHtml(clean(player.maxSpeed, '--'))}</div></div>
-                                    <div class="mobile-meta-row"><div class="mobile-meta-label">Dominant Foot:</div><div class="mobile-meta-value">${escapeHtml(clean(player.dominantFoot, '--'))}</div></div>
+                                    <div class="mobile-meta-row"><div class="mobile-meta-label">HEIGHT:</div><div class="mobile-meta-value">${escapeHtml(clean(player.height, '--'))}</div></div>
+                                    <div class="mobile-meta-row"><div class="mobile-meta-label">WEIGHT:</div><div class="mobile-meta-value">${escapeHtml(clean(player.weight, '--'))}</div></div>
+                                    <div class="mobile-meta-row"><div class="mobile-meta-label">MAX SPEED:</div><div class="mobile-meta-value">${escapeHtml(clean(player.maxSpeed, '--'))}</div></div>
+                                    <div class="mobile-meta-row"><div class="mobile-meta-label">DOMINANT FOOT:</div><div class="mobile-meta-value">${escapeHtml(clean(player.dominantFoot, '--'))}</div></div>
                                     <div class="mobile-meta-row"><div class="mobile-meta-label">DOB:</div><div class="mobile-meta-value">${escapeHtml(clean(player.birth, '--'))}</div></div>
-                                    <div class="mobile-meta-row"><div class="mobile-meta-label">Coach:</div><div class="mobile-meta-value">${escapeHtml(clean(player.clubCoach, '--'))}</div></div>
+                                    <div class="mobile-meta-row"><div class="mobile-meta-label">COACH:</div><div class="mobile-meta-value">${escapeHtml(clean(player.clubCoach, '--'))}</div></div>
                                 </div>
                             </div>
                         </div>
