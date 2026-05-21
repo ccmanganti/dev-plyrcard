@@ -417,6 +417,97 @@
             .team-name{font-size:clamp(36px, 10vw, 48px) !important;}
         }
 
+    
+
+        /* FINAL FIX: pull team hero content up, enlarge info boxes, remove wasted hero space */
+        @media(max-width:900px){
+            .hero{
+                min-height:395px !important;
+                align-items:start !important;
+                display:block !important;
+            }
+            .hero-inner{
+                min-height:395px !important;
+                padding:54px 20px 24px !important;
+                align-items:start !important;
+                align-content:start !important;
+                display:block !important;
+            }
+            .team-main-polished{
+                display:block !important;
+                min-height:0 !important;
+                transform:none !important;
+                width:100% !important;
+                margin:0 !important;
+            }
+            .hero-info-strip{
+                display:grid !important;
+                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                gap:8px !important;
+                width:100% !important;
+                margin:0 0 18px !important;
+            }
+            .hero-info-strip span{
+                min-height:42px !important;
+                padding:0 8px !important;
+                justify-content:center !important;
+                text-align:center !important;
+                font-size:10px !important;
+                line-height:1.05 !important;
+                letter-spacing:.08em !important;
+                background:rgba(255,255,255,.105) !important;
+                border-left:2px solid rgba(255,255,255,.34) !important;
+                backdrop-filter:blur(14px) !important;
+            }
+            .hero-info-strip span i{
+                font-size:11px !important;
+                margin-right:5px !important;
+            }
+            .team-hero-identity{
+                display:grid !important;
+                grid-template-columns:52px minmax(0,1fr) 52px !important;
+                gap:12px !important;
+                align-items:center !important;
+                max-width:100% !important;
+                margin:0 !important;
+                padding-top:16px !important;
+                border-top:1px solid rgba(255,255,255,.24) !important;
+            }
+            .identity-logo,.identity-league{
+                width:50px !important;
+                height:50px !important;
+                object-fit:contain !important;
+            }
+            .team-title-stack .label{
+                font-size:10px !important;
+                line-height:1.1 !important;
+                letter-spacing:.12em !important;
+                margin-bottom:6px !important;
+                color:rgba(255,255,255,.82) !important;
+                white-space:normal !important;
+            }
+            .team-name{
+                font-size:clamp(42px,11.6vw,56px) !important;
+                line-height:.9 !important;
+                letter-spacing:.01em !important;
+            }
+        }
+        @media(max-width:420px){
+            .hero{min-height:380px !important;}
+            .hero-inner{min-height:380px !important;padding:50px 18px 20px !important;}
+            .hero-info-strip{gap:6px !important;margin-bottom:15px !important;}
+            .hero-info-strip span{min-height:40px !important;font-size:9px !important;padding:0 6px !important;}
+            .team-hero-identity{grid-template-columns:48px minmax(0,1fr) 48px !important;gap:10px !important;}
+            .identity-logo,.identity-league{width:46px !important;height:46px !important;}
+            .team-name{font-size:clamp(38px,10.7vw,50px) !important;}
+        }
+        @media(min-width:901px){
+            .hero{min-height:clamp(460px,58vh,620px) !important;}
+            .hero-inner{min-height:clamp(420px,52vh,560px) !important;padding:44px 0 34px !important;}
+            .team-main-polished{transform:none !important;}
+            .hero-info-strip span{font-size:11px !important;min-height:42px !important;}
+        }
+
     </style>
 </head>
 <body>

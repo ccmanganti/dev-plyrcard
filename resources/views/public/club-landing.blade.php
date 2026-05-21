@@ -413,6 +413,139 @@
             .identity-stacked .club-name{font-size:clamp(31px, 8.5vw, 39px) !important;}
         }
 
+    
+
+        /* FINAL FIX: logos top-left/top-right of HERO, text is its own row, no wasted hero space */
+        .hero{
+            min-height:clamp(430px, 54vh, 560px) !important;
+            display:block !important;
+            position:relative !important;
+            overflow:hidden !important;
+        }
+        .hero-inner{
+            position:relative !important;
+            display:grid !important;
+            grid-template-columns:1fr !important;
+            align-items:start !important;
+            align-content:start !important;
+            min-height:clamp(430px, 54vh, 560px) !important;
+            padding:96px 22px 0 !important;
+            gap:0 !important;
+        }
+        .hero-main{
+            position:relative !important;
+            width:100% !important;
+            max-width:760px !important;
+            padding:0 !important;
+            margin:0 !important;
+        }
+        .identity.identity-stacked{
+            position:static !important;
+            display:block !important;
+            max-width:760px !important;
+            margin:0 !important;
+        }
+        .club-logo-row{
+            position:absolute !important;
+            top:28px !important;
+            left:22px !important;
+            right:22px !important;
+            width:auto !important;
+            height:64px !important;
+            display:flex !important;
+            align-items:flex-start !important;
+            justify-content:space-between !important;
+            gap:18px !important;
+            margin:0 !important;
+            pointer-events:none !important;
+            z-index:4 !important;
+        }
+        .identity-stacked .identity-logo,
+        .identity-stacked .identity-league{
+            width:58px !important;
+            height:58px !important;
+            object-fit:contain !important;
+            margin:0 !important;
+        }
+        .club-title-stack{
+            display:block !important;
+            width:100% !important;
+            max-width:620px !important;
+            margin:0 !important;
+            text-align:left !important;
+            padding:0 !important;
+        }
+        .club-label{
+            font-size:10px !important;
+            letter-spacing:.22em !important;
+            margin-bottom:8px !important;
+            color:rgba(255,255,255,.74) !important;
+        }
+        .identity-stacked .club-name{
+            font-size:clamp(38px,4.2vw,60px) !important;
+            line-height:.92 !important;
+            max-width:620px !important;
+            letter-spacing:.015em !important;
+        }
+        .club-copy{display:none !important;}
+        .hero-side{
+            margin-top:28px !important;
+            align-self:auto !important;
+        }
+        @media(min-width:901px){
+            .hero-inner{
+                padding-top:110px !important;
+                padding-bottom:0 !important;
+            }
+            .club-logo-row{
+                top:34px !important;
+                left:0 !important;
+                right:0 !important;
+                height:78px !important;
+            }
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{
+                width:74px !important;
+                height:74px !important;
+            }
+            .hero-main{max-width:760px !important;}
+            .hero-side{margin-top:34px !important;}
+        }
+        @media(max-width:900px){
+            .hero{min-height:430px !important;}
+            .hero-inner{
+                min-height:430px !important;
+                padding:92px 20px 0 !important;
+            }
+            .club-logo-row{
+                top:28px !important;
+                left:20px !important;
+                right:20px !important;
+                height:54px !important;
+            }
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{
+                width:50px !important;
+                height:50px !important;
+            }
+            .identity-stacked .club-name{
+                font-size:clamp(31px,8vw,39px) !important;
+                line-height:.94 !important;
+                max-width:76% !important;
+            }
+            .hero-side{
+                margin:24px -20px 0 !important;
+            }
+        }
+        @media(max-width:420px){
+            .hero{min-height:414px !important;}
+            .hero-inner{min-height:414px !important;padding:86px 18px 0 !important;}
+            .club-logo-row{top:26px !important;left:18px !important;right:18px !important;}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:46px !important;height:46px !important;}
+            .identity-stacked .club-name{font-size:clamp(29px,7.8vw,36px) !important;}
+        }
+
     </style>
 </head>
 <body>
