@@ -2079,6 +2079,191 @@
 }
 
 </style>
+
+
+<style>
+/* --------------------------------------------------------------------------
+   Final team hero spacing pass: compact app-like website layout
+-------------------------------------------------------------------------- */
+.team-page{
+    background:#050506 !important;
+}
+
+.team-hero{
+    min-height:clamp(330px, 46vh, 470px) !important;
+    padding:clamp(20px, 4vw, 40px) clamp(18px, 4vw, 42px) !important;
+    display:flex !important;
+    align-items:center !important;
+    overflow:hidden !important;
+}
+
+.team-hero-bg{
+    object-position:center 42% !important;
+    filter:saturate(1.04) contrast(1.05) !important;
+}
+
+.team-hero::before{
+    background:
+        linear-gradient(90deg,
+            color-mix(in srgb, var(--team-primary) 36%, rgba(0,0,0,.92)) 0%,
+            rgba(0,0,0,.80) 44%,
+            rgba(0,0,0,.94) 100%
+        ),
+        linear-gradient(180deg, rgba(0,0,0,.12) 0%, rgba(0,0,0,.58) 76%, rgba(0,0,0,.88) 100%) !important;
+    opacity:1 !important;
+}
+
+.team-hero::after{
+    opacity:.55 !important;
+}
+
+.team-hero-inner{
+    width:min(980px, 100%) !important;
+    margin:0 auto !important;
+    padding:0 !important;
+}
+
+.team-brand-row{
+    display:grid !important;
+    grid-template-columns:auto minmax(0, 1fr) auto !important;
+    align-items:center !important;
+    gap:12px !important;
+    margin-bottom:14px !important;
+    max-width:640px !important;
+}
+
+.team-logo,
+.team-league-logo{
+    width:46px !important;
+    height:46px !important;
+    object-fit:contain !important;
+}
+
+.team-kicker{
+    margin-bottom:5px !important;
+    font-size:9px !important;
+    letter-spacing:.20em !important;
+    color:rgba(255,255,255,.70) !important;
+}
+
+.team-title{
+    font-size:clamp(32px, 7vw, 54px) !important;
+    line-height:.88 !important;
+    letter-spacing:.035em !important;
+}
+
+.team-subtitle{
+    margin-top:10px !important;
+    max-width:520px !important;
+    font-size:clamp(12px, 2.5vw, 14px) !important;
+    line-height:1.45 !important;
+    color:rgba(255,255,255,.82) !important;
+}
+
+.team-meta-strip{
+    margin-top:18px !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    max-width:680px !important;
+    border-top:1px solid rgba(255,255,255,.08) !important;
+    border-bottom:1px solid rgba(255,255,255,.08) !important;
+}
+
+.team-meta-item{
+    min-height:58px !important;
+    padding:10px 10px !important;
+    border-right:1px solid rgba(255,255,255,.08) !important;
+}
+.team-meta-item:last-child{ border-right:0 !important; }
+.team-meta-item span{ font-size:7px !important; letter-spacing:.14em !important; }
+.team-meta-item strong{ font-size:11px !important; line-height:1.12 !important; }
+
+.roster-section{
+    width:min(980px, 100%) !important;
+    margin:0 auto !important;
+    padding:26px 18px 42px !important;
+}
+
+.roster-head{
+    margin-bottom:14px !important;
+}
+
+.roster-title{
+    font-size:30px !important;
+    line-height:.9 !important;
+}
+
+.roster-subtitle{
+    font-size:11px !important;
+    line-height:1.35 !important;
+}
+
+.player-row,
+.roster-row{
+    min-height:64px !important;
+    padding:9px 0 !important;
+}
+
+.player-row-name,
+.roster-name{
+    font-size:15.5px !important;
+    line-height:1 !important;
+}
+
+.player-row-meta,
+.roster-meta,
+.roster-detail{
+    font-size:9px !important;
+    line-height:1.25 !important;
+}
+
+.roster-avatar{
+    width:50px !important;
+    height:50px !important;
+}
+
+@media (max-width:640px){
+    .team-hero{
+        min-height:360px !important;
+        padding:22px 20px !important;
+        align-items:center !important;
+    }
+
+    .team-brand-row{
+        gap:10px !important;
+        margin-bottom:12px !important;
+    }
+
+    .team-logo,
+    .team-league-logo{
+        width:42px !important;
+        height:42px !important;
+    }
+
+    .team-title{
+        font-size:39px !important;
+        line-height:.88 !important;
+    }
+
+    .team-subtitle{
+        font-size:12px !important;
+        max-width:330px !important;
+    }
+
+    .team-meta-strip{
+        margin-top:16px !important;
+    }
+
+    .team-meta-item{
+        min-height:54px !important;
+        padding:9px 7px !important;
+    }
+
+    .team-meta-item strong{ font-size:9.5px !important; }
+    .roster-section{ padding:23px 14px 36px !important; }
+}
+</style>
+
 </head>
 <body>
     <main class="team-page">
