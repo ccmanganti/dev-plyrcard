@@ -184,6 +184,70 @@
             .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))}
             .hero-side.facts-count-4{grid-template-columns:repeat(2,minmax(0,1fr))}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:34px 18px}.section-head{display:block}.team-switch{margin-top:14px}.teams-panel.is-active{grid-template-columns:1fr}.team-card{min-height:128px}.footer{padding:24px 18px}.nav-actions .coach-btn{padding:0 12px;font-size:11px}}
         @media (min-width:901px){.site{padding-bottom:28px}.hero{margin:0 auto}.section{animation:fadeUp .7s ease both}.club-page-frame{width:min(1180px, calc(100% - 32px));margin:0 auto}.hero .wrap{width:min(1180px, calc(100% - 32px))}}
+    
+
+        /* Requested refinement: logo row, title row, full-width tabs, larger team names */
+        .identity.identity-stacked{
+            display:grid;
+            grid-template-columns:1fr;
+            gap:18px;
+            max-width:780px;
+            margin-bottom:0;
+        }
+        .club-logo-row{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:18px;
+            width:min(360px,100%);
+        }
+        .identity-stacked .identity-logo,
+        .identity-stacked .identity-league{
+            width:68px;
+            height:68px;
+        }
+        .identity-stacked .club-title-stack{
+            gap:9px;
+        }
+        .identity-stacked .club-name{
+            font-size:clamp(44px,5.3vw,72px);
+            line-height:.9;
+            max-width:720px;
+        }
+        .section-head{
+            display:block;
+        }
+        .team-switch{
+            width:100%;
+            margin-top:20px;
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+        }
+        .team-tab{
+            width:100%;
+            height:46px;
+            font-size:14px;
+        }
+        .team-card-name{
+            font-size:clamp(32px,3.8vw,48px);
+            letter-spacing:.025em;
+        }
+        .team-card{
+            min-height:178px;
+        }
+        @media (max-width:900px){
+            .hero{min-height:clamp(500px,64vh,620px)}
+            .hero-inner{padding-top:48px;gap:20px}
+            .identity.identity-stacked{gap:14px}
+            .club-logo-row{width:100%}
+            .identity-stacked .identity-logo,
+            .identity-stacked .identity-league{width:54px;height:54px}
+            .identity-stacked .club-name{font-size:clamp(34px,10vw,46px);line-height:.9}
+            .team-tab{height:42px;font-size:12px}
+            .team-card{min-height:116px}
+            .team-card-name{font-size:34px}
+        }
+
     </style>
 </head>
 <body>
@@ -205,13 +269,15 @@
             <div class="hero-bg"></div>
             <div class="wrap hero-inner">
                 <div class="hero-main">
-                    <div class="identity">
-                        @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
+                    <div class="identity identity-stacked">
+                        <div class="club-logo-row">
+                            @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
+                            @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $club->league?->name }} logo">@endif
+                        </div>
                         <div class="club-title-stack">
                             <div class="club-label">Sports Club</div>
                             <h1 class="club-name">{{ $club->name }}</h1>
                         </div>
-                        @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $club->league?->name }} logo">@endif
                     </div>
                     @if($clubContent)
                         <div class="club-copy">{!! nl2br(e($clubContent)) !!}</div>

@@ -349,16 +349,11 @@ class PublicClubTeamController extends Controller
                         ->latest('updated_at');
                 },
             ])
-            ->where(function ($query) use ($team, $club) {
+            ->where('club_id', $club->id)
+            ->where(function ($query) use ($team) {
                 $query
-                    ->where(function ($inner) use ($team, $club) {
-                        $inner
-                            ->where('club_id', $club->id)
-                            ->where('team_name', $team->name);
-                    })
-                    ->orWhere(function ($inner) use ($team) {
-                        $inner->where('team_name', $team->name);
-                    });
+                    ->where('team_name', $team->name)
+                    ->orWhere('team_name', trim((string) $team->name));
             })
             ->get()
             ->sortBy(function (User $player) {
@@ -393,11 +388,8 @@ class PublicClubTeamController extends Controller
             return false;
         }
 
-        return (
-            (int) ($player->club_id ?? 0) === (int) $club->id
-            && strcasecmp($playerTeamName, $teamName) === 0
-        )
-        || strcasecmp($playerTeamName, $teamName) === 0;
+        return (int) ($player->club_id ?? 0) === (int) $club->id
+            && strcasecmp($playerTeamName, $teamName) === 0;
     }
 
     protected function playerWebsiteUrl(User $player): ?string

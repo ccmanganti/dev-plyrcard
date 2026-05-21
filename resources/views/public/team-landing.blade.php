@@ -114,6 +114,8 @@
         $teamIntro = trim((string) ($team->landing_page_content ?? $team->landing_page_intro ?? ''));
         $currentGenderSegment = request()->route('gender') ?? $team->landingGenderSegment();
         $coachSession = $coachCheckIn ?? session('coach_checkin');
+        $coachButtonText = is_array($coachSession) && filled($coachSession['name'] ?? null) ? 'Hi ' . str($coachSession['name'])->before(' ')->title() : 'Coach Check-In';
+        $coachButtonIcon = is_array($coachSession) && filled($coachSession['name'] ?? null) ? 'fa-user-tie' : 'fa-right-to-bracket';
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['team_id'] ?? 0) === (int) $team->id)->unique('player_id')->values();
         $savedIds = $savedPlayers->pluck('player_id')->map(fn ($id) => (int) $id)->all();
 
@@ -206,6 +208,85 @@
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}@keyframes popIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}@keyframes panelIn{to{transform:translateX(0)}}
         @media(max-width:900px){.frame,.wrap{width:100%}.nav{padding:0 16px;height:66px}.nav-brand-stack{display:flex;align-items:center;gap:0;align-content:center}.nav-brand img{display:none}.nav-brand span{display:inline-flex!important;font-size:22px!important;letter-spacing:-.045em!important}.nav-brand:before,.nav-brand:after{display:none!important;content:none!important}.mobile-back-row{display:block;position:absolute;top:66px;left:0;right:0;z-index:40;padding:10px 18px 0;background:transparent!important;border:0!important;pointer-events:none}.page-back-mobile{display:inline-flex;align-items:center;gap:7px;color:rgba(255,255,255,.84);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;line-height:1;font-family:var(--heading);padding:0;background:transparent!important;border:0!important;box-shadow:none!important;text-shadow:0 2px 12px rgba(0,0,0,.46);pointer-events:auto}.page-back-mobile i{font-size:9px;color:#fff}.page-back-mobile:hover{color:#fff}.nav-link{display:none}.hero{min-height:430px}.hero-inner{grid-template-columns:1fr;gap:18px;padding:64px 24px 0;position:relative;min-height:362px;align-items:end}.back{display:none}.identity{display:grid;grid-template-columns:54px minmax(0,1fr) 54px;gap:12px;margin-bottom:0;padding-top:0;align-items:center}.identity-logo{width:52px;height:52px}.identity-league{width:52px;height:52px}.label{font-size:10px;color:rgba(255,255,255,.72);letter-spacing:.2em;margin-bottom:7px}.team-name{font-size:43px;line-height:.88}.team-copy{display:none}.team-facts{grid-template-columns:repeat(3,minmax(0,1fr));border-left:0;border-right:0;margin:44px -24px 0}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:30px 14px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px}.roster-tools{margin-top:0;justify-content:flex-end}.roster-tools .sort-label{display:none}.saved-button{height:34px;padding:0 10px;font-size:10px}.roster{grid-template-columns:1fr}.player-row{grid-template-columns:62px 1fr auto;gap:10px}.avatar{width:54px;height:54px}.player-name{font-size:19px}.player-num{font-size:23px}.player-panel{width:100%}.mobile-card{height:min(640px,calc(100svh - 112px))}.footer{padding:24px 18px}.nav-actions .btn{padding:0 12px;font-size:11px}.player-panel-bar{height:52px}.player-dialog{height:calc(100% - 52px)}.player-panel-btn{height:34px}.player-nav-arrow{top:45%;width:38px;height:54px}.player-nav-arrow.is-left{left:0}.player-nav-arrow.is-right{right:0}}
         @media(max-width:380px){.mobile-card{min-height:650px}.mobile-first{font-size:44px}.mobile-last{font-size:52px}.mobile-big{font-size:64px}.mobile-class-year{font-size:58px}.mobile-stat{min-height:226px}.mobile-player-stage{height:330px}}
+    
+
+        /* Requested refinement: polished hero info and compact roster rows */
+        .team-main-polished{max-width:820px}
+        .hero-info-strip{
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            margin:0 0 18px;
+        }
+        .hero-info-strip span{
+            min-height:34px;
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:0 11px;
+            background:rgba(255,255,255,.075);
+            border-left:2px solid var(--brand-readable);
+            backdrop-filter:blur(14px);
+            color:rgba(255,255,255,.88);
+            font-family:var(--heading);
+            font-size:11px;
+            font-weight:900;
+            letter-spacing:.09em;
+            text-transform:uppercase;
+        }
+        .hero-info-strip i{color:var(--brand-readable)}
+        .team-hero-identity{
+            grid-template-columns:74px minmax(0,1fr) 68px;
+            gap:18px;
+            padding:18px 0 0;
+            border-top:1px solid rgba(255,255,255,.18);
+        }
+        .team-title-stack{min-width:0}
+        .team-title-stack .label{color:rgba(255,255,255,.82)}
+        .team-facts{display:none!important}
+        .player-row.player-row-polished{
+            grid-template-columns:64px 84px minmax(0,1fr) 24px;
+            gap:14px;
+            padding:12px 14px;
+            align-items:center;
+        }
+        .player-jersey-big{
+            font-family:var(--heading);
+            font-size:42px;
+            line-height:.9;
+            font-weight:900;
+            color:#fff;
+            letter-spacing:-.04em;
+            text-align:center;
+        }
+        .player-roster-copy{min-width:0}
+        .player-roster-meta{
+            display:grid;
+            grid-template-columns:repeat(3,max-content);
+            gap:8px;
+            margin-top:7px;
+            color:var(--muted);
+            font-size:11px;
+            font-weight:900;
+            white-space:nowrap;
+        }
+        .player-row-arrow{color:var(--brand-readable);font-size:15px;display:grid;place-items:center}
+        .player-row-polished .avatar{border:0;box-shadow:none}
+        .player-row-polished .player-name{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        @media(max-width:900px){
+            .hero{min-height:460px}
+            .hero-inner{min-height:392px;padding-top:78px;padding-bottom:0}
+            .hero-info-strip{gap:6px;margin-bottom:13px}
+            .hero-info-strip span{min-height:28px;font-size:8.5px;padding:0 8px;letter-spacing:.075em}
+            .team-hero-identity{grid-template-columns:52px minmax(0,1fr) 52px;gap:12px;padding-top:14px}
+            .team-name{font-size:46px}
+            .player-row.player-row-polished{grid-template-columns:58px 58px minmax(0,1fr) 18px;gap:10px;padding:11px 10px}
+            .player-jersey-big{font-size:30px;text-align:left}
+            .player-roster-meta{grid-template-columns:1fr;gap:3px;font-size:10px;margin-top:5px}
+            .player-row-polished .player-name{font-size:18px}
+            .player-row-arrow{font-size:13px}
+        }
+
     </style>
 </head>
 <body>
@@ -219,7 +300,7 @@
             </div>
             <div class="nav-actions">
                 <a class="nav-link" href="#roster">Roster</a>
-                <button class="btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
+                <button class="btn" type="button" data-open-coach><i class="fa-solid {{ $coachButtonIcon }}"></i> {{ $coachButtonText }}</button>
             </div>
         </nav>
     </div>
@@ -234,20 +315,25 @@
     <section class="hero">
         <div class="hero-bg"></div>
         <div class="wrap hero-inner">
-            <div class="team-main">
+            <div class="team-main team-main-polished">
                 <a class="back" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : '/' }}"><i class="fa-solid fa-chevron-left"></i> Back to club</a>
-                <div class="identity">
+
+                <div class="hero-info-strip" aria-label="Basic team information">
+                    <span><i class="fa-solid fa-users"></i> {{ $playerRows->count() }} Players</span>
+                    <span><i class="fa-solid fa-trophy"></i> {{ $leagueName }}</span>
+                    <span><i class="fa-solid fa-user-tie"></i> {{ $coachName }}</span>
+                </div>
+
+                <div class="identity team-hero-identity">
                     @if($teamLogo)<img class="identity-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">@endif
-                    <div style="min-width:0"><div class="label">{{ $club?->name ?: 'Club' }}</div><h1 class="team-name">Team {{ $team->name }}</h1></div>
+                    <div class="team-title-stack">
+                        <div class="label">{{ $club?->name ?: 'Club' }}</div>
+                        <h1 class="team-name">Team {{ $team->name }}</h1>
+                    </div>
                     @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $leagueName }} logo">@endif
                 </div>
                 @if($teamIntro)<div class="team-copy">{!! nl2br(e($teamIntro)) !!}</div>@endif
             </div>
-            <aside class="team-facts" aria-label="Team information">
-                <div class="fact"><i class="fa-solid fa-users"></i><div><span>Roster</span><strong>{{ $playerRows->count() }}</strong></div></div>
-                <div class="fact"><i class="fa-solid fa-trophy"></i><div><span>League</span><strong>{{ $leagueName }}</strong></div></div>
-                <div class="fact"><i class="fa-solid fa-user-tie"></i><div><span>Coach</span><strong>{{ $coachName }}</strong></div></div>
-            </aside>
         </div>
     </section>
 
@@ -262,24 +348,25 @@
             </div>
             <div class="roster">
                 @forelse($playerRows as $player)
-                    <button class="player-row" type="button" data-player-card data-player-index="{{ $player['index'] }}" data-player='@json($player)'>
-                        @if($player['card_image'])
-                            <img class="avatar card-img" src="{{ $player['card_image'] }}" alt="{{ $player['name'] }} card">
-                        @elseif($player['portrait_image'])
+                    <button class="player-row player-row-polished" type="button" data-player-card data-player-index="{{ $player['index'] }}" data-player='@json($player)'>
+                        @if($player['portrait_image'])
                             <img class="avatar" src="{{ $player['portrait_image'] }}" alt="{{ $player['name'] }} portrait">
+                        @elseif($player['card_image'])
+                            <img class="avatar card-img" src="{{ $player['card_image'] }}" alt="{{ $player['name'] }} card">
                         @else
                             <div class="avatar"><i class="fa-solid fa-user"></i></div>
                         @endif
-                        <div>
+                        <div class="player-jersey-big">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</div>
+                        <div class="player-roster-copy">
                             <div class="player-name">{{ $player['name'] }}</div>
-                            <div class="player-meta">
-                                @if($player['age'])<span>{{ $player['age'] }} yrs</span>@endif
+                            <div class="player-roster-meta">
                                 @if($player['position'])<span>{{ $player['position'] }}</span>@endif
+                                @if($player['gpa'])<span>{{ $player['gpa'] }} GPA</span>@endif
                                 @if($player['year'])<span>Class {{ $player['year'] }}</span>@endif
                             </div>
                             @if(in_array((int) $player['id'], $savedIds, true))<div class="player-save-mini">Saved by coach</div>@endif
                         </div>
-                        <div class="player-num">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</div>
+                        <div class="player-row-arrow"><i class="fa-solid fa-chevron-right"></i></div>
                     </button>
                 @empty
                     <div class="empty">Players will appear once they are assigned to this team.</div>
@@ -293,7 +380,7 @@
 
 <div class="modal" id="coachModal" aria-hidden="true">
     <div class="coach-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
-        <div class="modal-head"><div class="modal-title" id="coachModalTitle">{{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="modal-head"><div class="modal-title" id="coachModalTitle">Coach Info</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
         <div class="modal-body">
             @if($coachSession)
                 <div class="coach-status">Checked in as <strong>{{ $coachSession['name'] ?? 'Coach' }}</strong>{{ filled($coachSession['school'] ?? null) ? ' / ' . $coachSession['school'] : '' }}.</div>
