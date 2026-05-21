@@ -1090,6 +1090,275 @@
             .team-name{font-size:38px !important;}
         }
 
+
+
+        /* CLUB-STYLE TEAM HERO FINAL OVERRIDE
+           Goal: match the club landing structure: nav, one clean back row,
+           hero logos in the top-left/top-right of the hero, title as its own row,
+           readable info boxes, and no unused bottom space. */
+        .team-main-polished .back,
+        .hero .back{
+            display:none !important;
+        }
+
+        @media (max-width:900px){
+            .mobile-back-row{
+                display:block !important;
+                position:relative !important;
+                top:auto !important;
+                left:auto !important;
+                right:auto !important;
+                z-index:20 !important;
+                width:100% !important;
+                padding:11px 20px 8px !important;
+                margin:0 !important;
+                background:#050607 !important;
+                border-top:1px solid rgba(255,255,255,.045) !important;
+                border-bottom:1px solid rgba(255,255,255,.045) !important;
+                box-shadow:none !important;
+                pointer-events:none !important;
+            }
+
+            .page-back-mobile{
+                display:inline-flex !important;
+                align-items:center !important;
+                gap:8px !important;
+                padding:0 !important;
+                margin:0 !important;
+                background:transparent !important;
+                border:0 !important;
+                box-shadow:none !important;
+                color:rgba(255,255,255,.82) !important;
+                font-family:var(--heading) !important;
+                font-size:10px !important;
+                line-height:1 !important;
+                font-weight:900 !important;
+                letter-spacing:.13em !important;
+                text-transform:uppercase !important;
+                text-shadow:none !important;
+                pointer-events:auto !important;
+            }
+
+            .page-back-mobile i{
+                font-size:9px !important;
+                color:rgba(255,255,255,.72) !important;
+            }
+
+            .hero{
+                min-height:0 !important;
+                height:auto !important;
+                display:block !important;
+                overflow:hidden !important;
+                border-bottom:1px solid rgba(255,255,255,.08) !important;
+            }
+
+            .hero-bg{
+                background-position:center 42% !important;
+            }
+
+            .hero-bg:after{
+                background:
+                    linear-gradient(90deg,
+                        color-mix(in srgb,var(--brand) 62%,rgba(0,0,0,.46)) 0%,
+                        color-mix(in srgb,var(--brand) 34%,rgba(0,0,0,.20)) 52%,
+                        color-mix(in srgb,var(--brand) 54%,rgba(0,0,0,.42)) 100%),
+                    linear-gradient(180deg,
+                        rgba(0,0,0,.05) 0%,
+                        rgba(0,0,0,.10) 52%,
+                        color-mix(in srgb,var(--brand) 48%,rgba(0,0,0,.44)) 100%) !important;
+            }
+
+            .hero-inner{
+                position:relative !important;
+                display:block !important;
+                width:100% !important;
+                height:auto !important;
+                min-height:0 !important;
+                padding:22px 20px 24px !important;
+                margin:0 !important;
+            }
+
+            .team-main-polished{
+                position:relative !important;
+                display:flex !important;
+                flex-direction:column !important;
+                gap:16px !important;
+                width:100% !important;
+                height:auto !important;
+                min-height:0 !important;
+                padding:0 !important;
+                margin:0 !important;
+            }
+
+            .team-hero-identity{
+                order:1 !important;
+                position:relative !important;
+                z-index:6 !important;
+                display:grid !important;
+                grid-template-columns:56px minmax(0,1fr) 56px !important;
+                grid-template-rows:auto auto !important;
+                align-items:start !important;
+                column-gap:12px !important;
+                row-gap:14px !important;
+                min-height:0 !important;
+                margin:0 !important;
+                padding:0 !important;
+                border:0 !important;
+                max-width:none !important;
+            }
+
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{
+                position:static !important;
+                top:auto !important;
+                left:auto !important;
+                right:auto !important;
+                z-index:7 !important;
+                width:54px !important;
+                height:54px !important;
+                max-width:54px !important;
+                max-height:54px !important;
+                object-fit:contain !important;
+                margin:0 !important;
+                padding:0 !important;
+            }
+
+            .team-hero-identity .identity-logo{
+                grid-column:1 !important;
+                grid-row:1 !important;
+                justify-self:start !important;
+            }
+
+            .team-hero-identity .identity-league{
+                grid-column:3 !important;
+                grid-row:1 !important;
+                justify-self:end !important;
+            }
+
+            .team-title-stack{
+                grid-column:1 / -1 !important;
+                grid-row:2 !important;
+                position:relative !important;
+                z-index:8 !important;
+                width:100% !important;
+                min-width:0 !important;
+                padding:0 !important;
+                margin:0 !important;
+                text-align:left !important;
+            }
+
+            .team-title-stack .label,
+            .team-hero-identity .label{
+                margin:0 0 8px !important;
+                color:rgba(255,255,255,.76) !important;
+                font-size:10px !important;
+                line-height:1 !important;
+                font-weight:900 !important;
+                letter-spacing:.18em !important;
+                text-transform:uppercase !important;
+                white-space:nowrap !important;
+                overflow:hidden !important;
+                text-overflow:ellipsis !important;
+            }
+
+            .team-name{
+                margin:0 !important;
+                font-size:clamp(42px,12.4vw,58px) !important;
+                line-height:.88 !important;
+                letter-spacing:.01em !important;
+                text-transform:uppercase !important;
+                white-space:nowrap !important;
+                text-shadow:0 14px 32px rgba(0,0,0,.36) !important;
+            }
+
+            .hero-info-strip{
+                order:2 !important;
+                position:relative !important;
+                z-index:6 !important;
+                display:grid !important;
+                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                gap:8px !important;
+                margin:0 !important;
+                padding:0 !important;
+                border:0 !important;
+            }
+
+            .hero-info-strip span{
+                min-height:54px !important;
+                display:flex !important;
+                align-items:center !important;
+                justify-content:center !important;
+                gap:8px !important;
+                padding:0 8px !important;
+                border:1px solid rgba(255,255,255,.20) !important;
+                border-left:2px solid rgba(255,255,255,.45) !important;
+                background:rgba(255,255,255,.13) !important;
+                backdrop-filter:blur(14px) !important;
+                color:#fff !important;
+                font-size:10px !important;
+                line-height:1.05 !important;
+                font-weight:900 !important;
+                letter-spacing:.045em !important;
+                text-transform:uppercase !important;
+                text-align:center !important;
+            }
+
+            .hero-info-strip span i{
+                display:inline-block !important;
+                font-size:14px !important;
+                margin:0 !important;
+                color:rgba(255,255,255,.82) !important;
+            }
+
+            #roster.section{
+                padding-top:32px !important;
+            }
+        }
+
+        @media (max-width:420px){
+            .hero-inner{
+                padding:20px 18px 22px !important;
+            }
+
+            .team-main-polished{
+                gap:14px !important;
+            }
+
+            .team-hero-identity{
+                grid-template-columns:50px minmax(0,1fr) 50px !important;
+                column-gap:10px !important;
+                row-gap:12px !important;
+            }
+
+            .team-hero-identity .identity-logo,
+            .team-hero-identity .identity-league{
+                width:48px !important;
+                height:48px !important;
+                max-width:48px !important;
+                max-height:48px !important;
+            }
+
+            .team-title-stack .label,
+            .team-hero-identity .label{
+                font-size:9px !important;
+                letter-spacing:.15em !important;
+            }
+
+            .team-name{
+                font-size:42px !important;
+            }
+
+            .hero-info-strip{
+                gap:6px !important;
+            }
+
+            .hero-info-strip span{
+                min-height:50px !important;
+                font-size:9px !important;
+                padding:0 6px !important;
+            }
+        }
+
 </style>
 </head>
 <body>
