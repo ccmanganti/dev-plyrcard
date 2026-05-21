@@ -669,6 +669,81 @@
             .hero-main{padding-bottom:30px !important;}
         }
 
+    
+        /* Final full-width club team list override */
+        #teams.section{
+            padding-left:0 !important;
+            padding-right:0 !important;
+        }
+        #teams .wrap{
+            width:100% !important;
+            max-width:none !important;
+            margin:0 !important;
+        }
+        #teams .section-head{
+            padding-left:clamp(22px,4vw,52px) !important;
+            padding-right:clamp(22px,4vw,52px) !important;
+        }
+        #teams .team-switch{
+            width:100% !important;
+            margin-left:0 !important;
+            margin-right:0 !important;
+            border-left:0 !important;
+            border-right:0 !important;
+        }
+        #teams .team-tab{
+            flex:1 1 50% !important;
+        }
+        #teams .teams-panel{
+            width:100% !important;
+        }
+        #teams .team-card{
+            width:100% !important;
+            border-left:0 !important;
+            border-right:0 !important;
+            border-radius:0 !important;
+            margin:0 !important;
+            padding-left:clamp(22px,4vw,52px) !important;
+            padding-right:clamp(22px,4vw,52px) !important;
+        }
+        #teams .empty{
+            border-left:0 !important;
+            border-right:0 !important;
+            border-radius:0 !important;
+            margin:0 !important;
+        }
+        @media (max-width:900px){
+            #teams.section{
+                padding-top:34px !important;
+                padding-bottom:28px !important;
+            }
+            #teams .section-head{
+                padding-left:20px !important;
+                padding-right:20px !important;
+                margin-bottom:16px !important;
+            }
+            #teams .team-switch{
+                margin-top:16px !important;
+            }
+            #teams .team-card{
+                min-height:116px !important;
+                padding-left:20px !important;
+                padding-right:20px !important;
+                grid-template-columns:minmax(0,1fr) 128px !important;
+            }
+        }
+        @media (max-width:420px){
+            #teams .section-head{
+                padding-left:16px !important;
+                padding-right:16px !important;
+            }
+            #teams .team-card{
+                padding-left:16px !important;
+                padding-right:16px !important;
+                grid-template-columns:minmax(0,1fr) 104px !important;
+            }
+        }
+
     </style>
 </head>
 <body>
