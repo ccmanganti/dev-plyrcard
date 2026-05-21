@@ -546,6 +546,101 @@
             .identity-stacked .club-name{font-size:clamp(29px,7.8vw,36px) !important;}
         }
 
+    
+
+        /* === FINAL CLUB HERO FIX: logos in true corners, text in separate row, no wasted space === */
+        .hero{
+            min-height:clamp(390px, 56vh, 560px) !important;
+            align-items:center !important;
+        }
+        .hero-logo-corners{
+            position:absolute !important;
+            top:clamp(22px, 3vw, 34px) !important;
+            left:clamp(22px, 4vw, 52px) !important;
+            right:clamp(22px, 4vw, 52px) !important;
+            z-index:5 !important;
+            display:flex !important;
+            align-items:flex-start !important;
+            justify-content:space-between !important;
+            pointer-events:none !important;
+        }
+        .hero-logo-corners .identity-logo,
+        .hero-logo-corners .identity-league{
+            width:clamp(48px, 6vw, 76px) !important;
+            height:clamp(48px, 6vw, 76px) !important;
+            object-fit:contain !important;
+            filter:drop-shadow(0 12px 22px rgba(0,0,0,.38)) !important;
+        }
+        .hero-inner{
+            grid-template-columns:1fr !important;
+            min-height:clamp(330px, 48vh, 500px) !important;
+            padding:clamp(78px, 10vh, 112px) 0 0 !important;
+            align-items:end !important;
+            gap:0 !important;
+        }
+        .hero-main{
+            width:min(680px,100%) !important;
+            max-width:680px !important;
+            margin:0 !important;
+            padding-bottom:clamp(24px, 4vh, 42px) !important;
+        }
+        .identity.identity-stacked{
+            display:block !important;
+            max-width:680px !important;
+        }
+        .identity-stacked .club-title-stack{
+            display:grid !important;
+            gap:8px !important;
+            max-width:620px !important;
+        }
+        .identity-stacked .club-name{
+            font-size:clamp(36px, 5.4vw, 70px) !important;
+            line-height:.9 !important;
+            letter-spacing:.01em !important;
+            max-width:620px !important;
+        }
+        .club-label{font-size:11px !important;color:rgba(255,255,255,.72) !important;}
+        .club-copy{display:none !important;}
+        .hero-side{
+            width:100% !important;
+            margin:0 !important;
+            display:grid !important;
+            grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+            border-left:0 !important;
+            border-right:0 !important;
+        }
+        .hero-side.facts-count-1{grid-template-columns:1fr !important;}
+        .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+        .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+        .hero-side.facts-count-4{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}
+        .fact{min-height:92px !important;padding:16px 18px !important;}
+        .fact strong{font-size:16px !important;}
+        .fact span{font-size:9px !important;}
+        @media(max-width:900px){
+            .hero{min-height:430px !important;}
+            .hero-logo-corners{top:36px !important;left:26px !important;right:26px !important;}
+            .hero-logo-corners .identity-logo,
+            .hero-logo-corners .identity-league{width:50px !important;height:50px !important;}
+            .hero-inner{min-height:360px !important;padding:104px 28px 0 !important;}
+            .hero-main{padding-bottom:34px !important;}
+            .identity-stacked .club-name{font-size:clamp(34px, 8.8vw, 43px) !important;line-height:.9 !important;max-width:320px !important;}
+            .club-label{font-size:9px !important;letter-spacing:.22em !important;}
+            .hero-side.facts-count-4{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+            .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+            .fact{min-height:86px !important;padding:14px 16px !important;}
+            .fact strong{font-size:13px !important;}
+            .section{padding-top:34px !important;}
+        }
+        @media(max-width:420px){
+            .hero{min-height:408px !important;}
+            .hero-logo-corners{top:30px !important;left:22px !important;right:22px !important;}
+            .hero-logo-corners .identity-logo,
+            .hero-logo-corners .identity-league{width:44px !important;height:44px !important;}
+            .hero-inner{min-height:342px !important;padding:92px 22px 0 !important;}
+            .identity-stacked .club-name{font-size:34px !important;max-width:290px !important;}
+            .hero-main{padding-bottom:30px !important;}
+        }
+
     </style>
 </head>
 <body>
@@ -565,13 +660,13 @@
 
         <section class="hero">
             <div class="hero-bg"></div>
+            <div class="hero-logo-corners" aria-hidden="true">
+                @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
+                @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $club->league?->name }} logo">@endif
+            </div>
             <div class="wrap hero-inner">
                 <div class="hero-main">
                     <div class="identity identity-stacked">
-                        <div class="club-logo-row">
-                            @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
-                            @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $club->league?->name }} logo">@endif
-                        </div>
                         <div class="club-title-stack">
                             <div class="club-label">Sports Club</div>
                             <h1 class="club-name">{{ $club->name }}</h1>
