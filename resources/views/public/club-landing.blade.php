@@ -173,7 +173,11 @@
         .section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:18px;animation:fadeUp .55s ease both}
         .eyebrow{font-family:var(--heading);font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;color:var(--brand-readable);margin-bottom:6px}.section-title{font-family:var(--heading);font-size:clamp(30px, 4vw, 54px);line-height:.92;text-transform:uppercase;font-weight:900;letter-spacing:.02em}
         .team-switch{display:flex;gap:1px;border:1px solid var(--line);background:var(--line)}.team-tab{border:0;background:#0d0d10;color:var(--muted);height:38px;padding:0 18px;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.team-tab.is-active{background:var(--brand);color:var(--brand-on)}
-        .teams-panel{display:none}.teams-panel.is-active{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;animation:fadeUp .45s ease both}.team-card{position:relative;min-height:160px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:18px;background:#101014;border:1px solid var(--line);overflow:hidden}.team-card:before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, color-mix(in srgb, var(--brand) 22%, transparent), transparent 58%);opacity:.75}.team-card > *{position:relative;z-index:2}.team-card:hover{border-color:color-mix(in srgb, var(--brand-readable) 70%, white 0%);transform:translateY(-2px)}.team-card-name{font-family:var(--heading);font-size:24px;line-height:1;text-transform:uppercase;font-weight:900}.team-card-copy{color:var(--muted);font-size:12px;font-weight:800}.empty{padding:26px;border:1px solid var(--line);background:#0d0d10;color:var(--muted);font-weight:800;text-align:center;grid-column:1/-1}
+        .teams-panel{display:none}.teams-panel.is-active{display:grid;grid-template-columns:1fr;gap:12px;animation:fadeUp .45s ease both}
+        .team-card{position:relative;min-height:118px;display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:center;gap:14px;padding:16px 14px;background:linear-gradient(120deg, rgba(255,255,255,.055), rgba(255,255,255,.02)), #0b0b0e;border:1px solid var(--line);overflow:hidden;text-decoration:none;color:#fff}
+        .team-card:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 92% 40%, color-mix(in srgb, var(--brand) 24%, transparent), transparent 38%),linear-gradient(90deg, color-mix(in srgb, var(--brand) 20%, transparent), transparent 58%);opacity:.92;pointer-events:none}.team-card:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--brand-readable),transparent);opacity:.7}.team-card > *{position:relative;z-index:2}.team-card:hover{border-color:color-mix(in srgb, var(--brand-readable) 70%, white 0%);transform:translateY(-2px);background-color:#101014}
+        .team-card-main{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;min-width:0}.team-card-logo{width:44px;height:44px;object-fit:contain}.team-card-logo-fallback{width:44px;height:44px;display:grid;place-items:center;color:var(--brand-readable);font-size:26px}.team-card-meta{min-width:0}.team-card-name{font-family:var(--heading);font-size:clamp(27px,4.9vw,46px);line-height:.9;text-transform:uppercase;font-weight:900;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.team-card-copy{margin-top:7px;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.team-card-copy strong{color:#fff;font-weight:900}
+        .team-card-art{height:92px;display:flex;align-items:center;justify-content:flex-end;isolation:isolate}.team-card-tile{width:54px;height:74px;margin-left:-18px;border-radius:9px 9px 12px 12px;background:linear-gradient(160deg,#c9c9c9,#565b65);border:1px solid rgba(255,255,255,.30);box-shadow:0 12px 24px rgba(0,0,0,.38);display:grid;place-items:center;transform:skewY(-2deg)}.team-card-tile img{max-width:76%;max-height:76%;object-fit:contain}.team-card-tile.is-gold{width:62px;height:86px;z-index:3;background:linear-gradient(160deg,#f6d46d,#b98220 70%,#7d4c12);transform:translateY(-4px) skewY(-2deg)}.team-card-tile.is-bronze{background:linear-gradient(160deg,#d29061,#78402d)}.team-card-tile.is-empty i{font-size:22px;color:rgba(255,255,255,.72)}.empty{padding:26px;border:1px solid var(--line);background:#0d0d10;color:var(--muted);font-weight:800;text-align:center;grid-column:1/-1}
         .saved-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.saved-pill{border:1px solid var(--line);background:var(--soft);padding:8px 10px;font-size:11px;font-weight:850;color:var(--muted)}
         .footer{padding:28px 0;color:var(--muted);font-size:12px;font-weight:750}.footer-grid{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}.footer a{color:#fff}
         .modal{position:fixed;inset:0;z-index:2000;display:none;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);padding:18px;align-items:center;justify-content:center}.modal.is-open{display:flex}.modal-card{width:min(460px,100%);background:#08080a;border:1px solid var(--line);box-shadow:0 28px 80px rgba(0,0,0,.52);animation:popIn .22s ease both}.modal-head{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}.modal-title{font-family:var(--heading);font-size:18px;text-transform:uppercase;font-weight:900;letter-spacing:.1em}.modal-close{border:0;background:rgba(255,255,255,.08);color:#fff;width:34px;height:34px;cursor:pointer}.modal-body{padding:16px}.coach-status{border-left:2px solid var(--brand-readable);padding:10px 12px;margin-bottom:12px;background:rgba(255,255,255,.045);font-size:12px;color:var(--muted)}.coach-form{display:grid;gap:10px}.coach-form label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.coach-form input{height:42px;border:1px solid var(--line);background:#0d0d10;color:#fff;padding:0 12px;font:inherit}.coach-submit{height:44px;border:0;background:var(--brand);color:var(--brand-on);font-family:var(--heading);font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.coach-out{height:40px;border:1px solid var(--line);background:transparent;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;width:100%;margin-top:10px}
@@ -182,7 +186,7 @@
             .hero-side.facts-count-1{grid-template-columns:1fr}
             .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr))}
             .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))}
-            .hero-side.facts-count-4{grid-template-columns:repeat(2,minmax(0,1fr))}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:34px 18px}.section-head{display:block}.team-switch{margin-top:14px}.teams-panel.is-active{grid-template-columns:1fr}.team-card{min-height:128px}.footer{padding:24px 18px}.nav-actions .coach-btn{padding:0 12px;font-size:11px}}
+            .hero-side.facts-count-4{grid-template-columns:repeat(2,minmax(0,1fr))}.fact{display:block;padding:13px 14px}.fact i{font-size:14px;margin-bottom:10px}.fact span{font-size:8px}.fact strong{font-size:13px}.section{padding:34px 18px}.section-head{display:block}.team-switch{margin-top:14px}.teams-panel.is-active{grid-template-columns:1fr}.team-card{min-height:108px;grid-template-columns:minmax(0,1fr) 112px}.team-card-art{height:82px}.team-card-tile{width:48px;height:66px}.team-card-tile.is-gold{width:56px;height:78px}.footer{padding:24px 18px}.nav-actions .coach-btn{padding:0 12px;font-size:11px}}
         @media (min-width:901px){.site{padding-bottom:28px}.hero{margin:0 auto}.section{animation:fadeUp .7s ease both}.club-page-frame{width:min(1180px, calc(100% - 32px));margin:0 auto}.hero .wrap{width:min(1180px, calc(100% - 32px))}}
     
 
@@ -244,8 +248,8 @@
             .identity-stacked .identity-league{width:54px;height:54px}
             .identity-stacked .club-name{font-size:clamp(34px,10vw,46px);line-height:.9}
             .team-tab{height:42px;font-size:12px}
-            .team-card{min-height:116px}
-            .team-card-name{font-size:34px}
+            .team-card{min-height:104px;grid-template-columns:minmax(0,1fr) 108px}
+            .team-card-name{font-size:32px}.team-card-main{grid-template-columns:38px minmax(0,1fr);gap:10px}.team-card-logo,.team-card-logo-fallback{width:38px;height:38px}.team-card-art{height:78px}.team-card-tile{width:44px;height:62px}.team-card-tile.is-gold{width:52px;height:74px}
         }
 
 
@@ -704,8 +708,29 @@
                 <div class="teams-panel is-active" data-team-panel="boys">
                     @forelse($boysTeams as $team)
                         <a class="team-card" href="{{ $team->landingUrl() ?: '#' }}">
-                            <div class="team-card-name">{{ $team->name }}</div>
-                            <div class="team-card-copy">Open team <i class="fa-solid fa-arrow-right"></i></div>
+                            @php
+                                $teamLogo = $resolveAsset($team->logo ?? null);
+                                $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
+                            @endphp
+                            <div class="team-card-main">
+                                @if($teamLogo)
+                                    <img class="team-card-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
+                                @elseif($logo)
+                                    <img class="team-card-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
+                                @else
+                                    <span class="team-card-logo-fallback"><i class="fa-solid fa-shield-halved"></i></span>
+                                @endif
+                                <div class="team-card-meta">
+                                    <div class="team-card-name">{{ $team->name }}</div>
+                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
+                                </div>
+                            </div>
+                            <div class="team-card-art" aria-hidden="true">
+                                <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
+                                <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
+                                <span class="team-card-tile is-bronze">@if($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                            </div>
                         </a>
                     @empty
                         <div class="empty">Boys teams will appear here once published.</div>
@@ -715,8 +740,29 @@
                 <div class="teams-panel" data-team-panel="girls">
                     @forelse($girlsTeams as $team)
                         <a class="team-card" href="{{ $team->landingUrl() ?: '#' }}">
-                            <div class="team-card-name">{{ $team->name }}</div>
-                            <div class="team-card-copy">Open team <i class="fa-solid fa-arrow-right"></i></div>
+                            @php
+                                $teamLogo = $resolveAsset($team->logo ?? null);
+                                $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
+                            @endphp
+                            <div class="team-card-main">
+                                @if($teamLogo)
+                                    <img class="team-card-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
+                                @elseif($logo)
+                                    <img class="team-card-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
+                                @else
+                                    <span class="team-card-logo-fallback"><i class="fa-solid fa-shield-halved"></i></span>
+                                @endif
+                                <div class="team-card-meta">
+                                    <div class="team-card-name">{{ $team->name }}</div>
+                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
+                                </div>
+                            </div>
+                            <div class="team-card-art" aria-hidden="true">
+                                <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
+                                <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
+                                <span class="team-card-tile is-bronze">@if($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                            </div>
                         </a>
                     @empty
                         <div class="empty">Girls teams will appear here once published.</div>
