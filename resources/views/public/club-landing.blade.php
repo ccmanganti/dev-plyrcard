@@ -1472,3 +1472,38 @@
     .team-card-name{font-size:clamp(34px,5.6vw,54px)!important;line-height:.88!important;}
     @media(max-width:900px){.team-card-name{font-size:40px!important;}}
 </style>
+
+{{-- FINAL FULL-BLEED FACT GRID PATCH: remove left/right inset from club hero info boxes --}}
+<style>
+    .hero .hero-inner{
+        overflow: visible !important;
+    }
+
+    .hero .hero-side{
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    @media (min-width: 901px){
+        .hero .hero-side{
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+    }
+
+    @media (max-width: 900px){
+        .hero .hero-side{
+            width: 100vw !important;
+            max-width: 100vw !important;
+            margin-left: calc(50% - 50vw) !important;
+            margin-right: calc(50% - 50vw) !important;
+        }
+    }
+</style>
