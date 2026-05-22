@@ -1393,6 +1393,58 @@
             content: none !important;
         }
 
+
+
+        /* Final request: hero info cards + watchlist/navigation polish. */
+        .mobile-back-row{display:none!important}
+        .hero{min-height:clamp(430px,54vh,590px)!important;align-items:center!important}
+        .hero-inner{min-height:auto!important;align-items:center!important;padding:40px 0 34px!important}
+        .team-main-polished{width:100%!important;max-width:900px!important;display:grid!important;gap:18px!important;align-content:center!important}
+        .hero-info-strip{
+            display:grid!important;
+            grid-template-columns:repeat(3,minmax(0,1fr))!important;
+            gap:0!important;
+            width:100%!important;
+            margin:0!important;
+            border:1px solid rgba(255,255,255,.14)!important;
+            background:rgba(255,255,255,.10)!important;
+            backdrop-filter:blur(16px)!important;
+        }
+        .hero-info-strip .hero-info-card{
+            min-height:84px!important;
+            display:grid!important;
+            grid-template-columns:46px minmax(0,1fr)!important;
+            grid-template-rows:auto auto!important;
+            gap:2px 12px!important;
+            align-items:center!important;
+            padding:13px 14px!important;
+            border-left:1px solid rgba(255,255,255,.12)!important;
+            background:rgba(8,10,13,.48)!important;
+            text-align:left!important;
+        }
+        .hero-info-strip .hero-info-card:first-child{border-left:0!important}
+        .hero-info-icon,.hero-info-logo{grid-row:1/span 2!important;width:34px!important;height:34px!important;font-size:22px!important;color:var(--brand-readable)!important;display:grid!important;place-items:center!important;object-fit:contain!important;align-self:center!important}
+        .hero-info-label{display:block!important;font-family:var(--heading)!important;font-size:9px!important;font-weight:900!important;letter-spacing:.15em!important;text-transform:uppercase!important;color:var(--muted)!important;line-height:1!important;align-self:end!important}
+        .hero-info-value{display:block!important;font-family:var(--heading)!important;font-size:17px!important;font-weight:900!important;letter-spacing:.04em!important;text-transform:uppercase!important;color:#fff!important;line-height:1.02!important;align-self:start!important;overflow:hidden!important;text-overflow:ellipsis!important}
+        .hero-coach-actions{grid-column:2!important;display:flex!important;gap:8px!important;margin-top:7px!important}
+        .hero-coach-action{height:24px!important;display:inline-flex!important;align-items:center!important;gap:5px!important;padding:0 8px!important;background:rgba(255,255,255,.10)!important;color:#fff!important;border:1px solid rgba(255,255,255,.12)!important;font-family:var(--heading)!important;font-size:8px!important;font-weight:900!important;letter-spacing:.08em!important;text-transform:uppercase!important;text-decoration:none!important}
+        .team-hero-identity{border:0!important;padding:0!important;grid-template-columns:72px minmax(0,1fr) 70px!important;align-items:center!important}
+        .team-name{font-size:clamp(52px,7vw,92px)!important;line-height:.88!important}
+        .player-row.player-row-polished{grid-template-columns:70px 86px minmax(0,1fr) 24px!important;gap:14px!important;align-items:center!important}
+        .player-jersey-big{display:grid!important;gap:6px!important;text-align:left!important;color:#fff!important}
+        .player-jersey-big .jersey-number{font-family:var(--heading)!important;font-size:46px!important;line-height:.82!important;font-weight:900!important;letter-spacing:-.06em!important;color:#fff!important}
+        .player-jersey-position{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;font-family:var(--heading)!important;font-size:14px!important;line-height:1!important;font-weight:900!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:var(--brand-readable)!important;white-space:nowrap!important}
+        .player-roster-position{display:none!important}
+        .player-roster-academic{font-size:14px!important;color:rgba(255,255,255,.82)!important;font-weight:900!important;letter-spacing:.04em!important}
+        .player-row-polished .player-name{font-size:23px!important}
+        .player-panel-bar{display:grid!important;grid-template-columns:auto 1fr auto!important;gap:10px!important;align-items:center!important}
+        .player-panel-back{height:36px;width:36px;border:0;background:rgba(255,255,255,.08);color:#fff;display:grid;place-items:center;cursor:pointer}
+        .player-actions{grid-template-columns:repeat(4,minmax(0,1fr))!important;background:#050505!important;border-top:1px solid rgba(255,255,255,.14)!important;padding:8px!important;gap:7px!important}
+        .player-action{min-height:58px!important;border:0!important;border-radius:7px!important;background:#fff!important;color:#050505!important;box-shadow:0 4px 10px rgba(0,0,0,.24)!important;font-size:10px!important;line-height:1!important;gap:6px!important}
+        .player-action i{color:currentColor!important;font-size:14px!important}.player-action.primary{background:#ff5c35!important;color:#fff!important}.player-action.danger{background:#111!important;color:#fff!important}.player-action.is-disabled{opacity:.48!important;pointer-events:none!important}
+        @media(max-width:900px){
+            .hero{min-height:390px!important}.hero-inner{padding:30px 18px 28px!important}.team-main-polished{gap:15px!important}.hero-info-strip{grid-template-columns:1fr!important}.hero-info-strip .hero-info-card{min-height:68px!important;border-left:0!important;border-top:1px solid rgba(255,255,255,.10)!important;grid-template-columns:42px minmax(0,1fr)!important;padding:10px 12px!important}.hero-info-strip .hero-info-card:first-child{border-top:0!important}.hero-info-icon,.hero-info-logo{width:30px!important;height:30px!important}.hero-info-value{font-size:15px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;gap:12px!important}.team-name{font-size:44px!important}.player-row.player-row-polished{grid-template-columns:58px 70px minmax(0,1fr) 18px!important;gap:10px!important}.player-jersey-big .jersey-number{font-size:34px!important}.player-jersey-position{font-size:11px!important}.player-roster-academic{font-size:12px!important}.player-row-polished .player-name{font-size:18px!important}.avatar.card-img{width:48px!important;height:64px!important}.nav-actions{gap:8px!important}.nav-actions .btn{height:40px!important}.player-actions{grid-template-columns:repeat(4,minmax(0,1fr))!important;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))!important}.player-action{min-height:54px!important;font-size:9px!important}}
+
 </style>
 </head>
 <body>
@@ -1405,17 +1457,27 @@
                 </a>
             </div>
             <div class="nav-actions">
-                <a class="nav-link" href="#roster">Roster</a>
-                <button class="btn" type="button" data-open-coach><i class="fa-solid {{ $coachButtonIcon }}"></i> {{ $coachButtonText }}</button>
+                @if($coachSession)
+                    <button class="btn" type="button" data-open-saved><i class="fa-solid fa-binoculars"></i> My Watchlist</button>
+                    @php
+                        $watchlistEmailSubject = 'My PlyrCard Watchlist - ' . ($team->name ?? 'Team');
+                        $watchlistEmailBody = "My saved PlyrCard watchlist:
+
+" . $savedPlayers->map(function ($saved) {
+                            return trim(($saved['player_name'] ?? 'Player') . "
+" . ($saved['player_url'] ?? '') . "
+" . ($saved['player_email'] ?? '') . "
+" . ($saved['player_phone'] ?? ''));
+                        })->filter()->implode("
+
+");
+                    @endphp
+                    <a class="btn" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}"><i class="fa-solid fa-envelope"></i> Email Me the List</a>
+                @else
+                    <button class="btn" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i> Check In</button>
+                @endif
             </div>
         </nav>
-    </div>
-
-    <div class="frame mobile-back-row">
-        <a class="page-back-mobile" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : '/' }}">
-            <i class="fa-solid fa-chevron-left"></i>
-            Back to Club
-        </a>
     </div>
 
     <section class="hero">
@@ -1423,9 +1485,33 @@
         <div class="wrap hero-inner">
             <div class="team-main team-main-polished">
                 <div class="hero-info-strip" aria-label="Basic team information">
-                    <span><i class="fa-solid fa-users"></i> {{ $playerRows->count() }} Players</span>
-                    <span><i class="fa-solid fa-trophy"></i> {{ $leagueName }}</span>
-                    <span><i class="fa-solid fa-user-tie"></i> {{ $coachName }}</span>
+                    <div class="hero-info-card">
+                        <i class="hero-info-icon fa-solid fa-users"></i>
+                        <span class="hero-info-label">Roster</span>
+                        <strong class="hero-info-value">{{ $playerRows->count() }} Players</strong>
+                    </div>
+                    <div class="hero-info-card">
+                        @if($leagueLogo)
+                            <img class="hero-info-logo" src="{{ $leagueLogo }}" alt="{{ $leagueName }} logo">
+                        @else
+                            <i class="hero-info-icon fa-solid fa-trophy"></i>
+                        @endif
+                        <span class="hero-info-label">League</span>
+                        <strong class="hero-info-value">{{ $leagueName }}</strong>
+                    </div>
+                    <div class="hero-info-card">
+                        <i class="hero-info-icon fa-solid fa-user-tie"></i>
+                        <span class="hero-info-label">Coach</span>
+                        <strong class="hero-info-value">{{ $coachName }}</strong>
+                        <div class="hero-coach-actions">
+                            @if($coachPhone)
+                                <a class="hero-coach-action" href="sms:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-message"></i> Text</a>
+                                <a class="hero-coach-action" href="tel:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-phone"></i> Call</a>
+                            @elseif($coachEmail)
+                                <a class="hero-coach-action" href="mailto:{{ $coachEmail }}"><i class="fa-solid fa-envelope"></i> Email</a>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
                 <div class="identity team-hero-identity">
@@ -1462,7 +1548,12 @@
                                 <div class="avatar"><i class="fa-solid fa-user"></i></div>
                             @endif
 
-                            <div class="player-jersey-big">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</div>
+                            <div class="player-jersey-big">
+                                <span class="jersey-number">{{ filled($player['jersey']) ? '#' . ltrim($player['jersey'], '#') : '—' }}</span>
+                                @if($player['position'])
+                                    <span class="player-jersey-position">{{ $player['position'] }}</span>
+                                @endif
+                            </div>
 
                             <div class="player-roster-copy">
                                 <div class="player-name">{{ $player['name'] }}</div>
@@ -1525,6 +1616,7 @@
 
 @php
     $saveUrlTemplate = route('clubs.coach-save-player', ['clubSlug' => $club->landing_page_slug, 'gender' => $currentGenderSegment, 'teamSlug' => $team->landing_page_slug, 'player' => '__PLAYER_ID__']);
+    $unsaveUrlTemplate = route('clubs.coach-unsave-player', ['clubSlug' => $club->landing_page_slug, 'gender' => $currentGenderSegment, 'teamSlug' => $team->landing_page_slug, 'player' => '__PLAYER_ID__']);
 @endphp
 
 <div class="modal" id="savedModal" aria-hidden="true">
@@ -1546,7 +1638,7 @@
 
 <div class="player-overlay" id="playerOverlay" aria-hidden="true">
     <div class="player-panel">
-        <div class="player-panel-bar"><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-bookmark"></i> Save Profile</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
+        <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-bookmark"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
         <button class="player-nav-arrow is-left" id="playerPrevBtn" type="button" aria-label="Previous player"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="player-nav-arrow is-right" id="playerNextBtn" type="button" aria-label="Next player"><i class="fa-solid fa-chevron-right"></i></button>
         <div class="player-dialog" id="playerDialog"></div>
@@ -1571,7 +1663,10 @@ document.addEventListener('DOMContentLoaded', function(){
     const closeBtn = document.getElementById('playerCloseBtn');
     const nextBtn = document.getElementById('playerNextBtn');
     const prevBtn = document.getElementById('playerPrevBtn');
+    const backBtn = document.getElementById('playerBackBtn');
     const saveUrlTemplate = @json($saveUrlTemplate);
+    const unsaveUrlTemplate = @json($unsaveUrlTemplate);
+    const savedIds = @json($savedIds);
     const csrfToken = @json(csrf_token());
     const checkedIn = @json((bool) $coachSession);
     let active = 0;
@@ -1587,6 +1682,8 @@ document.addEventListener('DOMContentLoaded', function(){
         const override = clean(player.mobile_hero_image);
         const mainImage = player.main_image || player.portrait_image || '';
         const saveUrl = saveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
+        const unsaveUrl = unsaveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
+        const isSaved = savedIds.map(Number).includes(Number(player.id));
         let cardHtml = '';
         if(override){
             cardHtml = `<article class="mobile-card has-override"><img class="mobile-override-img" src="${esc(override)}" alt="${esc(player.name)}"></article>`;
@@ -1629,14 +1726,18 @@ document.addEventListener('DOMContentLoaded', function(){
         const phone = clean(player.phone).replace(/\D+/g, '');
         const parentEmail = player.parent_email || '';
         const coachEmail = player.coach_email || '';
-        const saveForm = checkedIn ? `<form method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="player-action primary" style="width:100%;height:100%;border:0;cursor:pointer" type="submit"><i class="fa-solid fa-bookmark"></i>Save</button></form>` : `<button class="player-action primary" type="button" data-open-coach><i class="fa-solid fa-user-tie"></i>Check In</button>`;
-        return `${cardHtml}<div class="player-actions">${saveForm}${action('Website','fa-arrow-up-right-from-square',player.website_url)}${action('Email','fa-envelope',contactEmail ? 'mailto:'+contactEmail : '')}${action('Call','fa-phone',phone ? 'tel:'+phone : '')}${action('Parent','fa-user-group',parentEmail ? 'mailto:'+parentEmail : '')}${action('Coach','fa-user-tie',coachEmail ? 'mailto:'+coachEmail : '')}</div>`;
+        const saveForm = checkedIn
+            ? (isSaved
+                ? `<form method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="player-action danger" style="width:100%;height:100%;border:0;cursor:pointer" type="submit"><i class="fa-solid fa-bookmark-slash"></i>Remove from my watchlist</button></form>`
+                : `<form method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="player-action primary" style="width:100%;height:100%;border:0;cursor:pointer" type="submit"><i class="fa-solid fa-bookmark"></i>Add to watchlist</button></form>`)
+            : `<button class="player-action primary" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>Check In</button>`;
+        return `${cardHtml}<div class="player-actions">${saveForm}${action('Website','fa-arrow-up-right-from-square',player.website_url)}${action('Email','fa-envelope',contactEmail ? 'mailto:'+contactEmail : '')}${action('Call','fa-phone',phone ? 'tel:'+phone : '')}</div>`;
     }
-    function openPlayer(index){const player = dataAt(index); if(!player) return; active = index; title.innerHTML = '<i class="fa-solid fa-bookmark"></i> Save Profile'; dialog.innerHTML = render(player); overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; dialog.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { overlay.classList.remove('is-open'); coachModal?.classList.add('is-open'); }));}
+    function openPlayer(index){const player = dataAt(index); if(!player) return; active = index; title.innerHTML = '<i class="fa-solid fa-id-card"></i> Player Card'; dialog.innerHTML = render(player); overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; dialog.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { overlay.classList.remove('is-open'); coachModal?.classList.add('is-open'); }));}
     function closePlayer(){overlay.classList.remove('is-open'); overlay.setAttribute('aria-hidden','true'); dialog.innerHTML=''; document.body.style.overflow='';}
     function next(){if(!cards.length)return; openPlayer((active+1)%cards.length);} function prev(){if(!cards.length)return; openPlayer((active-1+cards.length)%cards.length);}
     cards.forEach((card, i) => card.addEventListener('click', e => {e.preventDefault(); openPlayer(i);}));
-    closeBtn?.addEventListener('click', closePlayer); nextBtn?.addEventListener('click', next); prevBtn?.addEventListener('click', prev); overlay?.addEventListener('click', e => {if(e.target===overlay) closePlayer();});
+    closeBtn?.addEventListener('click', closePlayer); backBtn?.addEventListener('click', closePlayer); nextBtn?.addEventListener('click', next); prevBtn?.addEventListener('click', prev); overlay?.addEventListener('click', e => {if(e.target===overlay) closePlayer();});
     document.addEventListener('keydown', e => { if(e.key==='Escape'){closePlayer();coachModal?.classList.remove('is-open');savedModal?.classList.remove('is-open');} if(overlay?.classList.contains('is-open') && e.key==='ArrowRight') next(); if(overlay?.classList.contains('is-open') && e.key==='ArrowLeft') prev(); });
 });
 </script>

@@ -770,6 +770,58 @@
                 margin-right:calc(50% - 50vw) !important;
             }
         }
+
+
+        /* Final request: full-width two-row info boxes with large two-row icon column. */
+        .hero-side{
+            width:100% !important;
+            max-width:none !important;
+            margin:22px 0 0 !important;
+            display:grid !important;
+            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+            gap:0 !important;
+            border-left:0 !important;
+            border-right:0 !important;
+            border-color:rgba(255,255,255,.16) !important;
+            background:rgba(255,255,255,.10) !important;
+        }
+        .hero-side .fact{
+            min-height:92px !important;
+            display:grid !important;
+            grid-template-columns:52px minmax(0,1fr) !important;
+            grid-template-rows:auto auto !important;
+            gap:2px 14px !important;
+            align-items:center !important;
+            padding:16px 18px !important;
+            background:rgba(8,10,13,.54) !important;
+            border:0 !important;
+            border-right:1px solid rgba(255,255,255,.13) !important;
+            border-bottom:1px solid rgba(255,255,255,.13) !important;
+            backdrop-filter:blur(16px) !important;
+        }
+        .hero-side .fact i,
+        .hero-side .fact .fact-logo{
+            grid-row:1 / span 2 !important;
+            width:38px !important;
+            height:38px !important;
+            font-size:26px !important;
+            color:var(--brand-readable) !important;
+            display:grid !important;
+            place-items:center !important;
+            object-fit:contain !important;
+            align-self:center !important;
+        }
+        .hero-side .fact span{font-size:11px !important;margin:0 !important;align-self:end !important;letter-spacing:.16em !important;}
+        .hero-side .fact strong{font-size:21px !important;line-height:1.03 !important;align-self:start !important;}
+        @media(max-width:640px){
+            .hero-side{margin-top:18px !important;}
+            .hero-side .fact{min-height:84px !important;grid-template-columns:44px minmax(0,1fr) !important;padding:14px 14px !important;gap:2px 10px !important;}
+            .hero-side .fact i,.hero-side .fact .fact-logo{width:32px !important;height:32px !important;font-size:22px !important;}
+            .hero-side .fact span{font-size:9px !important;}
+            .hero-side .fact strong{font-size:16px !important;}
+        }
+        .team-card-copy .team-redundant{display:none!important;}
+
 </style>
 </head>
 <body>
@@ -809,7 +861,11 @@
                 <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
                     @foreach($clubFacts as $fact)
                         <div class="fact">
-                            <i class="fa-solid {{ $fact['icon'] }}"></i>
+                            @if(($fact['label'] ?? '') === 'League' && $leagueLogo)
+                                <img class="fact-logo" src="{{ $leagueLogo }}" alt="{{ $club->league?->name ?? 'League' }} logo">
+                            @else
+                                <i class="fa-solid {{ $fact['icon'] }}"></i>
+                            @endif
                             <div>
                                 <span>{{ $fact['label'] }}</span>
                                 <strong>{{ $fact['value'] }}</strong>
@@ -848,7 +904,7 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
+                                    <div class="team-card-copy"><span>{{ $teamSub }}</span></div>
                                 </div>
                             </div>
                             @php
@@ -896,7 +952,7 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
+                                    <div class="team-card-copy"><span>{{ $teamSub }}</span></div>
                                 </div>
                             </div>
                             @php
