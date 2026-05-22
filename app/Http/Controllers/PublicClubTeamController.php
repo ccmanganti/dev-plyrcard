@@ -291,28 +291,15 @@ class PublicClubTeamController extends Controller
             session(['coach_saved_players' => $savedPlayers->values()->all()]);
         }
 
-        $emailSent = false;
-        $emailError = null;
-
-        if (! $alreadySaved) {
-            try {
-                $this->sendSavedPlayerEmail($coachEmail, $coachCheckIn, $savedPayload, $player, $club, $team);
-                $emailSent = true;
-            } catch (\Throwable $exception) {
-                report($exception);
-                $emailError = 'Player was saved, but the email could not be sent.';
-            }
-        }
-
         $message = $alreadySaved
-            ? 'Player already saved.'
-            : ($emailSent ? 'Player saved and emailed to the coach.' : ($emailError ?: 'Player saved.'));
+            ? 'Player already saved to your watchlist.'
+            : 'Player saved to your watchlist.';
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'email_sent' => $emailSent,
+                'email_sent' => false,
                 'saved_count' => $savedPlayers->count(),
                 'player_id' => $player->id,
                 'saved_player' => $savedPayload,
@@ -371,6 +358,87 @@ class PublicClubTeamController extends Controller
         }
 
         return back()->with('player_save_success', 'Player removed from saved list.');
+    }
+
+
+    public function emailWatchlist(Request $request, string $clubSlug): RedirectResponse|JsonResponse
+    {
+        $club = Club::query()
+            ->with('league')
+            ->where('landing_page_slug', $clubSlug)
+            ->where('has_landing_page', true)
+            ->where('landing_page_is_published', true)
+            ->firstOrFail();
+
+        $coachCheckIn = session('coach_checkin');
+
+        if (! is_array($coachCheckIn) || empty($coachCheckIn['email'])) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please check in as a coach before emailing your watchlist.',
+                ], 422);
+            }
+
+            return back()->withErrors([
+                'coach_checkin' => 'Please check in as a coach before emailing your watchlist.',
+            ]);
+        }
+
+        $coachEmail = strtolower((string) ($coachCheckIn['email'] ?? ''));
+
+        $watchlist = collect(session('coach_saved_players', []))
+            ->filter(function ($saved) use ($club, $coachEmail) {
+                return (int) ($saved['club_id'] ?? 0) === (int) $club->id
+                    && strtolower((string) ($saved['coach_email'] ?? '')) === $coachEmail;
+            })
+            ->unique(fn ($saved) => (int) ($saved['player_id'] ?? 0))
+            ->values();
+
+        if ($watchlist->isEmpty()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your watchlist is empty. Save at least one player first.',
+                ], 422);
+            }
+
+            return back()->withErrors([
+                'watchlist' => 'Your watchlist is empty. Save at least one player first.',
+            ]);
+        }
+
+        try {
+            $sent = $this->sendCoachWatchlistEmail($coachEmail, $coachCheckIn, $watchlist->all(), $club);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $sent = false;
+        }
+
+        if (! $sent) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The watchlist was not sent. Please try again.',
+                ], 500);
+            }
+
+            return back()->withErrors([
+                'watchlist' => 'The watchlist was not sent. Please try again.',
+            ]);
+        }
+
+        $message = 'Watchlist emailed to ' . $coachEmail . '.';
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'saved_count' => $watchlist->count(),
+            ]);
+        }
+
+        return back()->with('player_save_success', $message);
     }
 
     protected function playersForTeam(Team $team, Club $club)
@@ -451,6 +519,86 @@ class PublicClubTeamController extends Controller
         }
 
         return null;
+    }
+
+
+    protected function sendCoachWatchlistEmail(
+        string $coachEmail,
+        array $coachCheckIn,
+        array $watchlist,
+        Club $club
+    ): bool {
+        $coachEmail = strtolower(trim($coachEmail));
+
+        if (! filter_var($coachEmail, FILTER_VALIDATE_EMAIL) || empty($watchlist)) {
+            return false;
+        }
+
+        $fromEmail = 'support@plyrcard.com';
+        $fromName = 'PlyrCard';
+        $subject = 'Your PlyrCard Watchlist - ' . ($club->name ?? 'Club');
+
+        $htmlBody = view('emails.coach-watchlist', [
+            'coach' => $coachCheckIn,
+            'watchlist' => $watchlist,
+            'club' => $club,
+        ])->render();
+
+        $textBody = $this->buildCoachWatchlistTextEmail($coachCheckIn, $watchlist, $club);
+
+        return $this->sendNativeMultipartMail(
+            to: $coachEmail,
+            subject: $subject,
+            textBody: $textBody,
+            htmlBody: $htmlBody,
+            fromEmail: $fromEmail,
+            fromName: $fromName,
+            replyTo: $fromEmail,
+            envelopeFrom: $fromEmail
+        );
+    }
+
+    protected function buildCoachWatchlistTextEmail(array $coachCheckIn, array $watchlist, Club $club): string
+    {
+        $lines = [
+            'PlyrCard Coach Watchlist',
+            '',
+            'Coach:',
+            'Name: ' . ($coachCheckIn['name'] ?? ''),
+            'School: ' . ($coachCheckIn['school'] ?? ''),
+            'Title: ' . ($coachCheckIn['title'] ?? ''),
+            'Email: ' . ($coachCheckIn['email'] ?? ''),
+            '',
+            'Club: ' . ($club->name ?? ''),
+            'League: ' . ($club->league?->name ?? ''),
+            '',
+            'Saved Players:',
+        ];
+
+        foreach ($watchlist as $index => $savedPlayer) {
+            $lines[] = '';
+            $lines[] = ($index + 1) . '. ' . (($savedPlayer['player_name'] ?? '') ?: 'Player');
+            $lines[] = 'Team: ' . (($savedPlayer['team_name'] ?? '') ?: 'N/A');
+            $lines[] = 'Jersey: ' . (($savedPlayer['jersey_number'] ?? '') ?: 'N/A');
+            $lines[] = 'Position: ' . (($savedPlayer['position'] ?? '') ?: 'N/A');
+            $lines[] = 'Class: ' . (($savedPlayer['year'] ?? '') ?: 'N/A');
+            $lines[] = 'GPA: ' . (($savedPlayer['gpa'] ?? '') ?: 'N/A');
+            $lines[] = 'Website: ' . (($savedPlayer['player_url'] ?? $savedPlayer['website_url'] ?? '') ?: 'No published website available.');
+            $lines[] = 'Player Email: ' . (($savedPlayer['player_email'] ?? '') ?: 'N/A');
+            $lines[] = 'Personal Email: ' . (($savedPlayer['player_personal_email'] ?? '') ?: 'N/A');
+            $lines[] = 'Phone: ' . (($savedPlayer['player_phone'] ?? '') ?: 'N/A');
+            $lines[] = 'Parent: ' . (($savedPlayer['parent'] ?? '') ?: 'N/A');
+            $lines[] = 'Parent Email: ' . (($savedPlayer['parent_email'] ?? '') ?: 'N/A');
+            $lines[] = 'Parent Phone: ' . (($savedPlayer['parent_phone'] ?? '') ?: 'N/A');
+            $lines[] = 'Club Coach: ' . (($savedPlayer['club_coach'] ?? '') ?: 'N/A');
+            $lines[] = 'Club Coach Email: ' . (($savedPlayer['club_coach_email'] ?? '') ?: 'N/A');
+            $lines[] = 'Club Coach Phone: ' . (($savedPlayer['club_coach_phone'] ?? '') ?: 'N/A');
+        }
+
+        $lines[] = '';
+        $lines[] = 'Sent from PlyrCard.';
+
+        return implode("\n", $lines);
     }
 
     protected function sendSavedPlayerEmail(

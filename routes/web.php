@@ -105,6 +105,9 @@ Route::post('/clubs/{clubSlug}/coach-checkin', [PublicClubTeamController::class,
 Route::post('/clubs/{clubSlug}/coach-checkout', [PublicClubTeamController::class, 'coachCheckOut'])
     ->name('clubs.coach-checkout');
 
+Route::post('/clubs/{clubSlug}/coach-watchlist/email', [PublicClubTeamController::class, 'emailWatchlist'])
+    ->name('clubs.coach-email-watchlist');
+
 Route::get('/clubs/{clubSlug}/teams/{gender}/{teamSlug}', [PublicClubTeamController::class, 'team'])
     ->whereIn('gender', ['boys', 'girls', 'mens', 'womens'])
     ->name('clubs.teams.landing');

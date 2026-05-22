@@ -1527,6 +1527,9 @@
         .coach-drawer-card{min-width:0!important;min-height:52px!important;padding:6px 4px 5px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:4px!important;border:0!important;border-radius:7px!important;background:#fff!important;color:#050505!important;box-shadow:0 3px 8px rgba(0,0,0,.22)!important;text-align:center!important;text-decoration:none!important;cursor:pointer!important;font:inherit!important;font-family:var(--heading)!important;}
         .coach-drawer-card.is-accent{background:#ff5c35!important;color:#fff!important;}
         .coach-drawer-card.is-dark{background:#fff!important;color:#050505!important;border:0!important;}
+
+        .coach-drawer-card-form{margin:0!important;padding:0!important;display:block!important;min-width:0!important;}
+        .coach-drawer-card-form .coach-drawer-card{width:100%!important;height:100%!important;}
         .coach-drawer-card i{font-size:13px!important;line-height:1!important;color:currentColor!important;}
         .coach-drawer-card span{display:block!important;color:currentColor!important;font-size:10px!important;line-height:1.02!important;font-weight:850!important;}
         .coach-drawer-note{margin:10px 0 0!important;color:rgba(255,255,255,.62)!important;font-size:12px!important;line-height:1.28!important;font-weight:650!important;}
@@ -1643,20 +1646,7 @@
                     <span class="plyr-wordmark"><b>PLYR</b><em>CARD</em></span>
                 </a>
             </div>
-            @php
-                $watchlistEmailSubject = 'My PlyrCard Watchlist - ' . ($team->name ?? 'Team');
-                $watchlistEmailBody = "My saved PlyrCard watchlist:
-
-" . $savedPlayers->map(function ($saved) {
-                    return trim(($saved['player_name'] ?? 'Player') . "
-" . ($saved['player_url'] ?? '') . "
-" . ($saved['player_email'] ?? '') . "
-" . ($saved['player_phone'] ?? ''));
-                })->filter()->implode("
-
-");
-            @endphp
-            <div class="nav-actions" aria-hidden="true"></div>
+<div class="nav-actions" aria-hidden="true"></div>
         </nav>
     </div>
 
@@ -1831,10 +1821,13 @@
                 <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                 <div class="coach-drawer-grid">
                     <button class="coach-drawer-card is-accent" type="button" data-open-saved data-close-actions><i class="fa-solid fa-binoculars"></i><span>My Watchlist</span></button>
-                    <a class="coach-drawer-card" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}"><i class="fa-solid fa-envelope"></i><span>Email Me the List</span></a>
+                    <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
+                        @csrf
+                        <button class="coach-drawer-card" type="submit"><i class="fa-solid fa-paper-plane"></i><span>Email Watchlist</span></button>
+                    </form>
                     <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
                 </div>
-                <p class="coach-drawer-note">Saved profiles stay in this browser session and can be emailed to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
+                <p class="coach-drawer-note">Saved profiles stay in this browser session. Tap Email Watchlist to send one email to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
             @else
                 <strong class="coach-drawer-group-title">Coach Check-In</strong>
                 <form class="coach-drawer-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">

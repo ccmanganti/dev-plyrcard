@@ -1001,13 +1001,17 @@
                     <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                     <div class="coach-drawer-grid">
                         <a class="coach-drawer-card is-accent" href="#teams" data-close-actions><i class="fa-solid fa-people-group"></i><span>View Teams</span></a>
+                        <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
+                            @csrf
+                            <button class="coach-drawer-card" type="submit"><i class="fa-solid fa-paper-plane"></i><span>Email Watchlist</span></button>
+                        </form>
                         <button class="coach-drawer-card" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
-                        <form class="coach-out-inline" method="POST" action="{{ route('clubs.coach-checkout', ['clubSlug' => $club->landing_page_slug]) }}">
+                        <form class="coach-out-inline coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-checkout', ['clubSlug' => $club->landing_page_slug]) }}">
                             @csrf
                             <button class="coach-drawer-card is-dark" type="submit"><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
                         </form>
                     </div>
-                    <p class="coach-drawer-note">Use the team pages to open players, save profiles, and email yourself a watchlist.</p>
+                    <p class="coach-drawer-note">Use the team pages to save players. Tap Email Watchlist here to send one email with every saved player to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
                 @else
                     <strong class="coach-drawer-group-title">Coach Check-In</strong>
                     <form class="coach-drawer-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">
@@ -1071,4 +1075,4 @@
         });
     </script>
 </body>
-</html>
+</html>-
