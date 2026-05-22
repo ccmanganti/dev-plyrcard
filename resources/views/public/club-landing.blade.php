@@ -1339,7 +1339,7 @@
         .hero .fact{min-height:78px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:13px 14px!important;}
         .hero .fact i,.hero .fact .fact-logo{width:28px!important;height:28px!important;font-size:17px!important;}
         .hero .fact span{font-size:8px!important;letter-spacing:.11em!important;}
-        .hero .fact strong{font-size:15px!important;line-height:1.02!important;}
+        .hero .fact strong{font-size:15 px!important;line-height:1.02!important;}
     }
     @media(max-width:420px){
         .hero .hero-side{margin-left:-18px!important;margin-right:-18px!important;width:calc(100% + 36px)!important;max-width:calc(100% + 36px)!important;}
