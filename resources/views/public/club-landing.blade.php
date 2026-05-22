@@ -933,7 +933,70 @@
             }
         }
 
-    </style>
+    
+
+        /* FINAL CLUB COACH DRAWER FIX: 4 equal buttons in one row, no broken form spacing. */
+        .coach-drawer-grid{
+            display:grid!important;
+            grid-template-columns:repeat(4,minmax(0,1fr))!important;
+            gap:6px!important;
+            align-items:stretch!important;
+            width:100%!important;
+        }
+        .coach-drawer-card-form{
+            margin:0!important;
+            padding:0!important;
+            display:contents!important;
+        }
+        .coach-drawer-card{
+            width:100%!important;
+            min-width:0!important;
+            min-height:56px!important;
+            padding:6px 4px!important;
+            border-radius:7px!important;
+            display:flex!important;
+            flex-direction:column!important;
+            align-items:center!important;
+            justify-content:center!important;
+            gap:5px!important;
+            text-align:center!important;
+            line-height:1!important;
+        }
+        .coach-drawer-card i{
+            font-size:14px!important;
+            line-height:1!important;
+        }
+        .coach-drawer-card span{
+            display:block!important;
+            width:100%!important;
+            max-width:100%!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+            color:currentColor!important;
+            font-size:9.5px!important;
+            line-height:1.02!important;
+            font-weight:900!important;
+            letter-spacing:.01em!important;
+            white-space:normal!important;
+        }
+        .coach-drawer-card.is-dark{
+            background:#111217!important;
+            color:#fff!important;
+            border:1px solid rgba(255,255,255,.10)!important;
+        }
+        .coach-drawer-note{
+            margin-top:12px!important;
+            font-size:12px!important;
+            line-height:1.25!important;
+            max-width:100%!important;
+        }
+        @media(max-width:390px){
+            .coach-drawer-grid{gap:5px!important;}
+            .coach-drawer-card{min-height:52px!important;padding:5px 3px!important;}
+            .coach-drawer-card i{font-size:13px!important;}
+            .coach-drawer-card span{font-size:8.8px!important;}
+        }
+</style>
 </head>
 <body>
     <main class="site">
@@ -1339,7 +1402,7 @@
         .hero .fact{min-height:78px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:13px 14px!important;}
         .hero .fact i,.hero .fact .fact-logo{width:28px!important;height:28px!important;font-size:17px!important;}
         .hero .fact span{font-size:8px!important;letter-spacing:.11em!important;}
-        .hero .fact strong{font-size:15 px!important;line-height:1.02!important;}
+        .hero .fact strong{font-size:15px!important;line-height:1.02!important;}
     }
     @media(max-width:420px){
         .hero .hero-side{margin-left:-18px!important;margin-right:-18px!important;width:calc(100% + 36px)!important;max-width:calc(100% + 36px)!important;}
