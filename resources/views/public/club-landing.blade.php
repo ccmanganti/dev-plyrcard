@@ -1189,3 +1189,123 @@
     </script>
 </body>
 </html>
+
+{{-- FINAL PATCH: keep club hero info as clean 2x2 grid and hide player names on random PlyrCard art --}}
+<style>
+    .hero .hero-side{
+        display:grid!important;
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        width:100%!important;
+        max-width:100%!important;
+        margin-left:0!important;
+        margin-right:0!important;
+        gap:1px!important;
+        overflow:hidden!important;
+        background:rgba(255,255,255,.12)!important;
+        border-top:1px solid rgba(255,255,255,.15)!important;
+        border-bottom:1px solid rgba(255,255,255,.15)!important;
+        border-left:0!important;
+        border-right:0!important;
+    }
+    .hero .hero-side.facts-count-1,
+    .hero .hero-side.facts-count-2,
+    .hero .hero-side.facts-count-3,
+    .hero .hero-side.facts-count-4{
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    }
+    .hero .fact{
+        min-width:0!important;
+        min-height:84px!important;
+        display:grid!important;
+        grid-template-columns:42px minmax(0,1fr)!important;
+        grid-template-rows:auto auto!important;
+        column-gap:12px!important;
+        align-items:center!important;
+        padding:14px 16px!important;
+        background:rgba(5,5,6,.55)!important;
+        border:0!important;
+        box-shadow:none!important;
+        overflow:hidden!important;
+        text-align:left!important;
+    }
+    .hero .fact i,
+    .hero .fact .fact-logo{
+        grid-column:1!important;
+        grid-row:1 / 3!important;
+        width:30px!important;
+        height:30px!important;
+        font-size:19px!important;
+        object-fit:contain!important;
+        align-self:center!important;
+        justify-self:center!important;
+        margin:0!important;
+        color:rgba(220,232,239,.82)!important;
+    }
+    .hero .fact span{
+        grid-column:2!important;
+        grid-row:1!important;
+        min-width:0!important;
+        margin:0 0 5px!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:rgba(220,232,239,.70)!important;
+        font-family:var(--heading)!important;
+        font-size:9px!important;
+        line-height:1!important;
+        font-weight:900!important;
+        letter-spacing:.13em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        white-space:nowrap!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .hero .fact strong{
+        grid-column:2!important;
+        grid-row:2!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:#fff!important;
+        font-family:var(--heading)!important;
+        font-size:17px!important;
+        line-height:1.03!important;
+        font-weight:900!important;
+        letter-spacing:.02em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .team-card-player-tag{display:none!important;}
+    .team-card-player:after{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 35%,rgba(0,0,0,.10))!important;}
+    @media(max-width:900px){
+        .hero .hero-side{
+            grid-template-columns:repeat(2,minmax(0,1fr))!important;
+            margin-left:-22px!important;
+            margin-right:-22px!important;
+            width:calc(100% + 44px)!important;
+            max-width:calc(100% + 44px)!important;
+        }
+        .hero .hero-side.facts-count-1,
+        .hero .hero-side.facts-count-2,
+        .hero .hero-side.facts-count-3,
+        .hero .hero-side.facts-count-4{
+            grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        }
+        .hero .fact{min-height:78px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:13px 14px!important;}
+        .hero .fact i,.hero .fact .fact-logo{width:28px!important;height:28px!important;font-size:17px!important;}
+        .hero .fact span{font-size:8px!important;letter-spacing:.11em!important;}
+        .hero .fact strong{font-size:15px!important;line-height:1.02!important;}
+    }
+    @media(max-width:420px){
+        .hero .hero-side{margin-left:-18px!important;margin-right:-18px!important;width:calc(100% + 36px)!important;max-width:calc(100% + 36px)!important;}
+        .hero .fact{min-height:76px!important;grid-template-columns:36px minmax(0,1fr)!important;padding:12px 12px!important;}
+        .hero .fact strong{font-size:14px!important;}
+    }
+</style>
