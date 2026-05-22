@@ -1575,6 +1575,30 @@
             .nav-email-list{display:none!important;}
         }
 
+
+        /* Final pull-up navigation revision: keep player actions inside drawer, not sticky under card. */
+        .player-actions{display:none!important;}
+        .player-panel-bar{display:grid!important;grid-template-columns:auto auto minmax(0,1fr) auto!important;gap:8px!important;align-items:center!important;}
+        .player-quick-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:36px!important;}
+        .player-quick-save form{margin:0!important;display:inline-flex!important;}
+        .player-quick-save button{height:34px!important;min-width:74px!important;border:0!important;border-radius:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:12px!important;font-weight:950!important;letter-spacing:.08em!important;text-transform:uppercase!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;cursor:pointer!important;padding:0 11px!important;}
+        .player-quick-save button.is-remove{background:#fff!important;color:#050505!important;}
+        .coach-drawer-form{display:grid!important;gap:8px!important;margin-top:8px!important;}
+        .coach-drawer-form label{display:grid!important;gap:5px!important;color:rgba(255,255,255,.62)!important;font-size:10px!important;font-weight:900!important;letter-spacing:.055em!important;text-transform:uppercase!important;}
+        .coach-drawer-form input{height:38px!important;border:1px solid rgba(255,255,255,.12)!important;background:#101116!important;color:#fff!important;padding:0 11px!important;font:inherit!important;font-family:var(--heading)!important;font-size:13px!important;font-weight:800!important;outline:none!important;}
+        .coach-drawer-form input:focus{border-color:#ff5c35!important;box-shadow:0 0 0 3px rgba(255,92,53,.15)!important;}
+        .coach-drawer-submit{height:40px!important;border:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:13px!important;font-weight:950!important;letter-spacing:.09em!important;text-transform:uppercase!important;cursor:pointer!important;}
+        .coach-drawer-form-row{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;}
+        .coach-drawer-player-actions{display:none;}
+        .coach-action-drawer.has-player .coach-drawer-main-actions{display:none!important;}
+        .coach-action-drawer.has-player .coach-drawer-player-actions{display:block!important;}
+        .coach-player-summary{display:grid!important;grid-template-columns:42px 1fr!important;gap:10px!important;align-items:center!important;margin:0 0 10px!important;padding:10px!important;background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.10)!important;}
+        .coach-player-summary strong{display:block!important;font-size:16px!important;line-height:1!important;text-transform:uppercase!important;color:#fff!important;}
+        .coach-player-summary span{display:block!important;margin-top:4px!important;color:rgba(255,255,255,.62)!important;font-size:11px!important;font-weight:850!important;text-transform:uppercase!important;}
+        .coach-player-summary-img{width:42px!important;height:42px!important;border-radius:50%!important;background:#15161b!important;object-fit:cover!important;display:grid!important;place-items:center!important;color:#fff!important;}
+        .coach-drawer-tab.is-player{background:#ff5c35!important;}
+        @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}.player-panel-bar{grid-template-columns:auto auto 1fr auto!important}.player-panel-title{font-size:12px!important}}
+
     </style>
 </head>
 <body>
@@ -1785,6 +1809,7 @@
             <button class="coach-drawer-close" type="button" data-close-actions aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="coach-drawer-body">
+            <div class="coach-drawer-main-actions">
             @if($coachSession)
                 <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                 <div class="coach-drawer-grid">
@@ -1794,12 +1819,26 @@
                 </div>
                 <p class="coach-drawer-note">Saved profiles stay in this browser session and can be emailed to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
             @else
-                <strong class="coach-drawer-group-title">Start Scouting</strong>
-                <div class="coach-drawer-grid">
-                    <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-to-bracket"></i><span>Check In</span></button>
-                </div>
+                <strong class="coach-drawer-group-title">Coach Check-In</strong>
+                <form class="coach-drawer-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">
+                    @csrf
+                    <label>School<input name="school" type="text" required></label>
+                    <div class="coach-drawer-form-row">
+                        <label>Name<input name="name" type="text" required></label>
+                        <label>Title<input name="title" type="text" placeholder="Scout"></label>
+                    </div>
+                    <label>Email<input name="email" type="email" required></label>
+                    <button class="coach-drawer-submit" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Check In</button>
+                </form>
                 <p class="coach-drawer-note">Check in once to save players, build a watchlist, and email yourself the list.</p>
             @endif
+            </div>
+            <div class="coach-drawer-player-actions" id="coachDrawerPlayerActions">
+                <strong class="coach-drawer-group-title">Player Actions</strong>
+                <div class="coach-player-summary" id="coachDrawerPlayerSummary"></div>
+                <div class="coach-drawer-grid" id="coachDrawerPlayerGrid"></div>
+                <p class="coach-drawer-note">Use these quick actions while viewing the player card.</p>
+            </div>
         </div>
     </section>
     <button class="coach-drawer-tab" type="button" data-open-actions>
@@ -1810,7 +1849,7 @@
 
 <div class="player-overlay" id="playerOverlay" aria-hidden="true">
     <div class="player-panel">
-        <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-bookmark"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
+        <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-quick-save" id="playerQuickSave"></div><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-id-card"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
         <button class="player-nav-arrow is-left" id="playerPrevBtn" type="button" aria-label="Previous player"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="player-nav-arrow is-right" id="playerNextBtn" type="button" aria-label="Next player"><i class="fa-solid fa-chevron-right"></i></button>
         <div class="player-dialog" id="playerDialog"></div>
@@ -1822,11 +1861,16 @@ document.addEventListener('DOMContentLoaded', function(){
     const coachModal = document.getElementById('coachModal');
     const savedModal = document.getElementById('savedModal');
     const coachActionDrawer = document.getElementById('coachActionDrawer');
+    const drawerTitle = coachActionDrawer?.querySelector('.coach-drawer-title');
+    const drawerPlayerSummary = document.getElementById('coachDrawerPlayerSummary');
+    const drawerPlayerGrid = document.getElementById('coachDrawerPlayerGrid');
+    const playerQuickSave = document.getElementById('playerQuickSave');
+    let currentPlayer = null;
     const openActions = () => { coachActionDrawer?.classList.add('is-open'); coachActionDrawer?.setAttribute('aria-hidden','false'); };
     const closeActions = () => { coachActionDrawer?.classList.remove('is-open'); coachActionDrawer?.setAttribute('aria-hidden','true'); };
     document.querySelectorAll('[data-open-actions]').forEach(btn => btn.addEventListener('click', openActions));
     document.querySelectorAll('[data-close-actions]').forEach(btn => btn.addEventListener('click', closeActions));
-    document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closeActions(); coachModal?.classList.add('is-open'); coachModal?.setAttribute('aria-hidden','false'); }));
+    document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { coachActionDrawer?.classList.remove('has-player'); openActions(); }));
     document.querySelectorAll('[data-close-coach]').forEach(btn => btn.addEventListener('click', () => { coachModal?.classList.remove('is-open');savedModal?.classList.remove('is-open'); coachModal?.setAttribute('aria-hidden','true'); }));
     document.querySelectorAll('[data-open-saved]').forEach(btn => btn.addEventListener('click', () => { closeActions(); savedModal?.classList.add('is-open'); savedModal?.setAttribute('aria-hidden','false'); }));
     document.querySelectorAll('[data-close-saved]').forEach(btn => btn.addEventListener('click', () => { savedModal?.classList.remove('is-open'); savedModal?.setAttribute('aria-hidden','true'); }));
@@ -1851,7 +1895,37 @@ document.addEventListener('DOMContentLoaded', function(){
     function esc(value){return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
     function dataAt(index){const el = cards[index]; if(!el) return null; try{return JSON.parse(el.dataset.player || '{}');}catch(e){return {};}}
     function clean(value){return value && value !== 'null' && value !== 'undefined' ? String(value) : '';}
-    function action(label, icon, href, extraClass){return href ? `<a class="player-action ${extraClass || ''}" href="${esc(href)}"><i class="fa-solid ${icon}"></i>${esc(label)}</a>` : '';}
+    function action(label, icon, href, extraClass){return href ? `<a class="coach-drawer-card ${extraClass || ''}" href="${esc(href)}"><i class="fa-solid ${icon}"></i><span>${esc(label)}</span></a>` : '';}
+    function saveButtonHtml(player, compact){
+        const saveUrl = saveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
+        const unsaveUrl = unsaveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
+        const isSaved = savedIds.map(Number).includes(Number(player.id));
+        if(!checkedIn){
+            return `<button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>${compact ? 'Check In' : '<span>Check In</span>'}</button>`;
+        }
+        if(isSaved){
+            return `<form method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
+        }
+        return `<form method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
+    }
+    function renderPlayerDrawer(player){
+        currentPlayer = player;
+        const phone = clean(player.phone).replace(/\D+/g, '');
+        const contactEmail = player.personal_email || player.email || '';
+        if(drawerTitle) drawerTitle.textContent = 'Player Actions';
+        if(drawerPlayerSummary){
+            const img = player.card_image || player.portrait_image || player.main_image || '';
+            drawerPlayerSummary.innerHTML = `${img ? `<img class="coach-player-summary-img" src="${esc(img)}" alt="${esc(player.name)}">` : `<div class="coach-player-summary-img"><i class="fa-solid fa-user"></i></div>`}<div><strong>${esc(player.name || 'Player')}</strong><span>${esc([player.position, player.year ? 'Class '+player.year : ''].filter(Boolean).join(' | '))}</span></div>`;
+        }
+        if(drawerPlayerGrid){
+            drawerPlayerGrid.innerHTML = `${saveButtonHtml(player,false)}${action('Website','fa-arrow-up-right-from-square',player.website_url)}${action('Email','fa-envelope',contactEmail ? 'mailto:'+contactEmail : '')}${action('Call','fa-phone',phone ? 'tel:'+phone : '')}`;
+            drawerPlayerGrid.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { coachActionDrawer?.classList.remove('has-player'); }));
+        }
+        if(playerQuickSave){
+            playerQuickSave.innerHTML = saveButtonHtml(player,true);
+            playerQuickSave.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closePlayer(); coachActionDrawer?.classList.remove('has-player'); openActions(); }));
+        }
+    }
 
     function render(player){
         const jersey = clean(player.jersey) ? '#' + String(player.jersey).replace(/^#/, '') : '';
@@ -1899,19 +1973,10 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                 </article>`;
         }
-        const contactEmail = player.personal_email || player.email || '';
-        const phone = clean(player.phone).replace(/\D+/g, '');
-        const parentEmail = player.parent_email || '';
-        const coachEmail = player.coach_email || '';
-        const saveForm = checkedIn
-            ? (isSaved
-                ? `<form method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="player-action danger" style="width:100%;height:100%;border:0;cursor:pointer" type="submit"><i class="fa-solid fa-bookmark-slash"></i>Remove from my watchlist</button></form>`
-                : `<form method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="player-action primary" style="width:100%;height:100%;border:0;cursor:pointer" type="submit"><i class="fa-solid fa-bookmark"></i>Add to watchlist</button></form>`)
-            : `<button class="player-action primary" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>Check In</button>`;
-        return `${cardHtml}<div class="player-actions">${saveForm}${action('Website','fa-arrow-up-right-from-square',player.website_url)}${action('Email','fa-envelope',contactEmail ? 'mailto:'+contactEmail : '')}${action('Call','fa-phone',phone ? 'tel:'+phone : '')}</div>`;
+        return `${cardHtml}`;
     }
-    function openPlayer(index){const player = dataAt(index); if(!player) return; active = index; title.innerHTML = '<i class="fa-solid fa-id-card"></i> Player Card'; dialog.innerHTML = render(player); overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; dialog.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { overlay.classList.remove('is-open'); coachModal?.classList.add('is-open'); }));}
-    function closePlayer(){overlay.classList.remove('is-open'); overlay.setAttribute('aria-hidden','true'); dialog.innerHTML=''; document.body.style.overflow='';}
+    function openPlayer(index){const player = dataAt(index); if(!player) return; active = index; renderPlayerDrawer(player); coachActionDrawer?.classList.add('has-player'); document.querySelector('.coach-drawer-tab')?.classList.add('is-player'); const tabText = document.querySelector('.coach-drawer-tab span'); if(tabText) tabText.textContent = 'ACTIONS'; title.innerHTML = '<i class="fa-solid fa-id-card"></i> Player Card'; dialog.innerHTML = render(player); overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';}
+    function closePlayer(){overlay.classList.remove('is-open'); overlay.setAttribute('aria-hidden','true'); dialog.innerHTML=''; if(playerQuickSave) playerQuickSave.innerHTML=''; coachActionDrawer?.classList.remove('has-player'); document.querySelector('.coach-drawer-tab')?.classList.remove('is-player'); const tabText = document.querySelector('.coach-drawer-tab span'); if(tabText) tabText.textContent = checkedIn ? 'WATCHLIST' : 'CHECK IN'; if(drawerTitle) drawerTitle.textContent = checkedIn ? 'Coach Navigation' : 'Coach Check-In'; document.body.style.overflow='';}
     function next(){if(!cards.length)return; openPlayer((active+1)%cards.length);} function prev(){if(!cards.length)return; openPlayer((active-1+cards.length)%cards.length);}
     cards.forEach((card, i) => card.addEventListener('click', e => {e.preventDefault(); openPlayer(i);}));
     closeBtn?.addEventListener('click', closePlayer); backBtn?.addEventListener('click', closePlayer); nextBtn?.addEventListener('click', next); prevBtn?.addEventListener('click', prev); overlay?.addEventListener('click', e => {if(e.target===overlay) closePlayer();});

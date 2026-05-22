@@ -791,6 +791,18 @@
         .coach-drawer-card i{font-size:15px;color:currentColor}.coach-drawer-card span{display:block;font-size:10.5px;line-height:1;font-weight:900;color:currentColor}.coach-drawer-note{margin:10px 0 0;color:rgba(255,255,255,.62);font-size:12px;line-height:1.3;font-weight:700}
         @media(max-width:420px){.coach-drawer-grid{gap:6px}.coach-drawer-card{min-height:56px}.coach-drawer-card span{font-size:9.5px}}
 
+
+        /* Final pull-up nav revision: check-in lives inside the drawer. */
+        .coach-drawer-form{display:grid!important;gap:8px!important;margin-top:8px!important;}
+        .coach-drawer-form label{display:grid!important;gap:5px!important;color:rgba(255,255,255,.62)!important;font-size:10px!important;font-weight:900!important;letter-spacing:.055em!important;text-transform:uppercase!important;}
+        .coach-drawer-form input{height:38px!important;border:1px solid rgba(255,255,255,.12)!important;background:#101116!important;color:#fff!important;padding:0 11px!important;font:inherit!important;font-family:var(--heading)!important;font-size:13px!important;font-weight:800!important;outline:none!important;}
+        .coach-drawer-form input:focus{border-color:#ff5c35!important;box-shadow:0 0 0 3px rgba(255,92,53,.15)!important;}
+        .coach-drawer-submit{height:40px!important;border:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:13px!important;font-weight:950!important;letter-spacing:.09em!important;text-transform:uppercase!important;cursor:pointer!important;}
+        .coach-drawer-form-row{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;}
+        .coach-out-inline{margin:0!important;display:contents!important;}
+        .coach-out-inline button{font:inherit!important;}
+        @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}}
+
     </style>
 </head>
 <body>
@@ -981,16 +993,26 @@
                 @if($coachSession)
                     <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                     <div class="coach-drawer-grid">
-                        <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
-                        <a class="coach-drawer-card" href="#teams"><i class="fa-solid fa-people-group"></i><span>View Teams</span></a>
-                        <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
+                        <a class="coach-drawer-card is-accent" href="#teams" data-close-actions><i class="fa-solid fa-people-group"></i><span>View Teams</span></a>
+                        <button class="coach-drawer-card" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
+                        <form class="coach-out-inline" method="POST" action="{{ route('clubs.coach-checkout', ['clubSlug' => $club->landing_page_slug]) }}">
+                            @csrf
+                            <button class="coach-drawer-card is-dark" type="submit"><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
+                        </form>
                     </div>
                     <p class="coach-drawer-note">Use the team pages to open players, save profiles, and email yourself a watchlist.</p>
                 @else
-                    <strong class="coach-drawer-group-title">Start Scouting</strong>
-                    <div class="coach-drawer-grid">
-                        <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-to-bracket"></i><span>Check In</span></button>
-                    </div>
+                    <strong class="coach-drawer-group-title">Coach Check-In</strong>
+                    <form class="coach-drawer-form" method="POST" action="{{ route('clubs.coach-checkin', ['clubSlug' => $club->landing_page_slug]) }}">
+                        @csrf
+                        <label>School<input name="school" type="text" required></label>
+                        <div class="coach-drawer-form-row">
+                            <label>Name<input name="name" type="text" required></label>
+                            <label>Title<input name="title" type="text" placeholder="Scout"></label>
+                        </div>
+                        <label>Email<input name="email" type="email" required></label>
+                        <button class="coach-drawer-submit" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Check In</button>
+                    </form>
                     <p class="coach-drawer-note">Check in once to unlock profile saving and watchlist tools on team pages.</p>
                 @endif
             </div>
