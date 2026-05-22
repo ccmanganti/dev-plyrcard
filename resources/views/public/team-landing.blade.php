@@ -2078,11 +2078,11 @@
                 <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                 <div class="coach-drawer-grid">
                     <button class="coach-drawer-card is-accent" type="button" data-open-saved data-close-actions><i class="fa-solid fa-binoculars"></i><span>My Watchlist</span></button>
-                    <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
+                    <form class="coach-drawer-card-form" data-email-watchlist-form method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
                         @csrf
                         <button class="coach-drawer-card" type="submit"><i class="fa-solid fa-paper-plane"></i><span>Email Watchlist</span></button>
                     </form>
-                    <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
+                    <button class="coach-drawer-card is-dark" type="button" data-open-coach-modal data-close-actions><i class="fa-solid fa-id-badge"></i><span>Coach Details</span></button>
                     <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-checkout', ['clubSlug' => $club->landing_page_slug]) }}">
                         @csrf
                         <button class="coach-drawer-card is-dark" type="submit"><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
@@ -2129,6 +2129,9 @@
 </div>
 
 <div class="watchlist-toast" id="watchlistToast" aria-live="polite"><i class="fa-solid fa-circle-check"></i><span>Saved to watchlist</span></div>
+@if(session('watchlist_email_sent'))
+    <div class="watchlist-toast is-visible is-email" id="watchlistEmailToast" aria-live="polite"><i class="fa-solid fa-circle-check"></i><span>{{ session('watchlist_email_sent') }}</span></div>
+@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
@@ -2149,7 +2152,7 @@ document.addEventListener('DOMContentLoaded', function(){
         });
     });
     document.querySelectorAll('form').forEach(form => {
-        if(form.hasAttribute('data-watchlist-form')) return;
+        if(form.hasAttribute('data-watchlist-form') || form.hasAttribute('data-email-watchlist-form')) return;
         form.addEventListener('submit', function(){
             const button = form.querySelector('button[type="submit"]');
             button?.classList.add('is-loading');
@@ -2170,6 +2173,7 @@ document.addEventListener('DOMContentLoaded', function(){
     document.querySelectorAll('[data-open-actions]').forEach(btn => btn.addEventListener('click', openActions));
     document.querySelectorAll('[data-close-actions]').forEach(btn => btn.addEventListener('click', closeActions));
     document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { coachActionDrawer?.classList.remove('has-player'); openActions(); }));
+    document.querySelectorAll('[data-open-coach-modal]').forEach(btn => btn.addEventListener('click', () => { closeActions(); coachModal?.classList.add('is-open'); coachModal?.setAttribute('aria-hidden','false'); }));
     document.querySelectorAll('[data-close-coach]').forEach(btn => btn.addEventListener('click', () => { coachModal?.classList.remove('is-open');savedModal?.classList.remove('is-open'); coachModal?.setAttribute('aria-hidden','true'); }));
     document.querySelectorAll('[data-open-saved]').forEach(btn => btn.addEventListener('click', () => { closeActions(); savedModal?.classList.add('is-open'); savedModal?.setAttribute('aria-hidden','false'); }));
     document.querySelectorAll('[data-close-saved]').forEach(btn => btn.addEventListener('click', () => { savedModal?.classList.remove('is-open'); savedModal?.setAttribute('aria-hidden','true'); }));
@@ -2405,6 +2409,44 @@ document.addEventListener('DOMContentLoaded', function(){
             showWatchlistToast(error.message || 'Could not save player');
         }finally{
             submitButton?.classList.remove('is-loading');
+        }
+    });
+
+
+    document.addEventListener('submit', async function(event){
+        const form = event.target.closest('[data-email-watchlist-form]');
+        if(!form) return;
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        const originalHtml = button ? button.innerHTML : '';
+        button?.classList.add('is-loading');
+        if(button) button.innerHTML = '<i class="fa-solid fa-circle-notch"></i><span>Sending</span>';
+        try{
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+                body: new FormData(form)
+            });
+            const data = await response.json().catch(() => ({}));
+            if(!response.ok || data.success === false){ throw new Error(data.message || 'Email could not be sent.'); }
+            button?.classList.remove('is-loading');
+            button?.classList.add('is-success');
+            if(button) button.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Email Sent</span>';
+            showWatchlistToast(data.message || 'Email Sent');
+            const toast = document.getElementById('watchlistToast');
+            toast?.classList.add('is-email');
+            setTimeout(() => {
+                button?.classList.remove('is-success');
+                if(button) button.innerHTML = originalHtml;
+                toast?.classList.remove('is-email');
+            }, 2200);
+        }catch(error){
+            button?.classList.remove('is-loading');
+            if(button) button.innerHTML = originalHtml;
+            showWatchlistToast(error.message || 'Email could not be sent.');
+            const toast = document.getElementById('watchlistToast');
+            toast?.classList.add('is-error');
+            setTimeout(() => toast?.classList.remove('is-error'), 1600);
         }
     });
 
@@ -2650,4 +2692,13 @@ document.addEventListener('DOMContentLoaded', function(){
     /* Save should swipe left, then bring the next player in from the right. */
     @keyframes plyrSwipeSave{0%{transform:translateX(0) rotate(0);opacity:1}100%{transform:translateX(-110%) rotate(-8deg);opacity:0}}
     @keyframes plyrSwipeNext{0%{transform:translateX(26%) scale(.96);opacity:0}100%{transform:translateX(0) scale(1);opacity:1}}
+
+        /* Email watchlist success/error feedback */
+        .watchlist-toast.is-email{background:#fff!important;color:#050505!important;border:1px solid rgba(255,255,255,.75)!important;box-shadow:0 18px 48px rgba(0,0,0,.34)!important}
+        .watchlist-toast.is-email i{color:#16a34a!important}
+        .watchlist-toast.is-error i{color:#ff5c35!important}
+        .coach-drawer-card.is-success{background:#16a34a!important;color:#fff!important}
+        .coach-drawer-card.is-loading{opacity:.72!important;pointer-events:none!important}
+        .coach-drawer-card.is-loading i{animation:spinLoader .75s linear infinite!important}
+        @keyframes spinLoader{to{transform:rotate(360deg)}}
 </style>

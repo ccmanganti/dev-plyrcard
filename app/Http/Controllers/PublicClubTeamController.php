@@ -438,17 +438,20 @@ class PublicClubTeamController extends Controller
             ]);
         }
 
-        $message = 'Watchlist emailed to ' . $coachEmail . '.';
+        $message = 'Email sent to ' . $coachEmail . '.';
+
+        session()->flash('watchlist_email_sent', $message);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'saved_count' => $watchlist->count(),
+                'sent_to' => $coachEmail,
             ]);
         }
 
-        return back()->with('player_save_success', $message);
+        return back()->with('watchlist_email_sent', $message);
     }
 
     protected function playersForTeam(Team $team, Club $club)

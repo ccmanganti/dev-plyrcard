@@ -1201,7 +1201,7 @@
                     <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
                     <div class="coach-drawer-grid">
                         <a class="coach-drawer-card is-accent" href="#teams" data-close-actions><i class="fa-solid fa-people-group"></i><span>View Teams</span></a>
-                        <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
+                        <form class="coach-drawer-card-form" data-email-watchlist-form method="POST" action="{{ route('clubs.coach-email-watchlist', ['clubSlug' => $club->landing_page_slug]) }}">
                             @csrf
                             <button class="coach-drawer-card" type="submit"><i class="fa-solid fa-paper-plane"></i><span>Email Watchlist</span></button>
                         </form>
@@ -1255,6 +1255,12 @@
         </div>
     </div>
 
+
+<style>
+    .watchlist-toast{position:fixed;left:50%;bottom:74px;z-index:100002;display:flex;align-items:center;gap:9px;min-height:42px;max-width:calc(100vw - 32px);padding:0 14px;border-radius:999px;background:#fff;color:#050505;box-shadow:0 18px 48px rgba(0,0,0,.34);font-family:var(--heading);font-size:13px;font-weight:950;text-transform:uppercase;letter-spacing:.06em;opacity:0;transform:translate(-50%,10px);pointer-events:none;transition:opacity .2s ease,transform .2s ease}.watchlist-toast.is-visible{opacity:1;transform:translate(-50%,0)}.watchlist-toast i{color:#16a34a}.watchlist-toast.is-error i{color:#ff5c35}.coach-drawer-card.is-success{background:#16a34a!important;color:#fff!important}.coach-drawer-card.is-loading{opacity:.72!important;pointer-events:none!important}.coach-drawer-card.is-loading i{animation:spinLoader .75s linear infinite!important}@keyframes spinLoader{to{transform:rotate(360deg)}}
+</style>
+    <div class="watchlist-toast" id="watchlistToast" aria-live="polite"><i class="fa-solid fa-circle-check"></i><span>Email Sent</span></div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function(){
 
@@ -1274,6 +1280,7 @@
         });
     });
     document.querySelectorAll('form').forEach(form => {
+        if(form.hasAttribute('data-email-watchlist-form')) return;
         form.addEventListener('submit', function(){
             const button = form.querySelector('button[type="submit"]');
             button?.classList.add('is-loading');
@@ -1285,6 +1292,18 @@
             const coachActionDrawer = document.getElementById('coachActionDrawer');
             const openActions = () => { coachActionDrawer?.classList.add('is-open'); coachActionDrawer?.setAttribute('aria-hidden','false'); };
             const closeActions = () => { coachActionDrawer?.classList.remove('is-open'); coachActionDrawer?.setAttribute('aria-hidden','true'); };
+            const showWatchlistToast = (message, isError = false) => {
+                const toast = document.getElementById('watchlistToast');
+                if(!toast) return;
+                const span = toast.querySelector('span');
+                const icon = toast.querySelector('i');
+                if(span) span.textContent = message || 'Email Sent';
+                if(icon) icon.className = isError ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check';
+                toast.classList.toggle('is-error', !!isError);
+                toast.classList.add('is-visible');
+                clearTimeout(toast._hideTimer);
+                toast._hideTimer = setTimeout(() => toast.classList.remove('is-visible'), 1800);
+            };
             document.querySelectorAll('[data-open-actions]').forEach(btn => btn.addEventListener('click', openActions));
             document.querySelectorAll('[data-close-actions]').forEach(btn => btn.addEventListener('click', closeActions));
             document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closeActions(); modal?.classList.add('is-open'); modal?.setAttribute('aria-hidden','false'); }));
@@ -1295,6 +1314,33 @@
                 document.querySelectorAll('[data-team-tab]').forEach(t => t.classList.toggle('is-active', t === this));
                 document.querySelectorAll('[data-team-panel]').forEach(p => p.classList.toggle('is-active', p.dataset.teamPanel === target));
             }));
+            document.addEventListener('submit', async function(event){
+                const form = event.target.closest('[data-email-watchlist-form]');
+                if(!form) return;
+                event.preventDefault();
+                const button = form.querySelector('button[type="submit"]');
+                const originalHtml = button ? button.innerHTML : '';
+                button?.classList.add('is-loading');
+                if(button) button.innerHTML = '<i class="fa-solid fa-circle-notch"></i><span>Sending</span>';
+                try{
+                    const response = await fetch(form.action, {
+                        method:'POST',
+                        headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+                        body:new FormData(form)
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if(!response.ok || data.success === false){throw new Error(data.message || 'Email could not be sent.');}
+                    button?.classList.remove('is-loading');
+                    button?.classList.add('is-success');
+                    if(button) button.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Email Sent</span>';
+                    showWatchlistToast(data.message || 'Email Sent');
+                    setTimeout(() => { button?.classList.remove('is-success'); if(button) button.innerHTML = originalHtml; }, 2200);
+                }catch(error){
+                    button?.classList.remove('is-loading');
+                    if(button) button.innerHTML = originalHtml;
+                    showWatchlistToast(error.message || 'Email could not be sent.', true);
+                }
+            });
             document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeActions(); modal?.classList.remove('is-open'); modal?.setAttribute('aria-hidden','true'); }});
         });
     </script>
