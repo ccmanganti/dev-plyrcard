@@ -803,6 +803,14 @@
         .coach-out-inline button{font:inherit!important;}
         @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}}
 
+
+
+        /* FINAL NAV FIX: drawer is opened from the Locker Room-style bottom tab, not the header. */
+        .coach-drawer-tab{position:fixed!important;right:0!important;bottom:0!important;width:196px!important;height:54px!important;padding:0 12px 0 42px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;border:0!important;border-radius:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:18px!important;font-weight:900!important;line-height:1!important;text-transform:uppercase!important;cursor:pointer!important;pointer-events:auto!important;clip-path:polygon(32px 0,100% 0,100% 100%,0 100%)!important;z-index:2!important;}
+        .coach-drawer-tab i{font-size:13px!important;transition:transform .25s ease!important;}
+        .coach-action-drawer.is-open .coach-drawer-tab i{transform:rotate(180deg)!important;}
+        @media(max-width:390px){.coach-drawer-tab{width:184px!important;height:50px!important;padding-left:38px!important;font-size:16px!important;clip-path:polygon(29px 0,100% 0,100% 100%,0 100%)!important}}
+
     </style>
 </head>
 <body>
@@ -815,7 +823,6 @@
                 <div class="nav-actions">
                     <a class="nav-link" href="#teams">Teams</a>
                     @if($email)<a class="nav-link" href="mailto:{{ $email }}">Contact</a>@endif
-                    <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-actions><i class="fa-solid {{ $coachSession ? 'fa-bars-staggered' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Menu' : 'Check In' }}</button>
                 </div>
             </nav>
         </div>
@@ -1017,6 +1024,10 @@
                 @endif
             </div>
         </section>
+        <button class="coach-drawer-tab" type="button" data-open-actions>
+            <i class="fa-solid {{ $coachSession ? 'fa-bookmark' : 'fa-chevron-up' }}"></i>
+            <span>{{ $coachSession ? 'WATCHLIST' : 'CHECK IN' }}</span>
+        </button>
     </div>
 
     <div class="modal" id="coachModal" aria-hidden="true">

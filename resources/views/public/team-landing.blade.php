@@ -1599,6 +1599,34 @@
         .coach-drawer-tab.is-player{background:#ff5c35!important;}
         @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}.player-panel-bar{grid-template-columns:auto auto 1fr auto!important}.player-panel-title{font-size:12px!important}}
 
+
+
+        /* FINAL TEAM HERO + NAV FIX */
+        .nav-actions{display:none!important;}
+        .nav-brand-stack{gap:10px!important;}
+        .nav-back-inline{width:34px!important;height:34px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;color:#fff!important;text-decoration:none!important;border:0!important;background:transparent!important;font-size:14px!important;}
+        .nav-back-inline:hover{color:#ff7a1a!important;}
+
+        /* Make team hero information use the same full-width box language as club landing. */
+        .hero-inner{display:block!important;padding-bottom:0!important;}
+        .team-main-polished{display:grid!important;gap:22px!important;width:100%!important;}
+        .team-hero-identity{display:grid!important;grid-template-columns:70px minmax(0,1fr) 70px!important;grid-template-rows:auto auto!important;column-gap:18px!important;row-gap:18px!important;align-items:start!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;}
+        .team-hero-identity .identity-logo{grid-column:1!important;grid-row:1!important;justify-self:start!important;position:static!important;width:66px!important;height:66px!important;object-fit:contain!important;}
+        .team-hero-identity .identity-league{grid-column:3!important;grid-row:1!important;justify-self:end!important;position:static!important;width:66px!important;height:66px!important;object-fit:contain!important;}
+        .team-title-stack{grid-column:1/-1!important;grid-row:2!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;}
+        .team-title-stack .label{display:block!important;margin:0 0 8px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;color:rgba(255,255,255,.72)!important;font-size:11px!important;letter-spacing:.22em!important;line-height:1!important;}
+        .team-name{font-size:clamp(44px,6vw,78px)!important;line-height:.9!important;margin:0!important;background:transparent!important;border:0!important;box-shadow:none!important;}
+        .hero-info-strip{width:100vw!important;max-width:none!important;margin-left:calc(50% - 50vw)!important;margin-right:calc(50% - 50vw)!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;background:rgba(255,255,255,.12)!important;border-top:1px solid rgba(255,255,255,.16)!important;border-bottom:1px solid rgba(255,255,255,.16)!important;border-left:0!important;border-right:0!important;padding:0!important;}
+        .hero-info-card{min-height:92px!important;display:grid!important;grid-template-columns:54px minmax(0,1fr)!important;grid-template-rows:auto auto!important;column-gap:14px!important;align-items:center!important;padding:18px 24px!important;background:rgba(5,5,6,.52)!important;border:0!important;border-left:1px solid rgba(255,255,255,.16)!important;backdrop-filter:blur(16px)!important;box-shadow:none!important;}
+        .hero-info-card:first-child{border-left:0!important;}
+        .hero-info-icon,.hero-info-logo{grid-column:1!important;grid-row:1/3!important;width:34px!important;height:34px!important;object-fit:contain!important;color:rgba(220,232,239,.80)!important;font-size:22px!important;justify-self:center!important;align-self:center!important;}
+        .hero-info-label{grid-column:2!important;grid-row:1!important;display:block!important;margin:0 0 5px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;color:rgba(220,232,239,.70)!important;font-size:10px!important;font-weight:900!important;letter-spacing:.14em!important;text-transform:uppercase!important;line-height:1!important;}
+        .hero-info-value{grid-column:2!important;grid-row:2!important;display:block!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;color:#fff!important;font-family:var(--heading)!important;font-size:20px!important;font-weight:900!important;text-transform:uppercase!important;line-height:1.05!important;}
+        .hero-coach-actions{grid-column:2!important;display:flex!important;gap:8px!important;flex-wrap:wrap!important;margin-top:8px!important;}
+        .hero-coach-action{font-size:10px!important;font-weight:900!important;letter-spacing:.07em!important;text-transform:uppercase!important;color:#fff!important;opacity:.92!important;}
+        @media(min-width:901px){.hero-info-strip{width:100%!important;margin-left:0!important;margin-right:0!important;}}
+        @media(max-width:900px){.hero{min-height:0!important;height:auto!important}.hero-inner{padding:30px 18px 0!important}.team-main-polished{gap:18px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;column-gap:12px!important;row-gap:14px!important}.team-hero-identity .identity-logo,.team-hero-identity .identity-league{width:52px!important;height:52px!important}.team-title-stack .label{font-size:9px!important}.team-name{font-size:42px!important}.hero-info-strip{grid-template-columns:1fr!important;width:100vw!important;margin-left:calc(50% - 50vw)!important;margin-right:calc(50% - 50vw)!important}.hero-info-card{min-height:76px!important;grid-template-columns:48px minmax(0,1fr)!important;padding:14px 20px!important;border-left:0!important;border-top:1px solid rgba(255,255,255,.14)!important}.hero-info-card:first-child{border-top:0!important}.hero-info-value{font-size:18px!important}}
+
     </style>
 </head>
 <body>
@@ -1606,6 +1634,9 @@
     <div class="frame">
         <nav class="nav">
             <div class="nav-brand-stack">
+                <a class="nav-back-inline" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : url('/') }}" aria-label="Back to club">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
                 <a class="nav-brand" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : '/' }}" aria-label="PlyrCard home">
                     <span class="plyr-wordmark"><b>PLYR</b><em>CARD</em></span>
                 </a>
@@ -1623,23 +1654,7 @@
 
 ");
             @endphp
-            <div class="nav-actions">
-                @if($coachSession)
-                    <button class="btn" type="button" data-open-actions>
-                        <i class="fa-solid fa-bookmark"></i>
-                        My Watchlist
-                    </button>
-                    <a class="btn nav-email-list" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}">
-                        <i class="fa-solid fa-envelope"></i>
-                        Email List
-                    </a>
-                @else
-                    <button class="btn" type="button" data-open-actions>
-                        <i class="fa-solid fa-right-to-bracket"></i>
-                        Check In
-                    </button>
-                @endif
-            </div>
+            <div class="nav-actions" aria-hidden="true"></div>
         </nav>
     </div>
 
