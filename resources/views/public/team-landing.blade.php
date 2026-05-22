@@ -1528,8 +1528,9 @@
         .coach-drawer-card.is-accent{background:#ff5c35!important;color:#fff!important;}
         .coach-drawer-card.is-dark{background:#fff!important;color:#050505!important;border:0!important;}
 
-        .coach-drawer-card-form{margin:0!important;padding:0!important;display:block!important;min-width:0!important;}
-        .coach-drawer-card-form .coach-drawer-card{width:100%!important;height:100%!important;}
+        .coach-drawer-card-form,.coach-drawer-grid > form.watchlist-action-form{margin:0!important;padding:0!important;display:block!important;min-width:0!important;height:100%!important;}
+        .coach-drawer-card-form .coach-drawer-card,.coach-drawer-grid > form.watchlist-action-form .coach-drawer-card{width:100%!important;height:100%!important;min-height:52px!important;}
+        .coach-drawer-grid > form.watchlist-action-form .coach-drawer-card{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:4px!important;border-radius:7px!important;} 
         .coach-drawer-card i{font-size:13px!important;line-height:1!important;color:currentColor!important;}
         .coach-drawer-card span{display:block!important;color:currentColor!important;font-size:10px!important;line-height:1.02!important;font-weight:850!important;}
         .coach-drawer-note{margin:10px 0 0!important;color:rgba(255,255,255,.62)!important;font-size:12px!important;line-height:1.28!important;font-weight:650!important;}
@@ -1640,7 +1641,29 @@
         .player-dialog.is-swipe-save{animation:plyrSwipeSave .42s cubic-bezier(.4,0,.2,1) both}.player-dialog.is-swipe-next{animation:plyrSwipeNext .26s cubic-bezier(.2,.8,.2,1) both}
         @keyframes plyrSwipeSave{0%{transform:translateX(0) rotate(0);opacity:1}100%{transform:translateX(110%) rotate(8deg);opacity:0}}
         @keyframes plyrSwipeNext{0%{transform:translateX(-26%) scale(.96);opacity:0}100%{transform:translateX(0) scale(1);opacity:1}}
-        .saved-card{width:min(720px,100%)!important}.saved-modal-body{padding:12px!important}.saved-profile-list{display:grid;gap:8px}.saved-profile-row{position:relative;display:grid;grid-template-columns:58px 72px minmax(0,1fr) 28px;gap:11px;align-items:center;min-height:74px;padding:8px 10px;background:#0d0d10;border:1px solid var(--line);color:#fff;overflow:hidden}.saved-profile-row:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 14%,transparent),transparent 58%);opacity:.72}.saved-profile-row>*{position:relative;z-index:2}.saved-profile-avatar{width:50px;height:50px;border-radius:999px;object-fit:cover;background:#17181d;display:grid;place-items:center;color:#fff;font-family:var(--heading);font-size:20px;font-weight:950}.saved-profile-avatar.is-card{width:42px;height:58px;border-radius:7px;object-position:center top}.saved-profile-number{display:grid;gap:5px;min-width:0}.saved-profile-number strong{font-family:var(--heading);font-size:30px;line-height:.85;font-weight:950;color:#fff;letter-spacing:-.04em}.saved-profile-number span{font-family:var(--heading);font-size:11px;line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-readable);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy{min-width:0}.saved-profile-copy strong{display:block;font-family:var(--heading);font-size:20px;line-height:1;font-weight:950;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy span{display:block;margin-top:6px;color:rgba(255,255,255,.74);font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-arrow{display:grid;place-items:center;color:var(--brand-readable);font-size:14px;text-decoration:none}.saved-empty-state{padding:24px 14px;background:#0d0d10;border:1px solid var(--line);color:var(--muted);font-weight:850;text-align:center}.coach-drawer-card.is-loading,.player-quick-save button.is-loading{opacity:.7;pointer-events:none}
+        .saved-card{width:min(720px,100%)!important}.saved-modal-body{padding:12px!important}.saved-profile-list{display:grid;gap:8px}.saved-profile-row{position:relative;display:grid;grid-template-columns:58px 72px minmax(0,1fr) 28px;gap:11px;align-items:center;min-height:74px;padding:8px 10px;background:#0d0d10;border:1px solid var(--line);color:#fff;overflow:hidden}.saved-profile-row:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 14%,transparent),transparent 58%);opacity:.72}.saved-profile-row>*{position:relative;z-index:2}.saved-profile-avatar{width:50px;height:50px;border-radius:999px;object-fit:cover;background:#17181d;display:grid;place-items:center;color:#fff;font-family:var(--heading);font-size:20px;font-weight:950}.saved-profile-avatar.is-card{width:42px;height:58px;border-radius:7px;object-position:center top}.saved-profile-number{display:grid;gap:5px;min-width:0}.saved-profile-number strong{font-family:var(--heading);font-size:30px;line-height:.85;font-weight:950;color:#fff;letter-spacing:-.04em}.saved-profile-number span{font-family:var(--heading);font-size:11px;line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-readable);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy{min-width:0}.saved-profile-copy strong{display:block;font-family:var(--heading);font-size:20px;line-height:1;font-weight:950;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy span{display:block;margin-top:6px;color:rgba(255,255,255,.74);font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-arrow{display:grid;place-items:center;color:var(--brand-readable);font-size:14px;text-decoration:none}.saved-empty-state{padding:24px 14px;background:#0d0d10;border:1px solid var(--line);color:var(--muted);font-weight:850;text-align:center}.saved-profile-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:4px}.saved-profile-action,.saved-profile-action-form{min-width:0;margin:0}.saved-profile-action,.saved-profile-action-form button{width:100%;min-height:42px;border:0;border-radius:7px;background:#fff;color:#050505;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--heading);font-size:10px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.22)}.saved-profile-action.is-remove,.saved-profile-action-form button{background:#ff5c35;color:#fff}.saved-profile-action.is-disabled{opacity:.42;pointer-events:none}.saved-profile-action i,.saved-profile-action-form i{font-size:12px;color:currentColor}.coach-drawer-card.is-loading,.player-quick-save button.is-loading,.saved-profile-action-form button.is-loading{opacity:.7;pointer-events:none}
+    
+
+        /* Final loading + swipe animation polish. */
+        .page-loading-overlay{position:fixed;inset:0;z-index:200000;display:grid;place-items:center;background:rgba(0,0,0,.62);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .18s ease;}
+        .page-loading-overlay.is-visible{opacity:1;pointer-events:auto;}
+        .page-loader-card{display:grid;gap:10px;place-items:center;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;}
+        .page-loader-spinner{width:38px;height:38px;border-radius:999px;border:3px solid rgba(255,255,255,.24);border-top-color:#ff5c35;animation:plyrSpin .72s linear infinite;}
+        .is-loading{position:relative;opacity:.72!important;pointer-events:none!important;}
+        .is-loading:after{content:"";width:14px;height:14px;border-radius:999px;border:2px solid currentColor;border-top-color:transparent;display:inline-block;margin-left:8px;vertical-align:-2px;animation:plyrSpin .7s linear infinite;}
+        @keyframes plyrSpin{to{transform:rotate(360deg)}}
+        .player-dialog.is-swipe-left{animation:plyrSwipeLeft .28s cubic-bezier(.4,0,.2,1) both;}
+        .player-dialog.is-swipe-right{animation:plyrSwipeRight .28s cubic-bezier(.4,0,.2,1) both;}
+        .player-dialog.is-swipe-enter-left{animation:plyrEnterLeft .28s cubic-bezier(.2,.8,.2,1) both;}
+        .player-dialog.is-swipe-enter-right{animation:plyrEnterRight .28s cubic-bezier(.2,.8,.2,1) both;}
+        @keyframes plyrSwipeLeft{to{opacity:0;transform:translateX(-45px) rotate(-3deg) scale(.985);filter:blur(2px)}}
+        @keyframes plyrSwipeRight{to{opacity:0;transform:translateX(45px) rotate(3deg) scale(.985);filter:blur(2px)}}
+        @keyframes plyrEnterLeft{from{opacity:0;transform:translateX(45px) rotate(3deg) scale(.985);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+        @keyframes plyrEnterRight{from{opacity:0;transform:translateX(-45px) rotate(-3deg) scale(.985);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+        .coach-drawer-card-form{display:flex!important;min-height:52px!important;margin:0!important;}
+        .coach-drawer-card-form button.coach-drawer-card{width:100%!important;height:auto!important;min-height:52px!important;}
+        .coach-drawer-card.is-loading:after,.saved-profile-action-form button.is-loading:after{display:block;margin:4px auto 0;}
+
     </style>
 </head>
 <body>
@@ -1772,6 +1795,9 @@
     <footer class="footer"><div class="wrap footer-grid"><div>© {{ now()->year }} {{ $team->name }}. Powered by PlyrCard.</div><div>{{ $club->name }}</div></div></footer>
 </main>
 
+
+<div class="page-loading-overlay" id="pageLoadingOverlay" aria-hidden="true"><div class="page-loader-card"><span class="page-loader-spinner"></span><span>Loading</span></div></div>
+
 <div class="modal" id="coachModal" aria-hidden="true">
     <div class="coach-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
         <div class="modal-head"><div class="modal-title" id="coachModalTitle">Coach Info</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
@@ -1835,11 +1861,35 @@
                                     <span>{{ $savedAcademic }}</span>
                                 @endif
                             </div>
-                            @if(filled($saved['player_url'] ?? null))
-                                <a class="saved-profile-arrow" href="{{ $saved['player_url'] }}" target="_blank" rel="noopener" aria-label="Open {{ $savedName }} website"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                            @else
-                                <span class="saved-profile-arrow"><i class="fa-solid fa-bookmark"></i></span>
-                            @endif
+                            <span class="saved-profile-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                            @php
+                                $savedPlayerId = (int) ($saved['player_id'] ?? $saved['id'] ?? 0);
+                                $savedRemoveUrl = $savedPlayerId ? route('clubs.coach-unsave-player', ['clubSlug' => $club->landing_page_slug, 'gender' => $currentGenderSegment, 'teamSlug' => $team->landing_page_slug, 'player' => $savedPlayerId]) : null;
+                                $savedPhone = preg_replace('/\D+/', '', (string) ($saved['player_phone'] ?? $saved['phone'] ?? ''));
+                            @endphp
+                            <div class="saved-profile-actions">
+                                @if($savedRemoveUrl)
+                                    <form class="saved-profile-action-form watchlist-action-form" data-watchlist-form data-watchlist-action="remove" method="POST" action="{{ $savedRemoveUrl }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"><i class="fa-solid fa-bookmark-slash"></i> Remove</button>
+                                    </form>
+                                @else
+                                    <span class="saved-profile-action is-remove is-disabled"><i class="fa-solid fa-bookmark-slash"></i> Remove</span>
+                                @endif
+
+                                @if(filled($saved['player_url'] ?? null))
+                                    <a class="saved-profile-action" href="{{ $saved['player_url'] }}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Website</a>
+                                @else
+                                    <span class="saved-profile-action is-disabled"><i class="fa-solid fa-arrow-up-right-from-square"></i> Website</span>
+                                @endif
+
+                                @if(filled($savedPhone))
+                                    <a class="saved-profile-action" href="tel:{{ $savedPhone }}"><i class="fa-solid fa-phone"></i> Call/Text</a>
+                                @else
+                                    <span class="saved-profile-action is-disabled"><i class="fa-solid fa-phone"></i> Call/Text</span>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 @else
@@ -1915,6 +1965,31 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
+
+    const pageLoadingOverlay = document.getElementById('pageLoadingOverlay');
+    const showPageLoading = (label) => {
+        if(!pageLoadingOverlay) return;
+        const text = pageLoadingOverlay.querySelector('.page-loader-card span:last-child');
+        if(text) text.textContent = label || 'Loading';
+        pageLoadingOverlay.classList.add('is-visible');
+        pageLoadingOverlay.setAttribute('aria-hidden','false');
+    };
+    document.querySelectorAll('a[href]').forEach(link => {
+        link.addEventListener('click', function(){
+            const href = this.getAttribute('href') || '';
+            if(!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('sms:') || this.target === '_blank' || this.hasAttribute('download')) return;
+            showPageLoading('Loading');
+        });
+    });
+    document.querySelectorAll('form').forEach(form => {
+        if(form.hasAttribute('data-watchlist-form')) return;
+        form.addEventListener('submit', function(){
+            const button = form.querySelector('button[type="submit"]');
+            button?.classList.add('is-loading');
+            showPageLoading('Working');
+        });
+    });
+
     const coachModal = document.getElementById('coachModal');
     const savedModal = document.getElementById('savedModal');
     const coachActionDrawer = document.getElementById('coachActionDrawer');
@@ -1965,11 +2040,19 @@ document.addEventListener('DOMContentLoaded', function(){
         const initial = name.trim().charAt(0).toUpperCase() || 'P';
         const academic = savedAcademicLine(player);
         const url = player.player_url || player.website_url || '';
-        return `<div class="saved-profile-row" data-saved-player-id="${esc(player.player_id || player.id || '')}">
+        const id = player.player_id || player.id || '';
+        const phone = clean(player.player_phone || player.phone).replace(/\D+/g, '');
+        const removeUrl = id ? unsaveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(id)) : '';
+        return `<div class="saved-profile-row" data-saved-player-id="${esc(id)}">
             ${img ? `<img class="saved-profile-avatar ${player.card_image || player.plyrcard_image ? 'is-card' : ''}" src="${esc(img)}" alt="${esc(name)}">` : `<div class="saved-profile-avatar"><span>${esc(initial)}</span></div>`}
             <div class="saved-profile-number"><strong>${esc(savedJersey(player))}</strong><span>${esc(savedPosition(player))}</span></div>
             <div class="saved-profile-copy"><strong>${esc(name)}</strong>${academic ? `<span>${esc(academic)}</span>` : ''}</div>
-            ${url ? `<a class="saved-profile-arrow" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Open ${esc(name)} website"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : `<span class="saved-profile-arrow"><i class="fa-solid fa-bookmark"></i></span>`}
+            <span class="saved-profile-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+            <div class="saved-profile-actions">
+                ${removeUrl ? `<form class="saved-profile-action-form watchlist-action-form" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(removeUrl)}"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button type="submit"><i class="fa-solid fa-bookmark-slash"></i> Remove</button></form>` : `<span class="saved-profile-action is-remove is-disabled"><i class="fa-solid fa-bookmark-slash"></i> Remove</span>`}
+                ${url ? `<a class="saved-profile-action" href="${esc(url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Website</a>` : `<span class="saved-profile-action is-disabled"><i class="fa-solid fa-arrow-up-right-from-square"></i> Website</span>`}
+                ${phone ? `<a class="saved-profile-action" href="tel:${esc(phone)}"><i class="fa-solid fa-phone"></i> Call/Text</a>` : `<span class="saved-profile-action is-disabled"><i class="fa-solid fa-phone"></i> Call/Text</span>`}
+            </div>
         </div>`;
     }
     function renderSavedList(){
@@ -2029,9 +2112,9 @@ document.addEventListener('DOMContentLoaded', function(){
             return `<button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>${compact ? 'Check In' : '<span>Check In</span>'}</button>`;
         }
         if(isSaved){
-            return `<form class="watchlist-action-form" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
+            return `<form class="watchlist-action-form ${compact ? '' : 'coach-drawer-card-form'}" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
         }
-        return `<form class="watchlist-action-form" data-watchlist-form data-watchlist-action="save" method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
+        return `<form class="watchlist-action-form ${compact ? '' : 'coach-drawer-card-form'}" data-watchlist-form data-watchlist-action="save" method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
     }
     function renderPlayerDrawer(player){
         currentPlayer = player;
@@ -2102,7 +2185,25 @@ document.addEventListener('DOMContentLoaded', function(){
     }
     function openPlayer(index){const player = dataAt(index); if(!player) return; active = index; renderPlayerDrawer(player); coachActionDrawer?.classList.add('has-player'); document.querySelector('.coach-drawer-tab')?.classList.add('is-player'); const tabText = document.querySelector('.coach-drawer-tab span'); if(tabText) tabText.textContent = 'ACTIONS'; title.innerHTML = '<i class="fa-solid fa-id-card"></i> Player Card'; dialog.innerHTML = render(player); overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';}
     function closePlayer(){overlay.classList.remove('is-open'); overlay.setAttribute('aria-hidden','true'); dialog.innerHTML=''; if(playerQuickSave) playerQuickSave.innerHTML=''; coachActionDrawer?.classList.remove('has-player'); document.querySelector('.coach-drawer-tab')?.classList.remove('is-player'); const tabText = document.querySelector('.coach-drawer-tab span'); if(tabText) tabText.textContent = checkedIn ? 'WATCHLIST' : 'CHECK IN'; if(drawerTitle) drawerTitle.textContent = checkedIn ? 'Coach Navigation' : 'Coach Check-In'; document.body.style.overflow='';}
-    function next(){if(!cards.length)return; openPlayer((active+1)%cards.length);} function prev(){if(!cards.length)return; openPlayer((active-1+cards.length)%cards.length);}
+    function switchPlayer(index, direction){
+        if(!cards.length) return;
+        const player = dataAt(index);
+        if(!player) return;
+        const exitClass = direction === 'prev' ? 'is-swipe-right' : 'is-swipe-left';
+        const enterClass = direction === 'prev' ? 'is-swipe-enter-right' : 'is-swipe-enter-left';
+        dialog.classList.remove('is-swipe-left','is-swipe-right','is-swipe-enter-left','is-swipe-enter-right','is-swipe-save','is-swipe-next');
+        dialog.classList.add(exitClass);
+        setTimeout(() => {
+            active = index;
+            renderPlayerDrawer(player);
+            dialog.innerHTML = render(player);
+            dialog.classList.remove(exitClass);
+            dialog.classList.add(enterClass);
+            setTimeout(() => dialog.classList.remove(enterClass), 290);
+        }, 245);
+    }
+    function next(){if(!cards.length)return; switchPlayer((active+1)%cards.length, 'next');}
+    function prev(){if(!cards.length)return; switchPlayer((active-1+cards.length)%cards.length, 'prev');}
     cards.forEach((card, i) => card.addEventListener('click', e => {e.preventDefault(); openPlayer(i);}));
     closeBtn?.addEventListener('click', closePlayer); backBtn?.addEventListener('click', closePlayer); nextBtn?.addEventListener('click', next); prevBtn?.addEventListener('click', prev); overlay?.addEventListener('click', e => {if(e.target===overlay) closePlayer();});
     document.addEventListener('submit', async function(event){

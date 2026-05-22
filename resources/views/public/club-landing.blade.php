@@ -99,7 +99,7 @@
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
         $clubFacts = collect([
             ['icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $teamCount],
-            ['icon' => 'fa-trophy', 'label' => 'League', 'value' => $club->league?->name ?: 'TBD'],
+            ['icon' => 'fa-trophy', 'logo' => $leagueLogo, 'label' => 'League', 'value' => $club->league?->name ?: 'TBD'],
             ['icon' => 'fa-location-dot', 'label' => 'Location', 'value' => $address ?: 'TBD'],
         ]);
 
@@ -193,7 +193,7 @@
         .team-card-player.is-2{right:36px;transform:translateY(-50%) rotate(-2deg) scale(1.03);z-index:3;animation-delay:.8s}
         .team-card-player.is-3{right:0;transform:translateY(-44%) rotate(9deg);z-index:2;animation-delay:1.2s;opacity:.95}
         .team-card-player.is-single{right:18px;transform:translateY(-50%) rotate(-1deg);width:78px;height:108px;z-index:3}
-        .team-card-player-tag{position:absolute;left:8px;right:8px;bottom:8px;padding:4px 6px;border-radius:8px;background:rgba(0,0,0,.54);backdrop-filter:blur(10px);font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+        .team-card-player-tag{display:none!important;position:absolute;left:8px;right:8px;bottom:8px;padding:4px 6px;border-radius:8px;background:rgba(0,0,0,.54);backdrop-filter:blur(10px);font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
         .team-card-fallback-logos{height:92px;display:flex;align-items:center;justify-content:flex-end;isolation:isolate}
         .team-card-fallback-logos .team-card-tile{width:54px;height:74px;margin-left:-18px;border-radius:9px 9px 12px 12px;background:linear-gradient(160deg,#c9c9c9,#565b65);border:1px solid rgba(255,255,255,.30);box-shadow:0 12px 24px rgba(0,0,0,.38);display:grid;place-items:center;transform:skewY(-2deg)}
         .team-card-fallback-logos .team-card-tile img{max-width:76%;max-height:76%;object-fit:contain}
@@ -811,6 +811,90 @@
         .coach-action-drawer.is-open .coach-drawer-tab i{transform:rotate(180deg)!important;}
         @media(max-width:390px){.coach-drawer-tab{width:184px!important;height:50px!important;padding-left:38px!important;font-size:16px!important;clip-path:polygon(29px 0,100% 0,100% 100%,0 100%)!important}}
 
+    
+
+        /* FINAL REVISION: club hero facts use 2-row layout, full-width, icon spans both rows. */
+        .hero .hero-side{
+            display:grid !important;
+            gap:0 !important;
+            background:rgba(255,255,255,.12) !important;
+            border-top:1px solid rgba(255,255,255,.16) !important;
+            border-bottom:1px solid rgba(255,255,255,.16) !important;
+            border-left:0 !important;
+            border-right:0 !important;
+        }
+        .hero .hero-side.facts-count-1{grid-template-columns:1fr !important;}
+        .hero .hero-side.facts-count-2{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+        .hero .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+        .hero .hero-side.facts-count-4{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}
+        .hero .fact{
+            min-height:92px !important;
+            display:grid !important;
+            grid-template-columns:54px minmax(0,1fr) !important;
+            grid-template-rows:auto auto !important;
+            column-gap:14px !important;
+            align-items:center !important;
+            padding:18px 24px !important;
+            border-left:1px solid rgba(255,255,255,.16) !important;
+            background:rgba(5,5,6,.52) !important;
+            backdrop-filter:blur(16px) !important;
+        }
+        .hero .fact:first-child{border-left:0 !important;}
+        .hero .fact i,
+        .hero .fact .fact-logo{
+            grid-column:1 !important;
+            grid-row:1 / span 2 !important;
+            width:34px !important;
+            height:34px !important;
+            object-fit:contain !important;
+            align-self:center !important;
+            justify-self:center !important;
+            color:rgba(220,232,239,.82) !important;
+            font-size:22px !important;
+            margin:0 !important;
+        }
+        .hero .fact span{
+            grid-column:2 !important;
+            grid-row:1 !important;
+            display:block !important;
+            margin:0 0 5px !important;
+            color:rgba(220,232,239,.70) !important;
+            font-size:10px !important;
+            font-weight:900 !important;
+            letter-spacing:.14em !important;
+            text-transform:uppercase !important;
+            line-height:1 !important;
+            align-self:end !important;
+        }
+        .hero .fact strong{
+            grid-column:2 !important;
+            grid-row:2 !important;
+            display:block !important;
+            color:#fff !important;
+            font-family:var(--heading) !important;
+            font-size:20px !important;
+            font-weight:900 !important;
+            text-transform:uppercase !important;
+            line-height:1.05 !important;
+            align-self:start !important;
+        }
+        @media(max-width:900px){
+            .hero .hero-side{grid-template-columns:1fr !important;margin-left:-22px !important;margin-right:-22px !important;}
+            .hero .fact{min-height:76px !important;grid-template-columns:48px minmax(0,1fr) !important;padding:14px 20px !important;border-left:0 !important;border-top:1px solid rgba(255,255,255,.14) !important;}
+            .hero .fact:first-child{border-top:0 !important;}
+            .hero .fact i,.hero .fact .fact-logo{width:30px !important;height:30px !important;font-size:18px !important;}
+            .hero .fact strong{font-size:18px !important;}
+        }
+
+        /* Global loading feedback for club page navigation and form actions. */
+        .page-loading-overlay{position:fixed;inset:0;z-index:200000;display:grid;place-items:center;background:rgba(0,0,0,.62);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .18s ease;}
+        .page-loading-overlay.is-visible{opacity:1;pointer-events:auto;}
+        .page-loader-card{display:grid;gap:10px;place-items:center;color:#fff;font-family:var(--heading);font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;}
+        .page-loader-spinner{width:38px;height:38px;border-radius:999px;border:3px solid rgba(255,255,255,.24);border-top-color:#ff5c35;animation:plyrSpin .72s linear infinite;}
+        .is-loading{position:relative;opacity:.72!important;pointer-events:none!important;}
+        .is-loading:after{content:"";width:14px;height:14px;border-radius:999px;border:2px solid currentColor;border-top-color:transparent;display:inline-block;margin-left:8px;vertical-align:-2px;animation:plyrSpin .7s linear infinite;}
+        @keyframes plyrSpin{to{transform:rotate(360deg)}}
+
     </style>
 </head>
 <body>
@@ -849,11 +933,13 @@
                 <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
                     @foreach($clubFacts as $fact)
                         <div class="fact">
-                            <i class="fa-solid {{ $fact['icon'] }}"></i>
-                            <div>
-                                <span>{{ $fact['label'] }}</span>
-                                <strong>{{ $fact['value'] }}</strong>
-                            </div>
+                            @if(filled($fact['logo'] ?? null))
+                                <img class="fact-logo" src="{{ $fact['logo'] }}" alt="{{ $fact['label'] }} logo">
+                            @else
+                                <i class="fa-solid {{ $fact['icon'] }}"></i>
+                            @endif
+                            <span>{{ $fact['label'] }}</span>
+                            <strong>{{ $fact['value'] }}</strong>
                         </div>
                     @endforeach
                 </aside>
@@ -988,7 +1074,10 @@
         </footer>
     </main>
 
-    <div class="coach-action-drawer" id="coachActionDrawer" aria-hidden="true">
+    
+<div class="page-loading-overlay" id="pageLoadingOverlay" aria-hidden="true"><div class="page-loader-card"><span class="page-loader-spinner"></span><span>Loading</span></div></div>
+
+<div class="coach-action-drawer" id="coachActionDrawer" aria-hidden="true">
         <div class="coach-drawer-scrim" data-close-actions></div>
         <section class="coach-drawer-panel" aria-label="Coach navigation">
             <div class="coach-drawer-handle" aria-hidden="true"></div>
@@ -1057,6 +1146,30 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function(){
+
+    const pageLoadingOverlay = document.getElementById('pageLoadingOverlay');
+    const showPageLoading = (label) => {
+        if(!pageLoadingOverlay) return;
+        const text = pageLoadingOverlay.querySelector('.page-loader-card span:last-child');
+        if(text) text.textContent = label || 'Loading';
+        pageLoadingOverlay.classList.add('is-visible');
+        pageLoadingOverlay.setAttribute('aria-hidden','false');
+    };
+    document.querySelectorAll('a[href]').forEach(link => {
+        link.addEventListener('click', function(e){
+            const href = this.getAttribute('href') || '';
+            if(!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('sms:') || this.target === '_blank' || this.hasAttribute('download')) return;
+            showPageLoading('Loading');
+        });
+    });
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(){
+            const button = form.querySelector('button[type="submit"]');
+            button?.classList.add('is-loading');
+            showPageLoading('Working');
+        });
+    });
+
             const modal = document.getElementById('coachModal');
             const coachActionDrawer = document.getElementById('coachActionDrawer');
             const openActions = () => { coachActionDrawer?.classList.add('is-open'); coachActionDrawer?.setAttribute('aria-hidden','false'); };
