@@ -1578,11 +1578,13 @@
 
         /* Final pull-up navigation revision: keep player actions inside drawer, not sticky under card. */
         .player-actions{display:none!important;}
-        .player-panel-bar{display:grid!important;grid-template-columns:auto auto minmax(0,1fr) auto!important;gap:8px!important;align-items:center!important;}
-        .player-quick-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:36px!important;}
-        .player-quick-save form{margin:0!important;display:inline-flex!important;}
-        .player-quick-save button{height:34px!important;min-width:74px!important;border:0!important;border-radius:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:12px!important;font-weight:950!important;letter-spacing:.08em!important;text-transform:uppercase!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;cursor:pointer!important;padding:0 11px!important;}
+        .player-panel-bar{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;gap:8px!important;align-items:center!important;}
+        .player-quick-save{display:none!important;}
+        .player-overlay.is-open .player-quick-save{position:fixed!important;left:0!important;bottom:0!important;z-index:2305!important;display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;width:154px!important;height:54px!important;pointer-events:auto!important;}
+        .player-quick-save form{margin:0!important;display:flex!important;width:100%!important;height:100%!important;}
+        .player-quick-save button{width:100%!important;height:54px!important;border:0!important;border-radius:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:18px!important;font-weight:950!important;letter-spacing:.05em!important;text-transform:uppercase!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;cursor:pointer!important;padding:0 40px 0 14px!important;clip-path:polygon(0 0,calc(100% - 32px) 0,100% 100%,0 100%)!important;box-shadow:0 -10px 28px rgba(0,0,0,.38)!important;}
         .player-quick-save button.is-remove{background:#fff!important;color:#050505!important;}
+        .player-quick-save button i{font-size:13px!important;}
         .coach-drawer-form{display:grid!important;gap:8px!important;margin-top:8px!important;}
         .coach-drawer-form label{display:grid!important;gap:5px!important;color:rgba(255,255,255,.62)!important;font-size:10px!important;font-weight:900!important;letter-spacing:.055em!important;text-transform:uppercase!important;}
         .coach-drawer-form input{height:38px!important;border:1px solid rgba(255,255,255,.12)!important;background:#101116!important;color:#fff!important;padding:0 11px!important;font:inherit!important;font-family:var(--heading)!important;font-size:13px!important;font-weight:800!important;outline:none!important;}
@@ -1597,7 +1599,7 @@
         .coach-player-summary span{display:block!important;margin-top:4px!important;color:rgba(255,255,255,.62)!important;font-size:11px!important;font-weight:850!important;text-transform:uppercase!important;}
         .coach-player-summary-img{width:42px!important;height:42px!important;border-radius:50%!important;background:#15161b!important;object-fit:cover!important;display:grid!important;place-items:center!important;color:#fff!important;}
         .coach-drawer-tab.is-player{background:#ff5c35!important;}
-        @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}.player-panel-bar{grid-template-columns:auto auto 1fr auto!important}.player-panel-title{font-size:12px!important}}
+        @media(max-width:420px){.coach-drawer-form-row{grid-template-columns:1fr!important}.player-panel-bar{grid-template-columns:auto 1fr auto!important}.player-panel-title{font-size:12px!important}.player-overlay.is-open .player-quick-save{width:142px!important;height:50px!important}.player-quick-save button{height:50px!important;font-size:16px!important;padding-left:12px!important;padding-right:34px!important;clip-path:polygon(0 0,calc(100% - 29px) 0,100% 100%,0 100%)!important}}
 
 
 
@@ -1863,8 +1865,9 @@
 </div>
 
 <div class="player-overlay" id="playerOverlay" aria-hidden="true">
+    <div class="player-quick-save" id="playerQuickSave" aria-label="Save player"></div>
     <div class="player-panel">
-        <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-quick-save" id="playerQuickSave"></div><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-id-card"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
+        <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-id-card"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
         <button class="player-nav-arrow is-left" id="playerPrevBtn" type="button" aria-label="Previous player"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="player-nav-arrow is-right" id="playerNextBtn" type="button" aria-label="Next player"><i class="fa-solid fa-chevron-right"></i></button>
         <div class="player-dialog" id="playerDialog"></div>
