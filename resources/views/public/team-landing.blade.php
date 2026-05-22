@@ -1664,6 +1664,39 @@
         .coach-drawer-card-form button.coach-drawer-card{width:100%!important;height:auto!important;min-height:52px!important;}
         .coach-drawer-card.is-loading:after,.saved-profile-action-form button.is-loading:after{display:block;margin:4px auto 0;}
 
+    
+
+        /* FINAL TIGHTEN: keep hero info label/value close together */
+        .hero-info-card{
+            grid-template-rows:min-content min-content !important;
+            row-gap:4px !important;
+            align-content:center !important;
+            align-items:center !important;
+        }
+        .hero-info-icon,
+        .hero-info-logo{
+            grid-row:1 / 3 !important;
+            align-self:center !important;
+        }
+        .hero-info-label{
+            grid-row:1 !important;
+            align-self:end !important;
+            margin:0 !important;
+            line-height:1 !important;
+        }
+        .hero-info-value{
+            grid-row:2 !important;
+            align-self:start !important;
+            margin:0 !important;
+            line-height:1.02 !important;
+        }
+        @media(max-width:900px){
+            .hero-info-card{
+                row-gap:4px !important;
+                align-content:center !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -2246,3 +2279,111 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 </body>
 </html>
+{{-- FINAL PATCH: keep team hero info in a compact grid, matching the club info-box language --}}
+<style>
+    .hero-info-strip{
+        display:grid!important;
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        width:100%!important;
+        max-width:100%!important;
+        margin-left:0!important;
+        margin-right:0!important;
+        gap:1px!important;
+        background:rgba(255,255,255,.12)!important;
+        border-top:1px solid rgba(255,255,255,.15)!important;
+        border-bottom:1px solid rgba(255,255,255,.15)!important;
+        border-left:0!important;
+        border-right:0!important;
+        overflow:hidden!important;
+    }
+    .hero-info-card{
+        min-width:0!important;
+        min-height:86px!important;
+        display:grid!important;
+        grid-template-columns:44px minmax(0,1fr)!important;
+        grid-template-rows:auto auto!important;
+        column-gap:12px!important;
+        align-items:center!important;
+        padding:15px 16px!important;
+        background:rgba(5,5,6,.55)!important;
+        border:0!important;
+        box-shadow:none!important;
+        text-align:left!important;
+        overflow:hidden!important;
+    }
+    .hero-info-card:nth-child(3){grid-column:1 / -1!important;}
+    .hero-info-icon,
+    .hero-info-logo{
+        grid-column:1!important;
+        grid-row:1 / 3!important;
+        width:31px!important;
+        height:31px!important;
+        font-size:20px!important;
+        object-fit:contain!important;
+        align-self:center!important;
+        justify-self:center!important;
+        color:rgba(220,232,239,.84)!important;
+        margin:0!important;
+    }
+    .hero-info-label{
+        grid-column:2!important;
+        grid-row:1!important;
+        min-width:0!important;
+        margin:0 0 5px!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:rgba(220,232,239,.70)!important;
+        font-family:var(--heading)!important;
+        font-size:9px!important;
+        line-height:1!important;
+        font-weight:900!important;
+        letter-spacing:.13em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        white-space:nowrap!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .hero-info-value{
+        grid-column:2!important;
+        grid-row:2!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:#fff!important;
+        font-family:var(--heading)!important;
+        font-size:18px!important;
+        line-height:1.04!important;
+        font-weight:900!important;
+        letter-spacing:.02em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .hero-coach-actions{grid-column:2!important;display:flex!important;gap:8px!important;flex-wrap:wrap!important;margin-top:7px!important;}
+    .hero-coach-action{font-size:9px!important;line-height:1!important;font-weight:900!important;letter-spacing:.08em!important;color:#fff!important;opacity:.92!important;}
+    @media(max-width:900px){
+        .hero-info-strip{
+            grid-template-columns:repeat(2,minmax(0,1fr))!important;
+            width:calc(100% + 36px)!important;
+            max-width:calc(100% + 36px)!important;
+            margin-left:-18px!important;
+            margin-right:-18px!important;
+        }
+        .hero-info-card{min-height:78px!important;grid-template-columns:40px minmax(0,1fr)!important;padding:13px 14px!important;}
+        .hero-info-card:nth-child(3){grid-column:1 / -1!important;}
+        .hero-info-icon,.hero-info-logo{width:28px!important;height:28px!important;font-size:18px!important;}
+        .hero-info-label{font-size:8px!important;letter-spacing:.11em!important;}
+        .hero-info-value{font-size:16px!important;line-height:1.02!important;}
+    }
+    @media(max-width:420px){
+        .hero-info-card{min-height:76px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:12px 12px!important;}
+        .hero-info-value{font-size:15px!important;}
+    }
+</style>

@@ -895,6 +895,44 @@
         .is-loading:after{content:"";width:14px;height:14px;border-radius:999px;border:2px solid currentColor;border-top-color:transparent;display:inline-block;margin-left:8px;vertical-align:-2px;animation:plyrSpin .7s linear infinite;}
         @keyframes plyrSpin{to{transform:rotate(360deg)}}
 
+    
+
+        /* FINAL TIGHTEN: keep hero fact label/value close together */
+        .hero .fact{
+            grid-template-columns:44px minmax(0,1fr) !important;
+            grid-template-rows:min-content min-content !important;
+            column-gap:12px !important;
+            row-gap:3px !important;
+            align-content:center !important;
+            align-items:center !important;
+        }
+        .hero .fact i,
+        .hero .fact .fact-logo{
+            grid-row:1 / 3 !important;
+            align-self:center !important;
+        }
+        .hero .fact span{
+            grid-column:2 !important;
+            grid-row:1 !important;
+            align-self:end !important;
+            margin:0 !important;
+            line-height:1 !important;
+        }
+        .hero .fact strong{
+            grid-column:2 !important;
+            grid-row:2 !important;
+            align-self:start !important;
+            margin:0 !important;
+            line-height:1.02 !important;
+        }
+        @media(max-width:900px){
+            .hero .fact{
+                grid-template-columns:38px minmax(0,1fr) !important;
+                row-gap:3px !important;
+                align-content:center !important;
+            }
+        }
+
     </style>
 </head>
 <body>
