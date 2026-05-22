@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -652,13 +653,45 @@ class PublicClubTeamController extends Controller
         $fromName = 'PlyrCard';
         $subject = 'Your PlyrCard Watchlist - ' . ($club->name ?? 'Club');
 
-        $htmlBody = view('emails.coach-watchlist', [
+        $emailData = [
             'coach' => $coachCheckIn,
             'watchlist' => $watchlist,
             'club' => $club,
-        ])->render();
+        ];
+
+        try {
+            $htmlBody = view('emails.coach-watchlist', $emailData)->render();
+        } catch (\Throwable $exception) {
+            report($exception);
+            $htmlBody = nl2br(e($this->buildCoachWatchlistTextEmail($coachCheckIn, $watchlist, $club)));
+        }
 
         $textBody = $this->buildCoachWatchlistTextEmail($coachCheckIn, $watchlist, $club);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Try Laravel Mail first, then native domain mail as a fallback.
+        |--------------------------------------------------------------------------
+        |
+        | This makes the button work whether the app has a Laravel mail transport
+        | configured or the server only allows the support@plyrcard.com native
+        | domain sender. The controller still returns JSON so the drawer can show
+        | the Email Sent check state immediately after a successful send.
+        |
+        */
+        try {
+            Mail::send('emails.coach-watchlist', $emailData, function ($message) use ($coachEmail, $fromEmail, $fromName, $subject) {
+                $message
+                    ->to($coachEmail)
+                    ->from($fromEmail, $fromName)
+                    ->replyTo($fromEmail, $fromName)
+                    ->subject($subject);
+            });
+
+            return true;
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         return $this->sendNativeMultipartMail(
             to: $coachEmail,
