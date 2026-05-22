@@ -1484,6 +1484,97 @@
         .hero-coach-actions{grid-column:2!important;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}.hero-coach-action{font-size:10px;font-weight:900;text-transform:uppercase;color:var(--brand-readable)}
         @media(max-width:900px){.hero{min-height:0!important;height:auto!important}.hero-inner{padding:30px 18px 0!important}.team-main-polished{gap:18px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;column-gap:12px!important;row-gap:14px!important}.team-hero-identity .identity-logo,.team-hero-identity .identity-league{width:52px!important;height:52px!important}.team-title-stack .label{font-size:9px!important}.team-name{font-size:42px!important}.hero-info-strip{grid-template-columns:1fr!important;margin:0 -18px!important;border-left:0!important;border-right:0!important}.hero-info-card{min-height:66px!important;grid-template-columns:42px minmax(0,1fr)!important;padding:12px 18px!important}.hero-info-value{font-size:16px!important}}
 
+
+        /* LOCKER ROOM STYLE PULL-UP + CLEAN CLUB-STYLE TEAM HERO FINAL PATCH */
+        .hero-info-card .hero-info-label,
+        .hero-info-card span.hero-info-label{
+            background:transparent!important;
+            border:0!important;
+            box-shadow:none!important;
+            min-height:auto!important;
+            padding:0!important;
+            margin:0!important;
+            justify-content:start!important;
+            text-align:left!important;
+            backdrop-filter:none!important;
+        }
+
+        .hero-info-card .hero-info-value{
+            background:transparent!important;
+            border:0!important;
+            box-shadow:none!important;
+            padding:0!important;
+            margin:0!important;
+        }
+
+        .hero-info-card{overflow:hidden!important;}
+        .hero-info-card .hero-coach-actions{grid-column:2!important;grid-row:auto!important;margin-top:7px!important;display:flex!important;gap:10px!important;align-items:center!important;flex-wrap:wrap!important;}
+        .hero-coach-action{display:inline-flex!important;align-items:center!important;gap:5px!important;color:#fff!important;opacity:.92!important;font-family:var(--heading)!important;font-size:10px!important;line-height:1!important;font-weight:900!important;letter-spacing:.08em!important;text-transform:uppercase!important;}
+
+        .coach-action-drawer{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100vw!important;max-width:100vw!important;z-index:100000!important;pointer-events:none!important;color:#fff!important;}
+        .coach-action-drawer.is-open{pointer-events:auto!important;}
+        .coach-drawer-scrim{position:fixed!important;inset:0!important;background:rgba(0,0,0,.44)!important;backdrop-filter:blur(3px)!important;-webkit-backdrop-filter:blur(3px)!important;opacity:0!important;pointer-events:none!important;transition:opacity .2s ease!important;}
+        .coach-action-drawer.is-open .coach-drawer-scrim{opacity:1!important;pointer-events:auto!important;}
+        .coach-drawer-panel{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;max-width:100vw!important;margin:0!important;padding:0!important;max-height:min(78dvh,580px)!important;background:#050505!important;border-radius:14px 14px 0 0!important;overflow:hidden!important;box-shadow:0 -12px 34px rgba(0,0,0,.46)!important;transform:translateY(100%)!important;transition:transform .28s cubic-bezier(.2,.8,.2,1)!important;pointer-events:auto!important;}
+        .coach-action-drawer.is-open .coach-drawer-panel{transform:translateY(0)!important;}
+        .coach-drawer-handle{position:absolute!important;top:7px!important;left:50%!important;width:50px!important;height:4px!important;border-radius:999px!important;background:rgba(0,0,0,.20)!important;transform:translateX(-50%)!important;z-index:2!important;}
+        .coach-drawer-head{min-height:50px!important;padding:13px 10px 8px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px!important;background:#fff!important;color:#050505!important;border-radius:14px 14px 0 0!important;}
+        .coach-drawer-title{margin:0!important;color:#050505!important;font-family:var(--heading)!important;font-size:14px!important;line-height:1!important;font-weight:950!important;text-transform:uppercase!important;letter-spacing:.015em!important;}
+        .coach-drawer-close{min-width:26px!important;width:26px!important;height:26px!important;border:0!important;background:transparent!important;color:#050505!important;font-size:17px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;}
+        .coach-drawer-body{padding:7px 9px calc(68px + env(safe-area-inset-bottom,0px))!important;max-height:calc(min(78dvh,580px) - 50px)!important;overflow-y:auto!important;background:#050505!important;color:#fff!important;}
+        .coach-drawer-group-title{display:block!important;margin:0 0 6px!important;color:rgba(255,255,255,.58)!important;font-size:10px!important;line-height:1!important;font-weight:900!important;letter-spacing:.055em!important;text-transform:uppercase!important;}
+        .coach-drawer-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;}
+        .coach-drawer-card{min-width:0!important;min-height:52px!important;padding:6px 4px 5px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:4px!important;border:0!important;border-radius:7px!important;background:#fff!important;color:#050505!important;box-shadow:0 3px 8px rgba(0,0,0,.22)!important;text-align:center!important;text-decoration:none!important;cursor:pointer!important;font:inherit!important;font-family:var(--heading)!important;}
+        .coach-drawer-card.is-accent{background:#ff5c35!important;color:#fff!important;}
+        .coach-drawer-card.is-dark{background:#fff!important;color:#050505!important;border:0!important;}
+        .coach-drawer-card i{font-size:13px!important;line-height:1!important;color:currentColor!important;}
+        .coach-drawer-card span{display:block!important;color:currentColor!important;font-size:10px!important;line-height:1.02!important;font-weight:850!important;}
+        .coach-drawer-note{margin:10px 0 0!important;color:rgba(255,255,255,.62)!important;font-size:12px!important;line-height:1.28!important;font-weight:650!important;}
+        .coach-drawer-tab{position:fixed!important;right:0!important;bottom:0!important;width:196px!important;height:54px!important;padding:0 12px 0 42px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;border:0!important;border-radius:0!important;background:#ff5c35!important;color:#fff!important;font-family:var(--heading)!important;font-size:18px!important;font-weight:900!important;line-height:1!important;text-transform:uppercase!important;cursor:pointer!important;pointer-events:auto!important;clip-path:polygon(32px 0,100% 0,100% 100%,0 100%)!important;z-index:2!important;}
+        .coach-drawer-tab i{font-size:13px!important;transition:transform .25s ease!important;}
+        .coach-action-drawer.is-open .coach-drawer-tab i{transform:rotate(180deg)!important;}
+        @media(max-width:390px){.coach-drawer-grid{gap:5px!important}.coach-drawer-card{min-height:49px!important;padding:5px 3px!important}.coach-drawer-card span{font-size:9.5px!important}.coach-drawer-tab{width:184px!important;height:50px!important;padding-left:38px!important;font-size:16px!important;clip-path:polygon(29px 0,100% 0,100% 100%,0 100%)!important}}
+
+        .player-panel-back{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:34px!important;height:34px!important;border:0!important;background:rgba(255,255,255,.08)!important;color:#fff!important;cursor:pointer!important;}
+        .player-panel-title{font-family:var(--heading)!important;font-size:14px!important;font-weight:900!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#fff!important;}
+        .player-panel-bar{grid-template-columns:40px 1fr auto!important;}
+
+        .nav-email-list{display:inline-flex!important;text-decoration:none!important;}
+
+        @media(min-width:901px){
+            .hero{min-height:clamp(560px,62vh,720px)!important;display:grid!important;align-items:end!important;}
+            .hero-inner{padding:72px 0 42px!important;display:grid!important;align-items:end!important;}
+            .team-main-polished{max-width:900px!important;gap:28px!important;}
+            .team-hero-identity{grid-template-columns:86px minmax(0,1fr) 86px!important;row-gap:20px!important;column-gap:20px!important;}
+            .team-hero-identity .identity-logo,.team-hero-identity .identity-league{width:76px!important;height:76px!important;}
+            .team-title-stack{grid-column:1/-1!important;}
+            .team-name{font-size:clamp(58px,7vw,96px)!important;}
+            .hero-info-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important;margin:0!important;border-left:0!important;border-right:0!important;}
+        }
+
+        @media(max-width:900px){
+            .mobile-back-row{display:none!important;}
+            .hero{min-height:0!important;height:auto!important;display:block!important;overflow:hidden!important;}
+            .hero-inner{padding:28px 18px 0!important;min-height:0!important;height:auto!important;display:block!important;}
+            .team-main-polished{height:auto!important;min-height:0!important;display:grid!important;gap:18px!important;align-content:start!important;padding:0!important;margin:0!important;}
+            .team-hero-identity{display:grid!important;grid-template-columns:54px minmax(0,1fr) 54px!important;grid-template-rows:auto auto!important;column-gap:12px!important;row-gap:14px!important;align-items:start!important;margin:0!important;padding:0!important;}
+            .team-hero-identity .identity-logo{grid-column:1!important;grid-row:1!important;position:static!important;width:52px!important;height:52px!important;justify-self:start!important;}
+            .team-hero-identity .identity-league{grid-column:3!important;grid-row:1!important;position:static!important;width:52px!important;height:52px!important;justify-self:end!important;}
+            .team-title-stack{grid-column:1/-1!important;grid-row:2!important;margin:0!important;padding:0!important;border:0!important;text-align:left!important;}
+            .team-title-stack .label{font-size:9px!important;letter-spacing:.20em!important;margin:0 0 8px!important;line-height:1!important;color:rgba(255,255,255,.72)!important;}
+            .team-name{font-size:42px!important;line-height:.90!important;white-space:normal!important;}
+            .hero-info-strip{display:grid!important;grid-template-columns:1fr!important;gap:1px!important;margin:0 -18px!important;padding:0!important;background:rgba(255,255,255,.12)!important;border-left:0!important;border-right:0!important;border-top:1px solid rgba(255,255,255,.12)!important;border-bottom:1px solid rgba(255,255,255,.12)!important;}
+            .hero-info-card{min-height:66px!important;display:grid!important;grid-template-columns:42px minmax(0,1fr)!important;grid-template-rows:auto auto!important;column-gap:12px!important;align-items:center!important;padding:12px 18px!important;background:rgba(5,5,6,.50)!important;border:0!important;}
+            .hero-info-icon,.hero-info-logo{grid-row:1/3!important;grid-column:1!important;width:30px!important;height:30px!important;font-size:18px!important;}
+            .hero-info-label{grid-column:2!important;grid-row:1!important;font-size:9px!important;letter-spacing:.13em!important;}
+            .hero-info-value{grid-column:2!important;grid-row:2!important;font-size:17px!important;}
+            .hero-coach-actions{grid-column:2!important;}
+            .section{padding-top:34px!important;}
+            .nav-actions{gap:8px!important;}
+            .nav-actions .btn{height:42px!important;padding:0 12px!important;font-size:10px!important;}
+            .nav-email-list{display:none!important;}
+        }
+
     </style>
 </head>
 <body>
@@ -1509,10 +1600,21 @@
 ");
             @endphp
             <div class="nav-actions">
-                <button class="btn" type="button" data-open-actions>
-                    <i class="fa-solid {{ $coachSession ? 'fa-bars-staggered' : 'fa-right-to-bracket' }}"></i>
-                    {{ $coachSession ? 'Coach Menu' : 'Check In' }}
-                </button>
+                @if($coachSession)
+                    <button class="btn" type="button" data-open-actions>
+                        <i class="fa-solid fa-bookmark"></i>
+                        My Watchlist
+                    </button>
+                    <a class="btn nav-email-list" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}">
+                        <i class="fa-solid fa-envelope"></i>
+                        Email List
+                    </a>
+                @else
+                    <button class="btn" type="button" data-open-actions>
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        Check In
+                    </button>
+                @endif
             </div>
         </nav>
     </div>
@@ -1521,6 +1623,15 @@
         <div class="hero-bg"></div>
         <div class="wrap hero-inner">
             <div class="team-main team-main-polished">
+                <div class="identity team-hero-identity">
+                    @if($teamLogo)<img class="identity-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">@endif
+                    @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $leagueName }} logo">@endif
+                    <div class="team-title-stack">
+                        <div class="label">{{ $club?->name ?: 'Club' }}</div>
+                        <h1 class="team-name">Team {{ $team->name }}</h1>
+                    </div>
+                </div>
+
                 <div class="hero-info-strip" aria-label="Basic team information">
                     <div class="hero-info-card">
                         <i class="hero-info-icon fa-solid fa-users"></i>
@@ -1542,22 +1653,13 @@
                         <strong class="hero-info-value">{{ $coachName }}</strong>
                         <div class="hero-coach-actions">
                             @if($coachPhone)
-                                <a class="hero-coach-action" href="sms:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-message"></i> Text</a>
-                                <a class="hero-coach-action" href="tel:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-phone"></i> Call</a>
+                                <a class="hero-coach-action" href="sms:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-message"></i> Text Coach</a>
+                                <a class="hero-coach-action" href="tel:{{ preg_replace('/\D+/', '', $coachPhone) }}"><i class="fa-solid fa-phone"></i> Call Coach</a>
                             @elseif($coachEmail)
-                                <a class="hero-coach-action" href="mailto:{{ $coachEmail }}"><i class="fa-solid fa-envelope"></i> Email</a>
+                                <a class="hero-coach-action" href="mailto:{{ $coachEmail }}"><i class="fa-solid fa-envelope"></i> Email Coach</a>
                             @endif
                         </div>
                     </div>
-                </div>
-
-                <div class="identity team-hero-identity">
-                    @if($teamLogo)<img class="identity-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">@endif
-                    <div class="team-title-stack">
-                        <div class="label">{{ $club?->name ?: 'Club' }}</div>
-                        <h1 class="team-name">Team {{ $team->name }}</h1>
-                    </div>
-                    @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $leagueName }} logo">@endif
                 </div>
                 @if($teamIntro)<div class="team-copy">{!! nl2br(e($teamIntro)) !!}</div>@endif
             </div>
@@ -1570,7 +1672,7 @@
                 <div><div class="eyebrow">Team Roster</div><div class="section-title">Players</div></div>
                 <div class="roster-tools">
                     <span class="sort-label"><i class="fa-solid fa-arrow-down-1-9"></i> Sorted by number</span>
-                    <button class="saved-button" type="button" data-open-saved><i class="fa-solid fa-bookmark"></i> Saved <strong>{{ $savedPlayers->count() }}</strong></button>
+                    <button class="saved-button" type="button" data-open-saved><i class="fa-solid fa-bookmark"></i> Watchlist <strong>{{ $savedPlayers->count() }}</strong></button>
                 </div>
             </div>
             <div class="roster">
@@ -1700,6 +1802,10 @@
             @endif
         </div>
     </section>
+    <button class="coach-drawer-tab" type="button" data-open-actions>
+        <i class="fa-solid {{ $coachSession ? 'fa-bookmark' : 'fa-chevron-up' }}"></i>
+        <span>{{ $coachSession ? 'WATCHLIST' : 'CHECK IN' }}</span>
+    </button>
 </div>
 
 <div class="player-overlay" id="playerOverlay" aria-hidden="true">
