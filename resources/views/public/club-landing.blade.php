@@ -1092,7 +1092,6 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
                             @php
@@ -1140,7 +1139,6 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
                             @php
@@ -1465,4 +1463,12 @@
         .hero .fact{min-height:76px!important;grid-template-columns:36px minmax(0,1fr)!important;padding:12px 12px!important;}
         .hero .fact strong{font-size:14px!important;}
     }
+</style>
+
+
+{{-- FINAL PATCH: team cards show only the team name, no duplicate club name or Team label. --}}
+<style>
+    .team-card-copy{display:none!important;}
+    .team-card-name{font-size:clamp(34px,5.6vw,54px)!important;line-height:.88!important;}
+    @media(max-width:900px){.team-card-name{font-size:40px!important;}}
 </style>
