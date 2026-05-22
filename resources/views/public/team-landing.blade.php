@@ -1774,6 +1774,54 @@
             color:currentColor!important;
         }
 
+    
+
+        /* FINAL PATCH: team hero order + inline coach actions */
+        .hero-info-card:nth-child(3){grid-column:auto!important;}
+        .hero-info-card:nth-child(4){grid-column:auto!important;}
+        .hero-coach-actions{
+            grid-column:2!important;
+            grid-row:3!important;
+            display:flex!important;
+            flex-wrap:nowrap!important;
+            align-items:center!important;
+            gap:6px!important;
+            margin-top:6px!important;
+            min-width:0!important;
+            width:100%!important;
+        }
+        .hero-coach-action{
+            height:24px!important;
+            min-width:0!important;
+            flex:1 1 0!important;
+            display:inline-flex!important;
+            align-items:center!important;
+            justify-content:center!important;
+            gap:4px!important;
+            padding:0 6px!important;
+            white-space:nowrap!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+            font-size:8px!important;
+            line-height:1!important;
+            background:rgba(255,255,255,.10)!important;
+            border:1px solid rgba(255,255,255,.12)!important;
+            color:#fff!important;
+        }
+        .hero-coach-action i{font-size:9px!important;flex:0 0 auto!important;}
+        @media(max-width:900px){
+            .hero-info-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+            .hero-info-card,
+            .hero-info-card:nth-child(3),
+            .hero-info-card:nth-child(4){grid-column:auto!important;}
+            .hero-coach-actions{gap:5px!important;margin-top:5px!important;}
+            .hero-coach-action{height:22px!important;font-size:7px!important;padding:0 4px!important;}
+        }
+        @media(max-width:420px){
+            .hero-info-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+            .hero-coach-action{font-size:6.5px!important;letter-spacing:.04em!important;}
+        }
+
     </style>
 </head>
 <body>
@@ -1821,11 +1869,6 @@
                         <strong class="hero-info-value">{{ $leagueName }}</strong>
                     </div>
                     <div class="hero-info-card">
-                        <i class="hero-info-icon fa-solid fa-location-dot"></i>
-                        <span class="hero-info-label">Location</span>
-                        <strong class="hero-info-value">{{ $teamLocation }}</strong>
-                    </div>
-                    <div class="hero-info-card">
                         <i class="hero-info-icon fa-solid fa-user-tie"></i>
                         <span class="hero-info-label">Coach</span>
                         <strong class="hero-info-value">{{ $coachName }}</strong>
@@ -1837,6 +1880,11 @@
                                 <a class="hero-coach-action" href="mailto:{{ $coachEmail }}"><i class="fa-solid fa-envelope"></i> Email Coach</a>
                             @endif
                         </div>
+                    </div>
+                    <div class="hero-info-card">
+                        <i class="hero-info-icon fa-solid fa-location-dot"></i>
+                        <span class="hero-info-label">Location</span>
+                        <strong class="hero-info-value">{{ $teamLocation }}</strong>
                     </div>
                 </div>
                 @if($teamIntro)<div class="team-copy">{!! nl2br(e($teamIntro)) !!}</div>@endif
