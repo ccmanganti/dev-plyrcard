@@ -1723,16 +1723,19 @@
         }
 
 
-        /* Coach navigation final polish: balanced cards, clean spacing, no awkward lone buttons. */
-        .coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;align-items:stretch!important;}
-        .coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:64px!important;border-radius:9px!important;font-size:10px!important;}
-        .coach-drawer-main-actions .coach-drawer-card i{font-size:15px!important;margin-bottom:2px!important;}
-        .coach-drawer-main-actions .coach-drawer-card span{font-size:10.5px!important;line-height:1.05!important;white-space:normal!important;}
-        .coach-drawer-main-actions .coach-drawer-card-form{height:auto!important;min-height:64px!important;}
-        .coach-drawer-note{max-width:100%!important;margin-top:12px!important;font-family:var(--body)!important;font-size:12px!important;line-height:1.3!important;letter-spacing:0!important;}
+        /* Coach navigation final polish: four compact buttons in one row, Locker Room style. */
+        .coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;align-items:stretch!important;}
+        .coach-drawer-main-actions .coach-drawer-card,
+        .coach-drawer-main-actions .coach-drawer-card-form button{min-height:56px!important;border-radius:7px!important;font-size:9.5px!important;padding:6px 4px 5px!important;}
+        .coach-drawer-main-actions .coach-drawer-card i{display:block!important;font-size:14px!important;line-height:1!important;margin:0 0 4px!important;color:currentColor!important;}
+        .coach-drawer-main-actions .coach-drawer-card span{display:block!important;font-size:9.5px!important;line-height:1.02!important;white-space:normal!important;color:currentColor!important;}
+        .coach-drawer-main-actions .coach-drawer-card-form{height:100%!important;min-height:56px!important;}
+        .coach-drawer-note{max-width:100%!important;margin-top:10px!important;font-family:var(--body)!important;font-size:11.5px!important;line-height:1.25!important;letter-spacing:0!important;}
         .coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;}
         .coach-drawer-player-actions .coach-drawer-card{min-height:58px!important;}
-        @media(max-width:420px){.coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:60px!important}.coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+        .coach-drawer-card.is-remove{background:#ff5c35!important;color:#fff!important;}
+        .coach-drawer-card.is-remove i{display:block!important;color:currentColor!important;}
+        @media(max-width:390px){.coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important}.coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:52px!important;font-size:9px!important}.coach-drawer-main-actions .coach-drawer-card span{font-size:8.8px!important}.coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 
     </style>
 </head>
@@ -1990,6 +1993,10 @@
                         <button class="coach-drawer-card" type="submit"><i class="fa-solid fa-paper-plane"></i><span>Email Watchlist</span></button>
                     </form>
                     <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
+                    <form class="coach-drawer-card-form" method="POST" action="{{ route('clubs.coach-checkout', ['clubSlug' => $club->landing_page_slug]) }}">
+                        @csrf
+                        <button class="coach-drawer-card is-dark" type="submit"><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
+                    </form>
                 </div>
                 <p class="coach-drawer-note">Saved profiles stay in this browser session. Tap Email Watchlist to send one email to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
             @else
@@ -2182,7 +2189,7 @@ document.addEventListener('DOMContentLoaded', function(){
             return `<button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>${compact ? 'Check In' : '<span>Check In</span>'}</button>`;
         }
         if(isSaved){
-            return `<form class="watchlist-action-form ${compact ? '' : 'coach-drawer-card-form'}" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
+            return `<form class="watchlist-action-form ${compact ? '' : 'coach-drawer-card-form'}" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card is-remove'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
         }
         return `<form class="watchlist-action-form ${compact ? '' : 'coach-drawer-card-form'}" data-watchlist-form data-watchlist-action="save" method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
     }
