@@ -772,57 +772,26 @@
         }
 
 
-        /* Final request: full-width two-row info boxes with large two-row icon column. */
-        .hero-side{
-            width:100% !important;
-            max-width:none !important;
-            margin:22px 0 0 !important;
-            display:grid !important;
-            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-            gap:0 !important;
-            border-left:0 !important;
-            border-right:0 !important;
-            border-color:rgba(255,255,255,.16) !important;
-            background:rgba(255,255,255,.10) !important;
-        }
-        .hero-side .fact{
-            min-height:92px !important;
-            display:grid !important;
-            grid-template-columns:52px minmax(0,1fr) !important;
-            grid-template-rows:auto auto !important;
-            gap:2px 14px !important;
-            align-items:center !important;
-            padding:16px 18px !important;
-            background:rgba(8,10,13,.54) !important;
-            border:0 !important;
-            border-right:1px solid rgba(255,255,255,.13) !important;
-            border-bottom:1px solid rgba(255,255,255,.13) !important;
-            backdrop-filter:blur(16px) !important;
-        }
-        .hero-side .fact i,
-        .hero-side .fact .fact-logo{
-            grid-row:1 / span 2 !important;
-            width:38px !important;
-            height:38px !important;
-            font-size:26px !important;
-            color:var(--brand-readable) !important;
-            display:grid !important;
-            place-items:center !important;
-            object-fit:contain !important;
-            align-self:center !important;
-        }
-        .hero-side .fact span{font-size:11px !important;margin:0 !important;align-self:end !important;letter-spacing:.16em !important;}
-        .hero-side .fact strong{font-size:21px !important;line-height:1.03 !important;align-self:start !important;}
-        @media(max-width:640px){
-            .hero-side{margin-top:18px !important;}
-            .hero-side .fact{min-height:84px !important;grid-template-columns:44px minmax(0,1fr) !important;padding:14px 14px !important;gap:2px 10px !important;}
-            .hero-side .fact i,.hero-side .fact .fact-logo{width:32px !important;height:32px !important;font-size:22px !important;}
-            .hero-side .fact span{font-size:9px !important;}
-            .hero-side .fact strong{font-size:16px !important;}
-        }
-        .team-card-copy .team-redundant{display:none!important;}
+        /* Pull-up navigation, matching Locker Room drawer motion and card grid. */
+        .coach-action-drawer{position:fixed;inset:0;z-index:3000;pointer-events:none;color:#fff;font-family:var(--heading)}
+        .coach-action-drawer.is-open{pointer-events:auto}
+        .coach-drawer-scrim{position:absolute;inset:0;background:rgba(0,0,0,.46);backdrop-filter:blur(4px);opacity:0;transition:opacity .22s ease}
+        .coach-action-drawer.is-open .coach-drawer-scrim{opacity:1}
+        .coach-drawer-panel{position:absolute;left:0;right:0;bottom:0;width:100%;max-height:min(78dvh,580px);background:#050505;border-radius:16px 16px 0 0;box-shadow:0 -18px 46px rgba(0,0,0,.50);transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+        .coach-action-drawer.is-open .coach-drawer-panel{transform:translateY(0)}
+        .coach-drawer-handle{position:absolute;top:8px;left:50%;width:52px;height:5px;border-radius:999px;background:rgba(0,0,0,.22);transform:translateX(-50%);z-index:2}
+        .coach-drawer-head{min-height:54px;padding:16px 12px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;color:#050505;border-radius:16px 16px 0 0}
+        .coach-drawer-title{margin:0;font-size:15px;line-height:1;font-weight:950;text-transform:uppercase;letter-spacing:.02em;color:#050505}
+        .coach-drawer-close{width:30px;height:30px;border:0;background:transparent;color:#050505;display:inline-flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer}
+        .coach-drawer-body{padding:10px 10px calc(78px + env(safe-area-inset-bottom,0px));max-height:calc(min(78dvh,580px) - 54px);overflow:auto;background:#050505}
+        .coach-drawer-group-title{display:block;margin:0 0 6px;color:rgba(255,255,255,.62);font-size:11px;line-height:1;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+        .coach-drawer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+        .coach-drawer-card{min-height:62px;padding:7px 5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:0;border-radius:8px;background:#fff;color:#050505;box-shadow:0 4px 10px rgba(0,0,0,.24);text-align:center;text-decoration:none;cursor:pointer;font:inherit;font-weight:900;text-transform:uppercase;letter-spacing:.015em}
+        .coach-drawer-card.is-accent{background:#ff5c35;color:#fff}.coach-drawer-card.is-dark{background:#121318;color:#fff;border:1px solid rgba(255,255,255,.08)}
+        .coach-drawer-card i{font-size:15px;color:currentColor}.coach-drawer-card span{display:block;font-size:10.5px;line-height:1;font-weight:900;color:currentColor}.coach-drawer-note{margin:10px 0 0;color:rgba(255,255,255,.62);font-size:12px;line-height:1.3;font-weight:700}
+        @media(max-width:420px){.coach-drawer-grid{gap:6px}.coach-drawer-card{min-height:56px}.coach-drawer-card span{font-size:9.5px}}
 
-</style>
+    </style>
 </head>
 <body>
     <main class="site">
@@ -834,7 +803,7 @@
                 <div class="nav-actions">
                     <a class="nav-link" href="#teams">Teams</a>
                     @if($email)<a class="nav-link" href="mailto:{{ $email }}">Contact</a>@endif
-                    <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-coach><i class="fa-solid {{ $coachSession ? 'fa-user-tie' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</button>
+                    <button class="coach-btn {{ $coachSession ? '' : 'is-checkin' }}" type="button" data-open-actions><i class="fa-solid {{ $coachSession ? 'fa-bars-staggered' : 'fa-right-to-bracket' }}"></i> {{ $coachSession ? 'Coach Menu' : 'Check In' }}</button>
                 </div>
             </nav>
         </div>
@@ -861,11 +830,7 @@
                 <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
                     @foreach($clubFacts as $fact)
                         <div class="fact">
-                            @if(($fact['label'] ?? '') === 'League' && $leagueLogo)
-                                <img class="fact-logo" src="{{ $leagueLogo }}" alt="{{ $club->league?->name ?? 'League' }} logo">
-                            @else
-                                <i class="fa-solid {{ $fact['icon'] }}"></i>
-                            @endif
+                            <i class="fa-solid {{ $fact['icon'] }}"></i>
                             <div>
                                 <span>{{ $fact['label'] }}</span>
                                 <strong>{{ $fact['value'] }}</strong>
@@ -904,7 +869,7 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><span>{{ $teamSub }}</span></div>
+                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
                             @php
@@ -952,7 +917,7 @@
                                 @endif
                                 <div class="team-card-meta">
                                     <div class="team-card-name">{{ $team->name }}</div>
-                                    <div class="team-card-copy"><span>{{ $teamSub }}</span></div>
+                                    <div class="team-card-copy"><strong>{{ $club->name }}</strong><br>{{ $teamSub }}</div>
                                 </div>
                             </div>
                             @php
@@ -1004,6 +969,34 @@
         </footer>
     </main>
 
+    <div class="coach-action-drawer" id="coachActionDrawer" aria-hidden="true">
+        <div class="coach-drawer-scrim" data-close-actions></div>
+        <section class="coach-drawer-panel" aria-label="Coach navigation">
+            <div class="coach-drawer-handle" aria-hidden="true"></div>
+            <div class="coach-drawer-head">
+                <h2 class="coach-drawer-title">{{ $coachSession ? 'Coach Navigation' : 'Coach Check-In' }}</h2>
+                <button class="coach-drawer-close" type="button" data-close-actions aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="coach-drawer-body">
+                @if($coachSession)
+                    <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
+                    <div class="coach-drawer-grid">
+                        <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
+                        <a class="coach-drawer-card" href="#teams"><i class="fa-solid fa-people-group"></i><span>View Teams</span></a>
+                        <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-from-bracket"></i><span>Check Out</span></button>
+                    </div>
+                    <p class="coach-drawer-note">Use the team pages to open players, save profiles, and email yourself a watchlist.</p>
+                @else
+                    <strong class="coach-drawer-group-title">Start Scouting</strong>
+                    <div class="coach-drawer-grid">
+                        <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-to-bracket"></i><span>Check In</span></button>
+                    </div>
+                    <p class="coach-drawer-note">Check in once to unlock profile saving and watchlist tools on team pages.</p>
+                @endif
+            </div>
+        </section>
+    </div>
+
     <div class="modal" id="coachModal" aria-hidden="true">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="coachModalTitle">
             <div class="modal-head"><div class="modal-title" id="coachModalTitle">{{ $coachSession ? 'Coach Info' : 'Coach Check-In' }}</div><button class="modal-close" type="button" data-close-coach><i class="fa-solid fa-xmark"></i></button></div>
@@ -1028,7 +1021,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function(){
             const modal = document.getElementById('coachModal');
-            document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { modal?.classList.add('is-open'); modal?.setAttribute('aria-hidden','false'); }));
+            const coachActionDrawer = document.getElementById('coachActionDrawer');
+            const openActions = () => { coachActionDrawer?.classList.add('is-open'); coachActionDrawer?.setAttribute('aria-hidden','false'); };
+            const closeActions = () => { coachActionDrawer?.classList.remove('is-open'); coachActionDrawer?.setAttribute('aria-hidden','true'); };
+            document.querySelectorAll('[data-open-actions]').forEach(btn => btn.addEventListener('click', openActions));
+            document.querySelectorAll('[data-close-actions]').forEach(btn => btn.addEventListener('click', closeActions));
+            document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closeActions(); modal?.classList.add('is-open'); modal?.setAttribute('aria-hidden','false'); }));
             document.querySelectorAll('[data-close-coach]').forEach(btn => btn.addEventListener('click', () => { modal?.classList.remove('is-open'); modal?.setAttribute('aria-hidden','true'); }));
             modal?.addEventListener('click', e => { if(e.target === modal){ modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true'); }});
             document.querySelectorAll('[data-team-tab]').forEach(tab => tab.addEventListener('click', function(){
@@ -1036,7 +1034,7 @@
                 document.querySelectorAll('[data-team-tab]').forEach(t => t.classList.toggle('is-active', t === this));
                 document.querySelectorAll('[data-team-panel]').forEach(p => p.classList.toggle('is-active', p.dataset.teamPanel === target));
             }));
-            document.addEventListener('keydown', e => { if(e.key === 'Escape'){ modal?.classList.remove('is-open'); modal?.setAttribute('aria-hidden','true'); }});
+            document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeActions(); modal?.classList.remove('is-open'); modal?.setAttribute('aria-hidden','true'); }});
         });
     </script>
 </body>

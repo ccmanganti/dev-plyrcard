@@ -1445,7 +1445,46 @@
         @media(max-width:900px){
             .hero{min-height:390px!important}.hero-inner{padding:30px 18px 28px!important}.team-main-polished{gap:15px!important}.hero-info-strip{grid-template-columns:1fr!important}.hero-info-strip .hero-info-card{min-height:68px!important;border-left:0!important;border-top:1px solid rgba(255,255,255,.10)!important;grid-template-columns:42px minmax(0,1fr)!important;padding:10px 12px!important}.hero-info-strip .hero-info-card:first-child{border-top:0!important}.hero-info-icon,.hero-info-logo{width:30px!important;height:30px!important}.hero-info-value{font-size:15px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;gap:12px!important}.team-name{font-size:44px!important}.player-row.player-row-polished{grid-template-columns:58px 70px minmax(0,1fr) 18px!important;gap:10px!important}.player-jersey-big .jersey-number{font-size:34px!important}.player-jersey-position{font-size:11px!important}.player-roster-academic{font-size:12px!important}.player-row-polished .player-name{font-size:18px!important}.avatar.card-img{width:48px!important;height:64px!important}.nav-actions{gap:8px!important}.nav-actions .btn{height:40px!important}.player-actions{grid-template-columns:repeat(4,minmax(0,1fr))!important;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))!important}.player-action{min-height:54px!important;font-size:9px!important}}
 
-</style>
+
+
+        /* Pull-up navigation, modeled after the Locker Room drawer behavior. */
+        .coach-action-drawer{position:fixed;inset:0;z-index:3000;pointer-events:none;color:#fff;font-family:var(--heading)}
+        .coach-action-drawer.is-open{pointer-events:auto}
+        .coach-drawer-scrim{position:absolute;inset:0;background:rgba(0,0,0,.46);backdrop-filter:blur(4px);opacity:0;transition:opacity .22s ease}
+        .coach-action-drawer.is-open .coach-drawer-scrim{opacity:1}
+        .coach-drawer-panel{position:absolute;left:0;right:0;bottom:0;width:100%;max-height:min(78dvh,580px);background:#050505;border-radius:16px 16px 0 0;box-shadow:0 -18px 46px rgba(0,0,0,.50);transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+        .coach-action-drawer.is-open .coach-drawer-panel{transform:translateY(0)}
+        .coach-drawer-handle{position:absolute;top:8px;left:50%;width:52px;height:5px;border-radius:999px;background:rgba(0,0,0,.22);transform:translateX(-50%);z-index:2}
+        .coach-drawer-head{min-height:54px;padding:16px 12px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;color:#050505;border-radius:16px 16px 0 0}
+        .coach-drawer-title{margin:0;font-size:15px;line-height:1;font-weight:950;text-transform:uppercase;letter-spacing:.02em;color:#050505}
+        .coach-drawer-close{width:30px;height:30px;border:0;background:transparent;color:#050505;display:inline-flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer}
+        .coach-drawer-body{padding:10px 10px calc(78px + env(safe-area-inset-bottom,0px));max-height:calc(min(78dvh,580px) - 54px);overflow:auto;background:#050505}
+        .coach-drawer-group-title{display:block;margin:0 0 6px;color:rgba(255,255,255,.62);font-size:11px;line-height:1;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+        .coach-drawer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+        .coach-drawer-card{min-height:62px;padding:7px 5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:0;border-radius:8px;background:#fff;color:#050505;box-shadow:0 4px 10px rgba(0,0,0,.24);text-align:center;text-decoration:none;cursor:pointer;font:inherit;font-weight:900;text-transform:uppercase;letter-spacing:.015em}
+        .coach-drawer-card.is-accent{background:#ff5c35;color:#fff}
+        .coach-drawer-card.is-dark{background:#121318;color:#fff;border:1px solid rgba(255,255,255,.08)}
+        .coach-drawer-card i{font-size:15px;color:currentColor}.coach-drawer-card span{display:block;font-size:10.5px;line-height:1;font-weight:900;color:currentColor}
+        .coach-drawer-note{margin:10px 0 0;color:rgba(255,255,255,.62);font-size:12px;line-height:1.3;font-weight:700}
+        @media(max-width:420px){.coach-drawer-grid{gap:6px}.coach-drawer-card{min-height:56px}.coach-drawer-card span{font-size:9.5px}}
+
+        /* Club-style team hero override: same layout rhythm as the club landing hero. */
+        .team-main-polished{display:grid!important;gap:22px!important;align-content:start!important;width:100%!important}
+        .team-hero-identity{order:1!important;display:grid!important;grid-template-columns:70px minmax(0,1fr) 70px!important;grid-template-rows:auto auto!important;align-items:start!important;column-gap:18px!important;row-gap:18px!important;margin:0!important;padding:0!important;border:0!important;max-width:none!important}
+        .team-hero-identity .identity-logo{grid-column:1!important;grid-row:1!important;justify-self:start!important;position:static!important;width:66px!important;height:66px!important;object-fit:contain!important}
+        .team-hero-identity .identity-league{grid-column:3!important;grid-row:1!important;justify-self:end!important;position:static!important;width:66px!important;height:66px!important;object-fit:contain!important}
+        .team-title-stack{grid-column:1/-1!important;grid-row:2!important;margin:0!important;padding:0!important;text-align:left!important;border:0!important}
+        .team-title-stack .label{font-size:11px!important;letter-spacing:.22em!important;margin:0 0 8px!important;color:rgba(255,255,255,.72)!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+        .team-name{font-size:clamp(44px,6vw,78px)!important;line-height:.9!important;white-space:normal!important;max-width:760px!important}
+        .hero-info-strip{order:2!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:1px!important;margin:0!important;padding:0!important;background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.12)!important}
+        .hero-info-card{min-height:74px!important;display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;grid-template-rows:auto auto!important;column-gap:12px!important;align-items:center!important;background:rgba(5,5,6,.62)!important;padding:14px 16px!important;border:0!important;backdrop-filter:blur(16px)!important}
+        .hero-info-icon,.hero-info-logo{grid-row:1/3!important;grid-column:1!important;width:34px!important;height:34px!important;object-fit:contain!important;color:var(--brand-readable)!important;font-size:19px!important;align-self:center!important;justify-self:center!important}
+        .hero-info-label{grid-column:2!important;grid-row:1!important;color:var(--muted)!important;font-size:10px!important;font-weight:900!important;letter-spacing:.14em!important;text-transform:uppercase!important;line-height:1!important}
+        .hero-info-value{grid-column:2!important;grid-row:2!important;font-family:var(--heading)!important;font-size:18px!important;line-height:1!important;text-transform:uppercase!important;font-weight:900!important;color:#fff!important}
+        .hero-coach-actions{grid-column:2!important;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}.hero-coach-action{font-size:10px;font-weight:900;text-transform:uppercase;color:var(--brand-readable)}
+        @media(max-width:900px){.hero{min-height:0!important;height:auto!important}.hero-inner{padding:30px 18px 0!important}.team-main-polished{gap:18px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;column-gap:12px!important;row-gap:14px!important}.team-hero-identity .identity-logo,.team-hero-identity .identity-league{width:52px!important;height:52px!important}.team-title-stack .label{font-size:9px!important}.team-name{font-size:42px!important}.hero-info-strip{grid-template-columns:1fr!important;margin:0 -18px!important;border-left:0!important;border-right:0!important}.hero-info-card{min-height:66px!important;grid-template-columns:42px minmax(0,1fr)!important;padding:12px 18px!important}.hero-info-value{font-size:16px!important}}
+
+    </style>
 </head>
 <body>
 <main class="site">
@@ -1456,26 +1495,24 @@
                     <span class="plyr-wordmark"><b>PLYR</b><em>CARD</em></span>
                 </a>
             </div>
-            <div class="nav-actions">
-                @if($coachSession)
-                    <button class="btn" type="button" data-open-saved><i class="fa-solid fa-binoculars"></i> My Watchlist</button>
-                    @php
-                        $watchlistEmailSubject = 'My PlyrCard Watchlist - ' . ($team->name ?? 'Team');
-                        $watchlistEmailBody = "My saved PlyrCard watchlist:
+            @php
+                $watchlistEmailSubject = 'My PlyrCard Watchlist - ' . ($team->name ?? 'Team');
+                $watchlistEmailBody = "My saved PlyrCard watchlist:
 
 " . $savedPlayers->map(function ($saved) {
-                            return trim(($saved['player_name'] ?? 'Player') . "
+                    return trim(($saved['player_name'] ?? 'Player') . "
 " . ($saved['player_url'] ?? '') . "
 " . ($saved['player_email'] ?? '') . "
 " . ($saved['player_phone'] ?? ''));
-                        })->filter()->implode("
+                })->filter()->implode("
 
 ");
-                    @endphp
-                    <a class="btn" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}"><i class="fa-solid fa-envelope"></i> Email Me the List</a>
-                @else
-                    <button class="btn" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i> Check In</button>
-                @endif
+            @endphp
+            <div class="nav-actions">
+                <button class="btn" type="button" data-open-actions>
+                    <i class="fa-solid {{ $coachSession ? 'fa-bars-staggered' : 'fa-right-to-bracket' }}"></i>
+                    {{ $coachSession ? 'Coach Menu' : 'Check In' }}
+                </button>
             </div>
         </nav>
     </div>
@@ -1636,6 +1673,35 @@
     </div>
 </div>
 
+
+<div class="coach-action-drawer" id="coachActionDrawer" aria-hidden="true">
+    <div class="coach-drawer-scrim" data-close-actions></div>
+    <section class="coach-drawer-panel" aria-label="Coach navigation">
+        <div class="coach-drawer-handle" aria-hidden="true"></div>
+        <div class="coach-drawer-head">
+            <h2 class="coach-drawer-title">{{ $coachSession ? 'Coach Navigation' : 'Coach Check-In' }}</h2>
+            <button class="coach-drawer-close" type="button" data-close-actions aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="coach-drawer-body">
+            @if($coachSession)
+                <strong class="coach-drawer-group-title">{{ filled($coachSession['name'] ?? null) ? 'Hi ' . $coachSession['name'] : 'Coach Tools' }}</strong>
+                <div class="coach-drawer-grid">
+                    <button class="coach-drawer-card is-accent" type="button" data-open-saved data-close-actions><i class="fa-solid fa-binoculars"></i><span>My Watchlist</span></button>
+                    <a class="coach-drawer-card" href="mailto:{{ $coachSession['email'] ?? '' }}?subject={{ rawurlencode($watchlistEmailSubject) }}&body={{ rawurlencode($watchlistEmailBody) }}"><i class="fa-solid fa-envelope"></i><span>Email Me the List</span></a>
+                    <button class="coach-drawer-card is-dark" type="button" data-open-coach data-close-actions><i class="fa-solid fa-user-tie"></i><span>Coach Info</span></button>
+                </div>
+                <p class="coach-drawer-note">Saved profiles stay in this browser session and can be emailed to {{ $coachSession['email'] ?? 'your inbox' }}.</p>
+            @else
+                <strong class="coach-drawer-group-title">Start Scouting</strong>
+                <div class="coach-drawer-grid">
+                    <button class="coach-drawer-card is-accent" type="button" data-open-coach data-close-actions><i class="fa-solid fa-right-to-bracket"></i><span>Check In</span></button>
+                </div>
+                <p class="coach-drawer-note">Check in once to save players, build a watchlist, and email yourself the list.</p>
+            @endif
+        </div>
+    </section>
+</div>
+
 <div class="player-overlay" id="playerOverlay" aria-hidden="true">
     <div class="player-panel">
         <div class="player-panel-bar"><button class="player-panel-back" id="playerBackBtn" type="button" aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button><div class="player-panel-title" id="playerPanelTitle"><i class="fa-solid fa-bookmark"></i> Player Card</div><button class="player-panel-btn" id="playerCloseBtn" type="button"><i class="fa-solid fa-xmark"></i> Close</button></div>
@@ -1649,9 +1715,14 @@
 document.addEventListener('DOMContentLoaded', function(){
     const coachModal = document.getElementById('coachModal');
     const savedModal = document.getElementById('savedModal');
-    document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { coachModal?.classList.add('is-open'); coachModal?.setAttribute('aria-hidden','false'); }));
+    const coachActionDrawer = document.getElementById('coachActionDrawer');
+    const openActions = () => { coachActionDrawer?.classList.add('is-open'); coachActionDrawer?.setAttribute('aria-hidden','false'); };
+    const closeActions = () => { coachActionDrawer?.classList.remove('is-open'); coachActionDrawer?.setAttribute('aria-hidden','true'); };
+    document.querySelectorAll('[data-open-actions]').forEach(btn => btn.addEventListener('click', openActions));
+    document.querySelectorAll('[data-close-actions]').forEach(btn => btn.addEventListener('click', closeActions));
+    document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closeActions(); coachModal?.classList.add('is-open'); coachModal?.setAttribute('aria-hidden','false'); }));
     document.querySelectorAll('[data-close-coach]').forEach(btn => btn.addEventListener('click', () => { coachModal?.classList.remove('is-open');savedModal?.classList.remove('is-open'); coachModal?.setAttribute('aria-hidden','true'); }));
-    document.querySelectorAll('[data-open-saved]').forEach(btn => btn.addEventListener('click', () => { savedModal?.classList.add('is-open'); savedModal?.setAttribute('aria-hidden','false'); }));
+    document.querySelectorAll('[data-open-saved]').forEach(btn => btn.addEventListener('click', () => { closeActions(); savedModal?.classList.add('is-open'); savedModal?.setAttribute('aria-hidden','false'); }));
     document.querySelectorAll('[data-close-saved]').forEach(btn => btn.addEventListener('click', () => { savedModal?.classList.remove('is-open'); savedModal?.setAttribute('aria-hidden','true'); }));
     coachModal?.addEventListener('click', e => { if(e.target === coachModal){ coachModal.classList.remove('is-open'); coachModal.setAttribute('aria-hidden','true'); }});
     savedModal?.addEventListener('click', e => { if(e.target === savedModal){ savedModal.classList.remove('is-open'); savedModal.setAttribute('aria-hidden','true'); }});
