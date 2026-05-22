@@ -109,6 +109,11 @@
         $heroImageUrl = $resolveAsset($team->background_image ?? $team->hero_image ?? $teamBranding['background_image'] ?? $teamBranding['hero_image'] ?? $club?->background_image ?? $club?->hero_image ?? null, asset('images/PLYRCARD-SITE.jpg'));
         $leagueName = $club?->league?->name ?? ($teamSettings['league'] ?? 'League');
         $coachName = $headCoach['name'] ?? $headCoach['full_name'] ?? 'TBA';
+        $teamLocation = collect([
+            $teamSettings['location'] ?? null,
+            filled($teamSettings['location'] ?? null) ? null : ($club?->city ?? null),
+            filled($teamSettings['location'] ?? null) ? null : ($club?->state ?? null),
+        ])->filter()->implode(', ') ?: 'Location';
         $coachEmail = $headCoach['email'] ?? null;
         $coachPhone = $headCoach['phone'] ?? null;
         $teamIntro = trim((string) ($team->landing_page_content ?? $team->landing_page_intro ?? ''));
@@ -1816,6 +1821,11 @@
                         <strong class="hero-info-value">{{ $leagueName }}</strong>
                     </div>
                     <div class="hero-info-card">
+                        <i class="hero-info-icon fa-solid fa-location-dot"></i>
+                        <span class="hero-info-label">Location</span>
+                        <strong class="hero-info-value">{{ $teamLocation }}</strong>
+                    </div>
+                    <div class="hero-info-card">
                         <i class="hero-info-icon fa-solid fa-user-tie"></i>
                         <span class="hero-info-label">Coach</span>
                         <strong class="hero-info-value">{{ $coachName }}</strong>
@@ -2462,4 +2472,134 @@ document.addEventListener('DOMContentLoaded', function(){
         .hero-info-card{min-height:76px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:12px 12px!important;}
         .hero-info-value{font-size:15px!important;}
     }
+</style>
+
+
+<style>
+    /* FINAL PATCH: team hero info must match club grid and include Location */
+    .hero-info-strip{
+        display:grid!important;
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        gap:1px!important;
+        width:100%!important;
+        max-width:100%!important;
+        margin-left:0!important;
+        margin-right:0!important;
+        background:rgba(255,255,255,.12)!important;
+        border-top:1px solid rgba(255,255,255,.15)!important;
+        border-bottom:1px solid rgba(255,255,255,.15)!important;
+        border-left:0!important;
+        border-right:0!important;
+        overflow:hidden!important;
+    }
+    .hero-info-card,
+    .hero-info-card:nth-child(3),
+    .hero-info-card:nth-child(4){
+        grid-column:auto!important;
+        min-height:82px!important;
+        display:grid!important;
+        grid-template-columns:42px minmax(0,1fr)!important;
+        grid-template-rows:min-content min-content!important;
+        column-gap:11px!important;
+        row-gap:3px!important;
+        align-content:center!important;
+        align-items:center!important;
+        padding:13px 14px!important;
+        background:rgba(5,5,6,.55)!important;
+        border:0!important;
+        border-left:1px solid rgba(255,255,255,.12)!important;
+        border-top:1px solid rgba(255,255,255,.10)!important;
+        box-shadow:none!important;
+        text-align:left!important;
+        overflow:hidden!important;
+    }
+    .hero-info-card:nth-child(odd){border-left:0!important;}
+    .hero-info-card:nth-child(-n+2){border-top:0!important;}
+    .hero-info-icon,
+    .hero-info-logo{
+        grid-column:1!important;
+        grid-row:1 / 3!important;
+        width:30px!important;
+        height:30px!important;
+        object-fit:contain!important;
+        align-self:center!important;
+        justify-self:center!important;
+        color:rgba(220,232,239,.86)!important;
+        font-size:19px!important;
+        margin:0!important;
+    }
+    .hero-info-label{
+        grid-column:2!important;
+        grid-row:1!important;
+        display:block!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:rgba(220,232,239,.70)!important;
+        font-family:var(--heading)!important;
+        font-size:8.5px!important;
+        line-height:1!important;
+        font-weight:900!important;
+        letter-spacing:.12em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        white-space:nowrap!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .hero-info-value{
+        grid-column:2!important;
+        grid-row:2!important;
+        display:block!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        color:#fff!important;
+        font-family:var(--heading)!important;
+        font-size:16px!important;
+        line-height:1!important;
+        font-weight:900!important;
+        letter-spacing:.02em!important;
+        text-transform:uppercase!important;
+        text-align:left!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis!important;
+    }
+    .hero-coach-actions{grid-column:2!important;display:flex!important;gap:7px!important;margin-top:6px!important;flex-wrap:wrap!important;}
+    .hero-coach-action{font-size:8px!important;line-height:1!important;}
+    @media(max-width:900px){
+        .hero-info-strip{
+            grid-template-columns:repeat(2,minmax(0,1fr))!important;
+            width:calc(100% + 36px)!important;
+            max-width:calc(100% + 36px)!important;
+            margin-left:-18px!important;
+            margin-right:-18px!important;
+        }
+        .hero-info-card,
+        .hero-info-card:nth-child(3),
+        .hero-info-card:nth-child(4){
+            min-height:76px!important;
+            grid-template-columns:38px minmax(0,1fr)!important;
+            padding:12px 12px!important;
+        }
+        .hero-info-icon,.hero-info-logo{width:27px!important;height:27px!important;font-size:17px!important;}
+        .hero-info-label{font-size:7.5px!important;letter-spacing:.10em!important;}
+        .hero-info-value{font-size:14px!important;line-height:1.02!important;}
+    }
+    @media(max-width:380px){
+        .hero-info-card,
+        .hero-info-card:nth-child(3),
+        .hero-info-card:nth-child(4){grid-template-columns:34px minmax(0,1fr)!important;padding:11px 10px!important;}
+        .hero-info-value{font-size:13px!important;}
+    }
+
+    /* Save should swipe left, then bring the next player in from the right. */
+    @keyframes plyrSwipeSave{0%{transform:translateX(0) rotate(0);opacity:1}100%{transform:translateX(-110%) rotate(-8deg);opacity:0}}
+    @keyframes plyrSwipeNext{0%{transform:translateX(26%) scale(.96);opacity:0}100%{transform:translateX(0) scale(1);opacity:1}}
 </style>
