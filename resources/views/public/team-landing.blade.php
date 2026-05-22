@@ -120,9 +120,33 @@
         $savedIds = $savedPlayers->pluck('player_id')->map(fn ($id) => (int) $id)->all();
 
         $playerWebsiteUrl = function ($player) {
-            $website = $player->websites->first();
+            $website = $player->websites
+                ? ($player->websites->firstWhere('is_active', true) ?: $player->websites->first())
+                : null;
+
             if (! $website) return '';
-            return filled($website->domain) ? 'https://' . preg_replace('/^https?:\/\//', '', $website->domain) : url('/' . ltrim($website->slug, '/'));
+
+            if (filled($website->domain)) {
+                return 'https://' . preg_replace('/^https?:\/\//', '', (string) $website->domain);
+            }
+
+            if (filled($website->slug)) {
+                return \Illuminate\Support\Facades\Route::has('website.show-by-name')
+                    ? route('website.show-by-name', ['websiteName' => ltrim((string) $website->slug, '/')])
+                    : url('/' . ltrim((string) $website->slug, '/'));
+            }
+
+            if (filled($website->name)) {
+                $generatedSlug = \Illuminate\Support\Str::slug((string) $website->name);
+
+                return $generatedSlug
+                    ? (\Illuminate\Support\Facades\Route::has('website.show-by-name')
+                        ? route('website.show-by-name', ['websiteName' => $generatedSlug])
+                        : url('/' . $generatedSlug))
+                    : '';
+            }
+
+            return '';
         };
 
         $isSubscribed = function ($player) {
@@ -1641,7 +1665,8 @@
         .player-dialog.is-swipe-save{animation:plyrSwipeSave .42s cubic-bezier(.4,0,.2,1) both}.player-dialog.is-swipe-next{animation:plyrSwipeNext .26s cubic-bezier(.2,.8,.2,1) both}
         @keyframes plyrSwipeSave{0%{transform:translateX(0) rotate(0);opacity:1}100%{transform:translateX(110%) rotate(8deg);opacity:0}}
         @keyframes plyrSwipeNext{0%{transform:translateX(-26%) scale(.96);opacity:0}100%{transform:translateX(0) scale(1);opacity:1}}
-        .saved-card{width:min(760px,100%)!important;max-height:min(86dvh,780px)!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.saved-card .modal-head{flex:0 0 auto!important}.saved-modal-body{padding:10px 10px calc(12px + env(safe-area-inset-bottom,0px))!important;overflow-y:auto!important;max-height:calc(min(86dvh,780px) - 54px)!important;-webkit-overflow-scrolling:touch!important}.saved-profile-list{display:grid;gap:9px;padding-bottom:6px}.saved-profile-row{position:relative;display:grid;grid-template-columns:54px 66px minmax(0,1fr);grid-template-areas:"avatar number copy" "actions actions actions";gap:9px 10px;align-items:center;min-height:0;padding:10px;background:#0d0d10;border:1px solid var(--line);color:#fff;overflow:visible}.saved-profile-row:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 14%,transparent),transparent 58%);opacity:.72;pointer-events:none}.saved-profile-row>*{position:relative;z-index:2}.saved-profile-avatar{grid-area:avatar;width:50px;height:50px;border-radius:999px;object-fit:cover;background:#17181d;display:grid;place-items:center;color:#fff;font-family:var(--heading);font-size:20px;font-weight:950}.saved-profile-avatar.is-card{width:42px;height:58px;border-radius:7px;object-position:center top;justify-self:center}.saved-profile-number{grid-area:number;display:grid;gap:4px;min-width:0}.saved-profile-number strong{font-family:var(--heading);font-size:31px;line-height:.85;font-weight:950;color:#fff;letter-spacing:-.04em}.saved-profile-number span{font-family:var(--heading);font-size:10px;line-height:1.08;font-weight:900;letter-spacing:.055em;text-transform:uppercase;color:var(--brand-readable);white-space:normal;overflow:visible;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.saved-profile-copy{grid-area:copy;min-width:0;padding-right:0}.saved-profile-copy strong{display:block;font-family:var(--heading);font-size:20px;line-height:1.03;font-weight:950;letter-spacing:.035em;text-transform:uppercase;white-space:normal;overflow:visible;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.saved-profile-copy span{display:block;margin-top:5px;color:rgba(255,255,255,.78);font-size:12px;line-height:1.15;font-weight:900;letter-spacing:.035em;text-transform:uppercase;white-space:normal;overflow:visible;text-overflow:clip}.saved-profile-arrow{display:none!important}.saved-empty-state{padding:24px 14px;background:#0d0d10;border:1px solid var(--line);color:var(--muted);font-weight:850;text-align:center}.saved-profile-actions{grid-area:actions;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:2px}.saved-profile-action,.saved-profile-action-form{min-width:0;margin:0}.saved-profile-action,.saved-profile-action-form button{width:100%;min-height:34px;border:0;border-radius:7px;background:#fff;color:#050505;display:flex;align-items:center;justify-content:center;gap:5px;font-family:var(--heading);font-size:9px;font-weight:900;letter-spacing:.025em;text-transform:uppercase;text-decoration:none;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.20);padding:0 6px}.saved-profile-action.is-remove,.saved-profile-action-form button{background:#ff5c35;color:#fff}.saved-profile-action.is-disabled{opacity:.42;pointer-events:none}.saved-profile-action i,.saved-profile-action-form i{font-size:11px;color:currentColor}.coach-drawer-card.is-loading,.player-quick-save button.is-loading,.saved-profile-action-form button.is-loading{opacity:.7;pointer-events:none}@media(max-width:420px){.saved-card{width:calc(100vw - 20px)!important;max-height:calc(100dvh - 112px)!important}.saved-modal-body{max-height:calc(100dvh - 166px)!important;padding:8px!important}.saved-profile-row{grid-template-columns:48px 58px minmax(0,1fr);gap:8px;padding:9px}.saved-profile-avatar{width:46px;height:46px}.saved-profile-avatar.is-card{width:38px;height:54px}.saved-profile-number strong{font-size:28px}.saved-profile-number span{font-size:9px}.saved-profile-copy strong{font-size:18px}.saved-profile-copy span{font-size:11px}.saved-profile-actions{gap:5px}.saved-profile-action,.saved-profile-action-form button{min-height:32px;font-size:8.5px;padding:0 4px}}
+        .saved-card{width:min(860px,calc(100vw - 18px))!important;height:min(86dvh,780px)!important;max-height:min(86dvh,780px)!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.saved-card .modal-head{flex:0 0 auto!important}.saved-modal-body{padding:10px!important;overflow-y:auto!important;max-height:none!important;flex:1 1 auto!important;-webkit-overflow-scrolling:touch!important}.saved-profile-list{display:grid!important;gap:9px!important;padding-bottom:6px!important}.saved-profile-row{position:relative!important;display:grid!important;grid-template-columns:52px 64px minmax(0,1fr)!important;grid-template-areas:"avatar number copy" "actions actions actions"!important;gap:8px 10px!important;align-items:center!important;min-height:0!important;padding:10px!important;background:#0d0d10!important;border:1px solid var(--line)!important;color:#fff!important;overflow:visible!important}.saved-profile-row:before{content:""!important;position:absolute!important;inset:0!important;background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 14%,transparent),transparent 58%)!important;opacity:.72!important;pointer-events:none!important}.saved-profile-row>*{position:relative!important;z-index:2!important}.saved-profile-avatar{grid-area:avatar!important;width:48px!important;height:48px!important;border-radius:999px!important;object-fit:cover!important;background:#17181d!important;display:grid!important;place-items:center!important;color:#fff!important;font-family:var(--heading)!important;font-size:20px!important;font-weight:950!important}.saved-profile-avatar.is-card{width:38px!important;height:54px!important;border-radius:7px!important;object-position:center top!important;justify-self:center!important}.saved-profile-number{grid-area:number!important;display:grid!important;gap:3px!important;min-width:0!important;align-content:center!important}.saved-profile-number strong{font-family:var(--heading)!important;font-size:30px!important;line-height:.86!important;font-weight:950!important;color:#fff!important;letter-spacing:-.04em!important}.saved-profile-number span{font-family:var(--heading)!important;font-size:10px!important;line-height:1!important;font-weight:900!important;letter-spacing:.05em!important;text-transform:uppercase!important;color:var(--brand-readable)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;display:block!important}.saved-profile-copy{grid-area:copy!important;min-width:0!important;padding-right:0!important}.saved-profile-copy strong{display:block!important;font-family:var(--heading)!important;font-size:19px!important;line-height:1.05!important;font-weight:950!important;letter-spacing:.03em!important;text-transform:uppercase!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important}.saved-profile-copy span{display:block!important;margin-top:4px!important;color:rgba(255,255,255,.82)!important;font-size:12px!important;line-height:1.08!important;font-weight:900!important;letter-spacing:.025em!important;text-transform:uppercase!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}.saved-profile-arrow{display:none!important}.saved-empty-state{padding:24px 14px!important;background:#0d0d10!important;border:1px solid var(--line)!important;color:var(--muted)!important;font-weight:850!important;text-align:center!important}.saved-profile-actions{grid-area:actions!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px!important;margin-top:1px!important}.saved-profile-action,.saved-profile-action-form{min-width:0!important;margin:0!important}.saved-profile-action,.saved-profile-action-form button{width:100%!important;min-height:30px!important;border:0!important;border-radius:6px!important;background:#fff!important;color:#050505!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:4px!important;font-family:var(--heading)!important;font-size:8px!important;font-weight:900!important;letter-spacing:.015em!important;text-transform:uppercase!important;text-decoration:none!important;cursor:pointer!important;box-shadow:0 3px 8px rgba(0,0,0,.20)!important;padding:0 4px!important}.saved-profile-action.is-remove,.saved-profile-action-form button{background:#ff5c35!important;color:#fff!important}.saved-profile-action.is-disabled{opacity:.42!important;pointer-events:none!important}.saved-profile-action i,.saved-profile-action-form i{font-size:10px!important;color:currentColor!important}.coach-drawer-card.is-loading,.player-quick-save button.is-loading,.saved-profile-action-form button.is-loading{opacity:.7!important;pointer-events:none!important}@media(max-width:420px){.saved-card{width:calc(100vw - 14px)!important;height:calc(100dvh - 96px)!important;max-height:calc(100dvh - 96px)!important}.saved-modal-body{padding:7px!important}.saved-profile-row{grid-template-columns:44px 52px minmax(0,1fr)!important;gap:7px!important;padding:8px!important}.saved-profile-avatar{width:42px!important;height:42px!important}.saved-profile-avatar.is-card{width:34px!important;height:48px!important}.saved-profile-number strong{font-size:26px!important}.saved-profile-number span{font-size:8.5px!important}.saved-profile-copy strong{font-size:16px!important;line-height:1.05!important}.saved-profile-copy span{font-size:10.5px!important}.saved-profile-actions{gap:4px!important}.saved-profile-action,.saved-profile-action-form button{min-height:28px!important;font-size:7.5px!important;padding:0 2px!important}}
+
     
 
         /* Final loading + swipe animation polish. */
@@ -1696,6 +1721,18 @@
                 align-content:center !important;
             }
         }
+
+
+        /* Coach navigation final polish: balanced cards, clean spacing, no awkward lone buttons. */
+        .coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;align-items:stretch!important;}
+        .coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:64px!important;border-radius:9px!important;font-size:10px!important;}
+        .coach-drawer-main-actions .coach-drawer-card i{font-size:15px!important;margin-bottom:2px!important;}
+        .coach-drawer-main-actions .coach-drawer-card span{font-size:10.5px!important;line-height:1.05!important;white-space:normal!important;}
+        .coach-drawer-main-actions .coach-drawer-card-form{height:auto!important;min-height:64px!important;}
+        .coach-drawer-note{max-width:100%!important;margin-top:12px!important;font-family:var(--body)!important;font-size:12px!important;line-height:1.3!important;letter-spacing:0!important;}
+        .coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;}
+        .coach-drawer-player-actions .coach-drawer-card{min-height:58px!important;}
+        @media(max-width:420px){.coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:60px!important}.coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 
     </style>
 </head>
@@ -1874,7 +1911,7 @@
                                 filled($saved['year'] ?? null) ? 'Class ' . $saved['year'] : null,
                                 filled($saved['gpa'] ?? null) ? $saved['gpa'] . ' GPA' : null,
                             ])->filter()->implode(' | ');
-                            $savedPosition = $saved['position'] ?? 'Player';
+                            $savedPosition = $formatPosition($saved['position'] ?? 'Player');
                             $savedJersey = filled($saved['jersey_number'] ?? null) ? '#' . ltrim((string) $saved['jersey_number'], '#') : '—';
                             $savedImage = $saved['card_image'] ?? $saved['portrait_image'] ?? $saved['player_image'] ?? null;
                         @endphp

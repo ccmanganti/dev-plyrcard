@@ -241,7 +241,11 @@ class PublicClubTeamController extends Controller
 
         $savedPayload = [
             'player_id' => $player->id,
+            'id' => $player->id,
             'player_name' => trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? '')),
+            'name' => trim(($player->first_name ?? '') . ' ' . ($player->last_name ?? '')),
+            'first_name' => $player->first_name,
+            'last_name' => $player->last_name,
             'player_email' => $player->email,
             'player_personal_email' => $player->personal_email,
             'player_phone' => $player->phone,
@@ -260,9 +264,13 @@ class PublicClubTeamController extends Controller
             'club_coach_phone' => $player->club_coach_phone,
 
             'jersey_number' => $player->jersey_number,
-            'position' => is_array($player->position)
-                ? implode(', ', array_filter($player->position))
-                : $player->position,
+            'jersey' => $player->jersey_number,
+            'card_image' => $this->publicAssetUrl($player->plyrcard_image),
+            'plyrcard_image' => $this->publicAssetUrl($player->plyrcard_image),
+            'portrait_image' => $this->publicAssetUrl($player->player_image ?: $player->action_image ?: $player->youtube_thumbnail ?: $player->mobile_hero_image),
+            'player_image' => $this->publicAssetUrl($player->player_image),
+            'main_image' => $this->publicAssetUrl($player->player_image ?: $player->action_image ?: $player->mobile_hero_image ?: $player->plyrcard_image),
+            'position' => $this->abbreviatedPosition($player->position),
             'year' => $player->year,
             'height' => $player->height,
             'weight' => $player->weight,
@@ -500,10 +508,97 @@ class PublicClubTeamController extends Controller
             && strcasecmp($playerTeamName, $teamName) === 0;
     }
 
+    protected function publicAssetUrl(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            if (array_key_exists(0, $value)) {
+                $first = $value[0] ?? null;
+
+                return $this->publicAssetUrl($first);
+            }
+
+            $path = $value['url'] ?? $value['path'] ?? $value['image_url'] ?? null;
+
+            return $this->publicAssetUrl($path);
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $this->publicAssetUrl($decoded);
+        }
+
+        return asset('storage/' . ltrim($value, '/'));
+    }
+
+    protected function abbreviatedPosition($value): string
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            }
+        }
+
+        $raw = is_array($value)
+            ? collect($value)->filter()->implode(' | ')
+            : trim((string) $value);
+
+        if ($raw === '') {
+            return 'PLYR';
+        }
+
+        $map = [
+            'goalkeeper' => 'GK', 'keeper' => 'GK', 'defender' => 'DEF', 'center_back' => 'CB', 'centre_back' => 'CB', 'center back' => 'CB', 'centre back' => 'CB', 'left_back' => 'LB', 'left back' => 'LB', 'right_back' => 'RB', 'right back' => 'RB', 'full_back' => 'FB', 'full back' => 'FB', 'wing_back' => 'WB', 'wing back' => 'WB',
+            'midfielder' => 'MID', 'defensive_midfielder' => 'CDM', 'defensive midfielder' => 'CDM', 'central_midfielder' => 'CM', 'central midfielder' => 'CM', 'attacking_midfielder' => 'CAM', 'attacking midfielder' => 'CAM', 'wide_midfielder' => 'WM', 'wide midfielder' => 'WM',
+            'forward' => 'FWD', 'wide_forward' => 'WF', 'wide forward' => 'WF', 'striker' => 'ST', 'winger' => 'WG', 'left_wing' => 'LW', 'left wing' => 'LW', 'right_wing' => 'RW', 'right wing' => 'RW',
+            'point_guard' => 'PG', 'point guard' => 'PG', 'shooting_guard' => 'SG', 'shooting guard' => 'SG', 'small_forward' => 'SF', 'small forward' => 'SF', 'power_forward' => 'PF', 'power forward' => 'PF', 'center' => 'C',
+        ];
+
+        return collect(preg_split('/\s*[|,\/]\s*/', $raw))
+            ->filter()
+            ->map(function ($item) use ($map) {
+                $item = trim((string) $item);
+                $key = Str::of($item)->lower()->replace('&', 'and')->replace('-', ' ')->replace('_', ' ')->squish()->toString();
+                $underscored = str_replace(' ', '_', $key);
+
+                if (isset($map[$key])) {
+                    return $map[$key];
+                }
+
+                if (isset($map[$underscored])) {
+                    return $map[$underscored];
+                }
+
+                $words = collect(explode(' ', $key))->filter();
+
+                return $words->count() > 1
+                    ? $words->map(fn ($word) => strtoupper(substr($word, 0, 1)))->implode('')
+                    : strtoupper(substr($item, 0, 4));
+            })
+            ->filter()
+            ->unique()
+            ->implode(' / ') ?: 'PLYR';
+    }
+
     protected function playerWebsiteUrl(User $player): ?string
     {
         $website = $player->websites
-            ? $player->websites->firstWhere('is_published', true) ?: $player->websites->first()
+            ? ($player->websites->firstWhere('is_active', true) ?: $player->websites->first())
             : null;
 
         if (! $website) {
@@ -515,7 +610,21 @@ class PublicClubTeamController extends Controller
         }
 
         if (filled($website->slug)) {
-            return url('/' . ltrim((string) $website->slug, '/'));
+            $slug = ltrim((string) $website->slug, '/');
+
+            return Route::has('website.show-by-name')
+                ? route('website.show-by-name', ['websiteName' => $slug])
+                : url('/' . $slug);
+        }
+
+        if (filled($website->name)) {
+            $slug = Str::slug((string) $website->name);
+
+            return $slug
+                ? (Route::has('website.show-by-name')
+                    ? route('website.show-by-name', ['websiteName' => $slug])
+                    : url('/' . $slug))
+                : null;
         }
 
         return null;
