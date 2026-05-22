@@ -1632,6 +1632,15 @@
         @media(min-width:901px){.hero-info-strip{width:100%!important;margin-left:0!important;margin-right:0!important;}}
         @media(max-width:900px){.hero{min-height:0!important;height:auto!important}.hero-inner{padding:30px 18px 0!important}.team-main-polished{gap:18px!important}.team-hero-identity{grid-template-columns:54px minmax(0,1fr) 54px!important;column-gap:12px!important;row-gap:14px!important}.team-hero-identity .identity-logo,.team-hero-identity .identity-league{width:52px!important;height:52px!important}.team-title-stack .label{font-size:9px!important}.team-name{font-size:42px!important}.hero-info-strip{grid-template-columns:1fr!important;width:100vw!important;margin-left:calc(50% - 50vw)!important;margin-right:calc(50% - 50vw)!important}.hero-info-card{min-height:76px!important;grid-template-columns:48px minmax(0,1fr)!important;padding:14px 20px!important;border-left:0!important;border-top:1px solid rgba(255,255,255,.14)!important}.hero-info-card:first-child{border-top:0!important}.hero-info-value{font-size:18px!important}}
 
+
+
+        /* Watchlist save feedback + saved profile rows */
+        .watchlist-toast{position:fixed;left:50%;top:76px;z-index:4000;display:flex;align-items:center;gap:9px;min-height:42px;padding:0 14px;border-radius:999px;background:#fff;color:#050505;box-shadow:0 16px 38px rgba(0,0,0,.35);font-family:var(--heading);font-size:13px;font-weight:950;letter-spacing:.05em;text-transform:uppercase;opacity:0;transform:translate(-50%,-18px) scale(.96);pointer-events:none;transition:opacity .18s ease,transform .22s cubic-bezier(.2,.8,.2,1)}
+        .watchlist-toast i{color:#ff5c35}.watchlist-toast.is-visible{opacity:1;transform:translate(-50%,0) scale(1)}
+        .player-dialog.is-swipe-save{animation:plyrSwipeSave .42s cubic-bezier(.4,0,.2,1) both}.player-dialog.is-swipe-next{animation:plyrSwipeNext .26s cubic-bezier(.2,.8,.2,1) both}
+        @keyframes plyrSwipeSave{0%{transform:translateX(0) rotate(0);opacity:1}100%{transform:translateX(110%) rotate(8deg);opacity:0}}
+        @keyframes plyrSwipeNext{0%{transform:translateX(-26%) scale(.96);opacity:0}100%{transform:translateX(0) scale(1);opacity:1}}
+        .saved-card{width:min(720px,100%)!important}.saved-modal-body{padding:12px!important}.saved-profile-list{display:grid;gap:8px}.saved-profile-row{position:relative;display:grid;grid-template-columns:58px 72px minmax(0,1fr) 28px;gap:11px;align-items:center;min-height:74px;padding:8px 10px;background:#0d0d10;border:1px solid var(--line);color:#fff;overflow:hidden}.saved-profile-row:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 14%,transparent),transparent 58%);opacity:.72}.saved-profile-row>*{position:relative;z-index:2}.saved-profile-avatar{width:50px;height:50px;border-radius:999px;object-fit:cover;background:#17181d;display:grid;place-items:center;color:#fff;font-family:var(--heading);font-size:20px;font-weight:950}.saved-profile-avatar.is-card{width:42px;height:58px;border-radius:7px;object-position:center top}.saved-profile-number{display:grid;gap:5px;min-width:0}.saved-profile-number strong{font-family:var(--heading);font-size:30px;line-height:.85;font-weight:950;color:#fff;letter-spacing:-.04em}.saved-profile-number span{font-family:var(--heading);font-size:11px;line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-readable);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy{min-width:0}.saved-profile-copy strong{display:block;font-family:var(--heading);font-size:20px;line-height:1;font-weight:950;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-copy span{display:block;margin-top:6px;color:rgba(255,255,255,.74);font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.saved-profile-arrow{display:grid;place-items:center;color:var(--brand-readable);font-size:14px;text-decoration:none}.saved-empty-state{padding:24px 14px;background:#0d0d10;border:1px solid var(--line);color:var(--muted);font-weight:850;text-align:center}.coach-drawer-card.is-loading,.player-quick-save button.is-loading{opacity:.7;pointer-events:none}
     </style>
 </head>
 <body>
@@ -1703,7 +1712,7 @@
                 <div><div class="eyebrow">Team Roster</div><div class="section-title">Players</div></div>
                 <div class="roster-tools">
                     <span class="sort-label"><i class="fa-solid fa-arrow-down-1-9"></i> Sorted by number</span>
-                    <button class="saved-button" type="button" data-open-saved><i class="fa-solid fa-bookmark"></i> Watchlist <strong>{{ $savedPlayers->count() }}</strong></button>
+                    <button class="saved-button" type="button" data-open-saved><i class="fa-solid fa-bookmark"></i> Watchlist <strong data-watchlist-count>{{ $savedPlayers->count() }}</strong></button>
                 </div>
             </div>
             <div class="roster">
@@ -1790,18 +1799,53 @@
 @endphp
 
 <div class="modal" id="savedModal" aria-hidden="true">
-    <div class="coach-card" role="dialog" aria-modal="true" aria-labelledby="savedModalTitle">
-        <div class="modal-head"><div class="modal-title" id="savedModalTitle">Saved Profiles</div><button class="modal-close" type="button" data-close-saved><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="modal-body">
-            @if($savedPlayers->isNotEmpty())
-                <div class="saved-list">
+    <div class="coach-card saved-card" role="dialog" aria-modal="true" aria-labelledby="savedModalTitle">
+        <div class="modal-head">
+            <div class="modal-title" id="savedModalTitle">Saved Profiles</div>
+            <button class="modal-close" type="button" data-close-saved><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body saved-modal-body">
+            <div class="saved-profile-list" id="savedListBody">
+                @if($savedPlayers->isNotEmpty())
                     @foreach($savedPlayers as $saved)
-                        <div class="saved-item"><strong>{{ $saved['player_name'] ?? 'Player' }}</strong><span>{{ $saved['saved_at'] ?? '' }}</span></div>
+                        @php
+                            $savedName = $saved['player_name'] ?? 'Player';
+                            $savedInitial = strtoupper(substr(trim($savedName), 0, 1));
+                            $savedAcademic = collect([
+                                filled($saved['year'] ?? null) ? 'Class ' . $saved['year'] : null,
+                                filled($saved['gpa'] ?? null) ? $saved['gpa'] . ' GPA' : null,
+                            ])->filter()->implode(' | ');
+                            $savedPosition = $saved['position'] ?? 'Player';
+                            $savedJersey = filled($saved['jersey_number'] ?? null) ? '#' . ltrim((string) $saved['jersey_number'], '#') : '—';
+                            $savedImage = $saved['card_image'] ?? $saved['portrait_image'] ?? $saved['player_image'] ?? null;
+                        @endphp
+                        <div class="saved-profile-row">
+                            @if($savedImage)
+                                <img class="saved-profile-avatar {{ filled($saved['card_image'] ?? null) ? 'is-card' : '' }}" src="{{ $savedImage }}" alt="{{ $savedName }}">
+                            @else
+                                <div class="saved-profile-avatar"><span>{{ $savedInitial }}</span></div>
+                            @endif
+                            <div class="saved-profile-number">
+                                <strong>{{ $savedJersey }}</strong>
+                                <span>{{ $savedPosition }}</span>
+                            </div>
+                            <div class="saved-profile-copy">
+                                <strong>{{ $savedName }}</strong>
+                                @if(filled($savedAcademic))
+                                    <span>{{ $savedAcademic }}</span>
+                                @endif
+                            </div>
+                            @if(filled($saved['player_url'] ?? null))
+                                <a class="saved-profile-arrow" href="{{ $saved['player_url'] }}" target="_blank" rel="noopener" aria-label="Open {{ $savedName }} website"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                            @else
+                                <span class="saved-profile-arrow"><i class="fa-solid fa-bookmark"></i></span>
+                            @endif
+                        </div>
                     @endforeach
-                </div>
-            @else
-                <div class="coach-status">No saved profiles yet. Open a player and tap Save Profile.</div>
-            @endif
+                @else
+                    <div class="saved-empty-state">No saved profiles yet. Open a player and tap Save.</div>
+                @endif
+            </div>
         </div>
     </div>
 </div>
@@ -1867,6 +1911,8 @@
     </div>
 </div>
 
+<div class="watchlist-toast" id="watchlistToast" aria-live="polite"><i class="fa-solid fa-circle-check"></i><span>Saved to watchlist</span></div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function(){
     const coachModal = document.getElementById('coachModal');
@@ -1898,7 +1944,8 @@ document.addEventListener('DOMContentLoaded', function(){
     const backBtn = document.getElementById('playerBackBtn');
     const saveUrlTemplate = @json($saveUrlTemplate);
     const unsaveUrlTemplate = @json($unsaveUrlTemplate);
-    const savedIds = @json($savedIds);
+    let savedIds = @json($savedIds);
+    let watchlistPlayers = @json($savedPlayers->values());
     const csrfToken = @json(csrf_token());
     const checkedIn = @json((bool) $coachSession);
     let active = 0;
@@ -1907,6 +1954,73 @@ document.addEventListener('DOMContentLoaded', function(){
     function dataAt(index){const el = cards[index]; if(!el) return null; try{return JSON.parse(el.dataset.player || '{}');}catch(e){return {};}}
     function clean(value){return value && value !== 'null' && value !== 'undefined' ? String(value) : '';}
     function action(label, icon, href, extraClass){return href ? `<a class="coach-drawer-card ${extraClass || ''}" href="${esc(href)}"><i class="fa-solid ${icon}"></i><span>${esc(label)}</span></a>` : '';}
+    function savedAcademicLine(player){return [player.year ? 'Class ' + player.year : '', player.gpa ? player.gpa + ' GPA' : ''].filter(Boolean).join(' | ');}
+    function savedImage(player){return player.card_image || player.plyrcard_image || player.portrait_image || player.player_image || player.main_image || '';}
+    function savedName(player){return player.player_name || player.name || 'Player';}
+    function savedJersey(player){const raw = clean(player.jersey_number || player.jersey); return raw ? '#' + raw.replace(/^#/, '') : '—';}
+    function savedPosition(player){return player.position || player.position_full || 'Player';}
+    function savedRowHtml(player){
+        const name = savedName(player);
+        const img = savedImage(player);
+        const initial = name.trim().charAt(0).toUpperCase() || 'P';
+        const academic = savedAcademicLine(player);
+        const url = player.player_url || player.website_url || '';
+        return `<div class="saved-profile-row" data-saved-player-id="${esc(player.player_id || player.id || '')}">
+            ${img ? `<img class="saved-profile-avatar ${player.card_image || player.plyrcard_image ? 'is-card' : ''}" src="${esc(img)}" alt="${esc(name)}">` : `<div class="saved-profile-avatar"><span>${esc(initial)}</span></div>`}
+            <div class="saved-profile-number"><strong>${esc(savedJersey(player))}</strong><span>${esc(savedPosition(player))}</span></div>
+            <div class="saved-profile-copy"><strong>${esc(name)}</strong>${academic ? `<span>${esc(academic)}</span>` : ''}</div>
+            ${url ? `<a class="saved-profile-arrow" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Open ${esc(name)} website"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : `<span class="saved-profile-arrow"><i class="fa-solid fa-bookmark"></i></span>`}
+        </div>`;
+    }
+    function renderSavedList(){
+        const body = document.getElementById('savedListBody');
+        if(!body) return;
+        if(!watchlistPlayers.length){body.innerHTML = '<div class="saved-empty-state">No saved profiles yet. Open a player and tap Save.</div>';return;}
+        body.innerHTML = watchlistPlayers.map(savedRowHtml).join('');
+    }
+    function updateWatchlistCount(){document.querySelectorAll('[data-watchlist-count]').forEach(el => el.textContent = String(savedIds.length));}
+    function showWatchlistToast(message){
+        const toast = document.getElementById('watchlistToast');
+        if(!toast) return;
+        const span = toast.querySelector('span');
+        if(span) span.textContent = message || 'Saved to watchlist';
+        toast.classList.add('is-visible');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => toast.classList.remove('is-visible'), 1300);
+    }
+    function addSavedPlayer(payload){
+        const id = Number(payload.player_id || payload.id || 0);
+        if(id && !savedIds.map(Number).includes(id)) savedIds.push(id);
+        if(id){watchlistPlayers = watchlistPlayers.filter(item => Number(item.player_id || item.id) !== id);}
+        watchlistPlayers.unshift(payload);
+        updateWatchlistCount();
+        renderSavedList();
+    }
+    function removeSavedPlayer(id){
+        const numeric = Number(id);
+        savedIds = savedIds.filter(item => Number(item) !== numeric);
+        watchlistPlayers = watchlistPlayers.filter(item => Number(item.player_id || item.id) !== numeric);
+        updateWatchlistCount();
+        renderSavedList();
+    }
+    function refreshCurrentPlayerActions(){if(currentPlayer) renderPlayerDrawer(currentPlayer);}
+    function swipeToNextPlayer(){
+        if(!overlay?.classList.contains('is-open')) return;
+        dialog.classList.remove('is-swipe-next');
+        dialog.classList.add('is-swipe-save');
+        setTimeout(() => {
+            const nextIndex = cards.length > 1 ? (active + 1) % cards.length : active;
+            const nextPlayer = dataAt(nextIndex);
+            if(!nextPlayer){closePlayer();return;}
+            active = nextIndex;
+            renderPlayerDrawer(nextPlayer);
+            dialog.innerHTML = render(nextPlayer);
+            dialog.classList.remove('is-swipe-save');
+            dialog.classList.add('is-swipe-next');
+            setTimeout(() => dialog.classList.remove('is-swipe-next'), 280);
+        }, 390);
+    }
+
     function saveButtonHtml(player, compact){
         const saveUrl = saveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
         const unsaveUrl = unsaveUrlTemplate.replace('__PLAYER_ID__', encodeURIComponent(player.id));
@@ -1915,9 +2029,9 @@ document.addEventListener('DOMContentLoaded', function(){
             return `<button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="button" data-open-coach><i class="fa-solid fa-right-to-bracket"></i>${compact ? 'Check In' : '<span>Check In</span>'}</button>`;
         }
         if(isSaved){
-            return `<form method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
+            return `<form class="watchlist-action-form" data-watchlist-form data-watchlist-action="remove" method="POST" action="${esc(unsaveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="${compact ? 'is-remove' : 'coach-drawer-card'}" type="submit"><i class="fa-solid fa-bookmark-slash"></i>${compact ? 'Remove' : '<span>Remove</span>'}</button></form>`;
         }
-        return `<form method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
+        return `<form class="watchlist-action-form" data-watchlist-form data-watchlist-action="save" method="POST" action="${esc(saveUrl)}" style="margin:0"><input type="hidden" name="_token" value="${esc(csrfToken)}"><button class="${compact ? '' : 'coach-drawer-card is-accent'}" type="submit"><i class="fa-solid fa-bookmark"></i>${compact ? 'Save' : '<span>Save</span>'}</button></form>`;
     }
     function renderPlayerDrawer(player){
         currentPlayer = player;
@@ -1991,6 +2105,41 @@ document.addEventListener('DOMContentLoaded', function(){
     function next(){if(!cards.length)return; openPlayer((active+1)%cards.length);} function prev(){if(!cards.length)return; openPlayer((active-1+cards.length)%cards.length);}
     cards.forEach((card, i) => card.addEventListener('click', e => {e.preventDefault(); openPlayer(i);}));
     closeBtn?.addEventListener('click', closePlayer); backBtn?.addEventListener('click', closePlayer); nextBtn?.addEventListener('click', next); prevBtn?.addEventListener('click', prev); overlay?.addEventListener('click', e => {if(e.target===overlay) closePlayer();});
+    document.addEventListener('submit', async function(event){
+        const form = event.target.closest('[data-watchlist-form]');
+        if(!form) return;
+        event.preventDefault();
+        const actionType = form.dataset.watchlistAction || 'save';
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton?.classList.add('is-loading');
+        try{
+            const response = await fetch(form.action, {
+                method:'POST',
+                headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+                body:new FormData(form)
+            });
+            const data = await response.json().catch(() => ({}));
+            if(!response.ok || data.success === false){throw new Error(data.message || 'Watchlist action failed.');}
+            if(actionType === 'remove'){
+                removeSavedPlayer(data.player_id || currentPlayer?.id);
+                showWatchlistToast(data.message || 'Removed from watchlist');
+                refreshCurrentPlayerActions();
+                return;
+            }
+            if(data.saved_player) addSavedPlayer(data.saved_player);
+            showWatchlistToast(data.message || 'Saved to watchlist');
+            if(currentPlayer && Number(currentPlayer.id) === Number(data.player_id || currentPlayer.id)){
+                setTimeout(swipeToNextPlayer, 180);
+            } else {
+                refreshCurrentPlayerActions();
+            }
+        }catch(error){
+            showWatchlistToast(error.message || 'Could not save player');
+        }finally{
+            submitButton?.classList.remove('is-loading');
+        }
+    });
+
     document.addEventListener('keydown', e => { if(e.key==='Escape'){closePlayer();coachModal?.classList.remove('is-open');savedModal?.classList.remove('is-open');} if(overlay?.classList.contains('is-open') && e.key==='ArrowRight') next(); if(overlay?.classList.contains('is-open') && e.key==='ArrowLeft') prev(); });
 });
 </script>
