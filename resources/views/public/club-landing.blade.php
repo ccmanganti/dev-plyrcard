@@ -996,7 +996,24 @@
             .coach-drawer-card i{font-size:13px!important;}
             .coach-drawer-card span{font-size:8.8px!important;}
         }
-</style>
+
+
+        /* Final fix: no highlighted Remove buttons in coach/watchlist actions. */
+        .coach-drawer-card.is-remove,
+        .coach-drawer-card-form button.coach-drawer-card.is-remove{
+            background:#fff!important;
+            color:#050505!important;
+            border:0!important;
+        }
+        .coach-drawer-card.is-remove i,
+        .coach-drawer-card-form button.coach-drawer-card.is-remove i{
+            display:block!important;
+            color:currentColor!important;
+            font-size:13px!important;
+            margin:0 0 2px!important;
+        }
+
+    </style>
 </head>
 <body>
     <main class="site">
@@ -1153,13 +1170,6 @@
                     @endforelse
                 </div>
 
-                @if($savedPlayers->isNotEmpty())
-                    <div class="saved-strip">
-                        @foreach($savedPlayers as $saved)
-                            <span class="saved-pill">Saved: {{ $saved['player_name'] ?? 'Player' }}</span>
-                        @endforeach
-                    </div>
-                @endif
             </div>
         </section>
 

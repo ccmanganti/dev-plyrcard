@@ -1737,6 +1737,38 @@
         .coach-drawer-card.is-remove i{display:block!important;color:currentColor!important;}
         @media(max-width:390px){.coach-drawer-main-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important}.coach-drawer-main-actions .coach-drawer-card,.coach-drawer-main-actions .coach-drawer-card-form button{min-height:52px!important;font-size:9px!important}.coach-drawer-main-actions .coach-drawer-card span{font-size:8.8px!important}.coach-drawer-player-actions .coach-drawer-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 
+    
+
+        /* Final fix: Remove is not the highlighted action. Only Save stays orange. */
+        .coach-drawer-card.is-remove,
+        .coach-drawer-card-form button.coach-drawer-card.is-remove{
+            background:#fff!important;
+            color:#050505!important;
+            border:0!important;
+        }
+        .coach-drawer-card.is-remove i,
+        .coach-drawer-card-form button.coach-drawer-card.is-remove i{
+            display:block!important;
+            color:currentColor!important;
+            font-size:13px!important;
+            line-height:1!important;
+            margin:0 0 2px!important;
+        }
+        .coach-drawer-card.is-remove span{
+            display:block!important;
+            color:currentColor!important;
+        }
+        .saved-profile-action.is-remove,
+        .saved-profile-action-form button{
+            background:#fff!important;
+            color:#050505!important;
+        }
+        .saved-profile-action.is-remove i,
+        .saved-profile-action-form button i{
+            display:inline-block!important;
+            color:currentColor!important;
+        }
+
     </style>
 </head>
 <body>
