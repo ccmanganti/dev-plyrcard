@@ -650,8 +650,14 @@ class UserResource extends Resource
                                         ->prefixIcon('heroicon-m-calculator')
                                         ->label('GPA')
                                         ->placeholder('e.g. 3.8')
-                                        ->numeric()
-                                        ->step('0.01'),
+                                        ->inputMode('decimal')
+                                        ->rules([
+                                            'nullable',
+                                            'numeric',
+                                            'min:0',
+                                            'max:5',
+                                        ])
+                                        ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state),
 
                                     Select::make('national_team_id')
                                         ->prefixIcon('heroicon-m-flag')
