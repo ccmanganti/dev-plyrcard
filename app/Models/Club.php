@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Club extends Model
 {
@@ -109,5 +110,35 @@ class Club extends Model
     public function conference(): BelongsTo
     {
         return $this->belongsTo(Conference::class);
+    }
+
+    public function clubLeagues(): HasMany
+    {
+        return $this->hasMany(ClubLeague::class);
+    }
+
+    public function leagues(): BelongsToMany
+    {
+        return $this->belongsToMany(League::class, 'club_leagues')
+            ->withPivot([
+                'id',
+                'genders',
+                'sport',
+                'is_active',
+                'sort_order',
+                'legacy_club_ids',
+                'settings',
+            ])
+            ->withTimestamps();
+    }
+
+    public function canonicalClub(): BelongsTo
+    {
+        return $this->belongsTo(Club::class, 'canonical_club_id');
+    }
+
+    public function duplicateClubs(): HasMany
+    {
+        return $this->hasMany(Club::class, 'canonical_club_id');
     }
 }

@@ -68,6 +68,10 @@ class User extends Authenticatable implements HasName, FilamentUser
         'school_id',
         'club_id',
         'league_id',
+        'club_league_id',
+        'legacy_club_id',
+        'legacy_league_id',
+        'legacy_team_name',
         'national_team_id',
         'password',
         'plyrcard_image',
@@ -162,6 +166,11 @@ class User extends Authenticatable implements HasName, FilamentUser
         return $this->belongsTo(Club::class);
     }
 
+    public function legacyClub(): BelongsTo
+    {
+        return $this->belongsTo(Club::class, 'legacy_club_id');
+    }
+
     public function websites(): HasMany
     {
         return $this->hasMany(Website::class);
@@ -170,6 +179,16 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function league(): BelongsTo
     {
         return $this->belongsTo(League::class);
+    }
+
+    public function legacyLeague(): BelongsTo
+    {
+        return $this->belongsTo(League::class, 'legacy_league_id');
+    }
+
+    public function clubLeague(): BelongsTo
+    {
+        return $this->belongsTo(ClubLeague::class);
     }
 
     public function activeWebsite(): HasOne

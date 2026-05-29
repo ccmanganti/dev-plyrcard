@@ -7,10 +7,10 @@ use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
 use App\Models\Club;
+use App\Models\ClubLeague;
 use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
-use App\Models\Team;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -237,51 +237,71 @@ class UserResource extends Resource
         };
     }
 
-    protected static function applyGenderAndSportFilter(
-        Builder $query,
-        ?string $gender,
-        ?string $sport,
-        string $genderColumn = 'gender',
-        string $sportColumn = 'sport',
-    ): Builder {
-        return $query
-            ->when(filled($gender), fn (Builder $q) => $q->where($genderColumn, $gender))
-            ->when(filled($sport), fn (Builder $q) => $q->where($sportColumn, $sport));
+    protected static function normalizeGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match (true) {
+            str_contains($gender, 'female'), str_contains($gender, 'girl'), str_contains($gender, 'women') => 'female',
+            str_contains($gender, 'male'), str_contains($gender, 'boy'), str_contains($gender, 'men') => 'male',
+            default => filled($gender) ? $gender : null,
+        };
     }
 
     protected static function getLeagueOptions(?string $gender = null, ?string $sport = null, ?string $search = null): array
     {
-        $query = League::query();
+        $gender = static::normalizeGender($gender);
 
-        static::applyGenderAndSportFilter($query, $gender, $sport);
-
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
+        $query = League::query()
+            ->when(filled($gender), function (Builder $query) use ($gender): Builder {
+                return $query->where(function (Builder $query) use ($gender): Builder {
+                    return $query
+                        ->whereJsonContains('genders', $gender)
+                        ->orWhere('gender', $gender)
+                        ->orWhere('gender', ucfirst($gender))
+                        ->orWhere('gender', $gender === 'female' ? 'Girls' : 'Boys')
+                        ->orWhere('gender', $gender === 'female' ? 'Female' : 'Male');
+                });
+            })
+            ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                return $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->when(filled($search), fn (Builder $query): Builder => $query->where('name', 'like', '%' . trim($search) . '%'));
 
         return $query
             ->orderBy('name')
             ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->get(['id', 'name', 'genders', 'gender'])
+            ->mapWithKeys(function (League $league): array {
+                $genders = collect($league->genders ?: [$league->gender])
+                    ->filter()
+                    ->map(fn ($gender) => str($gender)->title())
+                    ->implode('/');
+
+                return [(string) $league->id => $league->name . ($genders ? ' — ' . $genders : '')];
+            })
             ->all();
     }
 
     protected static function getClubOptions(?string $leagueId = null, ?string $gender = null, ?string $sport = null, ?string $search = null): array
     {
-        $query = Club::query();
-
-        if (filled($leagueId)) {
-            $query->where('league_id', $leagueId);
-        } else {
+        if (blank($leagueId)) {
             return [];
         }
 
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
+        $gender = static::normalizeGender($gender);
+
+        $query = Club::query()
+            ->whereHas('clubLeagues', function (Builder $query) use ($leagueId, $gender, $sport): Builder {
+                return $query
+                    ->where('league_id', $leagueId)
+                    ->where('is_active', true)
+                    ->when(filled($gender), fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+                    ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                        return $query->whereNull('sport')->orWhere('sport', $sport);
+                    }));
+            })
+            ->when(filled($search), fn (Builder $query): Builder => $query->where('name', 'like', '%' . trim($search) . '%'));
 
         return $query
             ->orderBy('name')
@@ -291,25 +311,43 @@ class UserResource extends Resource
             ->all();
     }
 
-    protected static function getTeamOptions(?string $clubId = null, ?string $gender = null, ?string $sport = null, ?string $search = null): array
+    protected static function getAgeGroupOptions(?string $search = null): array
     {
-        if (blank($clubId)) {
-            return ['__new__' => 'Add New'];
+        $configured = config('plyrcard.age_groups', [
+            'u13' => 'U13',
+            'u14' => 'U14',
+            'u15' => 'U15',
+            'u16' => 'U16',
+            'u17' => 'U17',
+            'u18' => 'U18',
+            'u19' => 'U19',
+        ]);
+
+        return collect($configured)
+            ->mapWithKeys(fn ($label) => [(string) $label => (string) $label])
+            ->when(filled($search), fn ($items) => $items->filter(fn ($label) => str_contains(strtolower($label), strtolower(trim($search)))))
+            ->all();
+    }
+
+    protected static function resolveClubLeagueId(?string $clubId, ?string $leagueId, ?string $gender, ?string $sport = null): ?int
+    {
+        if (blank($clubId) || blank($leagueId)) {
+            return null;
         }
 
-        $query = Team::query()->where('club_id', $clubId);
+        $gender = static::normalizeGender($gender);
 
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
-
-        return ['__new__' => 'Add New'] + $query
-            ->orderBy('name')
-            ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-            ->all();
+        return ClubLeague::query()
+            ->where('club_id', $clubId)
+            ->where('league_id', $leagueId)
+            ->where('is_active', true)
+            ->when(filled($gender), fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+            ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                return $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
     }
 
     public static function mutateUserFormData(array $data): array
@@ -330,82 +368,15 @@ class UserResource extends Resource
             $data['school_id'] = null;
         }
 
-        if (($data['team_id'] ?? null) === '__new__') {
-            $newLeagueName = trim((string) ($data['new_league_name'] ?? ''));
-            $newClubName = trim((string) ($data['new_club_name'] ?? ''));
-            $newTeamName = trim((string) ($data['new_team_name'] ?? ''));
+        $data['club_league_id'] = static::resolveClubLeagueId(
+            $data['club_id'] ?? null,
+            $data['league_id'] ?? null,
+            $data['gender'] ?? null,
+            $data['sport'] ?? null,
+        );
 
-            $league = null;
-            $club = null;
-            $team = null;
-
-            if ($newLeagueName !== '') {
-                $league = League::firstOrCreate(
-                    ['name' => $newLeagueName],
-                    ['logo' => $data['new_league_logo'] ?? null]
-                );
-
-                if (blank($league->logo) && filled($data['new_league_logo'] ?? null)) {
-                    $league->logo = $data['new_league_logo'];
-                    $league->save();
-                }
-            }
-
-            if ($newClubName !== '') {
-                $club = Club::firstOrCreate(
-                    [
-                        'name' => $newClubName,
-                        'league_id' => $league?->id,
-                    ],
-                    [
-                        'logo' => $data['new_club_logo'] ?? null,
-                    ]
-                );
-
-                $clubNeedsSave = false;
-
-                if ($league && $club->league_id !== $league->id) {
-                    $club->league_id = $league->id;
-                    $clubNeedsSave = true;
-                }
-
-                if (blank($club->logo) && filled($data['new_club_logo'] ?? null)) {
-                    $club->logo = $data['new_club_logo'];
-                    $clubNeedsSave = true;
-                }
-
-                if ($clubNeedsSave) {
-                    $club->save();
-                }
-            }
-
-            if ($newTeamName !== '') {
-                $team = Team::firstOrCreate(
-                    [
-                        'name' => $newTeamName,
-                        'club_id' => $club?->id,
-                    ]
-                );
-
-                if ($club && $team->club_id !== $club->id) {
-                    $team->club_id = $club->id;
-                    $team->save();
-                }
-            }
-
-            $data['team_name'] = $team?->name ?? null;
-            $data['club_id'] = $club?->id;
-            $data['league_id'] = $league?->id;
-        } else {
-            $selectedTeam = null;
-
-            if (filled($data['team_id'] ?? null)) {
-                $selectedTeam = Team::with('club.league')->find($data['team_id']);
-            }
-
-            $data['team_name'] = $selectedTeam?->name ?? null;
-            $data['club_id'] = $selectedTeam?->club?->id ?? null;
-            $data['league_id'] = $selectedTeam?->club?->league?->id ?? null;
+        if (filled($data['team_name'] ?? null)) {
+            $data['team_name'] = strtoupper(trim((string) $data['team_name']));
         }
 
         if (($data['national_team_id'] ?? null) === '__new__' && filled($data['new_national_team_name'] ?? null)) {
@@ -422,12 +393,6 @@ class UserResource extends Resource
         unset(
             $data['password_confirmation'],
             $data['new_school_name'],
-            $data['team_id'],
-            $data['new_team_name'],
-            $data['new_club_name'],
-            $data['new_club_logo'],
-            $data['new_league_name'],
-            $data['new_league_logo'],
             $data['new_national_team_name'],
             $data['new_national_team_logo'],
         );
@@ -438,9 +403,7 @@ class UserResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Hidden::make('club_id'),
-            Hidden::make('league_id'),
-            Hidden::make('team_name'),
+            Hidden::make('club_league_id'),
 
             Tabs::make('user_tabs')
                 ->persistTab()
@@ -595,7 +558,6 @@ class UserResource extends Resource
                                         ->afterStateUpdated(function (Set $set) {
                                             $set('league_id', null);
                                             $set('club_id', null);
-                                            $set('team_id', null);
                                             $set('team_name', null);
                                         }),
 
@@ -636,7 +598,6 @@ class UserResource extends Resource
                                         ->afterStateUpdated(function (Set $set) {
                                             $set('league_id', null);
                                             $set('club_id', null);
-                                            $set('team_id', null);
                                             $set('team_name', null);
                                         }),
 
@@ -725,6 +686,7 @@ class UserResource extends Resource
 
                             Section::make('Experience')
                                 ->icon('heroicon-m-flag')
+                                ->description('New flow: Sex → League → Club → Age Group. Age Group is static and stored in team_name.')
                                 ->columns(2)
                                 ->schema([
                                     Select::make('league_id')
@@ -736,7 +698,6 @@ class UserResource extends Resource
                                         ->searchable()
                                         ->live()
                                         ->preload(false)
-                                        ->dehydrated(fn (Get $get) => $get('team_id') !== '__new__')
                                         ->options(fn (Get $get): array => static::getLeagueOptions(
                                             $get('gender'),
                                             $get('sport'),
@@ -753,11 +714,11 @@ class UserResource extends Resource
 
                                             return League::query()->whereKey($value)->value('name');
                                         })
-                                        ->disabled(fn (Get $get): bool => (blank($get('sport')) || blank($get('gender'))) || $get('team_id') === '__new__')
-                                        ->helperText('Filtered by the selected sport and sex.')
+                                        ->disabled(fn (Get $get): bool => blank($get('sport')) || blank($get('gender')))
+                                        ->helperText('Filtered by Supported Genders on the League record.')
                                         ->afterStateUpdated(function (Set $set) {
                                             $set('club_id', null);
-                                            $set('team_id', null);
+                                            $set('club_league_id', null);
                                             $set('team_name', null);
                                         }),
 
@@ -770,7 +731,6 @@ class UserResource extends Resource
                                         ->searchable()
                                         ->live()
                                         ->preload(false)
-                                        ->dehydrated(fn (Get $get) => $get('team_id') !== '__new__')
                                         ->options(fn (Get $get): array => static::getClubOptions(
                                             $get('league_id'),
                                             $get('gender'),
@@ -789,131 +749,39 @@ class UserResource extends Resource
 
                                             return Club::query()->whereKey($value)->value('name');
                                         })
-                                        ->disabled(fn (Get $get): bool => blank($get('league_id')) || $get('team_id') === '__new__')
-                                        ->helperText('Filtered by the selected league.')
-                                        ->afterStateUpdated(function (Set $set) {
-                                            $set('team_id', null);
+                                        ->disabled(fn (Get $get): bool => blank($get('league_id')))
+                                        ->helperText('Filtered through Club Program Leagues.')
+                                        ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                             $set('team_name', null);
+                                            $set('club_league_id', static::resolveClubLeagueId(
+                                                $state,
+                                                $get('league_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ));
                                         }),
 
-                                    Select::make('team_id')
+                                    Select::make('team_name')
                                         ->prefixIcon('heroicon-m-users')
-                                        ->label('Team')
+                                        ->label('Age Group')
                                         ->placeholder(fn (Get $get) => blank($get('club_id'))
                                             ? 'Select club first'
-                                            : 'Search team')
+                                            : 'Select age group')
                                         ->searchable()
                                         ->live()
-                                        ->preload(false)
-                                        ->options(fn (Get $get): array => static::getTeamOptions(
-                                            $get('club_id'),
-                                            $get('gender'),
-                                            $get('sport'),
-                                        ))
-                                        ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
-                                            $get('club_id'),
-                                            $get('gender'),
-                                            $get('sport'),
-                                            $search,
-                                        ))
-                                        ->getOptionLabelUsing(function ($value): ?string {
-                                            if ($value === '__new__') {
-                                                return 'Add New';
-                                            }
-
-                                            if (blank($value)) {
-                                                return null;
-                                            }
-
-                                            return Team::query()->whereKey($value)->value('name');
-                                        })
-                                        ->disabled(fn (Get $get): bool => blank($get('club_id')) && $get('team_id') !== '__new__')
-                                        ->helperText('Filtered by the selected club, or choose Add New.')
-                                        ->afterStateHydrated(function ($state, Set $set, $record) {
-                                            if ($state || ! $record || blank($record->team_name)) {
-                                                return;
-                                            }
-
-                                            $team = Team::query()
-                                                ->with('club.league')
-                                                ->where('name', $record->team_name)
-                                                ->when($record->club_id, fn ($query) => $query->where('club_id', $record->club_id))
-                                                ->first();
-
-                                            if ($team) {
-                                                $set('team_id', (string) $team->id);
-                                            }
-                                        })
-                                        ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                            if ($state === '__new__') {
-                                                $set('team_name', null);
-                                                return;
-                                            }
-
-                                            if (blank($state)) {
-                                                $set('team_name', null);
-                                                return;
-                                            }
-
-                                            $team = Team::with('club.league')->find($state);
-
-                                            $set('team_name', $team?->name);
-                                            $set('club_id', $team?->club?->id ? (string) $team->club->id : $get('club_id'));
-                                            $set('league_id', $team?->club?->league?->id ? (string) $team->club->league->id : $get('league_id'));
-                                        }),
-
-                                    TextInput::make('team_name')
-                                        ->prefixIcon('heroicon-m-tag')
-                                        ->label('Selected Team')
-                                        ->disabled()
-                                        ->dehydrated()
-                                        ->visible(fn (Get $get) => $get('team_id') !== '__new__' && filled($get('team_id')))
-                                        ->helperText('Auto-filled from the selected team.'),
-
-                                    TextInput::make('new_team_name')
-                                        ->label('New Team Name')
-                                        ->placeholder('Enter team name')
-                                        ->maxLength(255)
-                                        ->visible(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->required(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->prefixIcon('heroicon-m-plus-circle'),
-
-                                    TextInput::make('new_club_name')
-                                        ->label('New Club Name')
-                                        ->placeholder('Enter club name')
-                                        ->maxLength(255)
-                                        ->visible(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->required(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->prefixIcon('heroicon-m-building-office-2'),
-
-                                    FileUpload::make('new_club_logo')
-                                        ->label('New Club Logo')
-                                        ->image()
-                                        ->downloadable()
-                                        ->imageEditor()
-                                        ->disk('public')
-                                        ->directory('club-logos')
-                                        ->visibility('public')
-                                        ->visible(fn (Get $get) => $get('team_id') === '__new__'),
-
-                                    TextInput::make('new_league_name')
-                                        ->label('New League Name')
-                                        ->placeholder('Enter league name')
-                                        ->maxLength(255)
-                                        ->visible(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->required(fn (Get $get) => $get('team_id') === '__new__')
-                                        ->prefixIcon('heroicon-m-sparkles'),
-
-                                    FileUpload::make('new_league_logo')
-                                        ->label('New League Logo')
-                                        ->image()
-                                        ->downloadable()
-                                        ->imageEditor()
-                                        ->disk('public')
-                                        ->directory('league-logos')
-                                        ->visibility('public')
-                                        ->visible(fn (Get $get) => $get('team_id') === '__new__'),
-                                ]),
+                                        ->preload()
+                                        ->options(fn (): array => static::getAgeGroupOptions())
+                                        ->getSearchResultsUsing(fn (string $search): array => static::getAgeGroupOptions($search))
+                                        ->disabled(fn (Get $get): bool => blank($get('club_id')))
+                                        ->helperText('Static age group. This replaces the old Team model selection.')
+                                        ->afterStateUpdated(function (Set $set, Get $get): void {
+                                            $set('club_league_id', static::resolveClubLeagueId(
+                                                $get('club_id'),
+                                                $get('league_id'),
+                                                $get('gender'),
+                                                $get('sport'),
+                                            ));
+                                        }),                                ]),
                         ]),
 
                     Tab::make('Bio & Accolades')

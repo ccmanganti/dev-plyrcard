@@ -38,6 +38,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class ClubResource extends Resource
@@ -48,6 +49,14 @@ class ClubResource extends Resource
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::ShieldCheck;
     protected static string|UnitEnum|null $navigationGroup = 'Organizations';
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGenderOptions(): array
+    {
+        return [
+            'male' => 'Male / Boys',
+            'female' => 'Female / Girls',
+        ];
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -69,7 +78,8 @@ class ClubResource extends Resource
                                             ->maxLength(255),
 
                                         Select::make('league_id')
-                                            ->label('League')
+                                            ->label('Legacy / Default League')
+                                            ->helperText('Kept for older records only. Use Program Leagues below for the new structure.')
                                             ->options(fn (): array => League::query()
                                                 ->orderBy('name')
                                                 ->pluck('name', 'id')
@@ -120,6 +130,64 @@ class ClubResource extends Resource
 
                                         ColorPicker::make('secondary_color')
                                             ->label('Secondary Color'),
+                                    ]),
+                            ]),
+
+                        Tab::make('Program Leagues')
+                            ->icon(Heroicon::OutlinedSquares2x2)
+                            ->schema([
+                                Section::make('Club League Programs')
+                                    ->description('Use this to define which leagues this club participates in and which genders are offered for each league.')
+                                    ->schema([
+                                        Repeater::make('clubLeagues')
+                                            ->relationship()
+                                            ->label('Program Leagues')
+                                            ->addActionLabel('Add Program League')
+                                            ->reorderable()
+                                            ->orderColumn('sort_order')
+                                            ->collapsed()
+                                            ->itemLabel(function (array $state): string {
+                                                $league = filled($state['league_id'] ?? null)
+                                                    ? League::query()->whereKey($state['league_id'])->value('name')
+                                                    : 'Program League';
+
+                                                $genders = collect($state['genders'] ?? [])
+                                                    ->map(fn ($gender) => Str::of((string) $gender)->title())
+                                                    ->implode(', ');
+
+                                                return trim($league . ($genders ? ' — ' . $genders : ''));
+                                            })
+                                            ->schema([
+                                                Select::make('league_id')
+                                                    ->label('League')
+                                                    ->options(fn (): array => League::query()
+                                                        ->orderBy('name')
+                                                        ->pluck('name', 'id')
+                                                        ->all())
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->required(),
+
+                                                Select::make('genders')
+                                                    ->label('Genders Offered')
+                                                    ->options(static::getGenderOptions())
+                                                    ->multiple()
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->required()
+                                                    ->helperText('Choose one or both genders for this club in this league.'),
+
+                                                TextInput::make('sport')
+                                                    ->label('Sport Override')
+                                                    ->helperText('Optional. Usually inherited from the league.')
+                                                    ->maxLength(255),
+
+                                                Toggle::make('is_active')
+                                                    ->label('Active')
+                                                    ->default(true),
+                                            ])
+                                            ->columns(2)
+                                            ->columnSpanFull(),
                                     ]),
                             ]),
 
@@ -245,7 +313,7 @@ class ClubResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['league', 'conference'])->withCount('teams'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['league', 'conference', 'clubLeagues.league'])->withCount('teams'))
             ->columns([
                 ImageColumn::make('logo')
                     ->label('')
@@ -258,15 +326,37 @@ class ClubResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('program_leagues')
+                    ->label('Program Leagues')
+                    ->state(function (Club $record): string {
+                        return $record->clubLeagues
+                            ->map(function ($program): string {
+                                $genders = collect($program->genders ?? [])
+                                    ->map(fn ($gender) => Str::of((string) $gender)->title())
+                                    ->implode('/');
+
+                                return trim(($program->league?->name ?? 'League') . ($genders ? ' (' . $genders . ')' : ''));
+                            })
+                            ->filter()
+                            ->implode(', ') ?: '-';
+                    })
+                    ->wrap()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->orWhereHas('clubLeagues.league', function (Builder $query) use ($search): void {
+                            $query->where('name', 'like', '%' . $search . '%');
+                        });
+                    }),
+
                 TextColumn::make('league.name')
-                    ->label('League')
+                    ->label('Legacy League')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('teams_count')
-                    ->label('Teams')
-                    ->sortable(),
+                    ->label('Legacy Teams')
+                    ->sortable()
+                    ->toggleable(),
 
                 IconColumn::make('has_landing_page')
                     ->label('Page')
@@ -291,8 +381,17 @@ class ClubResource extends Resource
             ->filters([
                 TrashedFilter::make(),
 
-                SelectFilter::make('league_id')
-                    ->label('League')
+                SelectFilter::make('program_league')
+                    ->label('Program League')
+                    ->options(fn (): array => League::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->whereHas('clubLeagues', fn (Builder $query) => $query->where('league_id', $data['value']))
+                        : $query)
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('legacy_league_id')
+                    ->label('Legacy League')
                     ->relationship('league', 'name')
                     ->searchable()
                     ->preload(),

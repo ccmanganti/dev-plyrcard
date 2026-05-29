@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
@@ -52,6 +53,14 @@ class LeagueResource extends Resource
         ];
     }
 
+    public static function getGenderOptions(): array
+    {
+        return [
+            'male' => 'Male / Boys',
+            'female' => 'Female / Girls',
+        ];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -62,12 +71,47 @@ class LeagueResource extends Resource
                         ->required()
                         ->maxLength(255),
 
-                    Select::make('gender')
+                    Select::make('genders')
+                        ->label('Supported Genders')
+                        ->helperText('Choose one or both. This is the new source of truth for league gender support.')
+                        ->options(static::getGenderOptions())
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
                         ->required()
+                        ->live()
+                        ->afterStateHydrated(function (Select $component, mixed $state, ?League $record): void {
+                            if (is_array($state) && $state !== []) {
+                                return;
+                            }
+
+                            $legacyGender = strtolower((string) ($record?->gender ?? ''));
+                            $resolved = match (true) {
+                                str_contains($legacyGender, 'female'), str_contains($legacyGender, 'girl'), str_contains($legacyGender, 'women') => ['female'],
+                                str_contains($legacyGender, 'male'), str_contains($legacyGender, 'boy'), str_contains($legacyGender, 'men') => ['male'],
+                                default => [],
+                            };
+
+                            if ($resolved !== []) {
+                                $component->state($resolved);
+                            }
+                        })
+                        ->afterStateUpdated(function (?array $state, Set $set): void {
+                            $set('gender', collect($state ?? [])->first());
+                        }),
+
+                    Select::make('gender')
+                        ->label('Legacy Gender')
+                        ->helperText('Kept for older code while the app moves to Supported Genders.')
                         ->options([
-                            'Male' => 'Male',
-                            'Female' => 'Female',
-                        ]),
+                            'male' => 'Male',
+                            'female' => 'Female',
+                            'Male' => 'Male (legacy)',
+                            'Female' => 'Female (legacy)',
+                            'Boys' => 'Boys (legacy)',
+                            'Girls' => 'Girls (legacy)',
+                        ])
+                        ->nullable(),
 
                     Select::make('sport')
                         ->label('Sport')
@@ -102,9 +146,18 @@ class LeagueResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('genders')
+                    ->label('Genders')
+                    ->state(fn (League $record): string => collect($record->genders ?: [$record->gender])
+                        ->filter()
+                        ->map(fn ($gender) => str((string) $gender)->title())
+                        ->implode(', ') ?: '-'),
+
                 TextColumn::make('gender')
+                    ->label('Legacy Gender')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('sport')
                     ->badge()
@@ -116,6 +169,11 @@ class LeagueResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('clubLeagues_count')
+                    ->counts('clubLeagues')
+                    ->label('Club Programs')
+                    ->sortable(),
+
                 TextColumn::make('updated_at')
                     ->since()
                     ->label('Updated'),
@@ -124,6 +182,25 @@ class LeagueResource extends Resource
                 SelectFilter::make('sport')
                     ->label('Sport')
                     ->options(static::getSportOptions())
+                    ->multiple(),
+
+                SelectFilter::make('gender_support')
+                    ->label('Gender Support')
+                    ->options(static::getGenderOptions())
+                    ->query(function (Builder $query, array $data): Builder {
+                        $values = $data['values'] ?? [];
+
+                        foreach ($values as $gender) {
+                            $query->where(function (Builder $query) use ($gender): Builder {
+                                return $query
+                                    ->whereJsonContains('genders', $gender)
+                                    ->orWhere('gender', $gender)
+                                    ->orWhere('gender', ucfirst($gender));
+                            });
+                        }
+
+                        return $query;
+                    })
                     ->multiple(),
 
                 TrashedFilter::make(),
