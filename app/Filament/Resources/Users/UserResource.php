@@ -933,7 +933,7 @@ class UserResource extends Resource
 
                             Section::make('Raw Player Images')
                                 ->icon('heroicon-m-photo')
-                                ->description('Players can upload only raw image assets here. Curated/profile/template images are managed by Superadmins.')
+                                ->description('Upload raw player images here. This is the only image upload area available to players.')
                                 ->schema([
                                     FileUpload::make('raw_player_images')
                                         ->label('Raw Player Images')
@@ -955,37 +955,6 @@ class UserResource extends Resource
                                             'class' => 'plyrcard-compact-upload',
                                         ])
                                         ->helperText('Upload up to 20 raw player images. Images are shown as compact thumbnails in a scrollable panel.'),
-                                ]),
-
-                            Section::make('Curated Images')
-                                ->icon('heroicon-m-eye')
-                                ->description('View-only for players. Only Superadmins can replace processed images used across cards, websites, thumbnails, and hero layouts.')
-                                ->columns(3)
-                                ->visible(fn (): bool => ! static::canManagePlayerImages())
-                                ->schema([
-                                    Placeholder::make('plyrcard_image_preview')
-                                        ->label('PlyrCard')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->plyrcard_image, 'PlyrCard image')),
-
-                                    Placeholder::make('player_image_preview')
-                                        ->label('Player Image')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->player_image, 'player image')),
-
-                                    Placeholder::make('action_image_preview')
-                                        ->label('Action Image')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->action_image, 'action image')),
-
-                                    Placeholder::make('national_team_image_preview')
-                                        ->label('National Team Image')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->national_team_image, 'national team image')),
-
-                                    Placeholder::make('mobile_hero_image_preview')
-                                        ->label('Vertical Hero Image')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->mobile_hero_image, 'vertical hero image')),
-
-                                    Placeholder::make('youtube_thumbnail_preview')
-                                        ->label('YouTube Thumbnail')
-                                        ->content(fn (?User $record): HtmlString => static::readonlyImagePreview($record?->youtube_thumbnail, 'YouTube thumbnail')),
                                 ]),
 
                             Section::make('Superadmin Curated Image Uploads')
