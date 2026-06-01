@@ -8,21 +8,29 @@ use App\Filament\Resources\Leagues\Pages\ListLeagues;
 use App\Filament\Resources\Leagues\Pages\ViewLeague;
 use App\Models\League;
 use BackedEnum;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Schema as DatabaseSchema;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class LeagueResource extends Resource
@@ -34,7 +42,16 @@ class LeagueResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Organizations';
     protected static ?string $recordTitleAttribute = 'name';
 
-    public static function getSportOptions(): array
+    public static function genderOptions(): array
+    {
+        return [
+            'male' => 'Male',
+            'female' => 'Female',
+            'coed' => 'Coed',
+        ];
+    }
+
+    public static function sportOptions(): array
     {
         return [
             'basketball' => 'Basketball',
@@ -53,12 +70,51 @@ class LeagueResource extends Resource
         ];
     }
 
-    public static function getGenderOptions(): array
+    protected static function normalizeGender(?string $gender): ?string
     {
-        return [
-            'male' => 'Male / Boys',
-            'female' => 'Female / Girls',
-        ];
+        $gender = strtolower(trim((string) $gender));
+
+        return match ($gender) {
+            'female', 'girls', 'girl', 'women', 'woman', 'womens' => 'female',
+            'male', 'boys', 'boy', 'men', 'man', 'mens' => 'male',
+            'coed', 'both' => 'coed',
+            default => $gender ?: null,
+        };
+    }
+
+    protected static function applyCanonicalLeagueFilter(Builder $query): Builder
+    {
+        if (DatabaseSchema::hasColumn('leagues', 'canonical_league_id')) {
+            $query->whereNull('canonical_league_id');
+        }
+
+        return $query;
+    }
+
+    protected static function applyActiveProgramFilter(Builder $query): Builder
+    {
+        if (DatabaseSchema::hasColumn('club_leagues', 'canonical_club_league_id')) {
+            $query->whereNull('canonical_club_league_id');
+        }
+
+        if (DatabaseSchema::hasColumn('club_leagues', 'is_active')) {
+            $query->where('is_active', true);
+        }
+
+        return $query;
+    }
+
+    protected static function formatGenders(?array $genders, ?string $legacyGender = null): string
+    {
+        $values = collect($genders ?? [])
+            ->merge([$legacyGender])
+            ->map(fn ($gender) => static::normalizeGender($gender))
+            ->filter()
+            ->unique()
+            ->map(fn ($gender) => Str::of((string) $gender)->title()->toString())
+            ->values();
+
+        return $values->isNotEmpty() ? $values->implode(', ') : '-';
     }
 
     public static function form(Schema $schema): Schema
@@ -68,54 +124,22 @@ class LeagueResource extends Resource
                 ->columns(2)
                 ->schema([
                     TextInput::make('name')
+                        ->label('League Name')
                         ->required()
                         ->maxLength(255),
 
                     Select::make('genders')
                         ->label('Supported Genders')
-                        ->helperText('Choose one or both. This is the new source of truth for league gender support.')
-                        ->options(static::getGenderOptions())
+                        ->options(static::genderOptions())
                         ->multiple()
                         ->searchable()
                         ->preload()
                         ->required()
-                        ->live()
-                        ->afterStateHydrated(function (Select $component, mixed $state, ?League $record): void {
-                            if (is_array($state) && $state !== []) {
-                                return;
-                            }
-
-                            $legacyGender = strtolower((string) ($record?->gender ?? ''));
-                            $resolved = match (true) {
-                                str_contains($legacyGender, 'female'), str_contains($legacyGender, 'girl'), str_contains($legacyGender, 'women') => ['female'],
-                                str_contains($legacyGender, 'male'), str_contains($legacyGender, 'boy'), str_contains($legacyGender, 'men') => ['male'],
-                                default => [],
-                            };
-
-                            if ($resolved !== []) {
-                                $component->state($resolved);
-                            }
-                        })
-                        ->afterStateUpdated(function (?array $state, Set $set): void {
-                            $set('gender', collect($state ?? [])->first());
-                        }),
-
-                    Select::make('gender')
-                        ->label('Legacy Gender')
-                        ->helperText('Kept for older code while the app moves to Supported Genders.')
-                        ->options([
-                            'male' => 'Male',
-                            'female' => 'Female',
-                            'Male' => 'Male (legacy)',
-                            'Female' => 'Female (legacy)',
-                            'Boys' => 'Boys (legacy)',
-                            'Girls' => 'Girls (legacy)',
-                        ])
-                        ->nullable(),
+                        ->helperText('This replaces the old single legacy gender field.'),
 
                     Select::make('sport')
                         ->label('Sport')
-                        ->options(static::getSportOptions())
+                        ->options(static::sportOptions())
                         ->searchable()
                         ->required(),
 
@@ -135,75 +159,106 @@ class LeagueResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => static::applyCanonicalLeagueFilter($query)
+                ->withCount([
+                    'clubLeagues as active_club_programs_count' => fn (Builder $programQuery) => static::applyActiveProgramFilter($programQuery),
+                ]))
             ->columns([
                 ImageColumn::make('logo')
                     ->label('Logo')
                     ->disk('public')
                     ->square()
+                    ->height(42)
                     ->toggleable(),
 
                 TextColumn::make('name')
+                    ->label('Name')
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('genders')
+                TextColumn::make('genders_display')
                     ->label('Genders')
-                    ->state(fn (League $record): string => collect($record->genders ?: [$record->gender])
-                        ->filter()
-                        ->map(fn ($gender) => str((string) $gender)->title())
-                        ->implode(', ') ?: '-'),
+                    ->state(fn (League $record): string => static::formatGenders($record->genders, $record->gender))
+                    ->badge()
+                    ->separator(',')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $gender = static::normalizeGender($search);
 
-                TextColumn::make('gender')
-                    ->label('Legacy Gender')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                        if (! $gender) {
+                            return $query;
+                        }
+
+                        return $query->whereJsonContains('genders', $gender);
+                    }),
 
                 TextColumn::make('sport')
+                    ->label('Sport')
                     ->badge()
                     ->formatStateUsing(
                         fn (?string $state): string => filled($state)
-                            ? str($state)->replace('_', ' ')->title()
+                            ? Str::of($state)->replace('_', ' ')->title()->toString()
                             : '-'
                     )
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('clubLeagues_count')
-                    ->counts('clubLeagues')
+                TextColumn::make('active_club_programs_count')
                     ->label('Club Programs')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('updated_at')
+                    ->label('Updated')
                     ->since()
-                    ->label('Updated'),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('sport')
-                    ->label('Sport')
-                    ->options(static::getSportOptions())
-                    ->multiple(),
+                TrashedFilter::make(),
 
-                SelectFilter::make('gender_support')
-                    ->label('Gender Support')
-                    ->options(static::getGenderOptions())
+                SelectFilter::make('gender')
+                    ->label('Gender')
+                    ->options(static::genderOptions())
+                    ->multiple()
                     ->query(function (Builder $query, array $data): Builder {
-                        $values = $data['values'] ?? [];
+                        $values = collect($data['values'] ?? [])
+                            ->map(fn ($gender) => static::normalizeGender($gender))
+                            ->filter()
+                            ->values();
 
-                        foreach ($values as $gender) {
-                            $query->where(function (Builder $query) use ($gender): Builder {
-                                return $query
-                                    ->whereJsonContains('genders', $gender)
-                                    ->orWhere('gender', $gender)
-                                    ->orWhere('gender', ucfirst($gender));
-                            });
+                        if ($values->isEmpty()) {
+                            return $query;
                         }
 
-                        return $query;
-                    })
-                    ->multiple(),
+                        return $query->where(function (Builder $nested) use ($values) {
+                            foreach ($values as $gender) {
+                                $nested->orWhereJsonContains('genders', $gender);
+                            }
+                        });
+                    }),
 
-                TrashedFilter::make(),
+                SelectFilter::make('sport')
+                    ->label('Sport')
+                    ->options(static::sportOptions())
+                    ->multiple()
+                    ->searchable(),
+
+                TernaryFilter::make('has_club_programs')
+                    ->label('Has Active Club Programs')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereHas('clubLeagues', fn (Builder $programQuery) => static::applyActiveProgramFilter($programQuery)),
+                        false: fn (Builder $query): Builder => $query->whereDoesntHave('clubLeagues', fn (Builder $programQuery) => static::applyActiveProgramFilter($programQuery)),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
+            ])
+            ->actions([
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                    DeleteAction::make(),
+                    RestoreAction::make(),
+                    ForceDeleteAction::make(),
+                ]),
             ])
             ->recordUrl(fn (League $record): string => static::getUrl('edit', ['record' => $record]));
     }

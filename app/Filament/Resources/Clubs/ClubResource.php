@@ -38,6 +38,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Illuminate\Support\Str;
 use UnitEnum;
 
@@ -50,12 +51,255 @@ class ClubResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Organizations';
     protected static ?string $recordTitleAttribute = 'name';
 
-    public static function getGenderOptions(): array
+    public static function genderOptions(): array
     {
         return [
-            'male' => 'Male / Boys',
-            'female' => 'Female / Girls',
+            'male' => 'Male',
+            'female' => 'Female',
         ];
+    }
+
+    public static function sportOptions(): array
+    {
+        return [
+            'basketball' => 'Basketball',
+            'volleyball' => 'Volleyball',
+            'football' => 'Football',
+            'baseball' => 'Baseball',
+            'softball' => 'Softball',
+            'soccer' => 'Soccer',
+            'tennis' => 'Tennis',
+            'badminton' => 'Badminton',
+            'table_tennis' => 'Table Tennis',
+            'track_and_field' => 'Track and Field',
+            'swimming' => 'Swimming',
+            'boxing' => 'Boxing',
+            'martial_arts' => 'Martial Arts',
+        ];
+    }
+
+    protected static function normalizeGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match ($gender) {
+            'female', 'girls', 'girl', 'women', 'woman', 'womens' => 'female',
+            'male', 'boys', 'boy', 'men', 'man', 'mens' => 'male',
+            default => null,
+        };
+    }
+
+    protected static function labelGender(?string $gender): string
+    {
+        $gender = static::normalizeGender($gender);
+
+        return match ($gender) {
+            'male' => 'Male',
+            'female' => 'Female',
+            default => '-',
+        };
+    }
+
+    protected static function genderShortLabel(?string $gender): string
+    {
+        $gender = static::normalizeGender($gender);
+
+        return match ($gender) {
+            'male' => 'Boys',
+            'female' => 'Girls',
+            default => '',
+        };
+    }
+
+    protected static function programGenders($program): array
+    {
+        $programGenders = collect($program->genders ?? [])
+            ->map(fn ($gender) => static::normalizeGender($gender))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($programGenders->isNotEmpty()) {
+            return $programGenders->all();
+        }
+
+        return collect($program->league?->genders ?? [])
+            ->map(fn ($gender) => static::normalizeGender($gender))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected static function programBadgeIcon(?string $state): string|BackedEnum|null
+    {
+        $state = strtolower((string) $state);
+
+        return match (true) {
+            str_contains($state, 'girls') => Heroicon::OutlinedUserCircle,
+            str_contains($state, 'boys') => Heroicon::OutlinedUser,
+            default => Heroicon::OutlinedTrophy,
+        };
+    }
+
+    protected static function programBadgeColor(?string $state): string
+    {
+        $state = strtolower((string) $state);
+
+        return match (true) {
+            str_contains($state, 'girls') => 'danger',
+            str_contains($state, 'boys') => 'info',
+            default => 'gray',
+        };
+    }
+
+    protected static function labelSport(?string $sport): string
+    {
+        return filled($sport)
+            ? Str::of($sport)->replace('_', ' ')->title()->toString()
+            : '-';
+    }
+
+    protected static function applyCanonicalClubFilter($query)
+    {
+        if (DatabaseSchema::hasColumn('clubs', 'canonical_club_id')) {
+            $query->whereNull('canonical_club_id');
+        }
+
+        return $query;
+    }
+
+    protected static function applyCanonicalLeagueFilter($query)
+    {
+        if (DatabaseSchema::hasColumn('leagues', 'canonical_league_id')) {
+            $query->whereNull('canonical_league_id');
+        }
+
+        return $query;
+    }
+
+    protected static function applyActiveProgramFilter($query)
+    {
+        if (DatabaseSchema::hasColumn('club_leagues', 'canonical_club_league_id')) {
+            $query->whereNull('canonical_club_league_id');
+        }
+
+        if (DatabaseSchema::hasColumn('club_leagues', 'is_active')) {
+            $query->where('is_active', true);
+        }
+
+        return $query;
+    }
+
+    protected static function canonicalLeagueOptions(): array
+    {
+        return static::applyCanonicalLeagueFilter(League::query())
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(function (League $league): array {
+                $genders = collect($league->genders ?? [])
+                    ->map(fn ($gender) => static::genderShortLabel($gender))
+                    ->filter()
+                    ->unique()
+                    ->implode('/');
+
+                $label = $league->name;
+
+                if ($genders !== '') {
+                    $label .= " ({$genders})";
+                }
+
+                if (filled($league->sport)) {
+                    $label .= ' - ' . static::labelSport($league->sport);
+                }
+
+                return [(string) $league->id => $label];
+            })
+            ->all();
+    }
+
+    protected static function getActiveProgramRows(Club $record)
+    {
+        return $record->clubLeagues()
+            ->with('league')
+            ->tap(fn ($query) => static::applyActiveProgramFilter($query))
+            ->whereHas('league', fn ($query) => static::applyCanonicalLeagueFilter($query))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn ($program) => filled($program->league?->name))
+            ->unique(fn ($program) => implode('|', [
+                $program->league_id,
+                collect(static::programGenders($program))
+                    ->sort()
+                    ->implode(','),
+                $program->sport ?: $program->league?->sport,
+            ]))
+            ->values();
+    }
+
+    protected static function programBadgeStates(Club $record): array
+    {
+        return static::getActiveProgramRows($record)
+            ->flatMap(function ($program) {
+                $leagueName = $program->league?->name;
+
+                if (blank($leagueName)) {
+                    return [];
+                }
+
+                $sport = static::labelSport($program->sport ?: $program->league?->sport);
+
+                $genders = collect(static::programGenders($program))
+                    ->map(fn ($gender) => static::genderShortLabel($gender))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($genders->isEmpty()) {
+                    return [
+                        collect([
+                            $leagueName,
+                            $sport !== '-' ? $sport : null,
+                        ])
+                            ->filter()
+                            ->implode(' • '),
+                    ];
+                }
+
+                return $genders
+                    ->map(fn (string $genderLabel): string => collect([
+                        $leagueName,
+                        $genderLabel,
+                        $sport !== '-' ? $sport : null,
+                    ])
+                        ->filter()
+                        ->implode(' • '))
+                    ->all();
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected static function programSummaryText(Club $record): string
+    {
+        $programs = static::programBadgeStates($record);
+
+        return filled($programs) ? implode(', ', $programs) : '-';
+    }
+
+    protected static function sportsSummary(Club $record): string
+    {
+        $sports = static::getActiveProgramRows($record)
+            ->map(fn ($program) => $program->sport ?: $program->league?->sport)
+            ->filter()
+            ->map(fn ($sport) => static::labelSport($sport))
+            ->unique()
+            ->values();
+
+        return $sports->isNotEmpty() ? $sports->implode(', ') : '-';
     }
 
     public static function form(Schema $schema): Schema
@@ -76,17 +320,6 @@ class ClubResource extends Resource
                                             ->label('Club Name')
                                             ->required()
                                             ->maxLength(255),
-
-                                        Select::make('league_id')
-                                            ->label('Legacy / Default League')
-                                            ->helperText('Kept for older records only. Use Program Leagues below for the new structure.')
-                                            ->options(fn (): array => League::query()
-                                                ->orderBy('name')
-                                                ->pluck('name', 'id')
-                                                ->all())
-                                            ->searchable()
-                                            ->preload()
-                                            ->nullable(),
 
                                         Select::make('conference_id')
                                             ->label('Conference')
@@ -136,58 +369,74 @@ class ClubResource extends Resource
                         Tab::make('Program Leagues')
                             ->icon(Heroicon::OutlinedSquares2x2)
                             ->schema([
-                                Section::make('Club League Programs')
-                                    ->description('Use this to define which leagues this club participates in and which genders are offered for each league.')
+                                Section::make('Active Club Programs')
+                                    ->description('Manage only the active canonical programs for this club. Legacy duplicate programs are intentionally hidden.')
                                     ->schema([
                                         Repeater::make('clubLeagues')
-                                            ->relationship()
                                             ->label('Program Leagues')
+                                            ->relationship(
+                                                name: 'clubLeagues',
+                                                modifyQueryUsing: fn ($query) => static::applyActiveProgramFilter($query)
+                                                    ->whereHas('league', fn ($leagueQuery) => static::applyCanonicalLeagueFilter($leagueQuery))
+                                                    ->orderBy('sort_order')
+                                                    ->orderBy('id')
+                                            )
                                             ->addActionLabel('Add Program League')
                                             ->reorderable()
-                                            ->orderColumn('sort_order')
                                             ->collapsed()
-                                            ->itemLabel(function (array $state): string {
-                                                $league = filled($state['league_id'] ?? null)
+                                            ->itemLabel(function (array $state): ?string {
+                                                $leagueName = filled($state['league_id'] ?? null)
                                                     ? League::query()->whereKey($state['league_id'])->value('name')
                                                     : 'Program League';
 
                                                 $genders = collect($state['genders'] ?? [])
-                                                    ->map(fn ($gender) => Str::of((string) $gender)->title())
-                                                    ->implode(', ');
+                                                    ->map(fn ($gender) => static::genderShortLabel($gender))
+                                                    ->filter()
+                                                    ->unique()
+                                                    ->values();
 
-                                                return trim($league . ($genders ? ' — ' . $genders : ''));
+                                                $sport = static::labelSport($state['sport'] ?? null);
+
+                                                return collect([
+                                                    $leagueName,
+                                                    $genders->isNotEmpty() ? $genders->implode('/') : null,
+                                                    $sport !== '-' ? $sport : null,
+                                                ])
+                                                    ->filter()
+                                                    ->implode(' • ');
                                             })
                                             ->schema([
                                                 Select::make('league_id')
                                                     ->label('League')
-                                                    ->options(fn (): array => League::query()
-                                                        ->orderBy('name')
-                                                        ->pluck('name', 'id')
-                                                        ->all())
+                                                    ->options(fn (): array => static::canonicalLeagueOptions())
                                                     ->searchable()
                                                     ->preload()
                                                     ->required(),
 
                                                 Select::make('genders')
                                                     ->label('Genders Offered')
-                                                    ->options(static::getGenderOptions())
+                                                    ->options(static::genderOptions())
                                                     ->multiple()
                                                     ->searchable()
                                                     ->preload()
-                                                    ->required()
-                                                    ->helperText('Choose one or both genders for this club in this league.'),
+                                                    ->required(),
 
-                                                TextInput::make('sport')
-                                                    ->label('Sport Override')
-                                                    ->helperText('Optional. Usually inherited from the league.')
-                                                    ->maxLength(255),
+                                                Select::make('sport')
+                                                    ->label('Sport')
+                                                    ->options(static::sportOptions())
+                                                    ->searchable()
+                                                    ->helperText('Optional. Leave empty to use the selected league sport.'),
+
+                                                TextInput::make('sort_order')
+                                                    ->label('Sort')
+                                                    ->numeric()
+                                                    ->default(0),
 
                                                 Toggle::make('is_active')
                                                     ->label('Active')
                                                     ->default(true),
                                             ])
-                                            ->columns(2)
-                                            ->columnSpanFull(),
+                                            ->columns(2),
                                     ]),
                             ]),
 
@@ -313,88 +562,122 @@ class ClubResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['league', 'conference', 'clubLeagues.league'])->withCount('teams'))
+            ->modifyQueryUsing(fn (Builder $query) => static::applyCanonicalClubFilter($query)
+                ->with([
+                    'clubLeagues' => fn ($programQuery) => static::applyActiveProgramFilter($programQuery)
+                        ->whereHas('league', fn ($leagueQuery) => static::applyCanonicalLeagueFilter($leagueQuery))
+                        ->with('league')
+                        ->orderBy('sort_order')
+                        ->orderBy('id'),
+                ]))
             ->columns([
                 ImageColumn::make('logo')
-                    ->label('')
+                    ->label('Logo')
                     ->disk('public')
-                    ->height(34)
+                    ->height(42)
                     ->circular(),
 
                 TextColumn::make('name')
                     ->label('Club')
                     ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('program_leagues')
-                    ->label('Program Leagues')
-                    ->state(function (Club $record): string {
-                        return $record->clubLeagues
-                            ->map(function ($program): string {
-                                $genders = collect($program->genders ?? [])
-                                    ->map(fn ($gender) => Str::of((string) $gender)->title())
-                                    ->implode('/');
-
-                                return trim(($program->league?->name ?? 'League') . ($genders ? ' (' . $genders . ')' : ''));
-                            })
-                            ->filter()
-                            ->implode(', ') ?: '-';
-                    })
-                    ->wrap()
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->orWhereHas('clubLeagues.league', function (Builder $query) use ($search): void {
-                            $query->where('name', 'like', '%' . $search . '%');
-                        });
-                    }),
-
-                TextColumn::make('league.name')
-                    ->label('Legacy League')
-                    ->searchable()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->description(fn (Club $record): ?string => trim(collect([$record->city, $record->state])->filter()->implode(', ')) ?: null),
 
-                TextColumn::make('teams_count')
-                    ->label('Legacy Teams')
-                    ->sortable()
+                TextColumn::make('sports_summary')
+                    ->label('Sports')
+                    ->badge()
+                    ->state(fn (Club $record): string => static::sportsSummary($record))
                     ->toggleable(),
 
                 IconColumn::make('has_landing_page')
                     ->label('Page')
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 IconColumn::make('landing_page_is_published')
                     ->label('Live')
-                    ->boolean(),
-
-                TextColumn::make('landing_page_slug')
-                    ->label('Slug')
-                    ->searchable()
-                    ->copyable()
+                    ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('updated_at')
                     ->label('Updated')
                     ->since()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 TrashedFilter::make(),
 
                 SelectFilter::make('program_league')
                     ->label('Program League')
-                    ->options(fn (): array => League::query()->orderBy('name')->pluck('name', 'id')->all())
-                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
-                        ? $query->whereHas('clubLeagues', fn (Builder $query) => $query->where('league_id', $data['value']))
-                        : $query)
+                    ->options(fn (): array => static::canonicalLeagueOptions())
                     ->searchable()
-                    ->preload(),
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = $data['value'] ?? null;
 
-                SelectFilter::make('legacy_league_id')
-                    ->label('Legacy League')
-                    ->relationship('league', 'name')
-                    ->searchable()
-                    ->preload(),
+                        if (blank($value)) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('clubLeagues', function (Builder $programQuery) use ($value) {
+                            static::applyActiveProgramFilter($programQuery)
+                                ->where('league_id', $value);
+                        });
+                    }),
+
+                SelectFilter::make('program_gender')
+                    ->label('Program Gender')
+                    ->options(static::genderOptions())
+                    ->multiple()
+                    ->query(function (Builder $query, array $data): Builder {
+                        $values = collect($data['values'] ?? [])
+                            ->map(fn ($gender) => static::normalizeGender($gender))
+                            ->filter()
+                            ->values();
+
+                        if ($values->isEmpty()) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('clubLeagues', function (Builder $programQuery) use ($values) {
+                            static::applyActiveProgramFilter($programQuery);
+
+                            $programQuery->where(function (Builder $nested) use ($values) {
+                                foreach ($values as $gender) {
+                                    $nested->orWhereJsonContains('genders', $gender);
+                                }
+                            });
+                        });
+                    }),
+
+                SelectFilter::make('program_sport')
+                    ->label('Program Sport')
+                    ->options(static::sportOptions())
+                    ->multiple()
+                    ->query(function (Builder $query, array $data): Builder {
+                        $values = collect($data['values'] ?? [])->filter()->values();
+
+                        if ($values->isEmpty()) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('clubLeagues', function (Builder $programQuery) use ($values) {
+                            static::applyActiveProgramFilter($programQuery);
+
+                            $programQuery->where(function (Builder $nested) use ($values) {
+                                $nested->whereIn('sport', $values)
+                                    ->orWhereHas('league', fn (Builder $leagueQuery) => $leagueQuery->whereIn('sport', $values));
+                            });
+                        });
+                    }),
+
+                TernaryFilter::make('has_programs')
+                    ->label('Has Active Programs')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereHas('clubLeagues', fn ($programQuery) => static::applyActiveProgramFilter($programQuery)),
+                        false: fn (Builder $query): Builder => $query->whereDoesntHave('clubLeagues', fn ($programQuery) => static::applyActiveProgramFilter($programQuery)),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
 
                 TernaryFilter::make('landing_page_is_published')
                     ->label('Published'),
