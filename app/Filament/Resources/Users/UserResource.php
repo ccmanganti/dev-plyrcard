@@ -21,6 +21,7 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -43,6 +44,7 @@ use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\HtmlString;
 use Spatie\Permission\Models\Role;
 use STS\FilamentImpersonate\Actions\Impersonate;
 use UnitEnum;
@@ -853,6 +855,57 @@ class UserResource extends Resource
                     Tab::make('Media')
                         ->icon('heroicon-m-photo')
                         ->schema([
+                            Placeholder::make('compact_raw_upload_styles')
+                                ->label('')
+                                ->content(new HtmlString(<<<'HTML'
+                                    <style>
+                                        .plyrcard-compact-upload .filepond--root {
+                                            max-height: 34rem !important;
+                                            overflow-y: auto !important;
+                                            border-radius: 0.75rem;
+                                        }
+
+                                        .plyrcard-compact-upload .filepond--list {
+                                            display: grid !important;
+                                            grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)) !important;
+                                            gap: 0.75rem !important;
+                                            transform: none !important;
+                                            position: relative !important;
+                                        }
+
+                                        .plyrcard-compact-upload .filepond--item {
+                                            position: relative !important;
+                                            transform: none !important;
+                                            width: 100% !important;
+                                            height: 132px !important;
+                                            margin: 0 !important;
+                                            left: auto !important;
+                                            right: auto !important;
+                                            top: auto !important;
+                                        }
+
+                                        .plyrcard-compact-upload .filepond--panel-root,
+                                        .plyrcard-compact-upload .filepond--image-preview,
+                                        .plyrcard-compact-upload .filepond--image-preview-wrapper,
+                                        .plyrcard-compact-upload .filepond--file {
+                                            height: 132px !important;
+                                            min-height: 132px !important;
+                                            max-height: 132px !important;
+                                        }
+
+                                        .plyrcard-compact-upload .filepond--image-preview img,
+                                        .plyrcard-compact-upload .filepond--image-bitmap,
+                                        .plyrcard-compact-upload canvas {
+                                            object-fit: cover !important;
+                                        }
+
+                                        .plyrcard-compact-upload .filepond--drop-label {
+                                            min-height: 5rem !important;
+                                        }
+                                    </style>
+                                HTML))
+                                ->columnSpanFull(),
+
                             Section::make('Raw Player Images')
                                 ->icon('heroicon-m-photo')
                                 ->description('Players can upload only raw image assets here. Curated/profile/template images are managed by Superadmins.')
@@ -868,109 +921,113 @@ class UserResource extends Resource
                                         ->maxFiles(20)
                                         ->maxSize(5120)
                                         ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imagePreviewHeight('132px')
                                         ->disk('public')
                                         ->directory('user-player-images/raw')
                                         ->visibility('public')
                                         ->columnSpanFull()
                                         ->extraAttributes([
-                                            'class' => 'max-h-[34rem] overflow-y-auto rounded-xl border border-gray-200 p-3 dark:border-gray-700',
+                                            'class' => 'plyrcard-compact-upload',
                                         ])
-                                        ->helperText('Upload up to 20 raw player images. This panel scrolls internally so a large image set will not stretch the whole page.'),
+                                        ->helperText('Upload up to 20 raw player images. Images are shown as compact thumbnails in a scrollable panel.'),
                                 ]),
 
-                            Section::make('Superadmin Curated Images')
+                            Section::make('Curated Images')
                                 ->icon('heroicon-m-sparkles')
-                                ->description('Only Superadmins can manage processed images used across cards, websites, thumbnails, and hero layouts.')
+                                ->description('View-only for players. Only Superadmins can replace processed images used across cards, websites, thumbnails, and hero layouts.')
                                 ->columns(4)
-                                ->visible(fn (): bool => static::canManagePlayerImages())
                                 ->schema([
                                     FileUpload::make('plyrcard_image')
                                         ->label('PlyrCard')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload the card-style PNG image used across templates.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Upload the card-style PNG image used across templates.' : 'View-only. Only Superadmins can replace this processed image.'),
 
                                     FileUpload::make('player_image')
                                         ->label('Player Image')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload the half-body player PNG image used across templates.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Upload the half-body player PNG image used across templates.' : 'View-only. Only Superadmins can replace this processed image.'),
 
                                     FileUpload::make('action_image')
                                         ->label('Action Image')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload an in-game action shot.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Upload an in-game action shot.' : 'View-only. Only Superadmins can replace this processed image.'),
 
                                     FileUpload::make('national_team_image')
                                         ->label('National Team Image')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload the image used for national team sections or layouts.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Upload the image used for national team sections or layouts.' : 'View-only. Only Superadmins can replace this processed image.'),
 
                                     FileUpload::make('mobile_hero_image')
                                         ->label('Vertical Hero Image')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('1:1')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->columnSpanFull()
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload the vertical/mobile hero image used for responsive hero layouts.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Upload the vertical/mobile hero image used for responsive hero layouts.' : 'View-only. Only Superadmins can replace this processed image.'),
 
                                     FileUpload::make('youtube_thumbnail')
                                         ->label('YouTube Thumbnail')
+                                        ->disabled(fn (): bool => ! static::canManagePlayerImages())
+                                        ->dehydrated(fn (): bool => static::canManagePlayerImages())
                                         ->columnSpanFull()
                                         ->image()
                                         ->downloadable()
                                         ->openable()
-                                        ->imageEditor()
-                                        ->panelLayout('grid')
-                                        ->imagePreviewHeight('120')
-                                        ->itemPanelAspectRatio('16:9')
+                                        ->imageEditor(fn (): bool => static::canManagePlayerImages())
+                                        ->panelLayout('compact')
+                                        ->imagePreviewHeight('120px')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
+                                        ->helperText(fn (): string => static::canManagePlayerImages() ? 'Used for highlights thumbnail, social sharing image, and SEO preview image.' : 'View-only. Only Superadmins can replace this processed image.'),
                                 ]),
                         ]),
 
