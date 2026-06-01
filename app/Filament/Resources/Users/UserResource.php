@@ -67,6 +67,11 @@ class UserResource extends Resource
         return (string) static::getModel()::count();
     }
 
+    protected static function canManagePlayerImages(): bool
+    {
+        return auth()->user()?->hasRole('Superadmin') ?? false;
+    }
+
     public static function getSportOptions(): array
     {
         return [
@@ -848,17 +853,48 @@ class UserResource extends Resource
                     Tab::make('Media')
                         ->icon('heroicon-m-photo')
                         ->schema([
-                            Section::make('Profile & Hero Images')
+                            Section::make('Raw Player Images')
                                 ->icon('heroicon-m-photo')
-                                ->description('Shared player images used across your card and website.')
+                                ->description('Players can upload only raw image assets here. Curated/profile/template images are managed by Superadmins.')
+                                ->schema([
+                                    FileUpload::make('raw_player_images')
+                                        ->label('Raw Player Images')
+                                        ->image()
+                                        ->multiple()
+                                        ->reorderable()
+                                        ->appendFiles()
+                                        ->downloadable()
+                                        ->openable()
+                                        ->maxFiles(20)
+                                        ->maxSize(5120)
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
+                                        ->disk('public')
+                                        ->directory('user-player-images/raw')
+                                        ->visibility('public')
+                                        ->columnSpanFull()
+                                        ->extraAttributes([
+                                            'class' => 'max-h-[34rem] overflow-y-auto rounded-xl border border-gray-200 p-3 dark:border-gray-700',
+                                        ])
+                                        ->helperText('Upload up to 20 raw player images. This panel scrolls internally so a large image set will not stretch the whole page.'),
+                                ]),
+
+                            Section::make('Superadmin Curated Images')
+                                ->icon('heroicon-m-sparkles')
+                                ->description('Only Superadmins can manage processed images used across cards, websites, thumbnails, and hero layouts.')
                                 ->columns(4)
+                                ->visible(fn (): bool => static::canManagePlayerImages())
                                 ->schema([
                                     FileUpload::make('plyrcard_image')
                                         ->label('PlyrCard')
                                         ->image()
                                         ->downloadable()
+                                        ->openable()
                                         ->imageEditor()
-                                        ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
@@ -867,9 +903,12 @@ class UserResource extends Resource
                                     FileUpload::make('player_image')
                                         ->label('Player Image')
                                         ->image()
-                                        ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
                                         ->downloadable()
+                                        ->openable()
                                         ->imageEditor()
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
@@ -879,19 +918,25 @@ class UserResource extends Resource
                                         ->label('Action Image')
                                         ->image()
                                         ->downloadable()
-                                        ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
+                                        ->openable()
                                         ->imageEditor()
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
-                                        ->helperText('Upload an in-game action shot (jersey number visible, dynamic pose).'),
+                                        ->helperText('Upload an in-game action shot.'),
 
-                                        FileUpload::make('national_team_image')
+                                    FileUpload::make('national_team_image')
                                         ->label('National Team Image')
                                         ->image()
                                         ->downloadable()
-                                        ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
+                                        ->openable()
                                         ->imageEditor()
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
@@ -901,9 +946,12 @@ class UserResource extends Resource
                                         ->label('Vertical Hero Image')
                                         ->image()
                                         ->downloadable()
+                                        ->openable()
                                         ->imageEditor()
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('1:1')
                                         ->columnSpanFull()
-                                        ->disabled(fn () => !auth()->user()?->hasRole('Superadmin'))
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
@@ -914,25 +962,15 @@ class UserResource extends Resource
                                         ->columnSpanFull()
                                         ->image()
                                         ->downloadable()
+                                        ->openable()
                                         ->imageEditor()
+                                        ->panelLayout('grid')
+                                        ->imagePreviewHeight('120')
+                                        ->itemPanelAspectRatio('16:9')
                                         ->disk('public')
                                         ->directory('user-player-images')
                                         ->visibility('public')
                                         ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
-
-                                    FileUpload::make('raw_player_images')
-                                        ->label('Raw Player Images')
-                                        ->image()
-                                        ->downloadable()
-                                        ->multiple()
-                                        ->reorderable()
-                                        ->appendFiles()
-                                        ->maxFiles(20)
-                                        ->disk('public')
-                                        ->directory('user-player-images/raw')
-                                        ->visibility('public')
-                                        ->columnSpanFull()
-                                        ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
                                 ]),
                         ]),
 
