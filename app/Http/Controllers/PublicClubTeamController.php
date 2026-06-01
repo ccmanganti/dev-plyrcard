@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Club;
-use App\Models\Team;
+use App\Models\ClubLeague;
+use App\Models\League;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Fluent;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -18,39 +21,63 @@ class PublicClubTeamController extends Controller
     public function club(string $clubSlug): View
     {
         $club = Club::query()
-            ->with(['league', 'teams.club.league'])
+            ->with([
+                'league',
+                'clubLeagues' => function ($query) {
+                    $query
+                        ->where('is_active', true)
+                        ->with('league')
+                        ->orderBy('sort_order')
+                        ->orderBy('id');
+                },
+            ])
             ->where('landing_page_slug', $clubSlug)
             ->where('has_landing_page', true)
             ->where('landing_page_is_published', true)
             ->firstOrFail();
 
-        $teams = $club->teams()
-            ->with(['club.league'])
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->orderBy('name')
+        $this->attachDisplayLeague($club);
+
+        $players = User::query()
+            ->with([
+                'websites' => function ($query) {
+                    $query
+                        ->where('is_active', true)
+                        ->where('is_published', true)
+                        ->latest('updated_at');
+                },
+                'roles',
+            ])
+            ->where('club_id', $club->id)
+            ->whereNotNull('team_name')
+            ->where('team_name', '!=', '')
             ->get();
 
-        $teamNames = $teams->pluck('name')->filter()->values();
+        $teams = $this->landingTeamsForClub($club, $players);
 
-        $journeyPlayers = User::query()
-            ->with(['websites' => function ($query) {
-                $query
-                    ->where('is_active', true)
-                    ->where('is_published', true)
-                    ->latest('updated_at');
-            }])
-            ->where('club_id', $club->id)
-            ->whereIn('team_name', $teamNames)
-            ->whereNotNull('plyrcard_image')
-            ->where('plyrcard_image', '!=', '')
-            ->whereHas('roles', function ($query) {
-                $query->whereIn('name', ['My Journey', 'my journey', 'My-Journey', 'my-journey']);
+        $journeyPlayers = $players
+            ->filter(function (User $player): bool {
+                if (blank($player->plyrcard_image)) {
+                    return false;
+                }
+
+                if (! method_exists($player, 'getRoleNames')) {
+                    return false;
+                }
+
+                $roles = $player->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)));
+
+                return $roles->contains('my journey')
+                    || $roles->contains('my-journey')
+                    || $roles->contains('plyr plus')
+                    || $roles->contains('plyr-plus');
             })
-            ->get()
-            ->groupBy(fn ($player) => (string) $player->team_name)
+            ->groupBy(fn (User $player): string => $this->teamKey(
+                $this->landingGenderSegmentForPlayer($player),
+                $player->team_name,
+            ))
             ->map(function ($group) {
-                return $group->shuffle()->map(function ($player) {
+                return $group->shuffle()->map(function (User $player) {
                     $website = $player->websites->first();
 
                     return [
@@ -60,15 +87,15 @@ class PublicClubTeamController extends Controller
                         'website_url' => $website
                             ? (filled($website->domain)
                                 ? 'https://' . preg_replace('/^https?:\/\//', '', $website->domain)
-                                : url('/' . ltrim($website->slug, '/')))
+                                : url('/' . ltrim((string) $website->slug, '/')))
                             : null,
                     ];
                 })->values();
             });
 
-        $teamJourneyCards = $teams->mapWithKeys(function ($team) use ($journeyPlayers) {
-            return [$team->id => $journeyPlayers->get((string) $team->name, collect())->all()];
-        })->all();
+        $teamJourneyCards = $teams
+            ->mapWithKeys(fn ($team) => [$team->id => $journeyPlayers->get((string) $team->id, collect())->all()])
+            ->all();
 
         return view('public.club-landing', [
             'club' => $club,
@@ -82,26 +109,31 @@ class PublicClubTeamController extends Controller
     public function team(string $clubSlug, string $gender, string $teamSlug): View
     {
         $club = Club::query()
-            ->with('league')
+            ->with([
+                'league',
+                'clubLeagues' => function ($query) {
+                    $query
+                        ->where('is_active', true)
+                        ->with('league')
+                        ->orderBy('sort_order')
+                        ->orderBy('id');
+                },
+            ])
             ->where('landing_page_slug', $clubSlug)
             ->where('has_landing_page', true)
             ->where('landing_page_is_published', true)
             ->firstOrFail();
 
-        $team = Team::query()
-            ->with(['club.league'])
-            ->where('club_id', $club->id)
-            ->where('landing_page_slug', $teamSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
+        $this->attachDisplayLeague($club);
 
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
-        $teamGender = $this->normalizeLandingGenderSegment($team->landingGenderSegment());
 
-        abort_unless($teamGender === $requestedGender, 404);
+        $players = $this->playersForLandingTeam($club, $requestedGender, $teamSlug);
 
-        $players = $this->playersForTeam($team, $club);
+        abort_if($players->isEmpty(), 404);
+
+        $teamName = (string) $players->first()->team_name;
+        $team = $this->buildLandingTeam($club, $requestedGender, $teamName, $players);
 
         return view('public.team-landing', [
             'team' => $team,
@@ -114,27 +146,18 @@ class PublicClubTeamController extends Controller
 
     public function legacyTeam(string $teamSlug): RedirectResponse
     {
-        $team = Team::query()
-            ->with(['club.league'])
-            ->where('landing_page_slug', $teamSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
+        $player = User::query()
+            ->with('club')
+            ->whereNotNull('team_name')
+            ->get()
+            ->first(fn (User $player): bool => Str::slug((string) $player->team_name) === $teamSlug);
 
-        $club = $team->club;
-
-        abort_unless(
-            $club
-            && $club->has_landing_page
-            && $club->landing_page_is_published
-            && filled($club->landing_page_slug),
-            404
-        );
+        abort_unless($player?->club?->landing_page_slug, 404);
 
         return redirect()->route('clubs.teams.landing', [
-            'clubSlug' => $club->landing_page_slug,
-            'gender' => $this->normalizeLandingGenderSegment($team->landingGenderSegment()),
-            'teamSlug' => $team->landing_page_slug,
+            'clubSlug' => $player->club->landing_page_slug,
+            'gender' => $this->landingGenderSegmentForPlayer($player),
+            'teamSlug' => Str::slug((string) $player->team_name),
         ], 301);
     }
 
@@ -193,25 +216,10 @@ class PublicClubTeamController extends Controller
         string $teamSlug,
         User $player
     ): RedirectResponse|JsonResponse {
-        $club = Club::query()
-            ->where('landing_page_slug', $clubSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
-
-        $team = Team::query()
-            ->with(['club.league'])
-            ->where('club_id', $club->id)
-            ->where('landing_page_slug', $teamSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
-
+        $club = $this->publishedClubBySlug($clubSlug);
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
-        $teamGender = $this->normalizeLandingGenderSegment($team->landingGenderSegment());
 
-        abort_unless($teamGender === $requestedGender, 404);
-        abort_unless($this->playerBelongsToTeam($player, $team, $club), 404);
+        abort_unless($this->playerBelongsToLandingTeam($player, $club, $requestedGender, $teamSlug), 404);
 
         $coachCheckIn = session('coach_checkin');
 
@@ -232,13 +240,15 @@ class PublicClubTeamController extends Controller
 
         $coachEmail = strtolower((string) ($coachCheckIn['email'] ?? ''));
         $playerUrl = $this->playerWebsiteUrl($player);
+        $teamName = trim((string) $player->team_name);
+        $teamKey = $this->teamKey($requestedGender, $teamName);
 
         $savedPlayers = collect(session('coach_saved_players', []));
 
-        $alreadySaved = $savedPlayers->contains(function ($saved) use ($player, $club, $team, $coachEmail) {
+        $alreadySaved = $savedPlayers->contains(function ($saved) use ($player, $club, $teamKey, $coachEmail) {
             return (int) ($saved['player_id'] ?? 0) === (int) $player->id
                 && (int) ($saved['club_id'] ?? 0) === (int) $club->id
-                && (int) ($saved['team_id'] ?? 0) === (int) $team->id
+                && (string) ($saved['team_key'] ?? '') === $teamKey
                 && strtolower((string) ($saved['coach_email'] ?? '')) === $coachEmail;
         });
 
@@ -285,9 +295,11 @@ class PublicClubTeamController extends Controller
 
             'club_id' => $club->id,
             'club_name' => $club->name,
-            'team_id' => $team->id,
-            'team_name' => $team->name,
-            'league_name' => $club->league?->name,
+            'team_key' => $teamKey,
+            'team_slug' => $teamSlug,
+            'team_name' => $teamName,
+            'gender' => $requestedGender,
+            'league_name' => $player->league?->name ?? $club->league?->name,
 
             'coach_email' => $coachEmail,
             'coach_name' => $coachCheckIn['name'] ?? '',
@@ -327,32 +339,21 @@ class PublicClubTeamController extends Controller
         string $teamSlug,
         User $player
     ): RedirectResponse|JsonResponse {
-        $club = Club::query()
-            ->where('landing_page_slug', $clubSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
-
-        $team = Team::query()
-            ->where('club_id', $club->id)
-            ->where('landing_page_slug', $teamSlug)
-            ->where('has_landing_page', true)
-            ->where('landing_page_is_published', true)
-            ->firstOrFail();
-
+        $club = $this->publishedClubBySlug($clubSlug);
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
-        $teamGender = $this->normalizeLandingGenderSegment($team->landingGenderSegment());
+        $teamName = trim((string) $player->team_name);
+        $teamKey = $this->teamKey($requestedGender, $teamName);
 
-        abort_unless($teamGender === $requestedGender, 404);
+        abort_unless($this->playerBelongsToLandingTeam($player, $club, $requestedGender, $teamSlug), 404);
 
         $coachCheckIn = session('coach_checkin');
         $coachEmail = strtolower((string) ($coachCheckIn['email'] ?? ''));
 
         $savedPlayers = collect(session('coach_saved_players', []))
-            ->reject(function ($saved) use ($player, $club, $team, $coachEmail) {
+            ->reject(function ($saved) use ($player, $club, $teamKey, $coachEmail) {
                 return (int) ($saved['player_id'] ?? 0) === (int) $player->id
                     && (int) ($saved['club_id'] ?? 0) === (int) $club->id
-                    && (int) ($saved['team_id'] ?? 0) === (int) $team->id
+                    && (string) ($saved['team_key'] ?? '') === $teamKey
                     && strtolower((string) ($saved['coach_email'] ?? '')) === $coachEmail;
             })
             ->values();
@@ -370,7 +371,6 @@ class PublicClubTeamController extends Controller
 
         return back()->with('player_save_success', 'Player removed from saved list.');
     }
-
 
     public function emailWatchlist(Request $request, string $clubSlug): RedirectResponse|JsonResponse
     {
@@ -455,7 +455,116 @@ class PublicClubTeamController extends Controller
         return back()->with('watchlist_email_sent', $message);
     }
 
-    protected function playersForTeam(Team $team, Club $club)
+    protected function publishedClubBySlug(string $clubSlug): Club
+    {
+        $club = Club::query()
+            ->with([
+                'league',
+                'clubLeagues' => function ($query) {
+                    $query
+                        ->where('is_active', true)
+                        ->with('league')
+                        ->orderBy('sort_order')
+                        ->orderBy('id');
+                },
+            ])
+            ->where('landing_page_slug', $clubSlug)
+            ->where('has_landing_page', true)
+            ->where('landing_page_is_published', true)
+            ->firstOrFail();
+
+        $this->attachDisplayLeague($club);
+
+        return $club;
+    }
+
+    protected function attachDisplayLeague(Club $club): void
+    {
+        if ($club->relationLoaded('clubLeagues')) {
+            $league = $club->clubLeagues
+                ->pluck('league')
+                ->filter()
+                ->first();
+
+            if ($league) {
+                $club->setRelation('league', $league);
+            }
+        }
+    }
+
+    protected function landingTeamsForClub(Club $club, Collection $players): Collection
+    {
+        return $players
+            ->filter(fn (User $player): bool => filled($player->team_name))
+            ->groupBy(fn (User $player): string => $this->teamKey(
+                $this->landingGenderSegmentForPlayer($player),
+                $player->team_name,
+            ))
+            ->map(function (Collection $group) use ($club) {
+                $player = $group->first();
+
+                return $this->buildLandingTeam(
+                    $club,
+                    $this->landingGenderSegmentForPlayer($player),
+                    (string) $player->team_name,
+                    $group,
+                );
+            })
+            ->sortBy([
+                fn ($team) => $team->gender_segment === 'boys' ? 0 : 1,
+                fn ($team) => $team->name,
+            ])
+            ->values();
+    }
+
+    protected function buildLandingTeam(Club $club, string $genderSegment, string $teamName, Collection $players): Fluent
+    {
+        $slug = Str::slug($teamName);
+        $teamKey = $this->teamKey($genderSegment, $teamName);
+        $program = $this->clubLeagueForGender($club, $genderSegment, $players->first()?->sport);
+
+        return new Fluent([
+            'id' => $teamKey,
+            'name' => $teamName,
+            'landing_page_slug' => $slug,
+            'landing_url' => route('clubs.teams.landing', [
+                'clubSlug' => $club->landing_page_slug,
+                'gender' => $genderSegment,
+                'teamSlug' => $slug,
+            ]),
+            'gender_segment' => $genderSegment,
+            'logo' => $club->logo,
+            'background_image' => $club->background_image,
+            'hero_image' => $club->hero_image ?? null,
+            'branding' => $club->branding ?? [],
+            'team_settings' => [
+                'gender' => $genderSegment,
+                'league' => $program?->league?->name ?? $club->league?->name,
+                'location' => trim(collect([$club->city, $club->state])->filter()->implode(', ')),
+            ],
+            'coaching_staff' => $club->coaching_staff ?? [],
+            'landing_page_content' => $club->landing_page_content,
+            'club' => $club,
+            'player_count' => $players->count(),
+        ]);
+    }
+
+    protected function clubLeagueForGender(Club $club, string $genderSegment, ?string $sport = null): ?ClubLeague
+    {
+        $gender = $genderSegment === 'girls' ? 'female' : 'male';
+
+        return $club->clubLeagues
+            ->first(function (ClubLeague $clubLeague) use ($gender, $sport): bool {
+                $genders = collect($clubLeague->genders ?? [])->map(fn ($value) => strtolower((string) $value));
+
+                $genderMatches = $genders->isEmpty() || $genders->contains($gender);
+                $sportMatches = blank($sport) || blank($clubLeague->sport) || $clubLeague->sport === $sport;
+
+                return $genderMatches && $sportMatches;
+            });
+    }
+
+    protected function playersForLandingTeam(Club $club, string $genderSegment, string $teamSlug): Collection
     {
         return User::query()
             ->with([
@@ -472,12 +581,12 @@ class PublicClubTeamController extends Controller
                 },
             ])
             ->where('club_id', $club->id)
-            ->where(function ($query) use ($team) {
-                $query
-                    ->where('team_name', $team->name)
-                    ->orWhere('team_name', trim((string) $team->name));
-            })
+            ->whereNotNull('team_name')
             ->get()
+            ->filter(function (User $player) use ($genderSegment, $teamSlug): bool {
+                return $this->landingGenderSegmentForPlayer($player) === $genderSegment
+                    && Str::slug((string) $player->team_name) === $teamSlug;
+            })
             ->sortBy(function (User $player) {
                 $number = trim((string) ($player->jersey_number ?? ''));
 
@@ -501,17 +610,26 @@ class PublicClubTeamController extends Controller
         };
     }
 
-    protected function playerBelongsToTeam(User $player, Team $team, Club $club): bool
+    protected function landingGenderSegmentForPlayer(User $player): string
     {
-        $playerTeamName = trim((string) ($player->team_name ?? ''));
-        $teamName = trim((string) ($team->name ?? ''));
+        $gender = strtolower((string) ($player->gender ?? ''));
 
-        if ($playerTeamName === '' || $teamName === '') {
-            return false;
-        }
+        return match (true) {
+            str_contains($gender, 'female'), str_contains($gender, 'girl'), str_contains($gender, 'women') => 'girls',
+            default => 'boys',
+        };
+    }
 
+    protected function teamKey(string $genderSegment, ?string $teamName): string
+    {
+        return $this->normalizeLandingGenderSegment($genderSegment) . ':' . Str::slug((string) $teamName);
+    }
+
+    protected function playerBelongsToLandingTeam(User $player, Club $club, string $genderSegment, string $teamSlug): bool
+    {
         return (int) ($player->club_id ?? 0) === (int) $club->id
-            && strcasecmp($playerTeamName, $teamName) === 0;
+            && $this->landingGenderSegmentForPlayer($player) === $this->normalizeLandingGenderSegment($genderSegment)
+            && Str::slug((string) $player->team_name) === $teamSlug;
     }
 
     protected function publicAssetUrl(mixed $value): ?string
@@ -522,14 +640,10 @@ class PublicClubTeamController extends Controller
 
         if (is_array($value)) {
             if (array_key_exists(0, $value)) {
-                $first = $value[0] ?? null;
-
-                return $this->publicAssetUrl($first);
+                return $this->publicAssetUrl($value[0] ?? null);
             }
 
-            $path = $value['url'] ?? $value['path'] ?? $value['image_url'] ?? null;
-
-            return $this->publicAssetUrl($path);
+            return $this->publicAssetUrl($value['url'] ?? $value['path'] ?? $value['image_url'] ?? null);
         }
 
         $value = trim((string) $value);
@@ -555,6 +669,7 @@ class PublicClubTeamController extends Controller
     {
         if (is_string($value)) {
             $decoded = json_decode($value, true);
+
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $value = $decoded;
             }
@@ -635,7 +750,6 @@ class PublicClubTeamController extends Controller
 
         return null;
     }
-
 
     protected function sendCoachWatchlistEmail(
         string $coachEmail,
@@ -748,83 +862,6 @@ class PublicClubTeamController extends Controller
         return implode("\n", $lines);
     }
 
-    protected function sendSavedPlayerEmail(
-        string $coachEmail,
-        array $coachCheckIn,
-        array $savedPlayer,
-        User $player,
-        Club $club,
-        Team $team
-    ): void {
-        $coachEmail = strtolower(trim($coachEmail));
-
-        if (! filter_var($coachEmail, FILTER_VALIDATE_EMAIL)) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Native Domain Mail
-        |--------------------------------------------------------------------------
-        |
-        | This intentionally does NOT depend on Laravel SMTP/.env mail settings.
-        | It works like the sample RSVP script: PHP's native mail() sends using
-        | a domain sender/envelope sender from plyrcard.com.
-        |
-        | Note: the hosting server still has to allow PHP mail(). For best
-        | deliverability, support@plyrcard.com should exist and the domain should
-        | have SPF/DKIM configured by the host/email provider.
-        |
-        */
-
-        $fromEmail = 'support@plyrcard.com';
-        $fromName = 'PlyrCard';
-        $subjectPlayerName = $savedPlayer['player_name'] ?: 'Player';
-        $subject = "Saved Player: {$subjectPlayerName} - {$club->name}";
-
-        $replyTo = $player->email
-            ?: $player->personal_email
-            ?: $player->parent_email
-            ?: $player->club_coach_email
-            ?: $fromEmail;
-
-        $htmlBody = view('emails.coach-saved-player', [
-            'coach' => $coachCheckIn,
-            'savedPlayer' => $savedPlayer,
-            'player' => $player,
-            'club' => $club,
-            'team' => $team,
-        ])->render();
-
-        $textBody = $this->buildSavedPlayerTextEmail(
-            $coachCheckIn,
-            $savedPlayer,
-            $player,
-            $club,
-            $team
-        );
-
-        $sent = $this->sendNativeMultipartMail(
-            to: $coachEmail,
-            subject: $subject,
-            textBody: $textBody,
-            htmlBody: $htmlBody,
-            fromEmail: $fromEmail,
-            fromName: $fromName,
-            replyTo: $replyTo,
-            envelopeFrom: $fromEmail
-        );
-
-        if (! $sent) {
-            logger()->warning('Coach saved player native email failed.', [
-                'to' => $coachEmail,
-                'from' => $fromEmail,
-                'player_id' => $player->id,
-                'club_id' => $club->id,
-                'team_id' => $team->id,
-            ]);
-        }
-    }
 
     protected function sendNativeMultipartMail(
         string $to,
@@ -897,59 +934,5 @@ class PublicClubTeamController extends Controller
         return trim(str_replace(["\r", "\n"], ' ', $value));
     }
 
-    protected function buildSavedPlayerTextEmail(
-        array $coachCheckIn,
-        array $savedPlayer,
-        User $player,
-        Club $club,
-        Team $team
-    ): string {
-        $lines = [
-            'PlyrCard Saved Player',
-            '',
-            'Coach:',
-            'Name: ' . ($coachCheckIn['name'] ?? ''),
-            'School: ' . ($coachCheckIn['school'] ?? ''),
-            'Title: ' . ($coachCheckIn['title'] ?? ''),
-            'Email: ' . ($coachCheckIn['email'] ?? ''),
-            '',
-            'Player:',
-            'Name: ' . ($savedPlayer['player_name'] ?? ''),
-            'Jersey: ' . ($savedPlayer['jersey_number'] ?? ''),
-            'Position: ' . ($savedPlayer['position'] ?? ''),
-            'Class: ' . ($savedPlayer['year'] ?? ''),
-            'Height: ' . ($savedPlayer['height'] ?? ''),
-            'Weight: ' . ($savedPlayer['weight'] ?? ''),
-            'GPA: ' . ($savedPlayer['gpa'] ?? ''),
-            'Location: ' . trim(($savedPlayer['city'] ?? '') . ', ' . ($savedPlayer['state'] ?? ''), ', '),
-            '',
-            'Program:',
-            'Club: ' . ($club->name ?? ''),
-            'Team: ' . ($team->name ?? ''),
-            'League: ' . ($club->league?->name ?? ''),
-            '',
-            'Website:',
-            ($savedPlayer['website_url'] ?? '') ?: 'No published website available.',
-            '',
-            'Contact:',
-            'Player Email: ' . (($savedPlayer['player_email'] ?? '') ?: 'N/A'),
-            'Personal Email: ' . (($savedPlayer['player_personal_email'] ?? '') ?: 'N/A'),
-            'Phone: ' . (($savedPlayer['player_phone'] ?? '') ?: 'N/A'),
-            '',
-            'Parent / Guardian:',
-            'Parent: ' . (($savedPlayer['parent'] ?? '') ?: 'N/A'),
-            'Parent Email: ' . (($savedPlayer['parent_email'] ?? '') ?: 'N/A'),
-            'Parent Phone: ' . (($savedPlayer['parent_phone'] ?? '') ?: 'N/A'),
-            '',
-            'Coach Contact:',
-            'Club Coach: ' . (($savedPlayer['club_coach'] ?? '') ?: 'N/A'),
-            'Club Coach Email: ' . (($savedPlayer['club_coach_email'] ?? '') ?: 'N/A'),
-            'Club Coach Phone: ' . (($savedPlayer['club_coach_phone'] ?? '') ?: 'N/A'),
-            '',
-            'Saved At: ' . (($savedPlayer['saved_at'] ?? '') ?: now()->toDateTimeString()),
-        ];
-
-        return implode("\n", $lines);
-    }
 
 }

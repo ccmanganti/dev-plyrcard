@@ -13,6 +13,11 @@
         $clubCoaches = collect(is_array($club->coaching_staff ?? null) ? $club->coaching_staff : []);
         $sponsors = collect(is_array($club->sponsors_partners ?? null) ? $club->sponsors_partners : []);
 
+        $displayLeague = $club->league;
+        if ($club->relationLoaded('clubLeagues')) {
+            $displayLeague = $club->clubLeagues->pluck('league')->filter()->first() ?: $displayLeague;
+        }
+
         $primary = $branding['primary_color'] ?? $club->primary_color ?? '#00A3FF';
         $secondary = $branding['secondary_color'] ?? $club->secondary_color ?? '#050505';
         $accent = $branding['accent_color'] ?? $primary;
@@ -74,7 +79,7 @@
         };
 
         $logo = $resolveAsset($club->logo ?? null);
-        $leagueLogo = $resolveAsset($club->league?->logo ?? null);
+        $leagueLogo = $resolveAsset($displayLeague?->logo ?? null);
         $heroImageUrl = $resolveAsset($club->background_image ?? $club->hero_image ?? $branding['background_image'] ?? $branding['hero_image'] ?? null, asset('images/PLYRCARD-SITE.jpg'));
         $clubContent = trim((string) ($club->landing_page_content ?? ''));
         $address = $contact['address'] ?? trim(collect([$club->city, $club->state])->filter()->implode(', '));
@@ -86,7 +91,7 @@
 
         $teamGender = function ($team) {
             $settings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
-            $raw = strtolower((string) ($settings['gender'] ?? $settings['division_gender'] ?? $team->club?->league?->gender ?? ''));
+            $raw = strtolower((string) ($settings['gender'] ?? $settings['division_gender'] ?? $team->gender_segment ?? ''));
             $name = strtolower((string) $team->name);
             if (str_contains($raw, 'female') || str_contains($raw, 'women') || str_contains($raw, 'girl') || str_contains($name, 'women') || str_contains($name, 'girl') || str_contains($name, 'female')) return 'girls';
             return 'boys';
@@ -99,7 +104,7 @@
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
         $clubFacts = collect([
             ['icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $teamCount],
-            ['icon' => 'fa-trophy', 'logo' => $leagueLogo, 'label' => 'League', 'value' => $club->league?->name ?: 'TBD'],
+            ['icon' => 'fa-trophy', 'logo' => $leagueLogo, 'label' => 'League', 'value' => $displayLeague?->name ?: 'TBD'],
             ['icon' => 'fa-location-dot', 'label' => 'Location', 'value' => $address ?: 'TBD'],
         ]);
 
@@ -1076,7 +1081,7 @@
 
                 <div class="teams-panel is-active" data-team-panel="boys">
                     @forelse($boysTeams as $team)
-                        <a class="team-card" href="{{ $team->landingUrl() ?: '#' }}">
+                        <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
                             @php
                                 $teamLogo = $resolveAsset($team->logo ?? null);
                                 $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
@@ -1123,7 +1128,7 @@
 
                 <div class="teams-panel" data-team-panel="girls">
                     @forelse($girlsTeams as $team)
-                        <a class="team-card" href="{{ $team->landingUrl() ?: '#' }}">
+                        <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
                             @php
                                 $teamLogo = $resolveAsset($team->logo ?? null);
                                 $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];

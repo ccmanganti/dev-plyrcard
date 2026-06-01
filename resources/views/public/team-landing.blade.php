@@ -105,9 +105,14 @@
 
         $teamLogo = $resolveAsset($team->logo ?: $club?->logo);
         $clubLogo = $resolveAsset($club?->logo);
-        $leagueLogo = $resolveAsset($club?->league?->logo);
+        $displayLeague = $club?->league;
+        if ($club?->relationLoaded('clubLeagues')) {
+            $displayLeague = $club->clubLeagues->pluck('league')->filter()->first() ?: $displayLeague;
+        }
+
+        $leagueLogo = $resolveAsset($displayLeague?->logo);
         $heroImageUrl = $resolveAsset($team->background_image ?? $team->hero_image ?? $teamBranding['background_image'] ?? $teamBranding['hero_image'] ?? $club?->background_image ?? $club?->hero_image ?? null, asset('images/PLYRCARD-SITE.jpg'));
-        $leagueName = $club?->league?->name ?? ($teamSettings['league'] ?? 'League');
+        $leagueName = $displayLeague?->name ?? ($teamSettings['league'] ?? 'League');
         $coachName = $headCoach['name'] ?? $headCoach['full_name'] ?? 'TBA';
         $teamLocation = collect([
             $teamSettings['location'] ?? null,
@@ -117,11 +122,11 @@
         $coachEmail = $headCoach['email'] ?? null;
         $coachPhone = $headCoach['phone'] ?? null;
         $teamIntro = trim((string) ($team->landing_page_content ?? $team->landing_page_intro ?? ''));
-        $currentGenderSegment = request()->route('gender') ?? $team->landingGenderSegment();
+        $currentGenderSegment = request()->route('gender') ?? ($team->gender_segment ?? 'boys');
         $coachSession = $coachCheckIn ?? session('coach_checkin');
         $coachButtonText = is_array($coachSession) && filled($coachSession['name'] ?? null) ? 'Hi ' . str($coachSession['name'])->before(' ')->title() : 'Coach Check-In';
         $coachButtonIcon = is_array($coachSession) && filled($coachSession['name'] ?? null) ? 'fa-user-tie' : 'fa-right-to-bracket';
-        $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['team_id'] ?? 0) === (int) $team->id)->unique('player_id')->values();
+        $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (string) ($saved['team_key'] ?? '') === (string) $team->id)->unique('player_id')->values();
         $savedIds = $savedPlayers->pluck('player_id')->map(fn ($id) => (int) $id)->all();
 
         $playerWebsiteUrl = function ($player) {
@@ -204,7 +209,7 @@
                 'state' => $player->state ?: '',
                 'school' => $player->school?->name ?? '',
                 'club' => $player->club?->name ?? $club?->name ?? '',
-                'league' => $player->league?->name ?? $player->club?->league?->name ?? $club?->league?->name ?? '',
+                'league' => $player->league?->name ?? $player->club?->league?->name ?? $displayLeague?->name ?? '',
                 'club_logo' => $clubLogo,
                 'league_logo' => $playerLeagueLogo,
                 'coach' => $player->club_coach ?: '',
