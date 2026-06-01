@@ -97,9 +97,8 @@
             return 'boys';
         };
 
-        $boysTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'boys')->values();
-        $girlsTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'girls')->values();
-        $teamCount = collect($teams ?? [])->count();
+        $allTeams = collect($teams ?? [])->values();
+        $teamCount = $allTeams->count();
 
         $teamGroupMeta = function ($group, string $fallbackGender) use ($resolveAsset, $displayLeague, $club, $coachName, $phone, $email, $address) {
             $firstTeam = collect($group)->first();
@@ -124,8 +123,57 @@
             ];
         };
 
-        $boysMeta = $teamGroupMeta($boysTeams, 'boys');
-        $girlsMeta = $teamGroupMeta($girlsTeams, 'girls');
+        $programGroups = $allTeams
+            ->groupBy(fn ($team) => (string) ($team->program_id ?? data_get($team, 'team_settings.program_id') ?? ($team->league_name ?? data_get($team, 'team_settings.league') ?? 'program')))
+            ->map(function ($programTeams, $programKey) use ($teamGender, $teamGroupMeta, $resolveAsset, $displayLeague) {
+                $firstTeam = $programTeams->first();
+                $settings = is_array($firstTeam?->team_settings ?? null) ? $firstTeam->team_settings : [];
+                $leagueName = $firstTeam?->league_name ?? $settings['league'] ?? $displayLeague?->name ?? 'League';
+                $leagueLogo = $resolveAsset($firstTeam?->league_logo ?? $settings['league_logo'] ?? $displayLeague?->logo ?? null);
+                $boys = $programTeams->filter(fn ($team) => $teamGender($team) === 'boys')->values();
+                $girls = $programTeams->filter(fn ($team) => $teamGender($team) === 'girls')->values();
+
+                return [
+                    'key' => \Illuminate\Support\Str::slug((string) $programKey),
+                    'id' => $programKey,
+                    'league' => $leagueName,
+                    'league_logo' => $leagueLogo,
+                    'teams' => $programTeams->values(),
+                    'boys' => $boys,
+                    'girls' => $girls,
+                    'boys_meta' => $teamGroupMeta($boys, 'boys'),
+                    'girls_meta' => $teamGroupMeta($girls, 'girls'),
+                ];
+            })
+            ->values();
+
+        if ($programGroups->isEmpty()) {
+            $programGroups = collect([[
+                'key' => 'default',
+                'id' => 'default',
+                'league' => $displayLeague?->name ?? 'League',
+                'league_logo' => $leagueLogo,
+                'teams' => collect(),
+                'boys' => collect(),
+                'girls' => collect(),
+                'boys_meta' => $teamGroupMeta(collect(), 'boys'),
+                'girls_meta' => $teamGroupMeta(collect(), 'girls'),
+            ]]);
+        }
+
+        $activeProgram = $programGroups->first();
+        $boysTeams = collect($activeProgram['boys'] ?? []);
+        $girlsTeams = collect($activeProgram['girls'] ?? []);
+        $boysMeta = $activeProgram['boys_meta'];
+        $girlsMeta = $activeProgram['girls_meta'];
+        $activeMeta = ($boysMeta['count'] ?? 0) > 0 ? $boysMeta : $girlsMeta;
+
+        $clubFacts = collect([
+            ['key' => 'teams', 'icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $activeMeta['count'] ?: $teamCount],
+            ['key' => 'league', 'icon' => 'fa-trophy', 'logo' => $activeProgram['league_logo'] ?: $leagueLogo, 'label' => 'League', 'value' => $activeProgram['league'] ?: ($displayLeague?->name ?: 'TBD')],
+            ['key' => 'coach', 'icon' => 'fa-user-tie', 'label' => 'Coach', 'value' => $activeMeta['coach'] ?: 'TBA', 'email' => $activeMeta['coach_email'], 'phone' => $activeMeta['coach_phone']],
+        ]);
+
         $coachSession = $coachCheckIn ?? session('coach_checkin');
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
         $clubFacts = collect([
@@ -1153,6 +1201,49 @@
             }
         }
 
+    
+        /* Multi-league navigation */
+        .league-switch{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+            gap:8px;
+            margin-bottom:10px;
+        }
+        .league-tab{
+            min-height:52px;
+            border:1px solid var(--line);
+            background:#0d0d10;
+            color:#fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:9px;
+            padding:0 12px;
+            font-family:var(--heading);
+            font-size:12px;
+            font-weight:900;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            cursor:pointer;
+        }
+        .league-tab.is-active{
+            background:color-mix(in srgb,var(--brand) 34%,#0b0b0d);
+            border-color:color-mix(in srgb,var(--brand) 55%,rgba(255,255,255,.18));
+        }
+        .league-tab-logo{
+            width:24px;
+            height:24px;
+            object-fit:contain;
+            flex:0 0 auto;
+        }
+        .program-panel{display:none}
+        .program-panel.is-active{display:block}
+        .program-panel .team-switch{margin-bottom:14px}
+        @media(max-width:900px){
+            .league-switch{grid-template-columns:1fr;margin-bottom:8px}
+            .league-tab{min-height:48px;font-size:11px}
+        }
+
     </style>
 </head>
 <body>
@@ -1215,122 +1306,149 @@
             <div class="wrap">
                 <div class="section-head">
                     <div><div class="section-title">Teams</div></div>
-                    <div class="team-switch" role="tablist">
-                        <button class="team-tab is-active" type="button" data-team-tab="boys"
-                            data-team-count="{{ $boysMeta['count'] ?: 0 }}"
-                            data-team-league="{{ $boysMeta['league'] }}"
-                            data-team-league-logo="{{ $boysMeta['league_logo'] }}"
-                            data-team-coach="{{ $boysMeta['coach'] }}"
-                            data-team-coach-phone="{{ $boysMeta['coach_phone'] }}"
-                            data-team-coach-email="{{ $boysMeta['coach_email'] }}"
-                            data-team-has-location="{{ $boysMeta['has_location'] ? '1' : '0' }}">@if($boysMeta['league_logo'])<img class="team-tab-logo" src="{{ $boysMeta['league_logo'] }}" alt="">@endif<span>Boys</span></button>
-                        <button class="team-tab" type="button" data-team-tab="girls"
-                            data-team-count="{{ $girlsMeta['count'] ?: 0 }}"
-                            data-team-league="{{ $girlsMeta['league'] }}"
-                            data-team-league-logo="{{ $girlsMeta['league_logo'] }}"
-                            data-team-coach="{{ $girlsMeta['coach'] }}"
-                            data-team-coach-phone="{{ $girlsMeta['coach_phone'] }}"
-                            data-team-coach-email="{{ $girlsMeta['coach_email'] }}"
-                            data-team-has-location="{{ $girlsMeta['has_location'] ? '1' : '0' }}">@if($girlsMeta['league_logo'])<img class="team-tab-logo" src="{{ $girlsMeta['league_logo'] }}" alt="">@endif<span>Girls</span></button>
+                </div>
+
+                <div class="league-switch" role="tablist" aria-label="Leagues">
+                    @foreach($programGroups as $programIndex => $program)
+                        <button class="league-tab {{ $programIndex === 0 ? 'is-active' : '' }}" type="button" data-program-tab="{{ $program['key'] }}">
+                            @if($program['league_logo'])
+                                <img class="league-tab-logo" src="{{ $program['league_logo'] }}" alt="">
+                            @endif
+                            <span>{{ $program['league'] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+
+                @foreach($programGroups as $programIndex => $program)
+                    @php
+                        $availableGenders = collect([
+                            'boys' => collect($program['boys'])->isNotEmpty(),
+                            'girls' => collect($program['girls'])->isNotEmpty(),
+                        ])->filter()->keys()->values();
+
+                        if ($availableGenders->isEmpty()) {
+                            $availableGenders = collect(['boys']);
+                        }
+
+                        $defaultGender = $availableGenders->first();
+                    @endphp
+
+                    <div class="program-panel {{ $programIndex === 0 ? 'is-active' : '' }}" data-program-panel="{{ $program['key'] }}">
+                        <div class="team-switch" role="tablist" aria-label="Available genders">
+                            @if($availableGenders->contains('boys'))
+                                <button class="team-tab {{ $defaultGender === 'boys' ? 'is-active' : '' }}" type="button"
+                                    data-team-tab="boys"
+                                    data-program-key="{{ $program['key'] }}"
+                                    data-team-count="{{ $program['boys_meta']['count'] ?: 0 }}"
+                                    data-team-league="{{ $program['league'] }}"
+                                    data-team-league-logo="{{ $program['league_logo'] }}"
+                                    data-team-coach="{{ $program['boys_meta']['coach'] }}"
+                                    data-team-coach-phone="{{ $program['boys_meta']['coach_phone'] }}"
+                                    data-team-coach-email="{{ $program['boys_meta']['coach_email'] }}"
+                                    data-team-has-location="{{ $program['boys_meta']['has_location'] ? '1' : '0' }}">
+                                    @if($program['league_logo'])<img class="team-tab-logo" src="{{ $program['league_logo'] }}" alt="">@endif
+                                    <span>Boys</span>
+                                </button>
+                            @endif
+
+                            @if($availableGenders->contains('girls'))
+                                <button class="team-tab {{ $defaultGender === 'girls' ? 'is-active' : '' }}" type="button"
+                                    data-team-tab="girls"
+                                    data-program-key="{{ $program['key'] }}"
+                                    data-team-count="{{ $program['girls_meta']['count'] ?: 0 }}"
+                                    data-team-league="{{ $program['league'] }}"
+                                    data-team-league-logo="{{ $program['league_logo'] }}"
+                                    data-team-coach="{{ $program['girls_meta']['coach'] }}"
+                                    data-team-coach-phone="{{ $program['girls_meta']['coach_phone'] }}"
+                                    data-team-coach-email="{{ $program['girls_meta']['coach_email'] }}"
+                                    data-team-has-location="{{ $program['girls_meta']['has_location'] ? '1' : '0' }}">
+                                    @if($program['league_logo'])<img class="team-tab-logo" src="{{ $program['league_logo'] }}" alt="">@endif
+                                    <span>Girls</span>
+                                </button>
+                            @endif
+                        </div>
+
+                        <div class="teams-panel {{ $defaultGender === 'boys' ? 'is-active' : '' }}" data-program-team-panel="{{ $program['key'] }}" data-team-panel="boys">
+                            @forelse($program['boys'] as $team)
+                                <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
+                                    @php
+                                        $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                        $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? $program['league_logo'] ?? null);
+                                    @endphp
+                                    <div class="team-card-main">
+                                        <div class="team-card-meta">
+                                            <div class="team-card-name">{{ $team->name }}</div>
+                                        </div>
+                                    </div>
+                                    @php
+                                        $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
+                                    @endphp
+                                    @if($journeyCards->isNotEmpty())
+                                        <div class="team-card-player-stack" aria-hidden="true">
+                                            @foreach($journeyCards as $journeyIndex => $journeyCard)
+                                                <span class="team-card-player-tile is-{{ $journeyIndex }}">
+                                                    @if(! empty($journeyCard['image']))
+                                                        <img src="{{ $resolveAsset($journeyCard['image']) }}" alt="">
+                                                    @elseif($teamLeagueLogo)
+                                                        <img src="{{ $teamLeagueLogo }}" alt="">
+                                                    @else
+                                                        <i class="fa-solid fa-user"></i>
+                                                    @endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="team-card-fallback-logos" aria-hidden="true">
+                                            <span class="team-card-tile is-gold">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                                        </div>
+                                    @endif
+                                </a>
+                            @empty
+                                <div class="empty">Boys teams will appear here once published.</div>
+                            @endforelse
+                        </div>
+
+                        <div class="teams-panel {{ $defaultGender === 'girls' ? 'is-active' : '' }}" data-program-team-panel="{{ $program['key'] }}" data-team-panel="girls">
+                            @forelse($program['girls'] as $team)
+                                <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
+                                    @php
+                                        $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                        $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? $program['league_logo'] ?? null);
+                                    @endphp
+                                    <div class="team-card-main">
+                                        <div class="team-card-meta">
+                                            <div class="team-card-name">{{ $team->name }}</div>
+                                        </div>
+                                    </div>
+                                    @php
+                                        $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
+                                    @endphp
+                                    @if($journeyCards->isNotEmpty())
+                                        <div class="team-card-player-stack" aria-hidden="true">
+                                            @foreach($journeyCards as $journeyIndex => $journeyCard)
+                                                <span class="team-card-player-tile is-{{ $journeyIndex }}">
+                                                    @if(! empty($journeyCard['image']))
+                                                        <img src="{{ $resolveAsset($journeyCard['image']) }}" alt="">
+                                                    @elseif($teamLeagueLogo)
+                                                        <img src="{{ $teamLeagueLogo }}" alt="">
+                                                    @else
+                                                        <i class="fa-solid fa-user"></i>
+                                                    @endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="team-card-fallback-logos" aria-hidden="true">
+                                            <span class="team-card-tile is-gold">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                                        </div>
+                                    @endif
+                                </a>
+                            @empty
+                                <div class="empty">Girls teams will appear here once published.</div>
+                            @endforelse
+                        </div>
                     </div>
-                </div>
-
-                <div class="teams-panel is-active" data-team-panel="boys">
-                    @forelse($boysTeams as $team)
-                        <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
-                            @php
-                                $teamLogo = $resolveAsset($team->logo ?? null);
-                                $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
-                                $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? null);
-                                $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
-                            @endphp
-                            <div class="team-card-main">
-                                @if($teamLogo)
-                                    <img class="team-card-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
-                                @elseif($logo)
-                                    <img class="team-card-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
-                                @else
-                                    <span class="team-card-logo-fallback"><i class="fa-solid fa-shield-halved"></i></span>
-                                @endif
-                                <div class="team-card-meta">
-                                    <div class="team-card-name">{{ $team->name }}</div>
-                                </div>
-                            </div>
-                            @php
-                                $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
-                            @endphp
-                            @if($journeyCards->isNotEmpty())
-                                <div class="team-card-player-stack" aria-hidden="true">
-                                    @foreach($journeyCards as $journeyIndex => $journeyCard)
-                                        <span
-                                            class="team-card-player {{ $journeyCards->count() === 1 ? 'is-single' : 'is-' . ($journeyIndex + 1) }}"
-                                            style="background-image:url('{{ $resolveAsset($journeyCard['image'] ?? null) }}')"
-                                        >
-                                            <span class="team-card-player-tag">{{ $journeyCard['name'] ?? 'PlyrCard' }}</span>
-                                        </span>
-                                    @endforeach
-                                </div>
-                            @else
-                                <div class="team-card-fallback-logos" aria-hidden="true">
-                                    <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
-                                    <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
-                                    <span class="team-card-tile is-bronze">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@elseif($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
-                                </div>
-                            @endif
-                        </a>
-                    @empty
-                        <div class="empty">Boys teams will appear here once published.</div>
-                    @endforelse
-                </div>
-
-                <div class="teams-panel" data-team-panel="girls">
-                    @forelse($girlsTeams as $team)
-                        <a class="team-card" href="{{ $team->landing_url ?? '#' }}">
-                            @php
-                                $teamLogo = $resolveAsset($team->logo ?? null);
-                                $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
-                                $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? null);
-                                $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
-                            @endphp
-                            <div class="team-card-main">
-                                @if($teamLogo)
-                                    <img class="team-card-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">
-                                @elseif($logo)
-                                    <img class="team-card-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
-                                @else
-                                    <span class="team-card-logo-fallback"><i class="fa-solid fa-shield-halved"></i></span>
-                                @endif
-                                <div class="team-card-meta">
-                                    <div class="team-card-name">{{ $team->name }}</div>
-                                </div>
-                            </div>
-                            @php
-                                $journeyCards = collect($teamJourneyCards[$team->id] ?? [])->shuffle()->take(3)->values();
-                            @endphp
-                            @if($journeyCards->isNotEmpty())
-                                <div class="team-card-player-stack" aria-hidden="true">
-                                    @foreach($journeyCards as $journeyIndex => $journeyCard)
-                                        <span
-                                            class="team-card-player {{ $journeyCards->count() === 1 ? 'is-single' : 'is-' . ($journeyIndex + 1) }}"
-                                            style="background-image:url('{{ $resolveAsset($journeyCard['image'] ?? null) }}')"
-                                        >
-                                            <span class="team-card-player-tag">{{ $journeyCard['name'] ?? 'PlyrCard' }}</span>
-                                        </span>
-                                    @endforeach
-                                </div>
-                            @else
-                                <div class="team-card-fallback-logos" aria-hidden="true">
-                                    <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
-                                    <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
-                                    <span class="team-card-tile is-bronze">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@elseif($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
-                                </div>
-                            @endif
-                        </a>
-                    @empty
-                        <div class="empty">Girls teams will appear here once published.</div>
-                    @endforelse
-                </div>
-
+                @endforeach
             </div>
         </section>
 
@@ -1502,13 +1620,37 @@
                 }
             }
 
+            function activateGenderTab(tab){
+                const target = tab.dataset.teamTab;
+                const programKey = tab.dataset.programKey;
+                const currentPanel = document.querySelector(`[data-program-panel="${programKey}"]`);
+
+                currentPanel?.querySelectorAll('[data-team-tab]').forEach(t => t.classList.toggle('is-active', t === tab));
+                currentPanel?.querySelectorAll('[data-program-team-panel]').forEach(p => {
+                    p.classList.toggle('is-active', p.dataset.teamPanel === target);
+                });
+
+                updateClubFacts(tab);
+            }
+
             document.querySelectorAll('[data-team-tab]').forEach(tab => tab.addEventListener('click', function(){
-                const target = this.dataset.teamTab;
-                document.querySelectorAll('[data-team-tab]').forEach(t => t.classList.toggle('is-active', t === this));
-                document.querySelectorAll('[data-team-panel]').forEach(p => p.classList.toggle('is-active', p.dataset.teamPanel === target));
-                updateClubFacts(this);
+                activateGenderTab(this);
             }));
-            const initialTeamTab = document.querySelector('[data-team-tab].is-active');
+
+            document.querySelectorAll('[data-program-tab]').forEach(tab => tab.addEventListener('click', function(){
+                const target = this.dataset.programTab;
+
+                document.querySelectorAll('[data-program-tab]').forEach(t => t.classList.toggle('is-active', t === this));
+                document.querySelectorAll('[data-program-panel]').forEach(panel => panel.classList.toggle('is-active', panel.dataset.programPanel === target));
+
+                const activeProgram = document.querySelector(`[data-program-panel="${target}"]`);
+                const activeGender = activeProgram?.querySelector('[data-team-tab].is-active') || activeProgram?.querySelector('[data-team-tab]');
+
+                if(activeGender) activateGenderTab(activeGender);
+            }));
+
+            const initialProgram = document.querySelector('[data-program-panel].is-active');
+            const initialTeamTab = initialProgram?.querySelector('[data-team-tab].is-active') || initialProgram?.querySelector('[data-team-tab]');
             if(initialTeamTab) updateClubFacts(initialTeamTab);
             document.addEventListener('submit', async function(event){
                 const form = event.target.closest('[data-email-watchlist-form]');

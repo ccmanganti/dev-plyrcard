@@ -75,6 +75,7 @@ class PublicClubTeamController extends Controller
             ->groupBy(fn (User $player): string => $this->teamKey(
                 $this->landingGenderSegmentForPlayer($player),
                 $player->team_name,
+                $player->club_league_id,
             ))
             ->map(function ($group) {
                 return $group->shuffle()->map(function (User $player) {
@@ -128,12 +129,15 @@ class PublicClubTeamController extends Controller
 
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
 
-        $players = $this->playersForLandingTeam($club, $requestedGender, $teamSlug);
+        $players = $this->playersForLandingTeam($club, $requestedGender, $teamSlug, request('program'));
 
         abort_if($players->isEmpty(), 404);
 
         $teamName = (string) $players->first()->team_name;
-        $team = $this->buildLandingTeam($club, $requestedGender, $teamName, $players);
+        $program = $club->clubLeagues->firstWhere('id', (int) request('program'))
+            ?: $this->clubLeagueForGender($club, $requestedGender, $players->first()?->sport);
+
+        $team = $this->buildLandingTeam($club, $requestedGender, $teamName, $players, $program);
 
         return view('public.team-landing', [
             'team' => $team,
@@ -241,7 +245,7 @@ class PublicClubTeamController extends Controller
         $coachEmail = strtolower((string) ($coachCheckIn['email'] ?? ''));
         $playerUrl = $this->playerWebsiteUrl($player);
         $teamName = trim((string) $player->team_name);
-        $teamKey = $this->teamKey($requestedGender, $teamName);
+        $teamKey = $this->teamKey($requestedGender, $teamName, $player->club_league_id);
 
         $savedPlayers = collect(session('coach_saved_players', []));
 
@@ -342,7 +346,7 @@ class PublicClubTeamController extends Controller
         $club = $this->publishedClubBySlug($clubSlug);
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
         $teamName = trim((string) $player->team_name);
-        $teamKey = $this->teamKey($requestedGender, $teamName);
+        $teamKey = $this->teamKey($requestedGender, $teamName, $player->club_league_id);
 
         abort_unless($this->playerBelongsToLandingTeam($player, $club, $requestedGender, $teamSlug), 404);
 
@@ -499,15 +503,19 @@ class PublicClubTeamController extends Controller
             ->groupBy(fn (User $player): string => $this->teamKey(
                 $this->landingGenderSegmentForPlayer($player),
                 $player->team_name,
+                $player->club_league_id,
             ))
             ->map(function (Collection $group) use ($club) {
                 $player = $group->first();
+                $program = $club->clubLeagues->firstWhere('id', $player?->club_league_id)
+                    ?: $this->clubLeagueForGender($club, $this->landingGenderSegmentForPlayer($player), $player?->sport);
 
                 return $this->buildLandingTeam(
                     $club,
                     $this->landingGenderSegmentForPlayer($player),
                     (string) $player->team_name,
                     $group,
+                    $program,
                 );
             })
             ->sortBy([
@@ -517,11 +525,11 @@ class PublicClubTeamController extends Controller
             ->values();
     }
 
-    protected function buildLandingTeam(Club $club, string $genderSegment, string $teamName, Collection $players): Fluent
+    protected function buildLandingTeam(Club $club, string $genderSegment, string $teamName, Collection $players, ?ClubLeague $program = null): Fluent
     {
         $slug = Str::slug($teamName);
-        $teamKey = $this->teamKey($genderSegment, $teamName);
-        $program = $this->clubLeagueForGender($club, $genderSegment, $players->first()?->sport);
+        $program ??= $this->clubLeagueForGender($club, $genderSegment, $players->first()?->sport);
+        $teamKey = $this->teamKey($genderSegment, $teamName, $program?->id);
 
         $coach = collect(is_array($club->coaching_staff ?? null) ? $club->coaching_staff : [])->first() ?? [];
 
@@ -535,11 +543,13 @@ class PublicClubTeamController extends Controller
                 'clubSlug' => $club->landing_page_slug,
                 'gender' => $genderSegment,
                 'teamSlug' => $slug,
+                'program' => $program?->id,
             ]),
             'gender_segment' => $genderSegment,
             'logo' => $club->logo,
             'league_name' => $program?->league?->name ?? $club->league?->name,
             'league_logo' => $program?->league?->logo ?? $club->league?->logo,
+            'program_id' => $program?->id,
             'coach_name' => $coach['name'] ?? $coach['full_name'] ?? 'TBA',
             'coach_email' => $coach['email'] ?? null,
             'coach_phone' => $coach['phone'] ?? null,
@@ -575,7 +585,7 @@ class PublicClubTeamController extends Controller
             });
     }
 
-    protected function playersForLandingTeam(Club $club, string $genderSegment, string $teamSlug): Collection
+    protected function playersForLandingTeam(Club $club, string $genderSegment, string $teamSlug, mixed $programId = null): Collection
     {
         return User::query()
             ->with([
@@ -594,8 +604,12 @@ class PublicClubTeamController extends Controller
             ->where('club_id', $club->id)
             ->whereNotNull('team_name')
             ->get()
-            ->filter(function (User $player) use ($genderSegment, $teamSlug): bool {
-                return $this->landingGenderSegmentForPlayer($player) === $genderSegment
+            ->filter(function (User $player) use ($genderSegment, $teamSlug, $programId): bool {
+                $programMatches = blank($programId)
+                    || (int) ($player->club_league_id ?? 0) === (int) $programId;
+
+                return $programMatches
+                    && $this->landingGenderSegmentForPlayer($player) === $genderSegment
                     && Str::slug((string) $player->team_name) === $teamSlug;
             })
             ->sortBy(function (User $player) {
@@ -631,14 +645,19 @@ class PublicClubTeamController extends Controller
         };
     }
 
-    protected function teamKey(string $genderSegment, ?string $teamName): string
+    protected function teamKey(string $genderSegment, ?string $teamName, mixed $programId = null): string
     {
-        return $this->normalizeLandingGenderSegment($genderSegment) . ':' . Str::slug((string) $teamName);
+        return ($programId ?: 'program') . ':' . $this->normalizeLandingGenderSegment($genderSegment) . ':' . Str::slug((string) $teamName);
     }
 
     protected function playerBelongsToLandingTeam(User $player, Club $club, string $genderSegment, string $teamSlug): bool
     {
-        return (int) ($player->club_id ?? 0) === (int) $club->id
+        $programId = request('program');
+        $programMatches = blank($programId)
+            || (int) ($player->club_league_id ?? 0) === (int) $programId;
+
+        return $programMatches
+            && (int) ($player->club_id ?? 0) === (int) $club->id
             && $this->landingGenderSegmentForPlayer($player) === $this->normalizeLandingGenderSegment($genderSegment)
             && Str::slug((string) $player->team_name) === $teamSlug;
     }

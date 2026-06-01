@@ -1892,6 +1892,54 @@
             }
         }
 
+    
+        /* Fix club logo/header overlap on team landing */
+        .team-hero-identity-clean{
+            display:grid!important;
+            grid-template-columns:64px minmax(0,1fr)!important;
+            gap:16px!important;
+            align-items:center!important;
+            max-width:100%!important;
+        }
+        .team-hero-identity-clean .identity-logo{
+            position:static!important;
+            grid-row:auto!important;
+            width:56px!important;
+            height:56px!important;
+            object-fit:contain!important;
+        }
+        .team-hero-identity-clean .team-title-stack{
+            min-width:0!important;
+            padding:0!important;
+            margin:0!important;
+            border:0!important;
+            overflow:hidden!important;
+        }
+        .team-hero-identity-clean .label,
+        .team-hero-identity-clean .team-name{
+            min-width:0!important;
+            max-width:100%!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+        }
+        .team-hero-identity-clean .team-name{
+            white-space:normal!important;
+        }
+        @media(max-width:900px){
+            .team-hero-identity-clean{
+                grid-template-columns:52px minmax(0,1fr)!important;
+                gap:12px!important;
+            }
+            .team-hero-identity-clean .identity-logo{
+                width:48px!important;
+                height:48px!important;
+            }
+            .team-hero-identity-clean .team-name{
+                font-size:clamp(34px,9vw,44px)!important;
+                line-height:.92!important;
+            }
+        }
+
     </style>
 </head>
 <body>
