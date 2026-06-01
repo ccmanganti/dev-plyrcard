@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Users;
 
 use App\Filament\Resources\Users\Pages\CreateUser;
-use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
 use App\Models\Club;
@@ -543,8 +542,9 @@ class UserResource extends Resource
                     Tab::make('Athlete Info')
                         ->icon('heroicon-m-user-circle')
                         ->schema([
-                            Section::make('Sport Details')
-                                ->icon('heroicon-m-cog-6-tooth')
+                            Section::make('Player Details')
+                                ->icon('heroicon-m-user-circle')
+                                ->description('Core playing information for the athlete.')
                                 ->columns(3)
                                 ->schema([
                                     Select::make('sport')
@@ -606,88 +606,12 @@ class UserResource extends Resource
                                         ->label('Birth Date')
                                         ->native(false)
                                         ->closeOnDateSelection(),
-
-                                    TextInput::make('gpa')
-                                        ->prefixIcon('heroicon-m-calculator')
-                                        ->label('GPA')
-                                        ->placeholder('e.g. 3.8')
-                                        ->inputMode('decimal')
-                                        ->rules([
-                                            'nullable',
-                                            'numeric',
-                                            'min:0',
-                                            'max:5',
-                                        ])
-                                        ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state),
-
-                                    Select::make('national_team_id')
-                                        ->prefixIcon('heroicon-m-flag')
-                                        ->label('National Team Experience')
-                                        ->placeholder('Select national team')
-                                        ->options(fn () => static::getNationalTeamOptions())
-                                        ->searchable()
-                                        ->preload()
-                                        ->live(),
-
-                                    TextInput::make('national_team_period')
-                                        ->prefixIcon('heroicon-m-calendar')
-                                        ->label('National Team Period')
-                                        ->placeholder('e.g. 2025-2026')
-                                        ->maxLength(255),
-
-                                    TextInput::make('new_national_team_name')
-                                        ->prefixIcon('heroicon-m-plus-circle')
-                                        ->label('New National Team Name')
-                                        ->placeholder('Enter national team name')
-                                        ->maxLength(255)
-                                        ->visible(fn (Get $get) => $get('national_team_id') === '__new__')
-                                        ->required(fn (Get $get) => $get('national_team_id') === '__new__'),
-
-                                    FileUpload::make('new_national_team_logo')
-                                        ->label('New National Team Logo')
-                                        ->image()
-                                        ->downloadable()
-                                        ->imageEditor()
-                                        ->disk('public')
-                                        ->directory('national-team-logos')
-                                        ->visibility('public')
-                                        ->helperText('Optional.')
-                                        ->visible(fn (Get $get) => $get('national_team_id') === '__new__'),
-                                ]),
-
-                            Section::make('Physical Stats')
-                                ->columns(2)
-                                ->icon('heroicon-m-chart-bar-square')
-                                ->schema([
-                                    TextInput::make('height')
-                                        ->prefixIcon('heroicon-m-arrows-up-down')
-                                        ->label('Height')
-                                        ->maxLength(255)
-                                        ->placeholder('e.g. 6\'2" or 188 cm'),
-
-                                    TextInput::make('weight')
-                                        ->prefixIcon('heroicon-m-scale')
-                                        ->label('Weight')
-                                        ->maxLength(255)
-                                        ->placeholder('e.g. 185 lbs or 84 kg'),
-
-                                    Select::make('dominant_foot')
-                                        ->prefixIcon('heroicon-m-hand-raised')
-                                        ->label('Dominant Foot')
-                                        ->placeholder('Select dominant foot')
-                                        ->options([
-                                            'left' => 'Left',
-                                            'right' => 'Right',
-                                            'both' => 'Both',
-                                        ])
-                                        ->visible(fn (Get $get) => $get('sport') === 'soccer')
-                                        ->required(fn (Get $get) => $get('sport') === 'soccer'),
                                 ]),
 
                             Section::make('Experience')
                                 ->icon('heroicon-m-flag')
-                                ->description('New flow: Sex → League → Club → Age Group. Age Group is static and stored in team_name.')
-                                ->columns(2)
+                                ->description('League, club, national team, NCAA, and professional club information.')
+                                ->columns(3)
                                 ->schema([
                                     Select::make('league_id')
                                         ->prefixIcon('heroicon-m-squares-2x2')
@@ -781,7 +705,106 @@ class UserResource extends Resource
                                                 $get('gender'),
                                                 $get('sport'),
                                             ));
-                                        }),                                ]),
+                                        }),
+
+                                    Select::make('national_team_id')
+                                        ->prefixIcon('heroicon-m-flag')
+                                        ->label('National Team Experience')
+                                        ->placeholder('Select national team')
+                                        ->options(fn () => static::getNationalTeamOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->live(),
+
+                                    TextInput::make('national_team_period')
+                                        ->prefixIcon('heroicon-m-calendar')
+                                        ->label('National Team Period')
+                                        ->placeholder('e.g. 2025-2026')
+                                        ->maxLength(255),
+
+                                    TextInput::make('ncaa_field_id')
+                                        ->prefixIcon('heroicon-m-identification')
+                                        ->label('NCAA Field ID')
+                                        ->placeholder('Enter NCAA Field ID')
+                                        ->maxLength(255),
+
+                                    TextInput::make('new_national_team_name')
+                                        ->prefixIcon('heroicon-m-plus-circle')
+                                        ->label('New National Team Name')
+                                        ->placeholder('Enter national team name')
+                                        ->maxLength(255)
+                                        ->visible(fn (Get $get) => $get('national_team_id') === '__new__')
+                                        ->required(fn (Get $get) => $get('national_team_id') === '__new__'),
+
+                                    FileUpload::make('new_national_team_logo')
+                                        ->label('New National Team Logo')
+                                        ->image()
+                                        ->downloadable()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('national-team-logos')
+                                        ->visibility('public')
+                                        ->helperText('Optional.')
+                                        ->visible(fn (Get $get) => $get('national_team_id') === '__new__'),
+
+                                    TextInput::make('pro_club_name')
+                                        ->prefixIcon('heroicon-m-building-office-2')
+                                        ->label('Pro Club')
+                                        ->placeholder('Enter pro club name')
+                                        ->maxLength(255),
+
+                                    FileUpload::make('pro_club_logo')
+                                        ->label('Pro Club Logo')
+                                        ->image()
+                                        ->downloadable()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->directory('pro-club-logos')
+                                        ->visibility('public')
+                                        ->helperText('Upload the professional club logo.'),
+                                ]),
+
+                            Section::make('Academic & Physical Stats')
+                                ->columns(3)
+                                ->icon('heroicon-m-chart-bar-square')
+                                ->schema([
+                                    TextInput::make('gpa')
+                                        ->prefixIcon('heroicon-m-calculator')
+                                        ->label('GPA')
+                                        ->placeholder('e.g. 3.8')
+                                        ->inputMode('decimal')
+                                        ->rules([
+                                            'nullable',
+                                            'numeric',
+                                            'min:0',
+                                            'max:5',
+                                        ])
+                                        ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state),
+
+                                    TextInput::make('height')
+                                        ->prefixIcon('heroicon-m-arrows-up-down')
+                                        ->label('Height')
+                                        ->maxLength(255)
+                                        ->placeholder('e.g. 6\'2" or 188 cm'),
+
+                                    TextInput::make('weight')
+                                        ->prefixIcon('heroicon-m-scale')
+                                        ->label('Weight')
+                                        ->maxLength(255)
+                                        ->placeholder('e.g. 185 lbs or 84 kg'),
+
+                                    Select::make('dominant_foot')
+                                        ->prefixIcon('heroicon-m-hand-raised')
+                                        ->label('Dominant Foot')
+                                        ->placeholder('Select dominant foot')
+                                        ->options([
+                                            'left' => 'Left',
+                                            'right' => 'Right',
+                                            'both' => 'Both',
+                                        ])
+                                        ->visible(fn (Get $get) => $get('sport') === 'soccer')
+                                        ->required(fn (Get $get) => $get('sport') === 'soccer'),
+                                ]),
                         ]),
 
                     Tab::make('Bio & Accolades')
@@ -1126,6 +1149,8 @@ class UserResource extends Resource
             'plyrcard_image' => 'PlyrCard image',
             'school_id' => 'School',
             'club_id' => 'Club',
+            'pro_club_name' => 'Pro club',
+            'pro_club_logo' => 'Pro club logo',
             'league_id' => 'League',
             'featured_video_url' => 'Featured video',
             'ig_handle' => 'Instagram handle',
@@ -1175,6 +1200,7 @@ class UserResource extends Resource
                     'height',
                     'weight',
                     'jersey_number',
+                    'ncaa_field_id',
                     'max_speed',
                     'player_bio',
                 ],
@@ -1185,6 +1211,8 @@ class UserResource extends Resource
                     'school_id',
                     'club_id',
                     'league_id',
+                    'pro_club_name',
+                    'pro_club_logo',
                 ],
             ],
             'media_branding' => [
@@ -1548,6 +1576,16 @@ class UserResource extends Resource
             TextColumn::make('gpa')
                 ->label('GPA')
                 ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+
+            TextColumn::make('ncaa_field_id')
+                ->label('NCAA Field ID')
+                ->searchable()
+                ->toggleable(isToggledHiddenByDefault: true),
+
+            TextColumn::make('pro_club_name')
+                ->label('Pro Club')
+                ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
 
             TextColumn::make('jersey_number')
@@ -1926,6 +1964,7 @@ class UserResource extends Resource
                 ->icon('heroicon-m-pencil-square')
                 ->iconButton()
                 ->tooltip('Edit')
+                ->url(null)
                 ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
                 ->modalSubmitActionLabel('Save changes')
                 ->modalWidth('7xl')
@@ -1988,7 +2027,6 @@ class UserResource extends Resource
             'index' => ListUsers::route('/'),
             'create' => CreateUser::route('/create'),
             'view' => ViewUser::route('/{record}'),
-            'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 

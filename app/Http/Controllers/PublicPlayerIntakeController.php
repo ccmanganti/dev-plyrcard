@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Club;
+use App\Models\ClubLeague;
 use App\Models\HeroTemplate;
 use App\Models\HeroTemplateField;
 use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\SiteTemplate;
-use App\Models\Team;
 use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteHeroFieldValue;
@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -152,7 +153,6 @@ class PublicPlayerIntakeController extends Controller
     protected array $genderOptions = [
         'male' => 'Male',
         'female' => 'Female',
-        'coed' => 'Coed',
     ];
 
     public function create(Request $request): View
@@ -168,10 +168,14 @@ class PublicPlayerIntakeController extends Controller
     protected function buildCreateView(Request $request, string $view): View
     {
         $schools = School::query()->orderBy('name')->get();
-        $leagues = League::query()->orderBy('name')->get();
-        $clubs = Club::query()->with('league')->orderBy('name')->get();
-        $teams = Team::query()->with(['club.league'])->orderBy('name')->get();
+        $leagues = $this->canonicalLeagueQuery()
+            ->orderBy('name')
+            ->get();
+        $clubPrograms = $this->activeClubLeagueQuery()
+            ->with(['club', 'league'])
+            ->get();
         $nationalTeams = NationalTeam::query()->orderBy('name')->get();
+        $ageGroupOptions = $this->getAgeGroupOptions();
 
         $states = [
             'AL' => 'Alabama',
@@ -287,55 +291,50 @@ class PublicPlayerIntakeController extends Controller
             'prefill' => $prefill,
             'stepFieldMap' => $this->stepFieldMap(),
 
+            'ageGroupOptions' => $ageGroupOptions,
+
             'leagueDirectory' => $leagues->map(function (League $league) {
-                $gender = filled($league->gender) ? strtolower((string) $league->gender) : null;
+                $genders = collect($league->genders ?: [$league->gender])
+                    ->map(fn ($gender) => $this->normalizeGender($gender))
+                    ->filter()
+                    ->unique()
+                    ->values();
                 $sport = filled($league->sport) ? strtolower((string) $league->sport) : null;
 
                 return [
                     'id' => (string) $league->id,
                     'name' => $league->name,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
+                    'genders' => $genders->all(),
+                    'gender_label' => $genders->map(fn ($gender) => $this->genderOptions[$gender] ?? Str::title($gender))->implode('/'),
                     'sport' => $sport,
                     'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
                 ];
             })->values(),
 
-            'clubDirectory' => $clubs->map(function (Club $club) {
-                $gender = filled($club->league?->gender) ? strtolower((string) $club->league->gender) : null;
-                $sport = filled($club->league?->sport) ? strtolower((string) $club->league->sport) : null;
+            'clubDirectory' => $clubPrograms->map(function (ClubLeague $program) {
+                $club = $program->club;
+                $league = $program->league;
+                $genders = collect($program->genders ?: $league?->genders ?: [$league?->gender])
+                    ->map(fn ($gender) => $this->normalizeGender($gender))
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $sport = filled($program->sport) ? strtolower((string) $program->sport) : (filled($league?->sport) ? strtolower((string) $league->sport) : null);
 
                 return [
-                    'id' => (string) $club->id,
-                    'name' => $club->name,
-                    'league_id' => (string) $club->league_id,
-                    'league_name' => $club->league?->name,
-                    'logo_url' => filled($club->logo) ? Storage::disk('public')->url($club->logo) : null,
+                    'id' => (string) $club?->id,
+                    'club_league_id' => (string) $program->id,
+                    'name' => $club?->name,
+                    'league_id' => (string) $league?->id,
+                    'league_name' => $league?->name,
+                    'logo_url' => filled($club?->logo) ? Storage::disk('public')->url($club->logo) : null,
                     'sport' => $sport,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
+                    'genders' => $genders->all(),
+                    'gender_label' => $genders->map(fn ($gender) => $this->genderOptions[$gender] ?? Str::title($gender))->implode('/'),
                     'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
                 ];
-            })->values(),
+            })->filter(fn ($club) => filled($club['id']))->values(),
 
-            'teamDirectory' => $teams->map(function (Team $team) {
-                $gender = filled($team->club?->league?->gender) ? strtolower((string) $team->club->league->gender) : null;
-                $sport = filled($team->club?->league?->sport) ? strtolower((string) $team->club->league->sport) : null;
-
-                return [
-                    'id' => (string) $team->id,
-                    'name' => $team->name,
-                    'club_id' => (string) $team->club_id,
-                    'league_id' => (string) ($team->club?->league_id),
-                    'league_name' => $team->club?->league?->name,
-                    'club_name' => $team->club?->name,
-                    'club_logo_url' => filled($team->club?->logo) ? Storage::disk('public')->url($team->club->logo) : null,
-                    'sport' => $sport,
-                    'gender' => $gender,
-                    'gender_label' => $this->genderOptions[$gender] ?? null,
-                    'sport_label' => $sport ? Str::of($sport)->replace('_', ' ')->title()->toString() : null,
-                ];
-            })->values(),
         ]);
     }
 
@@ -566,6 +565,86 @@ HTML;
         return '';
     }
 
+    protected function canonicalLeagueQuery()
+    {
+        return League::query()
+            ->when(Schema::hasColumn('leagues', 'canonical_league_id'), fn ($query) => $query->whereNull('canonical_league_id'));
+    }
+
+    protected function canonicalClubQuery()
+    {
+        return Club::query()
+            ->when(Schema::hasColumn('clubs', 'canonical_club_id'), fn ($query) => $query->whereNull('canonical_club_id'));
+    }
+
+    protected function activeClubLeagueQuery()
+    {
+        return ClubLeague::query()
+            ->when(Schema::hasColumn('club_leagues', 'canonical_club_league_id'), fn ($query) => $query->whereNull('canonical_club_league_id'))
+            ->when(Schema::hasColumn('club_leagues', 'is_active'), fn ($query) => $query->where('is_active', true))
+            ->whereHas('club', fn ($query) => $this->canonicalClubQuery())
+            ->whereHas('league', fn ($query) => $this->canonicalLeagueQuery());
+    }
+
+    protected function normalizeGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match ($gender) {
+            'female', 'girls', 'girl', 'women', 'woman', 'womens' => 'female',
+            'male', 'boys', 'boy', 'men', 'man', 'mens' => 'male',
+            default => null,
+        };
+    }
+
+    protected function getAgeGroupOptions(): array
+    {
+        return array_values(config('plyrcard.age_groups', [
+            'U13',
+            'U14',
+            'U15',
+            'U16',
+            'U17',
+            'U18',
+            'U19',
+        ]));
+    }
+
+    protected function gendersContain($genders, ?string $gender): bool
+    {
+        $gender = $this->normalizeGender($gender);
+
+        if (! $gender) {
+            return true;
+        }
+
+        return collect($genders ?? [])
+            ->map(fn ($value) => $this->normalizeGender($value))
+            ->filter()
+            ->contains($gender);
+    }
+
+    protected function resolveClubLeagueId(?string $clubId, ?string $leagueId, ?string $gender, ?string $sport = null): ?int
+    {
+        if (blank($clubId) || blank($leagueId)) {
+            return null;
+        }
+
+        $gender = $this->normalizeGender($gender);
+        $sport = filled($sport) ? strtolower((string) $sport) : null;
+
+        return $this->activeClubLeagueQuery()
+            ->where('club_id', $clubId)
+            ->where('league_id', $leagueId)
+            ->when(filled($gender), fn ($query) => $query->whereJsonContains('genders', $gender))
+            ->when(filled($sport), fn ($query) => $query->where(function ($query) use ($sport) {
+                $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
+    }
+
     protected function normalizePhone(?string $value): ?string
     {
         $value = trim((string) $value);
@@ -650,10 +729,9 @@ HTML;
 
             'league_id' => ['nullable', 'string'],
             'club_id' => ['nullable', 'string'],
-            'team_id' => ['nullable', 'string'],
+            'team_name' => ['nullable', 'string', 'max:50'],
             'league_other' => ['nullable', 'string', 'max:255'],
             'club_other' => ['nullable', 'string', 'max:255'],
-            'team_other' => ['nullable', 'string', 'max:255'],
 
             'league_name_manual' => ['nullable', 'string', 'max:255'],
             'club_name_manual' => ['nullable', 'string', 'max:255'],
@@ -724,20 +802,11 @@ HTML;
         if (($validated['league_id'] ?? null) === '__add_new__') {
             $validated['league_id'] = '__other__';
             $validated['club_id'] = '__other__';
-            $validated['team_id'] = '__other__';
             $validated['league_other'] = trim((string) ($validated['league_name_manual'] ?? ''));
             $validated['club_other'] = trim((string) ($validated['club_name_manual'] ?? ''));
-            $validated['team_other'] = trim((string) ($validated['team_name_manual'] ?? ''));
-        } else {
-            if (($validated['club_id'] ?? null) === '__add_new__') {
-                $validated['club_id'] = '__other__';
-                $validated['club_other'] = trim((string) ($validated['club_name_manual'] ?? ''));
-            }
-
-            if (($validated['team_id'] ?? null) === '__add_new__') {
-                $validated['team_id'] = '__other__';
-                $validated['team_other'] = trim((string) ($validated['team_name_manual'] ?? ''));
-            }
+        } elseif (($validated['club_id'] ?? null) === '__add_new__') {
+            $validated['club_id'] = '__other__';
+            $validated['club_other'] = trim((string) ($validated['club_name_manual'] ?? ''));
         }
 
         $totalRawImages =
@@ -795,7 +864,7 @@ HTML;
 
         $selectedLeagueId = $validated['league_id'] ?? null;
         $selectedClubId = $validated['club_id'] ?? null;
-        $selectedTeamId = $validated['team_id'] ?? null;
+        $selectedAgeGroup = trim((string) ($validated['team_name'] ?? $validated['team_name_manual'] ?? ''));
 
         if ($selectedLeagueId === '__other__') {
             if (blank($validated['league_other'] ?? null)) {
@@ -805,23 +874,18 @@ HTML;
             if (blank($validated['club_other'] ?? null)) {
                 return back()->withErrors(['club_other' => 'Please enter the new club name.'])->withInput();
             }
-
-            if (blank($validated['team_other'] ?? null)) {
-                return back()->withErrors(['team_other' => 'Please enter the new team name.'])->withInput();
-            }
         } else {
             $league = null;
             $club = null;
-            $team = null;
 
             if (filled($selectedLeagueId)) {
-                $league = League::query()->find($selectedLeagueId);
+                $league = $this->canonicalLeagueQuery()->find($selectedLeagueId);
 
                 if (! $league) {
                     return back()->withErrors(['league_id' => 'The selected league is invalid.'])->withInput();
                 }
 
-                if (! $this->isLeagueGenderCompatible($league->gender, $selectedGender)) {
+                if (! $this->gendersContain($league->genders ?: [$league->gender], $selectedGender)) {
                     return back()->withErrors(['league_id' => 'The selected league does not match the athlete gender.'])->withInput();
                 }
 
@@ -835,49 +899,16 @@ HTML;
                     return back()->withErrors(['club_id' => 'Please select a valid league first.'])->withInput();
                 }
 
-                $club = Club::query()
-                    ->with('league')
-                    ->where('id', $selectedClubId)
-                    ->where('league_id', $league->id)
-                    ->first();
+                $club = $this->canonicalClubQuery()->whereKey($selectedClubId)->first();
+                $clubLeagueId = $this->resolveClubLeagueId($selectedClubId, $league->id, $selectedGender, $sport);
 
-                if (! $club) {
-                    return back()->withErrors(['club_id' => 'The selected club does not belong to the selected league.'])->withInput();
-                }
-
-                if (! $this->isLeagueGenderCompatible($club->league?->gender, $selectedGender)) {
-                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete gender.'])->withInput();
-                }
-
-                if (! $this->isLeagueSportCompatible($club->league?->sport, $sport)) {
-                    return back()->withErrors(['club_id' => 'The selected club does not match the athlete sport.'])->withInput();
-                }
-            }
-
-            if (filled($selectedTeamId)) {
-                if (! $club) {
-                    return back()->withErrors(['team_id' => 'Please select a valid club first.'])->withInput();
-                }
-
-                $team = Team::query()
-                    ->with('club.league')
-                    ->where('id', $selectedTeamId)
-                    ->where('club_id', $club->id)
-                    ->first();
-
-                if (! $team) {
-                    return back()->withErrors(['team_id' => 'The selected team does not belong to the selected club.'])->withInput();
-                }
-
-                if (! $this->isLeagueGenderCompatible($team->club?->league?->gender, $selectedGender)) {
-                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete gender.'])->withInput();
-                }
-
-                if (! $this->isLeagueSportCompatible($team->club?->league?->sport, $sport)) {
-                    return back()->withErrors(['team_id' => 'The selected team does not match the athlete sport.'])->withInput();
+                if (! $club || ! $clubLeagueId) {
+                    return back()->withErrors(['club_id' => 'The selected club is not active for the selected league, sport, and gender.'])->withInput();
                 }
             }
         }
+
+        $validated['team_name'] = $selectedAgeGroup !== '' ? strtoupper($selectedAgeGroup) : null;
 
         $useCustomHighlights = $request->boolean('use_custom_highlights');
         $manualVideoUrls = $this->normalizeVideoUrls($validated['featured_video_urls'] ?? null);
@@ -900,7 +931,7 @@ HTML;
                 &$ghlResult
             ) {
                 $school = $this->resolveSchool($validated);
-                [$league, $club, $team] = $this->resolveLeagueClubAndTeam($validated);
+                [$league, $club, $clubLeague] = $this->resolveLeagueClubAndProgram($validated);
                 $nationalTeam = $this->resolveNationalTeam($validated);
 
                 $user = User::withTrashed()
@@ -951,7 +982,8 @@ HTML;
                     'school_id' => $school?->id,
                     'league_id' => $league?->id,
                     'club_id' => $club?->id,
-                    'team_name' => $team?->name,
+                    'club_league_id' => $clubLeague?->id,
+                    'team_name' => $validated['team_name'] ?? null,
                     'national_team_id' => $hasNationalTeamExperience ? $nationalTeam?->id : null,
 
                     'ig_handle' => $validated['ig_handle'] ?? null,
@@ -1004,7 +1036,7 @@ HTML;
                     $selectedPlan,
                     $league ?? null,
                     $club ?? null,
-                    $team ?? null,
+                    $validated['team_name'] ?? null,
                     $nationalTeam ?? null
                 );
 
@@ -1144,13 +1176,12 @@ HTML;
             'school_other' => 'School Name',
             'league_id' => 'League',
             'club_id' => 'Club',
-            'team_id' => 'Team',
+            'team_name' => 'Age Group',
             'league_other' => 'League Name',
             'club_other' => 'Club Name',
-            'team_other' => 'Team Name',
             'league_name_manual' => 'League Name',
             'club_name_manual' => 'Club Name',
-            'team_name_manual' => 'Team Name',
+            'team_name_manual' => 'Age Group',
             'natl_team_exp' => 'National Team Experience',
             'national_team_period' => 'National Team Period',
             'national_team_id' => 'National Team',
@@ -1230,11 +1261,11 @@ HTML;
             ],
             2 => [
                 'school_id', 'school_other',
-                'league_id', 'club_id', 'team_id',
-                'league_other', 'club_other', 'team_other',
+                'league_id', 'club_id', 'team_name',
+                'league_other', 'club_other',
                 'league_name_manual', 'club_name_manual', 'team_name_manual',
-                'national_team_id', 'national_team_other',
-            ],
+                'national_team_id', 'national_team_other', 'national_team_period', 'natl_team_exp',
+                ],
             3 => [
                 'ig_handle', 'x_handle', 'yt_url',
                 'featured_video_url', 'use_custom_highlights', 'featured_video_urls',
@@ -1294,65 +1325,80 @@ HTML;
         return null;
     }
 
-    protected function resolveLeagueClubAndTeam(array $validated): array
+    protected function resolveLeagueClubAndProgram(array $validated): array
     {
         $league = null;
         $club = null;
-        $team = null;
+        $clubLeague = null;
 
         $leagueId = $validated['league_id'] ?? null;
         $clubId = $validated['club_id'] ?? null;
-        $teamId = $validated['team_id'] ?? null;
-        $gender = strtolower((string) ($validated['gender'] ?? ''));
+        $gender = $this->normalizeGender($validated['gender'] ?? null);
         $sport = strtolower((string) ($validated['sport'] ?? ''));
 
         if ($leagueId === '__other__') {
-            $league = League::firstOrCreate([
-                'name' => trim((string) $validated['league_other']),
-                'gender' => $gender,
-                'sport' => $sport,
-            ]);
+            $league = League::firstOrCreate(
+                ['name' => trim((string) $validated['league_other'])],
+                [
+                    'genders' => [$gender],
+                    'gender' => $gender,
+                    'sport' => $sport,
+                ]
+            );
+
+            if (! $this->gendersContain($league->genders ?: [$league->gender], $gender)) {
+                $league->genders = collect($league->genders ?: [$league->gender])
+                    ->map(fn ($value) => $this->normalizeGender($value))
+                    ->filter()
+                    ->push($gender)
+                    ->unique()
+                    ->values()
+                    ->all();
+                $league->save();
+            }
 
             $club = Club::firstOrCreate([
                 'name' => trim((string) $validated['club_other']),
-                'league_id' => $league->id,
             ]);
 
-            $team = Team::firstOrCreate([
-                'name' => trim((string) $validated['team_other']),
-                'club_id' => $club->id,
-            ]);
+            $clubLeague = ClubLeague::firstOrCreate(
+                [
+                    'club_id' => $club->id,
+                    'league_id' => $league->id,
+                ],
+                [
+                    'genders' => [$gender],
+                    'sport' => $sport,
+                    'is_active' => true,
+                    'sort_order' => 0,
+                ]
+            );
 
-            return [$league, $club, $team];
+            return [$league, $club, $clubLeague];
         }
 
         if (filled($leagueId)) {
-            $league = League::find($leagueId);
+            $league = $this->canonicalLeagueQuery()->find($leagueId);
         }
 
         if (filled($clubId)) {
-            $club = Club::query()
-                ->with('league')
-                ->when($league, fn ($query) => $query->where('league_id', $league->id))
-                ->find($clubId);
+            $club = $this->canonicalClubQuery()->find($clubId);
         }
 
-        if (filled($teamId)) {
-            $team = Team::query()
-                ->with('club.league')
-                ->when($club, fn ($query) => $query->where('club_id', $club->id))
-                ->find($teamId);
-
-            if (! $club) {
-                $club = $team?->club;
-            }
-
-            if (! $league) {
-                $league = $club?->league;
-            }
+        if ($league && $club) {
+            $clubLeague = $this->activeClubLeagueQuery()
+                ->where('league_id', $league->id)
+                ->where('club_id', $club->id)
+                ->when(filled($gender), fn ($query) => $query->whereJsonContains('genders', $gender))
+                ->when(filled($sport), fn ($query) => $query->where(function ($query) use ($sport) {
+                    $query->whereNull('sport')->orWhere('sport', $sport);
+                }))
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->first();
         }
 
-        return [$league, $club, $team];
+        return [$league, $club, $clubLeague];
     }
 
     protected function resolveNationalTeam(array $validated): ?NationalTeam
@@ -1378,18 +1424,7 @@ HTML;
 
     protected function isLeagueGenderCompatible(?string $leagueGender, ?string $userGender): bool
     {
-        $leagueGender = filled($leagueGender) ? strtolower(trim((string) $leagueGender)) : null;
-        $userGender = filled($userGender) ? strtolower(trim((string) $userGender)) : null;
-
-        if (! $leagueGender || ! $userGender) {
-            return true;
-        }
-
-        if ($userGender === 'coed') {
-            return $leagueGender === 'coed';
-        }
-
-        return in_array($leagueGender, [$userGender, 'coed'], true);
+        return $this->gendersContain([$leagueGender], $userGender);
     }
 
     protected function isLeagueSportCompatible(?string $leagueSport, ?string $userSport): bool
@@ -1481,7 +1516,7 @@ HTML;
         string $selectedPlan = 'Free',
         ?League $league = null,
         ?Club $club = null,
-        ?Team $team = null,
+        ?string $ageGroup = null,
         ?NationalTeam $nationalTeam = null
     ): array {
         $token = config('services.ghl.token');
@@ -1530,7 +1565,7 @@ HTML;
             ['key' => 'positions', 'field_value' => ! empty($positions) ? implode(', ', $positions) : null],
             ['key' => 'league', 'field_value' => $league?->name],
             ['key' => 'club', 'field_value' => $club?->name],
-            ['key' => 'team', 'field_value' => $team?->name],
+            ['key' => 'age_group', 'field_value' => $ageGroup],
             ['key' => 'national_team', 'field_value' => $nationalTeam?->name],
         ], fn ($field) => filled($field['field_value'] ?? null)));
 

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>PLYRCARD Intake</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -993,132 +994,7 @@
 
                     <div class="step-panel active" data-step="1">
                         <div class="panel-scroll">
-                            <div class="field two">
-                                <div>
-                                    <label class="label" for="first_name">First Name</label>
-                                    <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name', $prefill['first_name'] ?? '') }}" placeholder="Enter first name" required>
-                                    <div class="field-message" id="first_name_error"></div>
-                                </div>
-                                <div>
-                                    <label class="label" for="last_name">Last Name</label>
-                                    <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name', $prefill['last_name'] ?? '') }}" placeholder="Enter last name" required>
-                                    <div class="field-message" id="last_name_error"></div>
-                                </div>
                             </div>
-                            <div class="step1-grid">
-                                <div class="step1-left">
-                                    <div class="field" id="gender_field">
-                                        <label class="label">Gender</label>
-                                        @php
-                                            $oldGender = old('gender');
-                                            $isFemale = in_array($oldGender, ['female', 'girls'], true);
-                                            $selectedGender = $isFemale ? 'female' : 'male';
-                                        @endphp
-                                        <input type="hidden" name="gender" id="gender" value="{{ $selectedGender }}">
-                                        <div class="gender-list" id="genderList">
-                                            <button type="button" class="gender-card {{ $selectedGender === 'male' ? 'is-selected' : '' }}" data-gender-value="male" aria-pressed="{{ $selectedGender === 'male' ? 'true' : 'false' }}">
-                                                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-                                                    <circle cx="18" cy="30" r="8" stroke="currentColor" stroke-width="3"/>
-                                                    <path d="M24 24L36 12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                                                    <path d="M28 12H36V20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                                </svg>
-                                                <span class="gender-card-label">Boys</span>
-                                            </button>
-                                            <button type="button" class="gender-card {{ $selectedGender === 'female' ? 'is-selected' : '' }}" data-gender-value="female" aria-pressed="{{ $selectedGender === 'female' ? 'true' : 'false' }}">
-                                                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-                                                    <circle cx="24" cy="18" r="8" stroke="currentColor" stroke-width="3"/>
-                                                    <path d="M24 26V40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                                                    <path d="M18 34H30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                                                </svg>
-                                                <span class="gender-card-label">Girls</span>
-                                            </button>
-                                        </div>
-                                        <div class="field-message" id="gender_error"></div>
-                                    </div>
-
-                                    <div class="field two">
-                                        <div class="field narrow">
-                                            <label class="label" for="personal_email">Email</label>
-                                            <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email', $prefill['personal_email'] ?? '') }}" placeholder="Enter email address" required>
-                                            <div class="field-message" id="personal_email_error"></div>
-                                        </div>
-
-                                        <div class="field narrow">
-                                            <label class="label" for="phone">Cell Phone</label>
-                                            <input class="input phone-input" type="text" id="phone" name="phone" value="{{ old('phone', $prefill['phone'] ?? '') }}" inputmode="tel" placeholder="(555) 123-4567">
-                                        <div class="field-message" id="phone_error"></div>
-                                    </div>
-                                </div>
-
-
-                                </div>
-                            </div>
-
-                            <div class="step-cta">
-                                <button type="button" class="btn" id="nextBtn1">Next</button>
-                            </div>
-                        </div>
-
-                        
-                    </div>
-
-                    <div class="step-panel" data-step="2">
-                        <div class="panel-scroll with-bottom-cta">
-                            <div class="field two">
-                                <div>
-                                    <label class="label" for="sport">Sport</label>
-                                    <select class="select" id="sport" name="sport" required>
-                                        <option value="">Select One</option>
-                                        @foreach ($sportPositions as $sportKey => $positions)
-                                            <option value="{{ $sportKey }}" {{ old('sport') === $sportKey ? 'selected' : '' }}>
-                                                {{ str($sportKey)->replace('_', ' ')->title() }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    <div class="field-message" id="sport_error"></div>
-                                </div>
-                                <div>
-                                    <div class="field" id="position_field">
-                                        <label class="label" for="position_select">Position</label>
-                                        <select class="select" id="position_select" aria-label="Position"></select>
-                                        <div class="field-message" id="position_error"></div>
-                                        <div class="chips-wrap" id="positionChips"></div>
-                                        <input type="hidden" name="position[]" id="position_values" value="">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="field" id="league_field">
-                                <label class="label">League</label>
-                                <div id="leagueSelectRoot"></div>
-                                <div class="field-message" id="league_error"></div>
-                                <div class="manual-input-wrap" id="leagueManualWrap">
-                                    <input class="manual-input" type="text" id="league_name_manual" name="league_name_manual" value="{{ old('league_name_manual') }}" placeholder="Enter league name">
-                                    <div class="manual-input-actions"><button type="button" class="manual-toggle-back" data-restore-select="league">Use dropdown instead</button></div>
-                                </div>
-                                <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
-                            </div>
-                            
-                            <div class="field two">
-                                
-                                <div class="field" id="club_field">
-                                    <label class="label">Club</label>
-                                    <div id="clubSelectRoot"></div>
-                                    <div class="field-message" id="club_error"></div>
-                                    <div class="manual-input-wrap" id="clubManualWrap">
-                                        <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club name">
-                                    </div>
-                                    <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
-                                </div>
-
-                                <div class="field" id="team_field">
-                                    <label class="label">Team</label>
-                                    <div id="teamSelectRoot"></div>
-                                    <div class="field-message" id="team_error"></div>
-                                    <div class="manual-input-wrap" id="teamManualWrap">
-                                        <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter team name">
-                                    </div>
-                                    <input type="hidden" id="team_id" name="team_id" value="{{ old('team_id') }}">
-                                </div>
                             </div>
                             
 
@@ -1224,19 +1100,22 @@
     </div>
 </div>
 
+
+<script>
+window.plyrCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+</script>
 <script>
 window.plyrIntakeData = {
     sportPositions: @json($sportPositions ?? []),
     leagueDirectory: @json($leagueDirectory ?? []),
     clubDirectory: @json($clubDirectory ?? []),
-    teamDirectory: @json($teamDirectory ?? []),
+    ageGroupOptions: @json($ageGroupOptions ?? []),
     oldLeagueId: @json(old('league_id')),
     oldClubId: @json(old('club_id')),
-    oldTeamId: @json(old('team_id')),
+    oldTeamName: @json(old('team_name', old('team_name_manual'))),
     oldPositions: @json(old('position', [])),
     oldManualLeague: @json(old('league_name_manual')),
     oldManualClub: @json(old('club_name_manual')),
-    oldManualTeam: @json(old('team_name_manual')),
     stepFieldMap: @json($stepFieldMap ?? []),
     serverErrors: @json($errors->getMessages()),
     selectedPlan: @json($selectedPlan ?? 'Free'),
@@ -1249,10 +1128,10 @@ window.plyrIntakeData = {
     const sportPositions = data.sportPositions || {};
     const leagueDirectory = data.leagueDirectory || [];
     const clubDirectory = data.clubDirectory || [];
-    const teamDirectory = data.teamDirectory || [];
+    const ageGroupOptions = data.ageGroupOptions || [];
     const oldLeagueId = data.oldLeagueId || '';
     const oldClubId = data.oldClubId || '';
-    const oldTeamId = data.oldTeamId || '';
+    const oldTeamName = data.oldTeamName || '';
     const oldPositions = Array.isArray(data.oldPositions) ? data.oldPositions : [];
     const stepFieldMap = data.stepFieldMap || {};
     const serverErrors = data.serverErrors || {};
@@ -1280,7 +1159,7 @@ window.plyrIntakeData = {
         club_id: 'club',
         team_other: 'team',
         team_name_manual: 'team',
-        team_id: 'team',
+        team_name: 'team',
         action_images: 'action_images',
         'action_images.0': 'action_images',
         portrait_images: 'portrait_images',
@@ -1429,9 +1308,9 @@ window.plyrIntakeData = {
         const gender = getSelectedGender();
         const sport = getSelectedSport();
         const filtered = leagueDirectory.filter(function(league){
-            const lg = safe(league.gender).toLowerCase();
+            const genders = Array.isArray(league.genders) ? league.genders.map(function(g){ return safe(g).toLowerCase(); }) : [];
             const ls = safe(league.sport).toLowerCase();
-            return (!gender || !lg || lg === gender || lg === 'coed') && (!sport || !ls || ls === sport);
+            return (!gender || !genders.length || genders.indexOf(gender) !== -1) && (!sport || !ls || ls === sport);
         }).map(function(league){
             return { id: String(league.id), label: league.name, subtitle: [league.gender_label, league.sport_label].filter(Boolean).join(' • '), logo_url: null };
         });
@@ -1446,9 +1325,9 @@ window.plyrIntakeData = {
         const sport = getSelectedSport();
         const leagueId = safe($('#league_id') && $('#league_id').value);
         const filtered = clubDirectory.filter(function(club){
-            const cg = safe(club.gender).toLowerCase();
+            const genders = Array.isArray(club.genders) ? club.genders.map(function(g){ return safe(g).toLowerCase(); }) : [];
             const cs = safe(club.sport).toLowerCase();
-            return (!leagueId || leagueId === ADD_NEW_VALUE || String(club.league_id) === leagueId) && (!gender || !cg || cg === gender || cg === 'coed') && (!sport || !cs || cs === sport);
+            return (!leagueId || leagueId === ADD_NEW_VALUE || String(club.league_id) === leagueId) && (!gender || !genders.length || genders.indexOf(gender) !== -1) && (!sport || !cs || cs === sport);
         }).map(function(club){
             return { id: String(club.id), label: club.name, subtitle: [club.league_name].filter(Boolean).join(' • '), logo_url: club.logo_url || null };
         });
@@ -1459,20 +1338,11 @@ window.plyrIntakeData = {
     }
 
     function mapTeamOptions(){
-        const gender = getSelectedGender();
-        const sport = getSelectedSport();
-        const clubId = safe($('#club_id') && $('#club_id').value);
-        const filtered = teamDirectory.filter(function(team){
-            const tg = safe(team.gender).toLowerCase();
-            const ts = safe(team.sport).toLowerCase();
-            return (!clubId || clubId === ADD_NEW_VALUE || String(team.club_id) === clubId) && (!gender || !tg || tg === gender || tg === 'coed') && (!sport || !ts || ts === sport);
-        }).map(function(team){
-            return { id: String(team.id), label: team.name, subtitle: [team.club_name, team.league_name].filter(Boolean).join(' • '), logo_url: team.club_logo_url || null };
-        });
         return [
-            { id: '', label: 'Select One', subtitle: '', logo_url: null },
-            { id: ADD_NEW_VALUE, label: 'Add New', subtitle: 'Enter team manually', logo_url: null }
-        ].concat(filtered);
+            { id: '', label: 'Select One', subtitle: '', logo_url: null }
+        ].concat((ageGroupOptions || []).map(function(ageGroup){
+            return { id: String(ageGroup), label: String(ageGroup), subtitle: 'Age Group', logo_url: null };
+        }));
     }
 
     function iconSearch(){ return '<svg class="search-select-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>'; }
@@ -1489,20 +1359,17 @@ window.plyrIntakeData = {
         if (enabled){
             $('#league_id').value = ADD_NEW_VALUE;
             $('#club_id').value = ADD_NEW_VALUE;
-            $('#team_id').value = ADD_NEW_VALUE;
+            $('#team_name').value = '';
             toggleManualField('league', true);
             toggleManualField('club', true);
-            toggleManualField('team', true);
         } else {
             $('#league_id').value = '';
             $('#club_id').value = '';
-            $('#team_id').value = '';
+            $('#team_name').value = '';
             $('#league_name_manual').value = '';
             $('#club_name_manual').value = '';
-            $('#team_name_manual').value = '';
             toggleManualField('league', false);
             toggleManualField('club', false);
-            toggleManualField('team', false);
         }
     }
 
@@ -1733,7 +1600,7 @@ window.plyrIntakeData = {
     function updateHierarchyManualStates(){
         const leagueVal = safe($('#league_id') && $('#league_id').value);
         const clubVal = safe($('#club_id') && $('#club_id').value);
-        const teamVal = safe($('#team_id') && $('#team_id').value);
+        const teamVal = safe($('#team_name') && $('#team_name').value);
         if (leagueVal === ADD_NEW_VALUE){
             toggleManualField('league', true);
             toggleManualField('club', true);
@@ -1763,18 +1630,18 @@ window.plyrIntakeData = {
         if (step === 2){
             const leagueVal = safe($('#league_id') && $('#league_id').value);
             const clubVal = safe($('#club_id') && $('#club_id').value);
-            const teamVal = safe($('#team_id') && $('#team_id').value);
+            const teamVal = safe($('#team_name') && $('#team_name').value);
             const manualMode = leagueVal === ADD_NEW_VALUE;
             const leagueOk = manualMode ? safe($('#league_name_manual') && $('#league_name_manual').value) : !!leagueVal;
             const clubOk = manualMode ? safe($('#club_name_manual') && $('#club_name_manual').value) : !!clubVal;
-            const teamOk = manualMode ? safe($('#team_name_manual') && $('#team_name_manual').value) : !!teamVal;
+            const teamOk = !!teamVal;
             const sportOk = !!safe($('#sport') && $('#sport').value);
             const posOk = !!selectedPositions.length;
             setFieldError('sport', sportOk ? '' : 'Select a sport.');
             setFieldError('position', posOk ? '' : 'Select at least one position.');
             setFieldError('league', leagueOk ? '' : (manualMode ? 'Enter a league name.' : 'Select a league.'));
             setFieldError('club', clubOk ? '' : (manualMode ? 'Enter a club name.' : 'Select a club.'));
-            setFieldError('team', teamOk ? '' : (manualMode ? 'Enter a team name.' : 'Select a team.'));
+            setFieldError('team', teamOk ? '' : 'Select an age group.');
             return sportOk && posOk && leagueOk && clubOk && teamOk;
         }
 
@@ -1804,7 +1671,7 @@ window.plyrIntakeData = {
         if (selectedPositions.length) filled += 1;
         if (manualMode ? safe($('#league_name_manual') && $('#league_name_manual').value) : leagueVal) filled += 1;
         if (manualMode ? safe($('#club_name_manual') && $('#club_name_manual').value) : safe($('#club_id') && $('#club_id').value)) filled += 1;
-        if (manualMode ? safe($('#team_name_manual') && $('#team_name_manual').value) : safe($('#team_id') && $('#team_id').value)) filled += 1;
+        if (safe($('#team_name') && $('#team_name').value)) filled += 1;
         return 50 + Math.round((filled / total) * 25);
     }
 
@@ -1948,6 +1815,18 @@ window.plyrIntakeData = {
             card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
         });
 
+
+        const nationalTeamSelect = document.getElementById('national_team_id');
+        const nationalTeamOther = document.getElementById('national_team_other');
+        function syncNationalTeamOther(){
+            if (!nationalTeamSelect || !nationalTeamOther) return;
+            nationalTeamOther.style.display = nationalTeamSelect.value === '__other__' ? 'block' : 'none';
+        }
+        if (nationalTeamSelect) {
+            nationalTeamSelect.addEventListener('change', syncNationalTeamOther);
+            syncNationalTeamOther();
+        }
+
         renderPositions();
         updatePositionField();
 
@@ -1958,13 +1837,12 @@ window.plyrIntakeData = {
             getOptions: mapLeagueOptions,
             onChange: function(item){
                 $('#club_id').value = '';
-                $('#team_id').value = '';
+                $('#team_name').value = '';
                 if (item && item.id === ADD_NEW_VALUE){
                     setHierarchyAddNewMode(true);
                 } else {
                     if (item) $('#league_name_manual').value = '';
                     $('#club_name_manual').value = '';
-                    $('#team_name_manual').value = '';
                     toggleManualField('league', false);
                     toggleManualField('club', false);
                     toggleManualField('team', false);
@@ -1981,9 +1859,8 @@ window.plyrIntakeData = {
             getOptions: mapClubOptions,
             disabledWhen: function(){ return !safe($('#league_id') && $('#league_id').value) || safe($('#league_id') && $('#league_id').value) === ADD_NEW_VALUE; },
             onChange: function(item){
-                $('#team_id').value = '';
+                $('#team_name').value = '';
                 if (item && item.id !== ADD_NEW_VALUE) $('#club_name_manual').value = '';
-                $('#team_name_manual').value = '';
                 toggleManualField('club', item && item.id === ADD_NEW_VALUE);
                 toggleManualField('team', false);
                 teamApi && teamApi.render();
@@ -1992,22 +1869,18 @@ window.plyrIntakeData = {
 
         teamApi = buildSearchSelect({
             rootId: 'teamSelectRoot',
-            hiddenInputId: 'team_id',
+            hiddenInputId: 'team_name',
             placeholder: 'Select One',
             getOptions: mapTeamOptions,
             disabledWhen: function(){ return !safe($('#club_id') && $('#club_id').value) || safe($('#club_id') && $('#club_id').value) === ADD_NEW_VALUE; },
-            onChange: function(item){
-                if (item && item.id !== ADD_NEW_VALUE) $('#team_name_manual').value = '';
-                toggleManualField('team', item && item.id === ADD_NEW_VALUE);
-            }
+            onChange: function(){ }
         });
 
         if (oldLeagueId) $('#league_id').value = oldLeagueId;
         if (oldClubId) $('#club_id').value = oldClubId;
-        if (oldTeamId) $('#team_id').value = oldTeamId;
+        if (oldTeamName) $('#team_name').value = oldTeamName;
         if (data.oldManualLeague) $('#league_name_manual').value = data.oldManualLeague;
         if (data.oldManualClub) $('#club_name_manual').value = data.oldManualClub;
-        if (data.oldManualTeam) $('#team_name_manual').value = data.oldManualTeam;
 
         leagueApi && leagueApi.render();
         clubApi && clubApi.render();
@@ -2054,13 +1927,11 @@ window.plyrIntakeData = {
             updatePositionField();
             $('#league_id').value = '';
             $('#club_id').value = '';
-            $('#team_id').value = '';
+            $('#team_name').value = '';
             $('#league_name_manual').value = '';
             $('#club_name_manual').value = '';
-            $('#team_name_manual').value = '';
             toggleManualField('league', false);
             toggleManualField('club', false);
-            toggleManualField('team', false);
             leagueApi && leagueApi.render();
             clubApi && clubApi.render();
             teamApi && teamApi.render();
@@ -2081,10 +1952,9 @@ window.plyrIntakeData = {
 
                 $('#league_id').value = '';
                 $('#club_id').value = '';
-                $('#team_id').value = '';
+                $('#team_name').value = '';
                 $('#league_name_manual').value = '';
                 $('#club_name_manual').value = '';
-                $('#team_name_manual').value = '';
                 toggleManualField('league', false);
                 toggleManualField('club', false);
                 toggleManualField('team', false);
@@ -2165,7 +2035,7 @@ window.plyrIntakeData = {
             input.addEventListener('blur', function(){ validateStep(1); });
         });
 
-        ['league_name_manual','club_name_manual','team_name_manual'].forEach(function(id){
+        ['league_name_manual','club_name_manual'].forEach(function(id){
             const input = document.getElementById(id);
             if (!input) return;
             input.addEventListener('input', function(){ updateLiveProgress(); saveDraft(); });
@@ -2228,7 +2098,8 @@ window.plyrIntakeData = {
                         headers: {
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
-                            'X-Plyrcard-Embed': '1'
+                            'X-Plyrcard-Embed': '1',
+                        'X-CSRF-TOKEN': window.plyrCsrfToken
                         }
                     });
 
