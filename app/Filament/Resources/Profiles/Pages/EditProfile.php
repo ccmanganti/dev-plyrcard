@@ -970,8 +970,6 @@ class EditProfile extends Page implements HasForms
                                     ->content(new HtmlString(<<<'HTML'
                                         <style>
                                             .plyrcard-compact-upload .filepond--root {
-                                                max-height: 34rem !important;
-                                                overflow-y: auto !important;
                                                 border-radius: 0.75rem;
                                             }
 
