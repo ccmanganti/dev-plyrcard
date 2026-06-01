@@ -302,6 +302,7 @@ class PublicClubTeamController extends Controller
             'team_key' => $teamKey,
             'team_slug' => $teamSlug,
             'team_name' => $teamName,
+            'program_id' => $player->club_league_id,
             'gender' => $requestedGender,
             'league_name' => $player->league?->name ?? $club->league?->name,
 

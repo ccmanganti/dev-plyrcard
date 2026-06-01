@@ -100,11 +100,25 @@
         $allTeams = collect($teams ?? [])->values();
         $teamCount = $allTeams->count();
 
-        $teamGroupMeta = function ($group, string $fallbackGender) use ($resolveAsset, $displayLeague, $club, $coachName, $phone, $email, $address) {
+        $normalizeGender = function ($value) {
+            $value = strtolower(trim((string) $value));
+
+            if ($value === '') return null;
+            if (str_contains($value, 'female') || str_contains($value, 'girl') || str_contains($value, 'women') || str_contains($value, 'woman')) return 'female';
+            if (str_contains($value, 'male') || str_contains($value, 'boy') || str_contains($value, 'men') || str_contains($value, 'man')) return 'male';
+            if (str_contains($value, 'coed') || str_contains($value, 'mixed')) return 'coed';
+
+            return in_array($value, ['male', 'female', 'coed'], true) ? $value : null;
+        };
+
+        $teamGroupMeta = function ($group, string $fallbackGender, $program = null) use ($resolveAsset, $displayLeague, $club, $coachName, $phone, $email, $address) {
             $firstTeam = collect($group)->first();
             $settings = is_array($firstTeam?->team_settings ?? null) ? $firstTeam->team_settings : [];
-            $leagueName = $firstTeam?->league_name ?? $settings['league'] ?? $displayLeague?->name ?? 'TBD';
-            $leagueLogo = $resolveAsset($firstTeam?->league_logo ?? $settings['league_logo'] ?? $displayLeague?->logo ?? null);
+
+            $league = $program?->league ?? null;
+            $leagueName = $league?->name ?? $firstTeam?->league_name ?? $settings['league'] ?? $displayLeague?->name ?? 'TBD';
+            $leagueLogo = $resolveAsset($league?->logo ?? $firstTeam?->league_logo ?? $settings['league_logo'] ?? $displayLeague?->logo ?? null);
+
             $coach = collect(is_array($firstTeam?->coaching_staff ?? null) ? $firstTeam->coaching_staff : (is_array($club->coaching_staff ?? null) ? $club->coaching_staff : []))->first() ?? [];
             $coachDisplay = $firstTeam?->coach_name ?? $coach['name'] ?? $coach['full_name'] ?? $coachName ?? 'TBA';
             $coachEmail = $firstTeam?->coach_email ?? $coach['email'] ?? $email ?? null;
@@ -123,26 +137,86 @@
             ];
         };
 
-        $programGroups = $allTeams
-            ->groupBy(fn ($team) => (string) ($team->program_id ?? data_get($team, 'team_settings.program_id') ?? ($team->league_name ?? data_get($team, 'team_settings.league') ?? 'program')))
-            ->map(function ($programTeams, $programKey) use ($teamGender, $teamGroupMeta, $resolveAsset, $displayLeague) {
-                $firstTeam = $programTeams->first();
-                $settings = is_array($firstTeam?->team_settings ?? null) ? $firstTeam->team_settings : [];
-                $leagueName = $firstTeam?->league_name ?? $settings['league'] ?? $displayLeague?->name ?? 'League';
-                $leagueLogo = $resolveAsset($firstTeam?->league_logo ?? $settings['league_logo'] ?? $displayLeague?->logo ?? null);
+        $activeClubLeagues = $club->relationLoaded('clubLeagues')
+            ? $club->clubLeagues
+            : collect();
+
+        $activeClubLeagues = $activeClubLeagues
+            ->filter(fn ($program) => ($program->is_active ?? true) && blank($program->deleted_at ?? null))
+            ->sortBy([
+                fn ($program) => $program->sort_order ?? 0,
+                fn ($program) => $program->id ?? 0,
+            ])
+            ->values();
+
+        if ($activeClubLeagues->isEmpty() && $displayLeague) {
+            $activeClubLeagues = collect([(object) [
+                'id' => 'legacy-' . $displayLeague->id,
+                'league' => $displayLeague,
+                'genders' => $displayLeague->genders ?? [$displayLeague->gender ?? null],
+                'sport' => $displayLeague->sport ?? null,
+                'is_active' => true,
+            ]]);
+        }
+
+        $programGroups = $activeClubLeagues
+            ->map(function ($program) use ($allTeams, $teamGender, $teamGroupMeta, $resolveAsset, $normalizeGender) {
+                $league = $program->league;
+                $programId = (string) $program->id;
+                $programTeams = $allTeams
+                    ->filter(function ($team) use ($programId, $league) {
+                        $teamProgramId = (string) ($team->program_id ?? data_get($team, 'team_settings.program_id') ?? '');
+
+                        if ($teamProgramId !== '') {
+                            return $teamProgramId === $programId;
+                        }
+
+                        return filled($league?->name)
+                            && strcasecmp((string) ($team->league_name ?? data_get($team, 'team_settings.league') ?? ''), (string) $league->name) === 0;
+                    })
+                    ->values();
+
+                $programGenders = collect($program->genders ?? [])
+                    ->map(fn ($gender) => $normalizeGender($gender))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($programGenders->isEmpty() && $league) {
+                    $programGenders = collect($league->genders ?? [$league->gender ?? null])
+                        ->map(fn ($gender) => $normalizeGender($gender))
+                        ->filter()
+                        ->unique()
+                        ->values();
+                }
+
+                if ($programGenders->contains('coed')) {
+                    $programGenders = collect(['male', 'female']);
+                }
+
                 $boys = $programTeams->filter(fn ($team) => $teamGender($team) === 'boys')->values();
                 $girls = $programTeams->filter(fn ($team) => $teamGender($team) === 'girls')->values();
 
+                $availableGenders = collect([
+                    'boys' => $programGenders->isEmpty() || $programGenders->contains('male') || $boys->isNotEmpty(),
+                    'girls' => $programGenders->contains('female') || $girls->isNotEmpty(),
+                ])->filter()->keys()->values();
+
+                if ($availableGenders->isEmpty()) {
+                    $availableGenders = collect(['boys']);
+                }
+
                 return [
-                    'key' => \Illuminate\Support\Str::slug((string) $programKey),
-                    'id' => $programKey,
-                    'league' => $leagueName,
-                    'league_logo' => $leagueLogo,
-                    'teams' => $programTeams->values(),
+                    'key' => 'program-' . \Illuminate\Support\Str::slug((string) $programId),
+                    'id' => $programId,
+                    'league' => $league?->name ?? 'League',
+                    'league_logo' => $resolveAsset($league?->logo ?? null),
+                    'teams' => $programTeams,
                     'boys' => $boys,
                     'girls' => $girls,
-                    'boys_meta' => $teamGroupMeta($boys, 'boys'),
-                    'girls_meta' => $teamGroupMeta($girls, 'girls'),
+                    'available_genders' => $availableGenders,
+                    'boys_meta' => $teamGroupMeta($boys, 'boys', $program),
+                    'girls_meta' => $teamGroupMeta($girls, 'girls', $program),
                 ];
             })
             ->values();
@@ -156,6 +230,7 @@
                 'teams' => collect(),
                 'boys' => collect(),
                 'girls' => collect(),
+                'available_genders' => collect(['boys']),
                 'boys_meta' => $teamGroupMeta(collect(), 'boys'),
                 'girls_meta' => $teamGroupMeta(collect(), 'girls'),
             ]]);
@@ -1321,16 +1396,8 @@
 
                 @foreach($programGroups as $programIndex => $program)
                     @php
-                        $availableGenders = collect([
-                            'boys' => collect($program['boys'])->isNotEmpty(),
-                            'girls' => collect($program['girls'])->isNotEmpty(),
-                        ])->filter()->keys()->values();
-
-                        if ($availableGenders->isEmpty()) {
-                            $availableGenders = collect(['boys']);
-                        }
-
-                        $defaultGender = $availableGenders->first();
+                        $availableGenders = collect($program['available_genders'] ?? ['boys'])->values();
+                        $defaultGender = $availableGenders->first() ?: 'boys';
                     @endphp
 
                     <div class="program-panel {{ $programIndex === 0 ? 'is-active' : '' }}" data-program-panel="{{ $program['key'] }}">
@@ -1404,7 +1471,7 @@
                                     @endif
                                 </a>
                             @empty
-                                <div class="empty">Boys teams will appear here once published.</div>
+                                <div class="empty">Boys teams for this league will appear here once players are assigned.</div>
                             @endforelse
                         </div>
 
@@ -1444,7 +1511,7 @@
                                     @endif
                                 </a>
                             @empty
-                                <div class="empty">Girls teams will appear here once published.</div>
+                                <div class="empty">Girls teams for this league will appear here once players are assigned.</div>
                             @endforelse
                         </div>
                     </div>

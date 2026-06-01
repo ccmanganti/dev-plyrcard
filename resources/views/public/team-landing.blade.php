@@ -1940,6 +1940,65 @@
             }
         }
 
+    
+        /* Final no-overlap team title row */
+        .team-hero-identity-clean{
+            display:flex!important;
+            align-items:center!important;
+            gap:14px!important;
+            max-width:100%!important;
+            min-width:0!important;
+            transform:none!important;
+        }
+        .team-hero-identity-clean .identity-logo{
+            position:static!important;
+            flex:0 0 54px!important;
+            width:54px!important;
+            height:54px!important;
+            object-fit:contain!important;
+            margin:0!important;
+        }
+        .team-hero-identity-clean .team-title-stack{
+            flex:1 1 auto!important;
+            min-width:0!important;
+            padding:0!important;
+            margin:0!important;
+            border:0!important;
+            overflow:visible!important;
+        }
+        .team-hero-identity-clean .label{
+            display:block!important;
+            max-width:100%!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+            white-space:nowrap!important;
+            line-height:1.1!important;
+            margin:0 0 6px!important;
+        }
+        .team-hero-identity-clean .team-name{
+            display:block!important;
+            max-width:100%!important;
+            white-space:normal!important;
+            overflow:visible!important;
+            line-height:.92!important;
+            margin:0!important;
+        }
+        @media(max-width:900px){
+            .team-hero-identity-clean{
+                gap:12px!important;
+                align-items:flex-start!important;
+            }
+            .team-hero-identity-clean .identity-logo{
+                flex-basis:46px!important;
+                width:46px!important;
+                height:46px!important;
+                margin-top:2px!important;
+            }
+            .team-hero-identity-clean .team-name{
+                font-size:clamp(34px,9vw,44px)!important;
+            }
+        }
+
     </style>
 </head>
 <body>
