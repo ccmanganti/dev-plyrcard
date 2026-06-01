@@ -119,7 +119,8 @@
                 'coach' => $coachDisplay,
                 'coach_email' => $coachEmail,
                 'coach_phone' => $coachPhone,
-                'location' => $address ?: 'TBD',
+                'location' => $address ?: '',
+                'has_location' => filled($address),
             ];
         };
 
@@ -1063,6 +1064,95 @@
             .fact-actions{gap:4px;margin-top:6px}.fact-actions a{font-size:7px;padding:0 5px}
         }
 
+    
+        /* Final spacing + dynamic team tab/logo refinements */
+        .hero{
+            min-height:auto!important;
+            display:block!important;
+        }
+        .hero-inner{
+            min-height:0!important;
+            padding-top:42px!important;
+            padding-bottom:0!important;
+            gap:0!important;
+        }
+        .hero-main{
+            margin-bottom:24px!important;
+        }
+        .identity-club-row{
+            margin-top:0!important;
+            transform:translateY(-8px)!important;
+        }
+        .hero-side{
+            margin-top:0!important;
+            align-self:auto!important;
+        }
+        .hero-side.facts-count-3{
+            display:grid!important;
+            grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        }
+        .hero-side.facts-count-3 .fact[data-club-fact="coach"].span-2{
+            grid-column:span 2!important;
+        }
+        .team-switch{
+            align-items:stretch!important;
+        }
+        .team-tab{
+            display:flex!important;
+            align-items:center!important;
+            justify-content:center!important;
+            gap:8px!important;
+        }
+        .team-tab-logo{
+            width:22px!important;
+            height:22px!important;
+            object-fit:contain!important;
+            flex:0 0 auto!important;
+        }
+        .team-card-main{
+            grid-template-columns:minmax(0,1fr)!important;
+        }
+        .team-card-logo,
+        .team-card-logo-fallback{
+            display:none!important;
+        }
+        .team-card-name{
+            padding-left:0!important;
+        }
+        .section#teams,
+        #teams{
+            margin-top:0!important;
+            padding-top:34px!important;
+        }
+        .team-card-fallback-logos .team-card-tile:first-child{
+            display:none!important;
+        }
+        @media(max-width:900px){
+            .hero-inner{
+                padding-top:34px!important;
+                padding-left:20px!important;
+                padding-right:20px!important;
+            }
+            .hero-main{
+                margin-bottom:20px!important;
+            }
+            .identity-club-row{
+                transform:translateY(-6px)!important;
+            }
+            .hero-side{
+                margin-left:-20px!important;
+                margin-right:-20px!important;
+                margin-bottom:0!important;
+            }
+            #teams{
+                padding-top:30px!important;
+            }
+            .team-tab-logo{
+                width:20px!important;
+                height:20px!important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -1099,7 +1189,7 @@
 
                 <aside class="hero-side facts-count-3" aria-label="Club information">
                     @foreach($clubFacts as $fact)
-                        <div class="fact" data-club-fact="{{ $fact['key'] ?? $fact['label'] }}">
+                        <div class="fact {{ (($fact['key'] ?? null) === 'coach' && empty($boysMeta['has_location'])) ? 'span-2' : '' }}" data-club-fact="{{ $fact['key'] ?? $fact['label'] }}">
                             @if(filled($fact['logo'] ?? null))
                                 <img class="fact-logo" data-fact-logo src="{{ $fact['logo'] }}" alt="{{ $fact['label'] }} logo">
                             @else
@@ -1132,14 +1222,16 @@
                             data-team-league-logo="{{ $boysMeta['league_logo'] }}"
                             data-team-coach="{{ $boysMeta['coach'] }}"
                             data-team-coach-phone="{{ $boysMeta['coach_phone'] }}"
-                            data-team-coach-email="{{ $boysMeta['coach_email'] }}">Boys</button>
+                            data-team-coach-email="{{ $boysMeta['coach_email'] }}"
+                            data-team-has-location="{{ $boysMeta['has_location'] ? '1' : '0' }}">@if($boysMeta['league_logo'])<img class="team-tab-logo" src="{{ $boysMeta['league_logo'] }}" alt="">@endif<span>Boys</span></button>
                         <button class="team-tab" type="button" data-team-tab="girls"
                             data-team-count="{{ $girlsMeta['count'] ?: 0 }}"
                             data-team-league="{{ $girlsMeta['league'] }}"
                             data-team-league-logo="{{ $girlsMeta['league_logo'] }}"
                             data-team-coach="{{ $girlsMeta['coach'] }}"
                             data-team-coach-phone="{{ $girlsMeta['coach_phone'] }}"
-                            data-team-coach-email="{{ $girlsMeta['coach_email'] }}">Girls</button>
+                            data-team-coach-email="{{ $girlsMeta['coach_email'] }}"
+                            data-team-has-location="{{ $girlsMeta['has_location'] ? '1' : '0' }}">@if($girlsMeta['league_logo'])<img class="team-tab-logo" src="{{ $girlsMeta['league_logo'] }}" alt="">@endif<span>Girls</span></button>
                     </div>
                 </div>
 
@@ -1394,6 +1486,8 @@
                     leagueLogo.style.display = '';
                 }
                 if(coach) coach.textContent = tab.dataset.teamCoach || 'TBA';
+                const coachFact = document.querySelector('[data-club-fact="coach"]');
+                if(coachFact) coachFact.classList.toggle('span-2', tab.dataset.teamHasLocation !== '1');
 
                 const phone = (tab.dataset.teamCoachPhone || '').replace(/\D+/g, '');
                 if(coachPhone){

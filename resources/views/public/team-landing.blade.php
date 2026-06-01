@@ -1821,6 +1821,77 @@
             .team-hero-identity-clean .team-name{white-space:normal!important}
         }
 
+    
+        /* Final team header spacing + logo/name row refinements */
+        .hero{
+            min-height:auto!important;
+            height:auto!important;
+            display:block!important;
+        }
+        .hero-inner{
+            min-height:0!important;
+            height:auto!important;
+            padding-top:34px!important;
+            padding-bottom:0!important;
+        }
+        .team-main-polished{
+            min-height:0!important;
+            height:auto!important;
+            padding-top:0!important;
+        }
+        .team-hero-identity-clean{
+            margin-top:0!important;
+            transform:translateY(-8px)!important;
+            display:grid!important;
+            grid-template-columns:58px minmax(0,1fr)!important;
+            grid-template-rows:auto auto!important;
+            column-gap:14px!important;
+            row-gap:4px!important;
+            align-items:center!important;
+        }
+        .team-hero-identity-clean .identity-logo{
+            grid-row:1 / span 2!important;
+            width:54px!important;
+            height:54px!important;
+            object-fit:contain!important;
+        }
+        .team-hero-identity-clean .team-title-stack{
+            display:grid!important;
+            gap:5px!important;
+            padding:0!important;
+            margin:0!important;
+            border:0!important;
+        }
+        .team-hero-identity-clean .label{
+            margin:0!important;
+            line-height:1!important;
+        }
+        .team-hero-identity-clean .team-name{
+            margin:0!important;
+        }
+        .hero-info-strip{
+            margin-top:14px!important;
+        }
+        @media(max-width:900px){
+            .hero-inner{
+                padding-top:26px!important;
+                padding-left:20px!important;
+                padding-right:20px!important;
+            }
+            .team-hero-identity-clean{
+                transform:translateY(-6px)!important;
+                grid-template-columns:50px minmax(0,1fr)!important;
+                gap:10px!important;
+            }
+            .team-hero-identity-clean .identity-logo{
+                width:46px!important;
+                height:46px!important;
+            }
+            .hero-info-strip{
+                margin-top:12px!important;
+            }
+        }
+
     </style>
 </head>
 <body>

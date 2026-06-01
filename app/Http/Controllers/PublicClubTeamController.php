@@ -525,6 +525,8 @@ class PublicClubTeamController extends Controller
 
         $coach = collect(is_array($club->coaching_staff ?? null) ? $club->coaching_staff : [])->first() ?? [];
 
+        $location = trim(collect([$club->city, $club->state])->filter()->implode(', '));
+
         return new Fluent([
             'id' => $teamKey,
             'name' => $teamName,
@@ -548,7 +550,8 @@ class PublicClubTeamController extends Controller
                 'gender' => $genderSegment,
                 'league' => $program?->league?->name ?? $club->league?->name,
                 'league_logo' => $program?->league?->logo ?? $club->league?->logo,
-                'location' => trim(collect([$club->city, $club->state])->filter()->implode(', ')),
+                'location' => $location,
+                'has_location' => filled($location),
             ],
             'coaching_staff' => $club->coaching_staff ?? [],
             'landing_page_content' => $club->landing_page_content,
