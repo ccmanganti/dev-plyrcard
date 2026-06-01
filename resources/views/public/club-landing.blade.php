@@ -141,12 +141,30 @@
             ? $club->clubLeagues
             : collect();
 
+        $programDedupeKey = function ($program) use ($normalizeGender) {
+            $genders = collect($program->genders ?? [])
+                ->map(fn ($gender) => $normalizeGender($gender))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->implode(',');
+
+            return implode('|', [
+                (int) ($program->club_id ?? 0),
+                (int) ($program->league_id ?? 0),
+                strtolower(trim((string) ($program->sport ?? ''))),
+                $genders,
+            ]);
+        };
+
         $activeClubLeagues = $activeClubLeagues
             ->filter(fn ($program) => ($program->is_active ?? true) && blank($program->deleted_at ?? null))
             ->sortBy([
                 fn ($program) => $program->sort_order ?? 0,
                 fn ($program) => $program->id ?? 0,
             ])
+            ->unique(fn ($program) => $programDedupeKey($program))
             ->values();
 
         if ($activeClubLeagues->isEmpty() && $displayLeague) {
@@ -1317,6 +1335,29 @@
         @media(max-width:900px){
             .league-switch{grid-template-columns:1fr;margin-bottom:8px}
             .league-tab{min-height:48px;font-size:11px}
+        }
+
+    
+        /* Duplicate-safe, compact league tabs */
+        .league-switch{
+            grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;
+        }
+        .league-tab{
+            justify-content:flex-start!important;
+            min-height:48px!important;
+            padding:0 14px!important;
+            text-align:left!important;
+        }
+        .league-tab span{
+            min-width:0!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+            white-space:nowrap!important;
+        }
+        @media(max-width:480px){
+            .league-switch{
+                grid-template-columns:1fr!important;
+            }
         }
 
     </style>

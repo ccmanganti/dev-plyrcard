@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Websites;
 
+use App\Filament\Clusters\Websites;
 use App\Filament\Resources\Websites\Pages\CreateWebsite;
 use App\Filament\Resources\Websites\Pages\EditWebsite;
 use App\Filament\Resources\Websites\Pages\ListWebsites;
@@ -48,8 +49,27 @@ class WebsiteResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedGlobeAlt;
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::GlobeAlt;
-    protected static string|UnitEnum|null $navigationGroup = 'Website Builder';
+    protected static ?string $cluster = Websites::class;
+    protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::isSuperadminNavigationUser();
+    }
 
     public static function form(Schema $schema): Schema
     {

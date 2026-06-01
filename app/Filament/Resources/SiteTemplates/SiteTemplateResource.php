@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SiteTemplates;
 
+use App\Filament\Clusters\Websites;
 use App\Filament\Resources\SiteTemplates\Pages\CreateSiteTemplate;
 use App\Filament\Resources\SiteTemplates\Pages\EditSiteTemplate;
 use App\Filament\Resources\SiteTemplates\Pages\ListSiteTemplates;
@@ -34,8 +35,27 @@ class SiteTemplateResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleGroup;
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::RectangleGroup;
-    protected static string|UnitEnum|null $navigationGroup = 'Website Builder';
+    protected static ?string $cluster = Websites::class;
+    protected static ?int $navigationSort = 3;
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::isSuperadminNavigationUser();
+    }
 
     public static function form(Schema $schema): Schema
     {

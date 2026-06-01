@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Schools;
 
+use App\Filament\Clusters\Organizations;
 use App\Filament\Resources\Schools\Pages\CreateSchool;
 use App\Filament\Resources\Schools\Pages\EditSchool;
 use App\Filament\Resources\Schools\Pages\ListSchools;
@@ -26,8 +27,27 @@ class SchoolResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAcademicCap;
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::AcademicCap;
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static ?string $cluster = Organizations::class;
+    protected static ?int $navigationSort = 4;
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::isSuperadminNavigationUser();
+    }
 
     public static function form(Schema $schema): Schema
     {

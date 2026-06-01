@@ -23,9 +23,22 @@ class ProfileResource extends Resource
         return auth()->check();
     }
 
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check();
+        return auth()->check() && ! static::isSuperadminNavigationUser();
     }
 
     public static function getNavigationUrl(): string

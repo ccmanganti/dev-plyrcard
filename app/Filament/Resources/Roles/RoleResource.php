@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Roles;
 
+use App\Filament\Clusters\Users;
 use App\Filament\Resources\Roles\Pages\CreateRole;
 use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
@@ -26,12 +27,25 @@ class RoleResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
     protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::UserCircle;
+    protected static ?string $cluster = Users::class;
+    protected static ?int $navigationSort = 2;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check() && auth()->user()->hasRole('Superadmin');
+        return static::isSuperadminNavigationUser();
     }
 
     public static function form(Schema $schema): Schema

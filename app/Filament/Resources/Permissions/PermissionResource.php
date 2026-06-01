@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Permissions;
 
+use App\Filament\Clusters\Users;
 use App\Filament\Resources\Permissions\Pages\CreatePermission;
 use App\Filament\Resources\Permissions\Pages\EditPermission;
 use App\Filament\Resources\Permissions\Pages\ListPermissions;
@@ -24,12 +25,25 @@ class PermissionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
     protected static string | BackedEnum | null $activeNavigationIcon = Heroicon::ShieldCheck;
+    protected static ?string $cluster = Users::class;
+    protected static ?int $navigationSort = 3;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Users & Permissions';
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check() && auth()->user()->hasRole('Superadmin');
+        return static::isSuperadminNavigationUser();
     }
 
     public static function form(Schema $schema): Schema

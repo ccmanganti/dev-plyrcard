@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Clubs;
 
+use App\Filament\Clusters\Organizations;
 use App\Filament\Resources\Clubs\Pages\CreateClub;
 use App\Filament\Resources\Clubs\Pages\EditClub;
 use App\Filament\Resources\Clubs\Pages\ListClubs;
@@ -48,7 +49,8 @@ class ClubResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::ShieldCheck;
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static ?string $cluster = Organizations::class;
+    protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function genderOptions(): array
@@ -300,6 +302,24 @@ class ClubResource extends Resource
             ->values();
 
         return $sports->isNotEmpty() ? $sports->implode(', ') : '-';
+    }
+
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::isSuperadminNavigationUser();
     }
 
     public static function form(Schema $schema): Schema

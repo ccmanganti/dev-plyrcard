@@ -18,9 +18,22 @@ class MyJourney extends Page
     protected static ?int $navigationSort = 6;
     protected static string|UnitEnum|null $navigationGroup = null;
 
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
+
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check();
+        return auth()->check() && ! static::isSuperadminNavigationUser();
     }
 
     public static function getNavigationBadge(): ?string

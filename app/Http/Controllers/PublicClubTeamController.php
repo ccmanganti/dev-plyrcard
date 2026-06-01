@@ -36,6 +36,7 @@ class PublicClubTeamController extends Controller
             ->where('landing_page_is_published', true)
             ->firstOrFail();
 
+        $this->dedupeActiveClubLeagues($club);
         $this->attachDisplayLeague($club);
 
         $players = User::query()
@@ -125,6 +126,7 @@ class PublicClubTeamController extends Controller
             ->where('landing_page_is_published', true)
             ->firstOrFail();
 
+        $this->dedupeActiveClubLeagues($club);
         $this->attachDisplayLeague($club);
 
         $requestedGender = $this->normalizeLandingGenderSegment($gender);
@@ -478,9 +480,73 @@ class PublicClubTeamController extends Controller
             ->where('landing_page_is_published', true)
             ->firstOrFail();
 
+        $this->dedupeActiveClubLeagues($club);
         $this->attachDisplayLeague($club);
 
         return $club;
+    }
+
+    protected function normalizeProgramGenderValue(?string $value): ?string
+    {
+        $value = strtolower(trim((string) $value));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (str_contains($value, 'female') || str_contains($value, 'girl') || str_contains($value, 'women') || str_contains($value, 'woman')) {
+            return 'female';
+        }
+
+        if (str_contains($value, 'male') || str_contains($value, 'boy') || str_contains($value, 'men') || str_contains($value, 'man')) {
+            return 'male';
+        }
+
+        if (str_contains($value, 'coed') || str_contains($value, 'mixed')) {
+            return 'coed';
+        }
+
+        return in_array($value, ['male', 'female', 'coed'], true) ? $value : null;
+    }
+
+    protected function programDedupeKey(?ClubLeague $program): string
+    {
+        if (! $program) {
+            return 'legacy';
+        }
+
+        $genders = collect($program->genders ?? [])
+            ->map(fn ($gender) => $this->normalizeProgramGenderValue($gender))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->implode(',');
+
+        return implode('|', [
+            (int) ($program->club_id ?? 0),
+            (int) ($program->league_id ?? 0),
+            strtolower(trim((string) ($program->sport ?? ''))),
+            $genders,
+        ]);
+    }
+
+    protected function dedupeActiveClubLeagues(Club $club): void
+    {
+        if (! $club->relationLoaded('clubLeagues')) {
+            return;
+        }
+
+        $deduped = $club->clubLeagues
+            ->filter(fn ($program) => ($program->is_active ?? true) && blank($program->deleted_at ?? null))
+            ->sortBy([
+                fn ($program) => $program->sort_order ?? 0,
+                fn ($program) => $program->id ?? 0,
+            ])
+            ->unique(fn ($program) => $this->programDedupeKey($program))
+            ->values();
+
+        $club->setRelation('clubLeagues', $deduped);
     }
 
     protected function attachDisplayLeague(Club $club): void

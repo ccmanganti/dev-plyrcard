@@ -24,6 +24,9 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\PasswordReset\RequestPasswordReset;
 use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
+use App\Filament\Clusters\Organizations;
+use App\Filament\Clusters\Websites;
+use App\Filament\Clusters\Users;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -42,6 +45,10 @@ class AdminPanelProvider extends PanelProvider
             )
             ->emailVerification()
             ->profile()
+            ->discoverClusters(
+                in: app_path('Filament/Clusters'),
+                for: 'App\\Filament\\Clusters',
+            )
             ->brandLogo(asset('logo.png'))
             ->brandLogoHeight('3rem')
             ->globalSearch(false)

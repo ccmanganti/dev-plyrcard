@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Filament\Clusters\Users;
 use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
@@ -57,12 +58,26 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::UserGroup;
-    protected static string|UnitEnum|null $navigationGroup = 'Users & Permissions';
+    protected static ?string $cluster = Users::class;
+    protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'first_name';
+
+    protected static function isSuperadminNavigationUser(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check() && auth()->user()->hasRole('Superadmin');
+        return static::isSuperadminNavigationUser();
     }
 
     public static function getNavigationBadge(): ?string
