@@ -1806,6 +1806,21 @@
             .hero-coach-action{font-size:6.5px!important;letter-spacing:.04em!important;}
         }
 
+    
+        /* Final requested team landing refinements */
+        .plyrcard-logo-img{width:112px!important;height:auto!important;object-fit:contain!important}
+        .team-hero-identity-clean{display:grid!important;grid-template-columns:66px minmax(0,1fr)!important;gap:16px!important;align-items:center!important;max-width:760px!important}
+        .team-hero-identity-clean .identity-logo{width:62px!important;height:62px!important;object-fit:contain!important}
+        .team-hero-identity-clean .identity-league{display:none!important}
+        .team-hero-identity-clean .team-title-stack{min-width:0!important}
+        @media(max-width:900px){
+            .plyrcard-logo-img{width:98px!important}
+            .team-hero-identity-clean{grid-template-columns:50px minmax(0,1fr)!important;gap:12px!important}
+            .team-hero-identity-clean .identity-logo{position:relative!important;top:auto!important;left:auto!important;width:48px!important;height:48px!important}
+            .team-hero-identity-clean .team-title-stack{padding-left:0!important;padding-right:0!important;margin:0!important}
+            .team-hero-identity-clean .team-name{white-space:normal!important}
+        }
+
     </style>
 </head>
 <body>
@@ -1817,7 +1832,7 @@
                     <i class="fa-solid fa-chevron-left"></i>
                 </a>
                 <a class="nav-brand" href="{{ $club?->landing_page_slug ? route('clubs.landing', ['clubSlug' => $club->landing_page_slug]) : '/' }}" aria-label="PlyrCard home">
-                    <span class="plyr-wordmark"><b>PLYR</b><em>CARD</em></span>
+                    <img class="plyrcard-logo-img" src="{{ asset('images/plyr-logo.png') }}" alt="PlyrCard">
                 </a>
             </div>
 <div class="nav-actions" aria-hidden="true"></div>
@@ -1828,9 +1843,8 @@
         <div class="hero-bg"></div>
         <div class="wrap hero-inner">
             <div class="team-main team-main-polished">
-                <div class="identity team-hero-identity">
-                    @if($teamLogo)<img class="identity-logo" src="{{ $teamLogo }}" alt="{{ $team->name }} logo">@endif
-                    @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $leagueName }} logo">@endif
+                <div class="identity team-hero-identity team-hero-identity-clean">
+                    @if($clubLogo)<img class="identity-logo" src="{{ $clubLogo }}" alt="{{ $club?->name }} logo">@endif
                     <div class="team-title-stack">
                         <div class="label">{{ $club?->name ?: 'Club' }}</div>
                         <h1 class="team-name">Team {{ $team->name }}</h1>

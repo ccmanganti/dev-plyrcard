@@ -100,17 +100,38 @@
         $boysTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'boys')->values();
         $girlsTeams = collect($teams ?? [])->filter(fn ($team) => $teamGender($team) === 'girls')->values();
         $teamCount = collect($teams ?? [])->count();
+
+        $teamGroupMeta = function ($group, string $fallbackGender) use ($resolveAsset, $displayLeague, $club, $coachName, $phone, $email, $address) {
+            $firstTeam = collect($group)->first();
+            $settings = is_array($firstTeam?->team_settings ?? null) ? $firstTeam->team_settings : [];
+            $leagueName = $firstTeam?->league_name ?? $settings['league'] ?? $displayLeague?->name ?? 'TBD';
+            $leagueLogo = $resolveAsset($firstTeam?->league_logo ?? $settings['league_logo'] ?? $displayLeague?->logo ?? null);
+            $coach = collect(is_array($firstTeam?->coaching_staff ?? null) ? $firstTeam->coaching_staff : (is_array($club->coaching_staff ?? null) ? $club->coaching_staff : []))->first() ?? [];
+            $coachDisplay = $firstTeam?->coach_name ?? $coach['name'] ?? $coach['full_name'] ?? $coachName ?? 'TBA';
+            $coachEmail = $firstTeam?->coach_email ?? $coach['email'] ?? $email ?? null;
+            $coachPhone = $firstTeam?->coach_phone ?? $coach['phone'] ?? $phone ?? null;
+
+            return [
+                'gender' => $fallbackGender,
+                'count' => collect($group)->count(),
+                'league' => $leagueName,
+                'league_logo' => $leagueLogo,
+                'coach' => $coachDisplay,
+                'coach_email' => $coachEmail,
+                'coach_phone' => $coachPhone,
+                'location' => $address ?: 'TBD',
+            ];
+        };
+
+        $boysMeta = $teamGroupMeta($boysTeams, 'boys');
+        $girlsMeta = $teamGroupMeta($girlsTeams, 'girls');
         $coachSession = $coachCheckIn ?? session('coach_checkin');
         $savedPlayers = collect($savedPlayers ?? session('coach_saved_players', []))->filter(fn ($saved) => (int) ($saved['club_id'] ?? 0) === (int) $club->id)->unique('player_id')->values();
         $clubFacts = collect([
-            ['icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $teamCount],
-            ['icon' => 'fa-trophy', 'logo' => $leagueLogo, 'label' => 'League', 'value' => $displayLeague?->name ?: 'TBD'],
-            ['icon' => 'fa-location-dot', 'label' => 'Location', 'value' => $address ?: 'TBD'],
+            ['key' => 'teams', 'icon' => 'fa-shield-halved', 'label' => 'Teams', 'value' => $boysMeta['count'] ?: $teamCount],
+            ['key' => 'league', 'icon' => 'fa-trophy', 'logo' => $boysMeta['league_logo'] ?: $leagueLogo, 'label' => 'League', 'value' => $boysMeta['league'] ?: ($displayLeague?->name ?: 'TBD')],
+            ['key' => 'coach', 'icon' => 'fa-user-tie', 'label' => 'Coach', 'value' => $boysMeta['coach'] ?: 'TBA', 'email' => $boysMeta['coach_email'], 'phone' => $boysMeta['coach_phone']],
         ]);
-
-        if ($coachName && $coachName !== 'Coach info') {
-            $clubFacts->push(['icon' => 'fa-user-tie', 'label' => 'Coach', 'value' => $coachName]);
-        }
 
     @endphp
 
@@ -1018,6 +1039,30 @@
             margin:0 0 2px!important;
         }
 
+    
+        /* Final requested club landing refinements */
+        .plyrcard-brand{display:inline-flex!important;align-items:center!important}
+        .plyrcard-logo-img{width:112px!important;height:auto!important;object-fit:contain!important}
+        .identity-club-row{display:grid!important;grid-template-columns:74px minmax(0,1fr)!important;gap:16px!important;align-items:center!important;max-width:760px!important}
+        .identity-club-row .identity-logo{grid-row:1 / span 2!important;width:68px!important;height:68px!important;object-fit:contain!important}
+        .identity-club-row .club-title-stack{width:100%!important;max-width:680px!important;margin:0!important}
+        .identity-club-row .club-label{margin-bottom:8px!important}
+        .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+        .fact{min-height:116px!important}
+        .fact-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+        .fact-actions a{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:0 7px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#fff}
+        .fact-actions a.is-hidden{display:none!important}
+        .team-card-league-logo{width:52px;height:52px;object-fit:contain;justify-self:end}
+        @media(max-width:900px){
+            .plyrcard-logo-img{width:98px!important}
+            .identity-club-row{grid-template-columns:54px minmax(0,1fr)!important;gap:12px!important}
+            .identity-club-row .identity-logo{width:50px!important;height:50px!important}
+            .identity-club-row .club-name{font-size:clamp(31px,8.2vw,40px)!important;max-width:100%!important}
+            .hero-side.facts-count-3{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+            .fact{min-height:104px!important;padding:12px 10px!important}
+            .fact-actions{gap:4px;margin-top:6px}.fact-actions a{font-size:7px;padding:0 5px}
+        }
+
     </style>
 </head>
 <body>
@@ -1025,7 +1070,7 @@
         <div class="club-page-frame">
             <nav class="nav">
                 <a class="nav-brand plyrcard-brand" href="{{ url('/') }}" aria-label="PlyrCard home">
-                    <span class="plyr-word">PLYR</span><span class="card-word">CARD</span>
+                    <img class="plyrcard-logo-img" src="{{ asset('images/plyr-logo.png') }}" alt="PlyrCard">
                 </a>
                 <div class="nav-actions">
                     <a class="nav-link" href="#teams">Teams</a>
@@ -1036,13 +1081,12 @@
 
         <section class="hero">
             <div class="hero-bg"></div>
-            <div class="hero-logo-corners" aria-hidden="true">
-                @if($logo)<img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">@endif
-                @if($leagueLogo)<img class="identity-league" src="{{ $leagueLogo }}" alt="{{ $club->league?->name }} logo">@endif
-            </div>
             <div class="wrap hero-inner">
                 <div class="hero-main">
-                    <div class="identity identity-stacked">
+                    <div class="identity identity-club-row">
+                        @if($logo)
+                            <img class="identity-logo" src="{{ $logo }}" alt="{{ $club->name }} logo">
+                        @endif
                         <div class="club-title-stack">
                             <div class="club-label">Sports Club</div>
                             <h1 class="club-name">{{ $club->name }}</h1>
@@ -1053,16 +1097,24 @@
                     @endif
                 </div>
 
-                <aside class="hero-side facts-count-{{ $clubFacts->count() }}" aria-label="Club information">
+                <aside class="hero-side facts-count-3" aria-label="Club information">
                     @foreach($clubFacts as $fact)
-                        <div class="fact">
+                        <div class="fact" data-club-fact="{{ $fact['key'] ?? $fact['label'] }}">
                             @if(filled($fact['logo'] ?? null))
-                                <img class="fact-logo" src="{{ $fact['logo'] }}" alt="{{ $fact['label'] }} logo">
+                                <img class="fact-logo" data-fact-logo src="{{ $fact['logo'] }}" alt="{{ $fact['label'] }} logo">
                             @else
                                 <i class="fa-solid {{ $fact['icon'] }}"></i>
                             @endif
-                            <span>{{ $fact['label'] }}</span>
-                            <strong>{{ $fact['value'] }}</strong>
+                            <div>
+                                <span>{{ $fact['label'] }}</span>
+                                <strong data-fact-value>{{ $fact['value'] }}</strong>
+                                @if(($fact['key'] ?? null) === 'coach')
+                                    <div class="fact-actions">
+                                        <a data-coach-phone href="{{ filled($fact['phone'] ?? null) ? 'tel:' . preg_replace('/\\D+/', '', $fact['phone']) : '#' }}" @class(['is-hidden' => blank($fact['phone'] ?? null)])><i class="fa-solid fa-phone"></i> Call</a>
+                                        <a data-coach-email href="{{ filled($fact['email'] ?? null) ? 'mailto:' . $fact['email'] : '#' }}" @class(['is-hidden' => blank($fact['email'] ?? null)])><i class="fa-solid fa-envelope"></i> Email</a>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </aside>
@@ -1072,10 +1124,22 @@
         <section class="section" id="teams">
             <div class="wrap">
                 <div class="section-head">
-                    <div><div class="eyebrow">Club Teams</div><div class="section-title">Teams</div></div>
+                    <div><div class="section-title">Teams</div></div>
                     <div class="team-switch" role="tablist">
-                        <button class="team-tab is-active" type="button" data-team-tab="boys">Boys</button>
-                        <button class="team-tab" type="button" data-team-tab="girls">Girls</button>
+                        <button class="team-tab is-active" type="button" data-team-tab="boys"
+                            data-team-count="{{ $boysMeta['count'] ?: 0 }}"
+                            data-team-league="{{ $boysMeta['league'] }}"
+                            data-team-league-logo="{{ $boysMeta['league_logo'] }}"
+                            data-team-coach="{{ $boysMeta['coach'] }}"
+                            data-team-coach-phone="{{ $boysMeta['coach_phone'] }}"
+                            data-team-coach-email="{{ $boysMeta['coach_email'] }}">Boys</button>
+                        <button class="team-tab" type="button" data-team-tab="girls"
+                            data-team-count="{{ $girlsMeta['count'] ?: 0 }}"
+                            data-team-league="{{ $girlsMeta['league'] }}"
+                            data-team-league-logo="{{ $girlsMeta['league_logo'] }}"
+                            data-team-coach="{{ $girlsMeta['coach'] }}"
+                            data-team-coach-phone="{{ $girlsMeta['coach_phone'] }}"
+                            data-team-coach-email="{{ $girlsMeta['coach_email'] }}">Girls</button>
                     </div>
                 </div>
 
@@ -1085,6 +1149,7 @@
                             @php
                                 $teamLogo = $resolveAsset($team->logo ?? null);
                                 $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? null);
                                 $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
                             @endphp
                             <div class="team-card-main">
@@ -1117,7 +1182,7 @@
                                 <div class="team-card-fallback-logos" aria-hidden="true">
                                     <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
                                     <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
-                                    <span class="team-card-tile is-bronze">@if($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                                    <span class="team-card-tile is-bronze">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@elseif($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
                                 </div>
                             @endif
                         </a>
@@ -1132,6 +1197,7 @@
                             @php
                                 $teamLogo = $resolveAsset($team->logo ?? null);
                                 $teamSettings = is_array($team->team_settings ?? null) ? $team->team_settings : [];
+                                $teamLeagueLogo = $resolveAsset($team->league_logo ?? $teamSettings['league_logo'] ?? null);
                                 $teamSub = $teamSettings['subtitle'] ?? $teamSettings['division'] ?? $teamSettings['age_group'] ?? 'Team';
                             @endphp
                             <div class="team-card-main">
@@ -1164,7 +1230,7 @@
                                 <div class="team-card-fallback-logos" aria-hidden="true">
                                     <span class="team-card-tile">@if($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-user"></i>@endif</span>
                                     <span class="team-card-tile is-gold">@if($teamLogo)<img src="{{ $teamLogo }}" alt="">@elseif($logo)<img src="{{ $logo }}" alt="">@else<i class="fa-solid fa-users"></i>@endif</span>
-                                    <span class="team-card-tile is-bronze">@if($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
+                                    <span class="team-card-tile is-bronze">@if($teamLeagueLogo)<img src="{{ $teamLeagueLogo }}" alt="">@elseif($leagueLogo)<img src="{{ $leagueLogo }}" alt="">@else<i class="fa-solid fa-trophy"></i>@endif</span>
                                 </div>
                             @endif
                         </a>
@@ -1312,11 +1378,44 @@
             document.querySelectorAll('[data-open-coach]').forEach(btn => btn.addEventListener('click', () => { closeActions(); modal?.classList.add('is-open'); modal?.setAttribute('aria-hidden','false'); }));
             document.querySelectorAll('[data-close-coach]').forEach(btn => btn.addEventListener('click', () => { modal?.classList.remove('is-open'); modal?.setAttribute('aria-hidden','true'); }));
             modal?.addEventListener('click', e => { if(e.target === modal){ modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true'); }});
+            function updateClubFacts(tab){
+                const teams = document.querySelector('[data-club-fact="teams"] [data-fact-value]');
+                const league = document.querySelector('[data-club-fact="league"] [data-fact-value]');
+                const leagueLogo = document.querySelector('[data-club-fact="league"] [data-fact-logo]');
+                const coach = document.querySelector('[data-club-fact="coach"] [data-fact-value]');
+                const coachPhone = document.querySelector('[data-coach-phone]');
+                const coachEmail = document.querySelector('[data-coach-email]');
+
+                if(teams) teams.textContent = tab.dataset.teamCount || '0';
+                if(league) league.textContent = tab.dataset.teamLeague || 'TBD';
+                if(leagueLogo && tab.dataset.teamLeagueLogo){
+                    leagueLogo.src = tab.dataset.teamLeagueLogo;
+                    leagueLogo.alt = (tab.dataset.teamLeague || 'League') + ' logo';
+                    leagueLogo.style.display = '';
+                }
+                if(coach) coach.textContent = tab.dataset.teamCoach || 'TBA';
+
+                const phone = (tab.dataset.teamCoachPhone || '').replace(/\D+/g, '');
+                if(coachPhone){
+                    coachPhone.href = phone ? `tel:${phone}` : '#';
+                    coachPhone.classList.toggle('is-hidden', !phone);
+                }
+
+                const email = tab.dataset.teamCoachEmail || '';
+                if(coachEmail){
+                    coachEmail.href = email ? `mailto:${email}` : '#';
+                    coachEmail.classList.toggle('is-hidden', !email);
+                }
+            }
+
             document.querySelectorAll('[data-team-tab]').forEach(tab => tab.addEventListener('click', function(){
                 const target = this.dataset.teamTab;
                 document.querySelectorAll('[data-team-tab]').forEach(t => t.classList.toggle('is-active', t === this));
                 document.querySelectorAll('[data-team-panel]').forEach(p => p.classList.toggle('is-active', p.dataset.teamPanel === target));
+                updateClubFacts(this);
             }));
+            const initialTeamTab = document.querySelector('[data-team-tab].is-active');
+            if(initialTeamTab) updateClubFacts(initialTeamTab);
             document.addEventListener('submit', async function(event){
                 const form = event.target.closest('[data-email-watchlist-form]');
                 if(!form) return;

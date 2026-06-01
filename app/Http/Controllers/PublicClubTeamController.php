@@ -523,6 +523,8 @@ class PublicClubTeamController extends Controller
         $teamKey = $this->teamKey($genderSegment, $teamName);
         $program = $this->clubLeagueForGender($club, $genderSegment, $players->first()?->sport);
 
+        $coach = collect(is_array($club->coaching_staff ?? null) ? $club->coaching_staff : [])->first() ?? [];
+
         return new Fluent([
             'id' => $teamKey,
             'name' => $teamName,
@@ -534,12 +536,18 @@ class PublicClubTeamController extends Controller
             ]),
             'gender_segment' => $genderSegment,
             'logo' => $club->logo,
+            'league_name' => $program?->league?->name ?? $club->league?->name,
+            'league_logo' => $program?->league?->logo ?? $club->league?->logo,
+            'coach_name' => $coach['name'] ?? $coach['full_name'] ?? 'TBA',
+            'coach_email' => $coach['email'] ?? null,
+            'coach_phone' => $coach['phone'] ?? null,
             'background_image' => $club->background_image,
             'hero_image' => $club->hero_image ?? null,
             'branding' => $club->branding ?? [],
             'team_settings' => [
                 'gender' => $genderSegment,
                 'league' => $program?->league?->name ?? $club->league?->name,
+                'league_logo' => $program?->league?->logo ?? $club->league?->logo,
                 'location' => trim(collect([$club->city, $club->state])->filter()->implode(', ')),
             ],
             'coaching_staff' => $club->coaching_staff ?? [],
