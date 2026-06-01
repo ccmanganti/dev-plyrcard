@@ -5,12 +5,12 @@ namespace App\Filament\Resources\Profiles\Pages;
 use App\Filament\Resources\Profiles\ProfileResource;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\Club;
+use App\Models\ClubLeague;
 use App\Models\HeroTemplate;
 use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\SiteTemplate;
-use App\Models\Team;
 use App\Models\User;
 use App\Models\Website;
 use App\Support\ProfilePlanInfo;
@@ -86,18 +86,9 @@ class EditProfile extends Page implements HasForms
 
         $this->website = $this->user->websites()->first();
 
-        $teamId = $this->user->team_id ?? null;
-
-        if (blank($teamId) && filled($this->user->team_name ?? null) && filled($this->user->club_id ?? null)) {
-            $teamId = Team::query()
-                ->where('club_id', $this->user->club_id)
-                ->where('name', $this->user->team_name)
-                ->value('id');
-        }
-
         $this->form->fill([
             ...$this->user->toArray(),
-            'team_id' => $teamId,
+            'team_name' => $this->user->team_name,
             'website_name' => $this->website?->name,
             'site_template_id' => $this->website?->site_template_id,
             'hero_template_id' => $this->website?->hero_template_id,
@@ -310,16 +301,15 @@ class EditProfile extends Page implements HasForms
         };
     }
 
-    protected static function applyGenderAndSportFilter(
-        Builder $query,
-        ?string $gender,
-        ?string $sport,
-        string $genderColumn = 'gender',
-        string $sportColumn = 'sport',
-    ): Builder {
-        return $query
-            ->when(filled($gender), fn (Builder $q) => $q->where($genderColumn, $gender))
-            ->when(filled($sport), fn (Builder $q) => $q->where($sportColumn, $sport));
+    protected static function normalizeGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match (true) {
+            str_contains($gender, 'female'), str_contains($gender, 'girl'), str_contains($gender, 'women') => 'female',
+            str_contains($gender, 'male'), str_contains($gender, 'boy'), str_contains($gender, 'men') => 'male',
+            default => filled($gender) ? $gender : null,
+        };
     }
 
     protected static function buildLogoOptionLabel(string $name, ?string $logoPath): string
@@ -353,70 +343,65 @@ class EditProfile extends Page implements HasForms
 
     protected static function getLeagueOptions(?string $gender, ?string $sport, ?string $search = null): array
     {
-        $query = League::query();
+        $gender = static::normalizeGender($gender);
 
-        static::applyGenderAndSportFilter($query, $gender, $sport);
-
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
-
-        return $query
+        return League::query()
+            ->when(filled($gender), function (Builder $query) use ($gender): Builder {
+                return $query->where(function (Builder $query) use ($gender): Builder {
+                    return $query
+                        ->whereJsonContains('genders', $gender)
+                        ->orWhere('gender', $gender)
+                        ->orWhere('gender', ucfirst($gender))
+                        ->orWhere('gender', $gender === 'female' ? 'Girls' : 'Boys')
+                        ->orWhere('gender', $gender === 'female' ? 'Female' : 'Male');
+                });
+            })
+            ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                return $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->when(filled($search), fn (Builder $query): Builder => $query->where('name', 'like', '%' . trim($search) . '%'))
             ->orderBy('name')
             ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->get(['id', 'name', 'genders', 'gender'])
+            ->mapWithKeys(function (League $league): array {
+                $genders = collect($league->genders ?: [$league->gender])
+                    ->filter()
+                    ->map(fn ($gender) => str($gender)->title())
+                    ->unique()
+                    ->implode('/');
+
+                return [(string) $league->id => $league->name . ($genders ? ' — ' . $genders : '')];
+            })
             ->all();
     }
 
     protected static function getClubOptions(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
     {
-        $query = Club::query();
-
-        if (filled($leagueId)) {
-            $query->where('league_id', $leagueId);
-        } else {
+        if (blank($leagueId)) {
             return [];
         }
 
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
+        $gender = static::normalizeGender($gender);
 
-        return $query
+        return Club::query()
+            ->whereHas('clubLeagues', function (Builder $query) use ($leagueId, $gender, $sport): Builder {
+                return $query
+                    ->where('league_id', $leagueId)
+                    ->where('is_active', true)
+                    ->when(filled($gender), fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+                    ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                        return $query->whereNull('sport')->orWhere('sport', $sport);
+                    }));
+            })
+            ->when(filled($search), fn (Builder $query): Builder => $query->where('name', 'like', '%' . trim($search) . '%'))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'logo'])
-            ->mapWithKeys(function (Club $club) {
+            ->mapWithKeys(function (Club $club): array {
                 return [
                     (string) $club->id => static::buildLogoOptionLabel($club->name, $club->logo),
                 ];
             })
-            ->all();
-    }
-
-    protected static function getClubSearchLabels(?string $leagueId, ?string $gender, ?string $sport, ?string $search = null): array
-    {
-        $query = Club::query();
-
-        if (filled($leagueId)) {
-            $query->where('league_id', $leagueId);
-        } else {
-            return [];
-        }
-
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
-
-        return $query
-            ->orderBy('name')
-            ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
             ->all();
     }
 
@@ -435,26 +420,48 @@ class EditProfile extends Page implements HasForms
         return static::buildLogoOptionLabel($club->name, $club->logo);
     }
 
-    protected static function getTeamOptions(?string $clubId, ?string $gender, ?string $sport, ?string $search = null): array
+    protected static function getAgeGroupOptions(?string $search = null): array
     {
-        if (blank($clubId)) {
-            return [];
+        $configured = config('plyrcard.age_groups', [
+            'u13' => 'U13',
+            'u14' => 'U14',
+            'u15' => 'U15',
+            'u16' => 'U16',
+            'u17' => 'U17',
+            'u18' => 'U18',
+            'u19' => 'U19',
+        ]);
+
+        return collect($configured)
+            ->mapWithKeys(fn ($label) => [(string) $label => (string) $label])
+            ->when(filled($search), fn ($items) => $items->filter(fn ($label) => str_contains(strtolower($label), strtolower(trim($search)))))
+            ->all();
+    }
+
+    protected static function resolveClubLeagueId(?string $clubId, ?string $leagueId, ?string $gender, ?string $sport = null): ?int
+    {
+        if (blank($clubId) || blank($leagueId)) {
+            return null;
         }
 
-        $query = Team::query()
-            ->where('club_id', $clubId);
+        $gender = static::normalizeGender($gender);
 
-        $query->when(
-            filled($search),
-            fn (Builder $q) => $q->where('name', 'like', '%' . trim($search) . '%')
-        );
+        return ClubLeague::query()
+            ->where('club_id', $clubId)
+            ->where('league_id', $leagueId)
+            ->where('is_active', true)
+            ->when(filled($gender), fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+            ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                return $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
+    }
 
-        return $query
-            ->orderBy('name')
-            ->limit(50)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
-            ->all();
+    protected static function canManagePlayerImages(): bool
+    {
+        return auth()->user()?->hasRole('Superadmin') ?? false;
     }
 
     protected function mutateProfileData(array $data): array
@@ -471,6 +478,20 @@ class EditProfile extends Page implements HasForms
 
         $data = UserResource::mutateUserFormData($data);
 
+        $data['club_league_id'] = static::resolveClubLeagueId(
+            $data['club_id'] ?? null,
+            $data['league_id'] ?? null,
+            $data['gender'] ?? null,
+            $data['sport'] ?? null,
+        );
+
+        if (filled($data['team_name'] ?? null)) {
+            $data['team_name'] = strtoupper(trim((string) $data['team_name']));
+        }
+
+        unset($data['team_id']);
+
+
         unset($data['new_school_name']);
 
         return $data;
@@ -480,6 +501,8 @@ class EditProfile extends Page implements HasForms
     {
         return $schema
             ->components([
+                \Filament\Forms\Components\Hidden::make('club_league_id'),
+
                 Tabs::make('profile_tabs')
                     ->tabs([
                         Tab::make('Basic Info')
@@ -616,7 +639,8 @@ class EditProfile extends Page implements HasForms
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('league_id', null);
                                                 $set('club_id', null);
-                                                $set('team_id', null);
+                                                $set('team_name', null);
+                                                $set('club_league_id', null);
                                             }),
 
                                         Select::make('position')
@@ -656,7 +680,8 @@ class EditProfile extends Page implements HasForms
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('league_id', null);
                                                 $set('club_id', null);
-                                                $set('team_id', null);
+                                                $set('team_name', null);
+                                                $set('club_league_id', null);
                                             }),
 
                                         DatePicker::make('birth')
@@ -671,6 +696,12 @@ class EditProfile extends Page implements HasForms
                                             ->placeholder('e.g. 3.8')
                                             ->numeric()
                                             ->step('0.01'),
+
+                                        TextInput::make('ncaa_field_id')
+                                            ->prefixIcon('heroicon-m-identification')
+                                            ->label('NCAA Field ID')
+                                            ->placeholder('Enter NCAA Field ID')
+                                            ->maxLength(255),
 
                                         Select::make('school_id')
                                             ->prefixIcon('heroicon-m-building-library')
@@ -768,7 +799,8 @@ class EditProfile extends Page implements HasForms
                                             ->helperText('Filtered by the selected sport and sex.')
                                             ->afterStateUpdated(function (Set $set) {
                                                 $set('club_id', null);
-                                                $set('team_id', null);
+                                                $set('team_name', null);
+                                                $set('club_league_id', null);
                                             }),
 
                                         Select::make('club_id')
@@ -798,74 +830,36 @@ class EditProfile extends Page implements HasForms
                                                 ->all())
                                             ->disabled(fn (Get $get): bool => blank($get('league_id')))
                                             ->helperText('Filtered by the selected league. Club logo is shown when available.')
-                                            ->afterStateUpdated(function (Set $set) {
-                                                $set('team_id', null);
+                                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                                $set('team_name', null);
+                                                $set('club_league_id', static::resolveClubLeagueId(
+                                                    $state,
+                                                    $get('league_id'),
+                                                    $get('gender'),
+                                                    $get('sport'),
+                                                ));
                                             }),
 
-                                        Select::make('team_id')
+                                        Select::make('team_name')
                                             ->prefixIcon('heroicon-m-users')
-                                            ->label('Team')
+                                            ->label('Age Group')
                                             ->placeholder(fn (Get $get) => blank($get('club_id'))
                                                 ? 'Select club first'
-                                                : 'Search team')
+                                                : 'Select age group')
                                             ->searchable()
                                             ->live()
-                                            ->preload(false)
-                                            ->options(fn (Get $get): array => static::getTeamOptions(
-                                                $get('club_id'),
-                                                $get('gender'),
-                                                $get('sport'),
-                                            ))
-                                            ->getSearchResultsUsing(fn (string $search, Get $get): array => static::getTeamOptions(
-                                                $get('club_id'),
-                                                $get('gender'),
-                                                $get('sport'),
-                                                $search,
-                                            ))
-                                            ->getOptionLabelUsing(function ($value): ?string {
-                                                if (blank($value)) {
-                                                    return null;
-                                                }
-
-                                                return Team::query()->whereKey($value)->value('name');
-                                            })
+                                            ->preload()
+                                            ->options(fn (): array => static::getAgeGroupOptions())
+                                            ->getSearchResultsUsing(fn (string $search): array => static::getAgeGroupOptions($search))
                                             ->disabled(fn (Get $get): bool => blank($get('club_id')))
-                                            ->helperText('Filtered by the selected club.')
-                                            ->afterStateHydrated(function ($state, Set $set, Get $get) {
-                                                if (blank($state)) {
-                                                    return;
-                                                }
-
-                                                $team = Team::query()->find($state);
-
-                                                if (! $team) {
-                                                    $set('team_id', null);
-
-                                                    return;
-                                                }
-
-                                                if (blank($get('club_id'))) {
-                                                    $set('club_id', $team->club_id);
-                                                }
-                                            })
-                                            ->rule(function (Get $get) {
-                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                    if (blank($value)) {
-                                                        return;
-                                                    }
-
-                                                    $exists = Team::query()
-                                                        ->whereKey($value)
-                                                        ->when(
-                                                            filled($get('club_id')),
-                                                            fn ($query) => $query->where('club_id', $get('club_id'))
-                                                        )
-                                                        ->exists();
-
-                                                    if (! $exists) {
-                                                        $fail('The selected team is invalid.');
-                                                    }
-                                                };
+                                            ->helperText('Static age group. This replaces the old Team model selection.')
+                                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                                $set('club_league_id', static::resolveClubLeagueId(
+                                                    $get('club_id'),
+                                                    $get('league_id'),
+                                                    $get('gender'),
+                                                    $get('sport'),
+                                                ));
                                             }),
 
                                         Select::make('national_team_id')
@@ -882,6 +876,21 @@ class EditProfile extends Page implements HasForms
                                             ->label('National Team Period')
                                             ->placeholder('e.g. 2025-2026')
                                             ->maxLength(255),
+
+                                        TextInput::make('pro_club_name')
+                                            ->prefixIcon('heroicon-m-building-office-2')
+                                            ->label('Pro Club')
+                                            ->placeholder('Enter pro club name')
+                                            ->maxLength(255),
+
+                                        FileUpload::make('pro_club_logo')
+                                            ->label('Pro Club Logo')
+                                            ->image()
+                                            ->imageEditor()
+                                            ->disk('public')
+                                            ->directory('pro-club-logos')
+                                            ->visibility('public')
+                                            ->helperText('Upload the professional club logo.'),
 
                                         TextInput::make('new_national_team_name')
                                             ->prefixIcon('heroicon-m-plus-circle')
@@ -956,14 +965,84 @@ class EditProfile extends Page implements HasForms
                         Tab::make('Media')
                             ->icon('heroicon-m-photo')
                             ->schema([
-                                Section::make('Profile & Hero Images')
+                                Placeholder::make('compact_raw_upload_styles')
+                                    ->label('')
+                                    ->content(new HtmlString(<<<'HTML'
+                                        <style>
+                                            .plyrcard-compact-upload .filepond--root {
+                                                max-height: 34rem !important;
+                                                overflow-y: auto !important;
+                                                border-radius: 0.75rem;
+                                            }
+
+                                            .plyrcard-compact-upload .filepond--list {
+                                                display: grid !important;
+                                                grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)) !important;
+                                                gap: 0.75rem !important;
+                                                transform: none !important;
+                                                position: relative !important;
+                                            }
+
+                                            .plyrcard-compact-upload .filepond--item {
+                                                position: relative !important;
+                                                transform: none !important;
+                                                width: 100% !important;
+                                                height: 132px !important;
+                                                margin: 0 !important;
+                                                left: auto !important;
+                                                right: auto !important;
+                                                top: auto !important;
+                                            }
+
+                                            .plyrcard-compact-upload .filepond--panel-root,
+                                            .plyrcard-compact-upload .filepond--image-preview,
+                                            .plyrcard-compact-upload .filepond--image-preview-wrapper,
+                                            .plyrcard-compact-upload .filepond--file {
+                                                height: 132px !important;
+                                                min-height: 132px !important;
+                                                max-height: 132px !important;
+                                            }
+
+                                            .plyrcard-compact-upload .filepond--drop-label {
+                                                min-height: 5rem !important;
+                                            }
+                                        </style>
+                                    HTML))
+                                    ->columnSpanFull(),
+
+                                Section::make('Raw Player Images')
                                     ->icon('heroicon-m-photo')
                                     ->extraAttributes([
                                         'id' => 'profile-section-profile-hero-images',
                                         'data-profile-section' => 'media-branding',
                                     ])
-                                    ->description('Shared player images used across your card and website.')
+                                    ->description('Upload raw player images here. This is the only image upload area available to players.')
+                                    ->schema([
+                                        FileUpload::make('raw_player_images')
+                                            ->label('Raw Player Images')
+                                            ->image()
+                                            ->multiple()
+                                            ->reorderable()
+                                            ->appendFiles()
+                                            ->maxFiles(20)
+                                            ->maxSize(5120)
+                                            ->panelLayout('grid')
+                                            ->imagePreviewHeight('132px')
+                                            ->disk('public')
+                                            ->directory('user-player-images/raw')
+                                            ->visibility('public')
+                                            ->columnSpanFull()
+                                            ->extraAttributes([
+                                                'class' => 'plyrcard-compact-upload',
+                                            ])
+                                            ->helperText('Upload up to 20 raw player images. Images are shown as compact thumbnails in a scrollable panel.'),
+                                    ]),
+
+                                Section::make('Superadmin Curated Image Uploads')
+                                    ->icon('heroicon-m-sparkles')
+                                    ->description('Only Superadmins can manage processed images used across cards, websites, thumbnails, and hero layouts.')
                                     ->columns(4)
+                                    ->visible(fn (): bool => static::canManagePlayerImages())
                                     ->schema([
                                         FileUpload::make('plyrcard_image')
                                             ->label('PlyrCard')
@@ -991,7 +1070,7 @@ class EditProfile extends Page implements HasForms
                                             ->disk('public')
                                             ->directory('user-player-images')
                                             ->visibility('public')
-                                            ->helperText('Upload an in-game action shot (jersey number visible, dynamic pose).'),
+                                            ->helperText('Upload an in-game action shot.'),
 
                                         FileUpload::make('national_team_image')
                                             ->label('National Team Image')
@@ -1022,19 +1101,6 @@ class EditProfile extends Page implements HasForms
                                             ->directory('user-player-images')
                                             ->visibility('public')
                                             ->helperText('Used for highlights thumbnail, social sharing image, and SEO preview image.'),
-
-                                        FileUpload::make('raw_player_images')
-                                            ->label('Raw Player Images')
-                                            ->image()
-                                            ->multiple()
-                                            ->reorderable()
-                                            ->appendFiles()
-                                            ->maxFiles(20)
-                                            ->disk('public')
-                                            ->directory('user-player-images/raw')
-                                            ->visibility('public')
-                                            ->columnSpanFull()
-                                            ->helperText('Upload up to 20 raw player images from the intake form. These are stored separately from the main Player Image.'),
                                     ]),
 
                                 Section::make('YouTube Highlights')
@@ -1377,7 +1443,7 @@ class EditProfile extends Page implements HasForms
             filled($this->user->player_image) || filled($this->user->plyrcard_image),
             filled($this->user->league_id),
             filled($this->user->club_id),
-            filled($this->user->team_id ?? $this->user->team_name),
+            filled($this->user->team_name),
         ];
 
         $total = count($checks);
