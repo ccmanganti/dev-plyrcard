@@ -276,13 +276,6 @@
         .back-btn svg{width:20px;height:20px;stroke:#666;stroke-width:2.6}
         .topbar-title{display:none}
 
-        .topbar-logo{
-            display:block;
-            height:28px;
-            width:auto;
-            margin-left:auto;
-            object-fit:contain;
-        }
 
         .progress-band{
             position:relative;
@@ -958,7 +951,6 @@
         @else
             <section class="screen hero-screen" id="introScreen">
                 <div class="hero-logo-wrap">
-                    <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="logo-main">
                 </div>
 
                 <div class="hero-copy">
@@ -982,7 +974,6 @@
                         <button type="button" class="back-btn" id="backBtn" aria-label="Back">
                             <svg viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6"/></svg>
                         </button>
-                        <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="topbar-logo">
                     </div>
 
                     <div class="progress-band" id="progressBand">
