@@ -22,9 +22,9 @@ $utmPlan = $normalizeRegistrationPlan($rawPlan);
 $utmPlan = in_array($utmPlan, $allowedPlans, true) ? $utmPlan : 'free';
 
 $formEmbedUrls = [
-  'free' => 'https://plyrcard.com/player-intake-app?utm_plan=free',
-  'plyr-plus' => 'https://plyrcard.com/player-intake-app?utm_plan=plyr-plus',
-  'my-journey' => 'https://plyrcard.com/player-intake-app?utm_plan=my-journey',
+  'free' => url('/player-intake-app?utm_plan=free'),
+  'plyr-plus' => url('/player-intake-app?utm_plan=plyr-plus'),
+  'my-journey' => url('/player-intake-app?utm_plan=my-journey'),
 ];
 
 $pageCopy = [
@@ -412,9 +412,149 @@ $copy = $pageCopy[$utmPlan];
       .registration-form-embed { width: 100% !important; max-width: none !important; height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; max-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; border-radius: 0 !important; border: 0 !important; box-shadow: none !important; overflow: hidden !important; }
       .registration-form-embed iframe { width: 100% !important; height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; min-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; max-height: calc(100svh - var(--header-h, 76px) - var(--safe-top, 0px)) !important; }
     }
+  
+    /* Registration container UI update */
+    body.registration-ui-updated {
+      background: var(--black) !important;
+    }
+
+    body.registration-ui-updated #site-header .logo-wrap img,
+    body.registration-ui-updated .logo-wrap img {
+      filter: none !important;
+      height: 32px !important;
+    }
+
+    .registration-back-btn {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      background: rgba(255,255,255,.08) !important;
+      color: #fff !important;
+      margin-right: 10px !important;
+      flex: 0 0 auto !important;
+      text-decoration: none !important;
+      font-family: var(--font-display) !important;
+      font-size: 18px !important;
+      line-height: 1 !important;
+    }
+
+    .registration-page {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .registration-page .demo-shell {
+      width: 100% !important;
+      max-width: 1180px !important;
+      padding-left: 24px !important;
+      padding-right: 24px !important;
+    }
+
+    .registration-form-embed {
+      overflow: hidden !important;
+      scrollbar-width: none !important;
+    }
+
+    .registration-form-embed::-webkit-scrollbar,
+    .registration-form-embed iframe::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    .registration-form-embed iframe {
+      overflow: hidden !important;
+      scrollbar-width: none !important;
+    }
+
+    .registration-footer {
+      background: var(--black) !important;
+      border-top: 1px solid rgba(255,255,255,0.07) !important;
+      padding: 16px 18px calc(16px + var(--safe-bottom)) !important;
+    }
+
+    .registration-footer-line {
+      margin: 0 !important;
+      color: rgba(255,255,255,.42) !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    @media (max-width: 767px) {
+      .registration-page {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .registration-page .demo-shell {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .registration-page .calendar-card,
+      .registration-page .form-card,
+      .registration-form-embed {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+      }
+
+      .registration-form-embed {
+        height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px)) !important;
+        min-height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px)) !important;
+        max-height: none !important;
+      }
+
+      .registration-form-embed iframe {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px)) !important;
+        min-height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px)) !important;
+        max-height: none !important;
+      }
+
+      .registration-footer {
+        padding-top: 9px !important;
+        padding-bottom: calc(9px + var(--safe-bottom)) !important;
+      }
+
+      .registration-footer-line {
+        font-size: 10px !important;
+      }
+    }
+
+  
+    /* Revision 2: remove registration-container back button and give iframe CTA room */
+    .registration-back-btn {
+      display: none !important;
+    }
+
+    @media (max-width: 767px) {
+      .registration-page .calendar-card,
+      .registration-page .form-card {
+        padding-bottom: 0 !important;
+      }
+
+      .registration-form-embed,
+      .registration-form-embed iframe {
+        height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px) - 54px) !important;
+        min-height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px) - 54px) !important;
+        max-height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px) - 54px) !important;
+      }
+    }
+
   </style>
 </head>
-<body>
+<body class="registration-ui-updated">
 @include('partials.navigation')
 
 <main>
@@ -457,8 +597,8 @@ $copy = $pageCopy[$utmPlan];
             src="{{ $currentFormEmbedUrl }}"
             title="{{ $copy['form_label'] }}"
             loading="lazy"
-            scrolling="yes"
-            style="width:425px;max-width:100%;height:811px;min-height:811px;max-height:811px;border:none;display:block;background:#000;"
+            scrolling="no"
+            style="width:100%;height:811px;min-height:811px;border:none;display:block;background:#000;overflow:hidden;"
           ></iframe>
         </div>
       </aside>
@@ -467,7 +607,9 @@ $copy = $pageCopy[$utmPlan];
   </section>
 </main>
 
-@include('partials.footer')
+<footer id="site-footer" class="registration-footer">
+  <p class="registration-footer-line">© {{ date('Y') }} PLYRCARD. All rights reserved. Built for players ready to be seen.</p>
+</footer>
 
 <script>
 (function () {
@@ -500,7 +642,8 @@ $copy = $pageCopy[$utmPlan];
   }
 
   window.addEventListener('message', function (event) {
-    if (event.origin !== 'https://plyrcard.com') return;
+    const allowedOrigins = ['https://plyrcard.com', window.location.origin];
+    if (!allowedOrigins.includes(event.origin)) return;
     if (!registrationIframe) return;
 
     const data = event.data || {};

@@ -897,6 +897,391 @@
             .step1-grid{grid-template-columns:1fr 144px}
             .step1-logo-col .watermark{width:170px;right:-18px}
         }
+    
+        /* Intake mobile UI update */
+        html, body {
+            overflow-x: hidden !important;
+            background: #050505 !important;
+        }
+
+        .page {
+            display: block !important;
+            width: 100% !important;
+            min-height: 100svh !important;
+        }
+
+        .app {
+            max-width: none !important;
+            width: 100% !important;
+            min-height: 100svh !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+        }
+
+        .logo-main,
+        .hero-logo-wrap,
+        .final-logo {
+            display: none !important;
+        }
+
+        .hero-screen {
+            min-height: 100svh !important;
+            padding: 28px 18px calc(22px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .hero-copy {
+            margin-top: auto !important;
+        }
+
+        .hero-title,
+        .final-title {
+            font-size: clamp(42px, 15vw, 66px) !important;
+            line-height: .86 !important;
+            margin-bottom: 12px !important;
+        }
+
+        .hero-text,
+        .final-text,
+        .sample-copy,
+        .sample-footer-note {
+            display: none !important;
+        }
+
+        .progress-band {
+            min-height: 74px !important;
+            padding: 20px 16px 12px !important;
+            background: rgba(5,5,5,.78) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+        }
+
+        .progress-title {
+            margin: 12px 0 0 !important;
+            font-size: 32px !important;
+            line-height: .9 !important;
+            text-transform: uppercase !important;
+            letter-spacing: .02em !important;
+        }
+
+        .step-panel,
+        .final-screen {
+            min-height: calc(100svh - 74px) !important;
+            padding: 16px 14px calc(18px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .field {
+            margin-bottom: 13px !important;
+        }
+
+        .field.two,
+        .club-team-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+        }
+
+        .label {
+            margin-bottom: 6px !important;
+            font-size: 15px !important;
+            color: rgba(255,255,255,.88) !important;
+        }
+
+        .input,
+        .select,
+        .search-select-control,
+        .manual-input {
+            min-height: 42px !important;
+            border: 1px solid rgba(255,255,255,.10) !important;
+            border-bottom: 2px solid var(--pc-orange) !important;
+            border-radius: 12px !important;
+            background: rgba(255,255,255,.08) !important;
+            color: #fff !important;
+            padding: 10px 11px !important;
+            font-size: 14px !important;
+        }
+
+        .btn,
+        .sample-trigger {
+            background: var(--pc-orange) !important;
+            color: #fff !important;
+            border-radius: 10px !important;
+            min-height: 46px !important;
+            box-shadow: 0 10px 24px rgba(255,92,53,.20) !important;
+        }
+
+        .sample-block {
+            margin: 0 0 14px !important;
+            max-width: none !important;
+        }
+
+        .sample-trigger {
+            width: auto !important;
+            padding: 0 16px !important;
+            margin-bottom: 0 !important;
+            font-size: 18px !important;
+        }
+
+        .gender-list {
+            gap: 10px !important;
+        }
+
+        .gender-card {
+            position: relative !important;
+            min-height: 54px !important;
+            border-radius: 12px !important;
+            flex-direction: row !important;
+            gap: 9px !important;
+            background: rgba(255,255,255,.08) !important;
+            border: 1px solid rgba(255,255,255,.10) !important;
+            border-bottom: 2px solid var(--pc-orange) !important;
+        }
+
+        .gender-card.is-selected {
+            background: rgba(25, 175, 92, .22) !important;
+            border-color: rgba(25, 175, 92, .88) !important;
+            border-bottom-color: #19af5c !important;
+            box-shadow: 0 0 0 2px rgba(25,175,92,.18) !important;
+        }
+
+        .gender-check {
+            width: 22px !important;
+            height: 22px !important;
+            border-radius: 999px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: rgba(255,255,255,.14) !important;
+            color: transparent !important;
+            border: 1px solid rgba(255,255,255,.18) !important;
+        }
+
+        .gender-check svg {
+            width: 14px !important;
+            height: 14px !important;
+        }
+
+        .gender-card.is-selected .gender-check {
+            background: #19af5c !important;
+            color: #fff !important;
+            border-color: #19af5c !important;
+        }
+
+        .gender-card > svg {
+            display: none !important;
+        }
+
+        .gender-card-label {
+            font-size: 16px !important;
+        }
+
+        .image-preview-grid {
+            max-width: none !important;
+            grid-template-columns: repeat(3, minmax(0,1fr)) !important;
+        }
+
+        .step-cta {
+            padding-top: 14px !important;
+            background: linear-gradient(to top, rgba(0,0,0,.58), rgba(0,0,0,0)) !important;
+        }
+
+        @media (max-width: 360px) {
+            .field.two,
+            .club-team-row {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+    
+        /* Revision 2: back button belongs inside intake app, and CTA must not be cut off */
+        .topbar {
+            display: flex !important;
+            height: 54px !important;
+            flex: 0 0 54px !important;
+            padding: 10px 14px 6px !important;
+            background: rgba(5,5,5,.78) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+        }
+
+        .topbar .back-btn {
+            width: 38px !important;
+            height: 38px !important;
+            background: rgba(255,255,255,.10) !important;
+            border: 1px solid rgba(255,255,255,.14) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+        }
+
+        .topbar .back-btn svg {
+            stroke: #fff !important;
+        }
+
+        .progress-band {
+            min-height: 70px !important;
+            flex: 0 0 70px !important;
+            padding-top: 14px !important;
+        }
+
+        .step-panel,
+        .final-screen {
+            min-height: calc(100svh - 54px - 70px) !important;
+            padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .panel-scroll,
+        .panel-scroll.with-bottom-cta {
+            padding-bottom: 96px !important;
+        }
+
+        .step-cta {
+            position: sticky !important;
+            bottom: 0 !important;
+            z-index: 60 !important;
+            margin-top: auto !important;
+            padding: 16px 0 calc(18px + env(safe-area-inset-bottom)) !important;
+            background: linear-gradient(to top, rgba(0,0,0,.88), rgba(0,0,0,.48) 72%, rgba(0,0,0,0)) !important;
+        }
+
+        .step-cta .btn {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 52px !important;
+            padding: 0 18px !important;
+        }
+
+        @media (max-width: 480px) {
+            .step-panel,
+            .final-screen {
+                padding-left: 16px !important;
+                padding-right: 16px !important;
+            }
+        }
+
+    
+        /* Revision 4: restore original intro/outro image-overlay treatment without re-adding logos */
+        #introScreen,
+        #thanksScreen {
+            position: relative !important;
+            min-height: 100svh !important;
+            color: #fff !important;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.24), rgba(0,0,0,.72) 58%, rgba(0,0,0,.96)),
+                var(--screen-bg) center center / cover no-repeat !important;
+            isolation: isolate !important;
+            overflow: hidden !important;
+        }
+
+        #introScreen::before,
+        #thanksScreen::before,
+        #formScreen::before {
+            content: "" !important;
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 0 !important;
+            pointer-events: none !important;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.48) 48%, rgba(0,0,0,.88) 100%),
+                radial-gradient(circle at 18% 18%, rgba(255,99,71,.18), transparent 34%) !important;
+        }
+
+        #introScreen > *,
+        #thanksScreen > *,
+        #formScreen > * {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+
+        #introScreen .hero-logo-wrap,
+        #thanksScreen .hero-logo-wrap,
+        .logo-main,
+        .final-logo {
+            display: none !important;
+        }
+
+        #introScreen .hero-copy,
+        #thanksScreen .hero-copy {
+            margin-top: auto !important;
+            padding-top: 120px !important;
+        }
+
+        #introScreen .hero-title,
+        #thanksScreen .hero-title {
+            display: block !important;
+            margin: 0 0 16px !important;
+            font-family: var(--font-display) !important;
+            font-size: clamp(44px, 13.5vw, 62px) !important;
+            font-weight: 700 !important;
+            line-height: .9 !important;
+            letter-spacing: .01em !important;
+            text-transform: uppercase !important;
+            color: #fff !important;
+        }
+
+        #introScreen .hero-text,
+        #thanksScreen .hero-text {
+            display: block !important;
+            margin: 0 0 18px !important;
+            max-width: 330px !important;
+            font-family: var(--font-body) !important;
+            font-size: 12px !important;
+            line-height: 1.24 !important;
+            color: #fff !important;
+            opacity: .96 !important;
+        }
+
+        #introScreen .bottom-cta,
+        #thanksScreen .bottom-cta {
+            display: block !important;
+            margin-top: 24px !important;
+        }
+
+        #formScreen.step-bg-4 {
+            background:
+                linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,.74) 58%, rgba(0,0,0,.96)),
+                var(--screen-bg) center center / cover no-repeat !important;
+        }
+
+        .final-screen {
+            position: relative !important;
+            padding-top: 14px !important;
+            color: #fff !important;
+            overflow: hidden !important;
+        }
+
+        .final-screen .panel-scroll {
+            min-height: 100% !important;
+            justify-content: flex-start !important;
+        }
+
+        .final-title {
+            display: block !important;
+            margin-top: 96px !important;
+            margin-bottom: 0 !important;
+            max-width: 300px !important;
+            font-family: var(--font-display) !important;
+            font-size: clamp(46px, 14vw, 60px) !important;
+            line-height: .9 !important;
+            letter-spacing: .01em !important;
+            text-transform: uppercase !important;
+            font-weight: 700 !important;
+            color: #fff !important;
+        }
+
+        .final-text {
+            display: block !important;
+            max-width: 336px !important;
+            margin-top: 18px !important;
+            margin-bottom: 18px !important;
+            font-family: var(--font-body) !important;
+            font-size: 16px !important;
+            line-height: 1.18 !important;
+            color: #fff !important;
+            opacity: .96 !important;
+        }
+
+        .final-screen .step-cta {
+            margin-top: auto !important;
+        }
+
     </style>
 </head>
 <body>
@@ -931,9 +1316,6 @@
 
         @if (session('success'))
             <section class="screen hero-screen" id="thanksScreen">
-                <div class="hero-logo-wrap">
-                    <img src="{{ asset('logo.png') }}" alt="PLYRCARD" class="logo-main">
-                </div>
 
                 <div class="hero-copy">
                     <h1 class="hero-title">Thank You</h1>
@@ -950,9 +1332,6 @@
             </section>
         @else
             <section class="screen hero-screen" id="introScreen">
-                <div class="hero-logo-wrap">
-                </div>
-
                 <div class="hero-copy">
                     <h1 class="hero-title">Start Your Journey</h1>
                     <p class="hero-text">Let’s build your PLYRCARD profile. Add the basics now, then finish the rest whenever you’re ready.</p>
@@ -978,27 +1357,145 @@
 
                     <div class="progress-band" id="progressBand">
                         <div class="ring" id="progressRing" style="--progress-width:25%;"></div>
-                        <div>
-                            <h2 class="progress-title" id="progressTitle">Begin with the basics and lay the foundation for your PLYRCARD.</h2>
-                        </div>
+                        <h2 class="progress-title" id="progressTitle">Basic Info</h2>
                     </div>
 
                     <div class="step-panel active" data-step="1">
-                        <div class="panel-scroll">
+                        <div class="panel-scroll with-bottom-cta">
+                            <div class="field two">
+                                <div class="field" id="first_name_field">
+                                    <label class="label" for="first_name">First Name</label>
+                                    <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" autocomplete="given-name">
+                                    <div class="field-message" id="first_name_error"></div>
+                                </div>
+
+                                <div class="field" id="last_name_field">
+                                    <label class="label" for="last_name">Last Name</label>
+                                    <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" autocomplete="family-name">
+                                    <div class="field-message" id="last_name_error"></div>
+                                </div>
                             </div>
+
+                            <div class="field" id="gender_field">
+                                <label class="label">Gender</label>
+                                <input type="hidden" id="gender" name="gender" value="{{ old('gender') }}">
+                                <div class="gender-list">
+                                    <button type="button" class="gender-card" data-gender-value="male" aria-pressed="false">
+                                        <span class="gender-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                        <span class="gender-card-label">Male</span>
+                                    </button>
+                                    <button type="button" class="gender-card" data-gender-value="female" aria-pressed="false">
+                                        <span class="gender-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                        <span class="gender-card-label">Female</span>
+                                    </button>
+                                </div>
+                                <div class="field-message" id="gender_error"></div>
                             </div>
-                            
+
+                            <div class="field" id="personal_email_field">
+                                <label class="label" for="personal_email">Email</label>
+                                <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" autocomplete="email">
+                                <div class="field-message" id="personal_email_error"></div>
+                            </div>
+
+                            <div class="field" id="phone_field">
+                                <label class="label" for="phone">Phone</label>
+                                <input class="input phone-input" type="tel" id="phone" name="phone" value="{{ old('phone') }}" autocomplete="tel">
+                                <div class="field-message" id="phone_error"></div>
+                            </div>
+
+                            <div class="step-cta">
+                                <button type="button" class="btn" id="nextBtn1">Next</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-panel" data-step="2">
+                        <div class="panel-scroll with-bottom-cta">
+                            <div class="field" id="sport_field">
+                                <label class="label" for="sport">Sport</label>
+                                <select class="select" id="sport" name="sport">
+                                    <option value="">Select One</option>
+                                    @php
+                                        $intakeSportOptions = $sports ?? [
+                                            'basketball' => 'Basketball',
+                                            'volleyball' => 'Volleyball',
+                                            'football' => 'Football',
+                                            'baseball' => 'Baseball',
+                                            'softball' => 'Softball',
+                                            'soccer' => 'Soccer',
+                                            'tennis' => 'Tennis',
+                                            'track_and_field' => 'Track and Field',
+                                            'swimming' => 'Swimming',
+                                        ];
+                                    @endphp
+                                    @foreach($intakeSportOptions as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('sport') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="field-message" id="sport_error"></div>
+                            </div>
+
+                            <div class="field" id="position_field">
+                                <label class="label" for="position_select">Position</label>
+                                <select class="select" id="position_select">
+                                    <option value="">Select position(s)</option>
+                                </select>
+                                <input type="hidden" id="position_values" name="position" value="">
+                                <div class="chips-wrap" id="positionChips"></div>
+                                <div class="field-message" id="position_error"></div>
+                            </div>
+
+                            <div class="field" id="league_field">
+                                <label class="label">League</label>
+                                <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
+                                <div id="leagueSelectRoot"></div>
+                                <div class="manual-input-wrap" id="leagueManualWrap">
+                                    <input class="manual-input" type="text" id="league_name_manual" name="league_name_manual" value="{{ old('league_name_manual') }}" placeholder="Enter league">
+                                    <div class="manual-input-actions">
+                                        <button type="button" class="manual-toggle-back" data-restore-select="league">Back to list</button>
+                                    </div>
+                                </div>
+                                <div class="field-message" id="league_error"></div>
+                            </div>
+
+                            <div class="field two club-team-row">
+                                <div class="field" id="club_field">
+                                    <label class="label">Club</label>
+                                    <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
+                                    <div id="clubSelectRoot"></div>
+                                    <div class="manual-input-wrap" id="clubManualWrap">
+                                        <input class="manual-input" type="text" id="club_name_manual" name="club_name_manual" value="{{ old('club_name_manual') }}" placeholder="Enter club">
+                                    </div>
+                                    <div class="field-message" id="club_error"></div>
+                                </div>
+
+                                <div class="field" id="team_field">
+                                    <label class="label">Age Group</label>
+                                    <input type="hidden" id="team_name" name="team_name" value="{{ old('team_name', old('team_name_manual')) }}">
+                                    <div id="teamSelectRoot"></div>
+                                    <div class="manual-input-wrap" id="teamManualWrap">
+                                        <input class="manual-input" type="text" id="team_name_manual" name="team_name_manual" value="{{ old('team_name_manual') }}" placeholder="Enter age group">
+                                    </div>
+                                    <div class="field-message" id="team_error"></div>
+                                </div>
+                            </div>
 
                             <div class="step-cta">
                                 <button type="button" class="btn" id="nextBtn2">Next</button>
                             </div>
                         </div>
-
-                        
                     </div>
 
                     <div class="step-panel" data-step="3">
                         <div class="panel-scroll with-bottom-cta" id="imageStepScroll">
+                            <div class="sample-block">
+                                <button type="button" class="sample-trigger" id="openSampleModal">
+                                    <span>Sample Guide</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
+                                </button>
+                            </div>
+
                             <div class="field" id="portrait_images_field">
                                 <label class="label" for="portrait_images">Portrait Images</label>
                                 <input class="file-input" type="file" id="portrait_images" name="portrait_images[]" accept="image/png,image/jpeg,image/jpg,image/webp" multiple>
@@ -1015,32 +1512,20 @@
                                 <div class="file-warning-list" id="action_images_feedback"></div>
                             </div>
 
-                            <div class="sample-block">
-                                <button type="button" class="sample-trigger" id="openSampleModal">
-                                    <span>Sample (Click Here)</span>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
-                                </button>
-                                <p class="sample-copy">Use the sample guide to see ideal framing for portrait and action uploads before you submit your images.</p>
-                            </div>
                             <div class="step-cta">
                                 <button type="button" class="btn" id="nextBtn3">Next</button>
                             </div>
                         </div>
-
-                        
                     </div>
 
                     <div class="final-screen" data-step="4">
                         <div class="panel-scroll with-bottom-cta">
                             <h1 class="final-title">Now Make It Unforgettable</h1>
                             <p class="final-text">You’ve built the foundation, now add the final touches that make your PLYRCARD stand out. Finish it now or come back later, but don’t skip the step that brings it all together.</p>
-                            <img src="{{ asset('images/plyrcardlogo.png') }}" alt="" class="final-logo">
                             <div class="step-cta">
                                 <button type="submit" class="btn" id="submitBtn">Submit</button>
                             </div>
                         </div>
-
-                        
                     </div>
                 </section>
             </form>
@@ -1050,7 +1535,6 @@
                 <div class="sample-modal-header">
                     <div>
                         <h2 class="sample-modal-title" id="sampleModalTitle">Image Upload Samples</h2>
-                        <p class="sample-modal-text">Use these as quick guides for framing, clarity, and cropping.</p>
                     </div>
                     <button type="button" class="sample-modal-close" id="closeSampleModal" aria-label="Close sample guide">×</button>
                 </div>
@@ -1084,8 +1568,6 @@
                         </div>
                     </article>
                 </div>
-
-                <p class="sample-footer-note">Best: 1 portrait + 2–3 action shots.</p>
             </div>
         </div>
     </div>
@@ -1135,10 +1617,10 @@ window.plyrIntakeData = {
     let teamApi = null;
 
     const stepMeta = {
-        1: { topbar: 'PLYRPROFILE', title: 'Begin with the basics and lay the foundation for your PLYRCARD.' },
-        2: { topbar: 'In Your Element', title: 'Set the stage for your profile by entering the sport you play and the team you represent.' },
-        3: { topbar: 'Show Your Story', title: 'Add your images so your PLYRCARD feels complete, personal, and ready to share.' },
-        4: { topbar: 'Show Your Story', title: 'Now make it unforgettable.' }
+        1: { topbar: '', title: 'Basic Info' },
+        2: { topbar: '', title: 'Team Info' },
+        3: { topbar: '', title: 'Photos' },
+        4: { topbar: '', title: 'Submit Profile' }
     };
 
     const fieldAliases = {
