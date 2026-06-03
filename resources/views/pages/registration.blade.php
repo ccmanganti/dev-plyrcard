@@ -557,6 +557,47 @@ $copy = $pageCopy[$utmPlan];
 <body class="registration-ui-updated">
 @include('partials.navigation')
 
+
+
+
+
+<style>
+  /* Intake registration page: keep pull-up nav, but let the active embedded step determine iframe height. */
+  body.registration-ui-updated {
+    --registration-drawer-tab-space: 82px;
+    --intake-embed-height: 720px;
+  }
+
+  body.registration-ui-updated .registration-form-embed {
+    height: var(--intake-embed-height) !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    margin-bottom: var(--registration-drawer-tab-space) !important;
+    transition: height .22s ease;
+  }
+
+  body.registration-ui-updated .registration-form-embed iframe {
+    width: 100% !important;
+    height: var(--intake-embed-height) !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    display: block !important;
+    transition: height .22s ease;
+  }
+
+  @media (max-width: 767px) {
+    body.registration-ui-updated .registration-page {
+      padding-bottom: var(--registration-drawer-tab-space) !important;
+    }
+
+    body.registration-ui-updated .registration-footer {
+      margin-bottom: var(--registration-drawer-tab-space) !important;
+    }
+  }
+</style>
+
 <main>
   <section id="book-demo" class="registration-page" aria-labelledby="registration-title">
     <div class="demo-shell">
@@ -943,6 +984,57 @@ $copy = $pageCopy[$utmPlan];
     });
   }
 })();
+</script>
+
+
+<script>
+  (function () {
+    const intakeFrame = document.getElementById('registrationEmbedFrame');
+
+    function setIntakeEmbedHeight(height) {
+      const safeHeight = Math.max(Number(height || 0), 520);
+      const drawerSpace = window.matchMedia('(max-width: 767px)').matches ? 24 : 16;
+      const maxReasonableHeight = window.matchMedia('(max-width: 767px)').matches ? 920 : 1100;
+      const finalHeight = Math.min(Math.ceil(safeHeight + drawerSpace), maxReasonableHeight);
+
+      document.documentElement.style.setProperty('--intake-embed-height', finalHeight + 'px');
+
+      if (intakeFrame) {
+        intakeFrame.style.height = finalHeight + 'px';
+        intakeFrame.style.minHeight = finalHeight + 'px';
+
+        const holder = intakeFrame.closest('.registration-form-embed');
+        if (holder) {
+          holder.style.height = finalHeight + 'px';
+          holder.style.minHeight = finalHeight + 'px';
+        }
+      }
+    }
+
+    window.addEventListener('message', function (event) {
+      if (!event.data || event.data.type !== 'plyrcard:intake.resize') return;
+
+      if (intakeFrame && event.source !== intakeFrame.contentWindow) return;
+
+      setIntakeEmbedHeight(event.data.height);
+    });
+
+    window.addEventListener('resize', function () {
+      if (!intakeFrame || !intakeFrame.contentWindow) return;
+
+      try {
+        intakeFrame.contentWindow.postMessage({ type: 'plyrcard:intake.requestResize' }, '*');
+      } catch (error) {}
+    });
+
+    setTimeout(function () {
+      if (!intakeFrame || !intakeFrame.contentWindow) return;
+
+      try {
+        intakeFrame.contentWindow.postMessage({ type: 'plyrcard:intake.requestResize' }, '*');
+      } catch (error) {}
+    }, 500);
+  })();
 </script>
 
 </body>

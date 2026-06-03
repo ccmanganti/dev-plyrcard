@@ -1282,6 +1282,174 @@
             margin-top: auto !important;
         }
 
+    
+        /* Revision 6: make the intake CTA visible in normal flow above the bottom drawer */
+        .step-panel,
+        .final-screen {
+            padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .panel-scroll,
+        .panel-scroll.with-bottom-cta {
+            padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .step-cta {
+            position: relative !important;
+            bottom: auto !important;
+            z-index: 20 !important;
+            margin-top: 32px !important;
+            padding: 0 0 calc(92px + env(safe-area-inset-bottom)) !important;
+            background: transparent !important;
+        }
+
+        .step-cta .btn,
+        .step-cta .btn-link,
+        .step-cta .btn-link .btn {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 54px !important;
+            width: 100% !important;
+        }
+
+        #imageStepScroll .step-cta {
+            margin-top: 110px !important;
+        }
+
+        .final-screen .step-cta {
+            margin-top: auto !important;
+        }
+
+        @media (max-width: 767px) {
+            .step-panel,
+            .final-screen {
+                padding-bottom: calc(128px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .panel-scroll,
+            .panel-scroll.with-bottom-cta {
+                padding-bottom: calc(128px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .step-cta {
+                padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
+        /* Flexible iframe height fix: CTA stays in normal flow, parent frame grows to content. */
+        html,
+        body,
+        .page,
+        .app {
+            min-height: auto !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .step-screen {
+            min-height: auto !important;
+        }
+
+        .step-panel,
+        .final-screen {
+            min-height: auto !important;
+            padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .panel-scroll,
+        .panel-scroll.with-bottom-cta {
+            min-height: auto !important;
+            overflow: visible !important;
+            padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .step-cta {
+            position: relative !important;
+            bottom: auto !important;
+            z-index: 20 !important;
+            margin-top: 30px !important;
+            margin-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+
+        .step-cta .btn,
+        .step-cta .btn-link,
+        .step-cta .btn-link .btn {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 54px !important;
+            width: 100% !important;
+        }
+
+        #imageStepScroll .step-cta {
+            margin-top: 96px !important;
+        }
+
+        @media (max-width: 767px) {
+            .step-panel,
+            .final-screen,
+            .panel-scroll,
+            .panel-scroll.with-bottom-cta {
+                padding-bottom: calc(148px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .step-cta {
+                margin-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
+    
+        /* Revision 9: dynamic height uses active step only; reduce extra bottom space */
+        .step-panel,
+        .final-screen {
+            padding-bottom: calc(58px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .panel-scroll,
+        .panel-scroll.with-bottom-cta {
+            padding-bottom: calc(58px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .step-cta {
+            position: relative !important;
+            bottom: auto !important;
+            z-index: 20 !important;
+            margin-top: 28px !important;
+            margin-bottom: calc(34px + env(safe-area-inset-bottom)) !important;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+
+        .step-cta .btn,
+        .step-cta .btn-link,
+        .step-cta .btn-link .btn {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 54px !important;
+            width: 100% !important;
+        }
+
+        #imageStepScroll .step-cta {
+            margin-top: 64px !important;
+        }
+
+        @media (max-width: 767px) {
+            .step-panel,
+            .final-screen,
+            .panel-scroll,
+            .panel-scroll.with-bottom-cta {
+                padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .step-cta {
+                margin-bottom: calc(48px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -1441,7 +1609,8 @@
                                 <select class="select" id="position_select">
                                     <option value="">Select position(s)</option>
                                 </select>
-                                <input type="hidden" id="position_values" name="position" value="">
+                                <input type="hidden" id="position_values" value="">
+                                <div id="positionArrayInputs"></div>
                                 <div class="chips-wrap" id="positionChips"></div>
                                 <div class="field-message" id="position_error"></div>
                             </div>
@@ -1963,13 +2132,34 @@ window.plyrIntakeData = {
         updatePositionField();
     }
 
+    function syncPositionArrayInputs(){
+        const holder = document.getElementById('positionArrayInputs');
+        const state = document.getElementById('position_values');
+
+        if (state) {
+            state.value = selectedPositions.join('|');
+        }
+
+        if (! holder) return;
+
+        holder.innerHTML = '';
+
+        selectedPositions.forEach(function(value){
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'position[]';
+            input.value = value;
+            holder.appendChild(input);
+        });
+    }
+
     function updatePositionField(){
         const chips = $('#positionChips');
         const hidden = $('#position_values');
         const sport = safe($('#sport') && $('#sport').value);
         if (!chips || !hidden) return;
         chips.innerHTML = '';
-        hidden.value = selectedPositions.join('|');
+        syncPositionArrayInputs();
         selectedPositions.forEach(function(value){
             const label = sportPositions[sport] && sportPositions[sport][value] ? sportPositions[sport][value] : value;
             const chip = document.createElement('span');
@@ -2623,6 +2813,66 @@ window.plyrIntakeData = {
             showIntro();
         }
     });
+
+    const intakeFormForPositionArray = document.getElementById('playerIntakeForm');
+    if (intakeFormForPositionArray) {
+        intakeFormForPositionArray.addEventListener('submit', function(){
+            syncPositionArrayInputs();
+        });
+    }
+
+
+    function notifyParentOfIntakeResize(){
+        try {
+            const visibleScreen = Array.from(document.querySelectorAll('.screen'))
+                .find(function(screen){
+                    const style = window.getComputedStyle(screen);
+                    return style.display !== 'none' && style.visibility !== 'hidden' && screen.offsetParent !== null;
+                });
+
+            const activePanel = visibleScreen
+                ? (visibleScreen.querySelector('.step-panel.active, .final-screen.active') || visibleScreen)
+                : (document.querySelector('.step-panel.active, .final-screen.active, #introScreen, #thanksScreen') || document.body);
+
+            const rect = activePanel.getBoundingClientRect();
+            const top = Math.max(0, rect.top);
+            const bottom = Math.max(rect.bottom, top + activePanel.scrollHeight);
+            const contentHeight = Math.ceil(bottom + 24);
+
+            const minHeight = 520;
+            const maxHeight = 920;
+            const height = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+
+            window.parent?.postMessage({
+                type: 'plyrcard:intake.resize',
+                height: height
+            }, '*');
+        } catch (error) {}
+    }
+
+    window.addEventListener('load', notifyParentOfIntakeResize);
+    window.addEventListener('resize', notifyParentOfIntakeResize);
+    window.addEventListener('message', function(event){
+        if (!event.data || event.data.type !== 'plyrcard:intake.requestResize') return;
+        notifyParentOfIntakeResize();
+    });
+
+    const intakeResizeObserver = new MutationObserver(function(){
+        window.requestAnimationFrame(notifyParentOfIntakeResize);
+    });
+
+    intakeResizeObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'style', 'aria-hidden']
+    });
+
+    setInterval(notifyParentOfIntakeResize, 1200);
+    setTimeout(notifyParentOfIntakeResize, 100);
+    setTimeout(notifyParentOfIntakeResize, 400);
+    setTimeout(notifyParentOfIntakeResize, 900);
+
 })();
 </script>
 </body>

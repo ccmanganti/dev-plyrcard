@@ -922,13 +922,13 @@
   </p>
 
   <!-- Billing toggle -->
-  <div class="billing-toggle reveal" style="transition-delay:0.14s">
+  <!-- <div class="billing-toggle reveal" style="transition-delay:0.14s">
     <span class="toggle-label active" id="label-monthly" aria-label="Switch to monthly billing">Monthly</span>
     <div class="toggle-switch" id="billing-toggle" role="switch" aria-checked="false" tabindex="0" aria-label="Toggle annual billing"></div>
     <span class="toggle-label" id="label-annual" aria-label="Switch to annual billing">
       Annual <span class="save-badge">Save 20%</span>
     </span>
-  </div>
+  </div> -->
 </section>
 
 
