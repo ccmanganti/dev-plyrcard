@@ -562,9 +562,9 @@ $copy = $pageCopy[$utmPlan];
 
 
 <style>
-  /* Intake registration page: keep pull-up nav, but let the active embedded step determine iframe height. */
+  /* Intake registration page: parent header controls back; active embedded step determines iframe height. */
   body.registration-ui-updated {
-    --registration-drawer-tab-space: 82px;
+    --registration-drawer-tab-space: 0px;
     --intake-embed-height: 720px;
   }
 
@@ -596,6 +596,112 @@ $copy = $pageCopy[$utmPlan];
       margin-bottom: var(--registration-drawer-tab-space) !important;
     }
   }
+
+  /* Registration-only: parent header back button + no pull-up / locker-room navigation. */
+  body.registration-ui-updated {
+    --registration-drawer-tab-space: 0px !important;
+  }
+
+  body.registration-ui-updated #site-header {
+    justify-content: space-between !important;
+    gap: 12px !important;
+  }
+
+  body.registration-ui-updated #site-header #menu-btn,
+  body.registration-ui-updated #site-header .menu-btn {
+    display: flex !important;
+    margin-left: auto !important;
+    flex: 0 0 44px !important;
+  }
+
+  body.registration-ui-updated #mobile-nav {
+    display: flex !important;
+  }
+
+  body.registration-ui-updated #site-header .logo-wrap {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    flex: 0 1 auto !important;
+  }
+
+  body.registration-ui-updated #site-header .registration-intake-back-btn + .logo-wrap {
+    margin-left: 0 !important;
+  }
+
+  body.registration-ui-updated .registration-intake-back-btn {
+    display: inline-flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.09);
+    color: #fff;
+    cursor: pointer;
+    margin-right: 10px;
+    position: relative;
+    z-index: 2;
+    touch-action: manipulation;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+    transition: transform .18s var(--ease-out), background .18s var(--ease-out), opacity .18s var(--ease-out), visibility .18s var(--ease-out);
+  }
+
+  body.registration-ui-updated .registration-intake-back-btn.is-visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body.registration-ui-updated .registration-intake-back-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,.14);
+  }
+
+  body.registration-ui-updated .registration-intake-back-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+    stroke: currentColor;
+    stroke-width: 2.6;
+  }
+
+  body.registration-ui-updated .mobile-drawer,
+  body.registration-ui-updated .mobile-drawer-tab,
+  body.registration-ui-updated .mobile-action-drawer,
+  body.registration-ui-updated .bottom-drawer,
+  body.registration-ui-updated .bottom-sheet,
+  body.registration-ui-updated .pull-up-nav,
+  body.registration-ui-updated .pullup-nav,
+  body.registration-ui-updated .locker-room-tab,
+  body.registration-ui-updated .locker-room-drawer,
+  body.registration-ui-updated [data-pull-up-nav],
+  body.registration-ui-updated [data-locker-room],
+  body.registration-ui-updated [data-mobile-drawer] {
+    display: none !important;
+  }
+
+  body.registration-ui-updated .registration-form-embed {
+    margin-bottom: 0 !important;
+  }
+
+  body.registration-ui-updated .registration-page,
+  body.registration-ui-updated .registration-footer {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+
+  /* Revision 12: parent registration header no longer owns intake back. */
+  body.registration-ui-updated .registration-intake-back-btn {
+    display: none !important;
+  }
+
 </style>
 
 <main>
@@ -993,7 +1099,7 @@ $copy = $pageCopy[$utmPlan];
 
     function setIntakeEmbedHeight(height) {
       const safeHeight = Math.max(Number(height || 0), 520);
-      const drawerSpace = window.matchMedia('(max-width: 767px)').matches ? 24 : 16;
+      const drawerSpace = 0;
       const maxReasonableHeight = window.matchMedia('(max-width: 767px)').matches ? 920 : 1100;
       const finalHeight = Math.min(Math.ceil(safeHeight + drawerSpace), maxReasonableHeight);
 
@@ -1036,6 +1142,7 @@ $copy = $pageCopy[$utmPlan];
     }, 500);
   })();
 </script>
+
 
 </body>
 </html>

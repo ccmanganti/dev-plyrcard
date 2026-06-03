@@ -1450,9 +1450,215 @@
             }
         }
 
+
+        /* Registration frame integration: the parent registration header owns the back control. */
+        body.embedded-registration-intake .topbar {
+            display: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            flex: 0 0 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+
+        body.embedded-registration-intake .progress-band {
+            border-top: 0 !important;
+        }
+
+        body.embedded-registration-intake .step-panel,
+        body.embedded-registration-intake .final-screen {
+            min-height: auto !important;
+        }
+
+
+        /* Revision 10: Club and age group fields should stack full-width, not sit side by side. */
+        .club-team-row,
+        .field.two.club-team-row {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            gap: 13px !important;
+            align-items: stretch !important;
+        }
+
+        .club-team-row > .field {
+            width: 100% !important;
+            min-width: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        .club-team-row .search-select,
+        .club-team-row .search-select-control,
+        .club-team-row .manual-input-wrap,
+        .club-team-row .manual-input {
+            width: 100% !important;
+        }
+
+
+        /* Revision 11: Sport + League row, dropdown-safe flow, and CTA no longer overlays fields. */
+        .sport-league-row,
+        .field.two.sport-league-row {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+            align-items: start !important;
+            margin-bottom: 13px !important;
+            overflow: visible !important;
+            position: relative !important;
+            z-index: 2500 !important;
+        }
+
+        .sport-league-row > .field {
+            width: 100% !important;
+            min-width: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        .sport-league-row #league_field.field-open,
+        .sport-league-row #league_field:has(.search-select.open) {
+            z-index: 5000 !important;
+        }
+
+        .sport-league-row .search-select-dropdown {
+            z-index: 5200 !important;
+        }
+
+        #position_field {
+            position: relative !important;
+            z-index: 1800 !important;
+        }
+
+        .club-team-row {
+            position: relative !important;
+            z-index: 1500 !important;
+        }
+
+        .panel-scroll,
+        .panel-scroll.with-bottom-cta {
+            overflow: visible !important;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .step-panel,
+        .final-screen {
+            overflow: visible !important;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .step-cta {
+            position: relative !important;
+            bottom: auto !important;
+            z-index: 1 !important;
+            margin-top: 24px !important;
+            margin-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+            padding: 0 !important;
+            background: transparent !important;
+            pointer-events: auto !important;
+        }
+
+        .search-select.open {
+            z-index: 6000 !important;
+        }
+
+        .search-select.open .search-select-dropdown {
+            z-index: 6100 !important;
+        }
+
+        @media (max-width: 390px) {
+            .sport-league-row,
+            .field.two.sport-league-row {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+
+        /* Revision 12: Back control lives beside the Next button inside the intake frame. */
+        body.embedded-registration-intake .topbar {
+            display: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            flex: 0 0 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+
+        .step-cta {
+            display: grid !important;
+            grid-template-columns: 0.42fr 1fr !important;
+            gap: 10px !important;
+            align-items: center !important;
+            position: relative !important;
+            z-index: 1 !important;
+        }
+
+        .step-cta .btn {
+            min-width: 0 !important;
+        }
+
+        .intake-step-back-btn {
+            background: rgba(255,255,255,.10) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255,255,255,.14) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 24px rgba(0,0,0,.18) !important;
+        }
+
+        .intake-step-back-btn:hover {
+            background: rgba(255,255,255,.15) !important;
+        }
+
+        #introScreen .bottom-cta,
+        #thanksScreen .bottom-cta {
+            display: block !important;
+        }
+
+        #introScreen .bottom-cta .btn,
+        #thanksScreen .bottom-cta .btn {
+            width: 100% !important;
+        }
+
+        @media (max-width: 350px) {
+            .step-cta {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+
+        /* Revision 13: Sport and League locked into one row before Position. */
+        .sport-league-row,
+        .field.two.sport-league-row {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+            align-items: start !important;
+            margin-bottom: 13px !important;
+            overflow: visible !important;
+            position: relative !important;
+            z-index: 2500 !important;
+        }
+
+        .sport-league-row > .field {
+            width: 100% !important;
+            min-width: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        @media (max-width: 360px) {
+            .sport-league-row,
+            .field.two.sport-league-row {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
     </style>
 </head>
-<body>
+<body class="embedded-registration-intake">
 <div class="page">
     <div class="app">
         @php
@@ -1533,13 +1739,13 @@
                             <div class="field two">
                                 <div class="field" id="first_name_field">
                                     <label class="label" for="first_name">First Name</label>
-                                    <input class="input" type="text" id="first_name" name="first_name" value="{{ old('first_name') }}" autocomplete="given-name">
+                                    <input class="input" type="text" id="first_name" name="first_name" placeholder="Type First Name" value="{{ old('first_name') }}" autocomplete="given-name">
                                     <div class="field-message" id="first_name_error"></div>
                                 </div>
 
                                 <div class="field" id="last_name_field">
                                     <label class="label" for="last_name">Last Name</label>
-                                    <input class="input" type="text" id="last_name" name="last_name" value="{{ old('last_name') }}" autocomplete="family-name">
+                                    <input class="input" type="text" id="last_name" name="last_name" placeholder="Type Last Name" value="{{ old('last_name') }}" autocomplete="family-name">
                                     <div class="field-message" id="last_name_error"></div>
                                 </div>
                             </div>
@@ -1550,11 +1756,11 @@
                                 <div class="gender-list">
                                     <button type="button" class="gender-card" data-gender-value="male" aria-pressed="false">
                                         <span class="gender-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                        <span class="gender-card-label">Male</span>
+                                        <span class="gender-card-label">Boys</span>
                                     </button>
                                     <button type="button" class="gender-card" data-gender-value="female" aria-pressed="false">
                                         <span class="gender-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                        <span class="gender-card-label">Female</span>
+                                        <span class="gender-card-label">Girls</span>
                                     </button>
                                 </div>
                                 <div class="field-message" id="gender_error"></div>
@@ -1562,17 +1768,18 @@
 
                             <div class="field" id="personal_email_field">
                                 <label class="label" for="personal_email">Email</label>
-                                <input class="input" type="email" id="personal_email" name="personal_email" value="{{ old('personal_email') }}" autocomplete="email">
+                                <input class="input" type="email" id="personal_email" name="personal_email" placeholder="youremail@here.com" value="{{ old('personal_email') }}" autocomplete="email">
                                 <div class="field-message" id="personal_email_error"></div>
                             </div>
 
                             <div class="field" id="phone_field">
                                 <label class="label" for="phone">Phone</label>
-                                <input class="input phone-input" type="tel" id="phone" name="phone" value="{{ old('phone') }}" autocomplete="tel">
+                                <input class="input phone-input" type="tel" id="phone" name="phone" placeholder="Phone Number" value="{{ old('phone') }}" autocomplete="tel">
                                 <div class="field-message" id="phone_error"></div>
                             </div>
 
                             <div class="step-cta">
+                                <button type="button" class="btn intake-step-back-btn" id="stepBackBtn1">Back</button>
                                 <button type="button" class="btn" id="nextBtn1">Next</button>
                             </div>
                         </div>
@@ -1580,7 +1787,8 @@
 
                     <div class="step-panel" data-step="2">
                         <div class="panel-scroll with-bottom-cta">
-                            <div class="field" id="sport_field">
+                            <div class="field two sport-league-row">
+                                <div class="field" id="sport_field">
                                 <label class="label" for="sport">Sport</label>
                                 <select class="select" id="sport" name="sport">
                                     <option value="">Select One</option>
@@ -1604,18 +1812,7 @@
                                 <div class="field-message" id="sport_error"></div>
                             </div>
 
-                            <div class="field" id="position_field">
-                                <label class="label" for="position_select">Position</label>
-                                <select class="select" id="position_select">
-                                    <option value="">Select position(s)</option>
-                                </select>
-                                <input type="hidden" id="position_values" value="">
-                                <div id="positionArrayInputs"></div>
-                                <div class="chips-wrap" id="positionChips"></div>
-                                <div class="field-message" id="position_error"></div>
-                            </div>
-
-                            <div class="field" id="league_field">
+                                <div class="field" id="league_field">
                                 <label class="label">League</label>
                                 <input type="hidden" id="league_id" name="league_id" value="{{ old('league_id') }}">
                                 <div id="leagueSelectRoot"></div>
@@ -1627,8 +1824,20 @@
                                 </div>
                                 <div class="field-message" id="league_error"></div>
                             </div>
+                            </div>
 
-                            <div class="field two club-team-row">
+                            <div class="field" id="position_field">
+                                <label class="label" for="position_select">Position</label>
+                                <select class="select" id="position_select">
+                                    <option value="">Select position(s)</option>
+                                </select>
+                                <input type="hidden" id="position_values" value="">
+                                <div id="positionArrayInputs"></div>
+                                <div class="chips-wrap" id="positionChips"></div>
+                                <div class="field-message" id="position_error"></div>
+                            </div>
+
+                            <div class="field club-team-row">
                                 <div class="field" id="club_field">
                                     <label class="label">Club</label>
                                     <input type="hidden" id="club_id" name="club_id" value="{{ old('club_id') }}">
@@ -1651,6 +1860,7 @@
                             </div>
 
                             <div class="step-cta">
+                                <button type="button" class="btn intake-step-back-btn" id="stepBackBtn2">Back</button>
                                 <button type="button" class="btn" id="nextBtn2">Next</button>
                             </div>
                         </div>
@@ -1682,6 +1892,7 @@
                             </div>
 
                             <div class="step-cta">
+                                <button type="button" class="btn intake-step-back-btn" id="stepBackBtn3">Back</button>
                                 <button type="button" class="btn" id="nextBtn3">Next</button>
                             </div>
                         </div>
@@ -1692,6 +1903,7 @@
                             <h1 class="final-title">Now Make It Unforgettable</h1>
                             <p class="final-text">You’ve built the foundation, now add the final touches that make your PLYRCARD stand out. Finish it now or come back later, but don’t skip the step that brings it all together.</p>
                             <div class="step-cta">
+                                <button type="button" class="btn intake-step-back-btn" id="stepBackBtn4">Back</button>
                                 <button type="submit" class="btn" id="submitBtn">Submit</button>
                             </div>
                         </div>
@@ -1705,7 +1917,7 @@
                     <div>
                         <h2 class="sample-modal-title" id="sampleModalTitle">Image Upload Samples</h2>
                     </div>
-                    <button type="button" class="sample-modal-close" id="closeSampleModal" aria-label="Close sample guide">×</button>
+                    <button type="button" class="sample-modal-close" id="closeSampleModal" aria-label="Close sample guide">x</button>
                 </div>
 
                 <div class="sample-grid">
@@ -1824,6 +2036,30 @@ window.plyrIntakeData = {
         if (thanks) thanks.style.display = 'none';
     }
 
+    function notifyParentOfIntakeState(){
+        try {
+            if (!window.parent || window.parent === window) return;
+
+            window.parent.postMessage({
+                type: 'plyrcard:intake.state',
+                currentStep: currentStep,
+                canGoBack: currentStep > 0,
+                isIntro: currentStep === 0
+            }, '*');
+        } catch (error) {}
+    }
+
+    function goBackFromParentFrame(){
+        if (currentStep > 1) {
+            showStep(currentStep - 1);
+            return;
+        }
+
+        if (currentStep === 1) {
+            showIntro();
+        }
+    }
+
     function setFormScreenBackground(step){
         const form = document.getElementById('formScreen');
         if (!form) return;
@@ -1838,6 +2074,7 @@ window.plyrIntakeData = {
         const intro = $('#introScreen');
         if (intro) intro.style.display = 'flex';
         animateProgress(25);
+        notifyParentOfIntakeState();
     }
 
     function getStepBody(step){
@@ -1870,6 +2107,7 @@ window.plyrIntakeData = {
 
         updateLiveProgress();
         saveDraft();
+        notifyParentOfIntakeState();
     }
 
     function animateProgress(percent){
@@ -2463,7 +2701,9 @@ window.plyrIntakeData = {
 
     document.addEventListener('DOMContentLoaded', function(){
         if (document.getElementById('thanksScreen')) {
+            currentStep = 0;
             clearDraft();
+            notifyParentOfIntakeState();
             postSubmittedMessage(data.submitted);
             return;
         }
@@ -2563,6 +2803,33 @@ window.plyrIntakeData = {
                 updateLiveProgress();
             });
         }
+
+
+        function addStepBackButtonListeners(){
+            const backMap = {
+                stepBackBtn1: function(){ showIntro(); },
+                stepBackBtn2: function(){ showStep(1); },
+                stepBackBtn3: function(){ showStep(2); },
+                stepBackBtn4: function(){ showStep(3); },
+            };
+
+            Object.keys(backMap).forEach(function(id){
+                const button = document.getElementById(id);
+                if (!button) return;
+
+                button.addEventListener('click', function(event){
+                    event.preventDefault();
+                    event.stopPropagation();
+                    backMap[id]();
+                    window.requestAnimationFrame(function(){
+                        notifyParentOfIntakeResize && notifyParentOfIntakeResize();
+                        notifyParentOfIntakeState && notifyParentOfIntakeState();
+                    });
+                });
+            });
+        }
+
+        addStepBackButtonListeners();
 
         $('#backBtn') && $('#backBtn').addEventListener('click', function(){
             if (currentStep === 1) showIntro();
@@ -2853,8 +3120,26 @@ window.plyrIntakeData = {
     window.addEventListener('load', notifyParentOfIntakeResize);
     window.addEventListener('resize', notifyParentOfIntakeResize);
     window.addEventListener('message', function(event){
-        if (!event.data || event.data.type !== 'plyrcard:intake.requestResize') return;
-        notifyParentOfIntakeResize();
+        if (!event.data) return;
+
+        if (event.data.type === 'plyrcard:intake.requestResize') {
+            notifyParentOfIntakeResize();
+            notifyParentOfIntakeState();
+            return;
+        }
+
+        if (event.data.type === 'plyrcard:intake.requestState') {
+            notifyParentOfIntakeState();
+            return;
+        }
+
+        if (event.data.type === 'plyrcard:intake.back') {
+            goBackFromParentFrame();
+            window.requestAnimationFrame(function(){
+                notifyParentOfIntakeResize();
+                notifyParentOfIntakeState();
+            });
+        }
     });
 
     const intakeResizeObserver = new MutationObserver(function(){
