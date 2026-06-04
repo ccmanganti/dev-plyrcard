@@ -96,6 +96,11 @@ class User extends Authenticatable implements HasName, FilamentUser
         'profile_completion_percentage',
         'profile_completion_threshold_sent_at',
         'ghl_contact_id',
+        'club_referral_id',
+        'registration_source',
+        'utm_club_id',
+        'utm_league_id',
+        'utm_team_name',
 
         // First-login / onboarding fields
         'must_change_password',
@@ -132,6 +137,9 @@ class User extends Authenticatable implements HasName, FilamentUser
             'youtube_cached_videos' => 'array',
             'youtube_cache_refreshed_at' => 'datetime',
             'raw_player_images' => 'array',
+            'club_referral_id' => 'integer',
+            'utm_club_id' => 'integer',
+            'utm_league_id' => 'integer',
 
             // First-login / onboarding casts
             'must_change_password' => 'boolean',
@@ -167,6 +175,11 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function club(): BelongsTo
     {
         return $this->belongsTo(Club::class);
+    }
+
+    public function assignedClub(): BelongsTo
+    {
+        return $this->belongsTo(Club::class, 'club_id');
     }
 
     public function legacyClub(): BelongsTo
@@ -212,6 +225,28 @@ class User extends Authenticatable implements HasName, FilamentUser
         return $this->hasMany(Schedule::class, 'created_by_user_id')
             ->orderBy('game_date')
             ->orderBy('game_time');
+    }
+
+
+
+    public function clubReferrals(): HasMany
+    {
+        return $this->hasMany(ClubReferral::class, 'club_manager_id');
+    }
+
+    public function registrationReferral(): BelongsTo
+    {
+        return $this->belongsTo(ClubReferral::class, 'club_referral_id');
+    }
+
+    public function isClubManager(): bool
+    {
+        return method_exists($this, 'hasRole')
+            && (
+                $this->hasRole('Club Manager')
+                || $this->hasRole('club manager')
+                || $this->hasRole('ClubManager')
+            );
     }
 
     public function canAccessPanel(Panel $panel): bool

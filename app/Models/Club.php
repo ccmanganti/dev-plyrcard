@@ -24,13 +24,11 @@ class Club extends Model
         'secondary_color',
         'city',
         'state',
-
         'has_landing_page',
         'landing_page_is_published',
         'landing_page_slug',
         'landing_page_intro',
         'landing_page_content',
-
         'contact_info',
         'coaching_staff',
         'sponsors_partners',
@@ -41,7 +39,6 @@ class Club extends Model
     protected $casts = [
         'has_landing_page' => 'boolean',
         'landing_page_is_published' => 'boolean',
-
         'contact_info' => 'array',
         'coaching_staff' => 'array',
         'sponsors_partners' => 'array',
@@ -79,22 +76,22 @@ class Club extends Model
 
     public function landingUrl(): ?string
     {
-        if (
-            ! $this->has_landing_page
-            || ! $this->landing_page_is_published
-            || blank($this->landing_page_slug)
-        ) {
+        if (! $this->has_landing_page || ! $this->landing_page_is_published || blank($this->landing_page_slug)) {
             return null;
         }
 
-        return route('clubs.landing', [
-            'clubSlug' => $this->landing_page_slug,
-        ]);
+        return route('clubs.landing', ['clubSlug' => $this->landing_page_slug]);
     }
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(ClubReferral::class);
     }
 
     public function teams(): HasMany

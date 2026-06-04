@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
+
+require __DIR__ . '/club_referrals.php';
 /*
 |--------------------------------------------------------------------------
 | Marketing routes

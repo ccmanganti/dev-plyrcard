@@ -90,6 +90,19 @@ class UserResource extends Resource
         return auth()->user()?->hasRole('Superadmin') ?? false;
     }
 
+
+    protected static function getClubManagerAssignmentOptions(?string $search = null): array
+    {
+        return Club::query()
+            ->withoutGlobalScopes()
+            ->when(filled($search), fn ($query) => $query->where('name', 'like', '%' . trim($search) . '%'))
+            ->orderBy('name')
+            ->limit(100)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => (string) $name])
+            ->all();
+    }
+
     protected static function readonlyImagePreview(?string $path, string $label): HtmlString
     {
         if (blank($path)) {
@@ -2099,10 +2112,11 @@ class UserResource extends Resource
                 ->icon('heroicon-m-shield-check')
                 ->iconButton()
                 ->tooltip('Edit Access')
-                ->modalHeading('Edit Roles & Website Publishing')
+                ->modalHeading('Edit Roles, Club Assignment & Website Publishing')
                 ->fillForm(function (User $record): array {
                     return [
                         'roles' => $record->roles->pluck('name')->all(),
+                        'club_id' => $record->club_id ? (string) $record->club_id : null,
                         'website_is_published' => (bool) $record->websites->first()?->is_published,
                     ];
                 })
@@ -2115,11 +2129,32 @@ class UserResource extends Resource
                         ->preload()
                         ->required(),
 
+                    Select::make('club_id')
+                        ->label('Assigned Club for Club Manager')
+                        ->placeholder('Search and select one club')
+                        ->helperText('Used only when this user has the Club Manager role. This assigns exactly one club via users.club_id.')
+                        ->searchable()
+                        ->preload()
+                        ->native(false)
+                        ->options(fn (): array => static::getClubManagerAssignmentOptions())
+                        ->getSearchResultsUsing(fn (string $search): array => static::getClubManagerAssignmentOptions($search))
+                        ->getOptionLabelUsing(fn ($value): ?string => filled($value)
+                            ? Club::query()->withoutGlobalScopes()->whereKey($value)->value('name')
+                            : null),
+
                     Toggle::make('website_is_published')
                         ->label('Website Published'),
                 ])
                 ->action(function (User $record, array $data): void {
-                    $record->syncRoles($data['roles'] ?? []);
+                    $roles = $data['roles'] ?? [];
+
+                    $record->syncRoles($roles);
+
+                    $record->forceFill([
+                        'club_id' => in_array('Club Manager', $roles, true)
+                            ? ($data['club_id'] ?? null)
+                            : null,
+                    ])->save();
 
                     $website = $record->websites()->first();
 
