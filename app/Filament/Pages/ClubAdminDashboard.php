@@ -3,10 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Models\Club;
+use App\Models\ClubLeague;
 use App\Models\ClubReferral;
 use App\Models\User;
 use App\Support\ClubManagerAccess;
 use BackedEnum;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
@@ -26,6 +28,16 @@ class ClubAdminDashboard extends Page
 
     protected string $view = 'filament.pages.club-admin-dashboard';
 
+    public ?string $selectedTeam = null;
+
+    public ?string $inviteClubLeagueId = null;
+
+    public ?string $inviteTeamName = null;
+
+    public ?string $inviteName = null;
+
+    public ?string $inviteEmail = null;
+
     public static function shouldRegisterNavigation(): bool
     {
         return ClubManagerAccess::canAccessClubArea(auth()->user());
@@ -41,17 +53,14 @@ class ClubAdminDashboard extends Page
         return 'Club Dashboard';
     }
 
+    public function mount(): void
+    {
+        $this->inviteTeamName = $this->inviteTeamName ?: 'U13';
+    }
+
     public function getAssignedClubProperty(): ?Club
     {
-        $clubIds = ClubManagerAccess::clubAdminClubIds(auth()->user());
-
-        if (empty($clubIds)) {
-            return null;
-        }
-
-        return Club::query()
-            ->whereKey($clubIds[0])
-            ->first();
+        return ClubManagerAccess::assignedClub(auth()->user());
     }
 
     public function getAgeGroupsProperty(): Collection
@@ -72,29 +81,43 @@ class ClubAdminDashboard extends Page
             ->map(fn ($label) => (string) $label)
             ->values()
             ->map(function (string $label) use ($club): array {
-                $playerCount = $club
+                $players = $club
                     ? User::query()
                         ->where('club_id', $club->id)
                         ->where('team_name', $label)
-                        ->count()
-                    : 0;
+                    : User::query()->whereRaw('1 = 0');
 
                 return [
                     'name' => $label,
-                    'player_count' => $playerCount,
+                    'player_count' => (clone $players)->count(),
+                    'recent_count' => (clone $players)->where('created_at', '>=', now()->subDays(30))->count(),
                 ];
             });
     }
 
-    public function getPlayersProperty(): EloquentCollection
+    public function getProgramsProperty(): EloquentCollection
+    {
+        $club = $this->assignedClub;
+
+        return ClubLeague::query()
+            ->with('league')
+            ->when($club, fn ($query) => $query->where('club_id', $club->id), fn ($query) => $query->whereRaw('1 = 0'))
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function getSelectedTeamPlayersProperty(): EloquentCollection
     {
         $club = $this->assignedClub;
 
         return User::query()
-            ->with(['club', 'league'])
+            ->with(['club', 'league', 'websites'])
             ->when($club, fn ($query) => $query->where('club_id', $club->id), fn ($query) => $query->whereRaw('1 = 0'))
-            ->latest()
-            ->limit(12)
+            ->when($this->selectedTeam, fn ($query) => $query->where('team_name', $this->selectedTeam), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
             ->get();
     }
 
@@ -139,5 +162,70 @@ class ClubAdminDashboard extends Page
             'invite_clicks' => (clone $invitesQuery)->whereNotNull('clicked_at')->count(),
             'invite_conversions' => (clone $invitesQuery)->whereNotNull('registered_at')->count(),
         ];
+    }
+
+    public function selectTeam(string $team): void
+    {
+        $this->selectedTeam = $team;
+    }
+
+    public function clearSelectedTeam(): void
+    {
+        $this->selectedTeam = null;
+    }
+
+    public function createInvite(): void
+    {
+        $club = $this->assignedClub;
+
+        if (! $club) {
+            Notification::make()
+                ->title('No club assigned')
+                ->body('Assign one club before creating invites.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $program = filled($this->inviteClubLeagueId)
+            ? ClubLeague::query()->with('league')->where('club_id', $club->id)->find($this->inviteClubLeagueId)
+            : null;
+
+        if (! $program) {
+            Notification::make()
+                ->title('Select a program')
+                ->body('Choose a league/program before creating the invite.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $referral = ClubReferral::create([
+            'club_manager_id' => auth()->id(),
+            'club_id' => $club->id,
+            'league_id' => $program->league_id,
+            'club_league_id' => $program->id,
+            'team_name' => $this->inviteTeamName,
+            'sport' => $program->sport ?: $program->league?->sport,
+            'gender' => collect($program->genders ?? [])->first(),
+            'invited_name' => $this->inviteName,
+            'invited_email' => $this->inviteEmail,
+            'status' => 'active',
+        ]);
+
+        $this->inviteClubLeagueId = null;
+        $this->inviteTeamName = 'U13';
+        $this->inviteName = null;
+        $this->inviteEmail = null;
+
+        $this->dispatch('close-modal', id: 'club-invite-modal');
+
+        Notification::make()
+            ->title('Invite created')
+            ->body('Invite URL copied from the Invites section when needed.')
+            ->success()
+            ->send();
     }
 }

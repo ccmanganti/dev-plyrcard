@@ -45,6 +45,7 @@ use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Spatie\Permission\Models\Role;
@@ -90,16 +91,53 @@ class UserResource extends Resource
         return auth()->user()?->hasRole('Superadmin') ?? false;
     }
 
-
     protected static function getClubManagerAssignmentOptions(?string $search = null): array
     {
-        return Club::query()
+        $query = Club::query()
             ->withoutGlobalScopes()
-            ->when(filled($search), fn ($query) => $query->where('name', 'like', '%' . trim($search) . '%'))
+            ->select([
+                'id',
+                'name',
+                'city',
+                'state',
+                'landing_page_slug',
+            ]);
+
+        if (SchemaFacade::hasColumn('clubs', 'canonical_club_id')) {
+            $query->whereNull('canonical_club_id');
+        }
+
+        if (filled($search)) {
+            $search = trim($search);
+
+            $query->where(function (Builder $query) use ($search): void {
+                $query
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhere('state', 'like', "%{$search}%")
+                    ->orWhere('landing_page_slug', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
             ->orderBy('name')
-            ->limit(100)
-            ->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(string) $id => (string) $name])
+            ->orderBy('city')
+            ->orderBy('state')
+            ->limit(300)
+            ->get()
+            ->unique(fn (Club $club): string => str($club->name)->lower()->squish()->toString())
+            ->mapWithKeys(function (Club $club): array {
+                $location = collect([
+                    $club->city,
+                    $club->state,
+                ])->filter()->implode(', ');
+
+                $label = filled($location)
+                    ? "{$club->name} — {$location}"
+                    : $club->name;
+
+                return [(string) $club->id => $label];
+            })
             ->all();
     }
 
@@ -2139,7 +2177,11 @@ class UserResource extends Resource
                         ->options(fn (): array => static::getClubManagerAssignmentOptions())
                         ->getSearchResultsUsing(fn (string $search): array => static::getClubManagerAssignmentOptions($search))
                         ->getOptionLabelUsing(fn ($value): ?string => filled($value)
-                            ? Club::query()->withoutGlobalScopes()->whereKey($value)->value('name')
+                            ? Club::query()
+                                ->withoutGlobalScopes()
+                                ->whereKey($value)
+                                ->first()
+                                ?->name
                             : null),
 
                     Toggle::make('website_is_published')
