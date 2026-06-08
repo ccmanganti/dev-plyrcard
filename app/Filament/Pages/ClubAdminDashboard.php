@@ -32,15 +32,17 @@ class ClubAdminDashboard extends Page
     protected string $view = 'filament.pages.club-admin-dashboard';
 
     /**
-     * IMPORTANT:
-     * This is NOT a club_leagues.id anymore.
+     * The dashboard selects a visible league/program group first, then a gender.
      *
-     * After the club/league restructure, duplicate club_leagues and even duplicate
-     * leagues can exist. The dashboard uses a normalized program key instead:
-     *
-     * club_id + normalized league name + normalized sport + normalized genders
+     * This value is not club_leagues.id. It is a normalized league group key:
+     * club_id + normalized league name + normalized sport.
      */
-    public ?string $selectedProgramKey = null;
+    public ?string $selectedLeagueKey = null;
+
+    /**
+     * male | female | coed
+     */
+    public ?string $selectedGender = null;
 
     public ?string $selectedTeam = null;
 
@@ -56,7 +58,9 @@ class ClubAdminDashboard extends Page
 
     public ?string $gameStatusFilter = null;
 
-    public ?string $inviteProgramKey = null;
+    public ?string $inviteLeagueKey = null;
+
+    public ?string $inviteGender = null;
 
     public ?string $inviteTeamName = null;
 
@@ -64,7 +68,9 @@ class ClubAdminDashboard extends Page
 
     public ?string $inviteEmail = null;
 
-    public ?string $scheduleProgramKey = null;
+    public ?string $scheduleLeagueKey = null;
+
+    public ?string $scheduleGender = null;
 
     public ?string $scheduleTeamName = null;
 
@@ -103,17 +109,21 @@ class ClubAdminDashboard extends Page
 
     public function mount(): void
     {
-        $defaultProgramKey = $this->defaultProgramKey();
+        $defaultLeagueKey = $this->defaultLeagueKey();
+        $defaultGender = $this->defaultGenderForLeague($defaultLeagueKey);
         $defaultTeam = $this->defaultTeamName();
 
-        $this->selectedProgramKey ??= $defaultProgramKey;
-        $this->selectedTeam ??= $defaultTeam;
+        $this->selectedLeagueKey ??= $defaultLeagueKey;
+        $this->selectedGender ??= $defaultGender;
+        $this->selectedTeam ??= $this->firstAvailableTeamName() ?: $defaultTeam;
 
-        $this->inviteProgramKey ??= $defaultProgramKey;
-        $this->inviteTeamName ??= $defaultTeam;
+        $this->inviteLeagueKey ??= $this->selectedLeagueKey;
+        $this->inviteGender ??= $this->selectedGender;
+        $this->inviteTeamName ??= $this->selectedTeam;
 
-        $this->scheduleProgramKey ??= $defaultProgramKey;
-        $this->scheduleTeamName ??= $defaultTeam;
+        $this->scheduleLeagueKey ??= $this->selectedLeagueKey;
+        $this->scheduleGender ??= $this->selectedGender;
+        $this->scheduleTeamName ??= $this->selectedTeam;
 
         $this->scheduleDate ??= now()->toDateString();
         $this->scheduleTime ??= '18:00';
@@ -132,9 +142,21 @@ class ClubAdminDashboard extends Page
         ]))->values()->first() ?: 'U13');
     }
 
-    protected function defaultProgramKey(): ?string
+    protected function defaultLeagueKey(): ?string
     {
-        return $this->programOptions->first()['key'] ?? null;
+        return $this->leagueOptions->first()['key'] ?? null;
+    }
+
+    protected function defaultGenderForLeague(?string $leagueKey): ?string
+    {
+        $league = $this->resolveLeagueOption($leagueKey);
+
+        return collect($league['genders'] ?? [])->first() ?: 'male';
+    }
+
+    protected function firstAvailableTeamName(): ?string
+    {
+        return $this->ageGroups->first()['name'] ?? null;
     }
 
     public function getAssignedClubProperty(): ?Club
@@ -143,17 +165,13 @@ class ClubAdminDashboard extends Page
     }
 
     /**
-     * Unique dropdown options for the current club.
+     * Selectable league buttons for the current club.
      *
-     * Duplicate safety:
-     * We DO NOT key by league_id because the restructure can leave duplicate League
-     * rows with the same name/sport/gender and duplicate ClubLeague rows pointing
-     * to those duplicate League rows.
-     *
-     * Instead, this groups by the label users actually mean:
-     * normalized league name + normalized sport + normalized genders.
+     * Duplicate-safe grouping:
+     * We do not key by league_id because the database restructure can leave
+     * duplicate League rows with the same visible name/sport/logo.
      */
-    public function getProgramOptionsProperty(): Collection
+    public function getLeagueOptionsProperty(): Collection
     {
         $club = $this->assignedClub;
 
@@ -170,52 +188,57 @@ class ClubAdminDashboard extends Page
             ->get();
 
         return $clubLeagues
-            ->groupBy(fn (ClubLeague $clubLeague): string => $this->programGroupKey($clubLeague))
+            ->groupBy(fn (ClubLeague $clubLeague): string => $this->leagueGroupKey($clubLeague))
             ->map(function (Collection $group) use ($club): array {
                 /** @var ClubLeague $primary */
                 $primary = $group->first();
 
                 $leagueName = trim((string) ($primary->league?->name ?: 'League'));
                 $sport = trim((string) ($primary->sport ?: $primary->league?->sport ?: ''));
+                $logo = $primary->league?->logo;
 
                 $genders = $group
-                    ->flatMap(fn (ClubLeague $clubLeague) => $clubLeague->genders ?? $clubLeague->league?->genders ?? [])
-                    ->map(fn ($value) => ClubLeague::normalizeGender($value) ?: Str::lower(trim((string) $value)))
+                    ->flatMap(function (ClubLeague $clubLeague) {
+                        $values = collect($clubLeague->genders ?? []);
+
+                        if ($values->isEmpty() && $clubLeague->league) {
+                            $values = collect($clubLeague->league->genders ?? [$clubLeague->league->gender ?? null]);
+                        }
+
+                        return $values;
+                    })
+                    ->map(fn ($value) => $this->normalizeGender($value))
                     ->filter()
                     ->unique()
                     ->sort()
                     ->values();
 
-                if ($genders->isEmpty()) {
-                    $legacyGender = ClubLeague::normalizeGender($primary->league?->gender);
-                    if ($legacyGender) {
-                        $genders = collect([$legacyGender]);
-                    }
+                if ($genders->contains('coed')) {
+                    $genders = collect(['male', 'female']);
                 }
 
-                $labelParts = collect([
-                    $leagueName,
-                    $sport,
-                    $genders->isNotEmpty() ? $genders->implode('/') : null,
-                ])->filter();
+                if ($genders->isEmpty()) {
+                    $genders = collect(['male']);
+                }
 
                 return [
-                    'key' => $this->programGroupKey($primary),
-                    'label' => $labelParts->implode(' • '),
+                    'key' => $this->leagueGroupKey($primary),
+                    'label' => $leagueName,
+                    'sport' => $sport,
+                    'logo' => $logo,
+                    'genders' => $genders->values()->all(),
                     'club_id' => (int) $club->id,
                     'primary_club_league_id' => (int) $primary->id,
                     'primary_league_id' => (int) $primary->league_id,
                     'club_league_ids' => $group->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
                     'league_ids' => $group->pluck('league_id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
-                    'sport' => $sport,
-                    'genders' => $genders->values()->all(),
                 ];
             })
             ->sortBy('label')
             ->values();
     }
 
-    protected function programGroupKey(ClubLeague $clubLeague): string
+    protected function leagueGroupKey(ClubLeague $clubLeague): string
     {
         $leagueName = Str::of((string) ($clubLeague->league?->name ?: 'league'))
             ->lower()
@@ -227,45 +250,106 @@ class ClubAdminDashboard extends Page
             ->squish()
             ->toString();
 
-        $genders = collect($clubLeague->genders ?? $clubLeague->league?->genders ?? [])
-            ->map(fn ($value) => ClubLeague::normalizeGender($value) ?: Str::lower(trim((string) $value)))
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-
-        if ($genders->isEmpty()) {
-            $legacyGender = ClubLeague::normalizeGender($clubLeague->league?->gender);
-            if ($legacyGender) {
-                $genders = collect([$legacyGender]);
-            }
-        }
-
         return implode('|', [
             (int) $clubLeague->club_id,
             $leagueName,
             $sport,
-            $genders->implode(','),
         ]);
     }
 
-    protected function resolveProgram(?string $programKey): ?array
+    protected function normalizeGender(?string $value): ?string
     {
-        if (blank($programKey)) {
+        $value = strtolower(trim((string) $value));
+
+        if ($value === '') {
             return null;
         }
 
-        return $this->programOptions->firstWhere('key', $programKey);
+        if (str_contains($value, 'female') || str_contains($value, 'girl') || str_contains($value, 'women') || str_contains($value, 'woman')) {
+            return 'female';
+        }
+
+        if (str_contains($value, 'male') || str_contains($value, 'boy') || str_contains($value, 'men') || str_contains($value, 'man')) {
+            return 'male';
+        }
+
+        if (str_contains($value, 'coed') || str_contains($value, 'mixed')) {
+            return 'coed';
+        }
+
+        return in_array($value, ['male', 'female', 'coed'], true) ? $value : null;
+    }
+
+    protected function genderLabel(?string $gender): string
+    {
+        return match ($gender) {
+            'female' => 'Girls',
+            'male' => 'Boys',
+            'coed' => 'Coed',
+            default => 'All',
+        };
+    }
+
+    protected function resolveLeagueOption(?string $leagueKey): ?array
+    {
+        if (blank($leagueKey)) {
+            return null;
+        }
+
+        return $this->leagueOptions->firstWhere('key', $leagueKey);
+    }
+
+    protected function resolveProgram(?string $leagueKey, ?string $gender = null): ?array
+    {
+        $league = $this->resolveLeagueOption($leagueKey);
+
+        if (! $league) {
+            return null;
+        }
+
+        $gender = $this->normalizeGender($gender) ?: collect($league['genders'])->first();
+
+        if ($gender && ! in_array($gender, $league['genders'], true)) {
+            $gender = collect($league['genders'])->first();
+        }
+
+        return [
+            ...$league,
+            'gender' => $gender,
+            'gender_label' => $this->genderLabel($gender),
+            'label' => trim(collect([
+                $league['label'] ?? null,
+                $league['sport'] ?? null,
+                $this->genderLabel($gender),
+            ])->filter()->implode(' • ')),
+        ];
+    }
+
+    public function getSelectedLeagueProperty(): ?array
+    {
+        return $this->resolveLeagueOption($this->selectedLeagueKey);
     }
 
     public function getSelectedProgramProperty(): ?array
     {
-        return $this->resolveProgram($this->selectedProgramKey);
+        return $this->resolveProgram($this->selectedLeagueKey, $this->selectedGender);
     }
 
-    public function getAgeGroupsProperty(): Collection
+    public function getAvailableGenderOptionsProperty(): Collection
     {
-        $configured = config('plyrcard.age_groups', [
+        $league = $this->selectedLeague;
+
+        return collect($league['genders'] ?? [])
+            ->map(fn ($gender) => [
+                'value' => $gender,
+                'label' => $this->genderLabel($gender),
+            ])
+            ->values();
+    }
+
+    public function getAllAgeGroupsProperty(): Collection
+    {
+        return collect(config('plyrcard.age_groups', [
             'u13' => 'U13',
             'u14' => 'U14',
             'u15' => 'U15',
@@ -273,25 +357,35 @@ class ClubAdminDashboard extends Page
             'u17' => 'U17',
             'u18' => 'U18',
             'u19' => 'U19',
-        ]);
+        ]))
+            ->map(fn ($label) => (string) $label)
+            ->values();
+    }
 
+    /**
+     * Only age groups that actually exist for the selected league + gender are shown.
+     */
+    public function getAgeGroupsProperty(): Collection
+    {
         $club = $this->assignedClub;
         $program = $this->selectedProgram;
 
-        return collect($configured)
-            ->map(fn ($label) => (string) $label)
-            ->values()
+        if (! $club || ! $program) {
+            return collect();
+        }
+
+        return $this->allAgeGroups
             ->map(function (string $label) use ($club, $program): array {
-                $players = $club && $program
-                    ? $this->playersForProgramAndTeam($club, $program, $label)
-                    : User::query()->whereRaw('1 = 0');
+                $players = $this->playersForProgramGenderAndTeam($club, $program, $label);
 
                 return [
                     'name' => $label,
                     'player_count' => (clone $players)->count(),
                     'game_count' => $this->countTeamGames($label),
                 ];
-            });
+            })
+            ->filter(fn (array $ageGroup): bool => ((int) $ageGroup['player_count'] > 0) || ((int) $ageGroup['game_count'] > 0))
+            ->values();
     }
 
     protected function usersForProgram(Club $club, array $program)
@@ -303,10 +397,6 @@ class ClubAdminDashboard extends Page
                 $query
                     ->whereIn('club_league_id', $program['club_league_ids'])
                     ->orWhere(function ($query) use ($program): void {
-                        /*
-                         * Legacy fallback only. If a user has already been migrated
-                         * to a club_league_id, do not match it by league_id again.
-                         */
                         $query
                             ->whereNull('club_league_id')
                             ->whereIn('league_id', $program['league_ids']);
@@ -316,10 +406,24 @@ class ClubAdminDashboard extends Page
             $query->whereIn('league_id', $program['league_ids']);
         }
 
+        $gender = $this->normalizeGender($program['gender'] ?? null);
+
+        if ($gender && $gender !== 'coed') {
+            $query->where(function ($query) use ($gender): void {
+                $query
+                    ->where('gender', $gender)
+                    ->orWhere('gender', $this->genderLabel($gender))
+                    ->orWhere('gender', strtolower($this->genderLabel($gender)))
+                    ->orWhere('gender', $gender === 'female' ? 'girls' : 'boys')
+                    ->orWhere('gender', $gender === 'female' ? 'Girl' : 'Boy')
+                    ->orWhere('gender', $gender === 'female' ? 'Female' : 'Male');
+            });
+        }
+
         return $query;
     }
 
-    protected function playersForProgramAndTeam(Club $club, array $program, string $teamName)
+    protected function playersForProgramGenderAndTeam(Club $club, array $program, string $teamName)
     {
         return $this->usersForProgram($club, $program)
             ->where('team_name', $teamName);
@@ -348,7 +452,7 @@ class ClubAdminDashboard extends Page
             return [];
         }
 
-        return $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
+        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
             ->whereNotNull('position')
             ->get()
             ->flatMap(fn (User $user) => collect($user->position ?? [])->flatten())
@@ -368,7 +472,7 @@ class ClubAdminDashboard extends Page
             return new EloquentCollection();
         }
 
-        return $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
+        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
             ->with(['club', 'league', 'websites'])
             ->when(filled($this->playerSearch), function ($query): void {
                 $search = trim((string) $this->playerSearch);
@@ -409,7 +513,7 @@ class ClubAdminDashboard extends Page
             return new EloquentCollection();
         }
 
-        $playerIds = $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
+        $playerIds = $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
             ->distinct()
             ->pluck('id');
 
@@ -475,22 +579,76 @@ class ClubAdminDashboard extends Page
         ];
     }
 
-    public function setSelectedProgram(string $programKey): void
+    public function setSelectedLeague(string $leagueKey): void
     {
-        $program = $this->resolveProgram($programKey);
+        $league = $this->resolveLeagueOption($leagueKey);
 
-        if (! $program) {
+        if (! $league) {
             return;
         }
 
-        $this->selectedProgramKey = $program['key'];
-        $this->scheduleProgramKey = $program['key'];
-        $this->inviteProgramKey = $program['key'];
+        $this->selectedLeagueKey = $league['key'];
+        $this->selectedGender = $this->defaultGenderForLeague($league['key']);
 
-        $this->selectedTeam = $this->selectedTeam ?: $this->defaultTeamName();
+        $this->scheduleLeagueKey = $this->selectedLeagueKey;
+        $this->scheduleGender = $this->selectedGender;
+
+        $this->inviteLeagueKey = $this->selectedLeagueKey;
+        $this->inviteGender = $this->selectedGender;
+
+        $this->selectedTeam = $this->firstAvailableTeamName() ?: $this->defaultTeamName();
         $this->scheduleTeamName = $this->selectedTeam;
         $this->inviteTeamName = $this->selectedTeam;
 
+        $this->resetDetailState();
+    }
+
+    public function setSelectedLeagueGender(string $leagueKey, string $gender): void
+    {
+        $league = $this->resolveLeagueOption($leagueKey);
+        $gender = $this->normalizeGender($gender);
+
+        if (! $league || ! $gender || ! in_array($gender, $league['genders'] ?? [], true)) {
+            return;
+        }
+
+        $this->selectedLeagueKey = $league['key'];
+        $this->selectedGender = $gender;
+
+        $this->scheduleLeagueKey = $this->selectedLeagueKey;
+        $this->scheduleGender = $this->selectedGender;
+
+        $this->inviteLeagueKey = $this->selectedLeagueKey;
+        $this->inviteGender = $this->selectedGender;
+
+        $this->selectedTeam = $this->firstAvailableTeamName() ?: $this->defaultTeamName();
+        $this->scheduleTeamName = $this->selectedTeam;
+        $this->inviteTeamName = $this->selectedTeam;
+
+        $this->resetDetailState();
+    }
+
+    public function setSelectedGender(string $gender): void
+    {
+        $gender = $this->normalizeGender($gender);
+
+        if (! $gender || ! in_array($gender, $this->selectedLeague['genders'] ?? [], true)) {
+            return;
+        }
+
+        $this->selectedGender = $gender;
+        $this->scheduleGender = $gender;
+        $this->inviteGender = $gender;
+
+        $this->selectedTeam = $this->firstAvailableTeamName() ?: $this->defaultTeamName();
+        $this->scheduleTeamName = $this->selectedTeam;
+        $this->inviteTeamName = $this->selectedTeam;
+
+        $this->resetDetailState();
+    }
+
+    protected function resetDetailState(): void
+    {
         $this->selectedPlayerId = null;
         $this->playerSearch = null;
         $this->playerPositionFilter = null;
@@ -561,11 +719,14 @@ class ClubAdminDashboard extends Page
 
     public function createInvite(): void
     {
+        /*
+         * Hidden from UI for now, but kept functional so existing routes/actions do not break.
+         */
         $club = $this->assignedClub;
-        $program = $this->resolveProgram($this->inviteProgramKey);
+        $program = $this->resolveProgram($this->inviteLeagueKey, $this->inviteGender);
 
         if (! $club || ! $program) {
-            Notification::make()->title('Select a league')->danger()->send();
+            Notification::make()->title('Select a league and gender')->danger()->send();
             return;
         }
 
@@ -576,13 +737,14 @@ class ClubAdminDashboard extends Page
             'club_league_id' => $program['primary_club_league_id'],
             'team_name' => $this->inviteTeamName,
             'sport' => $program['sport'],
-            'gender' => collect($program['genders'] ?? [])->first(),
+            'gender' => $program['gender'],
             'invited_name' => $this->inviteName,
             'invited_email' => $this->inviteEmail,
             'status' => 'active',
         ]);
 
-        $this->inviteProgramKey = $this->selectedProgramKey;
+        $this->inviteLeagueKey = $this->selectedLeagueKey;
+        $this->inviteGender = $this->selectedGender;
         $this->inviteTeamName = $this->selectedTeam ?: $this->defaultTeamName();
         $this->inviteName = null;
         $this->inviteEmail = null;
@@ -595,10 +757,10 @@ class ClubAdminDashboard extends Page
     public function createTeamGame(): void
     {
         $club = $this->assignedClub;
-        $program = $this->resolveProgram($this->scheduleProgramKey);
+        $program = $this->resolveProgram($this->scheduleLeagueKey, $this->scheduleGender);
 
         if (! $club || ! $program) {
-            Notification::make()->title('Select a league')->danger()->send();
+            Notification::make()->title('Select a league and gender')->danger()->send();
             return;
         }
 
@@ -612,7 +774,7 @@ class ClubAdminDashboard extends Page
             return;
         }
 
-        $players = $this->playersForProgramAndTeam($club, $program, $this->scheduleTeamName)
+        $players = $this->playersForProgramGenderAndTeam($club, $program, $this->scheduleTeamName)
             ->distinct()
             ->pluck('id');
 
@@ -641,7 +803,8 @@ class ClubAdminDashboard extends Page
 
         $schedule->users()->syncWithoutDetaching($players->all());
 
-        $this->selectedProgramKey = $program['key'];
+        $this->selectedLeagueKey = $program['key'];
+        $this->selectedGender = $program['gender'];
         $this->selectedTeam = $this->scheduleTeamName;
         $this->activePanel = 'games';
 
@@ -673,7 +836,7 @@ class ClubAdminDashboard extends Page
             return 0;
         }
 
-        $playerIds = $this->playersForProgramAndTeam($club, $program, $team)
+        $playerIds = $this->playersForProgramGenderAndTeam($club, $program, $team)
             ->distinct()
             ->pluck('id');
 

@@ -3,7 +3,10 @@
         $club = $this->assignedClub;
         $stats = $this->stats;
         $ageGroups = $this->ageGroups;
-        $programOptions = $this->programOptions;
+        $allAgeGroups = $this->allAgeGroups;
+        $leagueOptions = $this->leagueOptions;
+        $genderOptions = $this->availableGenderOptions;
+        $selectedLeague = $this->selectedLeague;
         $selectedProgram = $this->selectedProgram;
         $players = $this->selectedTeamPlayers;
         $selectedPlayer = $this->selectedPlayer;
@@ -16,103 +19,422 @@
         $logoUrl = $club?->logo ? \Illuminate\Support\Facades\Storage::disk('public')->url($club->logo) : null;
         $heroUrl = $club?->background_image ? \Illuminate\Support\Facades\Storage::disk('public')->url($club->background_image) : null;
         $primary = $club?->primary_color ?: '#ff5c35';
+
+        $assetUrl = function ($path) {
+            if (blank($path)) {
+                return null;
+            }
+
+            $path = trim((string) $path);
+
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+                return $path;
+            }
+
+            return \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($path, '/'));
+        };
+
+        $selectedLeagueLogo = $assetUrl($selectedLeague['logo'] ?? null);
     @endphp
 
     <style>
-        .club-dashboard-v6, .club-dashboard-v6 * { box-sizing: border-box; }
-        .club-dashboard-v6 { display:grid; gap:16px; }
-        .club-dashboard-v6 .hero { position:relative; overflow:hidden; border-radius:28px; padding:22px; background:linear-gradient(135deg, rgba(0,0,0,.78), rgba(0,0,0,.92)), var(--club-hero-image, linear-gradient(135deg, #111, #050505)); background-size:cover; color:#fff; border:1px solid rgba(255,255,255,.1); }
-        .club-dashboard-v6 .hero::before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--club-primary) 42%, transparent), transparent 34%); pointer-events:none; }
-        .club-dashboard-v6 .hero-inner { position:relative; z-index:1; display:flex; align-items:center; gap:16px; }
-        .club-dashboard-v6 .club-logo { width:76px; height:76px; border-radius:21px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 76px; font-size:26px; font-weight:950; }
-        .club-dashboard-v6 .club-logo img { width:100%; height:100%; object-fit:cover; }
-        .club-dashboard-v6 .kicker { margin:0 0 8px; color:rgba(255,255,255,.58); font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:900; }
-        .club-dashboard-v6 h2 { margin:0; font-size:clamp(30px, 5vw, 54px); line-height:.94; letter-spacing:-.05em; font-weight:950; }
-        .club-dashboard-v6 p { margin:0; }
-        .club-dashboard-v6 .copy { margin-top:10px; max-width:760px; color:rgba(255,255,255,.72); font-size:14px; line-height:1.55; }
-        .club-dashboard-v6 .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
-        .club-dashboard-v6 .btn { display:inline-flex; align-items:center; justify-content:center; min-height:40px; border-radius:999px; padding:0 15px; text-decoration:none; font-size:12px; font-weight:900; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
-        .club-dashboard-v6 .btn-primary { color:#120806; background:linear-gradient(135deg, #fff2de, var(--club-primary)); }
+        .club-dashboard-v7, .club-dashboard-v7 * { box-sizing: border-box; }
+        .club-dashboard-v7 { display:grid; gap:16px; }
+        .club-dashboard-v7 .hero { position:relative; overflow:hidden; border-radius:28px; padding:22px; background:linear-gradient(135deg, rgba(0,0,0,.78), rgba(0,0,0,.92)), var(--club-hero-image, linear-gradient(135deg, #111, #050505)); background-size:cover; color:#fff; border:1px solid rgba(255,255,255,.1); }
+        .club-dashboard-v7 .hero::before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--club-primary) 42%, transparent), transparent 34%); pointer-events:none; }
+        .club-dashboard-v7 .hero-inner { position:relative; z-index:1; display:grid; grid-template-columns:minmax(0,1fr) minmax(300px, 390px); align-items:center; gap:18px; }
+        .club-dashboard-v7 .hero-main { display:flex; align-items:center; gap:16px; min-width:0; }
+        .club-dashboard-v7 .club-logo { width:76px; height:76px; border-radius:21px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 76px; font-size:26px; font-weight:950; }
+        .club-dashboard-v7 .club-logo img { width:100%; height:100%; object-fit:cover; }
+        .club-dashboard-v7 .kicker { margin:0 0 8px; color:rgba(255,255,255,.58); font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:900; }
+        .club-dashboard-v7 h2 { margin:0; font-size:clamp(30px, 5vw, 54px); line-height:.94; letter-spacing:-.05em; font-weight:950; }
+        .club-dashboard-v7 p { margin:0; }
+        .club-dashboard-v7 .copy { margin-top:10px; max-width:760px; color:rgba(255,255,255,.72); font-size:14px; line-height:1.55; }
+        .club-dashboard-v7 .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
+        .club-dashboard-v7 .btn { display:inline-flex; align-items:center; justify-content:center; min-height:40px; border-radius:999px; padding:0 15px; text-decoration:none; font-size:12px; font-weight:900; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
+        .club-dashboard-v7 .btn-primary { color:#120806; background:linear-gradient(135deg, #fff2de, var(--club-primary)); }
 
-        .club-dashboard-v6 .stat-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
-        .club-dashboard-v6 .stat-card { border:0; text-align:left; cursor:pointer; border-radius:20px; padding:14px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; }
-        .club-dashboard-v6 .stat-card.is-active { outline:2px solid color-mix(in srgb, var(--club-primary) 65%, transparent); }
-        .club-dashboard-v6 .stat-label { color:rgba(255,255,255,.5); font-size:10px; letter-spacing:.11em; text-transform:uppercase; font-weight:900; }
-        .club-dashboard-v6 .stat-value { margin-top:7px; font-size:29px; line-height:1; font-weight:950; }
+        .club-dashboard-v7 .hero-control {
+            position:relative;
+            justify-self:end;
+            width:min(430px,100%);
+            min-height:160px;
+            display:flex;
+            justify-content:flex-end;
+            align-items:center;
+            padding:0;
+            background:transparent;
+            border:0;
+            overflow:visible;
+        }
+        .club-dashboard-v7 .hero-league-watermark {
+            position:absolute;
+            right:0;
+            top:50%;
+            transform:translateY(-50%);
+            width:220px;
+            height:150px;
+            object-fit:contain;
+            opacity:.20;
+            filter:drop-shadow(0 24px 38px rgba(0,0,0,.55));
+            pointer-events:none;
+            user-select:none;
+        }
+        .club-dashboard-v7 .control-label {
+            position:absolute;
+            right:0;
+            top:0;
+            margin:0;
+            color:rgba(255,255,255,.48);
+            font-size:10px;
+            font-weight:950;
+            letter-spacing:.14em;
+            text-transform:uppercase;
+            text-align:right;
+        }
+        .club-dashboard-v7 .league-logo-grid {
+            position:relative;
+            z-index:3;
+            display:flex;
+            justify-content:flex-end;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:24px;
+            padding-top:24px;
+            padding-right:4px;
+            overflow:visible;
+        }
+        .club-dashboard-v7 .league-option {
+            position:relative;
+            display:grid;
+            justify-items:center;
+            min-width:88px;
+            min-height:122px;
+            isolation:isolate;
+        }
+        .club-dashboard-v7 .league-logo-button {
+            border:0;
+            background:transparent;
+            color:#fff;
+            cursor:pointer;
+            display:grid;
+            place-items:center;
+            gap:7px;
+            padding:0;
+            text-align:center;
+            transition:transform .2s ease, filter .2s ease, opacity .2s ease;
+            opacity:.70;
+        }
+        .club-dashboard-v7 .league-logo-button:hover,
+        .club-dashboard-v7 .league-option:hover .league-logo-button,
+        .club-dashboard-v7 .league-option:focus-within .league-logo-button {
+            transform:translateY(-3px) scale(1.04);
+            filter:drop-shadow(0 18px 28px color-mix(in srgb, var(--club-primary) 34%, transparent));
+            opacity:1;
+        }
+        .club-dashboard-v7 .league-logo-button.is-active {
+            opacity:1;
+            filter:drop-shadow(0 18px 34px color-mix(in srgb, var(--club-primary) 44%, transparent));
+        }
+        .club-dashboard-v7 .league-logo-button.is-active::after {
+            content:"";
+            width:34px;
+            height:3px;
+            border-radius:999px;
+            background:linear-gradient(90deg,#fff2de,var(--club-primary));
+            display:block;
+            margin-top:3px;
+        }
+        .club-dashboard-v7 .league-logo-button img {
+            width:78px;
+            height:78px;
+            object-fit:contain;
+        }
+        .club-dashboard-v7 .league-logo-fallback {
+            width:78px;
+            height:78px;
+            border-radius:999px;
+            display:grid;
+            place-items:center;
+            background:rgba(255,255,255,.08);
+            font-size:18px;
+            font-weight:950;
+        }
+        .club-dashboard-v7 .league-logo-button span {
+            font-size:11px;
+            font-weight:950;
+            line-height:1.05;
+            max-width:96px;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+            color:rgba(255,255,255,.78);
+        }
 
-        .club-dashboard-v6 .layout { display:grid; grid-template-columns:360px minmax(0,1fr); gap:14px; align-items:start; }
-        .club-dashboard-v6 .panel { border-radius:22px; padding:15px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; min-width:0; }
-        .club-dashboard-v6 .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-        .club-dashboard-v6 .panel h3 { margin:0; font-size:18px; font-weight:950; }
-        .club-dashboard-v6 .note { color:rgba(255,255,255,.48); font-size:12px; font-weight:700; }
-        .club-dashboard-v6 .list { display:grid; gap:9px; }
-        .club-dashboard-v6 .list-item { width:100%; display:flex; justify-content:space-between; gap:12px; border-radius:16px; padding:12px; background:rgba(255,255,255,.055); border:0; color:inherit; text-align:left; cursor:pointer; }
-        .club-dashboard-v6 .list-item:hover { background:rgba(255,255,255,.085); }
-        .club-dashboard-v6 .list-item.is-active { background:color-mix(in srgb, var(--club-primary) 20%, rgba(255,255,255,.055)); }
-        .club-dashboard-v6 .list-main strong { display:block; color:#fff; }
-        .club-dashboard-v6 .list-main span { display:block; color:rgba(255,255,255,.55); font-size:12px; margin-top:3px; }
-        .club-dashboard-v6 .badge { display:inline-flex; align-items:center; height:27px; border-radius:999px; padding:0 10px; background:color-mix(in srgb, var(--club-primary) 20%, transparent); color:#ffd1c7; font-size:11px; font-weight:900; white-space:nowrap; }
-        .club-dashboard-v6 .empty { color:rgba(255,255,255,.58); font-size:13px; line-height:1.55; }
+        /* Split-gender animation. Hidden by default; appears only on hover/focus. */
+        .club-dashboard-v7 .league-genders {
+            position:absolute;
+            top:0;
+            left:50%;
+            width:188px;
+            height:106px;
+            transform:translateX(-50%) scale(.78);
+            opacity:0;
+            pointer-events:none;
+            z-index:80;
+            transition:opacity .18s ease, transform .22s cubic-bezier(.2,.85,.25,1);
+        }
+        .club-dashboard-v7 .league-option:hover .league-genders,
+        .club-dashboard-v7 .league-option:focus-within .league-genders {
+            opacity:1;
+            pointer-events:auto;
+            transform:translateX(-50%) scale(1);
+        }
+        .club-dashboard-v7 .split-gender-button {
+            position:absolute;
+            top:4px;
+            width:88px;
+            height:98px;
+            border:0;
+            border-radius:22px;
+            overflow:hidden;
+            cursor:pointer;
+            background:rgba(10,10,12,.86);
+            box-shadow:0 24px 52px rgba(0,0,0,.45);
+            transform:translateX(0) rotate(0deg);
+            transition:transform .22s cubic-bezier(.2,.85,.25,1), filter .16s ease, opacity .16s ease;
+        }
+        .club-dashboard-v7 .split-gender-button.is-male {
+            left:50%;
+            margin-left:-44px;
+        }
+        .club-dashboard-v7 .split-gender-button.is-female {
+            right:50%;
+            margin-right:-44px;
+        }
+        .club-dashboard-v7 .league-option:hover .split-gender-button.is-male,
+        .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-male {
+            transform:translateX(47px) rotate(5deg);
+        }
+        .club-dashboard-v7 .league-option:hover .split-gender-button.is-female,
+        .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-female {
+            transform:translateX(-47px) rotate(-5deg);
+        }
+        .club-dashboard-v7 .split-gender-button:hover {
+            filter:brightness(1.12) saturate(1.14);
+        }
+        .club-dashboard-v7 .split-gender-button.is-active {
+            outline:2px solid #fff;
+            outline-offset:2px;
+        }
+        .club-dashboard-v7 .split-gender-button img,
+        .club-dashboard-v7 .split-gender-fallback {
+            position:absolute;
+            inset:0;
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            padding:12px;
+            z-index:1;
+        }
+        .club-dashboard-v7 .split-gender-fallback {
+            display:grid;
+            place-items:center;
+            color:#fff;
+            font-size:18px;
+            font-weight:950;
+        }
+        .club-dashboard-v7 .split-gender-button::before {
+            content:"";
+            position:absolute;
+            inset:0;
+            z-index:2;
+            mix-blend-mode:screen;
+            opacity:.66;
+        }
+        .club-dashboard-v7 .split-gender-button.is-male::before {
+            background:linear-gradient(135deg, rgba(50,128,255,.82), rgba(27,51,148,.72));
+        }
+        .club-dashboard-v7 .split-gender-button.is-female::before {
+            background:linear-gradient(135deg, rgba(255,80,168,.82), rgba(126,46,255,.68));
+        }
+        .club-dashboard-v7 .split-gender-button strong {
+            position:absolute;
+            left:50%;
+            bottom:9px;
+            transform:translateX(-50%);
+            z-index:3;
+            min-height:24px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:999px;
+            padding:0 10px;
+            background:rgba(0,0,0,.52);
+            color:#fff;
+            font-size:10px;
+            font-weight:950;
+            letter-spacing:.05em;
+            text-transform:uppercase;
+        }
+        .club-dashboard-v7 .gender-row,
+        .club-dashboard-v7 .gender-button { display:none; }
 
-        .club-dashboard-v6 input, .club-dashboard-v6 select, .club-dashboard-v6 textarea { width:100%; min-height:42px; border-radius:13px; border:1px solid rgba(255,255,255,.12); background:#1b1b1d !important; color:#fff !important; padding:0 12px; font-size:13px; color-scheme:dark; }
-        .club-dashboard-v6 select option { background:#151518 !important; color:#fff !important; }
-        .club-dashboard-v6 textarea { padding:12px; min-height:86px; }
-        .club-dashboard-v6 .field { display:grid; gap:6px; color:rgba(255,255,255,.75); font-size:12px; font-weight:900; }
-        .club-dashboard-v6 .filter-row { display:grid; grid-template-columns:minmax(0,1fr); gap:9px; margin-bottom:12px; }
-        .club-dashboard-v6 .pill-row { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; }
-        .club-dashboard-v6 .pill { border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.075); color:#fff; border-radius:999px; min-height:32px; padding:0 11px; font-size:11px; font-weight:900; cursor:pointer; }
-        .club-dashboard-v6 .pill.is-active { background:color-mix(in srgb, var(--club-primary) 36%, rgba(255,255,255,.08)); }
+        .club-dashboard-v7 .stat-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+        .club-dashboard-v7 .stat-card { border:0; text-align:left; cursor:pointer; border-radius:20px; padding:14px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; }
+        .club-dashboard-v7 .stat-card.is-active { outline:2px solid color-mix(in srgb, var(--club-primary) 65%, transparent); }
+        .club-dashboard-v7 .stat-label { color:rgba(255,255,255,.5); font-size:10px; letter-spacing:.11em; text-transform:uppercase; font-weight:900; }
+        .club-dashboard-v7 .stat-value { margin-top:7px; font-size:29px; line-height:1; font-weight:950; }
 
-        .club-dashboard-v6 .player-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; align-items:stretch; }
-        .club-dashboard-v6 .player-card { border:0; text-align:left; cursor:pointer; border-radius:22px; overflow:hidden; background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.08); color:#fff; min-height:380px; display:flex; flex-direction:column; }
-        .club-dashboard-v6 .player-media { height:300px; background:rgba(255,255,255,.035); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; flex:0 0 300px; }
-        .club-dashboard-v6 .player-media.is-plyrcard img { width:100%; height:100%; object-fit:contain !important; border-radius:0 !important; }
-        .club-dashboard-v6 .player-media.is-plyrcard::after { content:"PlyrCard"; position:absolute; top:9px; left:9px; height:24px; display:inline-flex; align-items:center; border-radius:999px; padding:0 9px; background:color-mix(in srgb, var(--club-primary) 28%, rgba(0,0,0,.55)); color:#fff; font-size:10px; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
-        .club-dashboard-v6 .avatar-circle { width:172px; height:172px; border-radius:999px; border:1px solid rgba(255,255,255,.15); background:color-mix(in srgb, var(--club-primary) 28%, #151515); display:flex; align-items:center; justify-content:center; font-size:48px; font-weight:950; color:#fff; overflow:hidden; }
-        .club-dashboard-v6 .avatar-circle img { width:100%; height:100%; object-fit:cover !important; }
-        .club-dashboard-v6 .player-body { padding:12px; flex:1; }
-        .club-dashboard-v6 .player-title { color:#fff; font-weight:950; }
-        .club-dashboard-v6 .player-meta { color:rgba(255,255,255,.55); margin-top:4px; font-size:12px; }
-        .club-dashboard-v6 .player-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
-        .club-dashboard-v6 .player-action { display:inline-flex; align-items:center; justify-content:center; min-height:32px; border-radius:999px; padding:0 10px; background:rgba(255,255,255,.09); color:#fff; font-size:11px; font-weight:900; text-decoration:none; border:0; cursor:pointer; }
+        .club-dashboard-v7 .layout { display:grid; grid-template-columns:360px minmax(0,1fr); gap:14px; align-items:start; }
+        .club-dashboard-v7 .panel { border-radius:22px; padding:15px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; min-width:0; }
+        .club-dashboard-v7 .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+        .club-dashboard-v7 .panel h3 { margin:0; font-size:18px; font-weight:950; }
+        .club-dashboard-v7 .note { color:rgba(255,255,255,.48); font-size:12px; font-weight:700; }
+        .club-dashboard-v7 .list { display:grid; gap:9px; }
+        .club-dashboard-v7 .list-item { width:100%; display:flex; justify-content:space-between; gap:12px; border-radius:16px; padding:12px; background:rgba(255,255,255,.055); border:0; color:inherit; text-align:left; cursor:pointer; }
+        .club-dashboard-v7 .list-item:hover { background:rgba(255,255,255,.085); }
+        .club-dashboard-v7 .list-item.is-active { background:color-mix(in srgb, var(--club-primary) 20%, rgba(255,255,255,.055)); }
+        .club-dashboard-v7 .list-main strong { display:block; color:#fff; }
+        .club-dashboard-v7 .list-main span { display:block; color:rgba(255,255,255,.55); font-size:12px; margin-top:3px; }
+        .club-dashboard-v7 .badge { display:inline-flex; align-items:center; height:27px; border-radius:999px; padding:0 10px; background:color-mix(in srgb, var(--club-primary) 20%, transparent); color:#ffd1c7; font-size:11px; font-weight:900; white-space:nowrap; }
+        .club-dashboard-v7 .empty { color:rgba(255,255,255,.58); font-size:13px; line-height:1.55; }
 
-        .club-dashboard-v6 .schedule-grid { display:grid; gap:10px; }
-        .club-dashboard-v6 .schedule-card { border-radius:16px; padding:12px; background:rgba(255,255,255,.055); display:flex; justify-content:space-between; gap:12px; }
-        .club-dashboard-v6 .schedule-card span { color:rgba(255,255,255,.55); display:block; font-size:12px; margin-top:3px; }
-        .club-dashboard-v6 .loader-wrap { display:none; min-height:180px; align-items:center; justify-content:center; border-radius:20px; background:rgba(255,255,255,.045); }
-        .club-dashboard-v6 [wire\:loading].loader-wrap { display:flex; }
-        .club-dashboard-v6 .circle-loader { width:42px; height:42px; border-radius:999px; border:4px solid rgba(255,255,255,.18); border-top-color:var(--club-primary); animation:clubSpin .8s linear infinite; }
+        .club-dashboard-v7 input, .club-dashboard-v7 select, .club-dashboard-v7 textarea { width:100%; min-height:42px; border-radius:13px; border:1px solid rgba(255,255,255,.12); background:#1b1b1d !important; color:#fff !important; padding:0 12px; font-size:13px; color-scheme:dark; }
+        .club-dashboard-v7 select option { background:#151518 !important; color:#fff !important; }
+        .club-dashboard-v7 textarea { padding:12px; min-height:86px; }
+        .club-dashboard-v7 .field { display:grid; gap:6px; color:rgba(255,255,255,.75); font-size:12px; font-weight:900; }
+        .club-dashboard-v7 .filter-row { display:grid; grid-template-columns:minmax(0,1fr); gap:9px; margin-bottom:12px; }
+        .club-dashboard-v7 .pill-row { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; }
+        .club-dashboard-v7 .pill { border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.075); color:#fff; border-radius:999px; min-height:32px; padding:0 11px; font-size:11px; font-weight:900; cursor:pointer; }
+        .club-dashboard-v7 .pill.is-active { background:color-mix(in srgb, var(--club-primary) 36%, rgba(255,255,255,.08)); }
+
+        .club-dashboard-v7 .player-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; align-items:stretch; }
+        .club-dashboard-v7 .player-card { border:0; text-align:left; cursor:pointer; border-radius:22px; overflow:hidden; background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.08); color:#fff; min-height:380px; display:flex; flex-direction:column; }
+        .club-dashboard-v7 .player-media { height:300px; background:rgba(255,255,255,.035); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; flex:0 0 300px; }
+        .club-dashboard-v7 .player-media.is-plyrcard img { width:100%; height:100%; object-fit:contain !important; border-radius:0 !important; }
+        .club-dashboard-v7 .player-media.is-plyrcard::after { content:"PlyrCard"; position:absolute; top:9px; left:9px; height:24px; display:inline-flex; align-items:center; border-radius:999px; padding:0 9px; background:color-mix(in srgb, var(--club-primary) 28%, rgba(0,0,0,.55)); color:#fff; font-size:10px; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+        .club-dashboard-v7 .avatar-circle { width:172px; height:172px; border-radius:999px; border:1px solid rgba(255,255,255,.15); background:color-mix(in srgb, var(--club-primary) 28%, #151515); display:flex; align-items:center; justify-content:center; font-size:48px; font-weight:950; color:#fff; overflow:hidden; }
+        .club-dashboard-v7 .avatar-circle img { width:100%; height:100%; object-fit:cover !important; }
+        .club-dashboard-v7 .player-body { padding:12px; flex:1; }
+        .club-dashboard-v7 .player-title { color:#fff; font-weight:950; }
+        .club-dashboard-v7 .player-meta { color:rgba(255,255,255,.55); margin-top:4px; font-size:12px; }
+        .club-dashboard-v7 .player-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
+        .club-dashboard-v7 .player-action { display:inline-flex; align-items:center; justify-content:center; min-height:32px; border-radius:999px; padding:0 10px; background:rgba(255,255,255,.09); color:#fff; font-size:11px; font-weight:900; text-decoration:none; border:0; cursor:pointer; }
+
+        .club-dashboard-v7 .schedule-grid { display:grid; gap:10px; }
+        .club-dashboard-v7 .schedule-card { border-radius:16px; padding:12px; background:rgba(255,255,255,.055); display:flex; justify-content:space-between; gap:12px; }
+        .club-dashboard-v7 .schedule-card span { color:rgba(255,255,255,.55); display:block; font-size:12px; margin-top:3px; }
+        .club-dashboard-v7 .loader-wrap { display:none; min-height:180px; align-items:center; justify-content:center; border-radius:20px; background:rgba(255,255,255,.045); }
+        .club-dashboard-v7 [wire\:loading].loader-wrap { display:flex; }
+        .club-dashboard-v7 .circle-loader { width:42px; height:42px; border-radius:999px; border:4px solid rgba(255,255,255,.18); border-top-color:var(--club-primary); animation:clubSpin .8s linear infinite; }
         @keyframes clubSpin { to { transform:rotate(360deg); } }
 
-        .club-dashboard-v6 .modal-grid { display:grid; gap:12px; }
+        .club-dashboard-v7 .modal-grid { display:grid; gap:12px; }
 
-        @media (max-width:1280px) { .club-dashboard-v6 .player-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-        @media (max-width:980px) { .club-dashboard-v6 .layout { grid-template-columns:1fr; } .club-dashboard-v6 .stat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-        @media (max-width:560px) { .club-dashboard-v6 .hero-inner { flex-direction:column; align-items:flex-start; } .club-dashboard-v6 .actions .btn { width:100%; } .club-dashboard-v6 .player-grid { grid-template-columns:1fr; } }
+        @media (max-width:1280px) { .club-dashboard-v7 .player-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+        @media (max-width:980px) { .club-dashboard-v7 .hero-inner, .club-dashboard-v7 .layout { grid-template-columns:1fr; } .club-dashboard-v7 .stat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .club-dashboard-v7 .league-logo-grid { justify-content:flex-start; } .club-dashboard-v7 .hero-control { justify-self:stretch; } }
+        @media (max-width:560px) { .club-dashboard-v7 .hero-main { flex-direction:column; align-items:flex-start; } .club-dashboard-v7 .actions .btn { width:100%; } .club-dashboard-v7 .player-grid { grid-template-columns:1fr; } .club-dashboard-v7 .hero-control { justify-self:stretch; min-height:150px; } .club-dashboard-v7 .league-logo-grid { justify-content:flex-start; gap:30px; } .club-dashboard-v7 .hero-league-watermark { width:150px; height:110px; opacity:.16; } .club-dashboard-v7 .league-logo-button img, .club-dashboard-v7 .league-logo-fallback { width:62px; height:62px; } .club-dashboard-v7 .league-genders { width:166px; } .club-dashboard-v7 .split-gender-button { width:76px; } }
     </style>
 
-    <div class="club-dashboard-v6" style="--club-primary: {{ $primary }}; {{ $heroUrl ? "--club-hero-image: url('{$heroUrl}');" : '' }}">
+    <div class="club-dashboard-v7" style="--club-primary: {{ $primary }}; {{ $heroUrl ? "--club-hero-image: url('{$heroUrl}');" : '' }}">
         <section class="hero">
             <div class="hero-inner">
-                <div class="club-logo">
-                    @if ($logoUrl)
-                        <img src="{{ $logoUrl }}" alt="{{ $clubName }} logo">
-                    @else
-                        {{ str($clubName)->substr(0, 2)->upper() }}
-                    @endif
+                <div class="hero-main">
+                    <div class="club-logo">
+                        @if ($logoUrl)
+                            <img src="{{ $logoUrl }}" alt="{{ $clubName }} logo">
+                        @else
+                            {{ str($clubName)->substr(0, 2)->upper() }}
+                        @endif
+                    </div>
+
+                    <div>
+                        <p class="kicker">Club Dashboard</p>
+                        <h2>{{ $clubName }}</h2>
+                        <p class="copy">
+                            {{ $selectedProgram['label'] ?? 'Choose a league and gender' }}
+                        </p>
+
+                        <div class="actions">
+                            @if ($landingUrl)
+                                <a href="{{ $landingUrl }}" target="_blank" rel="noopener" class="btn btn-primary">Visit Club Site</a>
+                            @endif
+                            <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Create Game</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div>
-                    <p class="kicker">Club Dashboard</p>
-                    <h2>{{ $clubName }}</h2>
-                    <p class="copy">Choose one league/program first, then manage U13-U19 teams for that league.</p>
+                <div class="hero-control">
+                    @if ($selectedLeagueLogo)
+                        <img class="hero-league-watermark" src="{{ $selectedLeagueLogo }}" alt="">
+                    @endif
 
-                    <div class="actions">
-                        @if ($landingUrl)
-                            <a href="{{ $landingUrl }}" target="_blank" rel="noopener" class="btn btn-primary">Visit Club Site</a>
-                        @endif
-                        <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-invite-modal' })">Send Invite</button>
-                        <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Create Game</button>
+                    <p class="control-label">League / Gender</p>
+
+                    <div class="league-logo-grid">
+                        @forelse ($leagueOptions as $league)
+                            @php
+                                $leagueLogo = $assetUrl($league['logo'] ?? null);
+                                $isActiveLeague = $this->selectedLeagueKey === $league['key'];
+                                $leagueGenders = collect($league['genders'] ?? [])
+                                    ->filter(fn ($gender) => in_array($gender, ['male', 'female', 'coed'], true))
+                                    ->values();
+
+                                if ($leagueGenders->contains('coed')) {
+                                    $leagueGenders = collect(['male', 'female']);
+                                }
+
+                                $genderLabels = [
+                                    'male' => 'Boys',
+                                    'female' => 'Girls',
+                                ];
+                            @endphp
+
+                            <div class="league-option {{ $isActiveLeague ? 'is-active' : '' }}">
+                                <button
+                                    type="button"
+                                    wire:click="setSelectedLeague('{{ addslashes($league['key']) }}')"
+                                    class="league-logo-button {{ $isActiveLeague ? 'is-active' : '' }}"
+                                    title="{{ $league['label'] }}"
+                                >
+                                    @if ($leagueLogo)
+                                        <img src="{{ $leagueLogo }}" alt="{{ $league['label'] }}">
+                                    @else
+                                        <span class="league-logo-fallback">{{ str($league['label'])->substr(0, 2)->upper() }}</span>
+                                    @endif
+                                    <span>{{ $league['label'] }}</span>
+                                </button>
+
+                                @if ($leagueGenders->isNotEmpty())
+                                    <div class="league-genders">
+                                        @foreach ($leagueGenders as $genderValue)
+                                            @php
+                                                $isMale = $genderValue === 'male';
+                                                $genderClass = $isMale ? 'is-male' : 'is-female';
+                                                $genderLabel = $genderLabels[$genderValue] ?? ucfirst((string) $genderValue);
+                                            @endphp
+
+                                            <button
+                                                type="button"
+                                                wire:click="setSelectedLeagueGender('{{ addslashes($league['key']) }}', '{{ $genderValue }}')"
+                                                class="split-gender-button {{ $genderClass }} {{ $isActiveLeague && $this->selectedGender === $genderValue ? 'is-active' : '' }}"
+                                                title="{{ $league['label'] }} {{ $genderLabel }}"
+                                            >
+                                                @if ($leagueLogo)
+                                                    <img src="{{ $leagueLogo }}" alt="">
+                                                @else
+                                                    <span class="split-gender-fallback">{{ str($league['label'])->substr(0, 2)->upper() }}</span>
+                                                @endif
+                                                <strong>{{ $genderLabel }}</strong>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @empty
+                            <p class="empty">No active leagues are associated with this club.</p>
+                        @endforelse
                     </div>
                 </div>
             </div>
@@ -128,29 +450,12 @@
         <section class="layout">
             <aside class="panel">
                 <div class="panel-head">
-                    <h3>League</h3>
-                    <span class="note">De-duplicated</span>
-                </div>
-
-                <label class="field" style="margin-bottom:14px;">
-                    <select
-                        wire:model.live="selectedProgramKey"
-                        x-data
-                        x-on:change="$wire.call('setSelectedProgram', $event.target.value)"
-                    >
-                        @foreach ($programOptions as $program)
-                            <option value="{{ $program['key'] }}">{{ $program['label'] }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <div class="panel-head">
                     <h3>Teams</h3>
-                    <span class="note">{{ $selectedProgram['label'] ?? 'U13-U19' }}</span>
+                    <span class="note">{{ $selectedProgram['label'] ?? 'Select league' }}</span>
                 </div>
 
                 <div class="list">
-                    @foreach ($ageGroups as $ageGroup)
+                    @forelse ($ageGroups as $ageGroup)
                         <button type="button" wire:click="selectTeam('{{ $ageGroup['name'] }}')" class="list-item {{ $this->selectedTeam === $ageGroup['name'] ? 'is-active' : '' }}">
                             <div class="list-main">
                                 <strong>{{ $ageGroup['name'] }}</strong>
@@ -158,16 +463,18 @@
                             </div>
                             <span class="badge">Open</span>
                         </button>
-                    @endforeach
+                    @empty
+                        <p class="empty">No active age groups found for this league and gender.</p>
+                    @endforelse
                 </div>
             </aside>
 
             <main class="panel">
-                <div wire:loading.flex wire:target="setSelectedProgram,selectTeam,showTeamGames,selectPanel,selectPlayer,clearSelectedPlayer,createTeamGame,playerSearch,setPlayerPositionFilter,gameSearch,setGameStatusFilter" class="loader-wrap">
+                <div wire:loading.flex wire:target="setSelectedLeague,setSelectedGender,selectTeam,showTeamGames,selectPanel,selectPlayer,clearSelectedPlayer,createTeamGame,playerSearch,setPlayerPositionFilter,gameSearch,setGameStatusFilter" class="loader-wrap">
                     <div class="circle-loader"></div>
                 </div>
 
-                <div wire:loading.remove wire:target="setSelectedProgram,selectTeam,showTeamGames,selectPanel,selectPlayer,clearSelectedPlayer,createTeamGame,playerSearch,setPlayerPositionFilter,gameSearch,setGameStatusFilter">
+                <div wire:loading.remove wire:target="setSelectedLeague,setSelectedGender,selectTeam,showTeamGames,selectPanel,selectPlayer,clearSelectedPlayer,createTeamGame,playerSearch,setPlayerPositionFilter,gameSearch,setGameStatusFilter">
                     @if ($this->activePanel === 'games')
                         <div class="panel-head">
                             <h3>{{ collect([$selectedProgram['label'] ?? null, $this->selectedTeam ? $this->selectedTeam . ' Games' : 'Games'])->filter()->implode(' • ') }}</h3>
@@ -194,7 +501,7 @@
                                     <span class="badge">{{ $game->users_count }} players</span>
                                 </article>
                             @empty
-                                <p class="empty">No games found for this league/team.</p>
+                                <p class="empty">No games found for this league, gender, and team.</p>
                             @endforelse
                         </div>
                     @elseif ($this->activePanel === 'player' && $selectedPlayer)
@@ -252,7 +559,7 @@
                         </div>
 
                         @if ($players->isEmpty())
-                            <p class="empty">No players found for this league/team.</p>
+                            <p class="empty">No players found for this league, gender, and team.</p>
                         @else
                             <div class="player-grid">
                                 @foreach ($players as $player)
@@ -285,51 +592,29 @@
             </main>
         </section>
 
-        <x-filament::modal id="club-invite-modal" width="lg">
-            <x-slot name="heading">Send Invite</x-slot>
-
-            <div class="modal-grid">
-                <label class="field">League
-                    <select wire:model.live="inviteProgramKey">
-                        @foreach ($programOptions as $program)
-                            <option value="{{ $program['key'] }}">{{ $program['label'] }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="field">Team / Age Group
-                    <select wire:model.live="inviteTeamName">
-                        @foreach ($ageGroups as $ageGroup)
-                            <option value="{{ $ageGroup['name'] }}">{{ $ageGroup['name'] }}</option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="field">Invitee Name <input type="text" wire:model="inviteName" placeholder="Optional"></label>
-                <label class="field">Invitee Email <input type="email" wire:model="inviteEmail" placeholder="Optional"></label>
-
-                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
-                    <button type="button" class="btn" x-data x-on:click="$dispatch('close-modal', { id: 'club-invite-modal' })">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="createInvite">Create Invite</button>
-                </div>
-            </div>
-        </x-filament::modal>
-
         <x-filament::modal id="club-game-modal" width="lg">
             <x-slot name="heading">Create Game</x-slot>
 
             <div class="modal-grid">
                 <label class="field">League
-                    <select wire:model.live="scheduleProgramKey">
-                        @foreach ($programOptions as $program)
-                            <option value="{{ $program['key'] }}">{{ $program['label'] }}</option>
+                    <select wire:model.live="scheduleLeagueKey">
+                        @foreach ($leagueOptions as $league)
+                            <option value="{{ $league['key'] }}">{{ $league['label'] }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <label class="field">Gender
+                    <select wire:model.live="scheduleGender">
+                        @foreach ($genderOptions as $gender)
+                            <option value="{{ $gender['value'] }}">{{ $gender['label'] }}</option>
                         @endforeach
                     </select>
                 </label>
 
                 <label class="field">Team / Age Group
                     <select wire:model.live="scheduleTeamName">
-                        @foreach ($ageGroups as $ageGroup)
+                        @foreach (($ageGroups->isNotEmpty() ? $ageGroups : $allAgeGroups->map(fn ($name) => ['name' => $name])) as $ageGroup)
                             <option value="{{ $ageGroup['name'] }}">{{ $ageGroup['name'] }}</option>
                         @endforeach
                     </select>
