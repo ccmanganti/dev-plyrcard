@@ -55,8 +55,6 @@ class ClubManagerAccess
 
         $assignedClubId = static::assignedClubId($user);
 
-        // If a user has the Club Manager role, always treat the Club Admin area
-        // as one-club only, even if the user is also Superadmin for testing.
         if (static::isClubManager($user)) {
             return $assignedClubId ? [$assignedClubId] : [];
         }
@@ -158,41 +156,99 @@ class ClubManagerAccess
             ->implode('') ?: 'P';
     }
 
-    public static function playerImageUrl(User $player): ?string
+    public static function normalizeImageUrl(?string $candidate): ?string
     {
-        $candidate = null;
-
-        foreach ([
-            'plyrcard_image',
-            'plyrcard_photo',
-            'profile_photo_path',
-            'avatar',
-            'photo',
-            'headshot',
-            'image',
-        ] as $field) {
-            if (isset($player->{$field}) && filled($player->{$field})) {
-                $candidate = $player->{$field};
-                break;
-            }
-        }
-
-        if (! $candidate && is_array($player->raw_player_images ?? null)) {
-            $candidate = collect($player->raw_player_images)
-                ->flatten()
-                ->filter()
-                ->first();
-        }
-
-        if (! $candidate) {
+        if (blank($candidate)) {
             return null;
         }
+
+        $candidate = trim($candidate);
 
         if (str_starts_with($candidate, 'http://') || str_starts_with($candidate, 'https://')) {
             return $candidate;
         }
 
-        return Storage::disk('public')->url($candidate);
+        return Storage::disk('public')->url(ltrim($candidate, '/'));
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | Player image helpers
+     |--------------------------------------------------------------------------
+     |
+     | The dashboard Blade calls playerPlyrCardImageUrl() and
+     | playerProfileImageUrl(). This hotfix adds both methods.
+     |
+     | PlyrCard images should render as full rectangular cards.
+     | Profile-only images should render inside a circular avatar.
+     |
+     */
+
+    public static function playerPlyrCardImageValue(User $player): ?string
+    {
+        foreach ([
+            'plyrcard_image',
+            'player_card_image',
+            'plyr_card_image',
+            'card_image',
+            'generated_card_image',
+            'generated_card',
+            'share_card_image',
+        ] as $field) {
+            if (isset($player->{$field}) && filled($player->{$field})) {
+                return (string) $player->{$field};
+            }
+        }
+
+        return null;
+    }
+
+    public static function playerPlyrCardImageUrl(User $player): ?string
+    {
+        return static::normalizeImageUrl(static::playerPlyrCardImageValue($player));
+    }
+
+    public static function playerProfileImageValue(User $player): ?string
+    {
+        foreach ([
+            'player_image',
+            'profile_photo_path',
+            'avatar',
+            'photo',
+            'headshot',
+            'profile_image',
+            'image',
+            'action_image',
+            'mobile_hero_image',
+        ] as $field) {
+            if (isset($player->{$field}) && filled($player->{$field})) {
+                return (string) $player->{$field};
+            }
+        }
+
+        if (is_array($player->raw_player_images ?? null)) {
+            $candidate = collect($player->raw_player_images)
+                ->flatten()
+                ->filter()
+                ->first(fn ($value) => is_string($value) && filled($value));
+
+            if ($candidate) {
+                return (string) $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    public static function playerProfileImageUrl(User $player): ?string
+    {
+        return static::normalizeImageUrl(static::playerProfileImageValue($player));
+    }
+
+    public static function playerImageUrl(User $player): ?string
+    {
+        return static::playerPlyrCardImageUrl($player)
+            ?: static::playerProfileImageUrl($player);
     }
 
     public static function playerWebsiteUrl(User $player): ?string

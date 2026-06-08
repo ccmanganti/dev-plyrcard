@@ -16,6 +16,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class ClubAdminDashboard extends Page
@@ -29,6 +30,17 @@ class ClubAdminDashboard extends Page
     protected static ?int $navigationSort = 1;
 
     protected string $view = 'filament.pages.club-admin-dashboard';
+
+    /**
+     * IMPORTANT:
+     * This is NOT a club_leagues.id anymore.
+     *
+     * After the club/league restructure, duplicate club_leagues and even duplicate
+     * leagues can exist. The dashboard uses a normalized program key instead:
+     *
+     * club_id + normalized league name + normalized sport + normalized genders
+     */
+    public ?string $selectedProgramKey = null;
 
     public ?string $selectedTeam = null;
 
@@ -44,7 +56,7 @@ class ClubAdminDashboard extends Page
 
     public ?string $gameStatusFilter = null;
 
-    public ?string $inviteClubLeagueId = null;
+    public ?string $inviteProgramKey = null;
 
     public ?string $inviteTeamName = null;
 
@@ -52,9 +64,9 @@ class ClubAdminDashboard extends Page
 
     public ?string $inviteEmail = null;
 
-    public ?string $scheduleTeamName = null;
+    public ?string $scheduleProgramKey = null;
 
-    public ?string $scheduleClubLeagueId = null;
+    public ?string $scheduleTeamName = null;
 
     public ?string $scheduleTitle = null;
 
@@ -91,23 +103,25 @@ class ClubAdminDashboard extends Page
 
     public function mount(): void
     {
+        $defaultProgramKey = $this->defaultProgramKey();
         $defaultTeam = $this->defaultTeamName();
 
-        $this->selectedTeam = $this->selectedTeam ?: $defaultTeam;
-        $this->inviteTeamName = $this->inviteTeamName ?: $defaultTeam;
-        $this->scheduleTeamName = $this->scheduleTeamName ?: $defaultTeam;
+        $this->selectedProgramKey ??= $defaultProgramKey;
+        $this->selectedTeam ??= $defaultTeam;
 
-        $defaultClubLeagueId = $this->defaultClubLeagueId();
-        $this->inviteClubLeagueId = $this->inviteClubLeagueId ?: $defaultClubLeagueId;
-        $this->scheduleClubLeagueId = $this->scheduleClubLeagueId ?: $defaultClubLeagueId;
+        $this->inviteProgramKey ??= $defaultProgramKey;
+        $this->inviteTeamName ??= $defaultTeam;
 
-        $this->scheduleDate = $this->scheduleDate ?: now()->toDateString();
-        $this->scheduleTime = $this->scheduleTime ?: '18:00';
+        $this->scheduleProgramKey ??= $defaultProgramKey;
+        $this->scheduleTeamName ??= $defaultTeam;
+
+        $this->scheduleDate ??= now()->toDateString();
+        $this->scheduleTime ??= '18:00';
     }
 
     protected function defaultTeamName(): string
     {
-        return (string) collect(config('plyrcard.age_groups', [
+        return (string) (collect(config('plyrcard.age_groups', [
             'u13' => 'U13',
             'u14' => 'U14',
             'u15' => 'U15',
@@ -115,52 +129,138 @@ class ClubAdminDashboard extends Page
             'u17' => 'U17',
             'u18' => 'U18',
             'u19' => 'U19',
-        ]))->values()->first() ?: 'U13';
+        ]))->values()->first() ?: 'U13');
     }
 
-    public function setScheduleTeamName(string $team): void
+    protected function defaultProgramKey(): ?string
     {
-        $validTeams = $this->ageGroups
-            ->pluck('name')
-            ->map(fn ($value) => (string) $value)
-            ->all();
-
-        if (! in_array($team, $validTeams, true)) {
-            return;
-        }
-
-        $this->scheduleTeamName = $team;
-        $this->selectedTeam = $team;
-    }
-
-
-    protected function defaultClubLeagueId(): ?string
-    {
-        return $this->programs
-            ->first()
-            ?->id
-            ? (string) $this->programs->first()->id
-            : null;
-    }
-
-    protected function resolveClubLeague(?string $clubLeagueId): ?ClubLeague
-    {
-        $club = $this->assignedClub;
-
-        if (! $club || blank($clubLeagueId)) {
-            return null;
-        }
-
-        return ClubLeague::query()
-            ->with('league')
-            ->where('club_id', $club->id)
-            ->whereKey($clubLeagueId)
-            ->first();
+        return $this->programOptions->first()['key'] ?? null;
     }
 
     public function getAssignedClubProperty(): ?Club
     {
         return ClubManagerAccess::assignedClub(auth()->user());
+    }
+
+    /**
+     * Unique dropdown options for the current club.
+     *
+     * Duplicate safety:
+     * We DO NOT key by league_id because the restructure can leave duplicate League
+     * rows with the same name/sport/gender and duplicate ClubLeague rows pointing
+     * to those duplicate League rows.
+     *
+     * Instead, this groups by the label users actually mean:
+     * normalized league name + normalized sport + normalized genders.
+     */
+    public function getProgramOptionsProperty(): Collection
+    {
+        $club = $this->assignedClub;
+
+        if (! $club) {
+            return collect();
+        }
+
+        $clubLeagues = ClubLeague::query()
+            ->with('league')
+            ->where('club_id', $club->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        return $clubLeagues
+            ->groupBy(fn (ClubLeague $clubLeague): string => $this->programGroupKey($clubLeague))
+            ->map(function (Collection $group) use ($club): array {
+                /** @var ClubLeague $primary */
+                $primary = $group->first();
+
+                $leagueName = trim((string) ($primary->league?->name ?: 'League'));
+                $sport = trim((string) ($primary->sport ?: $primary->league?->sport ?: ''));
+
+                $genders = $group
+                    ->flatMap(fn (ClubLeague $clubLeague) => $clubLeague->genders ?? $clubLeague->league?->genders ?? [])
+                    ->map(fn ($value) => ClubLeague::normalizeGender($value) ?: Str::lower(trim((string) $value)))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                if ($genders->isEmpty()) {
+                    $legacyGender = ClubLeague::normalizeGender($primary->league?->gender);
+                    if ($legacyGender) {
+                        $genders = collect([$legacyGender]);
+                    }
+                }
+
+                $labelParts = collect([
+                    $leagueName,
+                    $sport,
+                    $genders->isNotEmpty() ? $genders->implode('/') : null,
+                ])->filter();
+
+                return [
+                    'key' => $this->programGroupKey($primary),
+                    'label' => $labelParts->implode(' • '),
+                    'club_id' => (int) $club->id,
+                    'primary_club_league_id' => (int) $primary->id,
+                    'primary_league_id' => (int) $primary->league_id,
+                    'club_league_ids' => $group->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
+                    'league_ids' => $group->pluck('league_id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
+                    'sport' => $sport,
+                    'genders' => $genders->values()->all(),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
+    }
+
+    protected function programGroupKey(ClubLeague $clubLeague): string
+    {
+        $leagueName = Str::of((string) ($clubLeague->league?->name ?: 'league'))
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $sport = Str::of((string) ($clubLeague->sport ?: $clubLeague->league?->sport ?: ''))
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $genders = collect($clubLeague->genders ?? $clubLeague->league?->genders ?? [])
+            ->map(fn ($value) => ClubLeague::normalizeGender($value) ?: Str::lower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        if ($genders->isEmpty()) {
+            $legacyGender = ClubLeague::normalizeGender($clubLeague->league?->gender);
+            if ($legacyGender) {
+                $genders = collect([$legacyGender]);
+            }
+        }
+
+        return implode('|', [
+            (int) $clubLeague->club_id,
+            $leagueName,
+            $sport,
+            $genders->implode(','),
+        ]);
+    }
+
+    protected function resolveProgram(?string $programKey): ?array
+    {
+        if (blank($programKey)) {
+            return null;
+        }
+
+        return $this->programOptions->firstWhere('key', $programKey);
+    }
+
+    public function getSelectedProgramProperty(): ?array
+    {
+        return $this->resolveProgram($this->selectedProgramKey);
     }
 
     public function getAgeGroupsProperty(): Collection
@@ -176,13 +276,14 @@ class ClubAdminDashboard extends Page
         ]);
 
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
         return collect($configured)
             ->map(fn ($label) => (string) $label)
             ->values()
-            ->map(function (string $label) use ($club): array {
-                $players = $club
-                    ? User::query()->where('club_id', $club->id)->where('team_name', $label)
+            ->map(function (string $label) use ($club, $program): array {
+                $players = $club && $program
+                    ? $this->playersForProgramAndTeam($club, $program, $label)
                     : User::query()->whereRaw('1 = 0');
 
                 return [
@@ -193,30 +294,61 @@ class ClubAdminDashboard extends Page
             });
     }
 
-    public function getProgramsProperty(): EloquentCollection
+    protected function usersForProgram(Club $club, array $program)
+    {
+        $query = User::query()->where('club_id', $club->id);
+
+        if (SchemaFacade::hasColumn('users', 'club_league_id')) {
+            $query->where(function ($query) use ($program): void {
+                $query
+                    ->whereIn('club_league_id', $program['club_league_ids'])
+                    ->orWhere(function ($query) use ($program): void {
+                        /*
+                         * Legacy fallback only. If a user has already been migrated
+                         * to a club_league_id, do not match it by league_id again.
+                         */
+                        $query
+                            ->whereNull('club_league_id')
+                            ->whereIn('league_id', $program['league_ids']);
+                    });
+            });
+        } else {
+            $query->whereIn('league_id', $program['league_ids']);
+        }
+
+        return $query;
+    }
+
+    protected function playersForProgramAndTeam(Club $club, array $program, string $teamName)
+    {
+        return $this->usersForProgram($club, $program)
+            ->where('team_name', $teamName);
+    }
+
+    protected function playerIdsForSelectedProgram()
     {
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
-        return ClubLeague::query()
-            ->with('league')
-            ->when($club, fn ($query) => $query->where('club_id', $club->id), fn ($query) => $query->whereRaw('1 = 0'))
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+        if (! $club || ! $program) {
+            return collect();
+        }
+
+        return $this->usersForProgram($club, $program)
+            ->distinct()
+            ->pluck('id');
     }
 
     public function getPositionOptionsProperty(): array
     {
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
-        if (! $club || ! $this->selectedTeam) {
+        if (! $club || ! $program || ! $this->selectedTeam) {
             return [];
         }
 
-        return User::query()
-            ->where('club_id', $club->id)
-            ->where('team_name', $this->selectedTeam)
+        return $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
             ->whereNotNull('position')
             ->get()
             ->flatMap(fn (User $user) => collect($user->position ?? [])->flatten())
@@ -230,11 +362,14 @@ class ClubAdminDashboard extends Page
     public function getSelectedTeamPlayersProperty(): EloquentCollection
     {
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
-        return User::query()
+        if (! $club || ! $program || ! $this->selectedTeam) {
+            return new EloquentCollection();
+        }
+
+        return $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
             ->with(['club', 'league', 'websites'])
-            ->when($club, fn ($query) => $query->where('club_id', $club->id), fn ($query) => $query->whereRaw('1 = 0'))
-            ->when($this->selectedTeam, fn ($query) => $query->where('team_name', $this->selectedTeam), fn ($query) => $query->whereRaw('1 = 0'))
             ->when(filled($this->playerSearch), function ($query): void {
                 $search = trim((string) $this->playerSearch);
 
@@ -262,74 +397,43 @@ class ClubAdminDashboard extends Page
             ->with(['club', 'league', 'websites', 'schedules'])
             ->find($this->selectedPlayerId);
 
-        if (! $player || ! ClubManagerAccess::canViewPlayer(auth()->user(), $player)) {
-            return null;
-        }
-
-        return $player;
+        return $player && ClubManagerAccess::canViewPlayer(auth()->user(), $player) ? $player : null;
     }
 
     public function getSelectedTeamGamesProperty(): EloquentCollection
     {
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
-        if (! $club || ! $this->selectedTeam) {
+        if (! $club || ! $program || ! $this->selectedTeam) {
             return new EloquentCollection();
         }
 
-        $playerIds = User::query()
-            ->where('club_id', $club->id)
-            ->where('team_name', $this->selectedTeam)
+        $playerIds = $this->playersForProgramAndTeam($club, $program, $this->selectedTeam)
+            ->distinct()
             ->pluck('id');
 
-        if ($playerIds->isEmpty()) {
-            return new EloquentCollection();
-        }
-
-        return Schedule::query()
-            ->whereHas('users', fn ($query) => $query->whereIn('users.id', $playerIds))
-            ->when(filled($this->gameSearch), function ($query): void {
-                $search = trim((string) $this->gameSearch);
-
-                $query->where(function ($query) use ($search): void {
-                    $query
-                        ->where('title', 'like', "%{$search}%")
-                        ->orWhere('opponent', 'like', "%{$search}%")
-                        ->orWhere('location', 'like', "%{$search}%")
-                        ->orWhere('venue', 'like', "%{$search}%");
-                });
-            })
-            ->when(filled($this->gameStatusFilter), fn ($query) => $query->where('status', $this->gameStatusFilter))
-            ->withCount('users')
-            ->orderByRaw('game_date is null')
-            ->orderBy('game_date')
-            ->orderBy('game_time')
-            ->limit(20)
-            ->get();
+        return $this->gamesForPlayerIds($playerIds, 20);
     }
 
     public function getUpcomingGamesProperty(): EloquentCollection
     {
-        $club = $this->assignedClub;
+        return $this->gamesForPlayerIds($this->playerIdsForSelectedProgram(), 12, true);
+    }
 
-        if (! $club) {
-            return new EloquentCollection();
-        }
-
-        $playerIds = User::query()
-            ->where('club_id', $club->id)
-            ->pluck('id');
-
+    protected function gamesForPlayerIds($playerIds, int $limit, bool $upcomingOnly = false): EloquentCollection
+    {
         if ($playerIds->isEmpty()) {
             return new EloquentCollection();
         }
 
         return Schedule::query()
             ->whereHas('users', fn ($query) => $query->whereIn('users.id', $playerIds))
-            ->where(function ($query): void {
-                $query->whereNull('game_date')
+            ->when($upcomingOnly, fn ($query) => $query->where(function ($query): void {
+                $query
+                    ->whereNull('game_date')
                     ->orWhereDate('game_date', '>=', now()->toDateString());
-            })
+            }))
             ->when(filled($this->gameSearch), function ($query): void {
                 $search = trim((string) $this->gameSearch);
 
@@ -346,26 +450,13 @@ class ClubAdminDashboard extends Page
             ->orderByRaw('game_date is null')
             ->orderBy('game_date')
             ->orderBy('game_time')
-            ->limit(12)
+            ->limit($limit)
             ->get();
     }
 
     public function getStatsProperty(): array
     {
-        $club = $this->assignedClub;
-
-        if (! $club) {
-            return [
-                'teams' => 0,
-                'players' => 0,
-                'games' => 0,
-                'upcoming_games' => 0,
-            ];
-        }
-
-        $playerIds = User::query()
-            ->where('club_id', $club->id)
-            ->pluck('id');
+        $playerIds = $this->playerIdsForSelectedProgram();
 
         $gamesQuery = Schedule::query()
             ->whereHas('users', fn ($query) => $query->whereIn('users.id', $playerIds));
@@ -373,14 +464,39 @@ class ClubAdminDashboard extends Page
         return [
             'teams' => $this->ageGroups->count(),
             'players' => $playerIds->count(),
-            'games' => (clone $gamesQuery)->count(),
-            'upcoming_games' => (clone $gamesQuery)
+            'games' => $playerIds->isEmpty() ? 0 : (clone $gamesQuery)->count(),
+            'upcoming_games' => $playerIds->isEmpty() ? 0 : (clone $gamesQuery)
                 ->where(function ($query): void {
-                    $query->whereNull('game_date')
+                    $query
+                        ->whereNull('game_date')
                         ->orWhereDate('game_date', '>=', now()->toDateString());
                 })
                 ->count(),
         ];
+    }
+
+    public function setSelectedProgram(string $programKey): void
+    {
+        $program = $this->resolveProgram($programKey);
+
+        if (! $program) {
+            return;
+        }
+
+        $this->selectedProgramKey = $program['key'];
+        $this->scheduleProgramKey = $program['key'];
+        $this->inviteProgramKey = $program['key'];
+
+        $this->selectedTeam = $this->selectedTeam ?: $this->defaultTeamName();
+        $this->scheduleTeamName = $this->selectedTeam;
+        $this->inviteTeamName = $this->selectedTeam;
+
+        $this->selectedPlayerId = null;
+        $this->playerSearch = null;
+        $this->playerPositionFilter = null;
+        $this->gameSearch = null;
+        $this->gameStatusFilter = null;
+        $this->activePanel = 'players';
     }
 
     public function setPlayerPositionFilter(?string $position): void
@@ -402,10 +518,6 @@ class ClubAdminDashboard extends Page
     public function selectPanel(string $panel): void
     {
         $this->activePanel = $panel;
-
-        if ($panel === 'players' && ! $this->selectedTeam) {
-            $this->selectedTeam = $this->defaultTeamName();
-        }
 
         if ($panel !== 'player') {
             $this->selectedPlayerId = null;
@@ -447,45 +559,30 @@ class ClubAdminDashboard extends Page
         $this->activePanel = 'players';
     }
 
-    public function clearSelectedTeam(): void
-    {
-        $this->selectedTeam = null;
-        $this->selectedPlayerId = null;
-        $this->activePanel = 'teams';
-    }
-
     public function createInvite(): void
     {
         $club = $this->assignedClub;
+        $program = $this->resolveProgram($this->inviteProgramKey);
 
-        if (! $club) {
-            Notification::make()->title('No club assigned')->danger()->send();
-            return;
-        }
-
-        $program = filled($this->inviteClubLeagueId)
-            ? ClubLeague::query()->with('league')->where('club_id', $club->id)->find($this->inviteClubLeagueId)
-            : null;
-
-        if (! $program) {
-            Notification::make()->title('Select a program')->danger()->send();
+        if (! $club || ! $program) {
+            Notification::make()->title('Select a league')->danger()->send();
             return;
         }
 
         ClubReferral::create([
             'club_manager_id' => auth()->id(),
             'club_id' => $club->id,
-            'league_id' => $program->league_id,
-            'club_league_id' => $program->id,
+            'league_id' => $program['primary_league_id'],
+            'club_league_id' => $program['primary_club_league_id'],
             'team_name' => $this->inviteTeamName,
-            'sport' => $program->sport ?: $program->league?->sport,
-            'gender' => collect($program->genders ?? [])->first(),
+            'sport' => $program['sport'],
+            'gender' => collect($program['genders'] ?? [])->first(),
             'invited_name' => $this->inviteName,
             'invited_email' => $this->inviteEmail,
             'status' => 'active',
         ]);
 
-        $this->inviteClubLeagueId = null;
+        $this->inviteProgramKey = $this->selectedProgramKey;
         $this->inviteTeamName = $this->selectedTeam ?: $this->defaultTeamName();
         $this->inviteName = null;
         $this->inviteEmail = null;
@@ -498,36 +595,15 @@ class ClubAdminDashboard extends Page
     public function createTeamGame(): void
     {
         $club = $this->assignedClub;
+        $program = $this->resolveProgram($this->scheduleProgramKey);
 
-        if (! $club) {
-            Notification::make()->title('No club assigned')->danger()->send();
+        if (! $club || ! $program) {
+            Notification::make()->title('Select a league')->danger()->send();
             return;
         }
 
-        $program = $this->resolveClubLeague($this->scheduleClubLeagueId);
-
-        if (! $program) {
-            Notification::make()
-                ->title('Select a league')
-                ->body('Choose one of the leagues currently associated with this club.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $validTeams = $this->ageGroups
-            ->pluck('name')
-            ->map(fn ($value) => (string) $value)
-            ->all();
-
-        if (blank($this->scheduleTeamName) || ! in_array($this->scheduleTeamName, $validTeams, true)) {
-            Notification::make()
-                ->title('Select a valid team / age group')
-                ->body('Choose one of the listed age groups for this club.')
-                ->danger()
-                ->send();
-
+        if (blank($this->scheduleTeamName)) {
+            Notification::make()->title('Select a team / age group')->danger()->send();
             return;
         }
 
@@ -536,33 +612,14 @@ class ClubAdminDashboard extends Page
             return;
         }
 
-        /*
-         * Current club + selected league/program + selected age group.
-         *
-         * The restructure introduced ClubLeague, so prefer users.club_league_id
-         * when the column exists. For older/player rows that only have league_id,
-         * fall back to users.league_id.
-         */
-        $playersQuery = User::query()
-            ->where('club_id', $club->id)
-            ->where('team_name', $this->scheduleTeamName);
-
-        if (SchemaFacade::hasColumn('users', 'club_league_id')) {
-            $playersQuery->where(function ($query) use ($program): void {
-                $query
-                    ->where('club_league_id', $program->id)
-                    ->orWhere('league_id', $program->league_id);
-            });
-        } else {
-            $playersQuery->where('league_id', $program->league_id);
-        }
-
-        $players = $playersQuery->pluck('id');
+        $players = $this->playersForProgramAndTeam($club, $program, $this->scheduleTeamName)
+            ->distinct()
+            ->pluck('id');
 
         if ($players->isEmpty()) {
             Notification::make()
                 ->title('No players found')
-                ->body("No players match {$club->name}, {$program->league?->name}, and {$this->scheduleTeamName}.")
+                ->body("No players match {$club->name}, {$program['label']}, and {$this->scheduleTeamName}.")
                 ->warning()
                 ->send();
 
@@ -584,6 +641,7 @@ class ClubAdminDashboard extends Page
 
         $schedule->users()->syncWithoutDetaching($players->all());
 
+        $this->selectedProgramKey = $program['key'];
         $this->selectedTeam = $this->scheduleTeamName;
         $this->activePanel = 'games';
 
@@ -601,7 +659,7 @@ class ClubAdminDashboard extends Page
 
         Notification::make()
             ->title('Game created')
-            ->body("The game was added to {$this->scheduleTeamName} players in {$program->league?->name}.")
+            ->body("The game was added to {$this->scheduleTeamName} players in {$program['label']}.")
             ->success()
             ->send();
     }
@@ -609,14 +667,14 @@ class ClubAdminDashboard extends Page
     protected function countTeamGames(string $team): int
     {
         $club = $this->assignedClub;
+        $program = $this->selectedProgram;
 
-        if (! $club) {
+        if (! $club || ! $program) {
             return 0;
         }
 
-        $playerIds = User::query()
-            ->where('club_id', $club->id)
-            ->where('team_name', $team)
+        $playerIds = $this->playersForProgramAndTeam($club, $program, $team)
+            ->distinct()
             ->pluck('id');
 
         if ($playerIds->isEmpty()) {
