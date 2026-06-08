@@ -73,11 +73,15 @@ class PublicClubTeamController extends Controller
                     || $roles->contains('plyr plus')
                     || $roles->contains('plyr-plus');
             })
-            ->groupBy(fn (User $player): string => $this->teamKey(
-                $this->landingGenderSegmentForPlayer($player),
-                $player->team_name,
-                $player->club_league_id,
-            ))
+            ->groupBy(function (User $player) use ($club): string {
+                $program = $this->clubLeagueForPlayer($club, $player);
+
+                return $this->teamKey(
+                    $this->landingGenderSegmentForPlayer($player),
+                    $player->team_name,
+                    $program?->id,
+                );
+            })
             ->map(function ($group) {
                 return $group->shuffle()->map(function (User $player) {
                     $website = $player->websites->first();
@@ -136,7 +140,8 @@ class PublicClubTeamController extends Controller
         abort_if($players->isEmpty(), 404);
 
         $teamName = (string) $players->first()->team_name;
-        $program = $club->clubLeagues->firstWhere('id', (int) request('program'))
+        $program = $this->resolveRequestedProgram($club, request('program'))
+            ?: $this->clubLeagueForPlayer($club, $players->first())
             ?: $this->clubLeagueForGender($club, $requestedGender, $players->first()?->sport);
 
         $team = $this->buildLandingTeam($club, $requestedGender, $teamName, $players, $program);
@@ -515,19 +520,46 @@ class PublicClubTeamController extends Controller
             return 'legacy';
         }
 
-        $genders = collect($program->genders ?? [])
+        /*
+         * IMPORTANT:
+         * Do not use league_id in this key.
+         *
+         * After the database restructure, it is possible to have duplicate
+         * League rows with the same visible league name/sport/gender, and
+         * duplicate ClubLeague rows pointing at those duplicate League rows.
+         *
+         * Public pages should show the visible program once.
+         */
+        $leagueName = Str::of((string) ($program->league?->name ?: 'league'))
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $sport = Str::of((string) ($program->sport ?: $program->league?->sport ?: ''))
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $genders = collect($program->genders ?? $program->league?->genders ?? [])
             ->map(fn ($gender) => $this->normalizeProgramGenderValue($gender))
             ->filter()
             ->unique()
             ->sort()
-            ->values()
-            ->implode(',');
+            ->values();
+
+        if ($genders->isEmpty()) {
+            $legacyGender = $this->normalizeProgramGenderValue($program->league?->gender);
+
+            if ($legacyGender) {
+                $genders = collect([$legacyGender]);
+            }
+        }
 
         return implode('|', [
             (int) ($program->club_id ?? 0),
-            (int) ($program->league_id ?? 0),
-            strtolower(trim((string) ($program->sport ?? ''))),
-            $genders,
+            $leagueName,
+            $sport,
+            $genders->implode(','),
         ]);
     }
 
@@ -549,6 +581,134 @@ class PublicClubTeamController extends Controller
         $club->setRelation('clubLeagues', $deduped);
     }
 
+    protected function allActiveClubLeaguesForProgram(Club $club, ClubLeague $program): Collection
+    {
+        $key = $this->programDedupeKey($program);
+
+        return ClubLeague::query()
+            ->with('league')
+            ->where('club_id', $club->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (ClubLeague $candidate): bool => $this->programDedupeKey($candidate) === $key)
+            ->values();
+    }
+
+    protected function programClubLeagueIds(Club $club, ?ClubLeague $program): array
+    {
+        if (! $program) {
+            return [];
+        }
+
+        return $this->allActiveClubLeaguesForProgram($club, $program)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function programLeagueIds(Club $club, ?ClubLeague $program): array
+    {
+        if (! $program) {
+            return [];
+        }
+
+        return $this->allActiveClubLeaguesForProgram($club, $program)
+            ->pluck('league_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function canonicalProgramForClubLeague(Club $club, ?ClubLeague $program): ?ClubLeague
+    {
+        if (! $program) {
+            return null;
+        }
+
+        $key = $this->programDedupeKey($program);
+
+        return $club->clubLeagues
+            ->first(fn (ClubLeague $candidate): bool => $this->programDedupeKey($candidate) === $key)
+            ?: $program;
+    }
+
+    protected function resolveRequestedProgram(Club $club, mixed $programId): ?ClubLeague
+    {
+        if (blank($programId)) {
+            return null;
+        }
+
+        $program = $club->clubLeagues->firstWhere('id', (int) $programId);
+
+        if ($program) {
+            return $program;
+        }
+
+        $duplicate = ClubLeague::query()
+            ->with('league')
+            ->where('club_id', $club->id)
+            ->whereKey((int) $programId)
+            ->first();
+
+        return $this->canonicalProgramForClubLeague($club, $duplicate);
+    }
+
+    protected function clubLeagueForPlayer(Club $club, ?User $player): ?ClubLeague
+    {
+        if (! $player) {
+            return null;
+        }
+
+        if (filled($player->club_league_id)) {
+            $program = $this->resolveRequestedProgram($club, $player->club_league_id);
+
+            if ($program) {
+                return $program;
+            }
+        }
+
+        $program = ClubLeague::query()
+            ->with('league')
+            ->where('club_id', $club->id)
+            ->where('league_id', $player->league_id)
+            ->where('is_active', true)
+            ->when(filled($player->sport), fn ($query) => $query->where(function ($query) use ($player): void {
+                $query
+                    ->whereNull('sport')
+                    ->orWhere('sport', '')
+                    ->orWhere('sport', $player->sport);
+            }))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+
+        return $this->canonicalProgramForClubLeague($club, $program)
+            ?: $this->clubLeagueForGender($club, $this->landingGenderSegmentForPlayer($player), $player->sport);
+    }
+
+    protected function playerMatchesProgram(User $player, Club $club, ?ClubLeague $program): bool
+    {
+        if (! $program) {
+            return true;
+        }
+
+        $clubLeagueIds = $this->programClubLeagueIds($club, $program);
+        $leagueIds = $this->programLeagueIds($club, $program);
+
+        if (filled($player->club_league_id)) {
+            return in_array((int) $player->club_league_id, $clubLeagueIds, true);
+        }
+
+        return filled($player->league_id)
+            && in_array((int) $player->league_id, $leagueIds, true);
+    }
+
+
     protected function attachDisplayLeague(Club $club): void
     {
         if ($club->relationLoaded('clubLeagues')) {
@@ -567,14 +727,18 @@ class PublicClubTeamController extends Controller
     {
         return $players
             ->filter(fn (User $player): bool => filled($player->team_name))
-            ->groupBy(fn (User $player): string => $this->teamKey(
-                $this->landingGenderSegmentForPlayer($player),
-                $player->team_name,
-                $player->club_league_id,
-            ))
+            ->groupBy(function (User $player) use ($club): string {
+                $program = $this->clubLeagueForPlayer($club, $player);
+
+                return $this->teamKey(
+                    $this->landingGenderSegmentForPlayer($player),
+                    $player->team_name,
+                    $program?->id,
+                );
+            })
             ->map(function (Collection $group) use ($club) {
                 $player = $group->first();
-                $program = $club->clubLeagues->firstWhere('id', $player?->club_league_id)
+                $program = $this->clubLeagueForPlayer($club, $player)
                     ?: $this->clubLeagueForGender($club, $this->landingGenderSegmentForPlayer($player), $player?->sport);
 
                 return $this->buildLandingTeam(
@@ -586,6 +750,7 @@ class PublicClubTeamController extends Controller
                 );
             })
             ->sortBy([
+                fn ($team) => $team->league_name ?: '',
                 fn ($team) => $team->gender_segment === 'boys' ? 0 : 1,
                 fn ($team) => $team->name,
             ])
@@ -654,6 +819,8 @@ class PublicClubTeamController extends Controller
 
     protected function playersForLandingTeam(Club $club, string $genderSegment, string $teamSlug, mixed $programId = null): Collection
     {
+        $program = $this->resolveRequestedProgram($club, $programId);
+
         return User::query()
             ->with([
                 'school',
@@ -671,11 +838,8 @@ class PublicClubTeamController extends Controller
             ->where('club_id', $club->id)
             ->whereNotNull('team_name')
             ->get()
-            ->filter(function (User $player) use ($genderSegment, $teamSlug, $programId): bool {
-                $programMatches = blank($programId)
-                    || (int) ($player->club_league_id ?? 0) === (int) $programId;
-
-                return $programMatches
+            ->filter(function (User $player) use ($club, $genderSegment, $teamSlug, $program): bool {
+                return $this->playerMatchesProgram($player, $club, $program)
                     && $this->landingGenderSegmentForPlayer($player) === $genderSegment
                     && Str::slug((string) $player->team_name) === $teamSlug;
             })
@@ -719,11 +883,9 @@ class PublicClubTeamController extends Controller
 
     protected function playerBelongsToLandingTeam(User $player, Club $club, string $genderSegment, string $teamSlug): bool
     {
-        $programId = request('program');
-        $programMatches = blank($programId)
-            || (int) ($player->club_league_id ?? 0) === (int) $programId;
+        $program = $this->resolveRequestedProgram($club, request('program'));
 
-        return $programMatches
+        return $this->playerMatchesProgram($player, $club, $program)
             && (int) ($player->club_id ?? 0) === (int) $club->id
             && $this->landingGenderSegmentForPlayer($player) === $this->normalizeLandingGenderSegment($genderSegment)
             && Str::slug((string) $player->team_name) === $teamSlug;

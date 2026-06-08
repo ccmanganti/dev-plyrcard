@@ -142,19 +142,31 @@
             : collect();
 
         $programDedupeKey = function ($program) use ($normalizeGender) {
-            $genders = collect($program->genders ?? [])
+            $leagueName = strtolower(trim((string) ($program->league?->name ?? 'league')));
+            $leagueName = preg_replace('/\s+/', ' ', $leagueName);
+
+            $sport = strtolower(trim((string) ($program->sport ?? $program->league?->sport ?? '')));
+            $sport = preg_replace('/\s+/', ' ', $sport);
+
+            $genders = collect($program->genders ?? $program->league?->genders ?? [])
                 ->map(fn ($gender) => $normalizeGender($gender))
                 ->filter()
                 ->unique()
                 ->sort()
-                ->values()
-                ->implode(',');
+                ->values();
+
+            if ($genders->isEmpty()) {
+                $legacyGender = $normalizeGender($program->league?->gender ?? null);
+                if ($legacyGender) {
+                    $genders = collect([$legacyGender]);
+                }
+            }
 
             return implode('|', [
                 (int) ($program->club_id ?? 0),
-                (int) ($program->league_id ?? 0),
-                strtolower(trim((string) ($program->sport ?? ''))),
-                $genders,
+                $leagueName,
+                $sport,
+                $genders->implode(','),
             ]);
         };
 
