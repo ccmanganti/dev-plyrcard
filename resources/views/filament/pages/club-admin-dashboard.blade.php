@@ -371,7 +371,7 @@
                             @if ($landingUrl)
                                 <a href="{{ $landingUrl }}" target="_blank" rel="noopener" class="btn btn-primary">Visit Club Site</a>
                             @endif
-                            <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Create Game</button>
+                            <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Add Schedule</button>
                         </div>
                     </div>
                 </div>
