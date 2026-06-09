@@ -684,7 +684,9 @@ class ClubResource extends Resource
                                                     ->icon('heroicon-m-arrow-right-on-rectangle')
                                                     ->tooltip('Impersonate')
                                                     ->record(function (array $arguments, Repeater $component): ?User {
-                                                        $state = $component->getItemState($arguments['item']);
+                                                        $state = method_exists($component, 'getRawItemState')
+                                                            ? $component->getRawItemState($arguments['item'])
+                                                            : ($component->getState()[$arguments['item']] ?? []);
 
                                                         if (blank($state['id'] ?? null)) {
                                                             return null;
@@ -696,7 +698,9 @@ class ClubResource extends Resource
                                                             ->first();
                                                     })
                                                     ->visible(function (array $arguments, Repeater $component): bool {
-                                                        $state = $component->getItemState($arguments['item']);
+                                                        $state = method_exists($component, 'getRawItemState')
+                                                            ? $component->getRawItemState($arguments['item'])
+                                                            : ($component->getState()[$arguments['item']] ?? []);
 
                                                         return filled($state['id'] ?? null)
                                                             && auth()->id() !== (int) $state['id']
