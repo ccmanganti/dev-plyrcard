@@ -492,7 +492,7 @@
                     @if ($this->activePanel === 'games')
                         <div class="panel-head">
                             <h3>{{ collect([$selectedProgram['label'] ?? null, $this->selectedTeam ? $this->selectedTeam . ' Games' : 'Games'])->filter()->implode(' • ') }}</h3>
-                            <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Create Game</button>
+                            <button type="button" class="btn" x-data x-on:click="$dispatch('open-modal', { id: 'club-game-modal' })">Add Schedule</button>
                         </div>
 
                         <div class="filter-row">
@@ -607,7 +607,7 @@
         </section>
 
         <x-filament::modal id="club-game-modal" width="lg">
-            <x-slot name="heading">Create Game</x-slot>
+            <x-slot name="heading">Add Schedule</x-slot>
 
             <div class="modal-grid">
                 <label class="field">League
