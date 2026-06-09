@@ -3,139 +3,287 @@
 namespace App\Support;
 
 use App\Models\Club;
+use App\Models\TeamManagerAssignment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ClubManagerAccess
 {
-    public static function isSuperadmin(?User $user): bool
+    public static function isSuperadmin(?User $user = null): bool
     {
-        return $user
+        $user ??= auth()->user();
+
+        return (bool) ($user
             && method_exists($user, 'hasRole')
             && (
                 $user->hasRole('Superadmin')
                 || $user->hasRole('superadmin')
                 || $user->hasRole('Super Admin')
-            );
+            ));
     }
 
-    public static function isClubManager(?User $user): bool
+    public static function isClubManager(?User $user = null): bool
     {
-        return $user
-            && method_exists($user, 'hasRole')
-            && (
-                $user->hasRole('Club Manager')
-                || $user->hasRole('club manager')
-                || $user->hasRole('ClubManager')
-            );
+        $user ??= auth()->user();
+
+        return (bool) ($user && method_exists($user, 'hasRole') && $user->hasRole('Club Manager'));
     }
 
-    public static function canAccessClubArea(?User $user): bool
+    public static function isTeamManager(?User $user = null): bool
     {
-        return static::isSuperadmin($user) || static::isClubManager($user);
+        $user ??= auth()->user();
+
+        return (bool) ($user && method_exists($user, 'hasRole') && $user->hasRole('Team Manager'));
     }
 
-    public static function canAccessClubAdmin(?User $user): bool
+    public static function isCoachManager(?User $user = null): bool
     {
-        return static::canAccessClubArea($user);
+        return static::isClubManager($user) || static::isTeamManager($user);
     }
 
-    public static function assignedClubId(?User $user): ?int
+    public static function canAccessClubArea(?User $user = null): bool
     {
-        return $user && filled($user->club_id) ? (int) $user->club_id : null;
+        $user ??= auth()->user();
+
+        return static::isSuperadmin($user)
+            || static::isClubManager($user)
+            || static::isTeamManager($user);
     }
 
-    public static function clubAdminClubIds(?User $user): array
+    public static function assignedClubId(?User $user = null): ?int
     {
+        $user ??= auth()->user();
+
         if (! $user) {
-            return [];
-        }
-
-        $assignedClubId = static::assignedClubId($user);
-
-        if (static::isClubManager($user)) {
-            return $assignedClubId ? [$assignedClubId] : [];
-        }
-
-        if (static::isSuperadmin($user)) {
-            return Club::query()
-                ->orderBy('name')
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
-
-        return [];
-    }
-
-    public static function managedClubIds(?User $user): array
-    {
-        return static::clubAdminClubIds($user);
-    }
-
-    public static function assignedClub(?User $user): ?Club
-    {
-        $clubIds = static::clubAdminClubIds($user);
-
-        if (empty($clubIds)) {
             return null;
         }
 
-        return Club::query()->whereKey($clubIds[0])->first();
+        return filled($user->club_id ?? null) ? (int) $user->club_id : null;
     }
 
-    public static function managedClubs(?User $user): Collection
+    public static function assignedClub(?User $user = null): ?Club
     {
-        $clubIds = static::clubAdminClubIds($user);
+        $clubId = static::assignedClubId($user);
 
-        if (empty($clubIds)) {
-            return collect();
+        return $clubId ? Club::query()->withoutGlobalScopes()->find($clubId) : null;
+    }
+
+    public static function managedClubs(?User $user = null)
+    {
+        $user ??= auth()->user();
+
+        if (! $user) {
+            return Club::query()->whereRaw('1 = 0');
         }
 
+        if (static::isSuperadmin($user)) {
+            return Club::query()->withoutGlobalScopes();
+        }
+
+        $clubId = static::assignedClubId($user);
+
         return Club::query()
-            ->whereIn('id', $clubIds)
-            ->orderBy('name')
-            ->get();
+            ->withoutGlobalScopes()
+            ->when($clubId, fn (Builder $query) => $query->whereKey($clubId), fn (Builder $query) => $query->whereRaw('1 = 0'));
     }
 
-    public static function userCanAccessClub(?User $user, Club|int|null $club): bool
+    public static function userCanAccessClub(?User $user, ?Club $club): bool
     {
         if (! $user || ! $club) {
             return false;
         }
 
-        $clubId = $club instanceof Club ? (int) $club->getKey() : (int) $club;
+        if (static::isSuperadmin($user)) {
+            return true;
+        }
 
-        return in_array($clubId, static::clubAdminClubIds($user), true);
+        return static::canAccessClubArea($user)
+            && static::assignedClubId($user) === (int) $club->getKey();
     }
 
-    public static function scopeClubs(Builder $query, ?User $user): Builder
+    public static function teamManagerAssignments(?User $user = null)
     {
-        $clubIds = static::clubAdminClubIds($user);
+        $user ??= auth()->user();
 
-        return empty($clubIds)
-            ? $query->whereRaw('1 = 0')
-            : $query->whereIn('id', $clubIds);
+        if (! $user || ! static::isTeamManager($user)) {
+            return collect();
+        }
+
+        return TeamManagerAssignment::query()
+            ->with(['clubLeague.league'])
+            ->where('user_id', $user->id)
+            ->when(static::assignedClubId($user), fn (Builder $query, int $clubId) => $query->where('club_id', $clubId))
+            ->get();
     }
 
-    public static function scopePlayers(Builder $query, ?User $user): Builder
+    public static function allowedTeamNames(?User $user = null): array
     {
-        $clubIds = static::clubAdminClubIds($user);
+        $user ??= auth()->user();
 
-        return empty($clubIds)
-            ? $query->whereRaw('1 = 0')
-            : $query->whereIn('club_id', $clubIds);
+        if (! static::isTeamManager($user)) {
+            return [];
+        }
+
+        return static::teamManagerAssignments($user)
+            ->pluck('team_name')
+            ->filter()
+            ->map(fn ($team) => strtoupper(trim((string) $team)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
-    public static function canViewPlayer(?User $manager, User $player): bool
+    public static function allowedClubLeagueIds(?User $user = null): array
     {
-        if (! $manager || ! filled($player->club_id)) {
+        $user ??= auth()->user();
+
+        if (! static::isTeamManager($user)) {
+            return [];
+        }
+
+        return static::teamManagerAssignments($user)
+            ->pluck('club_league_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public static function allowedLeagueIds(?User $user = null): array
+    {
+        $user ??= auth()->user();
+
+        if (! static::isTeamManager($user)) {
+            return [];
+        }
+
+        return static::teamManagerAssignments($user)
+            ->pluck('league_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public static function teamManagerCanAccessTeam(?User $user, ?int $clubLeagueId, ?int $leagueId, ?string $teamName): bool
+    {
+        if (! static::isTeamManager($user)) {
+            return true;
+        }
+
+        $teamName = strtoupper(trim((string) $teamName));
+
+        if (blank($teamName)) {
             return false;
         }
 
-        return in_array((int) $player->club_id, static::clubAdminClubIds($manager), true);
+        return static::teamManagerAssignments($user)
+            ->contains(function (TeamManagerAssignment $assignment) use ($clubLeagueId, $leagueId, $teamName): bool {
+                $assignmentTeam = strtoupper(trim((string) $assignment->team_name));
+
+                if ($assignmentTeam !== $teamName) {
+                    return false;
+                }
+
+                if ($clubLeagueId && (int) $assignment->club_league_id === (int) $clubLeagueId) {
+                    return true;
+                }
+
+                if ($leagueId && (int) $assignment->league_id === (int) $leagueId) {
+                    return true;
+                }
+
+                return false;
+            });
+    }
+
+    public static function scopePlayers(Builder $query, ?User $user = null): Builder
+    {
+        $user ??= auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if (static::isSuperadmin($user)) {
+            return $query;
+        }
+
+        $clubId = static::assignedClubId($user);
+
+        if (! $clubId) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->where('club_id', $clubId);
+
+        if (static::isTeamManager($user)) {
+            $teams = static::allowedTeamNames($user);
+            $clubLeagueIds = static::allowedClubLeagueIds($user);
+            $leagueIds = static::allowedLeagueIds($user);
+
+            if (empty($teams)) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->whereIn('team_name', $teams);
+
+            if (! empty($clubLeagueIds) && SchemaFacade::hasColumn('users', 'club_league_id')) {
+                $query->where(function (Builder $query) use ($clubLeagueIds, $leagueIds): void {
+                    $query->whereIn('club_league_id', $clubLeagueIds);
+
+                    if (! empty($leagueIds) && SchemaFacade::hasColumn('users', 'league_id')) {
+                        $query->orWhere(function (Builder $query) use ($leagueIds): void {
+                            $query->whereNull('club_league_id')
+                                ->whereIn('league_id', $leagueIds);
+                        });
+                    }
+                });
+            } elseif (! empty($leagueIds) && SchemaFacade::hasColumn('users', 'league_id')) {
+                $query->whereIn('league_id', $leagueIds);
+            }
+        }
+
+        return $query;
+    }
+
+    public static function canViewPlayer(?User $manager, ?User $player): bool
+    {
+        if (! $manager || ! $player) {
+            return false;
+        }
+
+        if (static::isSuperadmin($manager)) {
+            return true;
+        }
+
+        if (! static::canAccessClubArea($manager)) {
+            return false;
+        }
+
+        if (static::assignedClubId($manager) !== (int) ($player->club_id ?? 0)) {
+            return false;
+        }
+
+        if (static::isClubManager($manager)) {
+            return true;
+        }
+
+        if (! static::isTeamManager($manager)) {
+            return false;
+        }
+
+        return static::teamManagerCanAccessTeam(
+            $manager,
+            $player->club_league_id ?? null,
+            $player->league_id ?? null,
+            $player->team_name ?? null,
+        );
     }
 
     public static function playerDisplayName(User $player): string
@@ -148,55 +296,36 @@ class ClubManagerAccess
     {
         $name = static::playerDisplayName($player);
 
-        return str($name)
+        return Str::of($name)
             ->explode(' ')
             ->filter()
+            ->map(fn ($part) => Str::substr((string) $part, 0, 1))
             ->take(2)
-            ->map(fn ($part) => str($part)->substr(0, 1)->upper()->toString())
-            ->implode('') ?: 'P';
+            ->implode('')
+            ?: 'P';
     }
 
-    public static function normalizeImageUrl(?string $candidate): ?string
+    public static function playerEmail(User $player): ?string
     {
-        if (blank($candidate)) {
-            return null;
-        }
-
-        $candidate = trim($candidate);
-
-        if (str_starts_with($candidate, 'http://') || str_starts_with($candidate, 'https://')) {
-            return $candidate;
-        }
-
-        return Storage::disk('public')->url(ltrim($candidate, '/'));
+        return $player->email ?? $player->personal_email ?? null;
     }
 
-    /*
-     |--------------------------------------------------------------------------
-     | Player image helpers
-     |--------------------------------------------------------------------------
-     |
-     | The dashboard Blade calls playerPlyrCardImageUrl() and
-     | playerProfileImageUrl(). This hotfix adds both methods.
-     |
-     | PlyrCard images should render as full rectangular cards.
-     | Profile-only images should render inside a circular avatar.
-     |
-     */
-
-    public static function playerPlyrCardImageValue(User $player): ?string
+    public static function playerPhone(User $player): ?string
     {
-        foreach ([
-            'plyrcard_image',
-            'player_card_image',
-            'plyr_card_image',
-            'card_image',
-            'generated_card_image',
-            'generated_card',
-            'share_card_image',
-        ] as $field) {
-            if (isset($player->{$field}) && filled($player->{$field})) {
-                return (string) $player->{$field};
+        return $player->phone ?? $player->parent_phone ?? null;
+    }
+
+    public static function playerWebsiteUrl(User $player): ?string
+    {
+        if (method_exists($player, 'websites')) {
+            $website = $player->relationLoaded('websites')
+                ? $player->websites->first()
+                : $player->websites()->first();
+
+            if ($website?->domain) {
+                return str_starts_with($website->domain, 'http')
+                    ? $website->domain
+                    : 'https://' . $website->domain;
             }
         }
 
@@ -208,7 +337,36 @@ class ClubManagerAccess
         return static::normalizeImageUrl(static::playerPlyrCardImageValue($player));
     }
 
-    public static function playerProfileImageValue(User $player): ?string
+    public static function playerProfileImageUrl(User $player): ?string
+    {
+        return static::normalizeImageUrl(static::playerProfileImageValue($player));
+    }
+
+    public static function playerImageUrl(User $player): ?string
+    {
+        return static::playerPlyrCardImageUrl($player) ?: static::playerProfileImageUrl($player);
+    }
+
+    protected static function playerPlyrCardImageValue(User $player): mixed
+    {
+        foreach ([
+            'plyrcard_image',
+            'player_card_image',
+            'plyr_card_image',
+            'card_image',
+            'generated_card_image',
+            'generated_card',
+            'share_card_image',
+        ] as $field) {
+            if (filled($player->{$field} ?? null)) {
+                return $player->{$field};
+            }
+        }
+
+        return null;
+    }
+
+    protected static function playerProfileImageValue(User $player): mixed
     {
         foreach ([
             'player_image',
@@ -220,67 +378,34 @@ class ClubManagerAccess
             'image',
             'action_image',
             'mobile_hero_image',
+            'raw_player_images',
         ] as $field) {
-            if (isset($player->{$field}) && filled($player->{$field})) {
-                return (string) $player->{$field};
-            }
-        }
-
-        if (is_array($player->raw_player_images ?? null)) {
-            $candidate = collect($player->raw_player_images)
-                ->flatten()
-                ->filter()
-                ->first(fn ($value) => is_string($value) && filled($value));
-
-            if ($candidate) {
-                return (string) $candidate;
+            if (filled($player->{$field} ?? null)) {
+                return $player->{$field};
             }
         }
 
         return null;
     }
 
-    public static function playerProfileImageUrl(User $player): ?string
+    protected static function normalizeImageUrl(mixed $value): ?string
     {
-        return static::normalizeImageUrl(static::playerProfileImageValue($player));
-    }
+        if (is_array($value)) {
+            $value = collect($value)->filter()->first();
+        }
 
-    public static function playerImageUrl(User $player): ?string
-    {
-        return static::playerPlyrCardImageUrl($player)
-            ?: static::playerProfileImageUrl($player);
-    }
-
-    public static function playerWebsiteUrl(User $player): ?string
-    {
-        $website = method_exists($player, 'websites')
-            ? $player->websites()->where('is_published', true)->latest()->first()
-            : null;
-
-        if (! $website) {
+        if (blank($value)) {
             return null;
         }
 
-        if (filled($website->domain)) {
-            return str_starts_with($website->domain, 'http')
-                ? $website->domain
-                : 'https://' . $website->domain;
+        $value = (string) $value;
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
         }
 
-        if (filled($website->slug)) {
-            return url('/' . ltrim($website->slug, '/'));
-        }
+        $value = ltrim(str_replace('public/', '', $value), '/');
 
-        return null;
-    }
-
-    public static function playerEmail(User $player): ?string
-    {
-        return $player->personal_email ?: $player->email;
-    }
-
-    public static function playerPhone(User $player): ?string
-    {
-        return $player->phone ?: ($player->mobile_phone ?? null);
+        return Storage::disk('public')->url($value);
     }
 }

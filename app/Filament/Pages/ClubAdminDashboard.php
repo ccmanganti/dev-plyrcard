@@ -6,6 +6,7 @@ use App\Models\Club;
 use App\Models\ClubLeague;
 use App\Models\ClubReferral;
 use App\Models\Schedule;
+use App\Models\TeamManagerAssignment;
 use App\Models\User;
 use App\Support\ClubManagerAccess;
 use BackedEnum;
@@ -105,6 +106,60 @@ class ClubAdminDashboard extends Page
     public function getHeading(): string | Htmlable
     {
         return 'Club Dashboard';
+    }
+
+
+    protected function isTeamManagerDashboard(): bool
+    {
+        return ClubManagerAccess::isTeamManager(auth()->user());
+    }
+
+    protected function managerAssignmentRows(): Collection
+    {
+        return ClubManagerAccess::teamManagerAssignments(auth()->user());
+    }
+
+    protected function managerAllowedTeamNames(): array
+    {
+        return ClubManagerAccess::allowedTeamNames(auth()->user());
+    }
+
+    protected function managerAllowedClubLeagueIds(): array
+    {
+        return ClubManagerAccess::allowedClubLeagueIds(auth()->user());
+    }
+
+    protected function managerAllowedLeagueIds(): array
+    {
+        return ClubManagerAccess::allowedLeagueIds(auth()->user());
+    }
+
+    protected function managerCanUseProgram(array $program): bool
+    {
+        if (! $this->isTeamManagerDashboard()) {
+            return true;
+        }
+
+        $allowedClubLeagueIds = $this->managerAllowedClubLeagueIds();
+        $allowedLeagueIds = $this->managerAllowedLeagueIds();
+
+        $programClubLeagueIds = collect($program['club_league_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+        $programLeagueIds = collect($program['league_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+
+        return ! empty(array_intersect($allowedClubLeagueIds, $programClubLeagueIds))
+            || ! empty(array_intersect($allowedLeagueIds, $programLeagueIds));
+    }
+
+    protected function managerCanUseTeam(?string $teamName): bool
+    {
+        if (! $this->isTeamManagerDashboard()) {
+            return true;
+        }
+
+        $teamName = strtoupper(trim((string) $teamName));
+
+        return $teamName !== ''
+            && in_array($teamName, $this->managerAllowedTeamNames(), true);
     }
 
     public function mount(): void
@@ -235,6 +290,7 @@ class ClubAdminDashboard extends Page
                 ];
             })
             ->sortBy('label')
+            ->filter(fn (array $program): bool => $this->managerCanUseProgram($program))
             ->values();
     }
 
@@ -384,6 +440,7 @@ class ClubAdminDashboard extends Page
                     'game_count' => $this->countTeamGames($label),
                 ];
             })
+            ->filter(fn (array $ageGroup): bool => $this->managerCanUseTeam($ageGroup['name']))
             ->filter(fn (array $ageGroup): bool => ((int) $ageGroup['player_count'] > 0) || ((int) $ageGroup['game_count'] > 0))
             ->values();
     }
@@ -602,7 +659,6 @@ class ClubAdminDashboard extends Page
 
         $this->resetDetailState();
     }
-
     public function setSelectedLeagueGender(string $leagueKey, string $gender): void
     {
         $league = $this->resolveLeagueOption($leagueKey);

@@ -34,7 +34,7 @@
             return \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($path, '/'));
         };
 
-        $selectedLeagueLogo = $assetUrl($selectedLeague['logo'] ?? null);
+        $selectedLeagueLogo = $selectedLeague ? $assetUrl($selectedLeague['logo'] ?? null) : null;
     @endphp
 
     <style>
@@ -57,8 +57,8 @@
         .club-dashboard-v7 .hero-control {
             position:relative;
             justify-self:end;
-            width:min(430px,100%);
-            min-height:160px;
+            width:min(360px,100%);
+            min-height:86px;
             display:flex;
             justify-content:flex-end;
             align-items:center;
@@ -67,20 +67,7 @@
             border:0;
             overflow:visible;
         }
-        .club-dashboard-v7 .hero-league-watermark {
-            position:absolute;
-            right:0;
-            top:50%;
-            transform:translateY(-50%);
-            width:220px;
-            height:150px;
-            object-fit:contain;
-            opacity:.20;
-            filter:drop-shadow(0 24px 38px rgba(0,0,0,.55));
-            pointer-events:none;
-            user-select:none;
-        }
-        .club-dashboard-v7 .control-label {
+.club-dashboard-v7 .control-label {
             position:absolute;
             right:0;
             top:0;
@@ -97,10 +84,10 @@
             z-index:3;
             display:flex;
             justify-content:flex-end;
-            align-items:center;
+            align-items:flex-start;
             flex-wrap:wrap;
-            gap:24px;
-            padding-top:24px;
+            gap:18px;
+            padding-top:18px;
             padding-right:4px;
             overflow:visible;
         }
@@ -108,8 +95,9 @@
             position:relative;
             display:grid;
             justify-items:center;
-            min-width:88px;
-            min-height:122px;
+            align-items:start;
+            min-width:82px;
+            min-height:104px;
             isolation:isolate;
         }
         .club-dashboard-v7 .league-logo-button {
@@ -119,11 +107,11 @@
             cursor:pointer;
             display:grid;
             place-items:center;
-            gap:7px;
+            gap:8px;
             padding:0;
             text-align:center;
             transition:transform .2s ease, filter .2s ease, opacity .2s ease;
-            opacity:.70;
+            opacity:.72;
         }
         .club-dashboard-v7 .league-logo-button:hover,
         .club-dashboard-v7 .league-option:hover .league-logo-button,
@@ -146,39 +134,38 @@
             margin-top:3px;
         }
         .club-dashboard-v7 .league-logo-button img {
-            width:78px;
-            height:78px;
+            width:62px;
+            height:62px;
             object-fit:contain;
         }
         .club-dashboard-v7 .league-logo-fallback {
-            width:78px;
-            height:78px;
+            width:62px;
+            height:62px;
             border-radius:999px;
             display:grid;
             place-items:center;
             background:rgba(255,255,255,.08);
-            font-size:18px;
+            font-size:15px;
             font-weight:950;
         }
         .club-dashboard-v7 .league-logo-button span {
             font-size:11px;
             font-weight:950;
             line-height:1.05;
-            max-width:96px;
+            max-width:82px;
             overflow:hidden;
             text-overflow:ellipsis;
             white-space:nowrap;
             color:rgba(255,255,255,.78);
         }
-
-        /* Split-gender animation. Hidden by default; appears only on hover/focus. */
         .club-dashboard-v7 .league-genders {
             position:absolute;
-            top:0;
+            top:-2px;
             left:50%;
-            width:188px;
-            height:106px;
-            transform:translateX(-50%) scale(.78);
+            width:150px;
+            height:86px;
+            transform:translateX(-50%) scale(.82);
+            visibility:hidden;
             opacity:0;
             pointer-events:none;
             z-index:80;
@@ -186,6 +173,7 @@
         }
         .club-dashboard-v7 .league-option:hover .league-genders,
         .club-dashboard-v7 .league-option:focus-within .league-genders {
+            visibility:visible;
             opacity:1;
             pointer-events:auto;
             transform:translateX(-50%) scale(1);
@@ -193,92 +181,106 @@
         .club-dashboard-v7 .split-gender-button {
             position:absolute;
             top:4px;
-            width:88px;
-            height:98px;
+            width:70px;
+            height:84px;
             border:0;
-            border-radius:22px;
-            overflow:hidden;
+            padding:0;
+            background:transparent;
             cursor:pointer;
-            background:rgba(10,10,12,.86);
-            box-shadow:0 24px 52px rgba(0,0,0,.45);
+            overflow:visible;
             transform:translateX(0) rotate(0deg);
             transition:transform .22s cubic-bezier(.2,.85,.25,1), filter .16s ease, opacity .16s ease;
         }
         .club-dashboard-v7 .split-gender-button.is-male {
             left:50%;
-            margin-left:-44px;
+            margin-left:-35px;
         }
         .club-dashboard-v7 .split-gender-button.is-female {
             right:50%;
-            margin-right:-44px;
+            margin-right:-35px;
         }
         .club-dashboard-v7 .league-option:hover .split-gender-button.is-male,
         .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-male {
-            transform:translateX(47px) rotate(5deg);
+            transform:translateX(36px) rotate(4deg);
         }
         .club-dashboard-v7 .league-option:hover .split-gender-button.is-female,
         .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-female {
-            transform:translateX(-47px) rotate(-5deg);
+            transform:translateX(-36px) rotate(-4deg);
         }
         .club-dashboard-v7 .split-gender-button:hover {
-            filter:brightness(1.12) saturate(1.14);
-        }
-        .club-dashboard-v7 .split-gender-button.is-active {
-            outline:2px solid #fff;
-            outline-offset:2px;
+            filter:drop-shadow(0 18px 30px rgba(0,0,0,.45));
         }
         .club-dashboard-v7 .split-gender-button img,
-        .club-dashboard-v7 .split-gender-fallback {
-            position:absolute;
-            inset:0;
-            width:100%;
-            height:100%;
+        .club-dashboard-v7 .split-gender-button .split-gender-fallback {
+            width:70px;
+            height:70px;
             object-fit:contain;
-            padding:12px;
-            z-index:1;
+            display:block;
+            margin:0 auto;
+            transition:transform .18s ease, opacity .18s ease;
         }
         .club-dashboard-v7 .split-gender-fallback {
-            display:grid;
+            display:grid !important;
             place-items:center;
+            border-radius:999px;
+            background:rgba(255,255,255,.08);
             color:#fff;
-            font-size:18px;
+            font-size:15px;
             font-weight:950;
         }
         .club-dashboard-v7 .split-gender-button::before {
             content:"";
             position:absolute;
-            inset:0;
+            inset:5px 4px 15px;
+            border-radius:999px;
+            background:transparent;
+            transition:background .18s ease, box-shadow .18s ease;
+            pointer-events:none;
+        }
+        .club-dashboard-v7 .split-gender-button img,
+        .club-dashboard-v7 .split-gender-button .split-gender-fallback {
+            position:relative;
             z-index:2;
-            mix-blend-mode:screen;
-            opacity:.66;
+        }
+        .club-dashboard-v7 .split-gender-button.is-male img,
+        .club-dashboard-v7 .split-gender-button.is-male .split-gender-fallback {
+            filter:grayscale(1) brightness(1.25) contrast(1.05) sepia(.35) hue-rotate(165deg) saturate(3.8);
+        }
+        .club-dashboard-v7 .split-gender-button.is-female img,
+        .club-dashboard-v7 .split-gender-button.is-female .split-gender-fallback {
+            filter:grayscale(1) brightness(1.22) contrast(1.04) sepia(.45) hue-rotate(290deg) saturate(3.2);
         }
         .club-dashboard-v7 .split-gender-button.is-male::before {
-            background:linear-gradient(135deg, rgba(50,128,255,.82), rgba(27,51,148,.72));
+            box-shadow:0 0 0 1px rgba(82, 132, 255, .22), 0 18px 40px rgba(58, 108, 255, .12);
+            background:radial-gradient(circle at center, rgba(76,116,255,.18) 0%, rgba(76,116,255,.08) 55%, transparent 72%);
         }
         .club-dashboard-v7 .split-gender-button.is-female::before {
-            background:linear-gradient(135deg, rgba(255,80,168,.82), rgba(126,46,255,.68));
+            box-shadow:0 0 0 1px rgba(255, 97, 160, .24), 0 18px 40px rgba(255, 97, 160, .12);
+            background:radial-gradient(circle at center, rgba(255,97,160,.18) 0%, rgba(255,97,160,.08) 55%, transparent 72%);
         }
         .club-dashboard-v7 .split-gender-button strong {
             position:absolute;
             left:50%;
-            bottom:9px;
+            bottom:-2px;
             transform:translateX(-50%);
-            z-index:3;
-            min-height:24px;
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            border-radius:999px;
-            padding:0 10px;
-            background:rgba(0,0,0,.52);
-            color:#fff;
             font-size:10px;
             font-weight:950;
-            letter-spacing:.05em;
+            letter-spacing:.14em;
             text-transform:uppercase;
+            color:rgba(255,255,255,.82);
+            white-space:nowrap;
+            text-shadow:0 4px 14px rgba(0,0,0,.55);
+            z-index:3;
         }
-        .club-dashboard-v7 .gender-row,
-        .club-dashboard-v7 .gender-button { display:none; }
+        .club-dashboard-v7 .split-gender-button.is-active strong {
+            color:#fff;
+        }
+        .club-dashboard-v7 .split-gender-button.is-active img,
+        .club-dashboard-v7 .split-gender-button.is-active .split-gender-fallback {
+            transform:scale(1.03);
+        }
+        .club-dashboard-v7 .gender-row { display:none; }
+
 
         .club-dashboard-v7 .stat-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
         .club-dashboard-v7 .stat-card { border:0; text-align:left; cursor:pointer; border-radius:20px; padding:14px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; }
@@ -289,7 +291,7 @@
         .club-dashboard-v7 .layout { display:grid; grid-template-columns:360px minmax(0,1fr); gap:14px; align-items:start; }
         .club-dashboard-v7 .panel { border-radius:22px; padding:15px; background:#111; border:1px solid rgba(255,255,255,.09); color:#fff; min-width:0; }
         .club-dashboard-v7 .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-        .club-dashboard-v7 .panel h3 { margin:0; font-size:18px; font-weight:950; }
+        .club-dashboard-v7 .panel h3 { margin:0; font-size:15px; font-weight:950; }
         .club-dashboard-v7 .note { color:rgba(255,255,255,.48); font-size:12px; font-weight:700; }
         .club-dashboard-v7 .list { display:grid; gap:9px; }
         .club-dashboard-v7 .list-item { width:100%; display:flex; justify-content:space-between; gap:12px; border-radius:16px; padding:12px; background:rgba(255,255,255,.055); border:0; color:inherit; text-align:left; cursor:pointer; }
@@ -333,8 +335,8 @@
         .club-dashboard-v7 .modal-grid { display:grid; gap:12px; }
 
         @media (max-width:1280px) { .club-dashboard-v7 .player-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-        @media (max-width:980px) { .club-dashboard-v7 .hero-inner, .club-dashboard-v7 .layout { grid-template-columns:1fr; } .club-dashboard-v7 .stat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .club-dashboard-v7 .league-logo-grid { justify-content:flex-start; } .club-dashboard-v7 .hero-control { justify-self:stretch; } }
-        @media (max-width:560px) { .club-dashboard-v7 .hero-main { flex-direction:column; align-items:flex-start; } .club-dashboard-v7 .actions .btn { width:100%; } .club-dashboard-v7 .player-grid { grid-template-columns:1fr; } .club-dashboard-v7 .hero-control { justify-self:stretch; min-height:150px; } .club-dashboard-v7 .league-logo-grid { justify-content:flex-start; gap:30px; } .club-dashboard-v7 .hero-league-watermark { width:150px; height:110px; opacity:.16; } .club-dashboard-v7 .league-logo-button img, .club-dashboard-v7 .league-logo-fallback { width:62px; height:62px; } .club-dashboard-v7 .league-genders { width:166px; } .club-dashboard-v7 .split-gender-button { width:76px; } }
+        @media (max-width:980px) { .club-dashboard-v7 .hero-inner, .club-dashboard-v7 .layout { grid-template-columns:1fr; } .club-dashboard-v7 .stat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .club-dashboard-v7 .league-logo-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+        @media (max-width:560px) { .club-dashboard-v7 .hero-main { flex-direction:column; align-items:flex-start; } .club-dashboard-v7 .actions .btn { width:100%; } .club-dashboard-v7 .player-grid { grid-template-columns:1fr; } .club-dashboard-v7 .league-logo-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     </style>
 
     <div class="club-dashboard-v7" style="--club-primary: {{ $primary }}; {{ $heroUrl ? "--club-hero-image: url('{$heroUrl}');" : '' }}">
@@ -366,11 +368,7 @@
                 </div>
 
                 <div class="hero-control">
-                    @if ($selectedLeagueLogo)
-                        <img class="hero-league-watermark" src="{{ $selectedLeagueLogo }}" alt="">
-                    @endif
-
-                    <p class="control-label">League / Gender</p>
+<p class="control-label">League / Gender</p>
 
                     <div class="league-logo-grid">
                         @forelse ($leagueOptions as $league)
@@ -394,7 +392,7 @@
                             <div class="league-option {{ $isActiveLeague ? 'is-active' : '' }}">
                                 <button
                                     type="button"
-                                    wire:click="setSelectedLeague('{{ addslashes($league['key']) }}')"
+                                    wire:click="setSelectedLeague(@js($league['key']))"
                                     class="league-logo-button {{ $isActiveLeague ? 'is-active' : '' }}"
                                     title="{{ $league['label'] }}"
                                 >
@@ -417,7 +415,7 @@
 
                                             <button
                                                 type="button"
-                                                wire:click="setSelectedLeagueGender('{{ addslashes($league['key']) }}', '{{ $genderValue }}')"
+                                                wire:click="setSelectedLeagueGender(@js($league['key']), @js($genderValue))"
                                                 class="split-gender-button {{ $genderClass }} {{ $isActiveLeague && $this->selectedGender === $genderValue ? 'is-active' : '' }}"
                                                 title="{{ $league['label'] }} {{ $genderLabel }}"
                                             >
