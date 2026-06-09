@@ -171,13 +171,24 @@
             z-index:80;
             transition:opacity .18s ease, transform .22s cubic-bezier(.2,.85,.25,1);
         }
-        .club-dashboard-v7 .league-option:hover .league-genders,
-        .club-dashboard-v7 .league-option:focus-within .league-genders {
+        .club-dashboard-v7 .league-option:hover .league-genders {
             visibility:visible;
             opacity:1;
             pointer-events:auto;
             transform:translateX(-50%) scale(1);
         }
+
+        .club-dashboard-v7 .league-option.is-click-closed .league-genders {
+            visibility:hidden !important;
+            opacity:0 !important;
+            pointer-events:none !important;
+            transform:translateX(-50%) scale(.82) !important;
+        }
+        .club-dashboard-v7 .league-option.is-click-closed .split-gender-button.is-male,
+        .club-dashboard-v7 .league-option.is-click-closed .split-gender-button.is-female {
+            transform:translateX(0) rotate(0deg) !important;
+        }
+
         .club-dashboard-v7 .split-gender-button {
             position:absolute;
             top:4px;
@@ -199,12 +210,10 @@
             right:50%;
             margin-right:-35px;
         }
-        .club-dashboard-v7 .league-option:hover .split-gender-button.is-male,
-        .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-male {
+        .club-dashboard-v7 .league-option:hover .split-gender-button.is-male {
             transform:translateX(36px) rotate(4deg);
         }
-        .club-dashboard-v7 .league-option:hover .split-gender-button.is-female,
-        .club-dashboard-v7 .league-option:focus-within .split-gender-button.is-female {
+        .club-dashboard-v7 .league-option:hover .split-gender-button.is-female {
             transform:translateX(-36px) rotate(-4deg);
         }
         .club-dashboard-v7 .split-gender-button:hover {
@@ -389,7 +398,13 @@
                                 ];
                             @endphp
 
-                            <div class="league-option {{ $isActiveLeague ? 'is-active' : '' }}">
+                            <div
+                                x-data="{ closedAfterPick: false }"
+                                x-on:mouseenter="closedAfterPick = false"
+                                x-on:mouseleave="closedAfterPick = false"
+                                x-bind:class="{ 'is-click-closed': closedAfterPick }"
+                                class="league-option {{ $isActiveLeague ? 'is-active' : '' }}"
+                            >
                                 <button
                                     type="button"
                                     wire:click="setSelectedLeague(@js($league['key']))"
@@ -415,6 +430,7 @@
 
                                             <button
                                                 type="button"
+                                                x-on:click="closedAfterPick = true; $el.blur()"
                                                 wire:click="setSelectedLeagueGender(@js($league['key']), @js($genderValue))"
                                                 class="split-gender-button {{ $genderClass }} {{ $isActiveLeague && $this->selectedGender === $genderValue ? 'is-active' : '' }}"
                                                 title="{{ $league['label'] }} {{ $genderLabel }}"

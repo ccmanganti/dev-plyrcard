@@ -15,6 +15,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Illuminate\Support\Str;
@@ -447,7 +448,9 @@ class ClubAdminDashboard extends Page
 
     protected function usersForProgram(Club $club, array $program)
     {
-        $query = User::query()->where('club_id', $club->id);
+        $query = $this->scopedPlayersForCurrentManager(User::query())
+
+            ->where('club_id', $club->id);
 
         if (SchemaFacade::hasColumn('users', 'club_league_id')) {
             $query->where(function ($query) use ($program): void {
@@ -495,91 +498,19 @@ class ClubAdminDashboard extends Page
             return collect();
         }
 
-        return $this->usersForProgram($club, $program)
-            ->distinct()
-            ->pluck('id');
-    }
+        $query = $this->usersForProgram($club, $program);
 
-    public function getPositionOptionsProperty(): array
-    {
-        $club = $this->assignedClub;
-        $program = $this->selectedProgram;
+        if ($this->isTeamManagerDashboard()) {
+            $allowedTeamNames = $this->managerAllowedTeamNames();
 
-        if (! $club || ! $program || ! $this->selectedTeam) {
-            return [];
+            if (empty($allowedTeamNames)) {
+                return collect();
+            }
+
+            $query->whereIn('team_name', $allowedTeamNames);
         }
 
-        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
-            ->whereNotNull('position')
-            ->get()
-            ->flatMap(fn (User $user) => collect($user->position ?? [])->flatten())
-            ->filter()
-            ->unique()
-            ->values()
-            ->mapWithKeys(fn ($position) => [(string) $position => (string) $position])
-            ->all();
-    }
-
-    public function getSelectedTeamPlayersProperty(): EloquentCollection
-    {
-        $club = $this->assignedClub;
-        $program = $this->selectedProgram;
-
-        if (! $club || ! $program || ! $this->selectedTeam) {
-            return new EloquentCollection();
-        }
-
-        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
-            ->with(['club', 'league', 'websites'])
-            ->when(filled($this->playerSearch), function ($query): void {
-                $search = trim((string) $this->playerSearch);
-
-                $query->where(function ($query) use ($search): void {
-                    $query
-                        ->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('personal_email', 'like', "%{$search}%");
-                });
-            })
-            ->when(filled($this->playerPositionFilter), fn ($query) => $query->where('position', 'like', '%' . $this->playerPositionFilter . '%'))
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get();
-    }
-
-    public function getSelectedPlayerProperty(): ?User
-    {
-        if (! $this->selectedPlayerId) {
-            return null;
-        }
-
-        $player = User::query()
-            ->with(['club', 'league', 'websites', 'schedules'])
-            ->find($this->selectedPlayerId);
-
-        return $player && ClubManagerAccess::canViewPlayer(auth()->user(), $player) ? $player : null;
-    }
-
-    public function getSelectedTeamGamesProperty(): EloquentCollection
-    {
-        $club = $this->assignedClub;
-        $program = $this->selectedProgram;
-
-        if (! $club || ! $program || ! $this->selectedTeam) {
-            return new EloquentCollection();
-        }
-
-        $playerIds = $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
-            ->distinct()
-            ->pluck('id');
-
-        return $this->gamesForPlayerIds($playerIds, 20);
-    }
-
-    public function getUpcomingGamesProperty(): EloquentCollection
-    {
-        return $this->gamesForPlayerIds($this->playerIdsForSelectedProgram(), 12, true);
+        return $query->pluck('id');
     }
 
     protected function gamesForPlayerIds($playerIds, int $limit, bool $upcomingOnly = false): EloquentCollection
@@ -615,23 +546,59 @@ class ClubAdminDashboard extends Page
             ->get();
     }
 
+
+    protected function scopedPlayersForCurrentManager(Builder $query): Builder
+    {
+        return ClubManagerAccess::scopePlayers($query, auth()->user());
+    }
+
     public function getStatsProperty(): array
     {
-        $playerIds = $this->playerIdsForSelectedProgram();
+        $club = $this->assignedClub;
+        $program = $this->selectedProgram;
+
+        if (! $club || ! $program) {
+            return [
+                'teams' => 0,
+                'players' => 0,
+                'games' => 0,
+                'upcoming_games' => 0,
+            ];
+        }
+
+        $allowedTeamNames = collect($this->ageGroups)
+            ->pluck('name')
+            ->filter(fn ($teamName): bool => $this->managerCanUseTeam((string) $teamName))
+            ->map(fn ($teamName): string => strtoupper(trim((string) $teamName)))
+            ->unique()
+            ->values();
+
+        if ($this->isTeamManagerDashboard() && $allowedTeamNames->isEmpty()) {
+            return [
+                'teams' => 0,
+                'players' => 0,
+                'games' => 0,
+                'upcoming_games' => 0,
+            ];
+        }
+
+        $playersQuery = $this->usersForProgram($club, $program);
+
+        if ($allowedTeamNames->isNotEmpty()) {
+            $playersQuery->whereIn('team_name', $allowedTeamNames->all());
+        }
+
+        $playerIds = (clone $playersQuery)->pluck('id');
 
         $gamesQuery = Schedule::query()
-            ->whereHas('users', fn ($query) => $query->whereIn('users.id', $playerIds));
+            ->whereHas('users', fn (Builder $query): Builder => $query->whereIn('users.id', $playerIds));
 
         return [
-            'teams' => $this->ageGroups->count(),
-            'players' => $playerIds->count(),
-            'games' => $playerIds->isEmpty() ? 0 : (clone $gamesQuery)->count(),
-            'upcoming_games' => $playerIds->isEmpty() ? 0 : (clone $gamesQuery)
-                ->where(function ($query): void {
-                    $query
-                        ->whereNull('game_date')
-                        ->orWhereDate('game_date', '>=', now()->toDateString());
-                })
+            'teams' => $allowedTeamNames->count(),
+            'players' => (clone $playersQuery)->count(),
+            'games' => (clone $gamesQuery)->count(),
+            'upcoming_games' => (clone $gamesQuery)
+                ->whereDate('game_date', '>=', now()->toDateString())
                 ->count(),
         ];
     }
@@ -885,6 +852,11 @@ class ClubAdminDashboard extends Page
 
     protected function countTeamGames(string $team): int
     {
+        
+        if (! $this->managerCanUseTeam($teamName)) {
+            return 0;
+        }
+
         $club = $this->assignedClub;
         $program = $this->selectedProgram;
 
