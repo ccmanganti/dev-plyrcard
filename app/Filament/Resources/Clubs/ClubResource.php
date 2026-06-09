@@ -500,6 +500,7 @@ class ClubResource extends Resource
                     'last_name' => $coach->last_name,
                     'title' => $coach->title,
                     'email' => $coach->email,
+                    'password' => null,
                     'phone' => $coach->phone,
                     'manager_role' => $coach->hasRole('Team Manager') ? 'Team Manager' : 'Club Manager',
                     'assigned_club_league_ids' => $programIds,
@@ -550,15 +551,19 @@ class ClubResource extends Resource
                 : null;
 
             $isNew = ! $coach;
-            $plainPassword = null;
+            $plainPassword = filled($row['password'] ?? null)
+                ? (string) $row['password']
+                : null;
 
             if (! $coach) {
-                $plainPassword = Str::password(12);
+                $plainPassword ??= Str::password(12);
 
                 $coach = new User([
                     'password' => Hash::make($plainPassword),
                     'club_manager_created_at' => now(),
                 ]);
+            } elseif ($plainPassword) {
+                $coach->password = Hash::make($plainPassword);
             }
 
             $coach->forceFill([
@@ -603,7 +608,7 @@ class ClubResource extends Resource
                 }
             }
 
-            if ($isNew && $plainPassword) {
+            if ($plainPassword) {
                 Mail::to($coach->email)->send(new CoachAccountCreatedMail(
                     coach: $coach,
                     plainPassword: $plainPassword,
@@ -734,6 +739,18 @@ class ClubResource extends Resource
                                                             ->email()
                                                             ->required()
                                                             ->maxLength(255),
+
+
+                                                        TextInput::make('password')
+                                                            ->label(fn (Get $get): string => filled($get('id')) ? 'New Password' : 'Password')
+                                                            ->password()
+                                                            ->revealable()
+                                                            ->required(fn (Get $get): bool => blank($get('id')))
+                                                            ->minLength(8)
+                                                            ->maxLength(255)
+                                                            ->helperText(fn (Get $get): string => filled($get('id'))
+                                                                ? 'Leave blank to keep the existing password. Enter a new password to reset and email credentials.'
+                                                                : 'Required for the coach login account. This password will be emailed to the coach.'),
 
                                                         TextInput::make('phone')
                                                             ->label('Phone')
