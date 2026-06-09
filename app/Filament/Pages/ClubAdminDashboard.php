@@ -513,6 +513,89 @@ class ClubAdminDashboard extends Page
         return $query->pluck('id');
     }
 
+    public function getPositionOptionsProperty(): array
+    {
+        $club = $this->assignedClub;
+        $program = $this->selectedProgram;
+
+        if (! $club || ! $program || ! $this->selectedTeam || ! $this->managerCanUseTeam($this->selectedTeam)) {
+            return [];
+        }
+
+        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
+            ->whereNotNull('position')
+            ->get()
+            ->flatMap(fn (User $user) => collect($user->position ?? [])->flatten())
+            ->filter()
+            ->unique()
+            ->values()
+            ->mapWithKeys(fn ($position) => [(string) $position => (string) $position])
+            ->all();
+    }
+
+    public function getSelectedTeamPlayersProperty(): EloquentCollection
+    {
+        $club = $this->assignedClub;
+        $program = $this->selectedProgram;
+
+        if (! $club || ! $program || ! $this->selectedTeam || ! $this->managerCanUseTeam($this->selectedTeam)) {
+            return new EloquentCollection();
+        }
+
+        return $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
+            ->with(['club', 'league', 'websites'])
+            ->when(filled($this->playerSearch), function ($query): void {
+                $search = trim((string) $this->playerSearch);
+
+                $query->where(function ($query) use ($search): void {
+                    $query
+                        ->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('personal_email', 'like', "%{$search}%");
+                });
+            })
+            ->when(filled($this->playerPositionFilter), fn ($query) => $query->where('position', 'like', '%' . $this->playerPositionFilter . '%'))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+    }
+
+    public function getSelectedPlayerProperty(): ?User
+    {
+        if (! $this->selectedPlayerId) {
+            return null;
+        }
+
+        $player = User::query()
+            ->with(['club', 'league', 'websites', 'schedules'])
+            ->find($this->selectedPlayerId);
+
+        return $player && ClubManagerAccess::canViewPlayer(auth()->user(), $player) ? $player : null;
+    }
+
+    public function getSelectedTeamGamesProperty(): EloquentCollection
+    {
+        $club = $this->assignedClub;
+        $program = $this->selectedProgram;
+
+        if (! $club || ! $program || ! $this->selectedTeam || ! $this->managerCanUseTeam($this->selectedTeam)) {
+            return new EloquentCollection();
+        }
+
+        $playerIds = $this->playersForProgramGenderAndTeam($club, $program, $this->selectedTeam)
+            ->distinct()
+            ->pluck('id');
+
+        return $this->gamesForPlayerIds($playerIds, 20);
+    }
+
+    public function getUpcomingGamesProperty(): EloquentCollection
+    {
+        return $this->gamesForPlayerIds($this->playerIdsForSelectedProgram(), 12, true);
+    }
+
+
     protected function gamesForPlayerIds($playerIds, int $limit, bool $upcomingOnly = false): EloquentCollection
     {
         if ($playerIds->isEmpty()) {
@@ -853,8 +936,8 @@ class ClubAdminDashboard extends Page
     protected function countTeamGames(string $team): int
     {
         
-        if (! $this->managerCanUseTeam($this->selectedTeam)) {
-            return collect();
+        if (! $this->managerCanUseTeam($team)) {
+            return 0;
         }
 
         $club = $this->assignedClub;
