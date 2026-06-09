@@ -853,8 +853,8 @@ class ClubAdminDashboard extends Page
     protected function countTeamGames(string $team): int
     {
         
-        if (! $this->managerCanUseTeam($teamName)) {
-            return 0;
+        if (! $this->managerCanUseTeam($this->selectedTeam)) {
+            return collect();
         }
 
         $club = $this->assignedClub;
