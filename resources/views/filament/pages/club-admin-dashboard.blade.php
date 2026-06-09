@@ -651,7 +651,7 @@
 
                 <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
                     <button type="button" class="btn" x-data x-on:click="$dispatch('close-modal', { id: 'club-game-modal' })">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="createTeamGame">Create Game</button>
+                    <button type="button" class="btn btn-primary" wire:click="createTeamGame">Add Schedule</button>
                 </div>
             </div>
         </x-filament::modal>
