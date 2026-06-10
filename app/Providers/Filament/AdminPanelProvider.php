@@ -27,6 +27,8 @@ use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
 use App\Filament\Clusters\Organizations;
 use App\Filament\Clusters\Websites;
 use App\Filament\Clusters\Users;
+use App\Filament\Widgets\GhlProfileViewersWidget;
+use App\Filament\Widgets\PlayerCardOverview;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -64,7 +66,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                \App\Filament\Widgets\PlayerCardOverview::class,
+                PlayerCardOverview::class,
+                GhlProfileViewersWidget::class,
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,

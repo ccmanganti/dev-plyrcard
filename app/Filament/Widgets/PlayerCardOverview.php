@@ -2,10 +2,13 @@
 
 namespace App\Filament\Widgets;
 
+use App\Services\GoHighLevelService;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class PlayerCardOverview extends StatsOverviewWidget
 {
@@ -17,28 +20,60 @@ class PlayerCardOverview extends StatsOverviewWidget
     {
         $user = Auth::user();
 
-        $totalViews = 0; // wire this later
-        $cardScore = 0;  // wire this later
-
         $profileCompletion = $this->getProfileCompletion($user);
         $profileCompletionLabel = $this->getProfileCompletionLabel($profileCompletion);
 
+        $totalViews = $this->getGhlCommandCount($user, 'viewed_profile_contacts');
+
+        $viewScore = min(30, (int) round((min($totalViews, 50) / 50) * 30));
+        $completionScore = (int) round($profileCompletion * 0.70);
+        $cardScore = min(100, $completionScore + $viewScore);
+
         return [
             Stat::make('Card Views', number_format($totalViews))
-                ->description('Total Views on Your PlyrCard')
                 ->descriptionIcon(Heroicon::OutlinedEye)
                 ->color('danger'),
 
-            Stat::make('Card Score', (string) $cardScore)
-                ->description('Your PlyrCard performance score')
+            Stat::make('Highlight Views', (string) $cardScore)
                 ->descriptionIcon(Heroicon::OutlinedStar)
                 ->color('warning'),
 
-            Stat::make('Profile Complete', $profileCompletion . '%')
-                ->description($profileCompletionLabel)
-                ->descriptionIcon(Heroicon::OutlinedChartPie)
-                ->color($this->getProfileCompletionColor($profileCompletion)),
+            Stat::make('Emails Delivered', (string) $cardScore)
+                ->descriptionIcon(Heroicon::OutlinedStar)
+                ->color('warning'),
+
         ];
+    }
+
+    protected function getGhlCommandCount($user, string $command): int
+    {
+        if (! $user || ! method_exists($user, 'hasGhlConnection') || ! $user->hasGhlConnection()) {
+            return 0;
+        }
+
+        if (! method_exists($user, 'hasGhlLocationId') || ! $user->hasGhlLocationId()) {
+            return 0;
+        }
+
+        return Cache::remember(
+            "user:{$user->id}:ghl-command:{$command}:count",
+            now()->addMinutes(10),
+            function () use ($user, $command): int {
+                try {
+                    $result = app(GoHighLevelService::class)->runDashboardCommand($user, $command);
+
+                    return (int) ($result['count'] ?? 0);
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to pull GHL dashboard command count.', [
+                        'user_id' => $user->id,
+                        'command' => $command,
+                        'message' => $exception->getMessage(),
+                    ]);
+
+                    return 0;
+                }
+            }
+        );
     }
 
     protected function getProfileCompletion($user): int
@@ -47,14 +82,6 @@ class PlayerCardOverview extends StatsOverviewWidget
             return 0;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Core fields
-        |--------------------------------------------------------------------------
-        | These are the fields that make sense for most athletes regardless of sport.
-        | Sport-specific fields like dominant_foot are handled separately.
-        |--------------------------------------------------------------------------
-        */
         $coreFields = [
             'first_name',
             'last_name',
@@ -77,13 +104,6 @@ class PlayerCardOverview extends StatsOverviewWidget
             'ig_handle',
         ];
 
-        /*
-        |--------------------------------------------------------------------------
-        | Optional / sport-specific fields
-        |--------------------------------------------------------------------------
-        | These should not punish all athletes if not relevant to their sport.
-        |--------------------------------------------------------------------------
-        */
         $sportSpecificFields = [
             'position',
             'dominant_foot',
@@ -106,14 +126,6 @@ class PlayerCardOverview extends StatsOverviewWidget
             ? ($completedCore / count($coreFields)) * 100
             : 0;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Bonus score
-        |--------------------------------------------------------------------------
-        | Optional sport-specific fields can boost completion,
-        | but not heavily punish players if not applicable.
-        |--------------------------------------------------------------------------
-        */
         $completedSportSpecific = 0;
 
         foreach ($sportSpecificFields as $field) {
@@ -126,19 +138,17 @@ class PlayerCardOverview extends StatsOverviewWidget
             ? ($completedSportSpecific / count($sportSpecificFields)) * 10
             : 0;
 
-        $finalScore = min(100, round($corePercentage + $sportBonus));
-
-        return (int) $finalScore;
+        return (int) min(100, round($corePercentage + $sportBonus));
     }
 
     protected function getProfileCompletionLabel(int $completion): string
     {
         return match (true) {
-            $completion >= 100 => 'Outstanding — your PlyrCard is fully complete.',
-            $completion >= 85 => 'Almost there — your PlyrCard is nearly complete.',
-            $completion >= 60 => 'Great progress — keep building your PlyrCard.',
-            $completion >= 30 => 'Good start — add more details to strengthen your PlyrCard.',
-            default => 'Let’s get started — complete your PlyrCard to stand out.',
+            $completion >= 100 => 'Outstanding - your PlyrCard is fully complete.',
+            $completion >= 85 => 'Almost there - your PlyrCard is nearly complete.',
+            $completion >= 60 => 'Great progress - keep building your PlyrCard.',
+            $completion >= 30 => 'Good start - add more details to strengthen your PlyrCard.',
+            default => 'Let us get started - complete your PlyrCard to stand out.',
         };
     }
 

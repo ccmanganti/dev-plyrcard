@@ -113,6 +113,7 @@ class User extends Authenticatable implements HasName, FilamentUser
     protected $hidden = [
         'password',
         'remember_token',
+        'ghl_api_key',
     ];
 
     protected static function booted(): void
@@ -280,5 +281,33 @@ class User extends Authenticatable implements HasName, FilamentUser
     {
         return ! $this->isSuperadminOrImpersonating()
             && is_null($this->onboarding_completed_at);
+    }
+
+    public function hasGhlLocationId(): bool
+    {
+        return filled($this->ghl_location_id);
+    }
+
+    public function hasGhlApiKey(): bool
+    {
+        return filled($this->ghl_api_key);
+    }
+
+    public function hasGhlConnection(): bool
+    {
+        return $this->hasGhlLocationId() || $this->hasGhlApiKey();
+    }
+
+    public function preferredGhlConnectionType(): ?string
+    {
+        if ($this->hasGhlLocationId()) {
+            return 'location_id';
+        }
+
+        if ($this->hasGhlApiKey()) {
+            return 'api_key';
+        }
+
+        return null;
     }
 }
