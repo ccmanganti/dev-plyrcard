@@ -857,4 +857,4 @@ Tab::make('Sponsors')->icon(Heroicon::OutlinedStar)->schema([
     {
         return parent::getRecordRouteBindingEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
     }
-}
+}   

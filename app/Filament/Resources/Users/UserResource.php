@@ -607,6 +607,29 @@ class UserResource extends Resource
                                         ->columnSpanFull(),
                                 ]),
 
+                            Section::make('GHL Connection')
+                                ->icon('heroicon-m-link')
+                                ->description('Optional GoHighLevel connection fields for resolving this player subaccount.')
+                                ->columns(2)
+                                ->visible(fn (): bool => static::isSuperadminNavigationUser())
+                                ->schema([
+                                    TextInput::make('ghl_location_id')
+                                        ->label('GHL Location ID')
+                                        ->prefixIcon('heroicon-m-map-pin')
+                                        ->placeholder('Enter GHL subaccount/location ID')
+                                        ->maxLength(255)
+                                        ->helperText('Preferred identifier. Use this when the exact GHL subaccount/location is known.'),
+
+                                    TextInput::make('ghl_api_key')
+                                        ->label('GHL API Key')
+                                        ->prefixIcon('heroicon-m-key')
+                                        ->placeholder('Enter GHL API key')
+                                        ->password()
+                                        ->revealable()
+                                        ->dehydrated(fn ($state) => filled($state))
+                                        ->helperText('Optional fallback credential. Leave blank to keep the current key.'),
+                                ]),
+
                             Section::make('Address')
                                 ->icon('heroicon-m-map-pin')
                                 ->columns(2)

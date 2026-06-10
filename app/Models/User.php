@@ -101,6 +101,9 @@ class User extends Authenticatable implements HasName, FilamentUser
         'utm_club_id',
         'utm_league_id',
         'utm_team_name',
+        'ghl_contact_id',
+        'ghl_location_id',
+        'ghl_api_key',
 
         // First-login / onboarding fields
         'must_change_password',
