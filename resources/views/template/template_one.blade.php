@@ -756,8 +756,32 @@ HTML;
     $footerEmail = $user->email ?? '';
     $copyright   = 'Plyr Card 2026 © All Rights Reserved';
 
-    $smsPhone = !empty($user->club_coach_phone) ? preg_replace('/\D+/', '', $user->club_coach_phone) : '';
-    $textCoachUrl = $smsPhone ? 'sms:' . $smsPhone : ($playerEmail ? 'mailto:' . $playerEmail : '#');
+    $playerTextMeDomains = [
+        'arienderes.com',
+        'selinpehlivan.com',
+        'caylinretmier.com',
+        'naomigillis.com',
+        'victoriachristiansen.com',
+        'maylinfay.com',
+        'camilleford.com',
+        'sophiacobb.com',
+        'bedizlostuvali.com',
+    ];
+
+    $currentHost = strtolower(request()->getHost());
+    $normalizedCurrentHost = preg_replace('/^www\./', '', $currentHost);
+
+    $shouldUsePlayerTextMe = in_array($normalizedCurrentHost, $playerTextMeDomains, true);
+
+    $smsPhone = $shouldUsePlayerTextMe
+        ? (!empty($user->phone) ? preg_replace('/\D+/', '', $user->phone) : '')
+        : (!empty($user->club_coach_phone) ? preg_replace('/\D+/', '', $user->club_coach_phone) : '');
+
+    $textCoachLabel = $shouldUsePlayerTextMe ? 'TEXT ME' : 'TEXT COACH';
+
+    $textCoachUrl = $smsPhone
+        ? 'sms:' . $smsPhone
+        : (! $shouldUsePlayerTextMe && $playerEmail ? 'mailto:' . $playerEmail : '#');
 
     /*
     |--------------------------------------------------------------------------
@@ -2575,8 +2599,8 @@ HTML;
 
             <a href="{{ $textCoachUrl }}"
                class="mobile-text-coach {{ $textCoachUrl === '#' ? 'is-disabled' : '' }}"
-               aria-label="Text Coach">
-                TEXT COACH
+               aria-label="{{ $textCoachLabel }}">
+                {{ $textCoachLabel }}
             </a>
         </div>
     </div>
