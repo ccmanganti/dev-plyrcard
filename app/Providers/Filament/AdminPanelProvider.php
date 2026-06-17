@@ -2,7 +2,16 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Clusters\Organizations;
+use App\Filament\Clusters\Users;
+use App\Filament\Clusters\Websites;
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\PasswordReset\RequestPasswordReset;
+use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
+use App\Filament\Pages\CoachDatabase;
 use App\Filament\Pages\ForcePasswordChange;
+use App\Filament\Widgets\GhlProfileViewersWidget;
+use App\Filament\Widgets\PlayerCardOverview;
 use App\Support\ProfilePlanInfo;
 use Filament\FontProviders\GoogleFontProvider;
 use Filament\Http\Middleware\Authenticate;
@@ -14,21 +23,13 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Pages\Auth\Login;
-use App\Filament\Pages\Auth\PasswordReset\RequestPasswordReset;
-use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
-use App\Filament\Clusters\Organizations;
-use App\Filament\Clusters\Websites;
-use App\Filament\Clusters\Users;
-use App\Filament\Widgets\GhlProfileViewersWidget;
-use App\Filament\Widgets\PlayerCardOverview;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -62,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->pages([
                 Dashboard::class,
+                CoachDatabase::class,
                 ForcePasswordChange::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
