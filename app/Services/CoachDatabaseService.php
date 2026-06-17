@@ -584,13 +584,14 @@ class CoachDatabaseService
 
         $tagsFromCoaches = ($coaches ?: collect())
             ->flatMap(fn (array $coach): array => $coach['tags'] ?? [])
-            ->map(fn ($tag): string => trim((string) $tag))
+            ->map(fn ($tag): string => $this->stringTagFromMixed($tag))
             ->filter(fn (string $tag): bool => str_starts_with(strtolower($tag), strtolower($tagPrefix)))
             ->values()
             ->all();
 
-        collect(array_merge($customListTags, $tagsFromCoaches))
-            ->map(fn ($tag): string => trim((string) $tag))
+        collect($customListTags)
+            ->merge($tagsFromCoaches)
+            ->map(fn ($tag): string => $this->stringTagFromMixed($tag))
             ->filter(fn (string $tag): bool => str_starts_with(strtolower($tag), strtolower($tagPrefix)))
             ->unique(fn (string $tag): string => strtolower($tag))
             ->each(function (string $tag) use (&$definitions, $tagPrefix): void {
@@ -635,11 +636,22 @@ class CoachDatabaseService
     protected function normalizeCustomListTags(array $tags): array
     {
         return collect($tags)
-            ->map(fn ($tag): string => trim((string) $tag))
-            ->filter(fn (string $tag): bool => str_starts_with(strtolower($tag), strtolower($this->customListTagPrefix())))
+            ->map(fn ($tag): string => $this->stringTagFromMixed($tag))
+            ->filter(fn (string $tag): bool => $tag !== '' && str_starts_with(strtolower($tag), strtolower($this->customListTagPrefix())))
             ->unique(fn (string $tag): string => strtolower($tag))
             ->values()
             ->all();
+    }
+
+    protected function stringTagFromMixed(mixed $tag): string
+    {
+        if (is_array($tag)) {
+            $value = $tag['tag'] ?? $tag['name'] ?? $tag['value'] ?? $tag['id'] ?? '';
+
+            return is_scalar($value) ? trim((string) $value) : '';
+        }
+
+        return is_scalar($tag) ? trim((string) $tag) : '';
     }
 
     protected function formatListDefinition(string $key, array $config): array

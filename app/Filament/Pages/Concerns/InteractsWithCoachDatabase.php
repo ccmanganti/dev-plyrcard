@@ -60,6 +60,8 @@ trait InteractsWithCoachDatabase
     public bool $hasMoreMessages = false;
     public bool $isSendingEmail = false;
     public bool $isSyncingTags = false;
+    public bool $showNewConversationComposer = false;
+    public string $newConversationCoachSearch = '';
     public ?string $tagSyncedAt = null;
 
     public function mount(CoachDatabaseService $coachDatabaseService): void
@@ -600,12 +602,13 @@ trait InteractsWithCoachDatabase
         $customListTags = collect($snapshot['custom_list_tags'] ?? [])
             ->map(function ($item): ?string {
                 if (is_array($item)) {
-                    return $item['tag'] ?? null;
+                    $value = $item['tag'] ?? $item['name'] ?? $item['value'] ?? null;
+                    return is_scalar($value) ? trim((string) $value) : null;
                 }
 
-                return is_string($item) ? $item : null;
+                return is_scalar($item) ? trim((string) $item) : null;
             })
-            ->filter()
+            ->filter(fn (?string $tag): bool => filled($tag))
             ->values()
             ->all();
 
@@ -693,6 +696,48 @@ trait InteractsWithCoachDatabase
         $this->loadConversations();
     }
 
+    public function pollConversationUpdates(): void
+    {
+        if ($this->section !== 'conversations' || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        $this->loadConversations();
+
+        if ($this->selectedConversationId) {
+            $this->messages = [];
+            $this->messageLastId = null;
+            $this->loadConversationMessages();
+        }
+    }
+
+    public function startNewConversation(): void
+    {
+        $this->showNewConversationComposer = true;
+        $this->selectedConversationId = null;
+        $this->selectedCoachId = null;
+        $this->messages = [];
+        $this->messageLastId = null;
+        $this->emailSubject = '';
+        $this->emailBody = '';
+        $this->showNewConversationComposer = false;
+    }
+
+    public function cancelNewConversation(): void
+    {
+        $this->showNewConversationComposer = false;
+        $this->selectedCoachId = null;
+        $this->emailSubject = '';
+        $this->emailBody = '';
+    }
+
+    public function selectCoachForNewConversation(string $contactId): void
+    {
+        $this->showNewConversationComposer = true;
+        $this->composeToCoach($contactId);
+    }
+
+
     public function selectConversation(string $conversationId): void
     {
         $this->selectedConversationId = $conversationId;
@@ -739,7 +784,7 @@ trait InteractsWithCoachDatabase
 
         if ($coach) {
             $first = trim(explode(' ', (string) ($coach['name'] ?? 'Coach'))[0]);
-            $this->emailBody = "Hi {$first},\n\n";
+            $this->emailBody = "<p>Hi {$first},</p><p><br></p>";
         }
     }
 
@@ -754,8 +799,9 @@ trait InteractsWithCoachDatabase
     {
         $subject = trim($this->emailSubject);
         $body = trim($this->emailBody);
+        $plainBody = trim(strip_tags($body));
 
-        if ($subject === '' || $body === '') {
+        if ($subject === '' || $plainBody === '') {
             Notification::make()->title('Recruiting Center')->body('Subject and message are required.')->danger()->send();
             return;
         }
@@ -777,9 +823,10 @@ trait InteractsWithCoachDatabase
             'conversation_id' => $this->selectedConversationId,
             'conversationId' => $this->selectedConversationId,
             'subject' => $subject,
-            'body' => nl2br(e($body)),
-            'html' => nl2br(e($body)),
-            'text' => $body,
+            'body' => $body,
+            'html' => $body,
+            'text' => $plainBody,
+            'fromName' => (string) (Auth::user()->name ?? 'PLYRCard'),
             'to' => $to,
             'emailTo' => $to,
         ];
@@ -795,6 +842,7 @@ trait InteractsWithCoachDatabase
 
         $this->emailSubject = '';
         $this->emailBody = '';
+        $this->showNewConversationComposer = false;
 
         if ($this->selectedConversationId) {
             $this->messages = [];
@@ -836,7 +884,7 @@ trait InteractsWithCoachDatabase
         if (! $template) return;
         $this->selectedTemplateId = $templateId;
         $this->emailSubject = $template['subject'] ?? '';
-        $this->emailBody = strip_tags((string) ($template['body'] ?? ''));
+        $this->emailBody = (string) ($template['body'] ?? '');
     }
 
     protected function applyTagToCachedContacts(array $contactIds, string $tag, string $type): void

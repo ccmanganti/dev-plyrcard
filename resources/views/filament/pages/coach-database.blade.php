@@ -109,6 +109,44 @@
             line-height: 1.45;
         }
 
+        .rc-rich-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .375rem;
+            margin-top: .5rem;
+        }
+
+        .rc-rich-editor {
+            width: 100%;
+            min-height: 12rem;
+            border: 1px solid var(--rc-border);
+            border-radius: .75rem;
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            padding: .75rem;
+            font-size: .875rem;
+            line-height: 1.55;
+            outline: none;
+            margin-top: .5rem;
+        }
+
+        .rc-rich-editor:focus {
+            border-color: var(--rc-accent);
+            box-shadow: 0 0 0 3px var(--rc-accent-soft);
+        }
+
+        .rc-rich-editor:empty:before {
+            content: attr(data-placeholder);
+            color: var(--rc-muted);
+        }
+
+        .rc-mini-list {
+            display: grid;
+            gap: .5rem;
+            max-height: 22rem;
+            overflow: auto;
+        }
+
         .rc-btn {
             display: inline-flex;
             align-items: center;
@@ -624,6 +662,98 @@
             min-height: 5.25rem;
         }
 
+
+        .rc-sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .rc-format-btn {
+            min-width: 2.15rem;
+            padding-inline: .55rem;
+        }
+
+        .rc-rich-toolbar {
+            gap: .35rem;
+            flex-wrap: wrap;
+        }
+
+        .rc-rich-editor {
+            min-height: 11rem;
+            line-height: 1.55;
+        }
+
+        .rc-rich-editor p {
+            margin: 0 0 .75rem;
+        }
+
+        .rc-rich-editor ul,
+        .rc-rich-editor ol {
+            margin: .5rem 0 .75rem 1.25rem;
+            padding: 0;
+        }
+
+        .rc-school-grid.is-compact {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: .5rem;
+        }
+
+        .rc-school-grid.is-compact .rc-school-card {
+            min-height: 0;
+            padding: .7rem;
+            gap: .35rem;
+            border-radius: .75rem;
+        }
+
+        .rc-school-grid.is-compact .rc-school-topline {
+            margin-bottom: .1rem;
+        }
+
+        .rc-school-grid.is-compact .rc-school-card h3 {
+            font-size: .88rem;
+            line-height: 1.2;
+            margin: 0;
+        }
+
+        .rc-school-grid.is-compact .rc-school-conference {
+            font-size: .72rem;
+            -webkit-line-clamp: 1;
+            margin: 0;
+        }
+
+        .rc-school-grid.is-compact .rc-school-meta {
+            font-size: .7rem;
+            margin-top: .15rem;
+        }
+
+        .rc-school-grid.is-compact .rc-school-flags {
+            min-height: 0;
+            margin-top: .15rem;
+        }
+
+        .rc-school-grid.is-compact .rc-school-actions {
+            margin-top: .2rem;
+        }
+
+        .rc-school-grid.is-compact .rc-btn-primary {
+            min-height: 2.1rem;
+            padding: .45rem .65rem;
+        }
+
+        .rc-list-button {
+            min-height: 2.35rem;
+            padding: .45rem .65rem;
+            font-size: .78rem;
+        }
+
         @media (max-width: 1180px) {
             .rc-school-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
@@ -716,11 +846,11 @@
             <div class="rc-favorites-layout">
                 <div class="rc-card rc-favorites-panel">
                     <div class="rc-section-title">Saved schools</div>
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->savedSchools])
+                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->savedSchools, 'compact' => true])
                 </div>
                 <div class="rc-card rc-favorites-panel">
                     <div class="rc-section-title">Favorite schools</div>
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->favoriteSchools])
+                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->favoriteSchools, 'compact' => true])
                 </div>
                 <div class="rc-card rc-coach-panel">
                     <div class="rc-section-title">Saved coaches</div>
@@ -742,7 +872,7 @@
         @endif
 
         @if($section === 'lists')
-            <div class="rc-grid" style="grid-template-columns:minmax(260px,340px) minmax(0,1fr)">
+            <div class="rc-grid" style="grid-template-columns:minmax(220px,300px) minmax(0,1fr)">
                 <div class="rc-card rc-grid">
                     <div>
                         <div class="rc-section-title">Create list</div>
@@ -777,7 +907,7 @@
                             </div>
                             <button class="rc-btn" type="button" wire:click="clearSelectedList">Clear</button>
                         </div>
-                        @include('filament.partials.coach-database-school-grid', ['schools' => $this->selectedListSchools])
+                        @include('filament.partials.coach-database-school-grid', ['schools' => $this->selectedListSchools, 'compact' => true])
                         <div class="rc-section-title" style="margin-top:1.25rem">Coaches in this list</div>
                         @forelse($this->selectedListCoaches as $coach)
                             @include('filament.partials.coach-row', ['coach' => $coach])
@@ -804,9 +934,27 @@
         @endif
 
         @if($section === 'conversations')
-            <div class="rc-chat">
+            <div class="rc-chat" wire:poll.12s.visible="pollConversationUpdates">
                 <div class="rc-card">
-                    <div class="rc-toolbar" style="margin-bottom:.75rem"><input class="rc-input" placeholder="Search conversations" wire:model.live.debounce.500ms="conversationSearch" /></div>
+                    <div class="rc-toolbar" style="margin-bottom:.75rem">
+                        <input class="rc-input" placeholder="Search conversations" wire:model.live.debounce.500ms="conversationSearch" />
+                        <button class="rc-btn rc-btn-primary" type="button" wire:click="startNewConversation">Start new</button>
+                    </div>
+                    @if($showNewConversationComposer)
+                        <div class="rc-card is-flat" style="margin-bottom:.75rem">
+                            <div class="rc-section-title">Choose a coach</div>
+                            <input class="rc-input" style="width:100%;margin-bottom:.5rem" placeholder="Search coaches by name, school, or email" wire:model.live.debounce.300ms="newConversationCoachSearch" />
+                            <div class="rc-mini-list">
+                                @forelse($this->newConversationCoachResults as $coach)
+                                    <button type="button" class="rc-row rc-thread-button" wire:click="selectCoachForNewConversation('{{ $coach['id'] }}')">
+                                        <span><strong>{{ $coach['name'] }}</strong><br><span class="rc-subtle">{{ $coach['school'] ?? 'School unavailable' }} · {{ $coach['email'] }}</span></span>
+                                    </button>
+                                @empty
+                                    <div class="rc-subtle">No coaches with email found.</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    @endif
                     @forelse($conversations as $conversation)
                         <button type="button" class="rc-row rc-thread-button" wire:click="selectConversation('{{ $conversation['id'] }}')" wire:loading.attr="disabled" wire:target="selectConversation('{{ $conversation['id'] }}')">
                             <span><strong>{{ $conversation['contact_name'] }}</strong><br><span class="rc-subtle">{{ $conversation['last_message'] }}</span></span>
@@ -831,7 +979,7 @@
                             <div style="margin-top:.75rem"><button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Load older emails</span><span wire:loading.flex wire:target="loadConversationMessages" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Loading</span></button></div>
                         @endif
                     </div>
-                    @if($selectedConversationId)
+                    @if($selectedConversationId || $selectedCoachId)
                         @include('filament.partials.email-composer')
                     @endif
                 </div>

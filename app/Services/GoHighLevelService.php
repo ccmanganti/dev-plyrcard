@@ -1936,15 +1936,15 @@ class GoHighLevelService
         return true;
     }
 
-    private function findContactIdByEmail(?string $email): ?string
+    private function findContactIdByEmail(?string $email, ?string $locationId = null, ?string $tokenOverride = null): ?string
     {
         if (! $email) {
             return null;
         }
 
         $email = trim($email);
-        $locationId = config('ghl.location_id');
-        $token = config('ghl.token');
+        $locationId = $locationId ?: config('ghl.location_id');
+        $token = $this->tokenForLocation($locationId, $tokenOverride);
 
         if (! $locationId || ! $token) {
             return null;
@@ -2257,9 +2257,15 @@ class GoHighLevelService
         $html = (string) ($payload['body'] ?? $payload['html'] ?? '');
         $text = trim((string) ($payload['text'] ?? strip_tags($html)));
         $to = $payload['to'] ?? $payload['emailTo'] ?? null;
+        $fromName = trim((string) ($payload['fromName'] ?? $payload['senderName'] ?? $user->name ?? 'PLYRCard'));
+        $fromEmail = trim((string) ($payload['fromEmail'] ?? $payload['emailFrom'] ?? ''));
+
+        if ($fromEmail === '') {
+            $fromEmail = $this->defaultSenderEmailForUser($user);
+        }
 
         if (! $contactId && $to) {
-            $contactId = $this->findContactIdByEmail((string) $to);
+            $contactId = $this->findContactIdByEmail((string) $to, $locationId, $credentials['token_override']);
         }
 
         if (! $contactId) {
@@ -2280,6 +2286,10 @@ class GoHighLevelService
             'html' => $html,
             'message' => $text,
             'emailTo' => $to,
+            'fromEmail' => $fromEmail,
+            'emailFrom' => $fromEmail,
+            'fromName' => $fromName,
+            'senderName' => $fromName,
         ], fn ($value) => filled($value));
 
         $payloads[] = array_merge($base, ['type' => 'Email']);
@@ -2294,6 +2304,10 @@ class GoHighLevelService
             'body' => $html,
             'message' => $text,
             'emailTo' => $to,
+            'fromEmail' => $fromEmail,
+            'emailFrom' => $fromEmail,
+            'fromName' => $fromName,
+            'senderName' => $fromName,
         ], fn ($value) => filled($value));
 
         $versions = array_values(array_unique(array_filter([
@@ -2453,6 +2467,25 @@ class GoHighLevelService
         }
 
         return ['success' => false, 'error' => 'Unable to create template.', 'status' => $lastStatus, 'raw' => $lastData];
+    }
+
+    protected function defaultSenderEmailForUser(User $user): string
+    {
+        $configured = trim((string) config('ghl.coach_database.email.from_email', ''));
+
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        $domain = trim((string) config('ghl.coach_database.email.from_domain', 'plyr.yoursportcard.com'));
+        $name = trim((string) ($user->name ?? 'plyrcard'));
+        $local = Str::of($name)->lower()->replaceMatches('/[^a-z0-9]+/', '.')->trim('.')->toString();
+
+        if ($local === '') {
+            $local = 'recruiting';
+        }
+
+        return $local . '@' . $domain;
     }
 
     protected function transformSchoolBusiness(array $business): array
