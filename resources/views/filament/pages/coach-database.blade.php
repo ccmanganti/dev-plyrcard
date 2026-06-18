@@ -754,8 +754,351 @@
             font-size: .78rem;
         }
 
+
+        .rc-campaign-shell {
+            display: grid;
+            grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(280px, 360px);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .rc-campaign-panel {
+            border: 1px solid var(--rc-border);
+            border-radius: 1.1rem;
+            background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+            box-shadow: var(--rc-shadow);
+            overflow: hidden;
+        }
+
+        .rc-campaign-panel-header {
+            padding: 1rem 1rem .75rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .14);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+        }
+
+        .rc-template-list,
+        .rc-picker-list {
+            display: grid;
+            gap: .55rem;
+            max-height: 38rem;
+            overflow: auto;
+            padding: .85rem;
+        }
+
+        .rc-template-item,
+        .rc-picker-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: .9rem;
+            padding: .65rem;
+            background: rgba(255,255,255,.026);
+            transition: border-color .15s ease, background .15s ease, transform .15s ease;
+        }
+
+        .rc-template-item:hover,
+        .rc-picker-row:hover {
+            border-color: rgba(255, 91, 50, .42);
+            background: rgba(255, 91, 50, .055);
+        }
+
+        .rc-template-item.is-selected {
+            border-color: rgba(255, 91, 50, .75);
+            background: rgba(255, 91, 50, .1);
+        }
+
+        .rc-template-icon {
+            width: 2.15rem;
+            height: 2.15rem;
+            border-radius: .75rem;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            background: rgba(255, 91, 50, .13);
+            color: var(--rc-accent);
+            font-weight: 800;
+        }
+
+        .rc-template-main {
+            min-width: 0;
+            flex: 1;
+            display: grid;
+            gap: .15rem;
+            text-align: left;
+        }
+
+        .rc-template-main strong,
+        .rc-picker-row strong {
+            color: var(--rc-text);
+            font-size: .88rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-template-main span,
+        .rc-picker-row small {
+            color: var(--rc-muted);
+            font-size: .75rem;
+            line-height: 1.35;
+        }
+
+        .rc-picker-row {
+            justify-content: flex-start;
+            cursor: pointer;
+        }
+
+        .rc-picker-row input {
+            accent-color: var(--rc-accent);
+        }
+
+        .rc-campaign-fields {
+            display: grid;
+            gap: .7rem;
+            padding: 1rem;
+        }
+
+
+        .rc-campaign-compose {
+            display: grid;
+            gap: .8rem;
+            padding: 1rem;
+        }
+
+        .rc-campaign-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+            align-items: center;
+        }
+
+        .rc-token-chip {
+            border: 1px solid rgba(255, 91, 50, .24);
+            background: rgba(255, 91, 50, .08);
+            color: #ffb19d;
+            border-radius: 999px;
+            padding: .35rem .55rem;
+            font-size: .72rem;
+            font-weight: 800;
+        }
+
+        .rc-campaign-editor {
+            width: 100%;
+            min-height: 17rem;
+            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: .95rem;
+            background: rgba(2, 6, 23, .32);
+            color: var(--rc-text);
+            padding: .9rem;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: .88rem;
+            line-height: 1.55;
+            resize: vertical;
+        }
+
+        .rc-campaign-editor:focus {
+            outline: none;
+            border-color: rgba(255, 91, 50, .62);
+            box-shadow: 0 0 0 3px rgba(255, 91, 50, .12);
+        }
+
+        .rc-mini-preview-card {
+            border: 1px solid rgba(148, 163, 184, .16);
+            border-radius: 1rem;
+            background: rgba(255,255,255,.026);
+            padding: .75rem;
+        }
+
+        .rc-campaign-loading {
+            border: 1px dashed rgba(148, 163, 184, .28);
+            border-radius: .9rem;
+            padding: 1rem;
+            color: var(--rc-muted);
+            display: flex;
+            gap: .55rem;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rc-campaign-preview-wrap {
+            padding: 1rem;
+            display: grid;
+            gap: .75rem;
+        }
+
+        .rc-email-preview {
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 1rem;
+            overflow: hidden;
+            background: #fff;
+            color: #111827;
+            box-shadow: 0 18px 45px rgba(0,0,0,.18);
+        }
+
+        .rc-email-subject {
+            padding: .8rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 800;
+            color: #111827;
+            background: #f9fafb;
+            display: grid;
+            gap: .2rem;
+        }
+
+        .rc-email-subject small {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .rc-preview-frame {
+            width: 100%;
+            min-height: 30rem;
+            border: 0;
+            display: block;
+            background: #fff;
+        }
+
+        .rc-email-body-fallback {
+            padding: 1rem;
+            min-height: 18rem;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .rc-email-body-fallback img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .rc-target-card {
+            display: grid;
+            gap: .7rem;
+            padding: 1rem;
+        }
+
+        .rc-recipient-stat {
+            border: 1px solid rgba(255, 91, 50, .28);
+            border-radius: .9rem;
+            padding: .85rem;
+            background: rgba(255, 91, 50, .08);
+        }
+
+        .rc-recipient-stat strong {
+            color: var(--rc-text);
+            font-size: 1.6rem;
+            display: block;
+            line-height: 1;
+        }
+
+        .rc-template-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            width: fit-content;
+            border-radius: 999px;
+            padding: .35rem .55rem;
+            font-size: .72rem;
+            color: #fed7aa;
+            background: rgba(255, 91, 50, .14);
+            border: 1px solid rgba(255, 91, 50, .24);
+        }
+
+        .rc-empty.is-small {
+            min-height: 0;
+            padding: .75rem;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+
+    
+        .rc-visual-editor-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem;
+            align-items: center;
+            padding: .65rem;
+            border: 1px solid rgba(255,255,255,.14);
+            border-bottom: 0;
+            border-radius: 1rem 1rem 0 0;
+            background: rgba(15, 23, 42, .8);
+        }
+
+        .rc-visual-tool {
+            height: 2rem;
+            min-width: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: .6rem;
+            background: rgba(255,255,255,.055);
+            color: var(--rc-text);
+            font-size: .78rem;
+            font-weight: 900;
+        }
+
+        .rc-visual-tool:hover { border-color: rgba(255,91,50,.55); color:#fed7aa; }
+
+        .rc-template-live-editor-wrap{
+            border:1px solid rgba(255,255,255,.14);
+            border-radius:0 0 1rem 1rem;
+            overflow:hidden;
+            background:#fff;
+            min-height:46rem;
+        }
+        .rc-template-live-editor{display:block;width:100%;height:52rem;border:0;background:#fff}
+    .rc-design-editor {
+            display:grid;
+            gap:.75rem;
+            max-height:28rem;
+            overflow:auto;
+            padding:.85rem;
+            border:1px solid rgba(148,163,184,.22);
+            border-radius:1rem;
+            background:rgba(15,23,42,.38);
+        }
+        .rc-design-edit-row {
+            display:grid;
+            gap:.4rem;
+        }
+        .rc-design-edit-row label {
+            color:#cbd5e1;
+            font-size:.78rem;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:.04em;
+        }
+        .rc-design-textarea {
+            min-height:4.75rem;
+            resize:vertical;
+            line-height:1.45;
+        }
+        .rc-image-mini-preview {
+            width:5rem;
+            height:5rem;
+            border-radius:.75rem;
+            overflow:hidden;
+            border:1px solid rgba(148,163,184,.22);
+            background:#fff;
+        }
+        .rc-image-mini-preview img {
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            display:block;
+        }
+
         @media (max-width: 1180px) {
             .rc-school-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .rc-campaign-shell { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); }
+            .rc-campaign-shell > .rc-campaign-panel:last-child { grid-column: 1 / -1; }
         }
 
         @media (max-width: 900px) {
@@ -768,6 +1111,9 @@
             .rc-coach-row { grid-template-columns: 1fr; align-items: stretch; }
             .rc-coach-actions { justify-content: flex-start; max-width: none; }
             .rc-menu-panel { right: auto; left: 0; }
+            .rc-campaign-shell { grid-template-columns: 1fr; }
+            .rc-campaign-shell > .rc-campaign-panel:last-child { grid-column: auto; }
+            .rc-preview-frame { min-height: 24rem; }
         }
 
         @media (max-width: 640px) {
@@ -782,6 +1128,7 @@
     <div
         class="rc-wrap"
         x-data
+        wire:poll.visible.8s="pollRealtime"
         x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
     >
         <div class="rc-top">
@@ -987,21 +1334,191 @@
         @endif
 
         @if($section === 'campaigns')
-            <div class="rc-grid" style="grid-template-columns:minmax(0,1fr) minmax(280px,420px)">
-                <div class="rc-card">
-                    <div class="rc-section-title">Templates</div>
-                    @forelse($templates as $template)
-                        <div class="rc-row"><div><strong>{{ $template['name'] }}</strong><div class="rc-subtle">{{ $template['subject'] }}</div></div><button class="rc-btn" wire:click="useTemplate('{{ $template['id'] }}')">Use</button></div>
-                    @empty
-                        <div class="rc-empty"><strong>No templates found yet.</strong><span>Create a template or refresh after adding templates in your email builder.</span></div>
-                    @endforelse
+            <div class="rc-campaign-shell">
+                <div class="rc-campaign-panel">
+                    <div class="rc-campaign-panel-header">
+                        <div>
+                            <div class="rc-section-title">Emails</div>
+                            <div class="rc-subtle">{{ count($templates) }} emails</div>
+                        </div>
+                        <button class="rc-btn" type="button" wire:click="loadTemplates" wire:loading.attr="disabled" wire:target="loadTemplates">
+                            <span wire:loading.remove wire:target="loadTemplates">Refresh</span>
+                            <span wire:loading.flex wire:target="loadTemplates" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Loading</span>
+                        </button>
+                    </div>
+
+                    <div wire:loading.flex wire:target="loadTemplates" class="rc-campaign-loading">
+                        <span class="rc-spinner-mini"></span>
+                        <span>Loading emails...</span>
+                    </div>
+
+                    <div class="rc-template-list" wire:loading.class="opacity-60" wire:target="loadTemplates,previewTemplate,useTemplate">
+                        @forelse($templates as $template)
+                            @php($templateId = (string) ($template['id'] ?? ''))
+                            <div class="rc-template-item {{ $campaignTemplateId === $templateId || $previewTemplateId === $templateId ? 'is-selected' : '' }}" wire:key="template-{{ $templateId }}">
+                                <div class="rc-template-icon">{{ strtoupper(substr((string) ($template['name'] ?? 'T'), 0, 1)) }}</div>
+                                <button type="button" class="rc-template-main" wire:click="previewTemplate(@js($templateId))" wire:loading.attr="disabled" wire:target="previewTemplate,useTemplate">
+                                    <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
+                                    <span>{{ $template['subject'] ?? $template['subjectLine'] ?? 'Ready to edit' }}</span>
+                                </button>
+                                <button type="button" class="rc-btn rc-btn-primary" wire:click="useTemplate(@js($templateId))" wire:loading.attr="disabled" wire:target="useTemplate">
+                                    <span wire:loading.remove wire:target="useTemplate">Use</span>
+                                    <span wire:loading.flex wire:target="useTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span></span>
+                                </button>
+                            </div>
+                        @empty
+                            <div class="rc-empty"><strong>No emails found.</strong><span>Try Refresh.</span></div>
+                        @endforelse
+                    </div>
                 </div>
-                <div class="rc-card rc-grid">
-                    <div class="rc-section-title">Create template</div>
-                    <input class="rc-input" placeholder="Template name" wire:model="templateName" />
-                    <input class="rc-input" placeholder="Subject" wire:model="templateSubject" />
-                    <textarea class="rc-textarea" rows="8" placeholder="Email body" wire:model="templateBody"></textarea>
-                    <button class="rc-btn rc-btn-primary" wire:click="createTemplate" wire:loading.attr="disabled" wire:target="createTemplate"><span wire:loading.remove wire:target="createTemplate">Create template</span><span wire:loading.flex wire:target="createTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span></button>
+
+                <div class="rc-campaign-panel">
+                    <div class="rc-campaign-panel-header">
+                        <div>
+                            <div class="rc-section-title">Write email</div>
+                            <div class="rc-subtle">Edit the email before sending.</div>
+                        </div>
+                        @if($this->previewTemplate)
+                            <button class="rc-btn" type="button" wire:click="useTemplate(@js((string) ($this->previewTemplate['id'] ?? '')))" wire:loading.attr="disabled" wire:target="useTemplate">
+                                <span wire:loading.remove wire:target="useTemplate">Use selected</span>
+                                <span wire:loading.flex wire:target="useTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Applying</span>
+                            </button>
+                        @endif
+                    </div>
+
+                    <div class="rc-campaign-compose">
+                        @if($campaignTemplateId)
+                            <span class="rc-template-pill">Using: {{ $campaignName ?: 'Campaign draft' }}</span>
+                        @else
+                            <div class="rc-campaign-helper"><strong>Choose an email</strong><br>Select one on the left, then edit it here.</div>
+                        @endif
+
+                        <input class="rc-input" style="width:100%" placeholder="Campaign name" wire:model.live="campaignName" />
+                        <input class="rc-input" style="width:100%" placeholder="Subject line" wire:model.live="campaignSubject" />
+                        <input class="rc-input" style="width:100%" placeholder="Preview text" wire:model.live="campaignPreviewText" />
+
+                        <div>
+                            <div class="rc-subtle" style="margin-bottom:.45rem">Insert variables</div>
+                            <div class="rc-campaign-toolbar">
+                                <button class="rc-token-chip" type="button" wire:click="insertCampaignVariable(@js('{'.'{coach_name}'.'}'))">Coach name</button>
+                                <button class="rc-token-chip" type="button" wire:click="insertCampaignVariable(@js('{'.'{first_name}'.'}'))">First name</button>
+                                <button class="rc-token-chip" type="button" wire:click="insertCampaignVariable(@js('{'.'{school}'.'}'))">School</button>
+                                <button class="rc-token-chip" type="button" wire:click="insertCampaignVariable(@js('{'.'{email}'.'}'))">Email</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="rc-subtle" style="margin-bottom:.45rem">Email editor</div>
+                            <div wire:key="campaign-live-editor-shell-{{ $campaignTemplateId ?: 'draft' }}-{{ md5($campaignOriginalHtml) }}">
+                                <div
+                                    class="rc-template-live-editor-shell"
+                                    wire:ignore
+                                    x-data="{
+                                        timer: null,
+                                        initialHtml: @js($this->campaignEditablePreview),
+                                        loadEditor() {
+                                            this.$refs.frame.srcdoc = this.initialHtml;
+                                        },
+                                        receiveEdit(event) {
+                                            if (! event.data || event.data.type !== 'plyr-campaign-html') return;
+                                            clearTimeout(this.timer);
+                                            this.timer = setTimeout(() => this.$wire.set('campaignBody', event.data.html, false), 180);
+                                        },
+                                        sendCommand(command) {
+                                            this.$refs.frame.contentWindow?.postMessage({ type: 'plyr-campaign-command', command: command }, '*');
+                                        }
+                                    }"
+                                    x-init="loadEditor(); window.addEventListener('message', receiveEdit)"
+                                >
+                                    <div class="rc-visual-editor-toolbar">
+                                        <button class="rc-visual-tool" type="button" title="Bold" @click="sendCommand('bold')">B</button>
+                                        <button class="rc-visual-tool" type="button" title="Italic" @click="sendCommand('italic')"><em>I</em></button>
+                                        <button class="rc-visual-tool" type="button" title="Underline" @click="sendCommand('underline')"><u>U</u></button>
+                                        <button class="rc-visual-tool" type="button" title="Bullet list" @click="sendCommand('insertUnorderedList')">• List</button>
+                                        <button class="rc-visual-tool" type="button" title="Numbered list" @click="sendCommand('insertOrderedList')">1. List</button>
+                                        <button class="rc-visual-tool" type="button" title="Link" @click="sendCommand('createLink')">Link</button>
+                                    </div>
+                                    <div class="rc-template-live-editor-wrap">
+                                        <iframe
+                                            x-ref="frame"
+                                            class="rc-template-live-editor"
+                                            sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                                        ></iframe>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="rc-subtle" style="margin-top:.4rem">Click inside the email to edit text. Click an image to change it.</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="rc-campaign-panel">
+                    <div class="rc-campaign-panel-header">
+                        <div>
+                            <div class="rc-section-title">Review + send</div>
+                            <div class="rc-subtle">Choose recipients.</div>
+                        </div>
+                    </div>
+
+                    <div class="rc-target-card">
+                        <div class="rc-recipient-stat">
+                            <strong>{{ $campaignSubject !== '' ? 'Ready' : 'Draft' }}</strong>
+                            <span class="rc-subtle">Edit the email on the left, then choose who receives it.</span>
+                        </div>
+
+                        <div class="rc-subtle">Recipients</div>
+                        <select class="rc-select" style="width:100%" wire:model.live="campaignTargetMode">
+                            <option value="coaches">Selected coaches</option>
+                            <option value="list">A saved list</option>
+                            <option value="school">A school</option>
+                            <option value="all">All loaded coaches</option>
+                        </select>
+
+                        @if($campaignTargetMode === 'coaches')
+                            <input class="rc-input" style="width:100%" placeholder="Search coaches" wire:model.live.debounce.300ms="campaignCoachSearch" />
+                            <div class="rc-picker-list" style="max-height:17rem;padding:0">
+                                @foreach($this->campaignCoachResults as $coach)
+                                    <label class="rc-picker-row" wire:key="campaign-coach-{{ $coach['id'] }}">
+                                        <input type="checkbox" value="{{ $coach['id'] }}" wire:model.live="campaignCoachIds" />
+                                        <span><strong>{{ $coach['name'] }}</strong><br><small>{{ $coach['school'] ?? 'School unavailable' }} · {{ $coach['email'] }}</small></span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @elseif($campaignTargetMode === 'list')
+                            <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
+                                <option value="">Choose list</option>
+                                @foreach($lists as $list)
+                                    <option value="{{ $list['key'] }}">{{ $list['label'] }} · {{ number_format($list['coaches_count'] ?? 0) }} coaches</option>
+                                @endforeach
+                            </select>
+                        @elseif($campaignTargetMode === 'school')
+                            <select class="rc-select" style="width:100%" wire:model.live="campaignSchoolId">
+                                <option value="">Choose school</option>
+                                @foreach($this->filteredSchools as $school)
+                                    <option value="{{ $school['id'] }}">{{ $school['name'] }} · {{ number_format($school['coach_count'] ?? 0) }} coaches</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <div class="rc-empty is-small"><strong>{{ number_format($this->campaignRecipientCount) }} loaded coaches with email</strong><span>Sends to every loaded coach with an email.</span></div>
+                        @endif
+
+                        <div class="rc-recipient-stat">
+                            <strong>{{ number_format($this->campaignRecipientCount) }}</strong>
+                            <span class="rc-subtle">recipients selected</span>
+                        </div>
+
+                        <div class="rc-grid" style="grid-template-columns:1fr;gap:.5rem">
+                            @if($campaignTemplateId)
+                                <button class="rc-btn" type="button" wire:click="clearCampaignTemplate">Clear template</button>
+                            @endif
+
+                            <button class="rc-btn rc-btn-primary" type="button" wire:click="sendCampaign" wire:loading.attr="disabled" wire:target="sendCampaign">
+                                <span wire:loading.remove wire:target="sendCampaign">Send campaign</span>
+                                <span wire:loading.flex wire:target="sendCampaign" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Sending</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif

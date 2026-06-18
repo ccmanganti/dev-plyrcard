@@ -1548,35 +1548,58 @@ class GoHighLevelService
 
     private function extractTemplatesFromResponse(array $data): array
     {
-        $candidates = [
-            $data['templates']['templates'] ?? null,
-            $data['templates']['data'] ?? null,
-            $data['templates']['items'] ?? null,
-            $data['emailTemplates']['templates'] ?? null,
-            $data['emailTemplates']['data'] ?? null,
-            $data['data']['templates'] ?? null,
-            $data['data']['emailTemplates'] ?? null,
-            $data['data']['data'] ?? null,
-            $data['data']['items'] ?? null,
-            $data['data']['results'] ?? null,
-            $data['items']['templates'] ?? null,
-            $data['results']['templates'] ?? null,
-            $data['templates'] ?? null,
-            $data['emailTemplates'] ?? null,
-            $data['template'] ?? null,
-            $data['data'] ?? null,
-            $data['items'] ?? null,
-            $data['results'] ?? null,
-        ];
+        $items = [];
+        $this->collectTemplateEntities($data, $items);
 
-        foreach ($candidates as $candidate) {
-            $items = $this->normalizeResponseList($candidate, ['id', '_id', 'templateId', 'name', 'title', 'subject', 'body', 'html']);
-            if (! empty($items)) {
-                return $items;
+        return collect($items)
+            ->filter(fn ($item): bool => is_array($item))
+            ->unique(function (array $item): string {
+                $id = (string) ($item['id'] ?? $item['_id'] ?? $item['templateId'] ?? $item['template_id'] ?? data_get($item, 'data.id') ?? data_get($item, 'template.id') ?? '');
+                $name = (string) ($item['name'] ?? $item['title'] ?? $item['templateName'] ?? data_get($item, 'data.name') ?? data_get($item, 'template.name') ?? '');
+
+                return $id !== '' ? 'id:' . $id : 'name:' . strtolower($name);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function collectTemplateEntities(mixed $value, array &$items, int $depth = 0): void
+    {
+        if ($depth > 10 || ! is_array($value)) {
+            return;
+        }
+
+        if ($this->arrayLooksLikeTemplateEntity($value)) {
+            $items[] = $value;
+        }
+
+        foreach ($value as $child) {
+            if (is_array($child)) {
+                $this->collectTemplateEntities($child, $items, $depth + 1);
+            }
+        }
+    }
+
+    private function arrayLooksLikeTemplateEntity(array $value): bool
+    {
+        $id = $value['id'] ?? $value['_id'] ?? $value['templateId'] ?? $value['template_id'] ?? data_get($value, 'data.id') ?? data_get($value, 'template.id') ?? null;
+        $name = $value['name'] ?? $value['title'] ?? $value['templateName'] ?? data_get($value, 'data.name') ?? data_get($value, 'template.name') ?? null;
+
+        if (! filled($id) && ! filled($name)) {
+            return false;
+        }
+
+        if (array_key_exists('templates', $value) || array_key_exists('items', $value) || array_key_exists('results', $value)) {
+            return filled($name) || filled($id) && (array_key_exists('type', $value) || array_key_exists('templateType', $value));
+        }
+
+        foreach (['type', 'templateType', 'resourceType', 'editorType', 'editor', 'subject', 'subjectLine', 'html', 'body', 'updatedAt', 'createdAt', 'isFolder', 'folderId', 'templateData', 'builderData', 'design', 'editorContentUrl'] as $key) {
+            if (array_key_exists($key, $value)) {
+                return true;
             }
         }
 
-        return [];
+        return filled($name) && filled($id);
     }
 
     private function normalizeResponseList(mixed $candidate, array $entityKeys): array
@@ -1693,28 +1716,337 @@ class GoHighLevelService
 
     private function transformEmailTemplate(array $item): array
     {
-        $body = $item['body']
-            ?? $item['html']
-            ?? $item['htmlBody']
-            ?? $item['content']
-            ?? $item['template']
-            ?? $item['message']
-            ?? '';
+        $body = $this->extractTemplateHtmlFromKnownFields($item);
 
-        if (is_array($body)) {
-            $body = $body['html'] ?? $body['body'] ?? $body['content'] ?? '';
-        }
+        $subject = $this->extractFirstTemplateString($item, [
+            'subjectLine', 'subject', 'emailSubject', 'campaignSubject', 'title', 'data.subjectLine', 'data.subject', 'data.campaignSubject', 'email.subjectLine', 'email.subject',
+            'settings.subjectLine', 'settings.subject', 'template.subjectLine', 'template.subject',
+        ]);
+
+        $previewText = $this->extractFirstTemplateString($item, [
+            'previewText', 'preview', 'preview_text', 'data.previewText', 'data.preview', 'email.previewText', 'settings.previewText',
+        ]);
+
+        $fromName = $this->extractFirstTemplateString($item, [
+            'fromName', 'senderName', 'data.fromName', 'data.senderName', 'email.fromName', 'settings.fromName',
+        ]);
+
+        $fromEmail = $this->extractFirstTemplateString($item, [
+            'fromEmail', 'senderEmail', 'data.fromEmail', 'data.senderEmail', 'email.fromEmail', 'settings.fromEmail',
+        ]);
+
+        $type = strtolower(trim((string) ($item['type'] ?? $item['templateType'] ?? $item['resourceType'] ?? $item['data']['type'] ?? '')));
+        $name = (string) ($item['name'] ?? $item['title'] ?? $item['templateName'] ?? $item['campaignName'] ?? $item['campaignTitle'] ?? $item['data']['name'] ?? $item['data']['title'] ?? $item['data']['campaignName'] ?? 'Untitled Email');
+        $isFolder = (bool) ($item['isFolder'] ?? $item['folder'] ?? false)
+            || in_array($type, ['folder', 'template_folder', 'email_folder'], true);
+
+        $plainPreview = trim(Str::of((string) $body)->stripTags()->limit(160)->toString());
+        $id = (string) ($item['id'] ?? $item['_id'] ?? $item['templateId'] ?? $item['template_id'] ?? $item['campaignId'] ?? $item['emailCampaignId'] ?? $item['data']['id'] ?? $item['data']['_id'] ?? $item['data']['campaignId'] ?? '');
+        $previewUrl = (string) ($item['previewUrl'] ?? $item['preview_url'] ?? $item['data']['previewUrl'] ?? $item['url'] ?? '');
+        $editorContentUrl = (string) ($item['editorContentUrl'] ?? $item['editor_content_url'] ?? $item['data']['editorContentUrl'] ?? $item['template']['editorContentUrl'] ?? '');
+        $templateDataUrl = (string) ($item['templateDataUrl'] ?? $item['template_data_url'] ?? $item['data']['templateDataUrl'] ?? '');
 
         return [
-            'id' => (string) ($item['id'] ?? $item['_id'] ?? $item['templateId'] ?? $item['template_id'] ?? ''),
-            'name' => (string) ($item['name'] ?? $item['title'] ?? $item['templateName'] ?? 'Untitled Template'),
-            'subject' => (string) ($item['subject'] ?? $item['emailSubject'] ?? $item['title'] ?? ''),
+            'id' => $id,
+            'name' => $name,
+            'type' => $type,
+            'is_folder' => $isFolder,
+            'subject' => (string) $subject,
+            'subjectLine' => (string) $subject,
+            'previewText' => (string) $previewText,
             'body' => (string) $body,
-            'preview' => trim(str($body)->stripTags()->limit(160)->toString()),
-            'updated_at' => $item['updatedAt'] ?? $item['dateUpdated'] ?? $item['modifiedAt'] ?? null,
-            'created_at' => $item['createdAt'] ?? $item['dateAdded'] ?? null,
+            'html' => (string) $body,
+            'fromName' => (string) $fromName,
+            'fromEmail' => (string) $fromEmail,
+            'previewUrl' => $previewUrl,
+            'editorContentUrl' => $editorContentUrl,
+            'editor_content_url' => $editorContentUrl,
+            'templateDataUrl' => $templateDataUrl,
+            'preview' => $previewText !== '' ? (string) $previewText : $plainPreview,
+            'updated_at' => $item['updatedAt'] ?? $item['lastUpdated'] ?? $item['dateUpdated'] ?? $item['modifiedAt'] ?? $item['data']['updatedAt'] ?? null,
+            'created_at' => $item['createdAt'] ?? $item['dateAdded'] ?? $item['data']['createdAt'] ?? null,
             'raw' => $item,
         ];
+    }
+
+    private function extractFirstTemplateString(array $item, array $paths): string
+    {
+        foreach ($paths as $path) {
+            $value = data_get($item, $path);
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return '';
+    }
+
+    private function extractTemplateHtmlFromKnownFields(array $item): string
+    {
+        foreach ([
+            'html', 'body', 'htmlBody', 'content', 'message', 'campaignHtml', 'emailContent', 'template.html', 'template.body',
+            'email.html', 'email.body', 'email.content', 'campaign.html', 'campaign.body', 'data.html', 'data.body', 'data.content',
+            'design.html', 'builder.html', 'templateData.html', 'contentData.html', 'previewHtml',
+            'editorContent', 'editor.content', 'editor.html', 'editorHtml', 'dnd', 'dndData',
+            'templateData', 'templateContent', 'unlayer', 'unlayerData', 'builderData', 'data.editorContent',
+            'data.templateData', 'data.builderData', 'data.dnd', 'data.dndData', 'data.design', 'data.builder',
+        ] as $path) {
+            $html = $this->extractTemplateHtml(data_get($item, $path));
+            if ($html !== '') {
+                return $html;
+            }
+        }
+
+        foreach (['design', 'builder', 'data', 'email', 'template', 'templateData', 'contentData', 'editorContent', 'builderData', 'dnd', 'dndData'] as $path) {
+            $html = $this->extractTemplateHtml(data_get($item, $path));
+            if ($html !== '') {
+                return $html;
+            }
+        }
+
+        return '';
+    }
+
+    private function extractTemplateHtml(mixed $value): string
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+
+            if ($value === '' || $this->looksLikeIdentifier($value)) {
+                return '';
+            }
+
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $nested = $this->extractTemplateHtml($decoded);
+                if ($nested !== '') {
+                    return $nested;
+                }
+            }
+
+            if (str_contains($value, '<html') || str_contains($value, '<body') || str_contains($value, '<table') || str_contains($value, '<p') || str_contains($value, '<div') || str_contains($value, '<span') || str_contains($value, '<br') || str_contains($value, '{{')) {
+                return $value;
+            }
+
+            if ($this->looksLikeReadableTemplateText($value)) {
+                return nl2br(e($value), false);
+            }
+
+            return '';
+        }
+
+        if (! is_array($value)) {
+            return '';
+        }
+
+        foreach ([
+            'html', 'body', 'htmlBody', 'content', 'message', 'previewHtml', 'text', 'editorContent',
+            'editorHtml', 'templateData', 'templateContent', 'builderData', 'dnd', 'dndData',
+        ] as $key) {
+            if (array_key_exists($key, $value)) {
+                $html = $this->extractTemplateHtml($value[$key]);
+                if ($html !== '') {
+                    return $html;
+                }
+            }
+        }
+
+        foreach (['props', 'data', 'attributes'] as $key) {
+            if (isset($value[$key]) && is_array($value[$key])) {
+                foreach (['html', 'text', 'content', 'body', 'value', 'label'] as $nestedKey) {
+                    if (array_key_exists($nestedKey, $value[$key])) {
+                        $html = $this->extractTemplateHtml($value[$key][$nestedKey]);
+                        if ($html !== '') {
+                            return $html;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (['children', 'blocks', 'rows', 'columns', 'elements', 'nodes', 'values', 'items', 'cells', 'contents'] as $key) {
+            if (isset($value[$key]) && is_array($value[$key])) {
+                $parts = [];
+                foreach ($value[$key] as $child) {
+                    $html = $this->extractTemplateHtml($child);
+                    if ($html !== '') {
+                        $parts[] = $html;
+                    }
+                }
+                if (! empty($parts)) {
+                    return implode("\n", $parts);
+                }
+            }
+        }
+
+        foreach (['design', 'builder', 'data', 'email', 'template', 'editor', 'root', 'document', 'templateData', 'contentData', 'unlayer', 'unlayerData'] as $key) {
+            if (isset($value[$key])) {
+                $html = $this->extractTemplateHtml($value[$key]);
+                if ($html !== '') {
+                    return $html;
+                }
+            }
+        }
+
+        $designPreview = $this->renderTemplateDesignPreview($value);
+        if ($designPreview !== '') {
+            return $designPreview;
+        }
+
+        $textParts = $this->collectReadableTemplateText($value);
+        if (! empty($textParts)) {
+            return collect($textParts)
+                ->unique()
+                ->map(fn (string $text): string => '<p>' . e($text) . '</p>')
+                ->implode("\n");
+        }
+
+        return '';
+    }
+
+    private function renderTemplateDesignPreview(array $value): string
+    {
+        $fragments = [];
+        $this->collectTemplateDesignFragments($value, $fragments);
+
+        if (empty($fragments)) {
+            return '';
+        }
+
+        $html = collect($fragments)
+            ->unique(fn (array $fragment): string => ($fragment['type'] ?? '') . ':' . md5((string) ($fragment['value'] ?? '')))
+            ->take(80)
+            ->map(function (array $fragment): string {
+                $type = (string) ($fragment['type'] ?? 'text');
+                $value = trim((string) ($fragment['value'] ?? ''));
+
+                if ($value === '') {
+                    return '';
+                }
+
+                if ($type === 'html') {
+                    return $value;
+                }
+
+                if ($type === 'image') {
+                    return '<div style="margin:14px 0;text-align:center"><img src="' . e($value) . '" alt="" style="max-width:100%;height:auto;border-radius:10px;display:inline-block" /></div>';
+                }
+
+                if ($type === 'link') {
+                    return '<p><a href="' . e($value) . '">' . e($value) . '</a></p>';
+                }
+
+                return '<p>' . nl2br(e($value), false) . '</p>';
+            })
+            ->filter()
+            ->implode("
+");
+
+        return $html !== '' ? '<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.55;color:#111827">' . $html . '</div>' : '';
+    }
+
+    private function collectTemplateDesignFragments(mixed $value, array &$fragments, int $depth = 0): void
+    {
+        if ($depth > 14) {
+            return;
+        }
+
+        if (is_string($value)) {
+            $text = trim($value);
+            if ($text === '' || $this->looksLikeTemplateIdentifier($text)) {
+                return;
+            }
+
+            $decoded = json_decode($text, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $this->collectTemplateDesignFragments($decoded, $fragments, $depth + 1);
+                return;
+            }
+
+            if (preg_match('/<\s*(html|body|table|tr|td|div|p|span|img|a|br|h[1-6])/i', $text)) {
+                $fragments[] = ['type' => 'html', 'value' => $text];
+                return;
+            }
+
+            if ($this->looksLikeReadableTemplateText($text) || str_contains($text, '{')) {
+                $fragments[] = ['type' => 'text', 'value' => $text];
+            }
+
+            return;
+        }
+
+        if (! is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $key => $item) {
+            $key = (string) $key;
+
+            if (is_string($item)) {
+                $text = trim($item);
+                if ($text === '' || $this->looksLikeTemplateIdentifier($text)) {
+                    continue;
+                }
+
+                $isUrl = Str::startsWith($text, ['http://', 'https://']);
+                $imageKey = in_array($key, ['src', 'image', 'imageUrl', 'image_url', 'backgroundImage', 'background_image', 'thumbnail', 'thumbnailUrl'], true);
+                $linkKey = in_array($key, ['href', 'link', 'url', 'redirectUrl'], true);
+
+                if ($isUrl && ($imageKey || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $text))) {
+                    $fragments[] = ['type' => 'image', 'value' => $text];
+                    continue;
+                }
+
+                if ($isUrl && $linkKey) {
+                    $fragments[] = ['type' => 'link', 'value' => $text];
+                    continue;
+                }
+
+                if (in_array($key, ['html', 'body', 'content', 'text', 'value', 'message', 'label', 'title', 'alt', 'heading', 'paragraph'], true)) {
+                    $this->collectTemplateDesignFragments($text, $fragments, $depth + 1);
+                }
+            } elseif (is_array($item)) {
+                $this->collectTemplateDesignFragments($item, $fragments, $depth + 1);
+            }
+        }
+    }
+
+    private function collectReadableTemplateText(array $value): array
+    {
+        $parts = [];
+
+        foreach ($value as $key => $item) {
+            if (is_string($item) && in_array((string) $key, ['text', 'content', 'body', 'message', 'value', 'label', 'title'], true) && $this->looksLikeReadableTemplateText($item)) {
+                $parts[] = trim(strip_tags($item));
+            } elseif (is_array($item)) {
+                $parts = array_merge($parts, $this->collectReadableTemplateText($item));
+            }
+        }
+
+        return $parts;
+    }
+
+    private function looksLikeIdentifier(string $value): bool
+    {
+        $value = trim($value);
+
+        return (bool) preg_match('/^[a-f0-9]{16,}$/i', $value)
+            || (bool) preg_match('/^[A-Za-z0-9_-]{18,}$/', $value) && ! str_contains($value, ' ');
+    }
+
+    private function looksLikeReadableTemplateText(string $value): bool
+    {
+        $value = trim(strip_tags($value));
+
+        if (strlen($value) < 25 || ! str_contains($value, ' ')) {
+            return false;
+        }
+
+        if ($this->looksLikeIdentifier($value)) {
+            return false;
+        }
+
+        return (bool) preg_match('/[.!?,]|\s(the|and|you|your|coach|school|hi|hello|thanks)\s/i', ' ' . $value . ' ');
     }
 
     private function transformCoachContact(array $contact): array
@@ -2363,6 +2695,41 @@ class GoHighLevelService
         ];
     }
 
+
+    private function templateResponseCount(array $data): int
+    {
+        foreach (['templates', 'items', 'results', 'records', 'emails'] as $key) {
+            $value = $data[$key] ?? data_get($data, 'data.' . $key) ?? data_get($data, 'emailTemplates.' . $key);
+            if (is_array($value) && array_is_list($value)) {
+                return count($value);
+            }
+        }
+
+        $dataValue = $data['data'] ?? null;
+        if (is_array($dataValue) && array_is_list($dataValue)) {
+            return count($dataValue);
+        }
+
+        return count($this->extractTemplatesFromResponse($data));
+    }
+
+    private function decodeTemplateMaybeJson(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return $value;
+            }
+
+            $decoded = json_decode($trimmed, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $value;
+    }
+
     public function getEmailTemplatesForUser(User $user): array
     {
         $credentials = $this->credentialsForUser($user);
@@ -2373,44 +2740,360 @@ class GoHighLevelService
             return ['success' => false, 'templates' => [], 'error' => 'Missing recruiting data connection.'];
         }
 
-        $attempts = [
-            ['endpoint' => config('ghl.email_templates_v2_endpoint', '/emails/templates'), 'version' => config('ghl.email_templates_v2_version', '2021-07-28'), 'query' => ['locationId' => $locationId, 'limit' => 100]],
-            ['endpoint' => config('ghl.email_templates_v3_endpoint', '/emails/templates'), 'version' => config('ghl.email_templates_v3_version', 'v3'), 'query' => ['locationId' => $locationId, 'limit' => 100]],
-            ['endpoint' => config('ghl.email_templates_builder_v2_endpoint', '/emails/builder/templates'), 'version' => config('ghl.email_templates_builder_v2_version', '2021-07-28'), 'query' => ['locationId' => $locationId, 'limit' => 100]],
-            ['endpoint' => config('ghl.email_templates_builder_endpoint', '/emails/builder'), 'version' => config('ghl.email_templates_builder_version', '2021-04-15'), 'query' => ['locationId' => $locationId, 'limit' => 100]],
-            ['endpoint' => config('ghl.email_templates_endpoint', '/emails/templates'), 'version' => config('ghl.email_templates_version', '2021-04-15'), 'query' => ['locationId' => $locationId, 'limit' => 100]],
-            ['endpoint' => config('ghl.email_templates_alt_endpoint', '/templates'), 'version' => config('ghl.email_templates_alt_version', '2021-07-28'), 'query' => ['locationId' => $locationId, 'limit' => 100, 'type' => 'email']],
+        $templates = [];
+        $sources = [];
+        $errors = [];
+        $debug = [];
+
+        // First use the documented Email Templates API exactly. Extra sources are fallbacks only.
+        $fetchers = [
+            [
+                'source' => 'Email Templates v3',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Email Templates v3 pageNumber',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates",
+                'page_param' => 'pageNumber',
+                'base_params' => ['pageLimit' => 50, 'limit' => 50],
+                'page_size' => 50,
+                'starts_at' => 1,
+            ],
+            [
+                'source' => 'Email Templates v3 type=email',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'type' => 'email'],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Marketing emails / campaigns v2',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign",
+                'page_param' => 'offset',
+                'base_params' => ['limit' => 20],
+                'page_size' => 20,
+            ],
+            [
+                'source' => 'Email schedule library',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/schedule",
+                'page_param' => 'skip',
+                'base_params' => ['locationId' => $locationId, 'limit' => 50, 'showStats' => 'true'],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Location templates',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/locations/{$locationId}/templates",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'type' => 'email', 'originId' => $locationId],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Builder templates',
+                'version' => '2021-07-28',
+                'url' => "{$this->baseUrl}/emails/builder",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'locationId' => $locationId, 'originId' => $locationId, 'archived' => false, 'templatesOnly' => false],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Builder templates legacy',
+                'version' => '2021-04-15',
+                'url' => "{$this->baseUrl}/emails/builder",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'locationId' => $locationId, 'originId' => $locationId, 'archived' => false, 'templatesOnly' => false],
+                'page_size' => 50,
+            ],
         ];
 
-        $lastStatus = null;
-        $lastData = [];
+        foreach ($fetchers as $fetcher) {
+            $offset = (int) ($fetcher['starts_at'] ?? 0);
+            $sourceCount = 0;
+            $rawSeen = 0;
+            $page = 0;
+
+            do {
+                $params = array_merge($fetcher['base_params'], [$fetcher['page_param'] => $offset]);
+                $response = Http::withHeaders(['Version' => $fetcher['version']])
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get($fetcher['url'], $params);
+
+                $data = $response->json() ?? [];
+
+                if (! $response->successful()) {
+                    $message = $data['message'] ?? $data['error'] ?? ($fetcher['source'] . ' failed with status ' . $response->status());
+                    $errors[] = $message;
+                    $debug[] = [
+                        'source' => $fetcher['source'],
+                        'status' => $response->status(),
+                        'raw' => 0,
+                        'usable' => 0,
+                        'message' => is_string($message) ? Str::limit($message, 120) : 'Request failed',
+                    ];
+                    Log::warning('Recruiting email templates source failed.', [
+                        'status' => $response->status(),
+                        'source' => $fetcher['source'],
+                        'location_id' => $locationId,
+                        'params' => $params,
+                        'raw' => $data,
+                    ]);
+                    break;
+                }
+
+                $items = $this->extractTemplatesFromResponse($data);
+                $rawCount = $this->templateResponseCount($data);
+                $rawSeen += $rawCount;
+
+                $batch = collect($items)
+                    ->filter(fn ($item): bool => is_array($item))
+                    ->map(fn (array $item): array => array_merge($this->transformEmailTemplate($item), ['source' => $fetcher['source']]))
+                    ->filter(fn (array $item): bool => filled($item['id'] ?? null) && filled($item['name'] ?? null))
+                    ->values()
+                    ->all();
+
+                $sourceCount += count($batch);
+                $templates = array_merge($templates, $batch);
+
+                $total = (int) ($data['total'] ?? $data['totalCount'] ?? $data['count'] ?? data_get($data, 'meta.total') ?? data_get($data, 'pagination.total') ?? 0);
+                $pageSize = (int) ($fetcher['page_size'] ?? 50);
+                $page++;
+                if (($fetcher['page_param'] ?? 'skip') === 'pageNumber') {
+                    $offset++;
+                    $hasMore = $rawCount >= $pageSize && ($total === 0 || (($offset - 1) * $pageSize) < $total);
+                } else {
+                    $offset += $pageSize;
+                    $hasMore = $rawCount >= $pageSize && ($total === 0 || $offset < $total);
+                }
+            } while ($hasMore && $page < 100);
+
+            $debug[] = [
+                'source' => $fetcher['source'],
+                'status' => 200,
+                'raw' => $rawSeen,
+                'usable' => $sourceCount,
+                'message' => $sourceCount > 0 ? 'ok' : 'No usable templates returned',
+            ];
+
+            if ($sourceCount > 0) {
+                $sources[] = $fetcher['source'] . ': ' . $sourceCount;
+            }
+        }
+
+        $templates = collect($templates)
+            ->unique(fn (array $item): string => (string) ($item['id'] ?? ''))
+            ->sortByDesc(fn (array $item): string => (string) ($item['updatedAt'] ?? $item['updated_at'] ?? $item['createdAt'] ?? ''))
+            ->values()
+            ->all();
+
+        return [
+            'success' => true,
+            'templates' => $templates,
+            'source' => implode(', ', $sources) ?: 'No template source returned usable templates',
+            'location_id' => $locationId,
+            'debug' => $debug,
+            'error' => null,
+            'warnings' => $errors,
+        ];
+    }
+
+    public function getEmailTemplateForUser(User $user, string $templateId): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+        $templateId = trim($templateId);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'template' => null, 'error' => 'Missing recruiting data connection.'];
+        }
+
+        if ($templateId === '') {
+            return ['success' => false, 'template' => null, 'error' => 'Template id is required.'];
+        }
+
+        $attempts = [
+            [
+                'source' => '/emails/locations/{locationId}/templates/{templateId}',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}",
+                'params' => [],
+            ],
+            [
+                'source' => '/locations/{locationId}/templates/{templateId}',
+                'version' => 'v3',
+                'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}",
+                'params' => ['type' => 'email', 'originId' => $locationId],
+            ],
+            [
+                'source' => '/emails/public/v2/locations/{locationId}/campaigns/email-campaign/{id}',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign/{$templateId}",
+                'params' => [],
+            ],
+            [
+                'source' => '/emails/public/v2/locations/{locationId}/campaigns/{id}',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/{$templateId}",
+                'params' => [],
+            ],
+            [
+                'source' => '/emails/builder/{templateId}',
+                'version' => '2021-07-28',
+                'url' => "{$this->baseUrl}/emails/builder/{$templateId}",
+                'params' => ['locationId' => $locationId],
+            ],
+            [
+                'source' => '/emails/builder/{locationId}/{templateId}',
+                'version' => '2021-07-28',
+                'url' => "{$this->baseUrl}/emails/builder/{$locationId}/{$templateId}",
+                'params' => [],
+            ],
+        ];
+
+        $errors = [];
+        $bestTemplate = null;
+        $bestRaw = [];
+        $bestSource = '';
 
         foreach ($attempts as $attempt) {
             $response = Http::withHeaders(['Version' => $attempt['version']])
                 ->timeout((int) config('ghl.timeout', 20))
                 ->withToken($token)
                 ->acceptJson()
-                ->get("{$this->baseUrl}{$attempt['endpoint']}", $attempt['query']);
+                ->get($attempt['url'], $attempt['params']);
 
             $data = $response->json() ?? [];
-            $lastStatus = $response->status();
-            $lastData = $data;
 
-            if ($response->successful()) {
-                $items = $this->extractTemplatesFromResponse($data);
-                $templates = collect($items)->filter(fn ($item) => is_array($item))->map(fn (array $item): array => $this->transformEmailTemplate($item))->filter(fn (array $item): bool => filled($item['id'] ?? null))->values()->all();
+            if (! $response->successful()) {
+                $errors[] = $data['message'] ?? $data['error'] ?? ($attempt['source'] . ' failed with status ' . $response->status());
+                continue;
+            }
 
+            $template = $data['template'] ?? $data['data']['template'] ?? $data['data'] ?? $data['emailTemplate'] ?? $data;
+            $transformed = $this->transformEmailTemplate(is_array($template) ? $template : $data);
+            $transformed['source'] = $attempt['source'];
+
+            if (trim((string) ($transformed['html'] ?? '')) === '') {
+                $renderHtml = $this->fetchTemplateRenderHtml($transformed, $data);
+                if ($renderHtml !== '') {
+                    $transformed['html'] = $renderHtml;
+                    $transformed['body'] = $renderHtml;
+                    $transformed['renderedHtml'] = $renderHtml;
+                    $transformed['editorContentFetched'] = true;
+                }
+            }
+
+            if (trim((string) ($transformed['html'] ?? '')) !== '' || trim((string) ($transformed['subjectLine'] ?? '')) !== '') {
                 return [
                     'success' => true,
-                    'templates' => $templates,
-                    'source' => $attempt['endpoint'],
-                    'error' => null,
+                    'template' => $transformed,
+                    'raw' => $data,
+                    'source' => $attempt['source'],
+                    'warnings' => $errors,
                 ];
+            }
+
+            $bestTemplate ??= $transformed;
+            $bestRaw = $data;
+            $bestSource = $attempt['source'];
+        }
+
+        if (is_array($bestTemplate)) {
+            return [
+                'success' => true,
+                'template' => $bestTemplate,
+                'raw' => $bestRaw,
+                'source' => $bestSource,
+                'warnings' => $errors,
+            ];
+        }
+
+        Log::error('Recruiting email template detail request failed.', [
+            'location_id' => $locationId,
+            'template_id' => $templateId,
+            'errors' => $errors,
+        ]);
+
+        return [
+            'success' => false,
+            'template' => null,
+            'error' => $errors[0] ?? 'Unable to load template detail.',
+            'raw' => [],
+        ];
+    }
+
+    private function fetchTemplateRenderHtml(array $template, array $raw): string
+    {
+        $urls = [];
+
+        foreach ([
+            $template['editorContentUrl'] ?? null,
+            $template['previewUrl'] ?? null,
+            $template['templateDataUrl'] ?? null,
+            data_get($raw, 'editorContentUrl'),
+            data_get($raw, 'data.editorContentUrl'),
+            data_get($raw, 'template.editorContentUrl'),
+            data_get($raw, 'email.editorContentUrl'),
+            data_get($raw, 'editor.contentUrl'),
+            data_get($raw, 'editor.editorContentUrl'),
+            data_get($raw, 'builder.editorContentUrl'),
+            data_get($raw, 'templateData.editorContentUrl'),
+            data_get($raw, 'previewUrl'),
+            data_get($raw, 'data.previewUrl'),
+            data_get($raw, 'template.previewUrl'),
+            data_get($raw, 'templateDataUrl'),
+            data_get($raw, 'data.templateDataUrl'),
+        ] as $url) {
+            $url = trim((string) $url);
+            if ($url !== '' && Str::startsWith($url, ['http://', 'https://'])) {
+                $urls[] = $url;
             }
         }
 
-        Log::error('Recruiting templates request failed.', ['status' => $lastStatus, 'raw' => $lastData]);
-        return ['success' => false, 'templates' => [], 'error' => 'Unable to load templates.', 'status' => $lastStatus, 'raw' => $lastData];
+        foreach (array_values(array_unique($urls)) as $url) {
+            $html = $this->fetchTemplatePreviewUrl($url);
+            if ($html !== '') {
+                return $html;
+            }
+        }
+
+        return '';
+    }
+
+    private function fetchTemplatePreviewUrl(string $url): string
+    {
+        $url = trim($url);
+
+        if ($url === '' || ! Str::startsWith($url, ['http://', 'https://'])) {
+            return '';
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'PLYRCard Recruiting Center',
+                'Accept' => 'text/html,application/xhtml+xml,text/plain,*/*',
+            ])->timeout((int) config('ghl.timeout', 20))->get($url);
+            if ($response->successful()) {
+                $body = trim((string) $response->body());
+                if ($body !== '' && ! $this->looksLikeIdentifier($body)) {
+                    return $body;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Recruiting email template preview URL fetch failed.', ['url' => $url, 'error' => $e->getMessage()]);
+        }
+
+        return '';
     }
 
     public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body): array
@@ -2423,50 +3106,128 @@ class GoHighLevelService
             return ['success' => false, 'error' => 'Missing recruiting data connection.'];
         }
 
-        $attempts = [
-            [
-                'endpoint' => config('ghl.email_templates_v2_endpoint', '/emails/templates'),
-                'version' => config('ghl.email_templates_v2_version', '2021-07-28'),
-                'payload' => ['locationId' => $locationId, 'name' => $name, 'subject' => $subject, 'body' => $body, 'html' => $body],
-            ],
-            [
-                'endpoint' => config('ghl.email_templates_v3_endpoint', '/emails/templates'),
-                'version' => config('ghl.email_templates_v3_version', 'v3'),
-                'payload' => ['locationId' => $locationId, 'name' => $name, 'subject' => $subject, 'body' => $body, 'html' => $body],
-            ],
-            [
-                'endpoint' => config('ghl.email_templates_builder_v2_endpoint', '/emails/builder/templates'),
-                'version' => config('ghl.email_templates_builder_v2_version', '2021-07-28'),
-                'payload' => ['locationId' => $locationId, 'name' => $name, 'subject' => $subject, 'body' => $body, 'html' => $body],
-            ],
-            [
-                'endpoint' => config('ghl.email_templates_builder_endpoint', '/emails/builder'),
-                'version' => config('ghl.email_templates_builder_version', '2021-04-15'),
-                'payload' => ['locationId' => $locationId, 'name' => $name, 'subject' => $subject, 'body' => $body, 'html' => $body],
-            ],
-        ];
+        $response = Http::withHeaders(['Version' => 'v3'])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->post("{$this->baseUrl}/emails/locations/{$locationId}/templates", [
+                'name' => $name,
+                'subjectLine' => $subject,
+                'previewText' => Str::limit(trim(strip_tags($body)), 120, ''),
+                'fromName' => (string) ($user->name ?? 'PLYRCard'),
+                'fromEmail' => $this->defaultSenderEmailForUser($user),
+                'html' => $body,
+                'isPlainText' => false,
+            ]);
 
-        $lastStatus = null;
-        $lastData = [];
+        $data = $response->json() ?? [];
 
-        foreach ($attempts as $attempt) {
-            $response = Http::withHeaders(['Version' => $attempt['version']])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->asJson()
-                ->post("{$this->baseUrl}{$attempt['endpoint']}", $attempt['payload']);
-
-            $data = $response->json() ?? [];
-            $lastStatus = $response->status();
-            $lastData = $data;
-
-            if ($response->successful()) {
-                return ['success' => true, 'template' => $data['template'] ?? $data, 'source' => $attempt['endpoint'], 'raw' => $data];
-            }
+        if (! $response->successful()) {
+            return [
+                'success' => false,
+                'error' => $data['message'] ?? $data['error'] ?? 'Unable to create template.',
+                'status' => $response->status(),
+                'raw' => $data,
+            ];
         }
 
-        return ['success' => false, 'error' => 'Unable to create template.', 'status' => $lastStatus, 'raw' => $lastData];
+        return ['success' => true, 'template' => $data['template'] ?? $data['data'] ?? $data, 'source' => '/emails/locations/{locationId}/templates', 'raw' => $data];
+    }
+
+    public function createEmailCampaignForUser(User $user, array $payload): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'error' => 'Missing recruiting data connection.'];
+        }
+
+        $body = [
+            'name' => (string) ($payload['name'] ?? ('PLYRCard Campaign ' . now()->format('Y-m-d H:i'))),
+            'subjectLine' => (string) ($payload['subjectLine'] ?? $payload['subject'] ?? ''),
+            'previewText' => (string) ($payload['previewText'] ?? ''),
+            'fromName' => (string) ($payload['fromName'] ?? $user->name ?? 'PLYRCard'),
+            'fromEmail' => (string) ($payload['fromEmail'] ?? $this->defaultSenderEmailForUser($user)),
+            'html' => (string) ($payload['html'] ?? $payload['body'] ?? ''),
+        ];
+
+        $response = Http::withHeaders(['Version' => '2023-02-21'])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->post("{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign", $body);
+
+        $data = $response->json() ?? [];
+
+        if (! $response->successful()) {
+            Log::error('Recruiting email campaign create failed.', [
+                'status' => $response->status(),
+                'location_id' => $locationId,
+                'raw' => $data,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $data['message'] ?? $data['error'] ?? 'Unable to create campaign.',
+                'status' => $response->status(),
+                'raw' => $data,
+            ];
+        }
+
+        $campaign = $data['campaign'] ?? $data['data'] ?? $data;
+        $campaignId = $campaign['id'] ?? $campaign['_id'] ?? $campaign['campaignId'] ?? $data['id'] ?? $data['campaignId'] ?? null;
+
+        return [
+            'success' => true,
+            'campaign' => $campaign,
+            'campaign_id' => $campaignId ? (string) $campaignId : null,
+            'raw' => $data,
+        ];
+    }
+
+    public function scheduleEmailCampaignForUser(User $user, string $campaignId, ?int $scheduledTimestamp = null): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+        $campaignId = trim($campaignId);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'error' => 'Missing recruiting data connection.'];
+        }
+
+        if ($campaignId === '') {
+            return ['success' => false, 'error' => 'Campaign id is required.'];
+        }
+
+        $payload = [];
+        if ($scheduledTimestamp) {
+            $payload['scheduledTimestamp'] = $scheduledTimestamp;
+        }
+
+        $response = Http::withHeaders(['Version' => '2023-02-21'])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->post("{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/{$campaignId}/schedule", $payload);
+
+        $data = $response->json() ?? [];
+
+        if (! $response->successful()) {
+            return [
+                'success' => false,
+                'error' => $data['message'] ?? $data['error'] ?? 'Unable to schedule/start campaign.',
+                'status' => $response->status(),
+                'raw' => $data,
+            ];
+        }
+
+        return ['success' => true, 'raw' => $data];
     }
 
     protected function defaultSenderEmailForUser(User $user): string

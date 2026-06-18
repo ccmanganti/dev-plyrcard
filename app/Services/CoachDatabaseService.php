@@ -807,6 +807,21 @@ class CoachDatabaseService
         return $this->goHighLevelService->getEmailTemplatesForUser($user);
     }
 
+    public function getEmailTemplateForUser(User $user, string $templateId): array
+    {
+        return $this->goHighLevelService->getEmailTemplateForUser($user, $templateId);
+    }
+
+    public function createEmailCampaignForUser(User $user, array $payload): array
+    {
+        return $this->goHighLevelService->createEmailCampaignForUser($user, $payload);
+    }
+
+    public function scheduleEmailCampaignForUser(User $user, string $campaignId, ?int $scheduledTimestamp = null): array
+    {
+        return $this->goHighLevelService->scheduleEmailCampaignForUser($user, $campaignId, $scheduledTimestamp);
+    }
+
     public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body): array
     {
         if (trim($name) === '' || trim($subject) === '' || trim($body) === '') {

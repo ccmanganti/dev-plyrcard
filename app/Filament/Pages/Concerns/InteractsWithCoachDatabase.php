@@ -17,6 +17,9 @@ trait InteractsWithCoachDatabase
     public array $conversations = [];
     public array $messages = [];
     public array $templates = [];
+    public array $templateDetails = [];
+    public string $templateSourceSummary = '';
+    public array $templateSourceDebug = [];
 
     public bool $allowed = false;
     public bool $locked = false;
@@ -56,6 +59,22 @@ trait InteractsWithCoachDatabase
     public string $templateSubject = '';
     public string $templateBody = '';
     public ?string $selectedTemplateId = null;
+
+    public ?string $campaignTemplateId = null;
+    public ?string $previewTemplateId = null;
+    public string $campaignName = '';
+    public string $campaignSubject = '';
+    public string $campaignPreviewText = '';
+    public string $campaignBody = '';
+    public string $campaignOriginalHtml = '';
+    public bool $campaignTemplateIsDesign = false;
+    public array $campaignEditableBlocks = [];
+    public string $campaignTargetMode = 'coaches';
+    public string $campaignCoachSearch = '';
+    public array $campaignCoachIds = [];
+    public string $campaignListKey = '';
+    public string $campaignSchoolId = '';
+    public bool $isSendingCampaign = false;
     public ?string $messageLastId = null;
     public bool $hasMoreMessages = false;
     public bool $isSendingEmail = false;
@@ -237,6 +256,32 @@ trait InteractsWithCoachDatabase
 
         if ($this->isLoadingDataset) {
             $this->dispatch('coach-database-load-next');
+        }
+    }
+
+    public function pollRealtime(): void
+    {
+        if (! $this->allowed || $this->locked) {
+            return;
+        }
+
+        if ($this->hasMoreData || $this->isLoadingDataset) {
+            $this->loadNextBatch();
+            return;
+        }
+
+        $this->hydrateFromSnapshot(Cache::get($this->activeCacheKey(), $this->emptySnapshot()));
+
+        if ($this->section === 'conversations') {
+            $this->refreshConversationsRealtime();
+        }
+    }
+
+    public function refreshConversationsRealtime(): void
+    {
+        $this->loadConversations();
+        if ($this->selectedConversationId) {
+            $this->loadConversationMessages();
         }
     }
 
@@ -857,13 +902,28 @@ trait InteractsWithCoachDatabase
     {
         $result = app(CoachDatabaseService::class)->getEmailTemplatesForUser(Auth::user());
         $this->templates = $result['templates'] ?? [];
+        $this->templateSourceSummary = (string) ($result['source'] ?? '');
+        $this->templateSourceDebug = is_array($result['debug'] ?? null) ? $result['debug'] : [];
 
         if (! ($result['success'] ?? false)) {
             $this->error = $result['error'] ?? 'Unable to load templates.';
+            Notification::make()->title('Recruiting Center')->body($this->error)->danger()->send();
             return;
         }
 
         $this->error = null;
+
+        if ($this->previewTemplateId && ! collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->previewTemplateId)) {
+            $this->previewTemplateId = null;
+        }
+
+        if (! $this->previewTemplateId && ! empty($this->templates[0]['id'])) {
+            $this->previewTemplateId = (string) $this->templates[0]['id'];
+        }
+
+        if ($this->previewTemplateId) {
+            $this->loadTemplateDetail($this->previewTemplateId);
+        }
     }
 
     public function createTemplate(): void
@@ -878,13 +938,712 @@ trait InteractsWithCoachDatabase
         Notification::make()->title('Recruiting Center')->body('Template created.')->success()->send();
     }
 
+    public function loadTemplateDetail(string $templateId): ?array
+    {
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return null;
+        }
+
+        if (isset($this->templateDetails[$templateId])) {
+            return $this->templateDetails[$templateId];
+        }
+
+        $summary = collect($this->templates)->firstWhere('id', $templateId);
+        $result = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
+
+        if (! ($result['success'] ?? false)) {
+            if (is_array($summary)) {
+                $this->templateDetails[$templateId] = $summary;
+                return $summary;
+            }
+
+            Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to load template details.')->danger()->send();
+            return null;
+        }
+
+        $detail = $result['template'] ?? [];
+        $detail = is_array($detail) ? $detail : [];
+
+        if (is_array($summary)) {
+            $detail = $this->mergeTemplateRecord($summary, $detail);
+        }
+
+        $this->templateDetails[$templateId] = $detail;
+        $this->templates = collect($this->templates)
+            ->map(fn (array $template): array => (string) ($template['id'] ?? '') === $templateId ? $this->mergeTemplateRecord($template, $detail) : $template)
+            ->values()
+            ->all();
+
+        return $detail;
+    }
+
+    public function previewTemplate(string $templateId): void
+    {
+        $this->previewTemplateId = $templateId;
+        $this->loadTemplateDetail($templateId);
+    }
+
     public function useTemplate(string $templateId): void
     {
-        $template = collect($this->templates)->firstWhere('id', $templateId);
-        if (! $template) return;
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
+
+        if (! is_array($template)) {
+            return;
+        }
+
+        $subject = $this->templateSubject($template);
+        $body = $this->templateHtml($template);
+
+        if ($subject === '') {
+            $subject = (string) ($template['name'] ?? 'Recruiting Email');
+        }
+
+        if ($body === '') {
+            $body = '';
+        }
+
         $this->selectedTemplateId = $templateId;
-        $this->emailSubject = $template['subject'] ?? '';
-        $this->emailBody = (string) ($template['body'] ?? '');
+        $this->campaignTemplateId = $templateId;
+        $this->previewTemplateId = $templateId;
+        $this->emailSubject = $subject;
+        $this->emailBody = $body;
+        $this->campaignName = (string) ($template['name'] ?? 'Recruiting Campaign');
+        $this->campaignSubject = $subject;
+        $this->campaignPreviewText = $this->templatePreviewText($template);
+        // Full builder/design templates can be very large HTML documents.
+        // Keep that HTML available for preview/sending through previewTemplateHtml,
+        // but do not put it into the visible message textarea.
+        $this->campaignOriginalHtml = $body;
+        $this->campaignTemplateIsDesign = $this->isDesignedTemplateHtml($body);
+        $this->campaignEditableBlocks = [];
+        // Keep the full template HTML intact. The visual iframe editor updates only
+        // the text/image content inside this HTML and syncs the updated full HTML
+        // back into campaignBody for preview/sending.
+        $this->campaignBody = $body;
+
+        Notification::make()->title('Recruiting Center')->body('Email selected.')->success()->send();
+    }
+
+    public function clearCampaignTemplate(): void
+    {
+        $this->campaignTemplateId = null;
+        $this->campaignName = '';
+        $this->campaignSubject = '';
+        $this->campaignPreviewText = '';
+        $this->campaignBody = '';
+        $this->campaignOriginalHtml = '';
+        $this->campaignTemplateIsDesign = false;
+        $this->campaignEditableBlocks = [];
+    }
+
+    public function updatedCampaignEditableBlocks(mixed $value = null, ?string $key = null): void
+    {
+        if (! $this->campaignTemplateIsDesign || trim($this->campaignOriginalHtml) === '') {
+            return;
+        }
+
+        $this->campaignBody = $this->rebuildTemplateHtmlFromEditableBlocks();
+    }
+
+    public function insertCampaignVariable(string $token, string $field = 'body'): void
+    {
+        $allowed = ['{{coach_name}}', '{{first_name}}', '{{last_name}}', '{{school}}', '{{email}}'];
+        $token = trim($token);
+
+        if (! in_array($token, $allowed, true)) {
+            return;
+        }
+
+        if ($field === 'subject') {
+            $this->campaignSubject = trim($this->campaignSubject . ' ' . $token);
+            return;
+        }
+
+        if ($this->campaignTemplateIsDesign) {
+            $this->campaignBody = $this->appendTokenToHtmlBody($this->campaignBody, $token);
+            return;
+        }
+
+        $separator = trim($this->campaignBody) === '' ? '' : ' ';
+        $this->campaignBody .= $separator . $token;
+    }
+
+    public function updatedCampaignTargetMode(): void
+    {
+        $this->campaignCoachIds = [];
+        $this->campaignListKey = '';
+        $this->campaignSchoolId = '';
+    }
+
+    public function sendCampaign(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        if ($this->campaignTemplateId && (trim($this->campaignSubject) === '' || trim($this->campaignBody) === '')) {
+            $this->useTemplate($this->campaignTemplateId);
+        }
+
+        $subject = trim($this->campaignSubject);
+        $body = trim($this->campaignBody);
+        if ($body === '' && $this->campaignTemplateIsDesign) {
+            $body = trim($this->campaignOriginalHtml);
+            $this->campaignBody = $body;
+        }
+
+        if ($subject === '' || $body === '') {
+            Notification::make()->title('Recruiting Center')->body('Choose a template before creating a campaign.')->danger()->send();
+            return;
+        }
+
+        $recipients = $this->campaignRecipientCoaches();
+
+        if ($recipients->isEmpty()) {
+            Notification::make()->title('Recruiting Center')->body('No coaches with email matched this campaign target.')->danger()->send();
+            return;
+        }
+
+        $limit = (int) config('ghl.coach_database.campaign_send_limit', 250);
+        if ($recipients->count() > $limit) {
+            Notification::make()->title('Recruiting Center')->body('This campaign has ' . number_format($recipients->count()) . ' recipients. The current safety limit is ' . number_format($limit) . '. Narrow the target or raise ghl.coach_database.campaign_send_limit.')->danger()->send();
+            return;
+        }
+
+        $this->isSendingCampaign = true;
+
+        $campaignResult = app(CoachDatabaseService::class)->createEmailCampaignForUser($user, [
+            'name' => $this->campaignName !== '' ? $this->campaignName : ('PLYRCard Recruiting Campaign - ' . now()->format('M j, Y g:i A')),
+            'subjectLine' => $subject,
+            'previewText' => $this->campaignPreviewText,
+            'fromName' => (string) ($this->previewTemplate['fromName'] ?? $user->name ?? 'PLYRCard'),
+            'fromEmail' => (string) ($this->previewTemplate['fromEmail'] ?? ''),
+            'html' => $body,
+        ]);
+
+        if (! ($campaignResult['success'] ?? false)) {
+            $this->isSendingCampaign = false;
+            Notification::make()->title('Recruiting Center')->body($campaignResult['error'] ?? 'Unable to create campaign.')->danger()->send();
+            return;
+        }
+
+        $sent = 0;
+        $failed = 0;
+
+        foreach ($recipients as $coach) {
+            $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
+            $personalizedBody = $this->replaceCampaignTokens($body, $coach);
+
+            $payload = [
+                'contact_id' => (string) ($coach['id'] ?? ''),
+                'contactId' => (string) ($coach['id'] ?? ''),
+                'subject' => $personalizedSubject,
+                'body' => $personalizedBody,
+                'html' => $personalizedBody,
+                'text' => trim(strip_tags($personalizedBody)),
+                'to' => (string) ($coach['email'] ?? ''),
+                'emailTo' => (string) ($coach['email'] ?? ''),
+                'fromName' => (string) ($user->name ?? 'PLYRCard'),
+            ];
+
+            $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
+            if ($result['success'] ?? false) {
+                $sent++;
+            } else {
+                $failed++;
+            }
+        }
+
+        $this->isSendingCampaign = false;
+
+        $campaignId = (string) ($campaignResult['campaign_id'] ?? '');
+        $bodyText = 'Campaign created' . ($campaignId !== '' ? ' #' . $campaignId : '') . ' and sent to ' . number_format($sent) . ' coach' . ($sent === 1 ? '' : 'es') . ($failed ? '. Failed: ' . number_format($failed) . '.' : '.');
+
+        $notification = Notification::make()->title('Recruiting Center')->body($bodyText);
+        ($failed ? $notification->warning() : $notification->success())->send();
+    }
+
+    protected function mergeTemplateRecord(array $base, array $detail): array
+    {
+        $merged = $base;
+
+        foreach ($detail as $key => $value) {
+            if (is_string($value) && trim($value) === '' && filled($merged[$key] ?? null)) {
+                continue;
+            }
+
+            if (is_array($value) && empty($value) && ! empty($merged[$key] ?? null)) {
+                continue;
+            }
+
+            $merged[$key] = $value;
+        }
+
+        return $merged;
+    }
+
+    protected function templateSubject(array $template): string
+    {
+        return trim((string) ($template['subjectLine'] ?? $template['subject'] ?? $template['emailSubject'] ?? $template['raw']['subjectLine'] ?? $template['raw']['subject'] ?? ''));
+    }
+
+    protected function templatePreviewText(array $template): string
+    {
+        return trim((string) ($template['previewText'] ?? $template['preview'] ?? $template['raw']['previewText'] ?? $template['raw']['preview'] ?? ''));
+    }
+
+    protected function templateHtml(array $template): string
+    {
+        foreach ([
+            'html', 'body', 'htmlBody', 'renderedHtml', 'rendered_html', 'editorHtml', 'content', 'editorContent',
+            'templateData', 'builderData', 'dnd', 'dndData',
+            'raw.html', 'raw.body', 'raw.htmlBody', 'raw.renderedHtml', 'raw.editorHtml', 'raw.editorContent',
+            'raw.templateData', 'raw.builderData', 'raw.dnd', 'raw.dndData',
+        ] as $key) {
+            $html = $this->coerceTemplateHtml(data_get($template, $key));
+            if ($html !== '') {
+                return $html;
+            }
+        }
+
+        return $this->coerceTemplateHtml($template['raw'] ?? null);
+    }
+
+    protected function coerceTemplateHtml(mixed $value): string
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+
+            if ($value === '' || $this->looksLikeTemplateIdentifier($value)) {
+                return '';
+            }
+
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $nested = $this->coerceTemplateHtml($decoded);
+                if ($nested !== '') {
+                    return $nested;
+                }
+            }
+
+            if (str_contains($value, '<html') || str_contains($value, '<body') || str_contains($value, '<table') || str_contains($value, '<p') || str_contains($value, '<div') || str_contains($value, '<span') || str_contains($value, '<br') || str_contains($value, '{{')) {
+                return $value;
+            }
+
+            if ($this->looksLikeReadableTemplateText($value)) {
+                return nl2br(e($value), false);
+            }
+
+            return '';
+        }
+
+        if (! is_array($value)) {
+            return '';
+        }
+
+        foreach (['html', 'body', 'htmlBody', 'content', 'message', 'previewHtml', 'text', 'editorContent', 'editorHtml', 'templateData', 'templateContent', 'builderData', 'dnd', 'dndData'] as $key) {
+            if (array_key_exists($key, $value)) {
+                $html = $this->coerceTemplateHtml($value[$key]);
+                if ($html !== '') {
+                    return $html;
+                }
+            }
+        }
+
+        foreach (['props', 'data', 'attributes'] as $key) {
+            if (isset($value[$key]) && is_array($value[$key])) {
+                foreach (['html', 'text', 'content', 'body', 'value', 'label'] as $nestedKey) {
+                    if (array_key_exists($nestedKey, $value[$key])) {
+                        $html = $this->coerceTemplateHtml($value[$key][$nestedKey]);
+                        if ($html !== '') {
+                            return $html;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (['children', 'blocks', 'rows', 'columns', 'elements', 'nodes', 'values', 'items', 'cells', 'contents'] as $key) {
+            if (isset($value[$key]) && is_array($value[$key])) {
+                $parts = [];
+                foreach ($value[$key] as $child) {
+                    $html = $this->coerceTemplateHtml($child);
+                    if ($html !== '') {
+                        $parts[] = $html;
+                    }
+                }
+                if (! empty($parts)) {
+                    return implode("\n", $parts);
+                }
+            }
+        }
+
+        foreach (['design', 'builder', 'data', 'email', 'template', 'editor', 'root', 'document', 'templateData', 'contentData', 'unlayer', 'unlayerData'] as $key) {
+            if (isset($value[$key])) {
+                $html = $this->coerceTemplateHtml($value[$key]);
+                if ($html !== '') {
+                    return $html;
+                }
+            }
+        }
+
+        $designPreview = $this->renderTemplateDesignPreview($value);
+        if ($designPreview !== '') {
+            return $designPreview;
+        }
+
+        $parts = $this->collectReadableTemplateText($value);
+        if (! empty($parts)) {
+            return collect($parts)->unique()->map(fn (string $text): string => '<p>' . e($text) . '</p>')->implode("\n");
+        }
+
+        return '';
+    }
+
+    protected function renderTemplateDesignPreview(array $value): string
+    {
+        $fragments = [];
+        $this->collectTemplateDesignFragments($value, $fragments);
+
+        if (empty($fragments)) {
+            return '';
+        }
+
+        $html = collect($fragments)
+            ->unique(fn (array $fragment): string => ($fragment['type'] ?? '') . ':' . md5((string) ($fragment['value'] ?? '')))
+            ->take(80)
+            ->map(function (array $fragment): string {
+                $type = (string) ($fragment['type'] ?? 'text');
+                $value = trim((string) ($fragment['value'] ?? ''));
+
+                if ($value === '') {
+                    return '';
+                }
+
+                if ($type === 'html') {
+                    return $value;
+                }
+
+                if ($type === 'image') {
+                    return '<div style="margin:14px 0;text-align:center"><img src="' . e($value) . '" alt="" style="max-width:100%;height:auto;border-radius:10px;display:inline-block" /></div>';
+                }
+
+                if ($type === 'link') {
+                    return '<p><a href="' . e($value) . '">' . e($value) . '</a></p>';
+                }
+
+                return '<p>' . nl2br(e($value), false) . '</p>';
+            })
+            ->filter()
+            ->implode("
+");
+
+        return $html !== '' ? '<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.55;color:#111827">' . $html . '</div>' : '';
+    }
+
+    protected function collectTemplateDesignFragments(mixed $value, array &$fragments, int $depth = 0): void
+    {
+        if ($depth > 14) {
+            return;
+        }
+
+        if (is_string($value)) {
+            $text = trim($value);
+            if ($text === '' || $this->looksLikeTemplateIdentifier($text)) {
+                return;
+            }
+
+            $decoded = json_decode($text, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $this->collectTemplateDesignFragments($decoded, $fragments, $depth + 1);
+                return;
+            }
+
+            if (preg_match('/<\s*(html|body|table|tr|td|div|p|span|img|a|br|h[1-6])/i', $text)) {
+                $fragments[] = ['type' => 'html', 'value' => $text];
+                return;
+            }
+
+            if ($this->looksLikeReadableTemplateText($text) || str_contains($text, '{')) {
+                $fragments[] = ['type' => 'text', 'value' => $text];
+            }
+
+            return;
+        }
+
+        if (! is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $key => $item) {
+            $key = (string) $key;
+
+            if (is_string($item)) {
+                $text = trim($item);
+                if ($text === '' || $this->looksLikeTemplateIdentifier($text)) {
+                    continue;
+                }
+
+                $isUrl = Str::startsWith($text, ['http://', 'https://']);
+                $imageKey = in_array($key, ['src', 'image', 'imageUrl', 'image_url', 'backgroundImage', 'background_image', 'thumbnail', 'thumbnailUrl'], true);
+                $linkKey = in_array($key, ['href', 'link', 'url', 'redirectUrl'], true);
+
+                if ($isUrl && ($imageKey || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $text))) {
+                    $fragments[] = ['type' => 'image', 'value' => $text];
+                    continue;
+                }
+
+                if ($isUrl && $linkKey) {
+                    $fragments[] = ['type' => 'link', 'value' => $text];
+                    continue;
+                }
+
+                if (in_array($key, ['html', 'body', 'content', 'text', 'value', 'message', 'label', 'title', 'alt', 'heading', 'paragraph'], true)) {
+                    $this->collectTemplateDesignFragments($text, $fragments, $depth + 1);
+                }
+            } elseif (is_array($item)) {
+                $this->collectTemplateDesignFragments($item, $fragments, $depth + 1);
+            }
+        }
+    }
+
+    protected function collectReadableTemplateText(array $value): array
+    {
+        $parts = [];
+
+        foreach ($value as $key => $item) {
+            if (is_string($item) && in_array((string) $key, ['text', 'content', 'body', 'message', 'value', 'label', 'title'], true) && $this->looksLikeReadableTemplateText($item)) {
+                $parts[] = trim(strip_tags($item));
+            } elseif (is_array($item)) {
+                $parts = array_merge($parts, $this->collectReadableTemplateText($item));
+            }
+        }
+
+        return $parts;
+    }
+
+    protected function looksLikeTemplateIdentifier(string $value): bool
+    {
+        $value = trim($value);
+
+        return (bool) preg_match('/^[a-f0-9]{16,}$/i', $value)
+            || ((bool) preg_match('/^[A-Za-z0-9_-]{18,}$/', $value) && ! str_contains($value, ' '));
+    }
+
+    protected function looksLikeReadableTemplateText(string $value): bool
+    {
+        $value = trim(strip_tags($value));
+
+        if (strlen($value) < 25 || ! str_contains($value, ' ')) {
+            return false;
+        }
+
+        if ($this->looksLikeTemplateIdentifier($value)) {
+            return false;
+        }
+
+        return (bool) preg_match('/[.!?,]|\s(the|and|you|your|coach|school|hi|hello|thanks)\s/i', ' ' . $value . ' ');
+    }
+
+    protected function isDesignedTemplateHtml(string $html): bool
+    {
+        $lower = strtolower(ltrim($html));
+
+        return $html !== '' && (
+            str_starts_with($lower, '<!doctype')
+            || str_starts_with($lower, '<html')
+            || str_contains($lower, '<body')
+            || str_contains($lower, '<table')
+            || str_contains($lower, '<img')
+            || str_contains($lower, 'editorcontent')
+        );
+    }
+
+    protected function extractEditableTemplateBlocks(string $html): array
+    {
+        if (trim($html) === '') {
+            return [];
+        }
+
+        $document = $this->loadTemplateDom($html);
+        if (! $document) {
+            return [];
+        }
+
+        $blocks = [];
+        $textNumber = 1;
+        $imageNumber = 1;
+
+        $walk = function ($node) use (&$walk, &$blocks, &$textNumber, &$imageNumber): void {
+            if ($node instanceof \DOMText) {
+                $text = trim(preg_replace('/\s+/', ' ', $node->wholeText ?? ''));
+                if ($this->isEditableTemplateText($text)) {
+                    $blocks[] = [
+                        'type' => 'text',
+                        'label' => 'Text ' . $textNumber++,
+                        'value' => $text,
+                    ];
+                }
+                return;
+            }
+
+            if ($node instanceof \DOMElement && strtolower($node->tagName) === 'img') {
+                $src = trim((string) $node->getAttribute('src'));
+                if ($src !== '') {
+                    $blocks[] = [
+                        'type' => 'image',
+                        'label' => 'Image ' . $imageNumber++,
+                        'value' => $src,
+                    ];
+                }
+            }
+
+            if ($node->hasChildNodes()) {
+                foreach (iterator_to_array($node->childNodes) as $child) {
+                    $walk($child);
+                }
+            }
+        };
+
+        $body = $document->getElementsByTagName('body')->item(0) ?: $document->documentElement;
+        if ($body) {
+            $walk($body);
+        }
+
+        return array_values(array_slice($blocks, 0, 80));
+    }
+
+    protected function rebuildTemplateHtmlFromEditableBlocks(): string
+    {
+        $html = $this->campaignOriginalHtml;
+        if (trim($html) === '') {
+            return '';
+        }
+
+        $document = $this->loadTemplateDom($html);
+        if (! $document) {
+            return $html;
+        }
+
+        $blocks = array_values($this->campaignEditableBlocks ?? []);
+        $textIndex = 0;
+        $imageIndex = 0;
+
+        $walk = function ($node) use (&$walk, $blocks, &$textIndex, &$imageIndex, $document): void {
+            if ($node instanceof \DOMText) {
+                $text = trim(preg_replace('/\s+/', ' ', $node->wholeText ?? ''));
+                if ($this->isEditableTemplateText($text)) {
+                    $textBlocks = array_values(array_filter($blocks, fn ($block): bool => ($block['type'] ?? '') === 'text'));
+                    if (isset($textBlocks[$textIndex])) {
+                        $node->nodeValue = (string) ($textBlocks[$textIndex]['value'] ?? '');
+                    }
+                    $textIndex++;
+                }
+                return;
+            }
+
+            if ($node instanceof \DOMElement && strtolower($node->tagName) === 'img') {
+                $imageBlocks = array_values(array_filter($blocks, fn ($block): bool => ($block['type'] ?? '') === 'image'));
+                if (isset($imageBlocks[$imageIndex])) {
+                    $src = trim((string) ($imageBlocks[$imageIndex]['value'] ?? ''));
+                    if ($src !== '') {
+                        $node->setAttribute('src', $src);
+                    }
+                }
+                $imageIndex++;
+            }
+
+            if ($node->hasChildNodes()) {
+                foreach (iterator_to_array($node->childNodes) as $child) {
+                    $walk($child);
+                }
+            }
+        };
+
+        $body = $document->getElementsByTagName('body')->item(0) ?: $document->documentElement;
+        if ($body) {
+            $walk($body);
+        }
+
+        return $document->saveHTML() ?: $html;
+    }
+
+    protected function loadTemplateDom(string $html): ?\DOMDocument
+    {
+        $previous = libxml_use_internal_errors(true);
+        $document = new \DOMDocument('1.0', 'UTF-8');
+        $loaded = $document->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        return $loaded ? $document : null;
+    }
+
+    protected function isEditableTemplateText(string $text): bool
+    {
+        if ($text === '') {
+            return false;
+        }
+
+        if (strlen($text) < 2) {
+            return false;
+        }
+
+        $lower = strtolower($text);
+        if (str_contains($lower, '<!--') || str_contains($lower, 'doctype') || str_contains($lower, 'xmlns')) {
+            return false;
+        }
+
+        return preg_match('/[a-zA-Z0-9]/', $text) === 1;
+    }
+
+    protected function replaceCampaignTokens(string $content, array $coach): string
+    {
+        $replacements = [
+            '{{coach_name}}' => (string) ($coach['name'] ?? ''),
+            '{{first_name}}' => (string) ($coach['first_name'] ?? ''),
+            '{{last_name}}' => (string) ($coach['last_name'] ?? ''),
+            '{{school}}' => (string) ($coach['school'] ?? ''),
+            '{{email}}' => (string) ($coach['email'] ?? ''),
+        ];
+
+        return strtr($content, $replacements);
+    }
+
+    protected function campaignRecipientCoaches(): Collection
+    {
+        $coaches = collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null) && filled($coach['email'] ?? null));
+
+        return match ($this->campaignTargetMode) {
+            'all' => $coaches->values(),
+            'list' => $this->campaignListKey === ''
+                ? collect()
+                : $coaches->filter(function (array $coach): bool {
+                    $list = collect($this->lists)->firstWhere('key', $this->campaignListKey);
+                    $tag = strtolower(trim((string) ($list['tag'] ?? '')));
+                    if ($tag === '') {
+                        return false;
+                    }
+                    return collect($coach['tags'] ?? [])->contains(fn ($existing): bool => strtolower(trim((string) $existing)) === $tag);
+                })->values(),
+            'school' => $this->campaignSchoolId === ''
+                ? collect()
+                : $coaches->filter(function (array $coach): bool {
+                    $school = collect($this->allSchools())->firstWhere('id', $this->campaignSchoolId);
+                    if (! $school) {
+                        return false;
+                    }
+                    $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+                    return (string) ($coach['business_id'] ?? '') === $businessId
+                        || trim((string) ($coach['school'] ?? '')) === trim((string) ($school['name'] ?? ''));
+                })->values(),
+            default => $coaches->filter(fn (array $coach): bool => in_array((string) ($coach['id'] ?? ''), $this->campaignCoachIds, true))->values(),
+        };
     }
 
     protected function applyTagToCachedContacts(array $contactIds, string $tag, string $type): void
@@ -1019,6 +1778,243 @@ trait InteractsWithCoachDatabase
                 return collect($coach['tags'] ?? [])
                     ->contains(fn ($existing): bool => strtolower(trim((string) $existing)) === $tag);
             })
+            ->values()
+            ->all();
+    }
+
+
+    public function getPreviewTemplateProperty(): ?array
+    {
+        if (! $this->previewTemplateId) {
+            return collect($this->templates)->first() ?: null;
+        }
+
+        if (isset($this->templateDetails[$this->previewTemplateId])) {
+            return $this->templateDetails[$this->previewTemplateId];
+        }
+
+        return collect($this->templates)->firstWhere('id', $this->previewTemplateId);
+    }
+
+    public function getPreviewTemplateSubjectProperty(): string
+    {
+        $template = $this->previewTemplate;
+        return is_array($template) ? $this->templateSubject($template) : '';
+    }
+
+    public function getPreviewTemplateHtmlProperty(): string
+    {
+        $template = $this->previewTemplate;
+        if (! is_array($template)) {
+            return '';
+        }
+
+        return $this->templateHtml($template);
+    }
+
+
+    public function getCampaignEditablePreviewProperty(): string
+    {
+        $html = trim($this->campaignBody) !== '' ? $this->campaignBody : $this->campaignOriginalHtml;
+
+        if ($html === '') {
+            $html = '<p>Start typing your message.</p>';
+        }
+
+        $sampleCoach = $this->campaignRecipientCoaches()->first()
+            ?: collect($this->allCoaches())->first(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ?: [
+                'name' => 'Coach Smith',
+                'first_name' => 'Coach',
+                'last_name' => 'Smith',
+                'school' => 'Sample University',
+                'title' => 'Head Coach',
+                'email' => 'coach@example.com',
+            ];
+
+        return $this->makeTemplateHtmlEditable(
+            $this->replaceCampaignTokens($html, is_array($sampleCoach) ? $sampleCoach : [])
+        );
+    }
+
+    protected function makeTemplateHtmlEditable(string $html): string
+    {
+        $html = trim($html);
+
+        if (! str_contains(strtolower($html), '<html')) {
+            $html = '<!doctype html><html><head><meta charset="utf-8"></head><body>' . $html . '</body></html>';
+        }
+
+        $editorScript = <<<'HTML'
+<style>
+html,body{min-height:100%;}
+body{cursor:text;}
+body.plyr-editing-ready *{box-sizing:border-box;}
+body.plyr-editing-ready a{cursor:text!important;}
+body.plyr-editing-ready img{cursor:pointer!important;outline:1px dashed rgba(255,90,61,.55);outline-offset:4px;}
+body.plyr-editing-ready img:hover{outline:2px solid #ff5a3d;}
+.plyr-edit-focus{outline:2px solid #ff5a3d!important;outline-offset:2px;background:rgba(255,90,61,.05)!important;}
+</style>
+<script>
+(function(){
+    var sendTimer = null;
+
+    function sendNow(){
+        clearTimeout(sendTimer);
+        sendTimer = setTimeout(function(){
+            document.querySelectorAll('.plyr-edit-focus').forEach(function(el){ el.classList.remove('plyr-edit-focus'); });
+            parent.postMessage({ type: 'plyr-campaign-html', html: document.documentElement.outerHTML }, '*');
+        }, 180);
+    }
+
+    function command(cmd, value){
+        document.body.focus();
+        try { document.execCommand(cmd, false, value || null); } catch(e) {}
+        sendNow();
+    }
+
+    function replaceImage(img){
+        var current = img.getAttribute('src') || '';
+        var next = prompt('Paste image URL', current);
+        if (next !== null && next.trim() !== '') {
+            img.setAttribute('src', next.trim());
+            sendNow();
+        }
+    }
+
+    function prepare(){
+        document.designMode = 'on';
+        if (document.body) {
+            document.body.setAttribute('contenteditable', 'true');
+            document.body.classList.add('plyr-editing-ready');
+            document.body.spellcheck = true;
+        }
+
+        document.querySelectorAll('a').forEach(function(a){
+            a.addEventListener('click', function(e){ e.preventDefault(); });
+        });
+
+        document.querySelectorAll('img').forEach(function(img){
+            img.setAttribute('title', 'Click to change image');
+            img.addEventListener('click', function(e){
+                e.preventDefault();
+                e.stopPropagation();
+                replaceImage(img);
+            });
+        });
+
+        document.addEventListener('focusin', function(e){
+            document.querySelectorAll('.plyr-edit-focus').forEach(function(el){ el.classList.remove('plyr-edit-focus'); });
+            if (e.target && e.target !== document.body && e.target.nodeType === 1) {
+                e.target.classList.add('plyr-edit-focus');
+            }
+        });
+        document.addEventListener('input', sendNow);
+        document.addEventListener('keyup', sendNow);
+        document.addEventListener('mouseup', sendNow);
+        document.addEventListener('blur', sendNow, true);
+        document.addEventListener('paste', function(e){
+            if (! e.target || ! e.target.isContentEditable) return;
+            e.preventDefault();
+            var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            document.execCommand('insertText', false, text);
+            sendNow();
+        });
+
+        window.addEventListener('message', function(event){
+            if (! event.data || event.data.type !== 'plyr-campaign-command') return;
+            if (event.data.command === 'createLink') {
+                var url = prompt('Paste link URL', 'https://');
+                if (url && url.trim() !== '') command('createLink', url.trim());
+                return;
+            }
+            command(event.data.command || '');
+        });
+
+        sendNow();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', prepare);
+    else prepare();
+})();
+</script>
+HTML;
+
+        if (preg_match('/<\/body\s*>/i', $html)) {
+            return preg_replace('/<\/body\s*>/i', $editorScript . '</body>', $html, 1) ?: ($html . $editorScript);
+        }
+
+        return $html . $editorScript;
+    }
+
+    protected function appendTokenToHtmlBody(string $html, string $token): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '<p>' . e($token) . '</p>';
+        }
+
+        $addition = '<span> ' . e($token) . '</span>';
+
+        if (preg_match('/<\/body\s*>/i', $html)) {
+            return preg_replace('/<\/body\s*>/i', $addition . '</body>', $html, 1) ?: ($html . $addition);
+        }
+
+        return $html . $addition;
+    }
+
+    public function getCampaignRenderedPreviewProperty(): string
+    {
+        $body = trim($this->campaignBody) !== '' ? $this->campaignBody : $this->previewTemplateHtml;
+
+        if ($body === '') {
+            $body = '<p>Write your message to preview it.</p>';
+        }
+
+        $sampleCoach = $this->campaignRecipientCoaches()->first()
+            ?: collect($this->allCoaches())->first(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ?: [
+                'name' => 'Coach Smith',
+                'first_name' => 'Coach',
+                'last_name' => 'Smith',
+                'school' => 'Sample University',
+                'title' => 'Head Coach',
+                'email' => 'coach@example.com',
+            ];
+
+        $renderedBody = $this->replaceCampaignTokens($body, is_array($sampleCoach) ? $sampleCoach : []);
+        $subject = e($this->replaceCampaignTokens($this->campaignSubject ?: $this->previewTemplateSubject ?: 'Campaign preview', is_array($sampleCoach) ? $sampleCoach : []));
+        $preheader = e($this->replaceCampaignTokens($this->campaignPreviewText, is_array($sampleCoach) ? $sampleCoach : []));
+
+        if (str_contains(strtolower($renderedBody), '<html')) {
+            return $renderedBody;
+        }
+
+        return '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#f7f7f8;color:#111827;font-family:Arial,sans-serif}.wrap{max-width:720px;margin:0 auto;background:#fff;min-height:100vh}.head{padding:18px 22px;border-bottom:1px solid #e5e7eb}.subj{font-size:18px;font-weight:700}.prev{color:#6b7280;margin-top:6px}.body{padding:22px;line-height:1.55}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body><div class="wrap"><div class="head"><div class="subj">' . $subject . '</div>' . ($preheader !== '' ? '<div class="prev">' . $preheader . '</div>' : '') . '</div><div class="body">' . $renderedBody . '</div></div></body></html>';
+    }
+
+    public function getCampaignRecipientCountProperty(): int
+    {
+        return $this->campaignRecipientCoaches()->count();
+    }
+
+    public function getCampaignCoachResultsProperty(): array
+    {
+        $query = strtolower(trim($this->campaignCoachSearch));
+
+        return collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null) && filled($coach['email'] ?? null))
+            ->filter(function (array $coach) use ($query): bool {
+                if ($query === '') {
+                    return true;
+                }
+
+                $haystack = strtolower(implode(' ', [$coach['name'] ?? '', $coach['email'] ?? '', $coach['school'] ?? '', $coach['title'] ?? '']));
+
+                return str_contains($haystack, $query);
+            })
+            ->take(40)
             ->values()
             ->all();
     }
