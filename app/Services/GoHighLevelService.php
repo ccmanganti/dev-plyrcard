@@ -3096,43 +3096,292 @@ class GoHighLevelService
         return '';
     }
 
-    public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body): array
+    public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body, string $previewText = ''): array
+    {
+        return $this->saveSimpleEmailTemplateForUser($user, null, $name, $subject, $body, $previewText);
+    }
+
+    public function updateEmailTemplateForUser(User $user, string $templateId, string $name, string $subject, string $body, string $previewText = ''): array
+    {
+        return $this->saveSimpleEmailTemplateForUser($user, $templateId, $name, $subject, $body, $previewText);
+    }
+
+    private function saveSimpleEmailTemplateForUser(User $user, ?string $templateId, string $name, string $subject, string $body, string $previewText = ''): array
     {
         $credentials = $this->credentialsForUser($user);
         $locationId = $credentials['location_id'];
         $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+        $templateId = trim((string) $templateId);
 
         if (! $locationId || ! $token) {
             return ['success' => false, 'error' => 'Missing recruiting data connection.'];
         }
 
-        $response = Http::withHeaders(['Version' => 'v3'])
+        $name = trim($name) !== '' ? trim($name) : 'Untitled Template';
+        $subject = trim($subject);
+        $body = trim($body);
+        $previewText = trim($previewText) !== '' ? trim($previewText) : Str::limit(trim(strip_tags($body)), 120, '');
+
+        $fromName = (string) ($user->name ?? 'PLYRCard');
+        $fromEmail = $this->defaultSenderEmailForUser($user);
+        $updatedBy = (string) (data_get($user, 'ghl_user_id') ?: data_get($user, 'id') ?: 'plyrcard');
+
+        $builderRequest = Http::withHeaders(['Version' => '2023-02-21'])
             ->timeout((int) config('ghl.timeout', 20))
             ->withToken($token)
             ->acceptJson()
-            ->asJson()
-            ->post("{$this->baseUrl}/emails/locations/{$locationId}/templates", [
+            ->asJson();
+
+        $lastError = $templateId !== '' ? 'Unable to update template.' : 'Unable to create template.';
+        $lastStatus = null;
+        $lastData = [];
+        $createdViaBuilder = false;
+
+        if ($templateId === '') {
+            // Official Email Builder create endpoint. This creates the template shell and returns
+            // the template id in `redirect` on many HighLevel accounts.
+            $createPayload = [
+                'locationId' => $locationId,
                 'name' => $name,
+                'title' => $name,
+                'type' => 'html',
+                'builderVersion' => '2',
+                'updatedBy' => $updatedBy,
                 'subjectLine' => $subject,
-                'previewText' => Str::limit(trim(strip_tags($body)), 120, ''),
-                'fromName' => (string) ($user->name ?? 'PLYRCard'),
-                'fromEmail' => $this->defaultSenderEmailForUser($user),
-                'html' => $body,
+                'previewText' => $previewText,
+                'fromName' => $fromName,
+                'fromEmail' => $fromEmail,
                 'isPlainText' => false,
-            ]);
-
-        $data = $response->json() ?? [];
-
-        if (! $response->successful()) {
-            return [
-                'success' => false,
-                'error' => $data['message'] ?? $data['error'] ?? 'Unable to create template.',
-                'status' => $response->status(),
-                'raw' => $data,
             ];
+
+            $createResponse = $builderRequest->post("{$this->baseUrl}/emails/builder", $createPayload);
+            $createData = $createResponse->json();
+            if (! is_array($createData)) {
+                $createData = [];
+            }
+
+            if (! $createResponse->successful()) {
+                return [
+                    'success' => false,
+                    'error' => $this->extractApiErrorMessage($createData, 'Unable to create template.'),
+                    'status' => $createResponse->status(),
+                    'raw' => $createData,
+                ];
+            }
+
+            $templateId = (string) ($createData['id'] ?? $createData['_id'] ?? $createData['templateId'] ?? $createData['redirect'] ?? '');
+            $createdViaBuilder = true;
+            $lastData = $createData;
+            $lastStatus = $createResponse->status();
+
+            if ($templateId === '') {
+                return [
+                    'success' => false,
+                    'error' => 'Template was created, but no template id was returned.',
+                    'status' => $createResponse->status(),
+                    'raw' => $createData,
+                ];
+            }
         }
 
-        return ['success' => true, 'template' => $data['template'] ?? $data['data'] ?? $data, 'source' => '/emails/locations/{locationId}/templates', 'raw' => $data];
+        // Official Email Builder update-with-settings endpoint. GHL validates editorContent
+        // as a string on this endpoint for html templates, so do not send an array/object.
+        $updatePayloads = [
+            [
+                'locationId' => $locationId,
+                'updatedBy' => $updatedBy,
+                'name' => $name,
+                'title' => $name,
+                'subjectLine' => $subject,
+                'previewText' => $previewText,
+                'fromName' => $fromName,
+                'fromEmail' => $fromEmail,
+                'editorType' => 'html',
+                'editorContent' => $body,
+                'html' => $body,
+                'isPlainText' => false,
+                'archived' => false,
+            ],
+            [
+                'locationId' => $locationId,
+                'updatedBy' => $updatedBy,
+                'name' => $name,
+                'title' => $name,
+                'subjectLine' => $subject,
+                'previewText' => $previewText,
+                'fromName' => $fromName,
+                'fromEmail' => $fromEmail,
+                'editorType' => 'html',
+                'editorContent' => $body,
+                'html' => $body,
+                'isPlainText' => false,
+                'archived' => false,
+            ],
+        ];
+
+        foreach ($updatePayloads as $updatePayload) {
+            $response = $builderRequest->patch("{$this->baseUrl}/emails/builder/{$templateId}", $updatePayload);
+            $data = $response->json();
+            if (! is_array($data)) {
+                $data = [];
+            }
+
+            if ($response->successful()) {
+                $templateData = $data['template'] ?? $data['data'] ?? $data;
+                if (! is_array($templateData)) {
+                    $templateData = [];
+                }
+
+                return [
+                    'success' => true,
+                    'template' => array_merge($templateData, [
+                        'id' => $templateId,
+                        'name' => $name,
+                        'title' => $name,
+                        'subjectLine' => $subject,
+                        'previewText' => $previewText,
+                        'fromName' => $fromName,
+                        'fromEmail' => $fromEmail,
+                        'html' => $body,
+                        'body' => $body,
+                        'isPlainText' => false,
+                        'type' => 'html',
+                    ]),
+                    'source' => $createdViaBuilder ? '/emails/builder + /emails/builder/{templateId}' : '/emails/builder/{templateId}',
+                    'raw' => $data ?: $lastData,
+                ];
+            }
+
+            $lastError = $this->extractApiErrorMessage($data, $lastError);
+            $lastStatus = $response->status();
+            $lastData = $data;
+
+            // Do not continue retrying the same endpoint when auth/location is the actual issue.
+            if (in_array($response->status(), [401, 403, 404], true)) {
+                break;
+            }
+        }
+
+        return [
+            'success' => false,
+            'error' => $lastError,
+            'status' => $lastStatus,
+            'raw' => $lastData,
+        ];
+    }
+
+    private function extractApiErrorMessage(mixed $data, mixed $fallback = 'Request failed.'): string
+    {
+        if (is_string($data) && trim($data) !== '') {
+            return trim($data);
+        }
+
+        if (! is_array($data)) {
+            return is_string($fallback) ? $fallback : $this->stringifyApiError($fallback);
+        }
+
+        foreach (['message', 'error', 'title', 'detail'] as $key) {
+            $value = $data[$key] ?? null;
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+
+            if (is_array($value)) {
+                $message = $this->extractApiErrorMessage($value, '');
+                if ($message !== '') {
+                    return $message;
+                }
+            }
+        }
+
+        foreach ($data as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+
+            if (is_array($value)) {
+                $message = $this->extractApiErrorMessage($value, '');
+                if ($message !== '') {
+                    return $message;
+                }
+            }
+        }
+
+        return is_string($fallback) ? $fallback : $this->stringifyApiError($fallback);
+    }
+
+    private function stringifyApiError(mixed $value): string
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (is_scalar($value) || $value === null) {
+            return trim((string) $value);
+        }
+
+        if (is_array($value)) {
+            $message = $this->extractApiErrorMessage($value, '');
+            if ($message !== '') {
+                return $message;
+            }
+
+            $json = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            return is_string($json) && $json !== '' ? $json : 'Request failed.';
+        }
+
+        return 'Request failed.';
+    }
+
+    public function deleteEmailTemplateForUser(User $user, string $templateId): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+        $templateId = trim($templateId);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'error' => 'Missing recruiting data connection.'];
+        }
+
+        if ($templateId === '') {
+            return ['success' => false, 'error' => 'Choose a template first.'];
+        }
+
+        $attempts = [
+            "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}",
+            "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}",
+        ];
+
+        $lastError = 'Unable to delete template.';
+        $lastStatus = null;
+        $lastData = [];
+
+        foreach ($attempts as $url) {
+            $response = Http::withHeaders(['Version' => 'v3'])
+                ->timeout((int) config('ghl.timeout', 20))
+                ->withToken($token)
+                ->acceptJson()
+                ->delete($url);
+
+            $data = $response->json() ?? [];
+
+            if ($response->successful()) {
+                return ['success' => true, 'raw' => $data];
+            }
+
+            $lastError = $data['message'] ?? $data['error'] ?? $lastError;
+            $lastStatus = $response->status();
+            $lastData = $data;
+        }
+
+        return [
+            'success' => false,
+            'error' => $lastError,
+            'status' => $lastStatus,
+            'raw' => $lastData,
+        ];
     }
 
     public function createEmailCampaignForUser(User $user, array $payload): array

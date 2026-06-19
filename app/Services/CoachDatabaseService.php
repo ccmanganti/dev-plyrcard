@@ -822,12 +822,34 @@ class CoachDatabaseService
         return $this->goHighLevelService->scheduleEmailCampaignForUser($user, $campaignId, $scheduledTimestamp);
     }
 
-    public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body): array
+    public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body, string $previewText = ''): array
     {
         if (trim($name) === '' || trim($subject) === '' || trim($body) === '') {
-            return ['success' => false, 'error' => 'Template name, subject, and body are required.'];
+            return ['success' => false, 'error' => 'Template name, subject, and message are required.'];
         }
 
-        return $this->goHighLevelService->createEmailTemplateForUser($user, $name, $subject, $body);
+        return $this->goHighLevelService->createEmailTemplateForUser($user, $name, $subject, $body, $previewText);
+    }
+
+    public function updateEmailTemplateForUser(User $user, string $templateId, string $name, string $subject, string $body, string $previewText = ''): array
+    {
+        if (trim($templateId) === '') {
+            return ['success' => false, 'error' => 'Choose a template first.'];
+        }
+
+        if (trim($name) === '' || trim($subject) === '' || trim($body) === '') {
+            return ['success' => false, 'error' => 'Template name, subject, and message are required.'];
+        }
+
+        return $this->goHighLevelService->updateEmailTemplateForUser($user, $templateId, $name, $subject, $body, $previewText);
+    }
+
+    public function deleteEmailTemplateForUser(User $user, string $templateId): array
+    {
+        if (trim($templateId) === '') {
+            return ['success' => false, 'error' => 'Choose a template first.'];
+        }
+
+        return $this->goHighLevelService->deleteEmailTemplateForUser($user, $templateId);
     }
 }

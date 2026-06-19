@@ -7,10 +7,13 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\WithFileUploads;
 
 trait InteractsWithCoachDatabase
 {
+    use WithFileUploads;
     public array $lists = [];
     public array $stats = [];
     public array $topSchools = [];
@@ -58,7 +61,12 @@ trait InteractsWithCoachDatabase
     public string $templateName = '';
     public string $templateSubject = '';
     public string $templateBody = '';
+    public string $templatePreviewText = '';
+    public string $templateGraphicUrl = '';
+    public $templateGraphicUpload = null;
     public ?string $selectedTemplateId = null;
+    public bool $templateIsNew = true;
+    public bool $isSavingTemplate = false;
 
     public ?string $campaignTemplateId = null;
     public ?string $previewTemplateId = null;
@@ -901,41 +909,163 @@ trait InteractsWithCoachDatabase
     public function loadTemplates(): void
     {
         $result = app(CoachDatabaseService::class)->getEmailTemplatesForUser(Auth::user());
-        $this->templates = $result['templates'] ?? [];
+        $this->templates = collect($result['templates'] ?? [])
+            ->filter(fn ($template): bool => is_array($template) && filled($template['id'] ?? null) && filled($template['name'] ?? null))
+            ->values()
+            ->all();
         $this->templateSourceSummary = (string) ($result['source'] ?? '');
-        $this->templateSourceDebug = is_array($result['debug'] ?? null) ? $result['debug'] : [];
+        $this->templateSourceDebug = [];
 
         if (! ($result['success'] ?? false)) {
             $this->error = $result['error'] ?? 'Unable to load templates.';
-            Notification::make()->title('Recruiting Center')->body($this->error)->danger()->send();
+            Notification::make()->title('Recruiting Center')->body($this->templateErrorMessage($result, 'Unable to load templates.'))->danger()->send();
             return;
         }
 
         $this->error = null;
 
-        if ($this->previewTemplateId && ! collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->previewTemplateId)) {
-            $this->previewTemplateId = null;
+        if ($this->selectedTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->selectedTemplateId)) {
+            $this->selectTemplate($this->selectedTemplateId);
+            return;
         }
 
-        if (! $this->previewTemplateId && ! empty($this->templates[0]['id'])) {
-            $this->previewTemplateId = (string) $this->templates[0]['id'];
+        if ($this->templateIsNew) {
+            return;
         }
 
-        if ($this->previewTemplateId) {
-            $this->loadTemplateDetail($this->previewTemplateId);
+        if (! empty($this->templates[0]['id'])) {
+            $this->selectTemplate((string) $this->templates[0]['id']);
+            return;
         }
+
+        $this->newTemplate();
+    }
+
+    public function newTemplate(): void
+    {
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = true;
+        $this->templateName = '';
+        $this->templateSubject = '';
+        $this->templatePreviewText = '';
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->templateBody = '';
+    }
+
+    public function selectTemplate(string $templateId): void
+    {
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return;
+        }
+
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
+
+        if (! is_array($template)) {
+            return;
+        }
+
+        $this->selectedTemplateId = $templateId;
+        $this->previewTemplateId = $templateId;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = false;
+        $this->templateName = trim((string) ($template['name'] ?? 'Untitled Template')) ?: 'Untitled Template';
+        $this->templateSubject = $this->templateSubject($template);
+        $this->templatePreviewText = $this->templatePreviewText($template);
+        $templateHtml = $this->templateHtml($template);
+        $this->templateGraphicUrl = $this->extractFirstTemplateImageUrl($templateHtml);
+        $this->templateGraphicUpload = null;
+        $this->templateBody = $this->htmlToTemplateText($this->removeFirstTemplateImage($templateHtml));
     }
 
     public function createTemplate(): void
     {
-        $result = app(CoachDatabaseService::class)->createEmailTemplateForUser(Auth::user(), $this->templateName, $this->templateSubject, $this->templateBody);
-        if (! ($result['success'] ?? false)) {
-            Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to create template.')->danger()->send();
+        $this->newTemplate();
+    }
+
+    public function saveTemplate(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
             return;
         }
-        $this->templateName = $this->templateSubject = $this->templateBody = '';
+
+        $name = trim($this->templateName);
+        $subject = trim($this->templateSubject);
+        $bodyText = trim($this->templateBody);
+
+        if ($name === '' || $subject === '' || $bodyText === '') {
+            Notification::make()->title('Templates')->body('Add a name, subject, and message.')->danger()->send();
+            return;
+        }
+
+        $this->isSavingTemplate = true;
+        $this->resolveTemplateGraphicUpload();
+        $html = $this->buildTemplateHtml($bodyText);
+
+        $result = ($this->selectedTemplateId && ! $this->templateIsNew)
+            ? app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $this->selectedTemplateId, $name, $subject, $html, $this->templatePreviewText)
+            : app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
+
+        $this->isSavingTemplate = false;
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()->title('Templates')->body($this->templateErrorMessage($result, 'Unable to save template.'))->danger()->send();
+            return;
+        }
+
+        $saved = $result['template'] ?? [];
+        if (is_array($saved)) {
+            $savedId = (string) ($saved['id'] ?? $saved['_id'] ?? $saved['templateId'] ?? $this->selectedTemplateId ?? '');
+            if ($savedId !== '') {
+                $this->selectedTemplateId = $savedId;
+                $this->templateIsNew = false;
+                $this->templateDetails[$savedId] = $this->mergeTemplateRecord($saved, [
+                    'id' => $savedId,
+                    'name' => $name,
+                    'subjectLine' => $subject,
+                    'previewText' => $this->templatePreviewText,
+                    'graphicUrl' => $this->templateGraphicUrl,
+                    'html' => $html,
+                    'body' => $html,
+                ]);
+            }
+        }
+
         $this->loadTemplates();
-        Notification::make()->title('Recruiting Center')->body('Template created.')->success()->send();
+        Notification::make()->title('Templates')->body('Template saved.')->success()->send();
+    }
+
+    public function deleteTemplate(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        if (! $this->selectedTemplateId || $this->templateIsNew) {
+            $this->newTemplate();
+            return;
+        }
+
+        $result = app(CoachDatabaseService::class)->deleteEmailTemplateForUser($user, $this->selectedTemplateId);
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()->title('Templates')->body($this->templateErrorMessage($result, 'Unable to delete template.'))->danger()->send();
+            return;
+        }
+
+        $this->selectedTemplateId = null;
+        $this->templateDetails = [];
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->loadTemplates();
+        Notification::make()->title('Templates')->body('Template deleted.')->success()->send();
     }
 
     public function loadTemplateDetail(string $templateId): ?array
@@ -959,7 +1089,7 @@ trait InteractsWithCoachDatabase
                 return $summary;
             }
 
-            Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to load template details.')->danger()->send();
+            Notification::make()->title('Templates')->body('Unable to open template.')->danger()->send();
             return null;
         }
 
@@ -979,192 +1109,266 @@ trait InteractsWithCoachDatabase
         return $detail;
     }
 
-    public function previewTemplate(string $templateId): void
+    public function insertTemplateVariable(string $token, string $field = 'body'): void
     {
-        $this->previewTemplateId = $templateId;
-        $this->loadTemplateDetail($templateId);
-    }
-
-    public function useTemplate(string $templateId): void
-    {
-        $template = $this->loadTemplateDetail($templateId)
-            ?: collect($this->templates)->firstWhere('id', $templateId);
-
-        if (! is_array($template)) {
-            return;
-        }
-
-        $subject = $this->templateSubject($template);
-        $body = $this->templateHtml($template);
-
-        if ($subject === '') {
-            $subject = (string) ($template['name'] ?? 'Recruiting Email');
-        }
-
-        if ($body === '') {
-            $body = '';
-        }
-
-        $this->selectedTemplateId = $templateId;
-        $this->campaignTemplateId = $templateId;
-        $this->previewTemplateId = $templateId;
-        $this->emailSubject = $subject;
-        $this->emailBody = $body;
-        $this->campaignName = (string) ($template['name'] ?? 'Recruiting Campaign');
-        $this->campaignSubject = $subject;
-        $this->campaignPreviewText = $this->templatePreviewText($template);
-        // Full builder/design templates can be very large HTML documents.
-        // Keep that HTML available for preview/sending through previewTemplateHtml,
-        // but do not put it into the visible message textarea.
-        $this->campaignOriginalHtml = $body;
-        $this->campaignTemplateIsDesign = $this->isDesignedTemplateHtml($body);
-        $this->campaignEditableBlocks = [];
-        // Keep the full template HTML intact. The visual iframe editor updates only
-        // the text/image content inside this HTML and syncs the updated full HTML
-        // back into campaignBody for preview/sending.
-        $this->campaignBody = $body;
-
-        Notification::make()->title('Recruiting Center')->body('Email selected.')->success()->send();
-    }
-
-    public function clearCampaignTemplate(): void
-    {
-        $this->campaignTemplateId = null;
-        $this->campaignName = '';
-        $this->campaignSubject = '';
-        $this->campaignPreviewText = '';
-        $this->campaignBody = '';
-        $this->campaignOriginalHtml = '';
-        $this->campaignTemplateIsDesign = false;
-        $this->campaignEditableBlocks = [];
-    }
-
-    public function updatedCampaignEditableBlocks(mixed $value = null, ?string $key = null): void
-    {
-        if (! $this->campaignTemplateIsDesign || trim($this->campaignOriginalHtml) === '') {
-            return;
-        }
-
-        $this->campaignBody = $this->rebuildTemplateHtmlFromEditableBlocks();
-    }
-
-    public function insertCampaignVariable(string $token, string $field = 'body'): void
-    {
-        $allowed = ['{{coach_name}}', '{{first_name}}', '{{last_name}}', '{{school}}', '{{email}}'];
         $token = trim($token);
 
-        if (! in_array($token, $allowed, true)) {
+        if (! $this->isAllowedTemplateToken($token)) {
             return;
         }
 
         if ($field === 'subject') {
-            $this->campaignSubject = trim($this->campaignSubject . ' ' . $token);
+            $this->templateSubject = $this->appendTokenOnce($this->templateSubject, $token);
             return;
         }
 
-        if ($this->campaignTemplateIsDesign) {
-            $this->campaignBody = $this->appendTokenToHtmlBody($this->campaignBody, $token);
+        if ($field === 'preview') {
+            $this->templatePreviewText = $this->appendTokenOnce($this->templatePreviewText, $token);
             return;
         }
 
-        $separator = trim($this->campaignBody) === '' ? '' : ' ';
-        $this->campaignBody .= $separator . $token;
+        $this->templateBody = $this->appendTokenOnce($this->templateBody, $token);
     }
 
-    public function updatedCampaignTargetMode(): void
+    public function removeTemplateGraphic(): void
     {
-        $this->campaignCoachIds = [];
-        $this->campaignListKey = '';
-        $this->campaignSchoolId = '';
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
     }
 
-    public function sendCampaign(): void
+    protected function isAllowedTemplateToken(string $token): bool
     {
-        $user = Auth::user();
-        if (! $user) {
-            return;
+        return in_array($token, [
+            '{{CoachFirstName}}', '{{CoachLastName}}', '{{CoachName}}', '{{SchoolName}}', '{{CoachTitle}}',
+            '{{AthleteName}}', '{{GraduationYear}}', '{{Position}}', '{{ClubTeam}}', '{{GPA}}',
+            '{{HighlightLink}}', '{{ProfileLink}}',
+        ], true);
+    }
+
+    protected function appendTokenOnce(string $value, string $token): string
+    {
+        $value = rtrim($value);
+
+        if (str_ends_with($value, $token)) {
+            return $value;
         }
 
-        if ($this->campaignTemplateId && (trim($this->campaignSubject) === '' || trim($this->campaignBody) === '')) {
-            $this->useTemplate($this->campaignTemplateId);
+        return $value . ($value === '' ? '' : ' ') . $token;
+    }
+
+    public function getRenderedTemplateSubjectProperty(): string
+    {
+        return $this->replaceTemplateTokens($this->templateSubject);
+    }
+
+    public function getRenderedTemplatePreviewTextProperty(): string
+    {
+        return $this->replaceTemplateTokens($this->templatePreviewText);
+    }
+
+    public function getRenderedTemplateBodyProperty(): string
+    {
+        return $this->renderTemplateHtmlForPreview($this->buildTemplateHtml($this->templateBody));
+    }
+
+    protected function replaceTemplateTokens(string $value): string
+    {
+        $samples = [
+            '{{CoachFirstName}}' => 'Stephens',
+            '{{CoachLastName}}' => 'Salas',
+            '{{CoachName}}' => 'Stephens Salas',
+            '{{SchoolName}}' => 'Abilene Christian University',
+            '{{CoachTitle}}' => 'Head Coach',
+            '{{AthleteName}}' => (string) (Auth::user()?->name ?? 'Alex Johnson'),
+            '{{GraduationYear}}' => '2027',
+            '{{Position}}' => 'Center Back',
+            '{{ClubTeam}}' => 'Baltimore Celtic ECNL',
+            '{{GPA}}' => '4.0',
+            '{{HighlightLink}}' => 'https://plyrcard.com/highlights',
+            '{{ProfileLink}}' => 'https://plyrcard.com/profile',
+        ];
+
+        return strtr($value, $samples);
+    }
+
+    protected function templateErrorMessage(array $result, string $fallback): string
+    {
+        $error = $result['error'] ?? $result['message'] ?? $result['raw']['message'] ?? $result['raw']['error'] ?? null;
+
+        if (is_string($error) && trim($error) !== '') {
+            return trim($error);
         }
 
-        $subject = trim($this->campaignSubject);
-        $body = trim($this->campaignBody);
-        if ($body === '' && $this->campaignTemplateIsDesign) {
-            $body = trim($this->campaignOriginalHtml);
-            $this->campaignBody = $body;
-        }
+        if (is_array($error)) {
+            $flattened = collect($error)
+                ->flatten()
+                ->filter(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '')
+                ->map(fn ($value): string => trim((string) $value))
+                ->unique()
+                ->values()
+                ->all();
 
-        if ($subject === '' || $body === '') {
-            Notification::make()->title('Recruiting Center')->body('Choose a template before creating a campaign.')->danger()->send();
-            return;
-        }
-
-        $recipients = $this->campaignRecipientCoaches();
-
-        if ($recipients->isEmpty()) {
-            Notification::make()->title('Recruiting Center')->body('No coaches with email matched this campaign target.')->danger()->send();
-            return;
-        }
-
-        $limit = (int) config('ghl.coach_database.campaign_send_limit', 250);
-        if ($recipients->count() > $limit) {
-            Notification::make()->title('Recruiting Center')->body('This campaign has ' . number_format($recipients->count()) . ' recipients. The current safety limit is ' . number_format($limit) . '. Narrow the target or raise ghl.coach_database.campaign_send_limit.')->danger()->send();
-            return;
-        }
-
-        $this->isSendingCampaign = true;
-
-        $campaignResult = app(CoachDatabaseService::class)->createEmailCampaignForUser($user, [
-            'name' => $this->campaignName !== '' ? $this->campaignName : ('PLYRCard Recruiting Campaign - ' . now()->format('M j, Y g:i A')),
-            'subjectLine' => $subject,
-            'previewText' => $this->campaignPreviewText,
-            'fromName' => (string) ($this->previewTemplate['fromName'] ?? $user->name ?? 'PLYRCard'),
-            'fromEmail' => (string) ($this->previewTemplate['fromEmail'] ?? ''),
-            'html' => $body,
-        ]);
-
-        if (! ($campaignResult['success'] ?? false)) {
-            $this->isSendingCampaign = false;
-            Notification::make()->title('Recruiting Center')->body($campaignResult['error'] ?? 'Unable to create campaign.')->danger()->send();
-            return;
-        }
-
-        $sent = 0;
-        $failed = 0;
-
-        foreach ($recipients as $coach) {
-            $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
-            $personalizedBody = $this->replaceCampaignTokens($body, $coach);
-
-            $payload = [
-                'contact_id' => (string) ($coach['id'] ?? ''),
-                'contactId' => (string) ($coach['id'] ?? ''),
-                'subject' => $personalizedSubject,
-                'body' => $personalizedBody,
-                'html' => $personalizedBody,
-                'text' => trim(strip_tags($personalizedBody)),
-                'to' => (string) ($coach['email'] ?? ''),
-                'emailTo' => (string) ($coach['email'] ?? ''),
-                'fromName' => (string) ($user->name ?? 'PLYRCard'),
-            ];
-
-            $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
-            if ($result['success'] ?? false) {
-                $sent++;
-            } else {
-                $failed++;
+            if (! empty($flattened)) {
+                return implode(' ', array_slice($flattened, 0, 3));
             }
         }
 
-        $this->isSendingCampaign = false;
+        $raw = $result['raw'] ?? null;
+        if (is_array($raw)) {
+            foreach (['message', 'error', 'errors', 'details'] as $key) {
+                if (! array_key_exists($key, $raw)) {
+                    continue;
+                }
 
-        $campaignId = (string) ($campaignResult['campaign_id'] ?? '');
-        $bodyText = 'Campaign created' . ($campaignId !== '' ? ' #' . $campaignId : '') . ' and sent to ' . number_format($sent) . ' coach' . ($sent === 1 ? '' : 'es') . ($failed ? '. Failed: ' . number_format($failed) . '.' : '.');
+                $value = $raw[$key];
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
 
-        $notification = Notification::make()->title('Recruiting Center')->body($bodyText);
-        ($failed ? $notification->warning() : $notification->success())->send();
+                if (is_array($value)) {
+                    $flattened = collect($value)
+                        ->flatten()
+                        ->filter(fn ($item): bool => is_scalar($item) && trim((string) $item) !== '')
+                        ->map(fn ($item): string => trim((string) $item))
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    if (! empty($flattened)) {
+                        return implode(' ', array_slice($flattened, 0, 3));
+                    }
+                }
+            }
+        }
+
+        return $fallback;
+    }
+
+    protected function buildTemplateHtml(string $text): string
+    {
+        $body = $this->templateTextToHtml($text);
+        $graphicUrl = trim($this->templateGraphicUrl);
+
+        if ($graphicUrl === '') {
+            return $body;
+        }
+
+        return '<p style="margin:0 0 16px;text-align:center"><img src="' . e($graphicUrl) . '" alt="Email graphic" style="max-width:100%;height:auto;border:0;border-radius:12px"></p>' . "\n" . $body;
+    }
+
+    protected function renderTemplateHtmlForPreview(string $html): string
+    {
+        return $this->replaceTemplateTokens($html);
+    }
+
+    protected function resolveTemplateGraphicUpload(): void
+    {
+        if (! $this->templateGraphicUpload) {
+            return;
+        }
+
+        try {
+            $path = $this->templateGraphicUpload->store('recruiting-template-graphics', 'public');
+            $this->templateGraphicUrl = Storage::disk('public')->url($path);
+            $this->templateGraphicUpload = null;
+        } catch (\Throwable $e) {
+            Notification::make()->title('Templates')->body('Unable to upload graphic.')->danger()->send();
+        }
+    }
+
+    protected function templateTextToHtml(string $text): string
+    {
+        $paragraphs = preg_split('/\R{2,}/', trim($text)) ?: [];
+
+        return collect($paragraphs)
+            ->map(function (string $paragraph): string {
+                $paragraph = trim($paragraph);
+                if ($paragraph === '') {
+                    return '';
+                }
+
+                return '<p>' . nl2br(e($paragraph), false) . '</p>';
+            })
+            ->filter()
+            ->implode("\n");
+    }
+
+    protected function htmlToTemplateText(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('/<!--.*?-->/s', '', $html) ?? $html;
+        $html = preg_replace('/<\s*(script|style|head|title|meta|link|svg|noscript)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/<\s*img\b[^>]*>/i', '', $html) ?? $html;
+        $html = preg_replace('/<\s*(br|hr)\s*\/?\s*>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\s*\/\s*(p|div|tr|table|section|article|h1|h2|h3|h4|h5|h6)\s*>/i', "\n\n", $html) ?? $html;
+        $html = preg_replace('/<\s*\/\s*li\s*>/i', "\n", $html) ?? $html;
+
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        if ($loaded) {
+            foreach (['script', 'style', 'head', 'title', 'meta', 'link', 'svg', 'noscript', 'img'] as $tag) {
+                while (($nodes = $dom->getElementsByTagName($tag))->length > 0) {
+                    $node = $nodes->item(0);
+                    $node?->parentNode?->removeChild($node);
+                }
+            }
+
+            $body = $dom->getElementsByTagName('body')->item(0);
+            $text = $body ? $body->textContent : $dom->textContent;
+        } else {
+            $text = strip_tags($html);
+        }
+
+        $text = html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $lines = preg_split('/\R+/', $text) ?: [];
+        $lines = collect($lines)
+            ->map(fn (string $line): string => trim(preg_replace('/[ \t]+/', ' ', $line) ?? $line))
+            ->filter(function (string $line): bool {
+                if ($line === '') {
+                    return false;
+                }
+
+                if (preg_match('/^(view this email|unsubscribe|manage preferences|powered by)/i', $line)) {
+                    return false;
+                }
+
+                if (preg_match('/^[a-f0-9]{16,}$/i', $line)) {
+                    return false;
+                }
+
+                if (preg_match('/^(https?:\/\/|data:image\/)/i', $line)) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values()
+            ->all();
+
+        return trim(implode("\n", $lines));
+    }
+
+    protected function extractFirstTemplateImageUrl(string $html): string
+    {
+        if (preg_match('/<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>/i', $html, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        return '';
+    }
+
+    protected function removeFirstTemplateImage(string $html): string
+    {
+        return preg_replace('/<p[^>]*>\s*<img\b[^>]*>\s*<\/p>/i', '', $html, 1)
+            ?? preg_replace('/<img\b[^>]*>/i', '', $html, 1)
+            ?? $html;
     }
 
     protected function mergeTemplateRecord(array $base, array $detail): array
@@ -1815,10 +2019,20 @@ trait InteractsWithCoachDatabase
 
     public function getCampaignEditablePreviewProperty(): string
     {
-        $html = trim($this->campaignBody) !== '' ? $this->campaignBody : $this->campaignOriginalHtml;
+        // The editor should always be the rendered email template itself when one is selected.
+        // Never fall back to a plain "Start typing" box while a template body exists elsewhere.
+        $html = trim($this->campaignBody);
 
         if ($html === '') {
-            $html = '<p>Start typing your message.</p>';
+            $html = trim($this->campaignOriginalHtml);
+        }
+
+        if ($html === '') {
+            $html = trim($this->previewTemplateHtml);
+        }
+
+        if ($html === '') {
+            $html = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#fff;color:#111827;font-family:Arial,sans-serif}.empty{padding:32px;text-align:center;color:#6b7280}</style></head><body><div class="empty">Choose an email to edit.</div></body></html>';
         }
 
         $sampleCoach = $this->campaignRecipientCoaches()->first()
