@@ -7,20 +7,20 @@ use BackedEnum;
 use Filament\Pages\Page;
 use UnitEnum;
 
-class CoachDatabaseConversations extends Page
+class CoachDatabaseComposeEmail extends Page
 {
     use InteractsWithCoachDatabase;
 
-    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-inbox';
-    protected static ?string $navigationLabel = 'Inbox';
+    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-envelope';
+    protected static ?string $navigationLabel = 'Compose Email';
     protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
-    protected static ?string $title = 'Inbox';
-    protected static ?string $slug = 'coach-database/conversations';
-    protected static ?int $navigationSort = 18;
+    protected static ?string $title = 'Compose Email';
+    protected static ?string $slug = 'coach-database/compose-email';
+    protected static ?int $navigationSort = 17;
     protected string $view = 'filament.pages.coach-database';
 
     protected function coachDatabaseSection(): string
     {
-        return 'conversations';
+        return 'compose';
     }
 }

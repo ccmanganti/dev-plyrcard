@@ -757,17 +757,17 @@
 
         .rc-campaign-shell {
             display: grid;
-            grid-template-columns: minmax(245px, 300px) minmax(0, 1fr) minmax(360px, 460px);
-            gap: 1.15rem;
+            grid-template-columns: minmax(240px, 300px) minmax(420px, 1fr) minmax(360px, 460px);
+            gap: 1rem;
             align-items: start;
         }
 
         .rc-campaign-panel {
             position: relative;
-            border: 1px solid var(--rc-border);
-            border-radius: 1.15rem;
-            background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.025));
-            box-shadow: var(--rc-shadow);
+            border: 1px solid rgba(148, 163, 184, .16);
+            border-radius: 1.35rem;
+            background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.026));
+            box-shadow: 0 18px 48px rgba(0,0,0,.22);
             overflow: hidden;
             transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
         }
@@ -777,8 +777,8 @@
         }
 
         .rc-campaign-panel-header {
-            padding: 1rem 1rem .75rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .14);
+            padding: 1.05rem 1rem .85rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .12);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -802,10 +802,10 @@
             align-items: center;
             justify-content: space-between;
             gap: .75rem;
-            border: 1px solid rgba(148, 163, 184, .18);
-            border-radius: .95rem;
-            padding: .72rem;
-            background: rgba(255,255,255,.026);
+            border: 1px solid rgba(148, 163, 184, .14);
+            border-radius: 1rem;
+            padding: .78rem;
+            background: rgba(255,255,255,.032);
             transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
         }
 
@@ -818,10 +818,14 @@
         }
 
         .rc-template-item.is-selected {
-            border-color: rgba(255, 91, 50, .82);
-            background: linear-gradient(135deg, rgba(255, 91, 50, .18), rgba(255, 91, 50, .07));
-            box-shadow: inset 3px 0 0 rgba(255, 91, 50, .95), 0 14px 34px rgba(0,0,0,.2);
+            border-color: rgba(255, 91, 50, .9);
+            background: linear-gradient(135deg, rgba(255, 91, 50, .95), rgba(255, 91, 50, .72));
+            box-shadow: 0 16px 34px rgba(255, 91, 50, .16), 0 10px 28px rgba(0,0,0,.18);
         }
+        .rc-template-item.is-selected .rc-template-main strong,
+        .rc-template-item.is-selected .rc-template-main span,
+        .rc-template-item.is-selected .rc-template-icon { color:#fff; }
+        .rc-template-item.is-selected .rc-template-icon { background:rgba(255,255,255,.16); }
 
         .rc-template-icon {
             width: 2.15rem;
@@ -877,8 +881,23 @@
 
         .rc-campaign-compose {
             display: grid;
-            gap: .8rem;
+            gap: .82rem;
             padding: 1rem;
+        }
+        .rc-template-field-label {
+            display:block;
+            margin-bottom:.4rem;
+            color:rgba(203,213,225,.78);
+            font-size:.7rem;
+            text-transform:uppercase;
+            letter-spacing:.06em;
+            font-weight:800;
+        }
+        .rc-template-graphic-card {
+            padding:.85rem;
+            border:1px solid rgba(148,163,184,.16);
+            border-radius:1rem;
+            background:rgba(255,255,255,.024);
         }
 
         .rc-campaign-toolbar {
@@ -982,8 +1001,8 @@
             z-index: 5;
             display: grid;
             place-items: center;
-            background: rgba(3, 7, 18, .64);
-            backdrop-filter: blur(6px);
+            background: rgba(3, 7, 18, .28);
+            backdrop-filter: blur(1.5px);
             color: var(--rc-text);
             font-weight: 800;
         }
@@ -991,12 +1010,30 @@
         .rc-template-loading-card {
             display: inline-flex;
             align-items: center;
-            gap: .65rem;
-            border: 1px solid rgba(255, 91, 50, .25);
+            gap: .55rem;
+            border: 1px solid rgba(255, 91, 50, .22);
             border-radius: 999px;
-            padding: .65rem .9rem;
-            background: rgba(15, 23, 42, .86);
-            box-shadow: 0 18px 45px rgba(0,0,0,.32);
+            padding: .48rem .72rem;
+            background: rgba(15, 23, 42, .9);
+            box-shadow: 0 12px 32px rgba(0,0,0,.24);
+            font-size:.82rem;
+        }
+        .rc-preview-updating {
+            position:absolute;
+            top:.85rem;
+            right:.85rem;
+            z-index:4;
+            display:inline-flex;
+            align-items:center;
+            gap:.45rem;
+            border:1px solid rgba(148,163,184,.22);
+            background:rgba(255,255,255,.92);
+            color:#111827;
+            border-radius:999px;
+            padding:.42rem .65rem;
+            font-size:.78rem;
+            font-weight:800;
+            box-shadow:0 12px 28px rgba(15,23,42,.16);
         }
 
         .rc-skeleton {
@@ -1020,10 +1057,10 @@
         .rc-preview-card-soft {
             background: #f8fafc;
             color: #111827;
-            border-radius: 1.15rem;
+            border-radius: 1.25rem;
             overflow: hidden;
-            border: 1px solid rgba(148,163,184,.22);
-            box-shadow: 0 20px 55px rgba(0,0,0,.24);
+            border: 1px solid rgba(148,163,184,.18);
+            box-shadow: 0 18px 50px rgba(0,0,0,.20);
         }
 
         .rc-preview-content-font {
@@ -1191,6 +1228,55 @@
             .rc-coach-heading h3 { white-space: normal; }
             .rc-coach-actions .rc-btn-primary { flex: 1 1 auto; }
         }
+
+
+        /* v58 compact controls + inbox thread polish */
+        .rc-page-heading { display:grid; gap:.35rem; margin: .25rem 0 1.25rem; }
+        .rc-page-heading h1 { margin:0; font-size: clamp(1.55rem, 3vw, 2.15rem); line-height:1.05; font-weight:850; letter-spacing:-.04em; color:var(--rc-text); }
+        .rc-search-hero { display:flex; align-items:center; gap:.7rem; border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:.58rem .7rem; box-shadow: 0 10px 26px rgba(0,0,0,.10); }
+        .rc-search-hero svg { width:1.2rem; height:1.2rem; color:var(--rc-muted); flex:0 0 auto; }
+        .rc-search-hero input { flex:1; border:0 !important; background:transparent !important; box-shadow:none !important; min-height:2.35rem; font-size:.95rem; }
+        .rc-school-filter-box { display:grid; grid-template-columns: minmax(0,1fr) minmax(220px,.75fr) minmax(180px,.5fr); gap:1rem; align-items:end; margin-top:.85rem; padding:1rem; border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; }
+        .rc-filter-label { display:block; font-size:.72rem; letter-spacing:.09em; text-transform:uppercase; color:#9fb0c5; font-weight:750; margin-bottom:.55rem; }
+        .rc-chip-row { display:flex; flex-wrap:wrap; gap:.45rem; }
+        .rc-filter-chip { border:1px solid var(--rc-border); background:var(--rc-soft); color:#cbd5e1; border-radius:999px; padding:.52rem .78rem; font-size:.78rem; font-weight:700; transition:.15s ease; }
+        .rc-filter-chip:hover, .rc-filter-chip.is-active { border-color:var(--rc-accent); color:#fff; background:var(--rc-accent-soft); }
+        .rc-compose-compact-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:1rem; }
+        .rc-compose-summary { display:grid; gap:.65rem; }
+        .rc-recipient-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; }
+        .rc-recipient-tabs .rc-btn { padding:.62rem .55rem; font-size:.75rem; }
+        .rc-compact-panel { border:1px solid var(--rc-border); background:rgba(24,24,27,.65); border-radius:.9rem; padding:.8rem; }
+        .rc-details { border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); overflow:hidden; }
+        .rc-details summary { list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.78rem .9rem; font-weight:800; }
+        .rc-details summary::-webkit-details-marker { display:none; }
+        .rc-details-body { border-top:1px solid var(--rc-border); padding:.8rem; }
+        .rc-choice-list { display:grid; gap:.42rem; max-height:15rem; overflow:auto; padding-right:.2rem; }
+        .rc-choice-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.65rem; border:1px solid transparent; background:rgba(255,255,255,.025); border-radius:.75rem; padding:.6rem .7rem; text-align:left; transition:.15s ease; }
+        .rc-choice-row:hover, .rc-choice-row.is-selected { border-color:rgba(255,99,56,.55); background:rgba(255,99,56,.10); }
+        .rc-choice-title { font-weight:800; font-size:.86rem; color:var(--rc-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-choice-sub { color:var(--rc-muted); font-size:.74rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-icon-sm { width:1rem; height:1rem; }
+        .rc-loading-inline { display:inline-flex; align-items:center; gap:.35rem; color:var(--rc-muted); font-size:.75rem; }
+        .rc-inbox-layout { display:grid; grid-template-columns:minmax(320px,.42fr) minmax(0,1fr); gap:1rem; min-height:36rem; }
+        .rc-inbox-list { display:grid; gap:.5rem; max-height:38rem; overflow:auto; padding-right:.25rem; }
+        .rc-thread-card { width:100%; text-align:left; border:1px solid transparent; background:rgba(255,255,255,.025); border-radius:.9rem; padding:.72rem; display:grid; grid-template-columns:2.3rem minmax(0,1fr) auto; gap:.7rem; transition:.16s ease; }
+        .rc-thread-card:hover, .rc-thread-card.is-selected { border-color:rgba(255,99,56,.55); background:rgba(255,99,56,.12); }
+        .rc-avatar-mini { display:flex; align-items:center; justify-content:center; width:2.25rem; height:2.25rem; border-radius:.75rem; background:var(--rc-accent); color:white; font-weight:900; font-size:.8rem; }
+        .rc-thread-subject { color:var(--rc-text); font-weight:850; font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-thread-preview { color:var(--rc-muted); font-size:.76rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .rc-email-thread { min-height:34rem; display:flex; flex-direction:column; }
+        .rc-email-thread-head { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding-bottom:.9rem; border-bottom:1px solid var(--rc-border); }
+        .rc-message-list { display:grid; gap:.85rem; padding:1rem 0; flex:1; overflow:auto; }
+        .rc-email-message { border:1px solid var(--rc-border); background:rgba(255,255,255,.03); border-radius:1rem; padding:.9rem; max-width:82%; }
+        .rc-email-message.out { margin-left:auto; background:rgba(255,99,56,.16); border-color:rgba(255,99,56,.35); }
+        .rc-message-meta { display:flex; align-items:center; justify-content:space-between; gap:.65rem; margin-bottom:.55rem; color:var(--rc-muted); font-size:.72rem; }
+        .rc-message-body { color:var(--rc-text); line-height:1.55; font-size:.9rem; }
+        .rc-school-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:1rem; }
+        .rc-school-card { min-height:unset; padding:1rem; border-radius:1rem; transition:transform .15s ease, border-color .15s ease, background .15s ease; }
+        .rc-school-card:hover { transform:translateY(-2px); border-color:rgba(255,99,56,.5); }
+        .rc-school-actions .rc-btn { min-width:5rem; }
+        @media (max-width: 1100px) { .rc-compose-compact-grid,.rc-inbox-layout,.rc-school-filter-box { grid-template-columns:1fr; } .rc-recipient-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
     </style>
 
     <div
@@ -1244,16 +1330,56 @@
         @endif
 
         @if($section === 'schools')
-            <div class="rc-card rc-toolbar is-flat">
-                <input class="rc-input" placeholder="Search schools" wire:model.live.debounce.400ms="search" />
-                <select class="rc-select" wire:model.live="divisionFilter"><option value="">All divisions</option>@foreach($this->divisions as $division)<option value="{{ $division }}">{{ $division }}</option>@endforeach</select>
-                <select class="rc-select" wire:model.live="conferenceFilter"><option value="">All conferences</option>@foreach($this->conferences as $conference)<option value="{{ $conference }}">{{ $conference }}</option>@endforeach</select>
+            <div class="rc-page-heading">
+                <h1>Find schools</h1>
+                <div class="rc-subtle">Search {{ number_format($loadedSchoolsCount) }} women’s soccer programs by name, coach, division, or conference.</div>
             </div>
 
-            <div class="rc-card">
-                @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools])
-                @if($this->canLoadMoreSchools)<div style="margin-top:1rem"><button class="rc-btn" wire:click="loadMoreSchools">Load more</button></div>@endif
+            <div class="rc-search-hero">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+                <input class="rc-input" placeholder="Search school, coach, or conference..." wire:model.live.debounce.350ms="search" />
+                <button class="rc-btn" type="button" wire:click="clearSchoolFilters" wire:loading.attr="disabled" wire:target="clearSchoolFilters">
+                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v5l-4 3v-8L3 4Z" /></svg>
+                    Reset
+                </button>
             </div>
+
+            <div class="rc-school-filter-box">
+                <div>
+                    <span class="rc-filter-label">Division</span>
+                    <div class="rc-chip-row">
+                        @foreach(['NCAA D-I','NCAA D-II','NCAA D-III','NAIA','NJCAA'] as $division)
+                            <button type="button" class="rc-filter-chip {{ $divisionFilter === $division ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($division))">{{ $division }}</button>
+                        @endforeach
+                    </div>
+                </div>
+                <label>
+                    <span class="rc-filter-label">Conference</span>
+                    <select class="rc-select" style="width:100%" wire:model.live="conferenceFilter">
+                        <option value="">All conferences</option>
+                        @foreach($this->conferences as $conference)
+                            <option value="{{ $conference }}">{{ $conference }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>
+                    <span class="rc-filter-label">Sort</span>
+                    <select class="rc-select" style="width:100%" wire:model.live="sort">
+                        <option value="name">School A–Z</option>
+                        <option value="coach_count">Most coaches</option>
+                    </select>
+                </label>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.85rem 0 .25rem">
+                <div class="rc-subtle"><strong>{{ number_format($this->filteredSchoolsCount) }}</strong> schools</div>
+                <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
+            </div>
+
+            @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools])
+            @if($this->canLoadMoreSchools)
+                <div style="margin-top:1rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
+            @endif
         @endif
 
         @if($section === 'favorites')
@@ -1349,54 +1475,240 @@
         @endif
 
         @if($section === 'conversations')
-            <div class="rc-chat" wire:poll.12s.visible="pollConversationUpdates">
+            <div class="rc-page-heading">
+                <h1>Inbox</h1>
+                <div class="rc-subtle">Email threads from coaches. Filter by school when you need a focused view.</div>
+            </div>
+
+            <div class="rc-inbox-layout" wire:poll.12s.visible="pollConversationUpdates">
                 <div class="rc-card">
-                    <div class="rc-toolbar" style="margin-bottom:.75rem">
-                        <input class="rc-input" placeholder="Search conversations" wire:model.live.debounce.500ms="conversationSearch" />
-                        <button class="rc-btn rc-btn-primary" type="button" wire:click="startNewConversation">Start new</button>
+                    <div class="rc-toolbar" style="margin-bottom:.75rem;display:grid;grid-template-columns:1fr;gap:.55rem">
+                        <input class="rc-input" style="width:100%" placeholder="Search inbox" wire:model.live.debounce.500ms="conversationSearch" />
+                        <select class="rc-select" style="width:100%" wire:model.live="conversationSchoolFilter">
+                            <option value="">All schools</option>
+                            @foreach($this->conversationSchoolOptions as $schoolName)
+                                <option value="{{ $schoolName }}">{{ $schoolName }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    @if($showNewConversationComposer)
-                        <div class="rc-card is-flat" style="margin-bottom:.75rem">
-                            <div class="rc-section-title">Choose a coach</div>
-                            <input class="rc-input" style="width:100%;margin-bottom:.5rem" placeholder="Search coaches by name, school, or email" wire:model.live.debounce.300ms="newConversationCoachSearch" />
-                            <div class="rc-mini-list">
-                                @forelse($this->newConversationCoachResults as $coach)
-                                    <button type="button" class="rc-row rc-thread-button" wire:click="selectCoachForNewConversation('{{ $coach['id'] }}')">
-                                        <span><strong>{{ $coach['name'] }}</strong><br><span class="rc-subtle">{{ $coach['school'] ?? 'School unavailable' }} · {{ $coach['email'] }}</span></span>
-                                    </button>
-                                @empty
-                                    <div class="rc-subtle">No coaches with email found.</div>
-                                @endforelse
-                            </div>
-                        </div>
-                    @endif
-                    @forelse($conversations as $conversation)
-                        <button type="button" class="rc-row rc-thread-button" wire:click="selectConversation('{{ $conversation['id'] }}')" wire:loading.attr="disabled" wire:target="selectConversation('{{ $conversation['id'] }}')">
-                            <span><strong>{{ $conversation['contact_name'] }}</strong><br><span class="rc-subtle">{{ $conversation['last_message'] }}</span></span>
-                            <span class="rc-pill">{{ $conversation['status'] }}</span>
-                        </button>
-                    @empty
-                        <div class="rc-subtle">No conversations found.</div>
-                    @endforelse
-                </div>
-                <div class="rc-card">
-                    <div class="rc-thread">
-                        @forelse($messages as $message)
-                            <div class="rc-message {{ str_contains(strtolower($message['direction'] ?? ''), 'out') ? 'out' : '' }}">
-                                @if($message['subject'])<strong>{{ $message['subject'] }}</strong><br>@endif
-                                <div>{!! $message['body'] !!}</div>
-                                <div class="rc-subtle">{{ $message['status'] }} {{ $message['created_at'] }}</div>
-                            </div>
+
+                    <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationSchoolFilter" class="rc-loading-inline" style="margin-bottom:.65rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+
+                    <div class="rc-inbox-list">
+                        @forelse($this->filteredConversations as $conversation)
+                            @php
+                                $conversationId = (string) ($conversation['id'] ?? '');
+                                $contactName = (string) ($conversation['contact_name'] ?? $conversation['name'] ?? 'Coach');
+                                $initials = collect(explode(' ', $contactName))->filter()->map(fn($part) => substr($part,0,1))->take(2)->implode('');
+                                $lastMessage = strip_tags((string) ($conversation['last_message'] ?? $conversation['snippet'] ?? 'No preview available.'));
+                            @endphp
+                            <button type="button" class="rc-thread-card {{ $selectedConversationId === $conversationId ? 'is-selected' : '' }}" wire:click="selectConversation(@js($conversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($conversationId))">
+                                <span class="rc-avatar-mini">{{ strtoupper($initials ?: 'C') }}</span>
+                                <span style="min-width:0">
+                                    <span class="rc-thread-subject">{{ $contactName }}</span>
+                                    <span class="rc-choice-sub">{{ $conversation['school'] ?? $conversation['company_name'] ?? $conversation['email'] ?? 'School unavailable' }}</span>
+                                    <span class="rc-thread-preview">{{ $lastMessage }}</span>
+                                </span>
+                                <span style="display:grid;gap:.35rem;justify-items:end">
+                                    <span class="rc-subtle">{{ $conversation['updated_at'] ?? $conversation['last_message_at'] ?? '' }}</span>
+                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 6.75L2.25 6.75" /></svg>
+                                </span>
+                            </button>
                         @empty
-                            <div class="rc-subtle">Select a conversation to view emails.</div>
+                            <div class="rc-empty"><strong>No email threads found.</strong><span>Try another search or school filter.</span></div>
                         @endforelse
-                        @if($hasMoreMessages)
-                            <div style="margin-top:.75rem"><button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Load older emails</span><span wire:loading.flex wire:target="loadConversationMessages" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Loading</span></button></div>
+                    </div>
+                </div>
+
+                <div class="rc-card rc-email-thread">
+                    @php($selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null)
+                    <div class="rc-email-thread-head">
+                        <div>
+                            <div class="rc-title">{{ $selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? 'Email thread' }}</div>
+                            <div class="rc-subtle">{{ $selectedConversation['school'] ?? $selectedConversation['company_name'] ?? $selectedConversation['email'] ?? 'Select a thread to view emails' }}</div>
+                        </div>
+                        @if($selectedConversationId)
+                            <button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Refresh</span><span wire:loading.flex wire:target="loadConversationMessages" class="rc-loading-inline"><span class="rc-spinner-mini"></span></span></button>
                         @endif
                     </div>
+
+                    <div class="rc-message-list">
+                        @forelse($messages as $message)
+                            @php($isOut = str_contains(strtolower($message['direction'] ?? ''), 'out'))
+                            <article class="rc-email-message {{ $isOut ? 'out' : '' }}">
+                                <div class="rc-message-meta">
+                                    <span>{{ $isOut ? 'You' : ($selectedConversation['contact_name'] ?? 'Coach') }}</span>
+                                    <span>{{ $message['created_at'] ?? '' }}</span>
+                                </div>
+                                @if(!empty($message['subject']))<div class="rc-row-title" style="margin-bottom:.4rem">{{ $message['subject'] }}</div>@endif
+                                <div class="rc-message-body">{!! $message['body'] ?? '' !!}</div>
+                            </article>
+                        @empty
+                            <div class="rc-empty"><strong>Select a thread.</strong><span>Email messages will appear here.</span></div>
+                        @endforelse
+                    </div>
+
+                    @if($hasMoreMessages)
+                        <button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Load older emails</span><span wire:loading.flex wire:target="loadConversationMessages" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
+                    @endif
+
                     @if($selectedConversationId || $selectedCoachId)
                         @include('filament.partials.email-composer')
                     @endif
+                </div>
+            </div>
+        @endif
+
+
+        @if($section === 'compose')
+            <div class="rc-page-heading">
+                <h1>Compose email</h1>
+                <div class="rc-subtle">Choose recipients, start from a template, preview, then send.</div>
+            </div>
+
+            <div class="rc-compose-compact-grid">
+                <div class="rc-campaign-panel">
+                    <div class="rc-campaign-panel-header">
+                        <div>
+                            <div class="rc-section-title">Build email</div>
+                            <div class="rc-subtle">Recipient tools are tucked into compact dropdowns.</div>
+                        </div>
+                        <button class="rc-btn rc-btn-primary" type="button" wire:click="sendComposedEmail" wire:loading.attr="disabled" wire:target="sendComposedEmail">
+                            <span wire:loading.remove wire:target="sendComposedEmail">Send</span>
+                            <span wire:loading.flex wire:target="sendComposedEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                        </button>
+                    </div>
+
+                    <div class="rc-campaign-compose">
+                        <div class="rc-recipient-tabs">
+                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'list' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','list')">
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg> List
+                            </button>
+                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'school' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','school')">
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 3 8l9 5 9-5-9-5Zm0 10v8m-7-4 7 4 7-4" /></svg> School
+                            </button>
+                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'coaches' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','coaches')">
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19a6 6 0 0 0-12 0m12 0a6 6 0 0 1 6-6m-12-4a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm9 2a3 3 0 1 0 0-6" /></svg> Coaches
+                            </button>
+                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'all' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','all')">
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M5 7v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7" /></svg> All
+                            </button>
+                        </div>
+
+                        <div class="rc-compose-summary">
+                            @if($campaignTargetMode === 'list')
+                                <details class="rc-details" open>
+                                    <summary><span>Saved list</span><span class="rc-pill">{{ $this->composeSelectedList['label'] ?? 'Choose' }}</span></summary>
+                                    <div class="rc-details-body">
+                                        <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
+                                            <option value="">Select a list</option>
+                                            @foreach($lists as $list)
+                                                <option value="{{ $list['key'] ?? '' }}">{{ $list['label'] ?? 'List' }} ({{ number_format($list['coaches_count'] ?? $list['count'] ?? 0) }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </details>
+                            @endif
+
+                            @if($campaignTargetMode === 'school')
+                                <details class="rc-details" open>
+                                    <summary><span>School</span><span class="rc-pill">{{ collect($this->composeSchoolOptions)->firstWhere('id', $campaignSchoolId)['name'] ?? 'Choose' }}</span></summary>
+                                    <div class="rc-details-body">
+                                        <input class="rc-input" style="width:100%;margin-bottom:.55rem" placeholder="Search schools" wire:model.live.debounce.300ms="composeSchoolSearch" />
+                                        <div wire:loading.flex wire:target="composeSchoolSearch,selectComposeSchool" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Loading schools</div>
+                                        <div class="rc-choice-list">
+                                            @forelse($this->composeSchoolResults as $school)
+                                                @php($sid = (string) ($school['id'] ?? ''))
+                                                <button type="button" class="rc-choice-row {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))" wire:loading.attr="disabled" wire:target="selectComposeSchool(@js($sid))">
+                                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 3 8l9 5 9-5-9-5Z" /></svg>
+                                                    <span style="min-width:0"><span class="rc-choice-title">{{ $school['name'] ?? 'School' }}</span><span class="rc-choice-sub">{{ $school['conference'] ?? 'Conference unavailable' }} · {{ number_format($school['coach_count'] ?? 0) }} coaches</span></span>
+                                                    @if($campaignSchoolId === $sid)<span class="rc-pill rc-pill-accent">Selected</span>@endif
+                                                </button>
+                                            @empty
+                                                <div class="rc-subtle">No schools found.</div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                </details>
+                            @endif
+
+                            @if($campaignTargetMode === 'coaches')
+                                <details class="rc-details" open>
+                                    <summary><span>Coaches</span><span class="rc-pill">{{ count($campaignCoachIds) }} selected</span></summary>
+                                    <div class="rc-details-body">
+                                        <input class="rc-input" style="width:100%;margin-bottom:.55rem" placeholder="Search coaches" wire:model.live.debounce.300ms="campaignCoachSearch" />
+                                        <div wire:loading.flex wire:target="campaignCoachSearch" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Searching</div>
+                                        <div class="rc-choice-list">
+                                            @forelse($this->campaignCoachResults as $coach)
+                                                @php($coachId = (string) ($coach['id'] ?? ''))
+                                                <label class="rc-choice-row {{ in_array($coachId, $campaignCoachIds, true) ? 'is-selected' : '' }}">
+                                                    <input type="checkbox" value="{{ $coachId }}" wire:model.live="campaignCoachIds" />
+                                                    <span style="min-width:0"><span class="rc-choice-title">{{ $coach['name'] ?? 'Coach' }}</span><span class="rc-choice-sub">{{ $coach['school'] ?? 'School' }} · {{ $coach['email'] ?? '' }}</span></span>
+                                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75" /></svg>
+                                                </label>
+                                            @empty
+                                                <div class="rc-subtle">No coaches found.</div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                </details>
+                            @endif
+
+                            @if($campaignTargetMode === 'all')
+                                <div class="rc-compact-panel"><strong>All loaded coaches</strong><div class="rc-subtle">Every loaded coach with an email will receive this message.</div></div>
+                            @endif
+                        </div>
+
+                        <div class="rc-compact-panel">
+                            <div class="rc-template-field-label">Start from template</div>
+                            <select class="rc-select" style="width:100%;margin-top:.45rem" wire:model.live="campaignTemplateId" wire:change="useTemplateForCompose($event.target.value)">
+                                <option value="">No template</option>
+                                @foreach($templates as $template)
+                                    <option value="{{ $template['id'] ?? '' }}">{{ $template['name'] ?? 'Template' }}</option>
+                                @endforeach
+                            </select>
+                            <div wire:loading.flex wire:target="useTemplateForCompose,campaignTemplateId" class="rc-loading-inline" style="margin-top:.5rem"><span class="rc-spinner-mini"></span> Loading template</div>
+                        </div>
+
+                        <div class="rc-compact-panel">
+                            <div class="rc-subtle"><strong>{{ number_format($this->campaignRecipientCount) }}</strong> coaches will receive this email.</div>
+                        </div>
+
+                        <label>
+                            <span class="rc-template-field-label">Subject</span>
+                            <input class="rc-input" style="width:100%" placeholder="Subject" wire:model.live.debounce.650ms="campaignSubject" />
+                        </label>
+
+                        <div>
+                            <div class="rc-template-field-label">Message</div>
+                            <div class="rc-campaign-toolbar" style="margin-bottom:.55rem">
+                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{CoachFirstName}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Coach first</button>
+                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{SchoolName}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">School</button>
+                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{Position}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Position</button>
+                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{HighlightLink}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Highlight link</button>
+                            </div>
+                            <textarea id="composeBodyEditor" class="rc-input" style="width:100%;min-height:17rem;line-height:1.6;resize:vertical" placeholder="Write your message..." wire:model.live.debounce.800ms="campaignBody"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rc-campaign-panel">
+                    <div class="rc-campaign-panel-header">
+                        <div>
+                            <div class="rc-section-title">Preview</div>
+                            <div class="rc-subtle">Personalized for a sample coach.</div>
+                        </div>
+                    </div>
+                    <div wire:loading.flex wire:target="campaignSubject,campaignBody,campaignTemplateId,campaignListKey,campaignSchoolId,campaignCoachIds,campaignCoachSearch,composeSchoolSearch" class="rc-loading-inline" style="margin-bottom:.65rem"><span class="rc-spinner-mini"></span> Updating preview</div>
+                    <div class="rc-preview-card-soft" style="overflow:hidden">
+                        <div style="padding:1rem 1.15rem;border-bottom:1px solid #e5e7eb;background:#fff">
+                            <div style="font-size:.76rem;color:#64748b;margin-bottom:.45rem">To: {{ $this->composePreviewCoach['name'] ?? 'Coach' }} · {{ $this->composePreviewCoach['school'] ?? 'School' }}</div>
+                            <h3 style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:1.2rem;line-height:1.38;color:#111827;font-weight:800">{{ $this->composeRenderedSubject }}</h3>
+                        </div>
+                        <div style="padding:1.35rem;font-family:Arial,Helvetica,sans-serif;font-size:.98rem;line-height:1.7;min-height:32rem;background:#fff;color:#111827">
+                            {!! $this->composeRenderedBody !!}
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif
@@ -1406,7 +1718,7 @@
                 <div class="rc-campaign-panel">
                     <div class="rc-campaign-panel-header">
                         <div>
-                            <div class="rc-section-title">Templates</div>
+                            <div class="rc-section-title">Email templates</div>
                             <div class="rc-subtle">{{ count($templates) }} saved</div>
                         </div>
                         <div style="display:flex;gap:.5rem;align-items:center">
@@ -1441,7 +1753,7 @@
                     <div class="rc-campaign-panel-header">
                         <div>
                             <div class="rc-section-title">Edit template</div>
-                            <div class="rc-subtle">Subject and message only.</div>
+                            <div class="rc-subtle">Write once. Reuse anytime.</div>
                         </div>
                         <div style="display:flex;gap:.5rem;align-items:center">
                             @if($selectedTemplateId && ! $templateIsNew)
@@ -1462,22 +1774,22 @@
                         @endif
 
                         <label>
-                            <span class="rc-subtle" style="display:block;margin-bottom:.35rem">Template name</span>
+                            <span class="rc-template-field-label">Template name</span>
                             <input class="rc-input" style="width:100%" placeholder="Intro Email" wire:model.live.debounce.650ms="templateName" />
                         </label>
 
                         <label>
-                            <span class="rc-subtle" style="display:block;margin-bottom:.35rem">Subject line</span>
+                            <span class="rc-template-field-label">Subject line</span>
                             <input class="rc-input" style="width:100%" placeholder="{{ '{' }}{{ '{' }}GraduationYear{{ '}' }}{{ '}' }} {{ '{' }}{{ '{' }}Position{{ '}' }}{{ '}' }} — Interested in {{ '{' }}{{ '{' }}SchoolName{{ '}' }}{{ '}' }}" wire:model.live.debounce.650ms="templateSubject" />
                         </label>
 
                         <label>
-                            <span class="rc-subtle" style="display:block;margin-bottom:.35rem">Preview text</span>
+                            <span class="rc-template-field-label">Preview text</span>
                             <input class="rc-input" style="width:100%" placeholder="Short inbox preview" wire:model.live.debounce.650ms="templatePreviewText" />
                         </label>
 
                         <div>
-                            <div class="rc-subtle" style="margin-bottom:.45rem">Add values</div>
+                            <div class="rc-template-field-label">Add values</div>
                             <div class="rc-campaign-toolbar">
                                 <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{CoachFirstName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Coach first</button>
                                 <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{CoachLastName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Coach last</button>
@@ -1490,9 +1802,9 @@
                             </div>
                         </div>
 
-                        <div class="rc-card is-flat" style="padding:1rem">
-                            <div class="rc-section-title" style="margin-bottom:.5rem">Top graphic</div>
-                            <div class="rc-subtle" style="margin-bottom:.75rem">Optional. One image appears above the message.</div>
+                        <div class="rc-template-graphic-card">
+                            <div class="rc-template-field-label" style="margin-bottom:.5rem">Top graphic</div>
+                            <div class="rc-subtle" style="margin-bottom:.75rem">Optional image above the message.</div>
                             @if($templateGraphicUrl)
                                 <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
                                     <img src="{{ $templateGraphicUrl }}" alt="Template graphic" style="width:5rem;height:5rem;object-fit:cover;border-radius:.75rem;border:1px solid rgba(148,163,184,.25)">
@@ -1505,7 +1817,7 @@
                         </div>
 
                         <label>
-                            <span class="rc-subtle" style="display:block;margin-bottom:.35rem">Message</span>
+                            <span class="rc-template-field-label">Message</span>
                             <textarea x-ref="body" class="rc-input" style="width:100%;min-height:30rem;line-height:1.6;resize:vertical" placeholder="Write your template message here..." wire:model.live.debounce.800ms="templateBody"></textarea>
                         </label>
                     </div>
@@ -1515,13 +1827,13 @@
                     <div class="rc-campaign-panel-header">
                         <div>
                             <div class="rc-section-title">Live preview</div>
-                            <div class="rc-subtle">Sample coach view.</div>
+                            <div class="rc-subtle">Sample coach view</div>
                         </div>
                     </div>
 
                     <div class="rc-preview-card-soft rc-preview-content-font" style="position:relative">
-                        <div wire:loading.flex wire:target="templateName,templateSubject,templatePreviewText,templateBody,templateGraphicUrl,templateGraphicUpload" class="rc-template-loading-overlay" style="background:rgba(248,250,252,.72);color:#111827;backdrop-filter:blur(3px)">
-                            <div class="rc-template-loading-card" style="background:#fff;color:#111827;border-color:rgba(148,163,184,.3)"><span class="rc-spinner-mini"></span><span>Updating preview</span></div>
+                        <div wire:loading.flex wire:target="templateName,templateSubject,templatePreviewText,templateBody,templateGraphicUrl,templateGraphicUpload" class="rc-preview-updating">
+                            <span class="rc-spinner-mini"></span><span>Updating</span>
                         </div>
                         <div style="padding:1rem 1.15rem;border-bottom:1px solid #e5e7eb;background:#fff">
                             <div style="font-size:.76rem;color:#64748b;margin-bottom:.45rem">To: Stephens Salas • Abilene Christian University</div>
