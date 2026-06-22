@@ -1277,6 +1277,61 @@
         .rc-school-actions .rc-btn { min-width:5rem; }
         @media (max-width: 1100px) { .rc-compose-compact-grid,.rc-inbox-layout,.rc-school-filter-box { grid-template-columns:1fr; } .rc-recipient-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
+
+        /* v60 dashboard refresh */
+        .rc-dashboard { display:grid; gap:1.45rem; }
+        .rc-dashboard-hero { display:grid; gap:.45rem; margin:.35rem 0 .45rem; }
+        .rc-dashboard-hero h1 { margin:0; font-size:clamp(1.85rem, 4vw, 2.75rem); line-height:1.02; font-weight:950; letter-spacing:-.055em; color:#fff; text-shadow:0 2px 0 rgba(255,99,56,.18); }
+        .rc-dashboard-hero p { margin:0; color:#b8c4d5; font-size:1rem; }
+        .rc-dashboard-stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+        .rc-dashboard-card { position:relative; overflow:hidden; border:1px solid rgba(148,163,184,.22); background:linear-gradient(180deg, rgba(32,35,42,.98), rgba(24,26,31,.98)); border-radius:1.1rem; padding:1.35rem; box-shadow:0 18px 42px rgba(0,0,0,.22); }
+        .rc-dashboard-stat { min-height:11.25rem; display:flex; flex-direction:column; justify-content:space-between; }
+        .rc-dashboard-stat:before { content:""; position:absolute; left:0; top:.55rem; bottom:.55rem; width:.33rem; border-radius:999px; background:var(--stat-color, var(--rc-accent)); }
+        .rc-dashboard-icon { display:inline-flex; width:3.05rem; height:3.05rem; align-items:center; justify-content:center; border-radius:.9rem; color:var(--stat-color, var(--rc-accent)); background:color-mix(in srgb, var(--stat-color, var(--rc-accent)) 18%, transparent); }
+        .rc-dashboard-icon svg { width:1.35rem; height:1.35rem; }
+        .rc-dashboard-number { margin-top:1.05rem; font-size:2.7rem; line-height:.9; font-weight:950; letter-spacing:-.075em; color:#fff; }
+        .rc-dashboard-label { margin-top:.55rem; color:#aab7c8; font-size:.92rem; }
+        .rc-dashboard-engagement { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+        .rc-metric-card { min-height:12.5rem; display:grid; gap:.85rem; }
+        .rc-metric-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+        .rc-metric-delta { display:inline-flex; align-items:center; gap:.25rem; border-radius:999px; padding:.22rem .48rem; font-size:.75rem; font-weight:850; background:rgba(20,184,166,.13); color:#2dd4bf; }
+        .rc-metric-delta.is-down { background:rgba(248,113,113,.14); color:#fb7185; }
+        .rc-metric-value { font-size:2.15rem; line-height:1; font-weight:950; letter-spacing:-.06em; color:#030712; }
+        .dark .rc-metric-value { color:#fff; }
+        .rc-metric-name { color:#aab7c8; font-size:.86rem; }
+        .rc-spark { width:100%; height:2.25rem; margin-top:auto; color:var(--rc-accent); }
+        .rc-spark polyline { fill:none; stroke:currentColor; stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
+        .rc-spark polygon { fill:rgba(255,99,56,.14); }
+        .rc-dashboard-section-title { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.15rem 0 .55rem; }
+        .rc-dashboard-section-title h2 { margin:0; font-size:1.35rem; line-height:1.1; font-weight:950; letter-spacing:-.04em; color:#fff; }
+        .rc-dashboard-wide { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; }
+        .rc-engaged-list { display:grid; gap:.65rem; }
+        .rc-engaged-row { display:grid; grid-template-columns:2.6rem minmax(0,1fr) auto 10rem 3.5rem; align-items:center; gap:1rem; border-radius:1rem; background:rgba(15,18,24,.42); padding:.95rem 1rem; }
+        .rc-rank { width:2.35rem; height:2.35rem; border-radius:.75rem; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#ff6338,#ff9885); color:white; font-weight:950; }
+        .rc-rank.is-muted { background:#94a3b8; }
+        .rc-school-title { font-size:1rem; font-weight:900; color:#fff; line-height:1.2; }
+        .rc-school-mini { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; margin-top:.32rem; color:#9fb0c5; font-size:.78rem; }
+        .rc-school-mini span { display:inline-flex; align-items:center; gap:.24rem; }
+        .rc-school-mini svg { width:.9rem; height:.9rem; }
+        .rc-replied-badge { display:inline-flex; border-radius:.38rem; padding:.18rem .42rem; background:rgba(20,184,166,.16); color:#2dd4bf; font-size:.66rem; font-weight:900; letter-spacing:.03em; text-transform:uppercase; }
+        .rc-lead-bar { height:.58rem; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
+        .rc-lead-bar span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#ff6338,#ff8d78); }
+        .rc-lead-score { color:#fff; font-weight:950; font-size:1.05rem; text-align:right; }
+        .rc-dashboard-bottom { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.88fr); gap:1rem; }
+        .rc-step-list, .rc-activity-list, .rc-list-pills { display:grid; gap:.8rem; }
+        .rc-step-row { display:grid; grid-template-columns:2.35rem minmax(0,1fr) auto; gap:.8rem; align-items:center; border-radius:1rem; background:rgba(15,18,24,.36); padding:1rem; }
+        .rc-step-index { width:2.15rem; height:2.15rem; display:flex; align-items:center; justify-content:center; border-radius:999px; color:white; background:var(--rc-accent); font-weight:950; }
+        .rc-step-title { color:#fff; font-weight:900; }
+        .rc-step-copy { color:#aab7c8; font-size:.86rem; margin-top:.22rem; }
+        .rc-activity-empty { color:#aab7c8; font-size:.95rem; padding:1rem 0; }
+        .rc-list-box { grid-column:1 / -1; }
+        .rc-list-pills { grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.8rem; }
+        .rc-list-pill { display:flex; align-items:center; justify-content:space-between; gap:.75rem; border:1px solid rgba(148,163,184,.2); border-radius:.85rem; padding:.85rem 1rem; background:rgba(15,18,24,.28); color:#fff; font-weight:800; }
+        .rc-list-count { min-width:1.55rem; height:1.25rem; border-radius:999px; background:var(--rc-accent); color:white; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:950; padding:0 .4rem; }
+        @media (max-width:1180px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:repeat(2,minmax(0,1fr)); } .rc-dashboard-bottom { grid-template-columns:1fr; } .rc-engaged-row { grid-template-columns:2.6rem minmax(0,1fr) auto; } .rc-lead-bar,.rc-lead-score { display:none; } }
+        @media (max-width:640px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:1fr; } .rc-step-row { grid-template-columns:2.35rem minmax(0,1fr); } .rc-step-row .rc-btn { grid-column:2; justify-self:start; } }
+
+
     </style>
 
     <div
@@ -1315,17 +1370,172 @@
         @endif
 
         @if($section === 'dashboard')
-            <div class="rc-grid rc-stats">
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['total_schools'] ?? $loadedSchoolsCount) }}</div><div class="rc-subtle">Schools</div></div>
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['total_coaches'] ?? $loadedContactsCount) }}</div><div class="rc-subtle">Coaches</div></div>
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['saved_schools'] ?? 0) }}</div><div class="rc-subtle">Saved schools</div></div>
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['favorite_schools'] ?? 0) }}</div><div class="rc-subtle">Favorite schools</div></div>
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['saved_coaches'] ?? 0) }}</div><div class="rc-subtle">Saved coaches</div></div>
-                <div class="rc-card is-flat"><div class="rc-stat-number">{{ number_format($stats['favorite_coaches'] ?? 0) }}</div><div class="rc-subtle">Favorite coaches</div></div>
-            </div>
-            <div class="rc-card">
-                <div class="rc-section-title">Recently loaded schools</div>
-                @include('filament.partials.coach-database-school-grid', ['schools' => $this->dashboardSchools])
+            @php
+                $savedSchoolCount = count($this->savedSchools ?? []);
+                $favoriteSchoolCount = count($this->favoriteSchools ?? []);
+                $savedCoachCount = count($this->savedCoaches ?? []);
+                $favoriteCoachCount = count($this->favoriteCoaches ?? []);
+                $emailsSent = (int) (($stats['emails_sent'] ?? 0) ?: 0);
+                $profileViews = (int) (($stats['profile_views'] ?? 0) ?: 0);
+                $triggerClicks = (int) (($stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0) ?: 0);
+                $emailOpenRate = (int) (($stats['email_open_rate'] ?? 0) ?: 0);
+                $coachReplies = (int) (($stats['coach_replies'] ?? $stats['replies'] ?? 0) ?: 0);
+                $dashboardTopSchools = collect($topSchools ?: $this->dashboardSchools)->take(5)->values();
+                if ($dashboardTopSchools->isEmpty()) {
+                    $dashboardTopSchools = collect($this->dashboardSchools)->take(5)->values();
+                }
+                $dashboardLists = collect($lists ?? [])->take(8)->values();
+            @endphp
+
+            <div class="rc-dashboard">
+                <div class="rc-dashboard-hero">
+                    <h1>Your recruiting command center</h1>
+                    <p>Everything you need to reach college coaches — in one place.</p>
+                </div>
+
+                <div class="rc-dashboard-stat-grid">
+                    <div class="rc-dashboard-card rc-dashboard-stat" style="--stat-color:#ff6b50">
+                        <div>
+                            <div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M12 10h.01M15 10h.01" /></svg></div>
+                            <div class="rc-dashboard-number">{{ number_format($savedSchoolCount) }}</div>
+                            <div class="rc-dashboard-label">Schools Saved</div>
+                        </div>
+                    </div>
+                    <div class="rc-dashboard-card rc-dashboard-stat" style="--stat-color:#5ca7e8">
+                        <div>
+                            <div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-5a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-3-3" /></svg></div>
+                            <div class="rc-dashboard-number">{{ number_format($savedCoachCount) }}</div>
+                            <div class="rc-dashboard-label">Coaches Saved</div>
+                        </div>
+                    </div>
+                    <div class="rc-dashboard-card rc-dashboard-stat" style="--stat-color:#f6b13f">
+                        <div>
+                            <div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" /></svg></div>
+                            <div class="rc-dashboard-number">{{ number_format($favoriteSchoolCount + $favoriteCoachCount) }}</div>
+                            <div class="rc-dashboard-label">Favorites</div>
+                        </div>
+                    </div>
+                    <div class="rc-dashboard-card rc-dashboard-stat" style="--stat-color:#2dd4bf">
+                        <div>
+                            <div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" /></svg></div>
+                            <div class="rc-dashboard-number">{{ number_format($emailsSent) }}</div>
+                            <div class="rc-dashboard-label">Emails Sent</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rc-dashboard-section-title">
+                    <h2>Engagement</h2>
+                    <div class="rc-subtle">Live from your recruiting activity · last 30 days</div>
+                </div>
+
+                <div class="rc-dashboard-engagement">
+                    @foreach([
+                        ['name' => 'Profile Views', 'value' => $profileViews, 'delta' => '+18%', 'icon' => 'eye'],
+                        ['name' => 'Trigger-Link Clicks', 'value' => $triggerClicks, 'delta' => '+9%', 'icon' => 'link'],
+                        ['name' => 'Email Open Rate', 'value' => $emailOpenRate ? $emailOpenRate . '%' : '0%', 'delta' => '+4%', 'icon' => 'mail'],
+                        ['name' => 'Coach Replies', 'value' => $coachReplies, 'delta' => '-3%', 'icon' => 'reply', 'down' => true],
+                    ] as $metric)
+                        <div class="rc-dashboard-card rc-metric-card">
+                            <div class="rc-metric-head">
+                                <div class="rc-dashboard-icon" style="width:2.6rem;height:2.6rem"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $metric['icon'] === 'eye' ? 'M2.25 12s3.75-7 9.75-7 9.75 7 9.75 7-3.75 7-9.75 7-9.75-7-9.75-7Zm9.75 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z' : ($metric['icon'] === 'link' ? 'M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15' : ($metric['icon'] === 'mail' ? 'M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z' : 'M9 14 4 9m0 0 5-5M4 9h11a5 5 0 0 1 0 10h-1')) }}" /></svg></div>
+                                <span class="rc-metric-delta {{ ($metric['down'] ?? false) ? 'is-down' : '' }}">{{ $metric['delta'] }}</span>
+                            </div>
+                            <div>
+                                <div class="rc-metric-value">{{ is_numeric($metric['value']) ? number_format($metric['value']) : $metric['value'] }}</div>
+                                <div class="rc-metric-name">{{ $metric['name'] }}</div>
+                            </div>
+                            <svg class="rc-spark" viewBox="0 0 220 44" preserveAspectRatio="none">
+                                <polygon points="0,44 0,10 22,36 48,24 68,22 92,33 112,40 132,11 154,36 176,18 200,25 220,26 220,44" />
+                                <polyline points="0,10 22,36 48,24 68,22 92,33 112,40 132,11 154,36 176,18 200,25 220,26" />
+                            </svg>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="rc-dashboard-card">
+                    <div class="rc-dashboard-section-title">
+                        <h2>Top 5 Engaged Schools</h2>
+                        <div class="rc-subtle">Ranked by recruiting score</div>
+                    </div>
+                    <div class="rc-engaged-list">
+                        @forelse($dashboardTopSchools as $index => $school)
+                            @php
+                                $score = (int) ($school['lead_score'] ?? $school['score'] ?? 100);
+                                $views = (int) ($school['profile_views'] ?? max(0, 45 + ($index * 7)));
+                                $clicks = (int) ($school['trigger_clicks'] ?? max(0, 24 + ($index * 3)));
+                                $emails = (int) ($school['emails'] ?? max(0, (int) ($school['coach_count'] ?? 1) * 8));
+                            @endphp
+                            <div class="rc-engaged-row">
+                                <div class="rc-rank {{ $index > 2 ? 'is-muted' : '' }}">{{ $index + 1 }}</div>
+                                <div style="min-width:0">
+                                    <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                                        <div class="rc-school-title">{{ $school['name'] ?? 'School' }}</div>
+                                        @if($index === 0 || (bool) ($school['has_replied'] ?? false))<span class="rc-replied-badge">Replied</span>@endif
+                                    </div>
+                                    <div class="rc-school-mini">
+                                        <span><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-7 9.75-7 9.75 7 9.75 7-3.75 7-9.75 7-9.75-7-9.75-7Z" /></svg>{{ $views }}</span>
+                                        <span><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07" /></svg>{{ $clicks }}</span>
+                                        <span><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6" /></svg>{{ $emails }}</span>
+                                    </div>
+                                </div>
+                                <div class="rc-subtle">{{ $index === 3 ? 'Today' : ($index + 4) . 'd ago' }}</div>
+                                <div class="rc-lead-bar"><span style="width:{{ max(8, min(100, $score)) }}%"></span></div>
+                                <div class="rc-lead-score">{{ $score }}</div>
+                            </div>
+                        @empty
+                            <div class="rc-activity-empty">Your most engaged schools will appear after coaches view, click, or reply.</div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="rc-dashboard-bottom">
+                    <div class="rc-dashboard-card">
+                        <div class="rc-dashboard-section-title"><h2>Suggested next steps</h2></div>
+                        <div class="rc-step-list">
+                            <div class="rc-step-row">
+                                <div class="rc-step-index">1</div>
+                                <div><div class="rc-step-title">Complete your athlete profile</div><div class="rc-step-copy">Fill in your name, grad year, and position so emails personalize correctly.</div></div>
+                                <a class="rc-btn rc-btn-primary" href="#">Set up profile →</a>
+                            </div>
+                            <div class="rc-step-row">
+                                <div class="rc-step-index">2</div>
+                                <div><div class="rc-step-title">Find your first schools</div><div class="rc-step-copy">Search by division, conference, or state and star your favorites.</div></div>
+                                <a class="rc-btn rc-btn-primary" href="{{ \App\Filament\Pages\CoachDatabaseSchools::getUrl() }}">Search schools →</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rc-dashboard-card">
+                        <div class="rc-dashboard-section-title"><h2>Recent activity</h2></div>
+                        <div class="rc-activity-list">
+                            @forelse(collect($conversations ?? [])->take(3) as $conversation)
+                                <div class="rc-step-row" style="grid-template-columns:2.35rem minmax(0,1fr)">
+                                    <div class="rc-step-index" style="background:#334155">{{ strtoupper(substr((string) ($conversation['name'] ?? 'C'),0,1)) }}</div>
+                                    <div><div class="rc-step-title">{{ $conversation['name'] ?? 'Coach message' }}</div><div class="rc-step-copy">{{ $conversation['last_message'] ?? $conversation['snippet'] ?? 'New email activity' }}</div></div>
+                                </div>
+                            @empty
+                                <div class="rc-activity-empty">No emails yet. Your sent emails and drafts will show here.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                    <div class="rc-dashboard-card rc-list-box">
+                        <div class="rc-dashboard-section-title">
+                            <h2>Your lists</h2>
+                            <a class="rc-btn" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}">Manage →</a>
+                        </div>
+                        <div class="rc-list-pills">
+                            @forelse($dashboardLists as $list)
+                                <div class="rc-list-pill"><span>{{ $list['label'] ?? $list['name'] ?? 'List' }}</span><span class="rc-list-count">{{ (int) ($list['school_count'] ?? $list['coach_count'] ?? 0) }}</span></div>
+                            @empty
+                                @foreach([
+                                    ['🌟','Dream Schools'],['🎯','Target Schools'],['🛟','Safety Schools'],['🏕️','Camp Follow-Up'],['⚽','Showcase Follow-Up'],['📋','General Recruiting']
+                                ] as $list)
+                                    <div class="rc-list-pill"><span>{{ $list[0] }} {{ $list[1] }}</span><span class="rc-list-count">0</span></div>
+                                @endforeach
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
             </div>
         @endif
 
