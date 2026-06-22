@@ -4,8 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Filament\Pages\Concerns\InteractsWithCoachDatabase;
 use BackedEnum;
-use UnitEnum;
 use Filament\Pages\Page;
+use UnitEnum;
 
 class CoachDatabase extends Page
 {
@@ -17,13 +17,18 @@ class CoachDatabase extends Page
 
     protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
 
-    protected static ?string $title = 'Recruiting Dashboard';
+    protected static ?string $title = '';
 
     protected static ?string $slug = 'coach-database';
 
     protected static ?int $navigationSort = 10;
 
     protected string $view = 'filament.pages.coach-database';
+
+    public function getTitle(): string
+    {
+        return '';
+    }
 
     protected function coachDatabaseSection(): string
     {

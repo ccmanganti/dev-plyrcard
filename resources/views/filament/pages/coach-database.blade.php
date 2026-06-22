@@ -1334,6 +1334,23 @@
 
     </style>
 
+    @php
+        $formatRecruitingTimestamp = function ($value) {
+            if (blank($value)) {
+                return null;
+            }
+
+            try {
+                return \Carbon\Carbon::parse($value)->timezone(config('app.timezone', 'UTC'))->format('M j, Y · g:i A');
+            } catch (\Throwable $exception) {
+                return is_string($value) ? $value : null;
+            }
+        };
+
+        $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
+        $formattedTagSyncedAt = $formatRecruitingTimestamp($tagSyncedAt ?? null);
+    @endphp
+
     <div
         class="rc-wrap"
         x-data
@@ -1353,8 +1370,8 @@
                         <span wire:loading.flex wire:target="syncLatestContactTags,syncTagsIfStale" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Syncing</span>
                     </button>
                 @endif
-                @if($cachedAt)<span class="rc-pill">Updated {{ $cachedAt }}</span>@endif
-                @if($tagSyncedAt && in_array($section, ['favorites', 'lists'], true))<span class="rc-pill">Tags synced {{ $tagSyncedAt }}</span>@endif
+                @if($formattedCachedAt)<span class="rc-pill">Updated {{ $formattedCachedAt }}</span>@endif
+                @if($formattedTagSyncedAt && in_array($section, ['favorites', 'lists'], true))<span class="rc-pill">Tags synced {{ $formattedTagSyncedAt }}</span>@endif
             </div>
         </div>
 
@@ -1438,7 +1455,24 @@
                     ] as $metric)
                         <div class="rc-dashboard-card rc-metric-card">
                             <div class="rc-metric-head">
-                                <div class="rc-dashboard-icon" style="width:2.6rem;height:2.6rem"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $metric['icon'] === 'eye' ? 'M2.25 12s3.75-7 9.75-7 9.75 7 9.75 7-3.75 7-9.75 7-9.75-7-9.75-7Zm9.75 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z' : ($metric['icon'] === 'link' ? 'M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15' : ($metric['icon'] === 'mail' ? 'M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z' : 'M9 14 4 9m0 0 5-5M4 9h11a5 5 0 0 1 0 10h-1')) }}" /></svg></div>
+                                <div class="rc-dashboard-icon" style="width:2.6rem;height:2.6rem">
+                                    @switch($metric['icon'])
+                                        @case('eye')
+                                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-7 9.75-7 9.75 7 9.75 7-3.75 7-9.75 7-9.75-7-9.75-7Z" /><circle cx="12" cy="12" r="3" stroke-width="2" /></svg>
+                                            @break
+
+                                        @case('link')
+                                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15" /></svg>
+                                            @break
+
+                                        @case('mail')
+                                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" /></svg>
+                                            @break
+
+                                        @default
+                                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14 4 9m0 0 5-5M4 9h11a5 5 0 0 1 0 10h-1" /></svg>
+                                    @endswitch
+                                </div>
                                 <span class="rc-metric-delta {{ ($metric['down'] ?? false) ? 'is-down' : '' }}">{{ $metric['delta'] }}</span>
                             </div>
                             <div>
@@ -1479,7 +1513,7 @@
                                         <span><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6" /></svg>{{ $emails }}</span>
                                     </div>
                                 </div>
-                                <div class="rc-subtle">{{ $index === 3 ? 'Today' : ($index + 4) . 'd ago' }}</div>
+                                <div class="rc-subtle">{{ $index === 3 ? 'Today' : ($index + 4) . ' days ago' }}</div>
                                 <div class="rc-lead-bar"><span style="width:{{ max(8, min(100, $score)) }}%"></span></div>
                                 <div class="rc-lead-score">{{ $score }}</div>
                             </div>
@@ -1528,9 +1562,33 @@
                                 <div class="rc-list-pill"><span>{{ $list['label'] ?? $list['name'] ?? 'List' }}</span><span class="rc-list-count">{{ (int) ($list['school_count'] ?? $list['coach_count'] ?? 0) }}</span></div>
                             @empty
                                 @foreach([
-                                    ['🌟','Dream Schools'],['🎯','Target Schools'],['🛟','Safety Schools'],['🏕️','Camp Follow-Up'],['⚽','Showcase Follow-Up'],['📋','General Recruiting']
+                                    ['star','Dream Schools'],['target','Target Schools'],['shield','Safety Schools'],['map','Camp Follow-Up'],['play','Showcase Follow-Up'],['clipboard','General Recruiting']
                                 ] as $list)
-                                    <div class="rc-list-pill"><span>{{ $list[0] }} {{ $list[1] }}</span><span class="rc-list-count">0</span></div>
+                                    <div class="rc-list-pill">
+                                        <span style="display:inline-flex;align-items:center;gap:.45rem">
+                                            @switch($list[0])
+                                                @case('star')
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" /></svg>
+                                                    @break
+                                                @case('target')
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-width="2" /><circle cx="12" cy="12" r="3" stroke-width="2" /></svg>
+                                                    @break
+                                                @case('shield')
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" /></svg>
+                                                    @break
+                                                @case('map')
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0 0V3m6 18V6" /></svg>
+                                                    @break
+                                                @case('play')
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14l11-7L8 5Z" /></svg>
+                                                    @break
+                                                @default
+                                                    <svg class="rc-icon-sm" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h6M9 9h6M9 13h6M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
+                                            @endswitch
+                                            {{ $list[1] }}
+                                        </span>
+                                        <span class="rc-list-count">0</span>
+                                    </div>
                                 @endforeach
                             @endforelse
                         </div>
