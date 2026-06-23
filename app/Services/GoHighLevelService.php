@@ -3121,67 +3121,143 @@ class GoHighLevelService
             : ('plyrcard-template-image-' . now()->format('YmdHis') . '.jpg');
 
         $mimeType = method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : 'image/jpeg';
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            $name .= match ($mimeType) {
+                'image/png' => '.png',
+                'image/gif' => '.gif',
+                'image/webp' => '.webp',
+                default => '.jpg',
+            };
+        }
+
+        $endpoints = collect([
+            config('ghl.media_upload_endpoint'),
+            '/medias/upload-file',
+            '/medias/upload',
+        ])->filter()->map(fn ($endpoint): string => '/' . ltrim((string) $endpoint, '/'))->unique()->values()->all();
+
+        $versions = collect([
+            config('ghl.media_upload_version'),
+            '2021-07-28',
+            '2023-02-21',
+            'v3',
+        ])->filter()->unique()->values()->all();
+
+        // HighLevel media upload requirements differ between account/API versions.
+        // The location-scoped payload with altId/altType is the important part for
+        // making the uploaded image appear in that location's GHL media library.
+        $payloads = [[
+            'altId' => $locationId,
+            'altType' => 'location',
+            'locationId' => $locationId,
+            'hosted' => true,
+            'name' => $name,
+        ], [
+            'altId' => $locationId,
+            'altType' => 'location',
+            'hosted' => true,
+            'name' => $name,
+        ], [
+            'locationId' => $locationId,
+            'hosted' => true,
+            'name' => $name,
+        ], [
+            'altId' => $locationId,
+            'altType' => 'location',
+            'hosted' => false,
+            'name' => $name,
+        ]];
+
         $lastError = 'Unable to upload image.';
         $lastStatus = null;
         $lastRaw = [];
+        $attempts = [];
 
-        foreach (['v3', '2021-07-28'] as $version) {
-            try {
-                $handle = fopen($path, 'r');
-                if (! $handle) {
-                    return ['success' => false, 'error' => 'Image upload could not be opened.'];
+        foreach ($endpoints as $endpoint) {
+            foreach ($versions as $version) {
+                foreach ($payloads as $payload) {
+                    try {
+                        $handle = fopen($path, 'r');
+                        if (! $handle) {
+                            return ['success' => false, 'error' => 'Image upload could not be opened.'];
+                        }
+
+                        $response = Http::withHeaders(['Version' => $version])
+                            ->timeout((int) config('ghl.timeout', 30))
+                            ->withToken($token)
+                            ->acceptJson()
+                            ->attach('file', $handle, $name, ['Content-Type' => $mimeType])
+                            ->post("{$this->baseUrl}{$endpoint}", $payload);
+
+                        if (is_resource($handle)) {
+                            fclose($handle);
+                        }
+
+                        $data = $response->json();
+                        if (! is_array($data)) {
+                            $data = [];
+                        }
+
+                        $lastStatus = $response->status();
+                        $lastRaw = $data;
+                        $attempts[] = [
+                            'endpoint' => $endpoint,
+                            'version' => $version,
+                            'status' => $lastStatus,
+                            'payload_keys' => array_keys($payload),
+                        ];
+
+                        if (! $response->successful()) {
+                            $lastError = $this->extractApiErrorMessage($data, 'Unable to upload image.');
+                            continue;
+                        }
+
+                        $url = $this->extractMediaUploadUrl($data);
+
+                        if ($url === '') {
+                            $lastError = 'Image uploaded to GHL, but no URL was returned.';
+                            continue;
+                        }
+
+                        return [
+                            'success' => true,
+                            'url' => $url,
+                            'raw' => $data,
+                            'version' => $version,
+                            'endpoint' => $endpoint,
+                        ];
+                    } catch (\Throwable $e) {
+                        if (isset($handle) && is_resource($handle)) {
+                            fclose($handle);
+                        }
+
+                        $lastError = $e->getMessage() ?: 'Unable to upload image.';
+                        $attempts[] = [
+                            'endpoint' => $endpoint,
+                            'version' => $version,
+                            'status' => 'exception',
+                            'error' => $lastError,
+                        ];
+                    }
                 }
-
-                $response = Http::withHeaders(['Version' => $version])
-                    ->timeout((int) config('ghl.timeout', 30))
-                    ->withToken($token)
-                    ->acceptJson()
-                    ->attach('file', $handle, $name, ['Content-Type' => $mimeType])
-                    ->post("{$this->baseUrl}/medias/upload-file", [
-                        'hosted' => false,
-                        'name' => $name,
-                    ]);
-
-                if (is_resource($handle)) {
-                    fclose($handle);
-                }
-
-                $data = $response->json();
-                if (! is_array($data)) {
-                    $data = [];
-                }
-
-                $lastStatus = $response->status();
-                $lastRaw = $data;
-
-                if (! $response->successful()) {
-                    $lastError = $this->extractApiErrorMessage($data, 'Unable to upload image.');
-                    continue;
-                }
-
-                $url = $this->extractMediaUploadUrl($data);
-
-                if ($url === '') {
-                    $lastError = 'Image uploaded, but no URL was returned.';
-                    continue;
-                }
-
-                return [
-                    'success' => true,
-                    'url' => $url,
-                    'raw' => $data,
-                    'version' => $version,
-                ];
-            } catch (\Throwable $e) {
-                $lastError = $e->getMessage() ?: 'Unable to upload image.';
             }
         }
+
+        Log::error('GHL media upload failed.', [
+            'location_id' => $locationId,
+            'status' => $lastStatus,
+            'error' => $lastError,
+            'attempts' => $attempts,
+            'raw' => $lastRaw,
+        ]);
 
         return [
             'success' => false,
             'error' => $lastError,
             'status' => $lastStatus,
             'raw' => $lastRaw,
+            'debug' => $attempts,
         ];
     }
 

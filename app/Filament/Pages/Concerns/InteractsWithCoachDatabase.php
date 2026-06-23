@@ -7,7 +7,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\WithFileUploads;
 
@@ -944,13 +943,47 @@ trait InteractsWithCoachDatabase
 
     public function loadTemplates(): void
     {
-        // Use local hardcoded recruiting templates instead of account-backed
-        // TyncMe/GHL templates. This keeps Compose Email usable even when the
-        // connected account has no template access.
-        $this->templates = $this->hardcodedEmailTemplates();
-        $this->templateSourceSummary = 'Built-in PLYRCard templates';
-        $this->templateSourceDebug = [];
+        $builtIn = $this->hardcodedEmailTemplates();
+        $this->templateDetails = collect($this->templateDetails)
+            ->filter(fn ($template): bool => is_array($template))
+            ->all();
+
+        $result = Auth::user()
+            ? app(CoachDatabaseService::class)->getEmailTemplatesForUser(Auth::user())
+            : ['success' => false, 'templates' => [], 'error' => 'No authenticated user.'];
+
+        $ghlTemplates = collect($result['templates'] ?? [])
+            ->filter(fn ($template): bool => is_array($template))
+            ->map(function (array $template): array {
+                $id = (string) ($template['id'] ?? $template['_id'] ?? $template['templateId'] ?? '');
+
+                return array_merge($template, [
+                    'id' => $id,
+                    'source_type' => 'ghl',
+                ]);
+            })
+            ->filter(fn (array $template): bool => trim((string) ($template['id'] ?? '')) !== '')
+            ->unique(fn (array $template): string => (string) ($template['id'] ?? ''))
+            ->values();
+
+        $this->templates = $ghlTemplates
+            ->merge($builtIn)
+            ->unique(fn (array $template): string => (string) ($template['id'] ?? ''))
+            ->values()
+            ->all();
+
+        $this->templateSourceSummary = $ghlTemplates->isNotEmpty()
+            ? 'GHL email templates loaded. Built-in PLYRCard templates are included as fallbacks.'
+            : 'No GHL templates found. Showing built-in PLYRCard templates.';
+        $this->templateSourceDebug = $result['debug'] ?? [];
         $this->error = null;
+
+        if (! ($result['success'] ?? false) && $ghlTemplates->isEmpty() && filled($result['error'] ?? null)) {
+            $this->templateSourceDebug = array_merge($this->templateSourceDebug, [[
+                'stage' => 'ghl_template_load_failed',
+                'error' => $result['error'],
+            ]]);
+        }
 
         if ($this->campaignTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->campaignTemplateId)) {
             return;
@@ -976,6 +1009,7 @@ trait InteractsWithCoachDatabase
                 'previewText' => 'Quick introduction from {{AthleteName}}.',
                 'body' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
                 'html' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
             ],
             [
                 'id' => 'plyrcard-follow-up-email',
@@ -984,6 +1018,7 @@ trait InteractsWithCoachDatabase
                 'previewText' => 'Following up with {{CoachFirstName}} at {{SchoolName}}.',
                 'body' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
                 'html' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
             ],
             [
                 'id' => 'plyrcard-camp-invite-email',
@@ -992,6 +1027,7 @@ trait InteractsWithCoachDatabase
                 'previewText' => 'Camp and visit interest from {{AthleteName}}.',
                 'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
                 'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
             ],
         ];
     }
@@ -1028,15 +1064,14 @@ trait InteractsWithCoachDatabase
         $this->selectedTemplateId = $templateId;
         $this->previewTemplateId = $templateId;
         $this->campaignTemplateId = null;
-        $this->templateIsNew = false;
+        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
         $this->templateName = trim((string) ($template['name'] ?? 'Untitled Template')) ?: 'Untitled Template';
         $this->templateSubject = $this->templateSubject($template);
         $this->templatePreviewText = $this->templatePreviewText($template);
-        $templateHtml = $this->templateHtml($template);
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
-        $this->templateBody = $templateHtml !== '' ? $templateHtml : $this->htmlToTemplateText($this->coerceTemplateHtml($template));
+        $this->templateBody = $this->templateHtmlForNativeEditor($template);
     }
 
     public function createTemplate(): void
@@ -1064,7 +1099,11 @@ trait InteractsWithCoachDatabase
         $this->resolveTemplateGraphicUpload();
         $html = $this->buildTemplateHtml($bodyText);
 
-        $result = ($this->selectedTemplateId && ! $this->templateIsNew)
+        $shouldUpdateGhl = $this->selectedTemplateId
+            && ! $this->templateIsNew
+            && ! $this->isBuiltInTemplateId($this->selectedTemplateId);
+
+        $result = $shouldUpdateGhl
             ? app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $this->selectedTemplateId, $name, $subject, $html, $this->templatePreviewText)
             : app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
 
@@ -1162,12 +1201,11 @@ trait InteractsWithCoachDatabase
         $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
         $this->campaignSubject = $this->templateSubject($template);
         $this->campaignPreviewText = $this->templatePreviewText($template);
-        $templateHtml = $this->templateHtml($template);
         $this->composeGraphicUrl = '';
-        $this->campaignBody = $templateHtml !== '' ? $templateHtml : $this->htmlToTemplateText($this->coerceTemplateHtml($template));
+        $this->campaignBody = $this->templateHtmlForNativeEditor($template);
 
         if (trim($this->campaignBody) === '') {
-            $this->campaignBody = trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')));
+            $this->campaignBody = $this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? ''))));
         }
     }
 
@@ -1268,6 +1306,25 @@ trait InteractsWithCoachDatabase
 
         $summary = collect($this->templates)->firstWhere('id', $templateId)
             ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
+
+        if (is_array($summary) && ($this->isBuiltInTemplateId($templateId) || ($summary['source_type'] ?? null) === 'built_in')) {
+            $this->templateDetails[$templateId] = $summary;
+            return $summary;
+        }
+
+        if (Auth::user()) {
+            $result = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
+
+            if (($result['success'] ?? false) && is_array($result['template'] ?? null)) {
+                $detail = $this->mergeTemplateRecord(is_array($summary) ? $summary : [], array_merge($result['template'], [
+                    'id' => $templateId,
+                    'source_type' => 'ghl',
+                ]));
+
+                $this->templateDetails[$templateId] = $detail;
+                return $detail;
+            }
+        }
 
         if (is_array($summary)) {
             $this->templateDetails[$templateId] = $summary;
@@ -1484,12 +1541,33 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        try {
-            $path = $this->templateGraphicUpload->store('recruiting-template-graphics', 'public');
-            $this->templateGraphicUrl = Storage::disk('public')->url($path);
+        $user = Auth::user();
+        if (! $user) {
             $this->templateGraphicUpload = null;
+            return;
+        }
+
+        try {
+            $this->validate([
+                'templateGraphicUpload' => ['image', 'max:25600'],
+            ]);
+
+            $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $this->templateGraphicUpload);
+            $this->templateGraphicUpload = null;
+
+            if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                Notification::make()
+                    ->title('Templates')
+                    ->body($this->templateErrorMessage($result, 'Unable to upload graphic to GHL media.'))
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $this->templateGraphicUrl = trim((string) $result['url']);
         } catch (\Throwable $e) {
-            Notification::make()->title('Templates')->body('Unable to upload graphic.')->danger()->send();
+            $this->templateGraphicUpload = null;
+            Notification::make()->title('Templates')->body('Unable to upload graphic to GHL media.')->danger()->send();
         }
     }
 
@@ -1605,6 +1683,45 @@ trait InteractsWithCoachDatabase
         }
 
         return $merged;
+    }
+
+    protected function isBuiltInTemplateId(?string $templateId): bool
+    {
+        return is_string($templateId) && str_starts_with($templateId, 'plyrcard-');
+    }
+
+    protected function templateHtmlForNativeEditor(array $template): string
+    {
+        $html = $this->templateHtml($template);
+
+        if ($html === '') {
+            $html = $this->coerceTemplateHtml($template);
+        }
+
+        return $this->normalizeHtmlForNativeEditor($html);
+    }
+
+    protected function normalizeHtmlForNativeEditor(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        // Some GHL/TyncMe responses return escaped HTML. Decode it before
+        // placing it into the native contenteditable editor so users see the
+        // rendered email, not raw <p> / <table> code.
+        $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($decoded !== '') {
+            $html = $decoded;
+        }
+
+        if (preg_match('/<\s*(p|div|h1|h2|h3|h4|h5|h6|ul|ol|li|blockquote|img|a|table|tr|td|span|strong|em|br|body|html)\b/i', $html)) {
+            return $this->sanitizeTemplateHtml($html);
+        }
+
+        return $this->templateTextToHtml(trim(strip_tags($html)));
     }
 
     protected function templateSubject(array $template): string
@@ -2049,20 +2166,20 @@ trait InteractsWithCoachDatabase
             'CoachName' => $coachName ?: trim(($firstName ?: 'Coach') . ' ' . $lastName),
             'SchoolName' => $schoolName,
             'CoachTitle' => $title,
-            'CoachEmail' => trim((string) ($coach['email'] ?? '')),
-            'CoachPhone' => trim((string) ($coach['phone'] ?? '')),
-            'Sport' => trim((string) ($coach['sport'] ?? '')),
-            'Conference' => trim((string) ($coach['conference'] ?? '')),
-            'Division' => trim((string) ($coach['division'] ?? '')),
-            'City' => trim((string) ($coach['city'] ?? '')),
-            'State' => trim((string) ($coach['state'] ?? '')),
-            'AthleteName' => trim((string) ($user?->name ?? '[Your Name]')),
-            'GraduationYear' => trim((string) data_get($user, 'graduation_year', '[Graduation Year]')),
-            'Position' => trim((string) data_get($user, 'position', '[Position]')),
-            'ClubTeam' => trim((string) data_get($user, 'club_team', '[Club Team]')),
-            'GPA' => trim((string) data_get($user, 'gpa', '[GPA]')),
-            'HighlightLink' => trim((string) data_get($user, 'highlight_link', '[Highlight Link]')),
-            'ProfileLink' => trim((string) data_get($user, 'profile_link', '[Profile Link]')),
+            'CoachEmail' => $this->tokenText($coach['email'] ?? null),
+            'CoachPhone' => $this->tokenText($coach['phone'] ?? null),
+            'Sport' => $this->tokenText($coach['sport'] ?? null),
+            'Conference' => $this->tokenText($coach['conference'] ?? null),
+            'Division' => $this->tokenText($coach['division'] ?? null),
+            'City' => $this->tokenText($coach['city'] ?? null),
+            'State' => $this->tokenText($coach['state'] ?? null),
+            'AthleteName' => $this->tokenText($user?->name ?? null, '[Your Name]'),
+            'GraduationYear' => $this->userTokenText('graduation_year', '[Graduation Year]'),
+            'Position' => $this->userTokenText('position', '[Position]'),
+            'ClubTeam' => $this->userTokenText('club_team', '[Club Team]'),
+            'GPA' => $this->userTokenText('gpa', '[GPA]'),
+            'HighlightLink' => $this->userTokenText('highlight_link', '[Highlight Link]'),
+            'ProfileLink' => $this->userTokenText('profile_link', '[Profile Link]'),
         ];
 
         $aliases = [
@@ -2103,6 +2220,61 @@ trait InteractsWithCoachDatabase
         }
 
         return $content;
+    }
+
+    protected function userTokenText(string $key, string $fallback = ''): string
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return $fallback;
+        }
+
+        return $this->tokenText(data_get($user, $key), $fallback);
+    }
+
+    protected function tokenText(mixed $value, string $fallback = ''): string
+    {
+        if (is_null($value) || $value === '') {
+            return $fallback;
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if ($value instanceof \Stringable) {
+            return trim((string) $value);
+        }
+
+        if (is_array($value)) {
+            $preferred = [
+                'label',
+                'name',
+                'title',
+                'value',
+                'text',
+                'position',
+                'primary',
+            ];
+
+            foreach ($preferred as $key) {
+                if (array_key_exists($key, $value) && is_scalar($value[$key])) {
+                    return trim((string) $value[$key]);
+                }
+            }
+
+            $flat = collect($value)
+                ->flatten()
+                ->filter(fn ($item): bool => is_scalar($item) && trim((string) $item) !== '')
+                ->map(fn ($item): string => trim((string) $item))
+                ->unique()
+                ->values();
+
+            return $flat->isNotEmpty() ? $flat->implode(', ') : $fallback;
+        }
+
+        return $fallback;
     }
 
     protected function campaignRecipientCoaches(): Collection
@@ -2507,12 +2679,33 @@ HTML;
             return;
         }
 
-        try {
-            $path = $this->composeGraphicUpload->store('coach-database/email-graphics', 'public');
-            $this->composeGraphicUrl = Storage::disk('public')->url($path);
+        $user = Auth::user();
+        if (! $user) {
             $this->composeGraphicUpload = null;
+            return;
+        }
+
+        try {
+            $this->validate([
+                'composeGraphicUpload' => ['image', 'max:25600'],
+            ]);
+
+            $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $this->composeGraphicUpload);
+            $this->composeGraphicUpload = null;
+
+            if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                Notification::make()
+                    ->title('Compose Email')
+                    ->body($this->templateErrorMessage($result, 'Unable to upload image to GHL media.'))
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $this->composeGraphicUrl = trim((string) $result['url']);
         } catch (\Throwable $exception) {
-            Notification::make()->title('Compose Email')->body('Unable to upload image.')->danger()->send();
+            $this->composeGraphicUpload = null;
+            Notification::make()->title('Compose Email')->body('Unable to upload image to GHL media.')->danger()->send();
         }
     }
 
