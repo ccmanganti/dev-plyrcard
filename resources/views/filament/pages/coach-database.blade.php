@@ -334,6 +334,73 @@
             letter-spacing: .08em;
         }
 
+
+        .rc-school-list-picker {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+        }
+
+        .rc-school-list-trigger {
+            width: auto;
+            min-width: 4.15rem;
+            height: 2.1rem;
+            padding: 0 .55rem;
+            gap: .32rem;
+        }
+
+        .rc-school-list-menu {
+            position: absolute;
+            z-index: 45;
+            right: 0;
+            bottom: calc(100% + .35rem);
+            width: max-content;
+            min-width: 8.5rem;
+            max-width: 12rem;
+            max-height: 10.5rem;
+            overflow: auto;
+            border: 1px solid var(--rc-border);
+            border-radius: .65rem;
+            background: var(--rc-surface);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+            padding: .25rem;
+        }
+
+        .rc-school-list-option {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: var(--rc-text);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            text-align: left;
+            padding: .38rem .48rem;
+            border-radius: .45rem;
+            font-size: .72rem;
+            font-weight: 700;
+            line-height: 1.2;
+            cursor: pointer;
+        }
+
+        .rc-school-list-option:hover,
+        .rc-school-list-option.is-active {
+            background: var(--rc-accent-soft);
+            color: var(--rc-accent);
+        }
+
+        .rc-school-list-check {
+            font-size: .72rem;
+            font-weight: 900;
+        }
+
+        .rc-school-list-empty {
+            color: var(--rc-muted);
+            font-size: .72rem;
+            padding: .38rem .48rem;
+        }
+
         .rc-menu-panel {
             position: absolute;
             z-index: 40;
@@ -1435,11 +1502,22 @@
         .rc-thread-preview { color:var(--rc-muted); font-size:.76rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .rc-email-thread { min-height:34rem; display:flex; flex-direction:column; }
         .rc-email-thread-head { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding-bottom:.9rem; border-bottom:1px solid var(--rc-border); }
-        .rc-message-list { display:grid; gap:.85rem; padding:1rem 0; flex:1; overflow:auto; }
-        .rc-email-message { border:1px solid var(--rc-border); background:rgba(255,255,255,.03); border-radius:1rem; padding:.9rem; max-width:82%; }
-        .rc-email-message.out { margin-left:auto; background:rgba(255,99,56,.16); border-color:rgba(255,99,56,.35); }
+        .rc-message-list { display:grid; gap:1rem; padding:1rem 0; flex:1; overflow:auto; }
+        .rc-email-message { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:0; max-width:100%; overflow:hidden; box-shadow:0 12px 30px rgba(15,23,42,.06); }
+        .rc-email-message.out { margin-left:0; background:var(--rc-surface); border-color:rgba(255,99,56,.32); }
+        .rc-email-message.out .rc-email-format-head { border-left:4px solid var(--rc-accent); }
+        .rc-email-format-head { display:grid; gap:.35rem; padding:.9rem 1rem; border-bottom:1px solid var(--rc-border); background:var(--rc-soft); }
+        .rc-email-format-line { display:flex; gap:.45rem; align-items:baseline; min-width:0; color:var(--rc-muted); font-size:.75rem; line-height:1.35; }
+        .rc-email-format-line strong { color:var(--rc-text); font-size:.76rem; min-width:3.1rem; }
+        .rc-email-format-subject { color:var(--rc-text); font-weight:850; font-size:.95rem; line-height:1.35; margin-top:.15rem; }
         .rc-message-meta { display:flex; align-items:center; justify-content:space-between; gap:.65rem; margin-bottom:.55rem; color:var(--rc-muted); font-size:.72rem; }
-        .rc-message-body { color:var(--rc-text); line-height:1.55; font-size:.9rem; }
+        .rc-message-body { color:#111827; background:#fff; line-height:1.65; font-size:.94rem; padding:1.05rem; overflow:auto; }
+        .rc-message-body img { max-width:100%; height:auto; border-radius:.75rem; display:block; margin:.75rem 0; }
+        .rc-message-body table { max-width:100%; border-collapse:collapse; }
+        .rc-message-body a { color:#2563eb; text-decoration:underline; }
+        .rc-message-attachments { display:grid; gap:.55rem; padding:0 1.05rem 1.05rem; background:#fff; }
+        .rc-message-attachment-image { max-width:100%; border-radius:.85rem; border:1px solid #e5e7eb; background:#fff; }
+        .rc-message-attachment-link { display:inline-flex; align-items:center; gap:.4rem; width:max-content; max-width:100%; border:1px solid #e5e7eb; border-radius:.7rem; padding:.45rem .65rem; color:#2563eb; background:#f8fafc; font-size:.82rem; font-weight:750; text-decoration:none; }
         .rc-school-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:1rem; }
         .rc-school-card { min-height:unset; padding:1rem; border-radius:1rem; transition:transform .15s ease, border-color .15s ease, background .15s ease; }
         .rc-school-card:hover { transform:translateY(-2px); border-color:rgba(255,99,56,.5); }
@@ -1982,19 +2060,59 @@
                     </div>
 
                     <div class="rc-message-list">
-                        @forelse($messages as $message)
-                            @php($isOut = str_contains(strtolower($message['direction'] ?? ''), 'out'))
-                            <article class="rc-email-message {{ $isOut ? 'out' : '' }}">
-                                <div class="rc-message-meta">
-                                    <span>{{ $isOut ? 'You' : ($selectedConversation['contact_name'] ?? 'Coach') }}</span>
-                                    <span>{{ $message['created_at'] ?? '' }}</span>
-                                </div>
-                                @if(!empty($message['subject']))<div class="rc-row-title" style="margin-bottom:.4rem">{{ $message['subject'] }}</div>@endif
-                                <div class="rc-message-body">{!! $message['body'] ?? '' !!}</div>
-                            </article>
-                        @empty
+                        <?php $threadMessages = is_array($messages ?? null) ? $messages : []; ?>
+                        <?php if (empty($threadMessages)): ?>
                             <div class="rc-empty"><strong>Select a thread.</strong><span>Email messages will appear here.</span></div>
-                        @endforelse
+                        <?php else: ?>
+                            <?php foreach ($threadMessages as $message): ?>
+                                <?php
+                                    $message = is_array($message) ? $message : [];
+                                    $isOut = str_contains(strtolower((string) ($message['direction'] ?? '')), 'out');
+                                    $fromLabel = $isOut ? 'You' : ($message['from_name'] ?? $selectedConversation['contact_name'] ?? 'Coach');
+                                    $toLabel = $message['to'] ?? ($isOut ? ($selectedConversation['contact_name'] ?? 'Coach') : 'You');
+                                    if (is_array($toLabel)) {
+                                        $toLabel = collect($toLabel)->map(function ($item) {
+                                            if (is_array($item)) {
+                                                return $item['email'] ?? $item['name'] ?? $item['address'] ?? '';
+                                            }
+                                            return is_scalar($item) ? (string) $item : '';
+                                        })->filter()->implode(', ');
+                                    }
+                                    $messageBody = (string) ($message['body'] ?? '');
+                                    $messageAttachments = collect($message['attachments'] ?? [])->filter(fn ($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
+                                ?>
+                                <article class="rc-email-message <?php echo $isOut ? 'out' : ''; ?>">
+                                    <div class="rc-email-format-head">
+                                        <?php if (! empty($message['subject'])): ?>
+                                            <div class="rc-email-format-subject"><?php echo e((string) $message['subject']); ?></div>
+                                        <?php endif; ?>
+                                        <div class="rc-email-format-line"><strong>From</strong><span><?php echo e((string) ($fromLabel ?: ($isOut ? 'You' : 'Coach'))); ?></span></div>
+                                        <div class="rc-email-format-line"><strong>To</strong><span><?php echo e((string) ($toLabel ?: 'Recipient')); ?></span></div>
+                                        <?php if (! empty($message['created_at'])): ?>
+                                            <div class="rc-email-format-line"><strong>Date</strong><span><?php echo e((string) $message['created_at']); ?></span></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="rc-message-body"><?php echo $messageBody !== '' ? $messageBody : '<p style="color:#64748b;margin:0">No message body.</p>'; ?></div>
+                                    <?php if ($messageAttachments->isNotEmpty()): ?>
+                                        <div class="rc-message-attachments">
+                                            <?php foreach ($messageAttachments as $attachment): ?>
+                                                <?php
+                                                    $attachmentUrl = (string) ($attachment['url'] ?? '');
+                                                    $attachmentName = (string) ($attachment['name'] ?? 'Attachment');
+                                                    $attachmentType = strtolower((string) ($attachment['mime_type'] ?? $attachment['type'] ?? ''));
+                                                    $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
+                                                ?>
+                                                <?php if ($isImageAttachment): ?>
+                                                    <img class="rc-message-attachment-image" src="<?php echo e($attachmentUrl); ?>" alt="<?php echo e($attachmentName); ?>">
+                                                <?php else: ?>
+                                                    <a class="rc-message-attachment-link" href="<?php echo e($attachmentUrl); ?>" target="_blank" rel="noopener">Open <?php echo e($attachmentName); ?></a>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </article>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
 
                     @if($hasMoreMessages)
@@ -2044,6 +2162,8 @@
                                         <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
                                     </div>
+                                    <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                     <div
                                         x-ref="editor"
                                         class="rc-rich-editor rc-native-editor"
@@ -2221,7 +2341,7 @@
                                     <button class="rc-rich-tool" type="button" title="Bullet list" @click="command('insertUnorderedList')">• List</button>
                                     <button class="rc-rich-tool" type="button" title="Numbered list" @click="command('insertOrderedList')">1. List</button>
                                     <button class="rc-rich-tool" type="button" title="Add link" @click="addLink()">Link</button>
-                                    <button class="rc-rich-tool" type="button" title="Add image" @click="addImage()">Image</button>
+                                    <button class="rc-rich-tool" type="button" title="Upload image" @click="openImageUpload()">Image</button>
                                     <button class="rc-rich-tool" type="button" title="Add button" @click="addButton()">Button</button>
                                     <button class="rc-rich-tool" type="button" title="Clear formatting" @click="command('removeFormat')">Clear</button>
                                 </div>
@@ -2236,6 +2356,8 @@
                                     <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                     <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
                                 </div>
+                                <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                 <div
                                     x-ref="editor"
                                     class="rc-rich-editor rc-native-editor"
@@ -2399,6 +2521,8 @@
                                     <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                     <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
                                 </div>
+                                <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                 <div
                                     x-ref="editor"
                                     class="rc-rich-editor rc-native-editor"
@@ -2483,6 +2607,8 @@
                                         <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
                                     </div>
+                                    <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                     <div
                                         x-ref="editor"
                                         class="rc-rich-editor rc-native-editor"
@@ -2520,16 +2646,30 @@
                         </button>
                         <button class="rc-btn rc-btn-primary" type="button" wire:click="composeEmailSchool('{{ $schoolId }}')">Email coaches</button>
                     </div>
-                    @if(count($lists))
-                        <div class="rc-toolbar" style="margin-bottom:1rem">
-                            @foreach($lists as $list)
-                                @php($inList = in_array($list['key'] ?? '', $this->selectedSchool['list_keys'] ?? [], true))
-                                <button class="rc-btn" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}('{{ $schoolId }}','{{ $list['key'] }}')" wire:loading.attr="disabled" wire:target="addSchoolToListById('{{ $schoolId }}','{{ $list['key'] }}'),removeSchoolFromListById('{{ $schoolId }}','{{ $list['key'] }}')">
-                                    {{ $inList ? 'In ' : 'Add to ' }}{{ $list['label'] }}
-                                </button>
-                            @endforeach
+                    <?php if (count($lists)): ?>
+                        <div class="rc-school-list-picker" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false" style="margin-bottom:1rem">
+                            <button type="button" class="rc-btn rc-school-list-trigger" @click="open = !open" :aria-expanded="open.toString()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                <span>List</span>
+                            </button>
+                            <div class="rc-school-list-menu" style="left:0;right:auto;bottom:auto;top:calc(100% + .35rem)" x-cloak x-show="open" x-transition.origin.top.left>
+                                <?php foreach ($lists as $list): ?>
+                                    <?php
+                                        $listKey = (string) ($list['key'] ?? '');
+                                        $inList = in_array($listKey, $this->selectedSchool['list_keys'] ?? [], true);
+                                        $listAction = $inList ? 'removeSchoolFromListById' : 'addSchoolToListById';
+                                        $listLabel = (string) ($list['label'] ?? 'List');
+                                    ?>
+                                    <?php if ($listKey !== ''): ?>
+                                        <button type="button" class="rc-school-list-option <?php echo $inList ? 'is-active' : ''; ?>" wire:click="<?php echo $listAction; ?>('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>')" wire:loading.attr="disabled" wire:target="addSchoolToListById('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>'),removeSchoolFromListById('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>')" @click="open = false">
+                                            <span><?php echo e($listLabel); ?></span>
+                                            <?php if ($inList): ?><span class="rc-school-list-check">✓</span><?php endif; ?>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                    @endif
+                    <?php endif; ?>
                     @foreach($this->selectedSchool['coaches'] ?? [] as $coach)
                         @include('filament.partials.coach-row', ['coach' => $coach])
                     @endforeach
@@ -2544,6 +2684,7 @@
             return {
                 syncTimer: null,
                 mounted: false,
+                uploadingImages: false,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -2602,7 +2743,55 @@
                 addImage() {
                     const url = this.cleanUrl(prompt('Image URL', 'https://'));
                     if (!url) return;
-                    this.insertHtml('<p><img src="' + this.escapeHtml(url) + '" alt="Email image" style="max-width:100%;height:auto;border-radius:12px;" /></p>');
+                    this.insertImage(url);
+                },
+                openImageUpload() {
+                    if (!this.$refs.imageUpload) {
+                        this.addImage();
+                        return;
+                    }
+                    this.$refs.imageUpload.value = '';
+                    this.$refs.imageUpload.click();
+                },
+                uploadInlineImages(event) {
+                    const files = Array.from(event.target.files || []);
+                    if (!files.length) return;
+
+                    this.uploadingImages = true;
+                    const uploadNext = (index = 0) => {
+                        if (index >= files.length) {
+                            this.uploadingImages = false;
+                            event.target.value = '';
+                            this.syncNow();
+                            return;
+                        }
+
+                        const file = files[index];
+                        this.$wire.upload('templateInlineImageUpload', file, () => {
+                            this.$wire.call('uploadTemplateEditorImage').then((result) => {
+                                if (result && result.success && result.url) {
+                                    this.insertImage(result.url);
+                                } else {
+                                    alert((result && result.error) ? result.error : 'Image upload failed.');
+                                }
+                                uploadNext(index + 1);
+                            }).catch((error) => {
+                                console.error(error);
+                                alert('Image upload failed.');
+                                uploadNext(index + 1);
+                            });
+                        }, () => {
+                            alert('Image upload failed.');
+                            uploadNext(index + 1);
+                        });
+                    };
+
+                    uploadNext();
+                },
+                insertImage(url) {
+                    const clean = this.cleanUrl(url);
+                    if (!clean) return;
+                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" alt="Email image" style="max-width:100%;height:auto;border-radius:12px;" /></p>');
                 },
                 addButton() {
                     const label = prompt('Button text', 'View profile') || 'View profile';

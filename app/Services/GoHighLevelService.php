@@ -3752,19 +3752,161 @@ class GoHighLevelService
 
     protected function transformConversationMessage(array $item): array
     {
-        $body = $item['body'] ?? $item['message'] ?? $item['html'] ?? $item['text'] ?? $item['emailMessage'] ?? '';
-        $direction = $item['direction'] ?? $item['messageDirection'] ?? $item['directionType'] ?? $item['source'] ?? '';
+        $body = $this->conversationMessageBody($item);
+        $direction = $this->conversationScalar($item['direction'] ?? $item['messageDirection'] ?? $item['directionType'] ?? $item['source'] ?? '');
+        $from = $this->conversationScalar($item['from'] ?? $item['emailFrom'] ?? $item['sender'] ?? data_get($item, 'sender.email') ?? data_get($item, 'from.email') ?? '');
+        $to = $this->conversationScalar($item['to'] ?? $item['emailTo'] ?? $item['receiver'] ?? data_get($item, 'to.email') ?? '');
+        $fromName = $this->conversationScalar($item['fromName'] ?? $item['senderName'] ?? data_get($item, 'sender.name') ?? data_get($item, 'from.name') ?? '');
 
         return [
             'id' => (string) ($item['id'] ?? $item['_id'] ?? $item['messageId'] ?? ''),
-            'direction' => (string) $direction,
-            'type' => (string) ($item['type'] ?? $item['messageType'] ?? 'TYPE_EMAIL'),
-            'subject' => (string) ($item['subject'] ?? $item['emailSubject'] ?? ''),
-            'body' => (string) $body,
-            'status' => (string) ($item['status'] ?? ''),
-            'from' => (string) ($item['from'] ?? $item['emailFrom'] ?? $item['sender'] ?? ''),
-            'to' => (string) ($item['to'] ?? $item['emailTo'] ?? $item['receiver'] ?? ''),
+            'direction' => $direction,
+            'type' => $this->conversationScalar($item['type'] ?? $item['messageType'] ?? 'TYPE_EMAIL'),
+            'subject' => $this->conversationScalar($item['subject'] ?? $item['emailSubject'] ?? data_get($item, 'email.subject') ?? ''),
+            'body' => $body,
+            'status' => $this->conversationScalar($item['status'] ?? ''),
+            'from' => $from,
+            'from_name' => $fromName ?: $from,
+            'to' => $to,
+            'attachments' => $this->extractConversationAttachments($item),
             'created_at' => $item['dateAdded'] ?? $item['createdAt'] ?? $item['created_at'] ?? null,
         ];
+    }
+
+    protected function conversationMessageBody(array $item): string
+    {
+        foreach ([
+            $item['html'] ?? null,
+            $item['body'] ?? null,
+            $item['emailMessage'] ?? null,
+            data_get($item, 'email.html'),
+            data_get($item, 'email.body'),
+            data_get($item, 'message.html'),
+            data_get($item, 'message.body'),
+            $item['message'] ?? null,
+            $item['text'] ?? null,
+            data_get($item, 'message.text'),
+        ] as $candidate) {
+            $value = $this->conversationHtmlValue($candidate);
+            if (trim(strip_tags($value)) !== '' || str_contains(strtolower($value), '<img')) {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    protected function conversationHtmlValue(mixed $value): string
+    {
+        if (is_null($value)) {
+            return '';
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        if (! is_array($value)) {
+            return '';
+        }
+
+        foreach (['html', 'body', 'message', 'emailMessage', 'content', 'text', 'value'] as $key) {
+            if (array_key_exists($key, $value)) {
+                $resolved = $this->conversationHtmlValue($value[$key]);
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        $parts = [];
+        foreach ($value as $child) {
+            $resolved = $this->conversationHtmlValue($child);
+            if (trim(strip_tags($resolved)) !== '') {
+                $parts[] = $resolved;
+            }
+        }
+
+        return implode("
+", $parts);
+    }
+
+    protected function conversationScalar(mixed $value): string
+    {
+        if (is_null($value)) {
+            return '';
+        }
+
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if (is_array($value)) {
+            foreach (['name', 'email', 'address', 'value', 'label', 'id'] as $key) {
+                if (array_key_exists($key, $value)) {
+                    $resolved = $this->conversationScalar($value[$key]);
+                    if ($resolved !== '') {
+                        return $resolved;
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
+    protected function extractConversationAttachments(array $item): array
+    {
+        $candidates = [
+            $item['attachments'] ?? null,
+            $item['emailAttachments'] ?? null,
+            $item['files'] ?? null,
+            $item['media'] ?? null,
+            data_get($item, 'email.attachments'),
+            data_get($item, 'message.attachments'),
+            data_get($item, 'body.attachments'),
+        ];
+
+        $attachments = [];
+        foreach ($candidates as $candidate) {
+            $this->collectConversationAttachments($candidate, $attachments);
+        }
+
+        return collect($attachments)
+            ->filter(fn (array $attachment): bool => filled($attachment['url'] ?? null))
+            ->unique(fn (array $attachment): string => (string) ($attachment['url'] ?? ''))
+            ->values()
+            ->all();
+    }
+
+    protected function collectConversationAttachments(mixed $value, array &$attachments): void
+    {
+        if (! is_array($value)) {
+            return;
+        }
+
+        $url = $this->conversationScalar($value['url'] ?? $value['link'] ?? $value['mediaUrl'] ?? $value['fileUrl'] ?? $value['downloadUrl'] ?? $value['thumbnailUrl'] ?? $value['src'] ?? '');
+        if ($url !== '') {
+            $attachments[] = [
+                'url' => $url,
+                'name' => $this->conversationScalar($value['name'] ?? $value['filename'] ?? $value['fileName'] ?? $value['title'] ?? 'Attachment'),
+                'mime_type' => $this->conversationScalar($value['mimeType'] ?? $value['mime_type'] ?? $value['contentType'] ?? $value['type'] ?? ''),
+                'type' => $this->conversationScalar($value['type'] ?? ''),
+            ];
+        }
+
+        foreach ($value as $child) {
+            if (is_array($child)) {
+                $this->collectConversationAttachments($child, $attachments);
+            }
+        }
     }
 }
