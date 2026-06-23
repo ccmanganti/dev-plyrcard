@@ -23,6 +23,14 @@ trait InteractsWithCoachDatabase
     public string $templateSourceSummary = '';
     public array $templateSourceDebug = [];
 
+    /**
+     * Per-request memoization for expensive cache reads/search indexes.
+     * These stay protected so Livewire does not try to serialize the full dataset repeatedly.
+     */
+    protected ?array $coachDatabaseSnapshotMemo = null;
+    protected ?array $coachSearchIndexMemo = null;
+    protected ?array $schoolCoachIndexMemo = null;
+
     public bool $allowed = false;
     public bool $locked = false;
     public ?string $reason = null;
@@ -2977,19 +2985,214 @@ HTML;
         }
 
         $text = strtolower(trim((string) $text));
-        return str_replace(['ncaa d-i', 'ncaa d-ii', 'ncaa d-iii', 'd-i', 'd-ii', 'd-iii', 'division i', 'division ii', 'division iii'], ['d1', 'd2', 'd3', 'd1', 'd2', 'd3', 'd1', 'd2', 'd3'], $text);
+
+        return str_replace([
+            'ncaa division i', 'ncaa division ii', 'ncaa division iii',
+            'ncaa d-i', 'ncaa d-ii', 'ncaa d-iii',
+            'ncaa d1', 'ncaa d2', 'ncaa d3',
+            'division i', 'division ii', 'division iii',
+            'd-i', 'd-ii', 'd-iii',
+            'd 1', 'd 2', 'd 3',
+        ], [
+            'd1', 'd2', 'd3',
+            'd1', 'd2', 'd3',
+            'd1', 'd2', 'd3',
+            'd1', 'd2', 'd3',
+            'd1', 'd2', 'd3',
+            'd1', 'd2', 'd3',
+        ], $text);
+    }
+
+    protected function normalizeDivisionValue(mixed $value): string
+    {
+        $text = $this->normalizeSearchText($value);
+        $compact = preg_replace('/[^a-z0-9]+/', '', $text) ?: '';
+
+        return match (true) {
+            $compact === 'd1' || str_contains($compact, 'division1') || str_contains($compact, 'divisioni') => 'd1',
+            $compact === 'd2' || str_contains($compact, 'division2') || str_contains($compact, 'divisionii') => 'd2',
+            $compact === 'd3' || str_contains($compact, 'division3') || str_contains($compact, 'divisioniii') => 'd3',
+            str_contains($compact, 'naia') => 'naia',
+            str_contains($compact, 'njcaa') => 'njcaa',
+            default => $compact,
+        };
+    }
+
+    protected function divisionMatches(mixed $actual, mixed $selected): bool
+    {
+        $selected = $this->normalizeDivisionValue($selected);
+
+        if ($selected === '') {
+            return true;
+        }
+
+        return $this->normalizeDivisionValue($actual) === $selected;
+    }
+
+    protected function conferenceSearchTokens(mixed $conference): array
+    {
+        $raw = trim($this->tokenText($conference));
+
+        if ($raw === '') {
+            return [];
+        }
+
+        $normalized = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $raw) ?: '');
+        $words = collect(preg_split('/\s+/', trim($normalized)) ?: [])
+            ->filter(fn (string $word): bool => $word !== '' && ! in_array($word, ['the', 'and', 'of', 'for', 'conference', 'athletic', 'athletics', 'association', 'league'], true))
+            ->values();
+
+        $abbr = $words
+            ->map(fn (string $word): string => substr($word, 0, 1))
+            ->implode('');
+
+        $aliases = [
+            'atlantic coast conference' => ['acc'],
+            'southeastern conference' => ['sec'],
+            'big ten conference' => ['big ten', 'b1g'],
+            'big 10 conference' => ['big ten', 'b1g'],
+            'big 12 conference' => ['big twelve'],
+            'big twelve conference' => ['big 12'],
+            'pac 12 conference' => ['pac12', 'pac 12'],
+            'pac twelve conference' => ['pac12', 'pac 12'],
+            'colonial athletic association' => ['caa'],
+            'coastal athletic association' => ['caa'],
+            'big east conference' => ['big east'],
+            'american athletic conference' => ['aac', 'the american'],
+            'atlantic 10 conference' => ['a10', 'a 10', 'atlantic ten'],
+            'atlantic ten conference' => ['a10', 'a 10', 'atlantic 10'],
+            'sun belt conference' => ['sun belt', 'sbc'],
+            'southern conference' => ['socon'],
+            'western athletic conference' => ['wac'],
+            'missouri valley conference' => ['mvc'],
+            'mountain west conference' => ['mwc'],
+            'west coast conference' => ['wcc'],
+            'big west conference' => ['big west'],
+            'horizon league' => ['horizon'],
+            'ivy league' => ['ivy'],
+            'patriot league' => ['patriot'],
+            'summit league' => ['summit'],
+            'southland conference' => ['southland'],
+            'ohio valley conference' => ['ovc'],
+            'metro atlantic athletic conference' => ['maac'],
+            'mid american conference' => ['mac'],
+            'mid-american conference' => ['mac'],
+            'america east conference' => ['america east', 'aec'],
+            'atlantic sun conference' => ['asun', 'a sun'],
+            'asun conference' => ['asun', 'a sun'],
+        ];
+
+        $tokens = [$raw, $normalized, $abbr];
+
+        foreach ($aliases as $name => $nameAliases) {
+            if ($normalized === $name || str_contains($normalized, $name) || str_contains($name, $normalized)) {
+                $tokens = array_merge($tokens, [$name], $nameAliases);
+            }
+        }
+
+        return collect($tokens)
+            ->map(fn ($token): string => trim((string) $token))
+            ->filter()
+            ->unique(fn (string $token): string => strtolower($token))
+            ->values()
+            ->all();
+    }
+
+    protected function conferenceMatches(mixed $conference, string $needle): bool
+    {
+        $needle = $this->normalizeSearchText($needle);
+
+        if ($needle === '') {
+            return true;
+        }
+
+        return str_contains($this->normalizeSearchText($this->conferenceSearchTokens($conference)), $needle);
+    }
+
+    protected function schoolCoachSearchIndex(): array
+    {
+        if (is_array($this->schoolCoachIndexMemo)) {
+            return $this->schoolCoachIndexMemo;
+        }
+
+        $index = [];
+
+        foreach ($this->allCoaches() as $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+
+            $keys = [];
+            $businessId = trim((string) ($coach['business_id'] ?? ''));
+            $schoolName = strtolower(trim((string) ($coach['school'] ?? '')));
+
+            if ($businessId !== '') {
+                $keys[] = 'business:' . $businessId;
+            }
+
+            if ($schoolName !== '') {
+                $keys[] = 'school:' . $schoolName;
+            }
+
+            foreach (array_unique($keys) as $key) {
+                $index[$key] ??= [];
+                $coachId = (string) ($coach['id'] ?? md5(json_encode($coach)));
+                $index[$key][$coachId] = $coach;
+            }
+        }
+
+        return $this->schoolCoachIndexMemo = $index;
+    }
+
+    protected function coachesForSchoolSearch(array $school): array
+    {
+        $keys = [];
+        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
+        $schoolName = strtolower(trim((string) ($school['name'] ?? '')));
+
+        if ($businessId !== '') {
+            $keys[] = 'business:' . $businessId;
+        }
+
+        if ($schoolName !== '') {
+            $keys[] = 'school:' . $schoolName;
+        }
+
+        $index = $this->schoolCoachSearchIndex();
+        $coaches = [];
+
+        foreach (array_unique($keys) as $key) {
+            foreach (($index[$key] ?? []) as $coachId => $coach) {
+                $coaches[$coachId] = $coach;
+            }
+        }
+
+        return array_values($coaches);
+    }
+
+    protected function coachSearchHaystack(array $coach): string
+    {
+        return $this->normalizeSearchText([
+            $coach['name'] ?? '',
+            $coach['first_name'] ?? '',
+            $coach['last_name'] ?? '',
+            $coach['email'] ?? '',
+            $coach['phone'] ?? '',
+            $coach['title'] ?? '',
+            $coach['position'] ?? '',
+            $coach['school'] ?? '',
+            $coach['conference'] ?? '',
+            $this->conferenceSearchTokens($coach['conference'] ?? ''),
+            $coach['division'] ?? '',
+            $coach['city'] ?? '',
+            $coach['state'] ?? '',
+            $coach['tags'] ?? [],
+        ]);
     }
 
     protected function schoolSearchHaystack(array $school): string
     {
-        $schoolName = trim((string) ($school['name'] ?? ''));
-        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-
-        $coaches = collect($this->allCoaches())
-            ->filter(function (array $coach) use ($schoolName, $businessId): bool {
-                return (string) ($coach['business_id'] ?? '') === $businessId
-                    || strtolower(trim((string) ($coach['school'] ?? ''))) === strtolower($schoolName);
-            })
+        $coaches = collect($this->coachesForSchoolSearch($school))
             ->flatMap(function (array $coach): array {
                 return [
                     $coach['name'] ?? '',
@@ -3001,6 +3204,7 @@ HTML;
                     $coach['school'] ?? '',
                     $coach['division'] ?? '',
                     $coach['conference'] ?? '',
+                    $this->conferenceSearchTokens($coach['conference'] ?? ''),
                     $coach['city'] ?? '',
                     $coach['state'] ?? '',
                 ];
@@ -3010,6 +3214,7 @@ HTML;
         return $this->normalizeSearchText(array_merge([
             $school['name'] ?? '',
             $school['conference'] ?? '',
+            $this->conferenceSearchTokens($school['conference'] ?? ''),
             $school['division'] ?? '',
             $school['city'] ?? '',
             $school['state'] ?? '',
@@ -3021,18 +3226,18 @@ HTML;
     protected function filteredSchoolsQuery(): Collection
     {
         $query = $this->normalizeSearchText($this->search);
-        $divisionFilter = $this->normalizeSearchText($this->divisionFilter);
+        $divisionFilter = $this->divisionFilter;
 
         return collect($this->allSchools())->filter(function (array $school) use ($query, $divisionFilter): bool {
             if ($query !== '' && ! str_contains($this->schoolSearchHaystack($school), $query)) {
                 return false;
             }
 
-            if ($divisionFilter !== '' && $this->normalizeSearchText($school['division'] ?? '') !== $divisionFilter) {
+            if ($divisionFilter !== '' && ! $this->divisionMatches($school['division'] ?? '', $divisionFilter)) {
                 return false;
             }
 
-            if ($this->conferenceFilter !== '' && strtolower((string) ($school['conference'] ?? '')) !== strtolower($this->conferenceFilter)) {
+            if ($this->conferenceFilter !== '' && ! $this->conferenceMatches($school['conference'] ?? '', $this->conferenceFilter)) {
                 return false;
             }
 
@@ -3043,36 +3248,22 @@ HTML;
     protected function filteredCoachesQuery(): Collection
     {
         $query = $this->normalizeSearchText($this->coachSearch !== '' ? $this->coachSearch : $this->search);
-        $divisionFilter = $this->normalizeSearchText($this->divisionFilter);
+        $divisionFilter = $this->divisionFilter;
 
         return collect($this->allCoaches())->filter(function (array $coach) use ($query, $divisionFilter): bool {
             if ($query !== '') {
-                $haystack = $this->normalizeSearchText([
-                    $coach['name'] ?? '',
-                    $coach['first_name'] ?? '',
-                    $coach['last_name'] ?? '',
-                    $coach['email'] ?? '',
-                    $coach['phone'] ?? '',
-                    $coach['title'] ?? '',
-                    $coach['position'] ?? '',
-                    $coach['school'] ?? '',
-                    $coach['conference'] ?? '',
-                    $coach['division'] ?? '',
-                    $coach['city'] ?? '',
-                    $coach['state'] ?? '',
-                    $coach['tags'] ?? [],
-                ]);
+                $haystack = $this->coachSearchHaystack($coach);
 
                 if (! str_contains($haystack, $query)) {
                     return false;
                 }
             }
 
-            if ($divisionFilter !== '' && $this->normalizeSearchText($coach['division'] ?? '') !== $divisionFilter) {
+            if ($divisionFilter !== '' && ! $this->divisionMatches($coach['division'] ?? '', $divisionFilter)) {
                 return false;
             }
 
-            if ($this->conferenceFilter !== '' && strtolower((string) ($coach['conference'] ?? '')) !== strtolower($this->conferenceFilter)) {
+            if ($this->conferenceFilter !== '' && ! $this->conferenceMatches($coach['conference'] ?? '', $this->conferenceFilter)) {
                 return false;
             }
 
@@ -3080,11 +3271,43 @@ HTML;
         })->sortBy(fn (array $coach): string => strtolower(($coach['school'] ?? '') . ' ' . ($coach['name'] ?? '')));
     }
 
-    protected function allSchools(): array { return Cache::get($this->activeCacheKey(), [])['schools'] ?? []; }
-    protected function allCoaches(): array { return Cache::get($this->activeCacheKey(), [])['coaches'] ?? []; }
+    protected function activeSnapshotRows(): array
+    {
+        if (is_array($this->coachDatabaseSnapshotMemo)) {
+            return $this->coachDatabaseSnapshotMemo;
+        }
+
+        $snapshot = Cache::get($this->activeCacheKey(), []);
+        $this->coachDatabaseSnapshotMemo = is_array($snapshot) ? $snapshot : [];
+
+        return $this->coachDatabaseSnapshotMemo;
+    }
+
+    protected function resetSearchMemos(): void
+    {
+        $this->coachDatabaseSnapshotMemo = null;
+        $this->coachSearchIndexMemo = null;
+        $this->schoolCoachIndexMemo = null;
+    }
+
+    protected function allSchools(): array
+    {
+        $snapshot = $this->activeSnapshotRows();
+        return is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [];
+    }
+
+    protected function allCoaches(): array
+    {
+        $snapshot = $this->activeSnapshotRows();
+        return is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [];
+    }
 
     protected function hydrateFromSnapshot(array $snapshot): void
     {
+        $this->coachDatabaseSnapshotMemo = is_array($snapshot) ? $snapshot : [];
+        $this->coachSearchIndexMemo = null;
+        $this->schoolCoachIndexMemo = null;
+
         $this->lists = $snapshot['lists'] ?? [];
         $this->stats = $snapshot['stats'] ?? [];
         $this->topSchools = $snapshot['top_schools'] ?? [];
