@@ -93,6 +93,13 @@
                     <span wire:loading.remove wire:target="selectSchoolById('{{ $schoolId }}')">View coaches</span>
                     <span wire:loading.flex wire:target="selectSchoolById('{{ $schoolId }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Loading</span>
                 </button>
+                <button type="button" class="rc-btn" wire:click="{{ $saveAction }}('{{ $schoolId }}')" wire:loading.attr="disabled" wire:target="saveSchoolById('{{ $schoolId }}'),unsaveSchoolById('{{ $schoolId }}')" aria-label="{{ $isSaved ? 'Remove from saved list' : 'Add to saved list' }}">
+                    <span wire:loading.remove wire:target="saveSchoolById('{{ $schoolId }}'),unsaveSchoolById('{{ $schoolId }}')" style="display:inline-flex;align-items:center;gap:.38rem">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        <span>{{ $isSaved ? 'Saved' : 'List' }}</span>
+                    </span>
+                    <span wire:loading.flex wire:target="saveSchoolById('{{ $schoolId }}'),unsaveSchoolById('{{ $schoolId }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span></span>
+                </button>
             </div>
         </article>
     @empty

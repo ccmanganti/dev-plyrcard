@@ -757,7 +757,7 @@
 
         .rc-campaign-shell {
             display: grid;
-            grid-template-columns: minmax(240px, 300px) minmax(420px, 1fr) minmax(360px, 460px);
+            grid-template-columns: minmax(240px, 320px) minmax(520px, 1fr);
             gap: 1rem;
             align-items: start;
         }
@@ -898,6 +898,175 @@
             border:1px solid rgba(148,163,184,.16);
             border-radius:1rem;
             background:rgba(255,255,255,.024);
+        }
+
+        .rc-rich-editor-shell {
+            border: 1px solid rgba(148,163,184,.2);
+            border-radius: 1.1rem;
+            overflow: hidden;
+            background: rgba(2,6,23,.32);
+        }
+
+        .rc-rich-editor-toolbar {
+            display:flex;
+            flex-wrap:wrap;
+            gap:.38rem;
+            padding:.65rem;
+            border-bottom:1px solid rgba(148,163,184,.14);
+            background:rgba(255,255,255,.025);
+        }
+
+        .rc-rich-tool {
+            min-width:2.15rem;
+            height:2.15rem;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:.35rem;
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:.65rem;
+            background:rgba(255,255,255,.035);
+            color:#e5e7eb;
+            font-size:.78rem;
+            font-weight:800;
+            transition:.15s ease;
+        }
+
+        .rc-rich-tool:hover {
+            border-color:rgba(255,91,50,.42);
+            color:#fff;
+            background:rgba(255,91,50,.11);
+        }
+
+        .rc-rich-editor {
+            min-height:34rem;
+            padding:1.1rem;
+            color:var(--rc-text);
+            background:rgba(2,6,23,.18);
+            font-family:Arial,Helvetica,sans-serif;
+            font-size:.98rem;
+            line-height:1.7;
+            outline:none;
+        }
+
+        .rc-rich-editor:empty:before {
+            content: attr(data-placeholder);
+            color:rgba(148,163,184,.72);
+        }
+
+        .rc-rich-editor img {
+            max-width:100%;
+            height:auto;
+            border-radius:.75rem;
+            margin:.7rem 0;
+        }
+
+        .rc-rich-editor a.rc-email-button {
+            display:inline-block;
+            margin:.75rem 0;
+            padding:.7rem 1rem;
+            border-radius:.75rem;
+            background:#ff5b32;
+            color:#fff !important;
+            font-weight:800;
+            text-decoration:none;
+        }
+
+
+        .rc-quill-editor {
+            min-height: 34rem;
+            background: #ffffff;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .rc-rich-editor-shell .ql-toolbar.ql-snow {
+            border: 0;
+            border-bottom: 1px solid rgba(148,163,184,.18);
+            background: rgba(255,255,255,.96);
+            padding: .65rem .75rem;
+            border-radius: 1.1rem 1.1rem 0 0;
+        }
+
+        .rc-rich-editor-shell .ql-container.ql-snow {
+            border: 0;
+            min-height: 34rem;
+            background: #ffffff;
+            border-radius: 0 0 1.1rem 1.1rem;
+            font-size: 1rem;
+        }
+
+        .rc-rich-editor-shell .ql-editor {
+            min-height: 34rem;
+            padding: 1.35rem;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.7;
+        }
+
+        .rc-rich-editor-shell .ql-editor.ql-blank::before {
+            color: #94a3b8;
+            font-style: normal;
+            left: 1.35rem;
+            right: 1.35rem;
+        }
+
+        .rc-rich-editor-shell .ql-editor img {
+            max-width: 100%;
+            border-radius: .75rem;
+            margin: .65rem 0;
+        }
+
+        .rc-rich-editor-shell .ql-editor .rc-email-button {
+            display: inline-block;
+            margin: .75rem 0;
+            padding: .7rem 1rem;
+            border-radius: .75rem;
+            background: #ff5b32;
+            color: #fff !important;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .rc-preview-modal-backdrop {
+            position:fixed;
+            inset:0;
+            z-index:70;
+            background:rgba(0,0,0,.72);
+            backdrop-filter:blur(9px);
+            display:grid;
+            place-items:center;
+            padding:1.5rem;
+        }
+
+        .rc-preview-modal {
+            width:min(820px,96vw);
+            max-height:88vh;
+            overflow:auto;
+            border-radius:1.35rem;
+            border:1px solid rgba(148,163,184,.22);
+            background:#fff;
+            color:#111827;
+            box-shadow:0 30px 90px rgba(0,0,0,.45);
+        }
+
+        .rc-preview-modal-head {
+            position:sticky;
+            top:0;
+            z-index:2;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:1rem;
+            padding:1rem 1.15rem;
+            border-bottom:1px solid #e5e7eb;
+            background:#fff;
+        }
+
+        .rc-preview-modal-body {
+            padding:1.35rem;
+            font-family:Arial,Helvetica,sans-serif;
+            line-height:1.7;
         }
 
         .rc-campaign-toolbar {
@@ -1275,6 +1444,15 @@
         .rc-school-card { min-height:unset; padding:1rem; border-radius:1rem; transition:transform .15s ease, border-color .15s ease, background .15s ease; }
         .rc-school-card:hover { transform:translateY(-2px); border-color:rgba(255,99,56,.5); }
         .rc-school-actions .rc-btn { min-width:5rem; }
+
+        /* v62 compose/template quick actions */
+        .rc-mini-action { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .7rem; border-radius:.7rem; border:1px solid rgba(148,163,184,.18); background:rgba(255,255,255,.045); color:#fff; font-weight:800; font-size:.82rem; transition:all .14s ease; }
+        .rc-mini-action:hover { border-color:rgba(255,99,56,.55); color:#ff7a5c; transform:translateY(-1px); }
+        .rc-rich-toolbar { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.55rem; }
+        .rc-rich-toolbar button { min-width:2.1rem; justify-content:center; }
+        .rc-search-slim { margin:.75rem 0 1rem; }
+        .rc-school-modal-actions { display:flex; flex-wrap:wrap; gap:.55rem; margin:1rem 0; }
+
         @media (max-width: 1100px) { .rc-compose-compact-grid,.rc-inbox-layout,.rc-school-filter-box { grid-template-columns:1fr; } .rc-recipient-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 
@@ -1655,10 +1833,12 @@
             <div class="rc-favorites-layout">
                 <div class="rc-card rc-favorites-panel">
                     <div class="rc-section-title">Saved schools</div>
+                    <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search saved schools" wire:model.live.debounce.350ms="favoriteSchoolSearch" />
                     @include('filament.partials.coach-database-school-grid', ['schools' => $this->savedSchools, 'compact' => true])
                 </div>
                 <div class="rc-card rc-favorites-panel">
                     <div class="rc-section-title">Favorite schools</div>
+                    <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search favorite schools" wire:model.live.debounce.350ms="favoriteSchoolSearch" />
                     @include('filament.partials.coach-database-school-grid', ['schools' => $this->favoriteSchools, 'compact' => true])
                 </div>
                 <div class="rc-card rc-coach-panel">
@@ -1716,6 +1896,7 @@
                             </div>
                             <button class="rc-btn" type="button" wire:click="clearSelectedList">Clear</button>
                         </div>
+                        <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search schools in this list" wire:model.live.debounce.350ms="listSchoolSearch" />
                         @include('filament.partials.coach-database-school-grid', ['schools' => $this->selectedListSchools, 'compact' => true])
                         <div class="rc-section-title" style="margin-top:1.25rem">Coaches in this list</div>
                         @forelse($this->selectedListCoaches as $coach)
@@ -1821,7 +2002,68 @@
                     @endif
 
                     @if($selectedConversationId || $selectedCoachId)
-                        @include('filament.partials.email-composer')
+                        @php($composerCoach = $this->selectedCoach)
+                        <div class="rc-native-email-composer" x-data="plyrNativeEditorBase('emailBody')" x-init="mount()" wire:key="native-email-composer-{{ $selectedCoachId ?: $selectedConversationId ?: 'new' }}">
+                            <div class="rc-card is-flat" style="display:grid;gap:.75rem;margin-top:.75rem">
+                                <div class="rc-top">
+                                    <div>
+                                        <div class="rc-row-title">Email {{ $composerCoach['name'] ?? ($selectedConversation['contact_name'] ?? 'coach') }}</div>
+                                        <div class="rc-subtle">Built-in PLYRCard editor. No external editor account required.</div>
+                                    </div>
+                                    <button class="rc-btn" type="button" wire:click="closeComposer">Close</button>
+                                </div>
+
+                                <label style="display:grid;gap:.35rem">
+                                    <span class="rc-section-title" style="margin:0">Subject</span>
+                                    <input class="rc-input" style="width:100%" type="text" wire:model.live.debounce.500ms="emailSubject" placeholder="Subject">
+                                </label>
+
+                                <div class="rc-rich-editor-shell rc-native-editor-shell">
+                                    <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Email message toolbar">
+                                        <button class="rc-rich-tool" type="button" @click="command('undo')">↶</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('redo')">↷</button>
+                                        <button class="rc-rich-tool" type="button" @click="block('p')">P</button>
+                                        <button class="rc-rich-tool" type="button" @click="block('h2')">H2</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('bold')"><strong>B</strong></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('italic')"><em>I</em></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('underline')"><u>U</u></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
+                                        <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
+                                        <button class="rc-rich-tool" type="button" @click="addImage()">Image</button>
+                                        <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
+                                    </div>
+                                    <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                    </div>
+                                    <div
+                                        x-ref="editor"
+                                        class="rc-rich-editor rc-native-editor"
+                                        contenteditable="true"
+                                        data-placeholder="Write your message..."
+                                        data-initial-body="{{ base64_encode($emailBody ?? '') }}"
+                                        @input="queueSync()"
+                                        @blur="syncNow()"
+                                    ></div>
+                                </div>
+
+                                <div class="rc-toolbar" style="justify-content:flex-end">
+                                    <button class="rc-btn" type="button" wire:click="closeComposer">Cancel</button>
+                                    <button class="rc-btn rc-btn-primary" type="button" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
+                                        <span wire:loading.remove wire:target="sendEmail">Send email</span>
+                                        <span wire:loading.flex wire:target="sendEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -1939,6 +2181,19 @@
                         </div>
 
                         <div class="rc-compact-panel">
+                            <div class="rc-template-field-label">Email image</div>
+                            @if($composeGraphicUrl)
+                                <div style="display:flex;align-items:center;gap:.65rem;margin:.55rem 0">
+                                    <img src="{{ $composeGraphicUrl }}" alt="Email image" style="width:4.5rem;height:4.5rem;object-fit:cover;border-radius:.75rem;border:1px solid rgba(148,163,184,.25)">
+                                    <button class="rc-btn" type="button" wire:click="removeComposeGraphic">Remove</button>
+                                </div>
+                            @endif
+                            <input class="rc-input" style="width:100%;margin-bottom:.45rem" type="file" accept="image/*" wire:model="composeGraphicUpload" />
+                            <input class="rc-input" style="width:100%" placeholder="Paste image URL" wire:model.live.debounce.650ms="composeGraphicUrl" />
+                            <div wire:loading.flex wire:target="composeGraphicUpload,composeGraphicUrl" class="rc-loading-inline" style="margin-top:.5rem"><span class="rc-spinner-mini"></span> Updating image</div>
+                        </div>
+
+                        <div class="rc-compact-panel">
                             <div class="rc-subtle"><strong>{{ number_format($this->campaignRecipientCount) }}</strong> coaches will receive this email.</div>
                         </div>
 
@@ -1949,13 +2204,55 @@
 
                         <div>
                             <div class="rc-template-field-label">Message</div>
-                            <div class="rc-campaign-toolbar" style="margin-bottom:.55rem">
-                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{CoachFirstName}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Coach first</button>
-                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{SchoolName}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">School</button>
-                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{Position}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Position</button>
-                                <button class="rc-token-chip" type="button" x-data x-on:click="const el=document.getElementById('composeBodyEditor'); el.focus(); el.setRangeText('@{{HighlightLink}}', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input',{bubbles:true}));">Highlight link</button>
+                            <div
+                                class="rc-rich-editor-shell rc-native-editor-shell"
+                                wire:ignore
+                                x-data="plyrCampaignBodyEditor()"
+                                x-init="mount()"
+                            >
+                                <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Campaign message toolbar">
+                                    <button class="rc-rich-tool" type="button" title="Undo" @click="command('undo')">↶</button>
+                                    <button class="rc-rich-tool" type="button" title="Redo" @click="command('redo')">↷</button>
+                                    <button class="rc-rich-tool" type="button" title="Paragraph" @click="block('p')">P</button>
+                                    <button class="rc-rich-tool" type="button" title="Heading" @click="block('h2')">H2</button>
+                                    <button class="rc-rich-tool" type="button" title="Bold" @click="command('bold')"><strong>B</strong></button>
+                                    <button class="rc-rich-tool" type="button" title="Italic" @click="command('italic')"><em>I</em></button>
+                                    <button class="rc-rich-tool" type="button" title="Underline" @click="command('underline')"><u>U</u></button>
+                                    <button class="rc-rich-tool" type="button" title="Bullet list" @click="command('insertUnorderedList')">• List</button>
+                                    <button class="rc-rich-tool" type="button" title="Numbered list" @click="command('insertOrderedList')">1. List</button>
+                                    <button class="rc-rich-tool" type="button" title="Add link" @click="addLink()">Link</button>
+                                    <button class="rc-rich-tool" type="button" title="Add image" @click="addImage()">Image</button>
+                                    <button class="rc-rich-tool" type="button" title="Add button" @click="addButton()">Button</button>
+                                    <button class="rc-rich-tool" type="button" title="Clear formatting" @click="command('removeFormat')">Clear</button>
+                                </div>
+                                <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Campaign merge values">
+                                    <span class="rc-subtle" style="align-self:center">Insert value:</span>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                </div>
+                                <div
+                                    x-ref="editor"
+                                    class="rc-rich-editor rc-native-editor"
+                                    contenteditable="true"
+                                    data-plyr-native-editor="campaign-body"
+                                    data-placeholder="Write your message..."
+                                    data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
+                                    x-on:input="queueSync()"
+                                    x-on:blur="syncNow()"
+                                ></div>
                             </div>
-                            <textarea id="composeBodyEditor" class="rc-input" style="width:100%;min-height:17rem;line-height:1.6;resize:vertical" placeholder="Write your message..." wire:model.live.debounce.800ms="campaignBody"></textarea>
+                            <input
+                                x-ref="campaignBodyHidden"
+                                type="hidden"
+                                data-plyr-native-editor-hidden="campaign-body"
+                                wire:model.live.debounce.800ms="campaignBody"
+                            />
                         </div>
                     </div>
                 </div>
@@ -2021,12 +2318,20 @@
                     <div class="rc-campaign-panel-header">
                         <div>
                             <div class="rc-section-title">Edit template</div>
-                            <div class="rc-subtle">Write once. Reuse anytime.</div>
+                            <div class="rc-subtle">Write the email body directly with formatting.</div>
                         </div>
                         <div style="display:flex;gap:.5rem;align-items:center">
                             @if($selectedTemplateId && ! $templateIsNew)
                                 <button class="rc-btn" type="button" wire:click="deleteTemplate" wire:loading.attr="disabled" wire:target="deleteTemplate"><span wire:loading.remove wire:target="deleteTemplate">Delete</span><span wire:loading.flex wire:target="deleteTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Deleting</span></button>
                             @endif
+                            <button
+                                class="rc-btn"
+                                type="button"
+                                x-data
+                                x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"
+                            >
+                                Preview
+                            </button>
                             <button class="rc-btn rc-btn-primary" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
                                 <span wire:loading.remove wire:target="saveTemplate">Save</span>
                                 <span wire:loading.flex wire:target="saveTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Saving</span>
@@ -2034,7 +2339,13 @@
                         </div>
                     </div>
 
-                    <div class="rc-campaign-compose" x-data>
+                    <div
+                        class="rc-campaign-compose"
+                        wire:key="template-rich-editor-{{ $selectedTemplateId ?: ($templateIsNew ? 'new' : 'blank') }}"
+                        x-data="plyrTemplateEditor()"
+                        x-init="mount()"
+                        @keydown.escape.window="showPreview = false"
+                    >
                         @if($templateIsNew)
                             <span class="rc-template-pill">New template</span>
                         @elseif($templateName !== '')
@@ -2048,7 +2359,7 @@
 
                         <label>
                             <span class="rc-template-field-label">Subject line</span>
-                            <input class="rc-input" style="width:100%" placeholder="{{ '{' }}{{ '{' }}GraduationYear{{ '}' }}{{ '}' }} {{ '{' }}{{ '{' }}Position{{ '}' }}{{ '}' }} — Interested in {{ '{' }}{{ '{' }}SchoolName{{ '}' }}{{ '}' }}" wire:model.live.debounce.650ms="templateSubject" />
+                            <input x-ref="subject" class="rc-input" style="width:100%" placeholder="{{ '{' }}{{ '{' }}GraduationYear{{ '}' }}{{ '}' }} {{ '{' }}{{ '{' }}Position{{ '}' }}{{ '}' }} — Interested in {{ '{' }}{{ '{' }}SchoolName{{ '}' }}{{ '}' }}" wire:model.live.debounce.650ms="templateSubject" />
                         </label>
 
                         <label>
@@ -2057,65 +2368,71 @@
                         </label>
 
                         <div>
-                            <div class="rc-template-field-label">Add values</div>
-                            <div class="rc-campaign-toolbar">
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{CoachFirstName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Coach first</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{CoachLastName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Coach last</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{SchoolName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">School</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{AthleteName}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Athlete</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{GraduationYear}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Grad year</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{Position}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Position</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{HighlightLink}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Highlight link</button>
-                                <button class="rc-token-chip" type="button" x-on:click="$refs.body.focus(); $refs.body.setRangeText('@{{ProfileLink}}', $refs.body.selectionStart, $refs.body.selectionEnd, 'end'); $refs.body.dispatchEvent(new Event('input', { bubbles: true })); $refs.body.dispatchEvent(new Event('change', { bubbles: true }))">Profile link</button>
+                            <div class="rc-template-field-label">Message</div>
+                            <div class="rc-rich-editor-shell rc-native-editor-shell" wire:ignore>
+                                <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Template editor toolbar">
+                                    <button class="rc-rich-tool" type="button" title="Undo" @click="command('undo')">↶</button>
+                                    <button class="rc-rich-tool" type="button" title="Redo" @click="command('redo')">↷</button>
+                                    <button class="rc-rich-tool" type="button" title="Paragraph" @click="block('p')">P</button>
+                                    <button class="rc-rich-tool" type="button" title="Heading" @click="block('h2')">H2</button>
+                                    <button class="rc-rich-tool" type="button" title="Bold" @click="command('bold')"><strong>B</strong></button>
+                                    <button class="rc-rich-tool" type="button" title="Italic" @click="command('italic')"><em>I</em></button>
+                                    <button class="rc-rich-tool" type="button" title="Underline" @click="command('underline')"><u>U</u></button>
+                                    <button class="rc-rich-tool" type="button" title="Bullet list" @click="command('insertUnorderedList')">• List</button>
+                                    <button class="rc-rich-tool" type="button" title="Numbered list" @click="command('insertOrderedList')">1. List</button>
+                                    <button class="rc-rich-tool" type="button" title="Add link" @click="addLink()">Link</button>
+                                    <button class="rc-rich-tool" type="button" title="Upload image" @click="openImageUpload()">Image</button>
+                                    <button class="rc-rich-tool" type="button" title="Add button" @click="addButton()">Button</button>
+                                    <button class="rc-rich-tool" type="button" title="Add simple table" @click="addTable()">Table</button>
+                                    <button class="rc-rich-tool" type="button" title="Clear formatting" @click="command('removeFormat')">Clear</button>
+                                </div>
+                                <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
+                                    <span class="rc-subtle" style="align-self:center">Insert value:</span>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                </div>
+                                <div
+                                    x-ref="editor"
+                                    class="rc-rich-editor rc-native-editor"
+                                    contenteditable="true"
+                                    data-placeholder="Write your email template here..."
+                                    data-initial-body="{{ base64_encode($templateBody ?? '') }}"
+                                    x-on:input="queueSync()"
+                                    x-on:blur="syncNow()"
+                                ></div>
+                            </div>
+                            <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
+                            <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody" />
+                            <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.65rem">
+                                <span class="rc-subtle" x-show="!uploadingImages">Built-in PLYRCard editor. No external editor account or API key required.</span>
+                                <span class="rc-subtle" x-show="uploadingImages" style="display:inline-flex;align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Uploading image…</span>
                             </div>
                         </div>
 
-                        <div class="rc-template-graphic-card">
-                            <div class="rc-template-field-label" style="margin-bottom:.5rem">Top graphic</div>
-                            <div class="rc-subtle" style="margin-bottom:.75rem">Optional image above the message.</div>
-                            @if($templateGraphicUrl)
-                                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
-                                    <img src="{{ $templateGraphicUrl }}" alt="Template graphic" style="width:5rem;height:5rem;object-fit:cover;border-radius:.75rem;border:1px solid rgba(148,163,184,.25)">
-                                    <button class="rc-btn" type="button" wire:click="removeTemplateGraphic">Remove</button>
+                        <div class="rc-preview-modal-backdrop" x-cloak x-show="showPreview" x-transition.opacity>
+                            <div class="rc-preview-modal" @click.outside="showPreview = false">
+                                <div class="rc-preview-modal-head">
+                                    <div>
+                                        <div style="font-size:.78rem;color:#64748b;margin-bottom:.25rem">To: Stephens Salas • Abilene Christian University</div>
+                                        <h3 style="margin:0;font-size:1.2rem;line-height:1.35;font-weight:800" x-text="previewSubject()"></h3>
+                                    </div>
+                                    <button type="button" class="rc-btn" @click="showPreview = false">Close</button>
                                 </div>
-                            @endif
-                            <input class="rc-input" style="width:100%;margin-bottom:.5rem" type="file" accept="image/*" wire:model="templateGraphicUpload" />
-                            <input class="rc-input" style="width:100%" placeholder="Or paste image URL" wire:model.live.debounce.650ms="templateGraphicUrl" />
-                            <div wire:loading.flex wire:target="templateGraphicUpload" class="rc-subtle" style="margin-top:.5rem;align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Uploading</div>
-                        </div>
-
-                        <label>
-                            <span class="rc-template-field-label">Message</span>
-                            <textarea x-ref="body" class="rc-input" style="width:100%;min-height:30rem;line-height:1.6;resize:vertical" placeholder="Write your template message here..." wire:model.live.debounce.800ms="templateBody"></textarea>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="rc-campaign-panel">
-                    <div class="rc-campaign-panel-header">
-                        <div>
-                            <div class="rc-section-title">Live preview</div>
-                            <div class="rc-subtle">Sample coach view</div>
-                        </div>
-                    </div>
-
-                    <div class="rc-preview-card-soft rc-preview-content-font" style="position:relative">
-                        <div wire:loading.flex wire:target="templateName,templateSubject,templatePreviewText,templateBody,templateGraphicUrl,templateGraphicUpload" class="rc-preview-updating">
-                            <span class="rc-spinner-mini"></span><span>Updating</span>
-                        </div>
-                        <div style="padding:1rem 1.15rem;border-bottom:1px solid #e5e7eb;background:#fff">
-                            <div style="font-size:.76rem;color:#64748b;margin-bottom:.45rem">To: Stephens Salas • Abilene Christian University</div>
-                            <h3 style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:1.2rem;line-height:1.38;color:#111827;font-weight:800">{{ $this->renderedTemplateSubject ?: 'Subject preview' }}</h3>
-                            @if($this->renderedTemplatePreviewText)
-                                <div style="margin-top:.35rem;color:#64748b;font-size:.86rem">{{ $this->renderedTemplatePreviewText }}</div>
-                            @endif
-                        </div>
-                        <div style="padding:1.35rem;font-family:Arial,Helvetica,sans-serif;font-size:.98rem;line-height:1.7;min-height:32rem;background:#fff;color:#111827">
-                            @if(trim($templateBody) !== '')
-                                {!! $this->renderedTemplateBody !!}
-                            @else
-                                <p style="color:#64748b">Your message preview will appear here.</p>
-                            @endif
+                                <div class="rc-preview-modal-body">
+                                    <template x-if="previewGraphic()">
+                                        <img :src="previewGraphic()" alt="Email graphic" style="max-width:100%;border-radius:1rem;margin-bottom:1rem">
+                                    </template>
+                                    <div x-html="previewHtml()"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2124,7 +2441,68 @@
 
         @if($selectedCoachId && $section !== 'conversations')
             <div class="rc-card">
-                @include('filament.partials.email-composer')
+                @php($composerCoach = $this->selectedCoach)
+                        <div class="rc-native-email-composer" x-data="plyrNativeEditorBase('emailBody')" x-init="mount()" wire:key="native-email-composer-{{ $selectedCoachId ?: $selectedConversationId ?: 'new' }}">
+                            <div class="rc-card is-flat" style="display:grid;gap:.75rem;margin-top:.75rem">
+                                <div class="rc-top">
+                                    <div>
+                                        <div class="rc-row-title">Email {{ $composerCoach['name'] ?? ($selectedConversation['contact_name'] ?? 'coach') }}</div>
+                                        <div class="rc-subtle">Built-in PLYRCard editor. No external editor account required.</div>
+                                    </div>
+                                    <button class="rc-btn" type="button" wire:click="closeComposer">Close</button>
+                                </div>
+
+                                <label style="display:grid;gap:.35rem">
+                                    <span class="rc-section-title" style="margin:0">Subject</span>
+                                    <input class="rc-input" style="width:100%" type="text" wire:model.live.debounce.500ms="emailSubject" placeholder="Subject">
+                                </label>
+
+                                <div class="rc-rich-editor-shell rc-native-editor-shell">
+                                    <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Email message toolbar">
+                                        <button class="rc-rich-tool" type="button" @click="command('undo')">↶</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('redo')">↷</button>
+                                        <button class="rc-rich-tool" type="button" @click="block('p')">P</button>
+                                        <button class="rc-rich-tool" type="button" @click="block('h2')">H2</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('bold')"><strong>B</strong></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('italic')"><em>I</em></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('underline')"><u>U</u></button>
+                                        <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
+                                        <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
+                                        <button class="rc-rich-tool" type="button" @click="addImage()">Image</button>
+                                        <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
+                                        <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
+                                    </div>
+                                    <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                    </div>
+                                    <div
+                                        x-ref="editor"
+                                        class="rc-rich-editor rc-native-editor"
+                                        contenteditable="true"
+                                        data-placeholder="Write your message..."
+                                        data-initial-body="{{ base64_encode($emailBody ?? '') }}"
+                                        @input="queueSync()"
+                                        @blur="syncNow()"
+                                    ></div>
+                                </div>
+
+                                <div class="rc-toolbar" style="justify-content:flex-end">
+                                    <button class="rc-btn" type="button" wire:click="closeComposer">Cancel</button>
+                                    <button class="rc-btn rc-btn-primary" type="button" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
+                                        <span wire:loading.remove wire:target="sendEmail">Send email</span>
+                                        <span wire:loading.flex wire:target="sendEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
             </div>
         @endif
 
@@ -2132,7 +2510,7 @@
             <div class="rc-drawer" wire:key="school-drawer">
                 <div class="rc-drawer-panel">
                     <div class="rc-top"><div><div class="rc-title">{{ $this->selectedSchool['name'] }}</div><div class="rc-subtle">{{ $this->selectedSchool['conference'] ?? 'Conference unavailable' }} · {{ $this->selectedSchool['division'] ?? 'Division unavailable' }}</div></div><button class="rc-btn" wire:click="closeSchool">Close</button></div>
-                    <div class="rc-toolbar" style="margin:1rem 0">
+                    <div class="rc-school-modal-actions">
                         @php($schoolId = $this->selectedSchool['id'])
                         <button class="rc-btn" wire:click="{{ ($this->selectedSchool['is_saved'] ?? false) ? 'unsaveSchoolById' : 'saveSchoolById' }}('{{ $schoolId }}')" wire:loading.attr="disabled" wire:target="saveSchoolById('{{ $schoolId }}'),unsaveSchoolById('{{ $schoolId }}')">
                             {{ ($this->selectedSchool['is_saved'] ?? false) ? 'Saved' : 'Save' }}
@@ -2140,6 +2518,7 @@
                         <button class="rc-btn" wire:click="{{ ($this->selectedSchool['is_favorite'] ?? false) ? 'unfavoriteSchoolById' : 'favoriteSchoolById' }}('{{ $schoolId }}')" wire:loading.attr="disabled" wire:target="favoriteSchoolById('{{ $schoolId }}'),unfavoriteSchoolById('{{ $schoolId }}')">
                             {{ ($this->selectedSchool['is_favorite'] ?? false) ? 'Favorited' : 'Favorite' }}
                         </button>
+                        <button class="rc-btn rc-btn-primary" type="button" wire:click="composeEmailSchool('{{ $schoolId }}')">Email coaches</button>
                     </div>
                     @if(count($lists))
                         <div class="rc-toolbar" style="margin-bottom:1rem">
@@ -2159,4 +2538,245 @@
         @endif
     </div>
     </div>
+
+    <script>
+        window.plyrNativeEditorBase = function (modelName, initialBody = '') {
+            return {
+                syncTimer: null,
+                mounted: false,
+                mount() {
+                    if (this.mounted) return;
+                    this.mounted = true;
+                    this.$nextTick(() => this.bootEditor());
+                },
+                bootEditor() {
+                    if (!this.$refs.editor) return;
+                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
+                    if (html && this.$refs.editor.innerHTML.trim() === '') this.$refs.editor.innerHTML = html;
+                    this.syncNow();
+                },
+                decodeInitialBody(initial) {
+                    if (!initial) return '';
+                    try { return decodeURIComponent(escape(window.atob(initial))); }
+                    catch (error) { try { return window.atob(initial); } catch (_) { return ''; } }
+                },
+                queueSync() {
+                    clearTimeout(this.syncTimer);
+                    this.syncTimer = setTimeout(() => this.syncNow(), 250);
+                },
+                syncNow() {
+                    if (!this.$refs.editor) return;
+                    const html = this.$refs.editor.innerHTML || '';
+                    if (modelName && this.$wire) this.$wire.set(modelName, html, true);
+                },
+                focusEditor() { this.$refs.editor?.focus(); },
+                command(name, value = null) {
+                    this.focusEditor();
+                    document.execCommand(name, false, value);
+                    this.syncNow();
+                },
+                block(tag) {
+                    const safeTag = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tag) ? tag : 'p';
+                    this.command('formatBlock', safeTag);
+                },
+                escapeHtml(value) {
+                    return String(value || '')
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                },
+                cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
+                mergeToken(name) { return '{' + '{' + String(name || '').trim() + '}' + '}'; },
+                insertHtml(html) {
+                    this.focusEditor();
+                    document.execCommand('insertHTML', false, html);
+                    this.syncNow();
+                },
+                insertMerge(name) { this.insertHtml(this.escapeHtml(this.mergeToken(name))); },
+                addLink() {
+                    const url = this.cleanUrl(prompt('Link URL', 'https://'));
+                    if (!url) return;
+                    const selection = String(window.getSelection?.() || '').trim();
+                    const label = selection || this.cleanUrl(prompt('Link text', url)) || url;
+                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                },
+                addImage() {
+                    const url = this.cleanUrl(prompt('Image URL', 'https://'));
+                    if (!url) return;
+                    this.insertHtml('<p><img src="' + this.escapeHtml(url) + '" alt="Email image" style="max-width:100%;height:auto;border-radius:12px;" /></p>');
+                },
+                addButton() {
+                    const label = prompt('Button text', 'View profile') || 'View profile';
+                    const url = this.cleanUrl(prompt('Button link URL', 'https://'));
+                    if (!url) return;
+                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a></p>');
+                }
+            };
+        };
+
+        window.plyrCampaignBodyEditor = function () {
+            return window.plyrNativeEditorBase('campaignBody');
+        };
+
+        window.plyrTemplateEditor = function () {
+            return {
+                showPreview: false,
+                mounted: false,
+                syncTimer: null,
+                uploadingImages: false,
+                mount() {
+                    if (this.mounted) return;
+                    this.mounted = true;
+
+                    this.$nextTick(() => this.bootEditor());
+
+                    document.addEventListener('rc-open-template-preview', () => {
+                        this.syncNow();
+                        this.showPreview = true;
+                    });
+                },
+                bootEditor() {
+                    if (!this.$refs.editor) return;
+
+                    const html = this.decodeInitialBody();
+                    if (html && this.$refs.editor.innerHTML.trim() === '') {
+                        this.$refs.editor.innerHTML = html;
+                    }
+
+                    this.syncNow();
+                },
+                decodeInitialBody() {
+                    const initial = this.$refs.editor?.dataset?.initialBody || '';
+                    if (!initial) return '';
+
+                    try {
+                        return decodeURIComponent(escape(window.atob(initial)));
+                    } catch (error) {
+                        try { return window.atob(initial); } catch (_) { return ''; }
+                    }
+                },
+                queueSync() {
+                    clearTimeout(this.syncTimer);
+                    this.syncTimer = setTimeout(() => this.syncNow(), 250);
+                },
+                syncNow() {
+                    if (!this.$refs.hidden || !this.$refs.editor) return;
+
+                    const html = this.$refs.editor.innerHTML || '';
+                    this.$refs.hidden.value = html;
+                    this.$refs.hidden.dispatchEvent(new Event('input', { bubbles: true }));
+                    this.$refs.hidden.dispatchEvent(new Event('change', { bubbles: true }));
+                },
+                focusEditor() {
+                    this.$refs.editor?.focus();
+                },
+                command(name, value = null) {
+                    this.focusEditor();
+                    document.execCommand(name, false, value);
+                    this.syncNow();
+                },
+                block(tag) {
+                    const safeTag = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tag) ? tag : 'p';
+                    this.command('formatBlock', safeTag);
+                },
+                mergeToken(name) {
+                    return '{' + '{' + String(name || '').trim() + '}' + '}';
+                },
+                insertHtml(html) {
+                    this.focusEditor();
+                    document.execCommand('insertHTML', false, html);
+                    this.syncNow();
+                },
+                insertMerge(name) {
+                    const token = this.mergeToken(name);
+                    if (!token) return;
+                    this.insertHtml(this.escapeHtml(token));
+                },
+                cleanUrl(url) {
+                    return String(url || '').trim().replace(/["<>]/g, '');
+                },
+                escapeHtml(value) {
+                    return String(value || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+                },
+                openImageUpload() {
+                    if (!this.$refs.imageUpload) return;
+                    this.$refs.imageUpload.value = '';
+                    this.$refs.imageUpload.click();
+                },
+                uploadInlineImages(event) {
+                    const files = Array.from(event.target.files || []);
+                    if (!files.length) return;
+
+                    this.uploadingImages = true;
+                    const uploadNext = (index = 0) => {
+                        if (index >= files.length) {
+                            this.uploadingImages = false;
+                            event.target.value = '';
+                            this.syncNow();
+                            return;
+                        }
+
+                        const file = files[index];
+                        this.$wire.upload('templateInlineImageUpload', file, () => {
+                            this.$wire.call('uploadTemplateEditorImage').then((result) => {
+                                if (result && result.success && result.url) {
+                                    this.insertImage(result.url);
+                                } else {
+                                    alert((result && result.error) ? result.error : 'Image upload failed.');
+                                }
+                                uploadNext(index + 1);
+                            }).catch((error) => {
+                                console.error(error);
+                                alert('Image upload failed.');
+                                uploadNext(index + 1);
+                            });
+                        }, () => {
+                            alert('Image upload failed.');
+                            uploadNext(index + 1);
+                        });
+                    };
+
+                    uploadNext();
+                },
+                insertImage(url) {
+                    const clean = this.cleanUrl(url);
+                    if (!clean) return;
+                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" style="max-width:100%;height:auto;" alt="" /></p>');
+                },
+                addLink() {
+                    const url = this.cleanUrl(prompt('Link URL'));
+                    if (!url) return;
+
+                    const selection = String(window.getSelection?.() || '').trim();
+                    const label = selection || this.cleanUrl(prompt('Link text', url)) || url;
+                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                },
+                addButton() {
+                    const label = prompt('Button text', 'View profile');
+                    if (!label) return;
+
+                    const url = this.cleanUrl(prompt('Button link URL'));
+                    if (!url) return;
+
+                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a></p>');
+                },
+                addTable() {
+                    this.insertHtml('<table style="width:100%;border-collapse:collapse;margin:12px 0;"><tr><td style="border:1px solid #e5e7eb;padding:8px;">Label</td><td style="border:1px solid #e5e7eb;padding:8px;">Value</td></tr><tr><td style="border:1px solid #e5e7eb;padding:8px;">School</td><td style="border:1px solid #e5e7eb;padding:8px;">' + this.escapeHtml(this.mergeToken('SchoolName')) + '</td></tr></table>');
+                },
+                previewSubject() {
+                    return this.$refs.subject?.value || 'Subject preview';
+                },
+                previewGraphic() {
+                    return '';
+                },
+                previewHtml() {
+                    return this.$refs.editor ? this.$refs.editor.innerHTML : '';
+                }
+            };
+        };
+    </script>
 </x-filament-panels::page>

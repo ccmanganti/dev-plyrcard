@@ -3096,6 +3096,128 @@ class GoHighLevelService
         return '';
     }
 
+
+    public function uploadMediaForUser(User $user, mixed $file): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'error' => 'Missing recruiting data connection.'];
+        }
+
+        if (! is_object($file) || ! method_exists($file, 'getRealPath')) {
+            return ['success' => false, 'error' => 'Choose a valid image.'];
+        }
+
+        $path = (string) $file->getRealPath();
+        if ($path === '' || ! is_file($path)) {
+            return ['success' => false, 'error' => 'Image upload could not be read.'];
+        }
+
+        $name = method_exists($file, 'getClientOriginalName')
+            ? (string) $file->getClientOriginalName()
+            : ('plyrcard-template-image-' . now()->format('YmdHis') . '.jpg');
+
+        $mimeType = method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : 'image/jpeg';
+        $lastError = 'Unable to upload image.';
+        $lastStatus = null;
+        $lastRaw = [];
+
+        foreach (['v3', '2021-07-28'] as $version) {
+            try {
+                $handle = fopen($path, 'r');
+                if (! $handle) {
+                    return ['success' => false, 'error' => 'Image upload could not be opened.'];
+                }
+
+                $response = Http::withHeaders(['Version' => $version])
+                    ->timeout((int) config('ghl.timeout', 30))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->attach('file', $handle, $name, ['Content-Type' => $mimeType])
+                    ->post("{$this->baseUrl}/medias/upload-file", [
+                        'hosted' => false,
+                        'name' => $name,
+                    ]);
+
+                if (is_resource($handle)) {
+                    fclose($handle);
+                }
+
+                $data = $response->json();
+                if (! is_array($data)) {
+                    $data = [];
+                }
+
+                $lastStatus = $response->status();
+                $lastRaw = $data;
+
+                if (! $response->successful()) {
+                    $lastError = $this->extractApiErrorMessage($data, 'Unable to upload image.');
+                    continue;
+                }
+
+                $url = $this->extractMediaUploadUrl($data);
+
+                if ($url === '') {
+                    $lastError = 'Image uploaded, but no URL was returned.';
+                    continue;
+                }
+
+                return [
+                    'success' => true,
+                    'url' => $url,
+                    'raw' => $data,
+                    'version' => $version,
+                ];
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage() ?: 'Unable to upload image.';
+            }
+        }
+
+        return [
+            'success' => false,
+            'error' => $lastError,
+            'status' => $lastStatus,
+            'raw' => $lastRaw,
+        ];
+    }
+
+    private function extractMediaUploadUrl(array $data): string
+    {
+        $candidates = [
+            $data['url'] ?? null,
+            $data['fileUrl'] ?? null,
+            $data['mediaUrl'] ?? null,
+            data_get($data, 'file.url'),
+            data_get($data, 'file.fileUrl'),
+            data_get($data, 'data.url'),
+            data_get($data, 'data.fileUrl'),
+            data_get($data, 'uploadedFiles.0.url'),
+            data_get($data, 'uploadedFiles.0.fileUrl'),
+            data_get($data, 'uploadedFiles.0.mediaUrl'),
+            data_get($data, 'files.0.url'),
+            data_get($data, 'files.0.fileUrl'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        $flat = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($data));
+        foreach ($flat as $value) {
+            if (is_string($value) && preg_match('/^https?:\/\//i', $value)) {
+                return trim($value);
+            }
+        }
+
+        return '';
+    }
+
     public function createEmailTemplateForUser(User $user, string $name, string $subject, string $body, string $previewText = ''): array
     {
         return $this->saveSimpleEmailTemplateForUser($user, null, $name, $subject, $body, $previewText);

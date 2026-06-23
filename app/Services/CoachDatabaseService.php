@@ -852,4 +852,10 @@ class CoachDatabaseService
 
         return $this->goHighLevelService->deleteEmailTemplateForUser($user, $templateId);
     }
+
+    public function uploadMediaForUser(User $user, mixed $file): array
+    {
+        return $this->goHighLevelService->uploadMediaForUser($user, $file);
+    }
+
 }

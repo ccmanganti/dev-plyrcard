@@ -35,6 +35,8 @@ trait InteractsWithCoachDatabase
     public string $conversationSearch = '';
     public string $conversationSchoolFilter = '';
     public string $composeSchoolSearch = '';
+    public string $favoriteSchoolSearch = '';
+    public string $listSchoolSearch = '';
     public string $divisionFilter = '';
     public string $conferenceFilter = '';
     public string $sort = 'name';
@@ -66,6 +68,9 @@ trait InteractsWithCoachDatabase
     public string $templatePreviewText = '';
     public string $templateGraphicUrl = '';
     public $templateGraphicUpload = null;
+    public $templateInlineImageUpload = null;
+    public string $composeGraphicUrl = '';
+    public $composeGraphicUpload = null;
     public ?string $selectedTemplateId = null;
     public bool $templateIsNew = true;
     public bool $isSavingTemplate = false;
@@ -137,6 +142,10 @@ trait InteractsWithCoachDatabase
 
         if ($this->section === 'compose') {
             $this->campaignTargetMode = $this->campaignTargetMode ?: 'list';
+            $schoolId = trim((string) request()->query('school', ''));
+            if ($schoolId !== '') {
+                $this->selectComposeSchool($schoolId);
+            }
         }
     }
 
@@ -935,37 +944,56 @@ trait InteractsWithCoachDatabase
 
     public function loadTemplates(): void
     {
-        $result = app(CoachDatabaseService::class)->getEmailTemplatesForUser(Auth::user());
-        $this->templates = collect($result['templates'] ?? [])
-            ->filter(fn ($template): bool => is_array($template) && filled($template['id'] ?? null) && filled($template['name'] ?? null))
-            ->values()
-            ->all();
-        $this->templateSourceSummary = (string) ($result['source'] ?? '');
+        // Use local hardcoded recruiting templates instead of account-backed
+        // TyncMe/GHL templates. This keeps Compose Email usable even when the
+        // connected account has no template access.
+        $this->templates = $this->hardcodedEmailTemplates();
+        $this->templateSourceSummary = 'Built-in PLYRCard templates';
         $this->templateSourceDebug = [];
+        $this->error = null;
 
-        if (! ($result['success'] ?? false)) {
-            $this->error = $result['error'] ?? 'Unable to load templates.';
-            Notification::make()->title('Recruiting Center')->body($this->templateErrorMessage($result, 'Unable to load templates.'))->danger()->send();
+        if ($this->campaignTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->campaignTemplateId)) {
             return;
         }
-
-        $this->error = null;
 
         if ($this->selectedTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->selectedTemplateId)) {
             $this->selectTemplate($this->selectedTemplateId);
             return;
         }
 
-        if ($this->templateIsNew) {
-            return;
-        }
-
-        if (! empty($this->templates[0]['id'])) {
+        if (! empty($this->templates[0]['id']) && ! $this->templateIsNew) {
             $this->selectTemplate((string) $this->templates[0]['id']);
-            return;
         }
+    }
 
-        $this->newTemplate();
+    protected function hardcodedEmailTemplates(): array
+    {
+        return [
+            [
+                'id' => 'plyrcard-intro-email',
+                'name' => 'Intro to Coach',
+                'subjectLine' => 'Prospect for {{SchoolName}} - {{AthleteName}}',
+                'previewText' => 'Quick introduction from {{AthleteName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+            ],
+            [
+                'id' => 'plyrcard-follow-up-email',
+                'name' => 'Follow Up',
+                'subjectLine' => 'Following up - {{AthleteName}}',
+                'previewText' => 'Following up with {{CoachFirstName}} at {{SchoolName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
+            ],
+            [
+                'id' => 'plyrcard-camp-invite-email',
+                'name' => 'Camp / Visit Interest',
+                'subjectLine' => '{{AthleteName}} - camp interest for {{SchoolName}}',
+                'previewText' => 'Camp and visit interest from {{AthleteName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+            ],
+        ];
     }
 
     public function newTemplate(): void
@@ -1005,9 +1033,10 @@ trait InteractsWithCoachDatabase
         $this->templateSubject = $this->templateSubject($template);
         $this->templatePreviewText = $this->templatePreviewText($template);
         $templateHtml = $this->templateHtml($template);
-        $this->templateGraphicUrl = $this->extractFirstTemplateImageUrl($templateHtml);
+        $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
-        $this->templateBody = $this->htmlToTemplateText($this->removeFirstTemplateImage($templateHtml));
+        $this->templateInlineImageUpload = null;
+        $this->templateBody = $templateHtml !== '' ? $templateHtml : $this->htmlToTemplateText($this->coerceTemplateHtml($template));
     }
 
     public function createTemplate(): void
@@ -1133,7 +1162,9 @@ trait InteractsWithCoachDatabase
         $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
         $this->campaignSubject = $this->templateSubject($template);
         $this->campaignPreviewText = $this->templatePreviewText($template);
-        $this->campaignBody = $this->htmlToTemplateText($this->removeFirstTemplateImage($this->templateHtml($template)));
+        $templateHtml = $this->templateHtml($template);
+        $this->composeGraphicUrl = '';
+        $this->campaignBody = $templateHtml !== '' ? $templateHtml : $this->htmlToTemplateText($this->coerceTemplateHtml($template));
 
         if (trim($this->campaignBody) === '') {
             $this->campaignBody = trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')));
@@ -1148,6 +1179,14 @@ trait InteractsWithCoachDatabase
         $this->campaignSubject = '';
         $this->campaignPreviewText = '';
         $this->campaignBody = '';
+        $this->composeGraphicUrl = '';
+        $this->composeGraphicUpload = null;
+    }
+
+    public function removeComposeGraphic(): void
+    {
+        $this->composeGraphicUrl = '';
+        $this->composeGraphicUpload = null;
     }
 
     public function sendComposedEmail(): void
@@ -1179,7 +1218,8 @@ trait InteractsWithCoachDatabase
         }
 
         $this->isSendingCampaign = true;
-        $html = $this->templateTextToHtml($bodyText);
+        $this->resolveComposeGraphicUpload();
+        $html = $this->buildComposeHtml($bodyText);
         $sent = 0;
         $failed = 0;
 
@@ -1226,33 +1266,15 @@ trait InteractsWithCoachDatabase
             return $this->templateDetails[$templateId];
         }
 
-        $summary = collect($this->templates)->firstWhere('id', $templateId);
-        $result = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
-
-        if (! ($result['success'] ?? false)) {
-            if (is_array($summary)) {
-                $this->templateDetails[$templateId] = $summary;
-                return $summary;
-            }
-
-            Notification::make()->title('Templates')->body('Unable to open template.')->danger()->send();
-            return null;
-        }
-
-        $detail = $result['template'] ?? [];
-        $detail = is_array($detail) ? $detail : [];
+        $summary = collect($this->templates)->firstWhere('id', $templateId)
+            ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
 
         if (is_array($summary)) {
-            $detail = $this->mergeTemplateRecord($summary, $detail);
+            $this->templateDetails[$templateId] = $summary;
+            return $summary;
         }
 
-        $this->templateDetails[$templateId] = $detail;
-        $this->templates = collect($this->templates)
-            ->map(fn (array $template): array => (string) ($template['id'] ?? '') === $templateId ? $this->mergeTemplateRecord($template, $detail) : $template)
-            ->values()
-            ->all();
-
-        return $detail;
+        return null;
     }
 
     public function insertTemplateVariable(string $token, string $field = 'body'): void
@@ -1280,6 +1302,40 @@ trait InteractsWithCoachDatabase
     {
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
+    }
+
+    public function uploadTemplateEditorImage(): array
+    {
+        $user = Auth::user();
+
+        if (! $user || ! $this->templateInlineImageUpload) {
+            return ['success' => false, 'error' => 'Choose an image first.'];
+        }
+
+        try {
+            $this->validate([
+                'templateInlineImageUpload' => ['image', 'max:25600'],
+            ]);
+
+            $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $this->templateInlineImageUpload);
+            $this->templateInlineImageUpload = null;
+
+            if (! ($result['success'] ?? false)) {
+                return [
+                    'success' => false,
+                    'error' => $this->templateErrorMessage($result, 'Unable to upload image.'),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'url' => (string) ($result['url'] ?? ''),
+            ];
+        } catch (\Throwable $e) {
+            $this->templateInlineImageUpload = null;
+
+            return ['success' => false, 'error' => 'Unable to upload image.'];
+        }
     }
 
     protected function isAllowedTemplateToken(string $token): bool
@@ -1392,14 +1448,29 @@ trait InteractsWithCoachDatabase
 
     protected function buildTemplateHtml(string $text): string
     {
-        $body = $this->templateTextToHtml($text);
-        $graphicUrl = trim($this->templateGraphicUrl);
+        $text = trim($text);
 
-        if ($graphicUrl === '') {
-            return $body;
+        if ($text === '') {
+            return '';
         }
 
-        return '<p style="margin:0 0 16px;text-align:center"><img src="' . e($graphicUrl) . '" alt="Email graphic" style="max-width:100%;height:auto;border:0;border-radius:12px"></p>' . "\n" . $body;
+        // Quill stores the message as HTML. Keep that HTML intact so images,
+        // links, buttons, lists, colors, and headings remain compatible with GHL.
+        if (preg_match('/<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i', $text)) {
+            return $this->sanitizeTemplateHtml($text);
+        }
+
+        return $this->templateTextToHtml($text);
+    }
+
+    protected function sanitizeTemplateHtml(string $html): string
+    {
+        $html = trim($html);
+        $html = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
+        $html = preg_replace("/\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)/i", '', $html) ?? $html;
+        $html = preg_replace('/javascript\s*:/i', '', $html) ?? $html;
+
+        return $html;
     }
 
     protected function renderTemplateHtmlForPreview(string $html): string
@@ -1953,33 +2024,85 @@ trait InteractsWithCoachDatabase
 
     protected function replaceCampaignTokens(string $content, array $coach): string
     {
-        $coachName = (string) ($coach['name'] ?? '');
-        $firstName = (string) ($coach['first_name'] ?? Str::before($coachName, ' '));
-        $lastName = (string) ($coach['last_name'] ?? trim(Str::after($coachName, ' ')));
-        $schoolName = (string) ($coach['school'] ?? '');
-        $title = (string) ($coach['title'] ?? 'Coach');
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $replacements = [
-            '{{coach_name}}' => $coachName,
-            '{{first_name}}' => $firstName,
-            '{{last_name}}' => $lastName,
-            '{{school}}' => $schoolName,
-            '{{email}}' => (string) ($coach['email'] ?? ''),
-            '{{CoachFirstName}}' => $firstName,
-            '{{CoachLastName}}' => $lastName,
-            '{{CoachName}}' => $coachName,
-            '{{SchoolName}}' => $schoolName,
-            '{{CoachTitle}}' => $title,
-            '{{AthleteName}}' => (string) (Auth::user()->name ?? '[Your Name]'),
-            '{{GraduationYear}}' => '[Graduation Year]',
-            '{{Position}}' => '[Position]',
-            '{{ClubTeam}}' => '[Club Team]',
-            '{{GPA}}' => '[GPA]',
-            '{{HighlightLink}}' => '[Highlight Link]',
-            '{{ProfileLink}}' => '[Profile Link]',
+        $coachName = trim((string) ($coach['name'] ?? ''));
+        $parts = preg_split('/\s+/', $coachName, 2) ?: [];
+        $firstName = trim((string) ($coach['first_name'] ?? ($parts[0] ?? '')));
+        $lastName = trim((string) ($coach['last_name'] ?? ($parts[1] ?? '')));
+
+        if ($coachName === '') {
+            $coachName = trim($firstName . ' ' . $lastName);
+        }
+
+        if ($firstName === '' && $coachName !== '') {
+            $firstName = trim((string) ($parts[0] ?? $coachName));
+        }
+
+        $schoolName = trim((string) ($coach['school'] ?? ''));
+        $title = trim((string) ($coach['title'] ?? 'Coach')) ?: 'Coach';
+        $user = Auth::user();
+
+        $values = [
+            'CoachFirstName' => $firstName ?: 'Coach',
+            'CoachLastName' => $lastName,
+            'CoachName' => $coachName ?: trim(($firstName ?: 'Coach') . ' ' . $lastName),
+            'SchoolName' => $schoolName,
+            'CoachTitle' => $title,
+            'CoachEmail' => trim((string) ($coach['email'] ?? '')),
+            'CoachPhone' => trim((string) ($coach['phone'] ?? '')),
+            'Sport' => trim((string) ($coach['sport'] ?? '')),
+            'Conference' => trim((string) ($coach['conference'] ?? '')),
+            'Division' => trim((string) ($coach['division'] ?? '')),
+            'City' => trim((string) ($coach['city'] ?? '')),
+            'State' => trim((string) ($coach['state'] ?? '')),
+            'AthleteName' => trim((string) ($user?->name ?? '[Your Name]')),
+            'GraduationYear' => trim((string) data_get($user, 'graduation_year', '[Graduation Year]')),
+            'Position' => trim((string) data_get($user, 'position', '[Position]')),
+            'ClubTeam' => trim((string) data_get($user, 'club_team', '[Club Team]')),
+            'GPA' => trim((string) data_get($user, 'gpa', '[GPA]')),
+            'HighlightLink' => trim((string) data_get($user, 'highlight_link', '[Highlight Link]')),
+            'ProfileLink' => trim((string) data_get($user, 'profile_link', '[Profile Link]')),
         ];
 
-        return strtr($content, $replacements);
+        $aliases = [
+            'CoachFirstName' => ['coach_first_name', 'first_name', 'firstname', 'coach.first_name', 'contact.first_name', 'contact.firstName', 'custom_values.coach_first_name'],
+            'CoachLastName' => ['coach_last_name', 'last_name', 'lastname', 'coach.last_name', 'contact.last_name', 'contact.lastName', 'custom_values.coach_last_name'],
+            'CoachName' => ['coach_name', 'name', 'full_name', 'coach.name', 'contact.name', 'contact.full_name'],
+            'SchoolName' => ['school_name', 'school', 'school.name', 'custom_values.school_name'],
+            'CoachTitle' => ['coach_title', 'title', 'coach.title', 'contact.title'],
+            'CoachEmail' => ['coach_email', 'email', 'coach.email', 'contact.email'],
+            'CoachPhone' => ['coach_phone', 'phone', 'coach.phone', 'contact.phone'],
+            'Sport' => ['sport'],
+            'Conference' => ['conference'],
+            'Division' => ['division'],
+            'City' => ['city'],
+            'State' => ['state'],
+            'AthleteName' => ['athlete_name', 'player_name', 'user.name'],
+            'GraduationYear' => ['graduation_year', 'grad_year', 'gradYear'],
+            'Position' => ['position'],
+            'ClubTeam' => ['club_team', 'team'],
+            'GPA' => ['gpa'],
+            'HighlightLink' => ['highlight_link', 'highlights_link', 'highlightLink'],
+            'ProfileLink' => ['profile_link', 'plyrcard_link', 'profileLink'],
+        ];
+
+        foreach ($values as $canonical => $value) {
+            $names = collect([$canonical, lcfirst($canonical), Str::snake($canonical)])
+                ->merge($aliases[$canonical] ?? [])
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($names as $name) {
+                $quoted = preg_quote((string) $name, '/');
+                $content = preg_replace('/\{\{\s*' . $quoted . '\s*\}\}/i', (string) $value, $content) ?? $content;
+                $content = preg_replace('/\[\s*' . $quoted . '\s*\]/i', (string) $value, $content) ?? $content;
+                $content = preg_replace('/%' . $quoted . '%/i', (string) $value, $content) ?? $content;
+            }
+        }
+
+        return $content;
     }
 
     protected function campaignRecipientCoaches(): Collection
@@ -2094,18 +2217,38 @@ trait InteractsWithCoachDatabase
     public function getFilteredCoachesProperty(): array { return $this->filteredCoachesQuery()->take($this->coachDisplayLimit)->values()->all(); }
     public function getFilteredCoachesCountProperty(): int { return $this->filteredCoachesQuery()->count(); }
     public function getCanLoadMoreCoachesProperty(): bool { return $this->filteredCoachesCount > count($this->filteredCoaches); }
-    public function getFavoriteSchoolsProperty(): array { return collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->values()->all(); }
+    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false)), $this->favoriteSchoolSearch)->values()->all(); }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
     public function getSavedSchoolsProperty(): array
     {
-        return collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->values()->all();
+        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false)), $this->favoriteSchoolSearch)->values()->all();
     }
 
     public function getSavedCoachesProperty(): array
     {
         return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_saved_coach'] ?? false))->take(120)->values()->all();
+    }
+
+    protected function filterSchoolsForSearch(Collection $schools, string $query): Collection
+    {
+        $query = strtolower(trim($query));
+
+        if ($query === '') {
+            return $schools;
+        }
+
+        return $schools->filter(function (array $school) use ($query): bool {
+            $haystack = strtolower(implode(' ', [
+                $school['name'] ?? '',
+                $school['conference'] ?? '',
+                $school['division'] ?? '',
+                $school['head_coach']['name'] ?? '',
+            ]));
+
+            return str_contains($haystack, $query);
+        });
     }
 
     public function getSelectedListProperty(): ?array
@@ -2126,8 +2269,8 @@ trait InteractsWithCoachDatabase
             return [];
         }
 
-        return collect($this->allSchools())
-            ->filter(fn (array $school): bool => in_array((string) ($list['key'] ?? ''), $school['list_keys'] ?? [], true))
+        return $this->filterSchoolsForSearch(collect($this->allSchools())
+            ->filter(fn (array $school): bool => in_array((string) ($list['key'] ?? ''), $school['list_keys'] ?? [], true)), $this->listSchoolSearch)
             ->values()
             ->all();
     }
@@ -2342,6 +2485,47 @@ HTML;
         return $html . $addition;
     }
 
+    protected function buildComposeHtml(string $text): string
+    {
+        // Preserve real HTML from the hardcoded templates/editor. The old path
+        // always treated compose content as plain text, which could escape HTML
+        // and make template values look broken in previews/sends.
+        $html = $this->buildTemplateHtml($text);
+        $graphic = trim($this->composeGraphicUrl);
+
+        if ($graphic !== '') {
+            $image = '<p style="margin:0 0 18px;text-align:center"><img src="' . e($graphic) . '" alt="Email graphic" style="max-width:100%;height:auto;border-radius:14px;display:inline-block"></p>';
+            return $image . $html;
+        }
+
+        return $html;
+    }
+
+    protected function resolveComposeGraphicUpload(): void
+    {
+        if (! $this->composeGraphicUpload) {
+            return;
+        }
+
+        try {
+            $path = $this->composeGraphicUpload->store('coach-database/email-graphics', 'public');
+            $this->composeGraphicUrl = Storage::disk('public')->url($path);
+            $this->composeGraphicUpload = null;
+        } catch (\Throwable $exception) {
+            Notification::make()->title('Compose Email')->body('Unable to upload image.')->danger()->send();
+        }
+    }
+
+    public function composeEmailSchool(string $schoolId): void
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return;
+        }
+
+        $this->redirect($this->pageUrl('compose') . '?school=' . urlencode($schoolId), navigate: true);
+    }
+
     public function getCampaignRenderedPreviewProperty(): string
     {
         $body = trim($this->campaignBody) !== '' ? $this->campaignBody : $this->previewTemplateHtml;
@@ -2421,7 +2605,7 @@ HTML;
     public function getComposeRenderedBodyProperty(): string
     {
         $body = trim($this->campaignBody) !== '' ? $this->campaignBody : 'Choose a template or write your message.';
-        return $this->replaceCampaignTokens($this->templateTextToHtml($body), $this->composePreviewCoach);
+        return $this->replaceCampaignTokens($this->buildComposeHtml($body), $this->composePreviewCoach);
     }
 
     public function getComposeSelectedListProperty(): ?array
@@ -2462,7 +2646,7 @@ HTML;
 
                 return str_contains($haystack, $query);
             })
-            ->take(60)
+            ->take($query === '' ? 12 : 24)
             ->values()
             ->all();
     }
