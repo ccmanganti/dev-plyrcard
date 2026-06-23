@@ -39,6 +39,7 @@ trait InteractsWithCoachDatabase
     public string $divisionFilter = '';
     public string $conferenceFilter = '';
     public string $sort = 'name';
+    public string $schoolViewMode = 'grid';
     public string $newListName = '';
     public string $selectedListKey = '';
 
@@ -2954,29 +2955,127 @@ HTML;
         $this->divisionFilter = $this->divisionFilter === $division ? '' : $division;
     }
 
+    public function setSchoolViewMode(string $mode): void
+    {
+        $this->schoolViewMode = in_array($mode, ['grid', 'list'], true) ? $mode : 'grid';
+    }
+
+    protected function normalizeSearchText(mixed $value): string
+    {
+        if (is_null($value)) {
+            return '';
+        }
+
+        if (is_scalar($value)) {
+            $text = (string) $value;
+        } elseif (is_array($value)) {
+            $text = collect($value)->map(fn ($item): string => $this->normalizeSearchText($item))->implode(' ');
+        } elseif (is_object($value)) {
+            $text = method_exists($value, '__toString') ? (string) $value : json_encode($value);
+        } else {
+            $text = '';
+        }
+
+        $text = strtolower(trim((string) $text));
+        return str_replace(['ncaa d-i', 'ncaa d-ii', 'ncaa d-iii', 'd-i', 'd-ii', 'd-iii', 'division i', 'division ii', 'division iii'], ['d1', 'd2', 'd3', 'd1', 'd2', 'd3', 'd1', 'd2', 'd3'], $text);
+    }
+
+    protected function schoolSearchHaystack(array $school): string
+    {
+        $schoolName = trim((string) ($school['name'] ?? ''));
+        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+
+        $coaches = collect($this->allCoaches())
+            ->filter(function (array $coach) use ($schoolName, $businessId): bool {
+                return (string) ($coach['business_id'] ?? '') === $businessId
+                    || strtolower(trim((string) ($coach['school'] ?? ''))) === strtolower($schoolName);
+            })
+            ->flatMap(function (array $coach): array {
+                return [
+                    $coach['name'] ?? '',
+                    $coach['first_name'] ?? '',
+                    $coach['last_name'] ?? '',
+                    $coach['email'] ?? '',
+                    $coach['title'] ?? '',
+                    $coach['position'] ?? '',
+                    $coach['school'] ?? '',
+                    $coach['division'] ?? '',
+                    $coach['conference'] ?? '',
+                    $coach['city'] ?? '',
+                    $coach['state'] ?? '',
+                ];
+            })
+            ->all();
+
+        return $this->normalizeSearchText(array_merge([
+            $school['name'] ?? '',
+            $school['conference'] ?? '',
+            $school['division'] ?? '',
+            $school['city'] ?? '',
+            $school['state'] ?? '',
+            $school['head_coach']['name'] ?? '',
+            $school['head_coach']['title'] ?? '',
+        ], $coaches));
+    }
+
     protected function filteredSchoolsQuery(): Collection
     {
-        return collect($this->allSchools())->filter(function (array $school): bool {
-            if ($this->search !== '') {
-                $haystack = strtolower(implode(' ', [$school['name'] ?? '', $school['conference'] ?? '', $school['division'] ?? '']));
-                if (! str_contains($haystack, strtolower($this->search))) return false;
+        $query = $this->normalizeSearchText($this->search);
+        $divisionFilter = $this->normalizeSearchText($this->divisionFilter);
+
+        return collect($this->allSchools())->filter(function (array $school) use ($query, $divisionFilter): bool {
+            if ($query !== '' && ! str_contains($this->schoolSearchHaystack($school), $query)) {
+                return false;
             }
-            if ($this->divisionFilter !== '' && (string) ($school['division'] ?? '') !== $this->divisionFilter) return false;
-            if ($this->conferenceFilter !== '' && (string) ($school['conference'] ?? '') !== $this->conferenceFilter) return false;
+
+            if ($divisionFilter !== '' && $this->normalizeSearchText($school['division'] ?? '') !== $divisionFilter) {
+                return false;
+            }
+
+            if ($this->conferenceFilter !== '' && strtolower((string) ($school['conference'] ?? '')) !== strtolower($this->conferenceFilter)) {
+                return false;
+            }
+
             return true;
         })->sortBy($this->sort === 'coach_count' ? 'coach_count' : 'name');
     }
 
     protected function filteredCoachesQuery(): Collection
     {
-        return collect($this->allCoaches())->filter(function (array $coach): bool {
-            $query = trim($this->coachSearch !== '' ? $this->coachSearch : $this->search);
+        $query = $this->normalizeSearchText($this->coachSearch !== '' ? $this->coachSearch : $this->search);
+        $divisionFilter = $this->normalizeSearchText($this->divisionFilter);
+
+        return collect($this->allCoaches())->filter(function (array $coach) use ($query, $divisionFilter): bool {
             if ($query !== '') {
-                $haystack = strtolower(implode(' ', [$coach['name'] ?? '', $coach['email'] ?? '', $coach['title'] ?? '', $coach['school'] ?? '']));
-                if (! str_contains($haystack, strtolower($query))) return false;
+                $haystack = $this->normalizeSearchText([
+                    $coach['name'] ?? '',
+                    $coach['first_name'] ?? '',
+                    $coach['last_name'] ?? '',
+                    $coach['email'] ?? '',
+                    $coach['phone'] ?? '',
+                    $coach['title'] ?? '',
+                    $coach['position'] ?? '',
+                    $coach['school'] ?? '',
+                    $coach['conference'] ?? '',
+                    $coach['division'] ?? '',
+                    $coach['city'] ?? '',
+                    $coach['state'] ?? '',
+                    $coach['tags'] ?? [],
+                ]);
+
+                if (! str_contains($haystack, $query)) {
+                    return false;
+                }
             }
-            if ($this->divisionFilter !== '' && (string) ($coach['division'] ?? '') !== $this->divisionFilter) return false;
-            if ($this->conferenceFilter !== '' && (string) ($coach['conference'] ?? '') !== $this->conferenceFilter) return false;
+
+            if ($divisionFilter !== '' && $this->normalizeSearchText($coach['division'] ?? '') !== $divisionFilter) {
+                return false;
+            }
+
+            if ($this->conferenceFilter !== '' && strtolower((string) ($coach['conference'] ?? '')) !== strtolower($this->conferenceFilter)) {
+                return false;
+            }
+
             return true;
         })->sortBy(fn (array $coach): string => strtolower(($coach['school'] ?? '') . ' ' . ($coach['name'] ?? '')));
     }

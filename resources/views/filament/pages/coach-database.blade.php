@@ -342,11 +342,9 @@
         }
 
         .rc-school-list-trigger {
-            width: auto;
-            min-width: 4.15rem;
-            height: 2.1rem;
-            padding: 0 .55rem;
-            gap: .32rem;
+            min-width: 4.25rem;
+            padding-inline: .55rem;
+            gap: .3rem;
         }
 
         .rc-school-list-menu {
@@ -578,6 +576,108 @@
             grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
             gap: .65rem;
         }
+
+        .rc-school-view-toggle {
+            display:inline-flex;
+            gap:.25rem;
+            padding:.22rem;
+            border:1px solid var(--rc-border);
+            border-radius:.75rem;
+            background:var(--rc-surface);
+        }
+
+        .rc-school-view-toggle .rc-btn {
+            min-height:1.9rem;
+            padding:.32rem .5rem;
+            border-radius:.55rem;
+            border-color:transparent;
+        }
+
+        .rc-school-view-toggle .rc-btn.is-active {
+            border-color:rgba(255,99,56,.28);
+            background:var(--rc-accent-soft);
+            color:var(--rc-accent);
+        }
+
+        .rc-school-list-table {
+            display:grid;
+            gap:.4rem;
+        }
+
+        .rc-school-list-head,
+        .rc-school-list-row {
+            display:grid;
+            grid-template-columns:minmax(13rem,2fr) 5.5rem minmax(7rem,1fr) minmax(7rem,1fr) 4rem 4rem 9rem;
+            gap:.65rem;
+            align-items:center;
+        }
+
+        .rc-school-list-head {
+            color:var(--rc-muted);
+            font-size:.68rem;
+            font-weight:800;
+            text-transform:uppercase;
+            letter-spacing:.05em;
+            padding:.2rem .75rem;
+        }
+
+        .rc-school-list-row {
+            border:1px solid var(--rc-border);
+            border-radius:.78rem;
+            background:var(--rc-surface);
+            padding:.58rem .75rem;
+            box-shadow:0 1px 2px rgba(15,23,42,.035);
+        }
+
+        .rc-school-list-row:hover {
+            border-color:rgba(255,99,56,.35);
+            background:var(--rc-soft);
+        }
+
+        .rc-school-list-name {
+            border:0;
+            background:transparent;
+            color:var(--rc-text);
+            text-align:left;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:.55rem;
+            min-width:0;
+            font-weight:750;
+            font-size:.82rem;
+        }
+
+        .rc-school-list-logo {
+            width:2rem;
+            height:2rem;
+            border-radius:.55rem;
+            object-fit:contain;
+            background:var(--rc-soft);
+            flex:0 0 auto;
+        }
+
+        .rc-school-list-actions {
+            display:flex;
+            justify-content:flex-end;
+            align-items:center;
+            gap:.35rem;
+        }
+
+        .rc-school-list-picker { position:relative; display:inline-flex; }
+        .rc-school-list-trigger { min-height:1.95rem; padding:.35rem .55rem; font-size:.72rem; white-space:nowrap; }
+        .rc-school-list-menu { position:absolute; z-index:60; right:0; bottom:calc(100% + .35rem); width:10.5rem; max-height:12rem; overflow:auto; padding:.25rem; border:1px solid var(--rc-border); border-radius:.7rem; background:var(--rc-surface); box-shadow:0 16px 35px rgba(15,23,42,.16); }
+        .rc-school-list-option { width:100%; border:0; border-radius:.5rem; background:transparent; color:var(--rc-text); display:flex; align-items:center; justify-content:space-between; gap:.45rem; padding:.42rem .5rem; font-size:.72rem; font-weight:700; text-align:left; }
+        .rc-school-list-option:hover, .rc-school-list-option.is-active { background:var(--rc-accent-soft); color:var(--rc-accent); }
+        .rc-school-list-empty { padding:.45rem .5rem; color:var(--rc-muted); font-size:.72rem; }
+        .rc-school-list-check { font-size:.72rem; font-weight:900; }
+
+        @media (max-width: 980px) {
+            .rc-school-list-head { display:none; }
+            .rc-school-list-row { grid-template-columns:1fr auto; gap:.45rem; }
+            .rc-school-list-row > :nth-child(n+2):nth-child(-n+6) { display:none; }
+        }
+
 
         .rc-school-card {
             border: 1px solid var(--rc-border);
@@ -1895,12 +1995,22 @@
                 </label>
             </div>
 
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.85rem 0 .25rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.85rem 0 .25rem;flex-wrap:wrap">
                 <div class="rc-subtle"><strong>{{ number_format($this->filteredSchoolsCount) }}</strong> schools</div>
-                <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
+                <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                    <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
+                    <div class="rc-school-view-toggle" aria-label="School view">
+                        <button type="button" class="rc-btn {{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        </button>
+                        <button type="button" class="rc-btn {{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools])
+            @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode])
             @if($this->canLoadMoreSchools)
                 <div style="margin-top:1rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
             @endif
@@ -2646,30 +2756,6 @@
                         </button>
                         <button class="rc-btn rc-btn-primary" type="button" wire:click="composeEmailSchool('{{ $schoolId }}')">Email coaches</button>
                     </div>
-                    <?php if (count($lists)): ?>
-                        <div class="rc-school-list-picker" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false" style="margin-bottom:1rem">
-                            <button type="button" class="rc-btn rc-school-list-trigger" @click="open = !open" :aria-expanded="open.toString()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                <span>List</span>
-                            </button>
-                            <div class="rc-school-list-menu" style="left:0;right:auto;bottom:auto;top:calc(100% + .35rem)" x-cloak x-show="open" x-transition.origin.top.left>
-                                <?php foreach ($lists as $list): ?>
-                                    <?php
-                                        $listKey = (string) ($list['key'] ?? '');
-                                        $inList = in_array($listKey, $this->selectedSchool['list_keys'] ?? [], true);
-                                        $listAction = $inList ? 'removeSchoolFromListById' : 'addSchoolToListById';
-                                        $listLabel = (string) ($list['label'] ?? 'List');
-                                    ?>
-                                    <?php if ($listKey !== ''): ?>
-                                        <button type="button" class="rc-school-list-option <?php echo $inList ? 'is-active' : ''; ?>" wire:click="<?php echo $listAction; ?>('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>')" wire:loading.attr="disabled" wire:target="addSchoolToListById('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>'),removeSchoolFromListById('<?php echo e($schoolId); ?>','<?php echo e($listKey); ?>')" @click="open = false">
-                                            <span><?php echo e($listLabel); ?></span>
-                                            <?php if ($inList): ?><span class="rc-school-list-check">✓</span><?php endif; ?>
-                                        </button>
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
                     @foreach($this->selectedSchool['coaches'] ?? [] as $coach)
                         @include('filament.partials.coach-row', ['coach' => $coach])
                     @endforeach
