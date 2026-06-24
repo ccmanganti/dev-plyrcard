@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
+use App\Services\GoHighLevelService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,8 @@ trait InteractsWithCoachDatabase
     public array $topSchools = [];
     public array $conversations = [];
     public array $messages = [];
+    public array $dashboardRecentActivity = [];
+    public array $dashboardActivitySummary = [];
     public array $templates = [];
     public array $templateDetails = [];
     public string $templateSourceSummary = '';
@@ -139,6 +142,10 @@ trait InteractsWithCoachDatabase
             } else {
                 $this->syncTagsIfStale(false);
             }
+        }
+
+        if ($this->section === 'dashboard') {
+            $this->loadDashboardActivity();
         }
 
         if ($this->section === 'conversations') {
@@ -806,6 +813,41 @@ trait InteractsWithCoachDatabase
             $this->messages = [];
             $this->messageLastId = null;
             $this->loadConversationMessages();
+        }
+    }
+
+
+    public function loadDashboardActivity(): void
+    {
+        if (! $this->allowed || $this->locked) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $cacheKey = 'coach-database:dashboard-activity:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? '') . '|' . substr((string) ($user->ghl_api_key ?? ''), -12));
+        $summary = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user): array {
+            return app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
+        });
+
+        if (! is_array($summary)) {
+            return;
+        }
+
+        $remoteStats = $summary['stats'] ?? [];
+        if (is_array($remoteStats)) {
+            $this->stats = array_merge($this->stats, array_filter($remoteStats, fn ($value) => $value !== null));
+        }
+
+        $recent = $summary['recent_activity'] ?? [];
+        $this->dashboardRecentActivity = is_array($recent) ? array_values($recent) : [];
+        $this->dashboardActivitySummary = $summary;
+
+        if (empty($this->conversations) && ! empty($summary['conversations']) && is_array($summary['conversations'])) {
+            $this->conversations = array_values($summary['conversations']);
         }
     }
 
@@ -2606,6 +2648,121 @@ HTML;
         return collect($this->allCoaches())
             ->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === trim((string) ($school['name'] ?? '')))
             ->pluck('id')->filter()->unique()->values()->all();
+    }
+
+
+    public function getDashboardMetricsProperty(): array
+    {
+        $stats = $this->stats ?? [];
+        return [
+            'saved_schools' => (int) (($stats['saved_schools'] ?? count($this->savedSchools ?? [])) ?: 0),
+            'saved_coaches' => (int) (($stats['saved_coaches'] ?? count($this->savedCoaches ?? [])) ?: 0),
+            'favorites' => (int) (($stats['favorite_schools'] ?? 0) + ($stats['favorite_coaches'] ?? 0)),
+            'emails_sent' => (int) (($stats['emails_sent'] ?? $stats['campaigns_sent'] ?? 0) ?: 0),
+            'profile_views' => (int) (($stats['profile_views'] ?? 0) ?: 0),
+            'trigger_link_clicks' => (int) (($stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0) ?: 0),
+            'email_open_rate' => (int) (($stats['email_open_rate'] ?? 0) ?: 0),
+            'coach_replies' => (int) (($stats['coach_replies'] ?? $stats['replies'] ?? 0) ?: 0),
+        ];
+    }
+
+    public function getDashboardRecommendationsProperty(): array
+    {
+        $user = Auth::user();
+        $steps = [];
+        $metrics = $this->dashboardMetrics;
+
+        $profileMissing = collect([
+            $user?->name ?? null,
+            $this->firstUserTokenText(['graduation_year', 'grad_year', 'profile.graduation_year'], ''),
+            $this->firstUserTokenText(['position', 'primary_position', 'profile.position'], ''),
+        ])->filter(fn ($value) => filled($value))->count() < 3;
+
+        if ($profileMissing) {
+            $steps[] = [
+                'title' => 'Complete your athlete profile',
+                'copy' => 'Add name, grad year, position, links, and socials so email templates personalize correctly.',
+                'url' => method_exists(\App\Filament\Pages\AthleteProfile::class, 'getUrl') ? \App\Filament\Pages\AthleteProfile::getUrl() : '#',
+                'label' => 'Set up profile',
+            ];
+        }
+
+        if ((int) ($metrics['saved_schools'] ?? 0) === 0) {
+            $steps[] = [
+                'title' => 'Build your first school list',
+                'copy' => 'Search by division, conference, state, or coach and add schools to a focused recruiting list.',
+                'url' => \App\Filament\Pages\CoachDatabaseSchools::getUrl(),
+                'label' => 'Find schools',
+            ];
+        }
+
+        if ((int) ($metrics['emails_sent'] ?? 0) === 0) {
+            $steps[] = [
+                'title' => 'Send your first recruiting email',
+                'copy' => 'Use a starter template, add your profile and highlight links, then send to selected coaches.',
+                'url' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
+                'label' => 'Compose email',
+            ];
+        }
+
+        if ((int) ($metrics['trigger_link_clicks'] ?? 0) > 0 && (int) ($metrics['coach_replies'] ?? 0) === 0) {
+            $steps[] = [
+                'title' => 'Follow up with clicked coaches',
+                'copy' => 'Coaches have interacted with your links. Send a shorter follow-up while interest is fresh.',
+                'url' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
+                'label' => 'Follow up',
+            ];
+        }
+
+        if (empty($steps)) {
+            $steps[] = [
+                'title' => 'Review engaged schools',
+                'copy' => 'Prioritize schools with replies and link clicks, then move them into your target lists.',
+                'url' => \App\Filament\Pages\CoachDatabaseLists::getUrl(),
+                'label' => 'Manage lists',
+            ];
+        }
+
+        return array_slice($steps, 0, 3);
+    }
+
+    public function getDashboardTopEngagedSchoolsProperty(): array
+    {
+        $schools = collect($this->topSchools ?: $this->allSchools())
+            ->map(function (array $school): array {
+                $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
+                $clicks = (int) ($school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
+                $views = (int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0);
+                $score = ($replies * 20) + ($clicks * 6) + ($views * 2) + (int) ($school['engagement_score'] ?? 0);
+                $school['lead_score'] = $score;
+                $school['has_replied'] = $replies > 0;
+                return $school;
+            })
+            ->filter(fn (array $school): bool => (int) ($school['lead_score'] ?? 0) > 0)
+            ->sortByDesc(fn (array $school): int => (int) ($school['lead_score'] ?? 0))
+            ->take(5)
+            ->values()
+            ->all();
+
+        return $schools ?: collect($this->allSchools())->take(5)->values()->all();
+    }
+
+    public function getDashboardRecentActivityProperty(): array
+    {
+        if (! empty($this->dashboardRecentActivity)) {
+            return array_slice($this->dashboardRecentActivity, 0, 6);
+        }
+
+        return collect($this->conversations ?? [])
+            ->take(6)
+            ->map(fn (array $conversation): array => [
+                'type' => 'message',
+                'title' => $conversation['name'] ?? 'Coach conversation',
+                'copy' => $conversation['last_message'] ?? $conversation['snippet'] ?? 'New recruiting email activity',
+                'time' => $conversation['last_message_at'] ?? $conversation['updated_at'] ?? null,
+            ])
+            ->values()
+            ->all();
     }
 
     public function getDashboardSchoolsProperty(): array { return collect($this->allSchools())->take(8)->values()->all(); }

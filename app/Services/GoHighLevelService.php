@@ -1714,6 +1714,18 @@ class GoHighLevelService
         return false;
     }
 
+
+    private function contactHasAnyTag(array $contact, array $tags): bool
+    {
+        foreach ($tags as $tag) {
+            if ($this->contactHasTag($contact, $tag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function transformEmailTemplate(array $item): array
     {
         $body = $this->extractTemplateHtmlFromKnownFields($item);
@@ -2150,11 +2162,15 @@ class GoHighLevelService
             'is_favorite_school' => $this->contactHasTag($contact, config('ghl.coach_database.tags.favorite_school', 'favorite school')),
             'is_saved_coach' => $this->contactHasTag($contact, config('ghl.coach_database.tags.saved_coach', 'saved coach')),
             'is_favorite_coach' => $this->contactHasTag($contact, config('ghl.coach_database.tags.favorite_coach', 'favorite coach')),
-            'viewed_profile' => $this->contactHasTag($contact, config('ghl.coach_database.tags.viewed_profile', 'viewed profile')),
-            'viewed_highlights' => $this->contactHasTag($contact, config('ghl.coach_database.tags.viewed_highlights', 'viewed highlights')),
-            'engaged' => $this->contactHasTag($contact, config('ghl.coach_database.tags.engaged', 'engaged')),
-            'replied' => $this->contactHasTag($contact, config('ghl.coach_database.tags.replied', 'replied')),
-            'trigger_link_clicked' => $this->contactHasTag($contact, config('ghl.coach_database.tags.trigger_link_clicked', 'trigger link clicked')),
+            'viewed_profile' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.viewed_profile', 'viewed profile'), 'profile viewed', 'viewed player profile']),
+            'viewed_highlights' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.viewed_highlights', 'viewed highlights'), 'highlight viewed', 'video viewed', 'youtube clicked']),
+            'engaged' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.engaged', 'engaged'), 'clicked', 'opened', 'replied']),
+            'replied' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.replied', 'replied'), 'coach replied', 'email replied']),
+            'trigger_link_clicked' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.trigger_link_clicked', 'trigger link clicked'), 'trigger link clicked', 'profile link clicked', 'website clicked', 'social clicked', 'instagram clicked', 'x clicked', 'youtube clicked', 'highlight link clicked']),
+            'profile_view_count' => $this->firstNumericValue($contact, ['profile_view_count', 'profileViews', 'profile_views', 'customFields.profile_views', 'customField.profile_views']),
+            'highlight_view_count' => $this->firstNumericValue($contact, ['highlight_view_count', 'highlightViews', 'highlight_views', 'youtube_clicks', 'customFields.highlight_views']),
+            'trigger_link_click_count' => $this->firstNumericValue($contact, ['trigger_link_click_count', 'triggerLinkClicks', 'trigger_link_clicks', 'link_clicks', 'website_clicks', 'social_clicks', 'youtube_clicks', 'instagram_clicks', 'x_clicks', 'stats.clicks', 'customFields.link_clicks']),
+            'coach_reply_count' => $this->firstNumericValue($contact, ['coach_reply_count', 'replyCount', 'replies', 'email_replies', 'stats.replies', 'customFields.replies']),
             'valid_email' => $contact['validEmail'] ?? null,
             'dnd' => $contact['dnd'] ?? false,
             'date_added' => $contact['dateAdded'] ?? null,
@@ -4142,4 +4158,148 @@ class GoHighLevelService
             }
         }
     }
+
+    public function getRecruitingDashboardActivityForUser(User $user): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'stats' => [], 'recent_activity' => [], 'conversations' => [], 'error' => 'Missing recruiting data connection.'];
+        }
+
+        $conversations = [];
+        $conversationResult = $this->getConversationsForUser($user, ['limit' => 20, 'status' => 'all']);
+        if ($conversationResult['success'] ?? false) {
+            $conversations = $conversationResult['conversations'] ?? [];
+        }
+
+        $campaignSummary = $this->getEmailCampaignActivityForLocation($locationId, $token);
+        $recent = collect($conversations)
+            ->map(fn (array $conversation): array => [
+                'type' => 'conversation',
+                'title' => $conversation['name'] ?? 'Coach conversation',
+                'copy' => $conversation['last_message'] ?? 'Recent email conversation activity',
+                'time' => $conversation['last_message_at'] ?? null,
+                'url' => null,
+            ])
+            ->merge($campaignSummary['recent_activity'] ?? [])
+            ->sortByDesc(fn (array $item): int => strtotime((string) ($item['time'] ?? '')) ?: 0)
+            ->take(8)
+            ->values()
+            ->all();
+
+        return [
+            'success' => true,
+            'stats' => [
+                'emails_sent' => (int) ($campaignSummary['emails_sent'] ?? 0),
+                'campaigns_sent' => (int) ($campaignSummary['campaigns_sent'] ?? 0),
+                'email_open_rate' => (int) ($campaignSummary['email_open_rate'] ?? 0),
+                'email_opens' => (int) ($campaignSummary['email_opens'] ?? 0),
+                'trigger_link_clicks' => (int) ($campaignSummary['trigger_link_clicks'] ?? 0),
+                'coach_replies' => (int) ($campaignSummary['coach_replies'] ?? 0),
+            ],
+            'recent_activity' => $recent,
+            'conversations' => $conversations,
+            'debug' => $campaignSummary['debug'] ?? [],
+        ];
+    }
+
+    protected function getEmailCampaignActivityForLocation(string $locationId, string $token): array
+    {
+        $attempts = [
+            ['version' => '2021-07-28', 'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign", 'params' => ['limit' => 100]],
+            ['version' => '2021-07-28', 'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns", 'params' => ['limit' => 100]],
+            ['version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/campaigns", 'params' => ['limit' => 100]],
+            ['version' => '2023-02-21', 'url' => "{$this->baseUrl}/campaigns/", 'params' => ['locationId' => $locationId, 'limit' => 100]],
+        ];
+
+        $campaigns = collect();
+        $debug = [];
+
+        foreach ($attempts as $attempt) {
+            try {
+                $response = Http::withHeaders(['Version' => $attempt['version']])
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get($attempt['url'], $attempt['params']);
+
+                $data = $response->json() ?? [];
+                $items = $this->normalizeResponseList($data['campaigns'] ?? $data['data'] ?? $data['items'] ?? $data['results'] ?? $data, ['id', '_id', 'campaignId', 'name', 'title', 'status']);
+                $debug[] = ['source' => $attempt['url'], 'status' => $response->status(), 'count' => count($items)];
+
+                if ($response->successful() && ! empty($items)) {
+                    $campaigns = $campaigns->merge($items);
+                }
+            } catch (\Throwable $e) {
+                $debug[] = ['source' => $attempt['url'], 'error' => $e->getMessage()];
+            }
+        }
+
+        $campaigns = $campaigns
+            ->filter(fn ($item): bool => is_array($item))
+            ->unique(fn (array $item): string => (string) ($item['id'] ?? $item['_id'] ?? $item['campaignId'] ?? md5(json_encode($item))))
+            ->values();
+
+        $emailsSent = 0;
+        $opens = 0;
+        $clicks = 0;
+        $replies = 0;
+        $sentCampaigns = 0;
+        $recent = [];
+
+        foreach ($campaigns as $campaign) {
+            $status = strtolower((string) ($campaign['status'] ?? $campaign['campaignStatus'] ?? data_get($campaign, 'data.status') ?? ''));
+            $sent = $this->firstNumericValue($campaign, ['sent', 'sentCount', 'emailsSent', 'totalSent', 'stats.sent', 'statistics.sent', 'analytics.sent', 'data.sent', 'data.stats.sent']);
+            $open = $this->firstNumericValue($campaign, ['opens', 'openCount', 'emailOpens', 'uniqueOpens', 'stats.opens', 'statistics.opens', 'analytics.opens', 'data.stats.opens']);
+            $click = $this->firstNumericValue($campaign, ['clicks', 'clickCount', 'linkClicks', 'uniqueClicks', 'triggerLinkClicks', 'stats.clicks', 'statistics.clicks', 'analytics.clicks', 'data.stats.clicks']);
+            $reply = $this->firstNumericValue($campaign, ['replies', 'replyCount', 'stats.replies', 'statistics.replies', 'analytics.replies', 'data.stats.replies']);
+
+            $emailsSent += $sent;
+            $opens += $open;
+            $clicks += $click;
+            $replies += $reply;
+
+            if ($sent > 0 || in_array($status, ['sent', 'completed', 'published', 'delivered'], true)) {
+                $sentCampaigns++;
+            }
+
+            $time = $campaign['sentAt'] ?? $campaign['lastSentAt'] ?? $campaign['updatedAt'] ?? $campaign['createdAt'] ?? data_get($campaign, 'data.updatedAt');
+            if ($time) {
+                $recent[] = [
+                    'type' => 'campaign',
+                    'title' => $campaign['name'] ?? $campaign['title'] ?? $campaign['campaignName'] ?? 'Email campaign',
+                    'copy' => ($sent > 0 ? number_format($sent) . ' emails sent' : 'Campaign activity updated'),
+                    'time' => $time,
+                    'url' => null,
+                ];
+            }
+        }
+
+        return [
+            'campaigns_sent' => $sentCampaigns,
+            'emails_sent' => $emailsSent > 0 ? $emailsSent : $sentCampaigns,
+            'email_opens' => $opens,
+            'email_open_rate' => $emailsSent > 0 ? (int) round(($opens / max(1, $emailsSent)) * 100) : 0,
+            'trigger_link_clicks' => $clicks,
+            'coach_replies' => $replies,
+            'recent_activity' => $recent,
+            'debug' => $debug,
+        ];
+    }
+
+    protected function firstNumericValue(array $source, array $paths): int
+    {
+        foreach ($paths as $path) {
+            $value = data_get($source, $path);
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+        }
+
+        return 0;
+    }
+
 }

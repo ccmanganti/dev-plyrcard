@@ -418,6 +418,11 @@ class CoachDatabaseService
 
     protected function buildStats(Collection $coaches, Collection $schools): array
     {
+        $profileViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['profile_view_count'] ?? 0), (bool) ($coach['viewed_profile'] ?? false) ? 1 : 0));
+        $highlightViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['highlight_view_count'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0));
+        $linkClicks = $coaches->sum(fn (array $coach): int => max((int) ($coach['trigger_link_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0));
+        $replies = $coaches->sum(fn (array $coach): int => max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0));
+
         return [
             'total_schools' => $schools->count(),
             'total_coaches' => $coaches->count(),
@@ -425,10 +430,10 @@ class CoachDatabaseService
             'favorite_schools' => $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count(),
             'saved_coaches' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['is_saved_coach'] ?? false))->count(),
             'favorite_coaches' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->count(),
-            'profile_views' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_profile'] ?? false))->count(),
-            'highlight_views' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_highlights'] ?? false))->count(),
-            'trigger_link_clicks' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['trigger_link_clicked'] ?? false))->count(),
-            'coach_replies' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['replied'] ?? false))->count(),
+            'profile_views' => $profileViews,
+            'highlight_views' => $highlightViews,
+            'trigger_link_clicks' => $linkClicks,
+            'coach_replies' => $replies,
         ];
     }
 
@@ -448,6 +453,7 @@ class CoachDatabaseService
                 'highlight_views' => $school['highlight_views'] ?? 0,
                 'trigger_link_clicks' => $school['trigger_link_clicks'] ?? 0,
                 'replies' => $school['replies'] ?? 0,
+                'lead_score' => $school['engagement_score'] ?? 0,
                 'engagement_score' => $school['engagement_score'] ?? 0,
             ])
             ->values()
