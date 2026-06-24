@@ -3534,7 +3534,31 @@ class GoHighLevelService
         $fromEmail = $this->defaultSenderEmailForUser($user);
         $updatedBy = (string) (data_get($user, 'ghl_user_id') ?: data_get($user, 'id') ?: 'plyrcard');
 
-        $builderRequest = Http::withHeaders(['Version' => '2023-02-21'])
+        $basePayload = [
+            'locationId' => $locationId,
+            'originId' => $locationId,
+            'updatedBy' => $updatedBy,
+            'name' => $name,
+            'title' => $name,
+            'subject' => $subject,
+            'subjectLine' => $subject,
+            'previewText' => $previewText,
+            'fromName' => $fromName,
+            'fromEmail' => $fromEmail,
+            'editorType' => 'html',
+            'type' => 'html',
+            'builderVersion' => '2',
+            'editorContent' => $body,
+            'html' => $body,
+            'body' => $body,
+            'content' => $body,
+            'emailContent' => $body,
+            'htmlContent' => $body,
+            'isPlainText' => false,
+            'archived' => false,
+        ];
+
+        $request = Http::withHeaders(['Version' => '2023-02-21'])
             ->timeout((int) config('ghl.timeout', 20))
             ->withToken($token)
             ->acceptJson()
@@ -3543,96 +3567,94 @@ class GoHighLevelService
         $lastError = $templateId !== '' ? 'Unable to update template.' : 'Unable to create template.';
         $lastStatus = null;
         $lastData = [];
+        $attemptDebug = [];
         $createdViaBuilder = false;
 
         if ($templateId === '') {
-            // Official Email Builder create endpoint. This creates the template shell and returns
-            // the template id in `redirect` on many HighLevel accounts.
-            $createPayload = [
-                'locationId' => $locationId,
-                'name' => $name,
-                'title' => $name,
-                'type' => 'html',
-                'builderVersion' => '2',
-                'updatedBy' => $updatedBy,
-                'subjectLine' => $subject,
-                'previewText' => $previewText,
-                'fromName' => $fromName,
-                'fromEmail' => $fromEmail,
-                'isPlainText' => false,
+            $createPayloads = [
+                $basePayload,
+                array_merge($basePayload, [
+                    'template' => [
+                        'name' => $name,
+                        'title' => $name,
+                        'subjectLine' => $subject,
+                        'previewText' => $previewText,
+                        'html' => $body,
+                        'body' => $body,
+                    ],
+                ]),
             ];
 
-            $createResponse = $builderRequest->post("{$this->baseUrl}/emails/builder", $createPayload);
-            $createData = $createResponse->json();
-            if (! is_array($createData)) {
-                $createData = [];
-            }
+            foreach ($createPayloads as $createPayload) {
+                $createResponse = $request->post("{$this->baseUrl}/emails/builder", $createPayload);
+                $createData = $createResponse->json();
+                if (! is_array($createData)) {
+                    $createData = [];
+                }
 
-            if (! $createResponse->successful()) {
-                return [
-                    'success' => false,
-                    'error' => $this->extractApiErrorMessage($createData, 'Unable to create template.'),
+                $attemptDebug[] = [
+                    'method' => 'POST',
+                    'url' => '/emails/builder',
                     'status' => $createResponse->status(),
-                    'raw' => $createData,
                 ];
-            }
 
-            $templateId = (string) ($createData['id'] ?? $createData['_id'] ?? $createData['templateId'] ?? $createData['redirect'] ?? '');
-            $createdViaBuilder = true;
-            $lastData = $createData;
-            $lastStatus = $createResponse->status();
+                if ($createResponse->successful()) {
+                    $templateId = (string) ($createData['id'] ?? $createData['_id'] ?? $createData['templateId'] ?? data_get($createData, 'data.id') ?? data_get($createData, 'template.id') ?? $createData['redirect'] ?? '');
+                    $createdViaBuilder = true;
+                    $lastData = $createData;
+                    $lastStatus = $createResponse->status();
+
+                    if ($templateId !== '') {
+                        break;
+                    }
+                }
+
+                $lastError = $this->extractApiErrorMessage($createData, $lastError);
+                $lastStatus = $createResponse->status();
+                $lastData = $createData;
+            }
 
             if ($templateId === '') {
                 return [
                     'success' => false,
                     'error' => 'Template was created, but no template id was returned.',
-                    'status' => $createResponse->status(),
-                    'raw' => $createData,
+                    'status' => $lastStatus,
+                    'raw' => $lastData,
+                    'debug' => $attemptDebug,
                 ];
             }
         }
 
-        // Official Email Builder update-with-settings endpoint. GHL validates editorContent
-        // as a string on this endpoint for html templates, so do not send an array/object.
-        $updatePayloads = [
-            [
-                'locationId' => $locationId,
-                'updatedBy' => $updatedBy,
-                'name' => $name,
-                'title' => $name,
-                'subjectLine' => $subject,
-                'previewText' => $previewText,
-                'fromName' => $fromName,
-                'fromEmail' => $fromEmail,
-                'editorType' => 'html',
-                'editorContent' => $body,
-                'html' => $body,
-                'isPlainText' => false,
-                'archived' => false,
-            ],
-            [
-                'locationId' => $locationId,
-                'updatedBy' => $updatedBy,
-                'name' => $name,
-                'title' => $name,
-                'subjectLine' => $subject,
-                'previewText' => $previewText,
-                'fromName' => $fromName,
-                'fromEmail' => $fromEmail,
-                'editorType' => 'html',
-                'editorContent' => $body,
-                'html' => $body,
-                'isPlainText' => false,
-                'archived' => false,
-            ],
+        $updateAttempts = [
+            ['method' => 'patch', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => '/emails/builder/{id}'],
+            ['method' => 'put', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/builder/{id}'],
+            ['method' => 'patch', 'version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/locations/{locationId}/templates/{id}'],
+            ['method' => 'put', 'version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/locations/{locationId}/templates/{id}'],
+            ['method' => 'patch', 'version' => 'v3', 'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}", 'payload' => array_merge($basePayload, ['templateType' => 'email']), 'source' => 'PATCH /locations/{locationId}/templates/{id}'],
+            ['method' => 'put', 'version' => 'v3', 'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}", 'payload' => array_merge($basePayload, ['templateType' => 'email']), 'source' => 'PUT /locations/{locationId}/templates/{id}'],
+            ['method' => 'patch', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/templates/{id}'],
+            ['method' => 'put', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/templates/{id}'],
         ];
 
-        foreach ($updatePayloads as $updatePayload) {
-            $response = $builderRequest->patch("{$this->baseUrl}/emails/builder/{$templateId}", $updatePayload);
+        foreach ($updateAttempts as $attempt) {
+            $response = Http::withHeaders(['Version' => $attempt['version']])
+                ->timeout((int) config('ghl.timeout', 20))
+                ->withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->send(strtoupper($attempt['method']), $attempt['url'], ['json' => $attempt['payload']]);
+
             $data = $response->json();
             if (! is_array($data)) {
                 $data = [];
             }
+
+            $attemptDebug[] = [
+                'method' => strtoupper($attempt['method']),
+                'source' => $attempt['source'],
+                'version' => $attempt['version'],
+                'status' => $response->status(),
+            ];
 
             if ($response->successful()) {
                 $templateData = $data['template'] ?? $data['data'] ?? $data;
@@ -3655,8 +3677,9 @@ class GoHighLevelService
                         'isPlainText' => false,
                         'type' => 'html',
                     ]),
-                    'source' => $createdViaBuilder ? '/emails/builder + /emails/builder/{templateId}' : '/emails/builder/{templateId}',
+                    'source' => $attempt['source'],
                     'raw' => $data ?: $lastData,
+                    'debug' => $attemptDebug,
                 ];
             }
 
@@ -3664,8 +3687,7 @@ class GoHighLevelService
             $lastStatus = $response->status();
             $lastData = $data;
 
-            // Do not continue retrying the same endpoint when auth/location is the actual issue.
-            if (in_array($response->status(), [401, 403, 404], true)) {
+            if (in_array($response->status(), [401, 403], true)) {
                 break;
             }
         }
@@ -3675,6 +3697,7 @@ class GoHighLevelService
             'error' => $lastError,
             'status' => $lastStatus,
             'raw' => $lastData,
+            'debug' => $attemptDebug,
         ];
     }
 

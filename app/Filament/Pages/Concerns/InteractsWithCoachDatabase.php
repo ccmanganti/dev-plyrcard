@@ -1179,20 +1179,52 @@ HTML;
             && ! $this->templateIsNew
             && ! $this->isBuiltInTemplateId($this->selectedTemplateId);
 
-        $result = $shouldUpdateGhl
-            ? app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $this->selectedTemplateId, $name, $subject, $html, $this->templatePreviewText)
-            : app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
+        $result = null;
+        $updatedTemplateId = $this->selectedTemplateId;
+        $updateFailures = [];
+
+        if ($shouldUpdateGhl) {
+            foreach ($this->templateUpdateCandidateIds((string) $this->selectedTemplateId) as $candidateId) {
+                $result = app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $candidateId, $name, $subject, $html, $this->templatePreviewText);
+
+                if ($result['success'] ?? false) {
+                    $updatedTemplateId = $candidateId;
+                    break;
+                }
+
+                $updateFailures[] = [
+                    'template_id' => $candidateId,
+                    'status' => $result['status'] ?? null,
+                    'error' => $result['error'] ?? 'Unable to update template.',
+                ];
+            }
+
+            if (! ($result['success'] ?? false) && $this->templateSaveFailedBecauseNotFound($result, $updateFailures)) {
+                // Some GHL HTML-builder templates expose one id for loading and a different/internal
+                // id for editing. If none of the known ids can be updated, save the edited version as
+                // a new GHL template instead of failing with "Template not found" and losing the work.
+                $copyName = Str::endsWith($name, ' (Edited Copy)') ? $name : $name . ' (Edited Copy)';
+                $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $copyName, $subject, $html, $this->templatePreviewText);
+                if ($result['success'] ?? false) {
+                    $name = $copyName;
+                    $this->templateName = $copyName;
+                    $updatedTemplateId = null;
+                }
+            }
+        } else {
+            $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
+        }
 
         $this->isSavingTemplate = false;
 
         if (! ($result['success'] ?? false)) {
-            Notification::make()->title('Templates')->body($this->templateErrorMessage($result, 'Unable to save template.'))->danger()->send();
+            Notification::make()->title('Templates')->body($this->templateErrorMessage($result ?? [], 'Unable to save template.'))->danger()->send();
             return;
         }
 
         $saved = $result['template'] ?? [];
         if (is_array($saved)) {
-            $savedId = (string) ($saved['id'] ?? $saved['_id'] ?? $saved['templateId'] ?? $this->selectedTemplateId ?? '');
+            $savedId = (string) ($saved['id'] ?? $saved['_id'] ?? $saved['templateId'] ?? $updatedTemplateId ?? $this->selectedTemplateId ?? '');
             if ($savedId !== '') {
                 $this->selectedTemplateId = $savedId;
                 $this->templateIsNew = false;
@@ -1205,12 +1237,79 @@ HTML;
                     'graphicUrl' => $this->templateGraphicUrl,
                     'html' => $html,
                     'body' => $html,
+                    'update_failures' => $updateFailures,
                 ]);
             }
         }
 
         $this->loadTemplates();
-        Notification::make()->title('Templates')->body('Template saved.')->success()->send();
+
+        $message = ! empty($updateFailures) && blank($updatedTemplateId)
+            ? 'Template saved as a new edited copy because GHL would not update the original template id.'
+            : 'Template saved.';
+
+        Notification::make()->title('Templates')->body($message)->success()->send();
+    }
+
+    protected function templateUpdateCandidateIds(string $templateId): array
+    {
+        $summary = collect($this->templates)->firstWhere('id', $templateId) ?: [];
+        $detail = $this->templateDetails[$templateId] ?? [];
+        $values = [$templateId];
+
+        foreach ([$summary, $detail] as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+
+            foreach ([
+                'id', '_id', 'templateId', 'template_id', 'campaignId', 'campaign_id', 'emailCampaignId', 'email_campaign_id',
+                'builderId', 'builder_id', 'contentId', 'content_id', 'emailId', 'email_id', 'detail_candidate_id',
+                'raw.id', 'raw._id', 'raw.templateId', 'raw.template_id', 'raw.campaignId', 'raw.campaign_id', 'raw.emailCampaignId', 'raw.email_campaign_id',
+                'raw.builderId', 'raw.builder_id', 'raw.contentId', 'raw.content_id', 'raw.emailId', 'raw.email_id',
+                'raw.data.id', 'raw.data._id', 'raw.data.templateId', 'raw.data.template_id', 'raw.data.campaignId', 'raw.data.builderId', 'raw.data.contentId',
+                'raw.template.id', 'raw.template._id', 'raw.template.templateId', 'raw.template.campaignId',
+                'raw.email.id', 'raw.email._id', 'raw.email.templateId',
+                'raw.campaign.id', 'raw.campaign._id', 'raw.campaign.templateId',
+            ] as $path) {
+                $value = data_get($record, $path);
+                if (is_scalar($value)) {
+                    $values[] = (string) $value;
+                }
+            }
+        }
+
+        return collect($values)
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter(fn (string $value): bool => $value !== '' && ! in_array(strtolower($value), ['null', 'undefined'], true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function templateSaveFailedBecauseNotFound(?array $result, array $failures = []): bool
+    {
+        if (is_array($result) && (int) ($result['status'] ?? 0) === 404) {
+            return true;
+        }
+
+        $message = strtolower((string) ($result['error'] ?? ''));
+        if ($message !== '' && (str_contains($message, 'not found') || str_contains($message, 'does not exist') || str_contains($message, 'invalid template'))) {
+            return true;
+        }
+
+        foreach ($failures as $failure) {
+            if ((int) ($failure['status'] ?? 0) === 404) {
+                return true;
+            }
+
+            $failureMessage = strtolower((string) ($failure['error'] ?? ''));
+            if ($failureMessage !== '' && (str_contains($failureMessage, 'not found') || str_contains($failureMessage, 'does not exist') || str_contains($failureMessage, 'invalid template'))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function deleteTemplate(): void
