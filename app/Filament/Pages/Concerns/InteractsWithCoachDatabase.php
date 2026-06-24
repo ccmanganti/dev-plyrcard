@@ -22,6 +22,7 @@ trait InteractsWithCoachDatabase
     public array $templateDetails = [];
     public string $templateSourceSummary = '';
     public array $templateSourceDebug = [];
+    public ?string $templateConnectionKey = null;
 
     /**
      * Per-request memoization for expensive cache reads/search indexes.
@@ -953,22 +954,37 @@ trait InteractsWithCoachDatabase
     public function loadTemplates(): void
     {
         $builtIn = $this->hardcodedEmailTemplates();
+        $user = Auth::user();
+        $currentConnectionKey = $this->templateConnectionKeyForUser($user);
+
+        if ($this->templateConnectionKey !== $currentConnectionKey) {
+            $this->templateConnectionKey = $currentConnectionKey;
+            $this->templateDetails = [];
+            $this->templates = [];
+            $this->selectedTemplateId = null;
+            $this->previewTemplateId = null;
+            $this->campaignTemplateId = null;
+            $this->templateIsNew = true;
+        }
+
         $this->templateDetails = collect($this->templateDetails)
             ->filter(fn ($template): bool => is_array($template))
+            ->filter(fn (array $template): bool => (string) ($template['connection_key'] ?? $currentConnectionKey) === $currentConnectionKey)
             ->all();
 
-        $result = Auth::user()
-            ? app(CoachDatabaseService::class)->getEmailTemplatesForUser(Auth::user())
+        $result = $user
+            ? app(CoachDatabaseService::class)->getEmailTemplatesForUser($user)
             : ['success' => false, 'templates' => [], 'error' => 'No authenticated user.'];
 
         $ghlTemplates = collect($result['templates'] ?? [])
             ->filter(fn ($template): bool => is_array($template))
-            ->map(function (array $template): array {
+            ->map(function (array $template) use ($currentConnectionKey): array {
                 $id = (string) ($template['id'] ?? $template['_id'] ?? $template['templateId'] ?? '');
 
                 return array_merge($template, [
                     'id' => $id,
                     'source_type' => 'ghl',
+                    'connection_key' => $currentConnectionKey,
                 ]);
             })
             ->filter(fn (array $template): bool => trim((string) ($template['id'] ?? '')) !== '')
@@ -982,8 +998,8 @@ trait InteractsWithCoachDatabase
             ->all();
 
         $this->templateSourceSummary = $ghlTemplates->isNotEmpty()
-            ? 'GHL email templates loaded. Built-in PLYRCard templates are included as fallbacks.'
-            : 'No GHL templates found. Showing built-in PLYRCard templates.';
+            ? 'GHL email templates loaded for this API key/location. Built-in PLYRCard templates are included as fallbacks.'
+            : 'No GHL templates found for this API key/location. Showing built-in PLYRCard templates.';
         $this->templateSourceDebug = $result['debug'] ?? [];
         $this->error = null;
 
@@ -1003,9 +1019,28 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        if ($this->templateIsNew && trim(strip_tags((string) $this->templateBody)) === '') {
+            $this->templateName = $this->templateName ?: 'New Recruiting Email';
+            $this->templateSubject = $this->templateSubject ?: '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
+            $this->templatePreviewText = $this->templatePreviewText ?: 'Quick intro, profile, and highlight link from {{AthleteName}}.';
+            $this->templateBody = $this->starterTemplateHtml();
+        }
+
         if (! empty($this->templates[0]['id']) && ! $this->templateIsNew) {
             $this->selectTemplate((string) $this->templates[0]['id']);
         }
+    }
+
+    protected function templateConnectionKeyForUser($user): string
+    {
+        if (! $user) {
+            return 'guest';
+        }
+
+        $locationId = trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? ''));
+        $token = trim((string) ($user->ghl_api_key ?? ''));
+
+        return sha1((string) ($user->id ?? 'user') . '|' . $locationId . '|' . substr(sha1($token), 0, 12));
     }
 
     protected function hardcodedEmailTemplates(): array
@@ -1047,12 +1082,14 @@ trait InteractsWithCoachDatabase
         $this->previewTemplateId = null;
         $this->campaignTemplateId = null;
         $this->templateIsNew = true;
-        $this->templateName = '';
-        $this->templateSubject = '';
-        $this->templatePreviewText = '';
+        $this->templateName = 'New Recruiting Email';
+        $this->templateSubject = '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
+        $this->templatePreviewText = 'Quick intro, profile, and highlight link from {{AthleteName}}.';
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
-        $this->templateBody = '';
+        $this->templateInlineImageUpload = null;
+        $this->templateBody = $this->starterTemplateHtml();
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
     }
 
     public function selectTemplate(string $templateId): void
@@ -1081,6 +1118,36 @@ trait InteractsWithCoachDatabase
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
         $this->templateBody = $this->templateHtmlForNativeEditor($template);
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+    }
+
+    protected function starterTemplateHtml(): string
+    {
+        return <<<'HTML'
+<div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
+    <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px 18px 0 0;background:#ffffff;">
+        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
+        <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
+        <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
+        <p style="margin:0 0 12px;">
+            <a class="rc-email-button" href="{{ProfileLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#ff5b32;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0 0 10px;">View PLYRCard Profile</a>
+            <a class="rc-email-button" href="{{HighlightLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#111827;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0;">Watch Highlights</a>
+        </p>
+        <p style="margin:0 0 16px;">Thank you for your time and consideration. I look forward to learning more about your program.</p>
+        <p style="margin:0;">Best,<br><strong>{{AthleteName}}</strong></p>
+    </div>
+    <div style="padding:18px 28px 22px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 18px 18px;background:#f9fafb;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+            <tr><td style="vertical-align:top;padding:0;"><div style="font-size:16px;font-weight:800;color:#111827;">{{AthleteName}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{GraduationYear}} • {{Position}} • {{ClubTeam}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{AthleteEmail}} • {{AthletePhone}}</div></td></tr>
+            <tr><td style="padding-top:14px;">
+                <a href="{{InstagramLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="18" height="18" viewBox="0 0 24 24" role="img" aria-label="Instagram" style="display:block;"><path fill="#ffffff" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4c0 3.2-2.6 5.8-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8C2 4.6 4.6 2 7.8 2Zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6Zm9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg></span></a>
+                <a href="{{TwitterLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="17" height="17" viewBox="0 0 24 24" role="img" aria-label="X" style="display:block;"><path fill="#ffffff" d="M18.9 2h3.1l-6.8 7.8L23.2 22h-6.3l-4.9-7.3L6.4 22H3.3l7.3-8.4L2.8 2h6.4l4.4 6.6L18.9 2Zm-1.1 17.9h1.7L8.3 4H6.5l11.3 15.9Z"/></svg></span></a>
+                <a href="{{YoutubeLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="20" height="20" viewBox="0 0 24 24" role="img" aria-label="YouTube" style="display:block;"><path fill="#ffffff" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg></span></a>
+            </td></tr>
+        </table>
+    </div>
+</div>
+HTML;
     }
 
     public function createTemplate(): void
@@ -1131,6 +1198,7 @@ trait InteractsWithCoachDatabase
                 $this->templateIsNew = false;
                 $this->templateDetails[$savedId] = $this->mergeTemplateRecord($saved, [
                     'id' => $savedId,
+                    'connection_key' => $this->templateConnectionKey,
                     'name' => $name,
                     'subjectLine' => $subject,
                     'previewText' => $this->templatePreviewText,
@@ -1310,7 +1378,11 @@ trait InteractsWithCoachDatabase
         }
 
         if (isset($this->templateDetails[$templateId])) {
-            return $this->templateDetails[$templateId];
+            $cached = $this->templateDetails[$templateId];
+            if (! is_array($cached) || (string) ($cached['connection_key'] ?? $this->templateConnectionKey) === (string) $this->templateConnectionKey) {
+                return $cached;
+            }
+            unset($this->templateDetails[$templateId]);
         }
 
         $summary = collect($this->templates)->firstWhere('id', $templateId)
@@ -1328,6 +1400,7 @@ trait InteractsWithCoachDatabase
                 $detail = $this->mergeTemplateRecord(is_array($summary) ? $summary : [], array_merge($result['template'], [
                     'id' => $templateId,
                     'source_type' => 'ghl',
+                    'connection_key' => $this->templateConnectionKey,
                 ]));
 
                 $this->templateDetails[$templateId] = $detail;
@@ -1409,7 +1482,8 @@ trait InteractsWithCoachDatabase
         return in_array($token, [
             '{{CoachFirstName}}', '{{CoachLastName}}', '{{CoachName}}', '{{SchoolName}}', '{{CoachTitle}}',
             '{{AthleteName}}', '{{GraduationYear}}', '{{Position}}', '{{ClubTeam}}', '{{GPA}}',
-            '{{HighlightLink}}', '{{ProfileLink}}',
+            '{{AthleteEmail}}', '{{AthletePhone}}', '{{HighlightLink}}', '{{ProfileLink}}',
+            '{{InstagramLink}}', '{{TwitterLink}}', '{{YoutubeLink}}',
         ], true);
     }
 
@@ -1452,8 +1526,13 @@ trait InteractsWithCoachDatabase
             '{{Position}}' => 'Center Back',
             '{{ClubTeam}}' => 'Baltimore Celtic ECNL',
             '{{GPA}}' => '4.0',
-            '{{HighlightLink}}' => 'https://plyrcard.com/highlights',
-            '{{ProfileLink}}' => 'https://plyrcard.com/profile',
+            '{{AthleteEmail}}' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], 'athlete@example.com'),
+            '{{AthletePhone}}' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '(555) 123-4567'),
+            '{{HighlightLink}}' => $this->firstUserTokenText(['highlight_link', 'highlights_link', 'highlightLink'], 'https://plyrcard.com/highlights'),
+            '{{ProfileLink}}' => $this->firstUserTokenText(['profile_link', 'plyrcard_link', 'profileLink'], 'https://plyrcard.com/profile'),
+            '{{InstagramLink}}' => $this->firstUserTokenText(['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'], 'https://instagram.com/yourhandle'),
+            '{{TwitterLink}}' => $this->firstUserTokenText(['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'], 'https://x.com/yourhandle'),
+            '{{YoutubeLink}}' => $this->firstUserTokenText(['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'], 'https://youtube.com/@yourhandle'),
         ];
 
         return strtr($value, $samples);
@@ -1777,6 +1856,16 @@ trait InteractsWithCoachDatabase
                 }
             }
 
+            if (strlen($value) > 80 && preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $value)) {
+                $base64 = base64_decode($value, true);
+                if (is_string($base64) && trim($base64) !== '' && $base64 !== $value) {
+                    $nested = $this->coerceTemplateHtml($base64);
+                    if ($nested !== '') {
+                        return $nested;
+                    }
+                }
+            }
+
             if (str_contains($value, '<html') || str_contains($value, '<body') || str_contains($value, '<table') || str_contains($value, '<p') || str_contains($value, '<div') || str_contains($value, '<span') || str_contains($value, '<br') || str_contains($value, '{{')) {
                 return $value;
             }
@@ -1801,7 +1890,7 @@ trait InteractsWithCoachDatabase
             }
         }
 
-        foreach (['props', 'data', 'attributes'] as $key) {
+        foreach (['props', 'data', 'attributes', 'values', 'properties', 'settings'] as $key) {
             if (isset($value[$key]) && is_array($value[$key])) {
                 foreach (['html', 'text', 'content', 'body', 'value', 'label'] as $nestedKey) {
                     if (array_key_exists($nestedKey, $value[$key])) {
@@ -2187,8 +2276,13 @@ trait InteractsWithCoachDatabase
             'Position' => $this->userTokenText('position', '[Position]'),
             'ClubTeam' => $this->userTokenText('club_team', '[Club Team]'),
             'GPA' => $this->userTokenText('gpa', '[GPA]'),
-            'HighlightLink' => $this->userTokenText('highlight_link', '[Highlight Link]'),
-            'ProfileLink' => $this->userTokenText('profile_link', '[Profile Link]'),
+            'AthleteEmail' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], '[Email]'),
+            'AthletePhone' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '[Phone]'),
+            'HighlightLink' => $this->firstUserTokenText(['highlight_link', 'highlights_link', 'highlightLink'], '[Highlight Link]'),
+            'ProfileLink' => $this->firstUserTokenText(['profile_link', 'plyrcard_link', 'profileLink'], '[Profile Link]'),
+            'InstagramLink' => $this->firstUserTokenText(['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'], '#'),
+            'TwitterLink' => $this->firstUserTokenText(['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'], '#'),
+            'YoutubeLink' => $this->firstUserTokenText(['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'], '#'),
         ];
 
         $aliases = [
@@ -2209,8 +2303,13 @@ trait InteractsWithCoachDatabase
             'Position' => ['position'],
             'ClubTeam' => ['club_team', 'team'],
             'GPA' => ['gpa'],
+            'AthleteEmail' => ['athlete_email', 'player_email', 'email', 'user.email'],
+            'AthletePhone' => ['athlete_phone', 'player_phone', 'phone', 'phone_number', 'mobile'],
             'HighlightLink' => ['highlight_link', 'highlights_link', 'highlightLink'],
             'ProfileLink' => ['profile_link', 'plyrcard_link', 'profileLink'],
+            'InstagramLink' => ['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'],
+            'TwitterLink' => ['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'],
+            'YoutubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'],
         ];
 
         foreach ($values as $canonical => $value) {
@@ -2240,6 +2339,25 @@ trait InteractsWithCoachDatabase
         }
 
         return $this->tokenText(data_get($user, $key), $fallback);
+    }
+
+    protected function firstUserTokenText(array $keys, string $fallback = ''): string
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return $fallback;
+        }
+
+        foreach ($keys as $key) {
+            $value = $this->tokenText(data_get($user, $key), '');
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return $fallback;
     }
 
     protected function tokenText(mixed $value, string $fallback = ''): string

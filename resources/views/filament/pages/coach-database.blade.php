@@ -1122,6 +1122,7 @@
         }
 
         .rc-rich-editor img {
+            width:100%;
             max-width:100%;
             height:auto;
             border-radius:.75rem;
@@ -1179,6 +1180,7 @@
         }
 
         .rc-rich-editor-shell .ql-editor img {
+            width: 100%;
             max-width: 100%;
             border-radius: .75rem;
             margin: .65rem 0;
@@ -1413,6 +1415,7 @@
         }
 
         .rc-email-body-fallback img {
+            width: 100%;
             max-width: 100%;
             height: auto;
         }
@@ -2258,8 +2261,9 @@
                                         <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
                                         <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
                                         <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
-                                        <button class="rc-rich-tool" type="button" @click="addImage()">Image</button>
+                                        <button class="rc-rich-tool" type="button" @click="openImageUpload()">Image</button>
                                         <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
+                                        <button class="rc-rich-tool" type="button" @click="addTable()">Table</button>
                                         <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
                                     </div>
                                     <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
@@ -2268,11 +2272,49 @@
                                         <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
+                                                                                                                        <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
                                     </div>
                                     <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    
+                                    <div
+                                        x-cloak
+                                        x-show="activePanel"
+                                        x-transition.opacity
+                                        @keydown.escape.window="closeEditorPanel()"
+                                        @click.self="closeEditorPanel()"
+                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
+                                    >
+                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
+                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
+                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                            </div>
+                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                            </div>
+                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
                                     <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                     <div
                                         x-ref="editor"
@@ -2465,8 +2507,44 @@
                                     <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
                                     <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                     <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
+                                    <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
+                                                                                                            <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
                                 </div>
                                 <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    
+                                    <div
+                                        x-cloak
+                                        x-show="activePanel"
+                                        x-transition.opacity
+                                        @keydown.escape.window="closeEditorPanel()"
+                                        @click.self="closeEditorPanel()"
+                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
+                                    >
+                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
+                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
+                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                            </div>
+                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                            </div>
+                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
                                 <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                 <div
                                     x-ref="editor"
@@ -2591,12 +2669,18 @@
 
                         <label>
                             <span class="rc-template-field-label">Subject line</span>
-                            <input x-ref="subject" class="rc-input" style="width:100%" placeholder="{{ '{' }}{{ '{' }}GraduationYear{{ '}' }}{{ '}' }} {{ '{' }}{{ '{' }}Position{{ '}' }}{{ '}' }} — Interested in {{ '{' }}{{ '{' }}SchoolName{{ '}' }}{{ '}' }}" wire:model.live.debounce.650ms="templateSubject" />
+                            <div style="display:flex;gap:.45rem;align-items:center">
+                                <input x-ref="subject" class="rc-input" style="width:100%;min-width:0" placeholder="@{{GraduationYear}} @{{Position}} — Interested in @{{SchoolName}}" wire:model.live.debounce.650ms="templateSubject" />
+                                <select class="rc-select" style="width:10.5rem;flex:0 0 10.5rem" @change="insertFieldMerge('subject', $event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
+                            </div>
                         </label>
 
                         <label>
                             <span class="rc-template-field-label">Preview text</span>
-                            <input class="rc-input" style="width:100%" placeholder="Short inbox preview" wire:model.live.debounce.650ms="templatePreviewText" />
+                            <div style="display:flex;gap:.45rem;align-items:center">
+                                <input x-ref="preview" class="rc-input" style="width:100%;min-width:0" placeholder="Short inbox preview" wire:model.live.debounce.650ms="templatePreviewText" />
+                                <select class="rc-select" style="width:10.5rem;flex:0 0 10.5rem" @change="insertFieldMerge('preview', $event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
+                            </div>
                         </label>
 
                         <div>
@@ -2620,18 +2704,40 @@
                                 </div>
                                 <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
                                     <span class="rc-subtle" style="align-self:center">Insert value:</span>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                    <select class="rc-select" style="width:min(18rem,100%)" @change="insertMergeFromSelect($event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
                                 </div>
                                 <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    
+                                    <div
+                                        x-cloak
+                                        x-show="activePanel"
+                                        x-transition.opacity
+                                        @keydown.escape.window="closeEditorPanel()"
+                                        @click.self="closeEditorPanel()"
+                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
+                                    >
+                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
+                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
+                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                            </div>
+                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                            </div>
+                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
                                 <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                 <div
                                     x-ref="editor"
@@ -2644,6 +2750,37 @@
                                 ></div>
                             </div>
                             <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
+                                
+                                    <div
+                                        x-cloak
+                                        x-show="activePanel"
+                                        x-transition.opacity
+                                        @keydown.escape.window="closeEditorPanel()"
+                                        @click.self="closeEditorPanel()"
+                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
+                                    >
+                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
+                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
+                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                            </div>
+                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                            </div>
+                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
                             <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody" />
                             <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.65rem">
                                 <span class="rc-subtle" x-show="!uploadingImages">Built-in PLYRCard editor. No external editor account or API key required.</span>
@@ -2703,8 +2840,9 @@
                                         <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
                                         <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
                                         <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
-                                        <button class="rc-rich-tool" type="button" @click="addImage()">Image</button>
+                                        <button class="rc-rich-tool" type="button" @click="openImageUpload()">Image</button>
                                         <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
+                                        <button class="rc-rich-tool" type="button" @click="addTable()">Table</button>
                                         <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
                                     </div>
                                     <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
@@ -2713,11 +2851,49 @@
                                         <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
                                         <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
+                                        <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
+                                                                                                                        <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
                                     </div>
                                     <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    
+                                    <div
+                                        x-cloak
+                                        x-show="activePanel"
+                                        x-transition.opacity
+                                        @keydown.escape.window="closeEditorPanel()"
+                                        @click.self="closeEditorPanel()"
+                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
+                                    >
+                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
+                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
+                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                            </div>
+                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                            </div>
+                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
+                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
+                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
                                     <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
                                     <div
                                         x-ref="editor"
@@ -2771,6 +2947,12 @@
                 syncTimer: null,
                 mounted: false,
                 uploadingImages: false,
+                editorNotice: '',
+                activePanel: '',
+                panelLinkLabel: '',
+                panelLinkUrl: '',
+                panelButtonLabel: '',
+                panelButtonUrl: '',
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -2812,6 +2994,38 @@
                         .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
                 },
                 cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
+                showNotice(message) {
+                    this.editorNotice = String(message || '');
+                    if (this.editorNotice) setTimeout(() => { this.editorNotice = ''; }, 4500);
+                },
+                closeEditorPanel() {
+                    this.activePanel = '';
+                },
+                openLinkPanel() {
+                    const selection = String(window.getSelection?.() || '').trim();
+                    this.panelLinkLabel = selection || 'Profile link';
+                    this.panelLinkUrl = this.mergeToken('ProfileLink');
+                    this.activePanel = 'link';
+                },
+                applyLinkPanel() {
+                    const url = this.cleanUrl(this.panelLinkUrl || this.mergeToken('ProfileLink'));
+                    const label = String(this.panelLinkLabel || 'Profile link').trim();
+                    if (!url || !label) return;
+                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                    this.closeEditorPanel();
+                },
+                openButtonPanel() {
+                    this.panelButtonLabel = 'View profile';
+                    this.panelButtonUrl = this.mergeToken('ProfileLink');
+                    this.activePanel = 'button';
+                },
+                applyButtonPanel() {
+                    const url = this.cleanUrl(this.panelButtonUrl || this.mergeToken('ProfileLink'));
+                    const label = String(this.panelButtonLabel || 'View profile').trim();
+                    if (!url || !label) return;
+                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank" style="display:block;width:100%;box-sizing:border-box;text-align:center;">' + this.escapeHtml(label) + '</a></p>');
+                    this.closeEditorPanel();
+                },
                 mergeToken(name) { return '{' + '{' + String(name || '').trim() + '}' + '}'; },
                 insertHtml(html) {
                     this.focusEditor();
@@ -2820,16 +3034,10 @@
                 },
                 insertMerge(name) { this.insertHtml(this.escapeHtml(this.mergeToken(name))); },
                 addLink() {
-                    const url = this.cleanUrl(prompt('Link URL', 'https://'));
-                    if (!url) return;
-                    const selection = String(window.getSelection?.() || '').trim();
-                    const label = selection || this.cleanUrl(prompt('Link text', url)) || url;
-                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                    this.openLinkPanel();
                 },
                 addImage() {
-                    const url = this.cleanUrl(prompt('Image URL', 'https://'));
-                    if (!url) return;
-                    this.insertImage(url);
+                    this.showNotice('Use the Image button to upload an image inside the app.');
                 },
                 openImageUpload() {
                     if (!this.$refs.imageUpload) {
@@ -2858,16 +3066,16 @@
                                 if (result && result.success && result.url) {
                                     this.insertImage(result.url);
                                 } else {
-                                    alert((result && result.error) ? result.error : 'Image upload failed.');
+                                    this.showNotice((result && result.error) ? result.error : 'Image upload failed.');
                                 }
                                 uploadNext(index + 1);
                             }).catch((error) => {
                                 console.error(error);
-                                alert('Image upload failed.');
+                                this.showNotice('Image upload failed.');
                                 uploadNext(index + 1);
                             });
                         }, () => {
-                            alert('Image upload failed.');
+                            this.showNotice('Image upload failed.');
                             uploadNext(index + 1);
                         });
                     };
@@ -2877,13 +3085,13 @@
                 insertImage(url) {
                     const clean = this.cleanUrl(url);
                     if (!clean) return;
-                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" alt="Email image" style="max-width:100%;height:auto;border-radius:12px;" /></p>');
+                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" alt="Email image" style="width:100%;max-width:100%;height:auto;display:block;border-radius:12px;" /></p>');
+                },
+                addTable() {
+                    this.insertHtml('<table style="width:100%;border-collapse:collapse;margin:12px 0;"><tr><td style="border:1px solid #e5e7eb;padding:8px;">Label</td><td style="border:1px solid #e5e7eb;padding:8px;">Value</td></tr><tr><td style="border:1px solid #e5e7eb;padding:8px;">School</td><td style="border:1px solid #e5e7eb;padding:8px;">' + this.escapeHtml(this.mergeToken('SchoolName')) + '</td></tr></table>');
                 },
                 addButton() {
-                    const label = prompt('Button text', 'View profile') || 'View profile';
-                    const url = this.cleanUrl(prompt('Button link URL', 'https://'));
-                    if (!url) return;
-                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a></p>');
+                    this.openButtonPanel();
                 }
             };
         };
@@ -2898,6 +3106,12 @@
                 mounted: false,
                 syncTimer: null,
                 uploadingImages: false,
+                editorNotice: '',
+                activePanel: '',
+                panelLinkLabel: '',
+                panelLinkUrl: '',
+                panelButtonLabel: '',
+                panelButtonUrl: '',
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -2907,6 +3121,15 @@
                     document.addEventListener('rc-open-template-preview', () => {
                         this.syncNow();
                         this.showPreview = true;
+                    });
+
+                    window.addEventListener('rc-template-editor-refresh', (event) => {
+                        const encoded = event.detail?.body || '';
+                        const html = this.decodeBodyValue(encoded);
+                        if (this.$refs.editor) {
+                            this.$refs.editor.innerHTML = html;
+                            this.syncNow();
+                        }
                     });
                 },
                 bootEditor() {
@@ -2919,15 +3142,17 @@
 
                     this.syncNow();
                 },
-                decodeInitialBody() {
-                    const initial = this.$refs.editor?.dataset?.initialBody || '';
+                decodeBodyValue(initial) {
                     if (!initial) return '';
-
                     try {
                         return decodeURIComponent(escape(window.atob(initial)));
                     } catch (error) {
                         try { return window.atob(initial); } catch (_) { return ''; }
                     }
+                },
+                decodeInitialBody() {
+                    const initial = this.$refs.editor?.dataset?.initialBody || '';
+                    return this.decodeBodyValue(initial);
                 },
                 queueSync() {
                     clearTimeout(this.syncTimer);
@@ -2966,8 +3191,96 @@
                     if (!token) return;
                     this.insertHtml(this.escapeHtml(token));
                 },
+                mergeTokenFromSelect(event) {
+                    const select = event?.target;
+                    const value = String(select?.value || '').trim();
+                    if (select) select.value = '';
+                    if (!value) return '';
+                    if (value === '__custom__') {
+                        this.showNotice('Inserted a custom value placeholder. Replace "your_value" with the exact field key.');
+                        return this.mergeToken('custom_values.your_value');
+                    }
+                    return this.mergeToken(value);
+                },
+                insertMergeFromSelect(event) {
+                    const token = this.mergeTokenFromSelect(event);
+                    if (!token) return;
+                    this.insertHtml(this.escapeHtml(token));
+                },
+                insertFieldMerge(refName, event) {
+                    const token = this.mergeTokenFromSelect(event);
+                    if (!token) return;
+                    const input = this.$refs?.[refName];
+                    if (!input) return;
+                    input.focus();
+                    const start = input.selectionStart ?? input.value.length;
+                    const end = input.selectionEnd ?? input.value.length;
+                    input.setRangeText(token, start, end, 'end');
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                },
+                mergeTokenFromSelect(event) {
+                    const select = event?.target;
+                    const value = String(select?.value || '').trim();
+                    if (select) select.value = '';
+                    if (!value) return '';
+                    if (value === '__custom__') {
+                        this.showNotice('Inserted a custom value placeholder. Replace "your_value" with the exact field key.');
+                        return this.mergeToken('custom_values.your_value');
+                    }
+                    return this.mergeToken(value);
+                },
+                insertMergeFromSelect(event) {
+                    const token = this.mergeTokenFromSelect(event);
+                    if (!token) return;
+                    this.insertHtml(this.escapeHtml(token));
+                },
+                insertFieldMerge(refName, event) {
+                    const token = this.mergeTokenFromSelect(event);
+                    if (!token) return;
+                    const input = this.$refs?.[refName];
+                    if (!input) return;
+                    input.focus();
+                    const start = input.selectionStart ?? input.value.length;
+                    const end = input.selectionEnd ?? input.value.length;
+                    input.setRangeText(token, start, end, 'end');
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                },
                 cleanUrl(url) {
                     return String(url || '').trim().replace(/["<>]/g, '');
+                },
+                showNotice(message) {
+                    this.editorNotice = String(message || '');
+                    if (this.editorNotice) setTimeout(() => { this.editorNotice = ''; }, 4500);
+                },
+                closeEditorPanel() {
+                    this.activePanel = '';
+                },
+                openLinkPanel() {
+                    const selection = String(window.getSelection?.() || '').trim();
+                    this.panelLinkLabel = selection || 'Profile link';
+                    this.panelLinkUrl = this.mergeToken('ProfileLink');
+                    this.activePanel = 'link';
+                },
+                applyLinkPanel() {
+                    const url = this.cleanUrl(this.panelLinkUrl || this.mergeToken('ProfileLink'));
+                    const label = String(this.panelLinkLabel || 'Profile link').trim();
+                    if (!url || !label) return;
+                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                    this.closeEditorPanel();
+                },
+                openButtonPanel() {
+                    this.panelButtonLabel = 'View profile';
+                    this.panelButtonUrl = this.mergeToken('ProfileLink');
+                    this.activePanel = 'button';
+                },
+                applyButtonPanel() {
+                    const url = this.cleanUrl(this.panelButtonUrl || this.mergeToken('ProfileLink'));
+                    const label = String(this.panelButtonLabel || 'View profile').trim();
+                    if (!url || !label) return;
+                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank" style="display:block;width:100%;box-sizing:border-box;text-align:center;">' + this.escapeHtml(label) + '</a></p>');
+                    this.closeEditorPanel();
                 },
                 escapeHtml(value) {
                     return String(value || '')
@@ -3001,16 +3314,16 @@
                                 if (result && result.success && result.url) {
                                     this.insertImage(result.url);
                                 } else {
-                                    alert((result && result.error) ? result.error : 'Image upload failed.');
+                                    this.showNotice((result && result.error) ? result.error : 'Image upload failed.');
                                 }
                                 uploadNext(index + 1);
                             }).catch((error) => {
                                 console.error(error);
-                                alert('Image upload failed.');
+                                this.showNotice('Image upload failed.');
                                 uploadNext(index + 1);
                             });
                         }, () => {
-                            alert('Image upload failed.');
+                            this.showNotice('Image upload failed.');
                             uploadNext(index + 1);
                         });
                     };
@@ -3020,24 +3333,13 @@
                 insertImage(url) {
                     const clean = this.cleanUrl(url);
                     if (!clean) return;
-                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" style="max-width:100%;height:auto;" alt="" /></p>');
+                    this.insertHtml('<p><img src="' + this.escapeHtml(clean) + '" style="width:100%;max-width:100%;height:auto;display:block;" alt="" /></p>');
                 },
                 addLink() {
-                    const url = this.cleanUrl(prompt('Link URL'));
-                    if (!url) return;
-
-                    const selection = String(window.getSelection?.() || '').trim();
-                    const label = selection || this.cleanUrl(prompt('Link text', url)) || url;
-                    this.insertHtml('<a href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a>');
+                    this.openLinkPanel();
                 },
                 addButton() {
-                    const label = prompt('Button text', 'View profile');
-                    if (!label) return;
-
-                    const url = this.cleanUrl(prompt('Button link URL'));
-                    if (!url) return;
-
-                    this.insertHtml('<p><a class="rc-email-button" href="' + this.escapeHtml(url) + '" target="_blank">' + this.escapeHtml(label) + '</a></p>');
+                    this.openButtonPanel();
                 },
                 addTable() {
                     this.insertHtml('<table style="width:100%;border-collapse:collapse;margin:12px 0;"><tr><td style="border:1px solid #e5e7eb;padding:8px;">Label</td><td style="border:1px solid #e5e7eb;padding:8px;">Value</td></tr><tr><td style="border:1px solid #e5e7eb;padding:8px;">School</td><td style="border:1px solid #e5e7eb;padding:8px;">' + this.escapeHtml(this.mergeToken('SchoolName')) + '</td></tr></table>');

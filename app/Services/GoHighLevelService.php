@@ -1742,9 +1742,9 @@ class GoHighLevelService
 
         $plainPreview = trim(Str::of((string) $body)->stripTags()->limit(160)->toString());
         $id = (string) ($item['id'] ?? $item['_id'] ?? $item['templateId'] ?? $item['template_id'] ?? $item['campaignId'] ?? $item['emailCampaignId'] ?? $item['data']['id'] ?? $item['data']['_id'] ?? $item['data']['campaignId'] ?? '');
-        $previewUrl = (string) ($item['previewUrl'] ?? $item['preview_url'] ?? $item['data']['previewUrl'] ?? $item['url'] ?? '');
-        $editorContentUrl = (string) ($item['editorContentUrl'] ?? $item['editor_content_url'] ?? $item['data']['editorContentUrl'] ?? $item['template']['editorContentUrl'] ?? '');
-        $templateDataUrl = (string) ($item['templateDataUrl'] ?? $item['template_data_url'] ?? $item['data']['templateDataUrl'] ?? '');
+        $previewUrl = (string) ($item['previewUrl'] ?? $item['preview_url'] ?? $item['data']['previewUrl'] ?? $item['data']['preview_url'] ?? $item['template']['previewUrl'] ?? $item['email']['previewUrl'] ?? $item['url'] ?? $item['data']['url'] ?? '');
+        $editorContentUrl = (string) ($item['editorContentUrl'] ?? $item['editor_content_url'] ?? $item['editorUrl'] ?? $item['editor_url'] ?? $item['contentUrl'] ?? $item['content_url'] ?? $item['data']['editorContentUrl'] ?? $item['data']['editor_content_url'] ?? $item['data']['editorUrl'] ?? $item['data']['contentUrl'] ?? $item['template']['editorContentUrl'] ?? $item['template']['editorUrl'] ?? $item['email']['editorContentUrl'] ?? '');
+        $templateDataUrl = (string) ($item['templateDataUrl'] ?? $item['template_data_url'] ?? $item['designUrl'] ?? $item['design_url'] ?? $item['builderUrl'] ?? $item['builder_url'] ?? $item['data']['templateDataUrl'] ?? $item['data']['template_data_url'] ?? $item['data']['designUrl'] ?? $item['template']['templateDataUrl'] ?? '');
 
         return [
             'id' => $id,
@@ -1784,12 +1784,15 @@ class GoHighLevelService
     private function extractTemplateHtmlFromKnownFields(array $item): string
     {
         foreach ([
-            'html', 'body', 'htmlBody', 'content', 'message', 'campaignHtml', 'emailContent', 'template.html', 'template.body',
-            'email.html', 'email.body', 'email.content', 'campaign.html', 'campaign.body', 'data.html', 'data.body', 'data.content',
+            'html', 'body', 'htmlBody', 'html_body', 'htmlContent', 'html_content', 'emailBody', 'email_body', 'content', 'message', 'campaignHtml', 'emailContent', 'compiledHtml', 'compiled_html', 'template.html', 'template.body',
+            'template.content', 'template.message', 'template.emailContent', 'template.htmlContent', 'template.emailBody', 'template.compiledHtml', 'template.templateData', 'template.builderData',
+            'email.html', 'email.body', 'email.htmlContent', 'email.emailContent', 'email.emailBody', 'email.content', 'email.message', 'email.templateData', 'email.builderData',
+            'campaign.html', 'campaign.body', 'campaign.htmlContent', 'campaign.emailBody', 'campaign.content', 'campaign.message', 'campaign.emailContent', 'campaign.templateData',
+            'data.html', 'data.body', 'data.htmlContent', 'data.emailBody', 'data.compiledHtml', 'data.content', 'data.message', 'data.emailContent', 'data.email.html', 'data.email.body', 'data.email.htmlContent', 'data.email.emailBody',
             'design.html', 'builder.html', 'templateData.html', 'contentData.html', 'previewHtml',
             'editorContent', 'editor.content', 'editor.html', 'editorHtml', 'dnd', 'dndData',
             'templateData', 'templateContent', 'unlayer', 'unlayerData', 'builderData', 'data.editorContent',
-            'data.templateData', 'data.builderData', 'data.dnd', 'data.dndData', 'data.design', 'data.builder',
+            'data.templateData', 'data.templateContent', 'data.builderData', 'data.dnd', 'data.dndData', 'data.design', 'data.builder',
         ] as $path) {
             $html = $this->extractTemplateHtml(data_get($item, $path));
             if ($html !== '') {
@@ -1824,6 +1827,16 @@ class GoHighLevelService
                 }
             }
 
+            if (strlen($value) > 80 && preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $value)) {
+                $base64 = base64_decode($value, true);
+                if (is_string($base64) && trim($base64) !== '' && $base64 !== $value) {
+                    $nested = $this->extractTemplateHtml($base64);
+                    if ($nested !== '') {
+                        return $nested;
+                    }
+                }
+            }
+
             if (str_contains($value, '<html') || str_contains($value, '<body') || str_contains($value, '<table') || str_contains($value, '<p') || str_contains($value, '<div') || str_contains($value, '<span') || str_contains($value, '<br') || str_contains($value, '{{')) {
                 return $value;
             }
@@ -1840,7 +1853,7 @@ class GoHighLevelService
         }
 
         foreach ([
-            'html', 'body', 'htmlBody', 'content', 'message', 'previewHtml', 'text', 'editorContent',
+            'html', 'body', 'htmlBody', 'html_body', 'htmlContent', 'html_content', 'emailBody', 'email_body', 'emailContent', 'compiledHtml', 'compiled_html', 'ampHtml', 'mjml', 'designHtml', 'templateHtml', 'renderedHtml', 'content', 'message', 'previewHtml', 'text', 'editorContent',
             'editorHtml', 'templateData', 'templateContent', 'builderData', 'dnd', 'dndData',
         ] as $key) {
             if (array_key_exists($key, $value)) {
@@ -1851,9 +1864,9 @@ class GoHighLevelService
             }
         }
 
-        foreach (['props', 'data', 'attributes'] as $key) {
+        foreach (['props', 'data', 'attributes', 'values', 'properties', 'settings'] as $key) {
             if (isset($value[$key]) && is_array($value[$key])) {
-                foreach (['html', 'text', 'content', 'body', 'value', 'label'] as $nestedKey) {
+                foreach (['html', 'htmlContent', 'emailBody', 'emailContent', 'compiledHtml', 'ampHtml', 'mjml', 'designHtml', 'templateHtml', 'renderedHtml', 'text', 'content', 'body', 'value', 'label', 'heading', 'paragraph', 'buttonText'] as $nestedKey) {
                     if (array_key_exists($nestedKey, $value[$key])) {
                         $html = $this->extractTemplateHtml($value[$key][$nestedKey]);
                         if ($html !== '') {
@@ -2002,7 +2015,7 @@ class GoHighLevelService
                     continue;
                 }
 
-                if (in_array($key, ['html', 'body', 'content', 'text', 'value', 'message', 'label', 'title', 'alt', 'heading', 'paragraph'], true)) {
+                if (in_array($key, ['html', 'htmlContent', 'emailBody', 'emailContent', 'compiledHtml', 'body', 'content', 'text', 'value', 'message', 'label', 'title', 'alt', 'heading', 'paragraph'], true)) {
                     $this->collectTemplateDesignFragments($text, $fragments, $depth + 1);
                 }
             } elseif (is_array($item)) {
@@ -2773,9 +2786,34 @@ class GoHighLevelService
                 'page_size' => 50,
             ],
             [
+                'source' => 'Marketing email templates v2',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-template",
+                'page_param' => 'offset',
+                'base_params' => ['limit' => 20],
+                'page_size' => 20,
+            ],
+            [
+                'source' => 'Marketing email templates v2 page',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-template",
+                'page_param' => 'page',
+                'base_params' => ['limit' => 20, 'pageLimit' => 20],
+                'page_size' => 20,
+                'starts_at' => 1,
+            ],
+            [
                 'source' => 'Marketing emails / campaigns v2',
                 'version' => '2023-02-21',
                 'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign",
+                'page_param' => 'offset',
+                'base_params' => ['limit' => 20],
+                'page_size' => 20,
+            ],
+            [
+                'source' => 'All marketing emails v2',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns",
                 'page_param' => 'offset',
                 'base_params' => ['limit' => 20],
                 'page_size' => 20,
@@ -2797,11 +2835,27 @@ class GoHighLevelService
                 'page_size' => 50,
             ],
             [
+                'source' => 'Generic email templates',
+                'version' => '2023-02-21',
+                'url' => "{$this->baseUrl}/emails/templates",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'locationId' => $locationId, 'originId' => $locationId],
+                'page_size' => 50,
+            ],
+            [
                 'source' => 'Builder templates',
                 'version' => '2021-07-28',
                 'url' => "{$this->baseUrl}/emails/builder",
                 'page_param' => 'skip',
                 'base_params' => ['limit' => 50, 'locationId' => $locationId, 'originId' => $locationId, 'archived' => false, 'templatesOnly' => false],
+                'page_size' => 50,
+            ],
+            [
+                'source' => 'Builder templates html type',
+                'version' => '2021-07-28',
+                'url' => "{$this->baseUrl}/emails/builder",
+                'page_param' => 'skip',
+                'base_params' => ['limit' => 50, 'locationId' => $locationId, 'originId' => $locationId, 'archived' => false, 'type' => 'html'],
                 'page_size' => 50,
             ],
             [
@@ -2867,7 +2921,7 @@ class GoHighLevelService
                 $total = (int) ($data['total'] ?? $data['totalCount'] ?? $data['count'] ?? data_get($data, 'meta.total') ?? data_get($data, 'pagination.total') ?? 0);
                 $pageSize = (int) ($fetcher['page_size'] ?? 50);
                 $page++;
-                if (($fetcher['page_param'] ?? 'skip') === 'pageNumber') {
+                if (in_array(($fetcher['page_param'] ?? 'skip'), ['pageNumber', 'page'], true)) {
                     $offset++;
                     $hasMore = $rawCount >= $pageSize && ($total === 0 || (($offset - 1) * $pageSize) < $total);
                 } else {
@@ -2921,91 +2975,185 @@ class GoHighLevelService
             return ['success' => false, 'template' => null, 'error' => 'Template id is required.'];
         }
 
-        $attempts = [
-            [
-                'source' => '/emails/locations/{locationId}/templates/{templateId}',
-                'version' => 'v3',
-                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}",
-                'params' => [],
-            ],
-            [
-                'source' => '/locations/{locationId}/templates/{templateId}',
-                'version' => 'v3',
-                'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}",
-                'params' => ['type' => 'email', 'originId' => $locationId],
-            ],
-            [
-                'source' => '/emails/public/v2/locations/{locationId}/campaigns/email-campaign/{id}',
-                'version' => '2023-02-21',
-                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign/{$templateId}",
-                'params' => [],
-            ],
-            [
-                'source' => '/emails/public/v2/locations/{locationId}/campaigns/{id}',
-                'version' => '2023-02-21',
-                'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/{$templateId}",
-                'params' => [],
-            ],
-            [
-                'source' => '/emails/builder/{templateId}',
-                'version' => '2021-07-28',
-                'url' => "{$this->baseUrl}/emails/builder/{$templateId}",
-                'params' => ['locationId' => $locationId],
-            ],
-            [
-                'source' => '/emails/builder/{locationId}/{templateId}',
-                'version' => '2021-07-28',
-                'url' => "{$this->baseUrl}/emails/builder/{$locationId}/{$templateId}",
-                'params' => [],
-            ],
-        ];
-
+        $summaryFallback = $this->findTemplateSummaryForDetail($user, $templateId);
+        $candidateIds = $this->emailTemplateDetailCandidateIds($templateId, $summaryFallback ?: []);
         $errors = [];
         $bestTemplate = null;
         $bestRaw = [];
         $bestSource = '';
 
-        foreach ($attempts as $attempt) {
-            $response = Http::withHeaders(['Version' => $attempt['version']])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->get($attempt['url'], $attempt['params']);
+        foreach ($candidateIds as $candidateId) {
+            $attempts = [
+                [
+                    'source' => '/emails/locations/{locationId}/templates/{templateId}',
+                    'version' => 'v3',
+                    'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$candidateId}",
+                    'params' => [],
+                ],
+                [
+                    'source' => '/emails/builder/{templateId}',
+                    'version' => '2021-07-28',
+                    'url' => "{$this->baseUrl}/emails/builder/{$candidateId}",
+                    'params' => ['locationId' => $locationId, 'originId' => $locationId],
+                ],
+                [
+                    'source' => '/emails/builder/{templateId} v3',
+                    'version' => 'v3',
+                    'url' => "{$this->baseUrl}/emails/builder/{$candidateId}",
+                    'params' => ['locationId' => $locationId, 'originId' => $locationId],
+                ],
+                [
+                    'source' => '/emails/builder/{locationId}/{templateId}',
+                    'version' => '2021-07-28',
+                    'url' => "{$this->baseUrl}/emails/builder/{$locationId}/{$candidateId}",
+                    'params' => [],
+                ],
+                [
+                    'source' => '/emails/public/v2/locations/{locationId}/campaigns/email-template/{id}',
+                    'version' => '2023-02-21',
+                    'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-template/{$candidateId}",
+                    'params' => [],
+                ],
+                [
+                    'source' => '/emails/public/v2/locations/{locationId}/campaigns/email-campaign/{id}',
+                    'version' => '2023-02-21',
+                    'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/email-campaign/{$candidateId}",
+                    'params' => [],
+                ],
+                [
+                    'source' => '/emails/public/v2/locations/{locationId}/campaigns/{id}',
+                    'version' => '2023-02-21',
+                    'url' => "{$this->baseUrl}/emails/public/v2/locations/{$locationId}/campaigns/{$candidateId}",
+                    'params' => [],
+                ],
+                [
+                    'source' => '/locations/{locationId}/templates/{templateId}',
+                    'version' => 'v3',
+                    'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$candidateId}",
+                    'params' => ['type' => 'email', 'originId' => $locationId],
+                ],
+                [
+                    'source' => '/emails/templates/{id}',
+                    'version' => '2023-02-21',
+                    'url' => "{$this->baseUrl}/emails/templates/{$candidateId}",
+                    'params' => ['locationId' => $locationId, 'originId' => $locationId],
+                ],
+            ];
 
-            $data = $response->json() ?? [];
+            foreach ($attempts as $attempt) {
+                $response = Http::withHeaders(['Version' => $attempt['version']])
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get($attempt['url'], $attempt['params']);
 
-            if (! $response->successful()) {
-                $errors[] = $data['message'] ?? $data['error'] ?? ($attempt['source'] . ' failed with status ' . $response->status());
-                continue;
-            }
+                $data = $response->json() ?? [];
 
-            $template = $data['template'] ?? $data['data']['template'] ?? $data['data'] ?? $data['emailTemplate'] ?? $data;
-            $transformed = $this->transformEmailTemplate(is_array($template) ? $template : $data);
-            $transformed['source'] = $attempt['source'];
+                if (! $response->successful()) {
+                    $message = $data['message'] ?? $data['error'] ?? ($attempt['source'] . ' failed with status ' . $response->status());
+                    $errors[] = $candidateId . ': ' . (is_scalar($message) ? (string) $message : $attempt['source'] . ' failed');
+                    continue;
+                }
 
-            if (trim((string) ($transformed['html'] ?? '')) === '') {
-                $renderHtml = $this->fetchTemplateRenderHtml($transformed, $data);
-                if ($renderHtml !== '') {
-                    $transformed['html'] = $renderHtml;
-                    $transformed['body'] = $renderHtml;
-                    $transformed['renderedHtml'] = $renderHtml;
-                    $transformed['editorContentFetched'] = true;
+                $template = $data['template']
+                    ?? data_get($data, 'data.template')
+                    ?? $data['emailTemplate']
+                    ?? data_get($data, 'data.emailTemplate')
+                    ?? data_get($data, 'data.email')
+                    ?? data_get($data, 'data.campaign')
+                    ?? data_get($data, 'campaign')
+                    ?? $data['data']
+                    ?? $data;
+
+                $transformed = $this->transformEmailTemplate(is_array($template) ? $template : $data);
+                $transformed['id'] = (string) ($transformed['id'] ?? $templateId) ?: $templateId;
+                $transformed['source'] = $attempt['source'];
+                $transformed['detail_candidate_id'] = $candidateId;
+
+                // Some builder templates store their actual HTML in sibling keys or deeply
+                // inside builder JSON rather than under the top-level template object.
+                $rawHtml = $this->extractTemplateHtmlFromKnownFields($data);
+                if ($rawHtml !== '' && trim((string) ($transformed['html'] ?? '')) === '') {
+                    $transformed['html'] = $rawHtml;
+                    $transformed['body'] = $rawHtml;
+                    $transformed['rawHtmlExtracted'] = true;
+                }
+
+                if (trim((string) ($transformed['html'] ?? '')) === '' && is_array($summaryFallback)) {
+                    $summaryHtml = $this->extractTemplateHtmlFromKnownFields($summaryFallback);
+                    if ($summaryHtml === '') {
+                        $summaryHtml = $this->extractTemplateHtmlFromKnownFields($summaryFallback['raw'] ?? []);
+                    }
+                    if ($summaryHtml !== '') {
+                        $transformed['html'] = $summaryHtml;
+                        $transformed['body'] = $summaryHtml;
+                        $transformed['summaryHtmlExtracted'] = true;
+                    }
+                }
+
+                if (trim((string) ($transformed['html'] ?? '')) === '') {
+                    $renderHtml = $this->fetchTemplateRenderHtml($transformed, $data);
+                    if ($renderHtml !== '') {
+                        $transformed['html'] = $renderHtml;
+                        $transformed['body'] = $renderHtml;
+                        $transformed['renderedHtml'] = $renderHtml;
+                        $transformed['editorContentFetched'] = true;
+                    }
+                }
+
+                if (trim((string) ($transformed['html'] ?? '')) !== '') {
+                    if (is_array($summaryFallback)) {
+                        $transformed = array_merge($summaryFallback, array_filter($transformed, function ($value): bool {
+                            return ! (is_string($value) && trim($value) === '') && ! (is_array($value) && empty($value));
+                        }));
+                        $transformed['id'] = $templateId;
+                    }
+
+                    return [
+                        'success' => true,
+                        'template' => $transformed,
+                        'raw' => $data,
+                        'source' => $attempt['source'],
+                        'warnings' => $errors,
+                    ];
+                }
+
+                if (is_null($bestTemplate) || trim((string) ($bestTemplate['subjectLine'] ?? '')) === '') {
+                    $bestTemplate = $transformed;
+                    $bestRaw = $data;
+                    $bestSource = $attempt['source'];
                 }
             }
+        }
 
-            if (trim((string) ($transformed['html'] ?? '')) !== '' || trim((string) ($transformed['subjectLine'] ?? '')) !== '') {
-                return [
-                    'success' => true,
-                    'template' => $transformed,
-                    'raw' => $data,
-                    'source' => $attempt['source'],
-                    'warnings' => $errors,
-                ];
+        if (is_array($summaryFallback)) {
+            $summaryHtml = $this->extractTemplateHtmlFromKnownFields($summaryFallback);
+            if ($summaryHtml === '') {
+                $summaryHtml = $this->extractTemplateHtmlFromKnownFields($summaryFallback['raw'] ?? []);
+            }
+            if ($summaryHtml === '') {
+                $summaryHtml = $this->fetchTemplateRenderHtml($summaryFallback, $summaryFallback['raw'] ?? $summaryFallback);
             }
 
-            $bestTemplate ??= $transformed;
-            $bestRaw = $data;
-            $bestSource = $attempt['source'];
+            if ($summaryHtml !== '') {
+                $summaryFallback['html'] = $summaryHtml;
+                $summaryFallback['body'] = $summaryHtml;
+                $summaryFallback['renderedHtml'] = $summaryHtml;
+            }
+
+            if (is_array($bestTemplate)) {
+                $summaryFallback = array_merge($bestTemplate, array_filter($summaryFallback, function ($value): bool {
+                    return ! (is_string($value) && trim($value) === '') && ! (is_array($value) && empty($value));
+                }));
+            }
+
+            return [
+                'success' => true,
+                'template' => $summaryFallback,
+                'raw' => $summaryFallback['raw'] ?? $bestRaw,
+                'source' => ($summaryFallback['source'] ?? 'summary fallback') . ' + summary/body fallback',
+                'warnings' => $errors,
+            ];
         }
 
         if (is_array($bestTemplate)) {
@@ -3021,6 +3169,7 @@ class GoHighLevelService
         Log::error('Recruiting email template detail request failed.', [
             'location_id' => $locationId,
             'template_id' => $templateId,
+            'candidate_ids' => $candidateIds,
             'errors' => $errors,
         ]);
 
@@ -3032,27 +3181,88 @@ class GoHighLevelService
         ];
     }
 
+    private function emailTemplateDetailCandidateIds(string $templateId, array $summary = []): array
+    {
+        $values = [$templateId];
+
+        foreach ([
+            'id', '_id', 'templateId', 'template_id', 'campaignId', 'campaign_id', 'emailCampaignId', 'email_campaign_id',
+            'builderId', 'builder_id', 'contentId', 'content_id', 'emailId', 'email_id',
+            'raw.id', 'raw._id', 'raw.templateId', 'raw.template_id', 'raw.campaignId', 'raw.campaign_id', 'raw.emailCampaignId', 'raw.email_campaign_id',
+            'raw.builderId', 'raw.builder_id', 'raw.contentId', 'raw.content_id', 'raw.emailId', 'raw.email_id',
+            'raw.data.id', 'raw.data._id', 'raw.data.templateId', 'raw.data.campaignId', 'raw.data.builderId', 'raw.data.contentId',
+            'raw.template.id', 'raw.template._id', 'raw.template.templateId', 'raw.template.campaignId', 'raw.email.id', 'raw.email._id',
+        ] as $path) {
+            $value = data_get($summary, $path);
+            if (is_scalar($value)) {
+                $values[] = (string) $value;
+            }
+        }
+
+        return collect($values)
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter(fn (string $value): bool => $value !== '' && ! in_array(strtolower($value), ['null', 'undefined'], true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function findTemplateSummaryForDetail(User $user, string $templateId): ?array
+    {
+        $list = $this->getEmailTemplatesForUser($user);
+
+        return collect($list['templates'] ?? [])
+            ->filter(fn ($template): bool => is_array($template))
+            ->first(function (array $template) use ($templateId): bool {
+                return (string) ($template['id'] ?? '') === $templateId
+                    || (string) ($template['templateId'] ?? '') === $templateId
+                    || (string) ($template['campaignId'] ?? '') === $templateId
+                    || (string) data_get($template, 'raw.id') === $templateId
+                    || (string) data_get($template, 'raw._id') === $templateId
+                    || (string) data_get($template, 'raw.templateId') === $templateId
+                    || (string) data_get($template, 'raw.campaignId') === $templateId;
+            });
+    }
+
     private function fetchTemplateRenderHtml(array $template, array $raw): string
     {
         $urls = [];
 
         foreach ([
             $template['editorContentUrl'] ?? null,
+            $template['editor_content_url'] ?? null,
+            $template['editorUrl'] ?? null,
+            $template['contentUrl'] ?? null,
             $template['previewUrl'] ?? null,
             $template['templateDataUrl'] ?? null,
+            $template['designUrl'] ?? null,
+            $template['builderUrl'] ?? null,
             data_get($raw, 'editorContentUrl'),
+            data_get($raw, 'editor_content_url'),
+            data_get($raw, 'editorUrl'),
+            data_get($raw, 'contentUrl'),
             data_get($raw, 'data.editorContentUrl'),
+            data_get($raw, 'data.editor_content_url'),
+            data_get($raw, 'data.editorUrl'),
+            data_get($raw, 'data.contentUrl'),
             data_get($raw, 'template.editorContentUrl'),
+            data_get($raw, 'template.editorUrl'),
             data_get($raw, 'email.editorContentUrl'),
+            data_get($raw, 'email.contentUrl'),
             data_get($raw, 'editor.contentUrl'),
             data_get($raw, 'editor.editorContentUrl'),
             data_get($raw, 'builder.editorContentUrl'),
             data_get($raw, 'templateData.editorContentUrl'),
             data_get($raw, 'previewUrl'),
+            data_get($raw, 'preview_url'),
+            data_get($raw, 'url'),
             data_get($raw, 'data.previewUrl'),
+            data_get($raw, 'data.url'),
             data_get($raw, 'template.previewUrl'),
             data_get($raw, 'templateDataUrl'),
             data_get($raw, 'data.templateDataUrl'),
+            data_get($raw, 'designUrl'),
+            data_get($raw, 'data.designUrl'),
         ] as $url) {
             $url = trim((string) $url);
             if ($url !== '' && Str::startsWith($url, ['http://', 'https://'])) {
