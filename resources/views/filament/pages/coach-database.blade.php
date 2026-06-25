@@ -1694,6 +1694,754 @@
         @media (max-width:640px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:1fr; } .rc-step-row { grid-template-columns:2.35rem minmax(0,1fr); } .rc-step-row .rc-btn { grid-column:2; justify-self:start; } }
 
 
+
+        /* v61 dashboard polish: compact text, png icons, scrollable activity, school slider */
+        .rc-dashboard { gap: 1.25rem; }
+        .rc-dashboard-hero h1 { max-width: 58rem; }
+        .rc-dashboard-hero p { max-width: 62rem; color:#a9b6c8; }
+        .rc-dashboard-stat-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+        .rc-dashboard-stat { min-height: 9.65rem; }
+        .rc-dashboard-icon { border-radius: 1rem; }
+        .rc-dashboard-icon img.rc-png-icon { width:1.35rem; height:1.35rem; display:block; object-fit:contain; }
+        .rc-dashboard-number { font-size:2.55rem; }
+        .rc-dashboard-label { font-size:.86rem; line-height:1.15; }
+        .rc-dashboard-subline { margin-top:.28rem; color:#7f8da2; font-size:.72rem; line-height:1.25; min-height:1.8em; max-width:15rem; }
+        .rc-metric-card { min-height:11.4rem; padding:1.15rem; }
+        .rc-metric-value { font-size:2rem; }
+        .rc-metric-name { font-size:.83rem; line-height:1.15; }
+        .rc-metric-caption { color:#7f8da2; font-size:.72rem; line-height:1.25; margin-top:.28rem; max-width:14rem; }
+        .rc-spark { height:2rem; opacity:.95; }
+        .rc-engaged-row { cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease; border:1px solid transparent; }
+        .rc-engaged-row:hover { transform:translateY(-1px); border-color:rgba(255,99,56,.35); background:rgba(255,99,56,.075); }
+        .rc-activity-list { max-height:24rem; overflow:auto; padding-right:.35rem; }
+        .rc-activity-card { display:grid; grid-template-columns:2.2rem minmax(0,1fr) auto; gap:.72rem; align-items:start; border-radius:1rem; background:rgba(15,18,24,.36); padding:.85rem; }
+        .rc-activity-copy { color:#aab7c8; font-size:.78rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+        .rc-activity-meta { color:#718096; font-size:.7rem; margin-top:.25rem; }
+        .rc-activity-view { min-height:1.85rem; padding:.25rem .5rem; font-size:.7rem; }
+        .rc-drawer { justify-content:center; align-items:center; background:rgba(0,0,0,.68); backdrop-filter:blur(8px); }
+        .rc-drawer-panel { width:min(760px,92vw); height:min(82vh,760px); border:1px solid rgba(148,163,184,.22); border-radius:1.25rem; background:linear-gradient(180deg, rgb(31 34 41), rgb(24 26 31)); box-shadow:0 30px 90px rgba(0,0,0,.45); padding:1.35rem; }
+        .rc-school-slide-head { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:1rem; align-items:start; }
+        .rc-school-score-ring { width:4.15rem; height:4.15rem; border-radius:999px; display:grid; place-items:center; border:.42rem solid var(--rc-accent); color:#fff; font-weight:950; font-size:1.1rem; }
+        .rc-school-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin:1rem 0; }
+        .rc-school-detail-stat { border-radius:.9rem; background:rgba(15,18,24,.42); padding:.85rem; }
+        .rc-school-detail-stat strong { display:block; color:#fff; font-size:1.2rem; }
+        .rc-school-detail-stat span { color:#9fb0c5; font-size:.72rem; }
+        .rc-school-coach-list { display:grid; gap:.7rem; max-height:20rem; overflow:auto; padding-right:.2rem; }
+        @media (max-width:1180px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media (max-width:640px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement,.rc-school-detail-grid { grid-template-columns:1fr; } .rc-activity-card { grid-template-columns:2.2rem minmax(0,1fr); } .rc-activity-view { grid-column:2; justify-self:start; } }
+        /* v62 upper dashboard stat alignment fix */
+        .rc-dashboard-hero { margin-top: .15rem; }
+        .rc-dashboard-hero h1 { margin-bottom: .15rem; }
+        .rc-dashboard-stat-grid { align-items: stretch; }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 8.8rem;
+            padding: 1.05rem 1rem 1rem;
+            text-align: center;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered > div {
+            width: 100%;
+            display: grid;
+            justify-items: center;
+            align-content: center;
+            gap: .32rem;
+        }
+        .rc-dashboard-card.rc-dashboard-stat:before {
+            top: .6rem;
+            bottom: .6rem;
+            width: .28rem;
+        }
+        .rc-dashboard-icon {
+            width: 2.7rem;
+            height: 2.7rem;
+            border-radius: .85rem;
+            margin: 0 auto .18rem;
+        }
+        .rc-dashboard-icon img.rc-png-icon {
+            width: 1.18rem;
+            height: 1.18rem;
+        }
+        .rc-dashboard-number {
+            margin: .08rem 0 0;
+            font-size: clamp(2rem, 3.4vw, 2.45rem);
+            line-height: .92;
+            letter-spacing: -.055em;
+        }
+        .rc-dashboard-label {
+            margin: 0;
+            font-size: .82rem;
+            line-height: 1.05;
+            color: #d9e5f5;
+        }
+        .rc-dashboard-subline {
+            margin: .05rem auto 0;
+            min-height: 0;
+            max-width: 11.5rem;
+            font-size: .66rem;
+            line-height: 1.18;
+            color: #8190a5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .rc-dashboard-section-title { margin-top: .35rem; }
+        .rc-dashboard-section-title .rc-subtle { max-width: 34rem; text-align: right; line-height: 1.25; }
+
+        /* v63 stat layout: top-left content, no stat subtext */
+        .rc-dashboard-stat-grid { align-items: stretch; }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered {
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            min-height: 7.85rem !important;
+            padding: 1.05rem 1.15rem 1rem 1.35rem !important;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered > div {
+            width: 100% !important;
+            display: grid !important;
+            justify-items: start !important;
+            align-content: start !important;
+            gap: .28rem !important;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered .rc-dashboard-icon {
+            margin: 0 0 .6rem 0 !important;
+            width: 2.55rem !important;
+            height: 2.55rem !important;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered .rc-dashboard-number {
+            margin: 0 !important;
+            font-size: clamp(2.05rem, 3vw, 2.45rem) !important;
+            line-height: .9 !important;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered .rc-dashboard-label {
+            margin: .1rem 0 0 !important;
+            font-size: .9rem !important;
+            line-height: 1.05 !important;
+            color: #e7eef9 !important;
+        }
+        .rc-dashboard-subline, .rc-metric-caption { display: none !important; }
+        .rc-metric-card { min-height: 8.6rem; }
+        .rc-metric-card .rc-metric-head { margin-bottom: .7rem; }
+
+        /* v64 engagement metrics: keep icons top-left, never centered */
+        .rc-dashboard-engagement .rc-dashboard-card.rc-metric-card {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            min-height: 8.75rem !important;
+            padding: 1.05rem 1.15rem !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head {
+            display: flex !important;
+            justify-content: flex-start !important;
+            align-items: flex-start !important;
+            margin: 0 0 .72rem 0 !important;
+            width: 100% !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
+            margin: 0 !important;
+            width: 2.5rem !important;
+            height: 2.5rem !important;
+        }
+        .rc-dashboard-engagement .rc-metric-card > div:nth-child(2) {
+            margin: 0 !important;
+            text-align: left !important;
+        }
+        .rc-dashboard-engagement .rc-metric-value {
+            margin: 0 !important;
+            font-size: 2.2rem !important;
+            line-height: .92 !important;
+        }
+        .rc-dashboard-engagement .rc-metric-name {
+            margin-top: .22rem !important;
+            color: #e7eef9 !important;
+        }
+        .rc-dashboard-engagement .rc-spark {
+            margin-top: auto !important;
+        }
+
+
+        /* v65 dashboard final alignment + readable activity */
+        .rc-load-status { display:flex; align-items:center; gap:.45rem; color:#b7c5d9; font-size:.88rem; font-weight:760; letter-spacing:.01em; }
+        .rc-load-status-icon { color:var(--rc-accent); font-weight:950; font-size:1.15rem; line-height:1; }
+        .rc-top .rc-pill { font-size:.76rem; padding:.48rem .68rem; color:#dbeafe; }
+        .rc-dashboard-engagement .rc-dashboard-card.rc-metric-card,
+        .rc-dashboard-engagement .rc-metric-card {
+            display:grid !important;
+            grid-template-rows:auto auto 1fr !important;
+            align-items:start !important;
+            justify-items:start !important;
+            align-content:start !important;
+            justify-content:stretch !important;
+            place-items:start stretch !important;
+            text-align:left !important;
+            min-height:9.2rem !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head,
+        .rc-dashboard-engagement .rc-metric-head * { align-self:start !important; justify-self:start !important; }
+        .rc-dashboard-engagement .rc-metric-head { width:100% !important; display:block !important; margin:0 0 .58rem 0 !important; }
+        .rc-dashboard-engagement .rc-dashboard-icon,
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon { margin:0 !important; display:inline-flex !important; }
+        .rc-dashboard-engagement .rc-metric-card > div:nth-child(2) { align-self:start !important; justify-self:start !important; width:100% !important; }
+        .rc-dashboard-engagement .rc-spark { align-self:end !important; justify-self:stretch !important; width:100% !important; margin-top:.55rem !important; }
+
+        /* v66 dashboard stat alignment: all stat icons/content stay top-left */
+        .rc-dashboard-card,
+        .rc-dashboard-card.rc-dashboard-stat,
+        .rc-dashboard-card.rc-metric-card {
+            position: relative;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered,
+        .rc-dashboard-card.rc-metric-card,
+        .rc-dashboard-engagement .rc-dashboard-card.rc-metric-card {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            gap: .72rem !important;
+        }
+        .rc-dashboard-card.rc-dashboard-stat.is-centered > div {
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            width: 100% !important;
+        }
+        .rc-dashboard-icon {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 0 0 auto !important;
+            margin: 0 !important;
+        }
+        .rc-dashboard-icon .rc-png-icon,
+        .rc-png-icon {
+            width: 1.05rem !important;
+            height: 1.05rem !important;
+            display: block !important;
+            object-fit: contain !important;
+            object-position: center center !important;
+            margin: auto !important;
+        }
+        .rc-dashboard-number,
+        .rc-metric-value {
+            margin-top: .2rem !important;
+            text-align: left !important;
+        }
+        .rc-dashboard-label,
+        .rc-metric-name {
+            text-align: left !important;
+            margin-top: -.18rem !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head {
+            display: flex !important;
+            width: auto !important;
+            margin: 0 !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+        }
+        .rc-dashboard-engagement .rc-metric-card > div:nth-child(2) {
+            width: 100% !important;
+            align-self: flex-start !important;
+        }
+        .rc-dashboard-engagement .rc-spark {
+            width: 100% !important;
+            margin-top: auto !important;
+            align-self: stretch !important;
+        }
+        .rc-engaged-row { cursor: pointer; }
+
+        .rc-activity-card.has-asset .rc-activity-copy { -webkit-line-clamp:2; }
+        .rc-activity-asset { display:inline-flex; align-items:center; gap:.28rem; margin-top:.35rem; width:max-content; max-width:100%; border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:.2rem .48rem; color:#dbeafe; background:rgba(59,130,246,.12); font-size:.68rem; font-weight:850; }
+
+        /* v68 console-safe top school clicks + locked icon alignment */
+        .rc-dashboard-stat-grid .rc-dashboard-card,
+        .rc-dashboard-engagement .rc-dashboard-card {
+            align-items:flex-start !important;
+            justify-content:flex-start !important;
+            place-items:start !important;
+            text-align:left !important;
+        }
+        .rc-dashboard-stat-grid .rc-dashboard-card > div,
+        .rc-dashboard-engagement .rc-dashboard-card > div {
+            align-self:flex-start !important;
+            justify-self:flex-start !important;
+            text-align:left !important;
+        }
+        .rc-dashboard-icon {
+            display:inline-grid !important;
+            place-items:center !important;
+            align-self:flex-start !important;
+            justify-self:flex-start !important;
+            overflow:hidden !important;
+            line-height:1 !important;
+        }
+        .rc-dashboard-icon img.rc-png-icon,
+        img.rc-png-icon {
+            width:1rem !important;
+            height:1rem !important;
+            object-fit:contain !important;
+            object-position:50% 50% !important;
+            display:block !important;
+            margin:0 !important;
+            transform:none !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head {
+            align-self:flex-start !important;
+            justify-self:flex-start !important;
+            margin:0 0 .72rem 0 !important;
+        }
+
+
+        /* v69 centered PNG stat icons: content stays top-left, icon artwork stays centered inside its badge */
+        .rc-dashboard-card .rc-dashboard-icon,
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+            padding:0 !important;
+            line-height:1 !important;
+            text-align:center !important;
+        }
+        .rc-dashboard-card .rc-dashboard-icon img.rc-png-icon,
+        .rc-dashboard-engagement .rc-dashboard-icon img.rc-png-icon,
+        .rc-png-icon {
+            width:1.06rem !important;
+            height:1.06rem !important;
+            display:block !important;
+            object-fit:contain !important;
+            object-position:center center !important;
+            margin:0 !important;
+            padding:0 !important;
+            transform:none !important;
+            position:static !important;
+            inset:auto !important;
+        }
+        .rc-dashboard-engagement .rc-metric-head {
+            display:flex !important;
+            align-items:flex-start !important;
+            justify-content:flex-start !important;
+        }
+
+
+
+        /* FINAL CLEAN DASHBOARD ICON RULES: one badge size, one artwork size, centered artwork */
+        .rc-dashboard-stat-grid .rc-dashboard-icon,
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
+            width: 3rem !important;
+            height: 3rem !important;
+            min-width: 3rem !important;
+            min-height: 3rem !important;
+            max-width: 3rem !important;
+            max-height: 3rem !important;
+            border-radius: 1rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: hidden !important;
+            line-height: 0 !important;
+            box-sizing: border-box !important;
+            flex: 0 0 3rem !important;
+        }
+
+        .rc-dashboard-stat-grid .rc-dashboard-icon > img.rc-png-icon,
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon > img.rc-png-icon {
+            width: 1.42rem !important;
+            height: 1.42rem !important;
+            min-width: 1.42rem !important;
+            min-height: 1.42rem !important;
+            max-width: 1.42rem !important;
+            max-height: 1.42rem !important;
+            display: block !important;
+            object-fit: contain !important;
+            object-position: 50% 50% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            position: static !important;
+            inset: auto !important;
+            transform: none !important;
+            translate: none !important;
+            vertical-align: middle !important;
+        }
+
+        .rc-dashboard-engagement .rc-metric-card {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+        }
+
+        .rc-dashboard-engagement .rc-metric-head {
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            max-width: none !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            align-self: flex-start !important;
+            justify-self: flex-start !important;
+            margin: 0 0 .78rem 0 !important;
+            padding: 0 !important;
+            line-height: 0 !important;
+        }
+
+        /* FINAL OVERRIDE: truly center engagement icons inside their colored badges */
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
+            position: relative !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon > img.rc-png-icon {
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            margin: 0 !important;
+            display: block !important;
+            object-fit: contain !important;
+            object-position: 50% 50% !important;
+        }
+
+        /* Top engaged school dialog */
+        .rc-school-modal-backdrop {
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 1.25rem !important;
+            background: rgba(0,0,0,.72) !important;
+            backdrop-filter: blur(10px) !important;
+        }
+
+        .rc-school-modal-panel {
+            position: relative !important;
+            width: min(720px, 92vw) !important;
+            height: min(82vh, 760px) !important;
+            max-height: 82vh !important;
+            overflow: auto !important;
+            border-radius: 1.35rem !important;
+            border: 1px solid rgba(148,163,184,.20) !important;
+            background: linear-gradient(180deg, #20232b 0%, #1b1d23 100%) !important;
+            box-shadow: 0 28px 90px rgba(0,0,0,.55) !important;
+            padding: 1.55rem !important;
+            color: #f8fafc !important;
+        }
+
+        .rc-school-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 2.35rem;
+            height: 2.35rem;
+            border: 1px solid rgba(148,163,184,.16);
+            border-radius: .85rem;
+            background: rgba(15,18,24,.46);
+            color: #9ca3af;
+            font-size: 1.6rem;
+            line-height: 1;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: .15s ease;
+            z-index: 3;
+        }
+
+        .rc-school-modal-close:hover {
+            color: #fff;
+            border-color: rgba(255,99,56,.35);
+            background: rgba(255,99,56,.12);
+        }
+
+        .rc-school-modal-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1.25rem;
+            align-items: start;
+            padding-right: 3.25rem;
+        }
+
+        .rc-school-modal-main h2 {
+            margin: .65rem 0 .35rem;
+            font-size: clamp(1.45rem, 3vw, 1.95rem);
+            line-height: 1.05;
+            letter-spacing: -.035em;
+            font-weight: 950;
+            color: #fff;
+        }
+
+        .rc-school-division-pill {
+            display: inline-flex;
+            width: max-content;
+            border-radius: .55rem;
+            background: rgba(245,158,11,.20);
+            color: #fbbf24;
+            padding: .22rem .48rem;
+            font-size: .72rem;
+            font-weight: 950;
+            letter-spacing: .035em;
+        }
+
+        .rc-school-modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            color: #9fb0c5;
+            font-size: .92rem;
+            line-height: 1.35;
+        }
+
+        .rc-school-score-wrap {
+            display: grid;
+            justify-items: center;
+            gap: .28rem;
+            padding-top: .25rem;
+        }
+
+        .rc-school-score-ring {
+            width: 4.55rem !important;
+            height: 4.55rem !important;
+            border-radius: 999px !important;
+            display: grid !important;
+            place-items: center !important;
+            border: .42rem solid #ff6b50 !important;
+            color: #fff !important;
+            font-weight: 950 !important;
+            font-size: 1.35rem !important;
+            line-height: 1 !important;
+            box-shadow: 0 0 0 .22rem rgba(255,99,56,.10), inset 0 0 0 1px rgba(255,255,255,.10) !important;
+        }
+
+        .rc-school-score-label {
+            color: #ff6b50;
+            font-size: .78rem;
+            font-weight: 950;
+            letter-spacing: .04em;
+        }
+
+        .rc-school-modal-actions {
+            display: flex !important;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .6rem;
+            margin: 1.25rem 0 0 !important;
+        }
+
+        .rc-school-action {
+            border: 1px solid rgba(148,163,184,.18);
+            background: rgba(15,18,24,.36);
+            color: #f8fafc;
+            border-radius: .8rem;
+            min-height: 2.65rem;
+            padding: .62rem .9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            font-size: .86rem;
+            font-weight: 850;
+            transition: .15s ease;
+        }
+
+        .rc-school-action:hover {
+            border-color: rgba(255,99,56,.40);
+            background: rgba(255,99,56,.10);
+        }
+
+        .rc-school-action-primary {
+            background: #ff6b50;
+            border-color: #ff6b50;
+            color: #fff;
+        }
+
+        .rc-school-action-primary:hover {
+            background: #ff5837;
+            border-color: #ff5837;
+        }
+
+        .rc-school-modal-rule {
+            height: 1px;
+            margin: 1.35rem 0 1.2rem;
+            background: rgba(148,163,184,.18);
+        }
+
+        .rc-school-modal-section {
+            display: grid;
+            gap: .78rem;
+            margin-top: 1.25rem;
+        }
+
+        .rc-school-section-title {
+            color: #fff;
+            font-size: 1rem;
+            line-height: 1.2;
+            font-weight: 950;
+            letter-spacing: -.02em;
+        }
+
+        .rc-school-modal-coaches {
+            display: grid;
+            gap: .65rem;
+            max-height: 19rem;
+            overflow: auto;
+            padding-right: .15rem;
+        }
+
+        .rc-school-coach-card {
+            display: grid;
+            grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+            align-items: center;
+            gap: .8rem;
+            border-radius: .95rem;
+            background: rgba(15,18,24,.28);
+            border: 1px solid rgba(148,163,184,.08);
+            padding: .78rem;
+        }
+
+        .rc-school-coach-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: grid;
+            place-items: center;
+            border-radius: .75rem;
+            background: #ff6b50;
+            color: #fff;
+            font-size: .78rem;
+            font-weight: 950;
+        }
+
+        .rc-school-coach-info {
+            display: grid;
+            gap: .12rem;
+            min-width: 0;
+        }
+
+        .rc-school-coach-info strong {
+            color: #fff;
+            font-size: .92rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-school-coach-info span {
+            color: #aab7c8;
+            font-size: .78rem;
+            line-height: 1.25;
+        }
+
+        .rc-school-coach-info a {
+            color: #4ea3ff;
+            font-size: .8rem;
+            text-decoration: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-school-copy-btn {
+            width: 2.15rem;
+            height: 2.15rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(148,163,184,.16);
+            border-radius: .65rem;
+            background: rgba(15,18,24,.32);
+            color: #9fb0c5;
+        }
+
+        .rc-school-copy-btn:hover {
+            color: #fff;
+            border-color: rgba(255,99,56,.35);
+        }
+
+        .rc-school-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .75rem;
+        }
+
+        .rc-school-stat-card {
+            display: grid;
+            grid-template-columns: 2.35rem minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: .7rem;
+            align-items: center;
+            border-radius: .95rem;
+            background: rgba(15,18,24,.28);
+            border: 1px solid rgba(148,163,184,.08);
+            padding: .78rem;
+        }
+
+        .rc-school-stat-card span {
+            grid-row: 1 / span 2;
+            width: 2.15rem;
+            height: 2.15rem;
+            display: grid;
+            place-items: center;
+            border-radius: .7rem;
+            background: rgba(255,99,56,.14);
+            color: #ff6b50;
+            font-weight: 950;
+            line-height: 1;
+        }
+
+        .rc-school-stat-card strong {
+            color: #fff;
+            font-size: 1.35rem;
+            line-height: 1;
+            font-weight: 950;
+        }
+
+        .rc-school-stat-card small {
+            color: #9fb0c5;
+            font-size: .78rem;
+            line-height: 1.2;
+        }
+
+        @media (max-width: 680px) {
+            .rc-school-modal-panel {
+                width: min(94vw, 720px) !important;
+                height: min(86vh, 760px) !important;
+                padding: 1rem !important;
+            }
+
+            .rc-school-modal-hero {
+                grid-template-columns: 1fr;
+                padding-right: 2.75rem;
+            }
+
+            .rc-school-score-wrap {
+                justify-items: start;
+            }
+
+            .rc-school-stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rc-school-coach-card {
+                grid-template-columns: 2.75rem minmax(0, 1fr);
+            }
+
+            .rc-school-copy-btn {
+                grid-column: 2;
+                justify-self: start;
+            }
+        }
+
     </style>
 
     @php
@@ -1703,7 +2451,7 @@
             }
 
             try {
-                return \Carbon\Carbon::parse($value)->timezone(config('app.timezone', 'UTC'))->format('M j, Y · g:i A');
+                return \Carbon\Carbon::parse($value)->timezone(config('app.timezone', 'UTC'))->format('M j, Y \a\t g:i A');
             } catch (\Throwable $exception) {
                 return is_string($value) ? $value : null;
             }
@@ -1720,7 +2468,7 @@
         x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
     >
         <div class="rc-top">
-            <div class="rc-subtle">{{ number_format($loadedSchoolsCount) }} schools · {{ number_format($loadedContactsCount) }} coaches loaded @if($isLoadingDataset) · syncing… @endif</div>
+            <div class="rc-load-status"><span class="rc-load-status-icon">⌁</span><span>{{ number_format($loadedSchoolsCount) }} schools</span><span>·</span><span>{{ number_format($loadedContactsCount) }} coaches</span>@if($isLoadingDataset)<span>·</span><span>syncing…</span>@endif</div>
             <div class="rc-toolbar">
                 <button class="rc-btn" type="button" wire:click="refreshData" wire:loading.attr="disabled" wire:target="refreshData">
                     <span wire:loading.remove wire:target="refreshData">Refresh data</span>
@@ -1751,82 +2499,115 @@
         @if($section === 'dashboard')
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools)->take(5)->values();
-                $dashboardLists = collect($lists ?? [])->take(8)->values();
-                $dashboardRecommendations = collect($this->dashboardRecommendations)->values();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity)->values();
+                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools)->take(5)->values()->all();
+                $dashboardLists = collect($lists ?? [])->take(8)->values()->all();
+                $dashboardRecommendations = collect($this->dashboardRecommendations)->values()->all();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity)->values()->all();
+                $sparks = $dashboardMetrics['sparks'] ?? [];
+                $sparkPoints = function ($key) use ($sparks) {
+                    $values = collect($sparks[$key] ?? [1,2,1,3,2,2,3])->map(fn ($v) => (int) $v)->values();
+                    if ($values->isEmpty()) { $values = collect([1,2,1,3,2,2,3]); }
+                    if ((int) $values->sum() === 0) { $values = collect([0,1,0,2,1,3,1]); }
+                    $max = max(1, (int) $values->max());
+                    return $values->values()->map(function ($value, $i) use ($values, $max) {
+                        $x = $values->count() <= 1 ? 0 : round(($i / max(1, $values->count() - 1)) * 220, 2);
+                        $y = round(38 - (($value / $max) * 26), 2);
+                        return $x . ',' . $y;
+                    })->implode(' ');
+                };
+                $dashboardStats = [
+                    ['name' => 'Schools Saved', 'value' => $dashboardMetrics['saved_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA+klEQVR4nO3Y0Q7CIBBEUdb4/7+MTxpNgGo7O2vCPW9NDLDDlhpaAwAAAAAA2ExUTt5776+FRJSs5VYxaWufxY+eXUoCmBVbEYI9gKMi3SHY3rszhTnOBUsHnN1VRzekB3BUxNEuZ4eQ2mKrxY8K//X3CmkdcKaYVZFZnZASwJWddIcgbaur73vWWCuyDlAv2HU4SgLI2i1HCLJXYLQY5cmdNf796gAzERHKQ0s93pPsDHjfjaxvdsYc8s9g9v939fjSAFyXGsp5yi5E/kXaITjzze457wS27wACqF5Ate0DsB+CVdffM9t3AAFUL6Da9gEAAAAAAABgNw9U/Xg0K1OcwgAAAABJRU5ErkJggg==', 'color' => '#ff6b50'],
+                    ['name' => 'Favorite Schools', 'value' => $dashboardMetrics['favorite_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABDUlEQVR4nO2YQQ7DIAwEocr/v0wvQYoqtaLEyzpi5lxqs15jQikAAAAAAACwntZac8Z/OYNnwCpAr77TBTjAFdjd+500DnAJkkYAFxYBsti/lGQOcAizXIBM1S8lmQMcLBVgpPqrHbK9A+rMomx93Km1/r2fKQfMBFIzm9PtjbjdcLcYt88ApxsiYocmv8oNkaKHToEVboiOET4GlSIo/ltasaiWUIoqvQiFHFLittr+JigVIKIF1JMFB7gTcCMTINK6yjbY3gGHM/h1xG33LP45310fVZKgv6o5stFv6xUiLXNAPRn9rTqfjvwMmH6pOdc97iJ0TTj6W8D9+jSEMslHCAAAAAAAAAAA6XkDiTVoQnfOMe0AAAAASUVORK5CYII=', 'color' => '#f6b13f'],
+                    ['name' => 'Engaged Schools', 'value' => $dashboardMetrics['engaged_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA/UlEQVR4nO3aQQ7CMBBD0V/uf+ewIRKLqrBobFfxu0A0nhloo0JVVVVVVVWAMcZQnvdSHvaLungIC2Br40N9bsQEOAqfIgJwsgfg7D6YA3AXDwET8O04jkN9pi2AhO6DKYCU4iFsBRzkASR1H4ImwPEDCOIA0roPIEv9ruLvnpSYFfjHijWRBJA4+tPyAFJHf3rECqz8h1gaQPLoT8sCSB/96RErsNKSAJ7SfRA+CJ25Ckr1aNwVcB2c0H0InAD1W2FcAGpRAWxzKXq2/1tciCSKCMDVfQgIwFk89FbYOwHu7kPACrjZAkjovpzrM5gr26+AVFr3q6qqqqo29gZjQmAtbz8YKwAAAABJRU5ErkJggg==', 'color' => '#5ca7e8'],
+                    ['name' => 'Total Emails Sent', 'value' => $dashboardMetrics['emails_sent'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA2UlEQVR4nO3XQQ7DMAhEUah6/yu7KzZRajkxDIry36ZSF3aGguuYAQAAAAAAAADew7MWGmOMrLVWufv2838yHqQjfNa+2wXoCp+1f0oHPNnrC/BVbXTnwFKMl6wDroZRnS3SEVgNpTxYS0Yg2v0sSHx3NhKz4LM1d5R2wGzuj0FWwlcoPwTd3f+FW/k1K8Obif4F7rRvdfAgPQRXQ6nCmwnvAWHWDcrgoe0mGGGPn2qtV+Hu8GZFI9D9hnjF61+GKMDuAp3zm7F/Sgd0FaG7+AAAAAAAAADwOD/TLVRCK+Pf4QAAAABJRU5ErkJggg==', 'color' => '#2dd4bf'],
+                ];
                 $engagementMetrics = [
-                    ['name' => 'Profile Views', 'value' => $dashboardMetrics['profile_views'] ?? 0, 'icon' => 'eye', 'caption' => 'Player profile + recruiting page views'],
-                    ['name' => 'Trigger-Link Clicks', 'value' => $dashboardMetrics['trigger_link_clicks'] ?? 0, 'icon' => 'link', 'caption' => 'Website, socials, YouTube, profile, and highlight links'],
-                    ['name' => 'Email Open Rate', 'value' => (($dashboardMetrics['email_open_rate'] ?? 0) ?: 0) . '%', 'icon' => 'mail', 'caption' => 'Opened emails divided by total sent'],
-                    ['name' => 'Coach Replies', 'value' => $dashboardMetrics['coach_replies'] ?? 0, 'icon' => 'reply', 'caption' => 'Replies found in GHL conversations and campaign stats'],
+                    ['key' => 'profile_views', 'name' => 'Profile Views', 'value' => $dashboardMetrics['profile_views'] ?? 0, 'icon' => 'data:image/png;base64,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'],
+                    ['key' => 'link_clicks', 'name' => 'Link Clicks', 'value' => $dashboardMetrics['link_clicks'] ?? ($dashboardMetrics['trigger_link_clicks'] ?? 0), 'icon' => 'data:image/png;base64,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'],
+                    ['key' => 'email_open_rate', 'name' => 'Email Open Rate', 'value' => (($dashboardMetrics['email_open_rate'] ?? 0) ?: 0) . '%', 'icon' => 'data:image/png;base64,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'],
+                    ['key' => 'coach_replies', 'name' => 'Coach Replies', 'value' => $dashboardMetrics['coach_replies'] ?? 0, 'icon' => 'data:image/png;base64,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'],
                 ];
             @endphp
 
             <div class="rc-dashboard">
                 <div class="rc-dashboard-hero">
                     <h1>Your recruiting command center</h1>
-                    <p>Live recruiting data from GHL, your saved schools, coach replies, link clicks, and recent actions.</p>
+                    <p>Track saved schools, engagement, email performance, link activity, and recent actions.</p>
                 </div>
 
                 <div class="rc-dashboard-stat-grid">
-                    <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:#ff6b50">
-                        <div><div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M12 10h.01M15 10h.01" /></svg></div><div class="rc-dashboard-number">{{ number_format($dashboardMetrics['saved_schools'] ?? 0) }}</div><div class="rc-dashboard-label">Schools Saved</div></div>
-                    </div>
-                    <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:#5ca7e8">
-                        <div><div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-5a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-3-3" /></svg></div><div class="rc-dashboard-number">{{ number_format($dashboardMetrics['saved_coaches'] ?? 0) }}</div><div class="rc-dashboard-label">Coaches Saved</div></div>
-                    </div>
-                    <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:#f6b13f">
-                        <div><div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" /></svg></div><div class="rc-dashboard-number">{{ number_format($dashboardMetrics['favorites'] ?? 0) }}</div><div class="rc-dashboard-label">Favorites</div></div>
-                    </div>
-                    <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:#2dd4bf">
-                        <div><div class="rc-dashboard-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" /></svg></div><div class="rc-dashboard-number">{{ number_format($dashboardMetrics['emails_sent'] ?? 0) }}</div><div class="rc-dashboard-label">Emails Sent</div></div>
-                    </div>
+                    @foreach($dashboardStats as $stat)
+                        <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:{{ $stat['color'] }}">
+                            <div>
+                                <div class="rc-dashboard-icon"><img class="rc-png-icon" src="{{ $stat['icon'] }}" alt="" /></div>
+                                <div class="rc-dashboard-number">{{ number_format((int) ($stat['value'] ?? 0)) }}</div>
+                                <div class="rc-dashboard-label">{{ $stat['name'] }}</div>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
 
                 <div class="rc-dashboard-section-title">
                     <h2>Engagement</h2>
-                    <div class="rc-subtle">Pulled from GHL campaigns, conversations, and link/click fields</div>
+                    
                 </div>
 
                 <div class="rc-dashboard-engagement">
                     @foreach($engagementMetrics as $metric)
                         <div class="rc-dashboard-card rc-metric-card">
-                            <div class="rc-metric-head">
-                                <div class="rc-dashboard-icon" style="width:2.6rem;height:2.6rem">
-                                    @switch($metric['icon'])
-                                        @case('eye')<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-7 9.75-7 9.75 7 9.75 7-3.75 7-9.75 7-9.75-7-9.75-7Z" /><circle cx="12" cy="12" r="3" stroke-width="2" /></svg>@break
-                                        @case('link')<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15" /></svg>@break
-                                        @case('mail')<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" /></svg>@break
-                                        @default<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14 4 9m0 0 5-5M4 9h11a5 5 0 0 1 0 10h-1" /></svg>
-                                    @endswitch
-                                </div>
-                            </div>
-                            <div><div class="rc-metric-value">{{ is_numeric($metric['value']) ? number_format($metric['value']) : $metric['value'] }}</div><div class="rc-metric-name">{{ $metric['name'] }}</div><div class="rc-step-copy" style="margin-top:.35rem">{{ $metric['caption'] }}</div></div>
-                            <svg class="rc-spark" viewBox="0 0 220 44" preserveAspectRatio="none"><polygon points="0,44 0,28 24,18 48,26 72,14 96,30 120,20 144,22 168,18 192,10 220,24 220,44" /><polyline points="0,28 24,18 48,26 72,14 96,30 120,20 144,22 168,18 192,10 220,24" /></svg>
+                            <div class="rc-metric-head"><div class="rc-dashboard-icon"><img class="rc-png-icon" src="{{ $metric['icon'] }}" alt="" /></div></div>
+                            <div><div class="rc-metric-value">{{ is_numeric($metric['value']) ? number_format((int) $metric['value']) : $metric['value'] }}</div><div class="rc-metric-name">{{ $metric['name'] }}</div></div>
+                            <svg class="rc-spark" viewBox="0 0 220 44" preserveAspectRatio="none"><polygon points="0,44 {{ $sparkPoints($metric['key']) }} 220,44" /><polyline points="{{ $sparkPoints($metric['key']) }}" /></svg>
                         </div>
                     @endforeach
                 </div>
 
                 <div class="rc-dashboard-card">
-                    <div class="rc-dashboard-section-title"><h2>Top 5 Engaged Schools</h2><div class="rc-subtle">Ranked by coach replies, reply volume, and trigger-link clicks</div></div>
+                    <div class="rc-dashboard-section-title"><h2>Top 5 Engaged Schools</h2><div class="rc-subtle">Ranked by replies, reply volume, and link activity</div></div>
                     <div class="rc-engaged-list">
-                        @forelse($dashboardTopSchools as $index => $school)
-                            @php
-                                $score = (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0);
-                                $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0));
-                                $clicks = (int) ($school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
-                                $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
-                                $bar = max(8, min(100, $score));
-                            @endphp
-                            <div class="rc-engaged-row">
-                                <div class="rc-rank {{ $index > 2 ? 'is-muted' : '' }}">{{ $index + 1 }}</div>
-                                <div style="min-width:0"><div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap"><div class="rc-school-title">{{ $school['name'] ?? 'School' }}</div>@if($replies > 0)<span class="rc-replied-badge">{{ $replies }} {{ $replies === 1 ? 'reply' : 'replies' }}</span>@endif</div><div class="rc-school-mini"><span>👁 {{ $views }}</span><span>↗ {{ $clicks }}</span><span>✉ {{ $replies }}</span><span>{{ $school['coach_count'] ?? 0 }} coaches</span></div></div>
-                                <div class="rc-lead-bar"><span style="width:{{ $bar }}%"></span></div><div class="rc-lead-score">{{ $score }}</div>
-                            </div>
-                        @empty
-                            <div class="rc-activity-empty">Your most engaged schools will appear after coaches reply or click your recruiting links.</div>
-                        @endforelse
+                        <?php $engagedSchools = array_values(is_array($dashboardTopSchools ?? null) ? $dashboardTopSchools : []); ?>
+                        <?php if (empty($engagedSchools)): ?>
+                            <div class="rc-activity-empty">Your most engaged schools will appear after coaches reply, view your profile, or click recruiting links.</div>
+                        <?php else: ?>
+                            <?php foreach ($engagedSchools as $engagedIndex => $school): ?>
+                                <?php
+                                    $engagedSchoolId = (string) ($school['id'] ?? $school['business_id'] ?? '');
+                                    if ($engagedSchoolId === '' && ! empty($school['name'])) { $engagedSchoolId = md5(strtolower(trim((string) $school['name']))); }
+                                    $score = (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0);
+                                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0));
+                                    $clicks = (int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
+                                    $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
+                                    $bar = max(8, min(100, $score));
+                                ?>
+                                <?php if ($engagedSchoolId !== ''): ?>
+                                    <button type="button" class="rc-engaged-row" wire:click="openDashboardEngagedSchool({{ (int) $engagedIndex }})" wire:loading.attr="disabled" wire:target="openDashboardEngagedSchool">
+                                <?php else: ?>
+                                    <div class="rc-engaged-row" role="group" aria-label="Engaged school">
+                                <?php endif; ?>
+                                        <div class="rc-rank {{ $engagedIndex > 2 ? 'is-muted' : '' }}">{{ $engagedIndex + 1 }}</div>
+                                        <div style="min-width:0;text-align:left">
+                                            <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                                                <div class="rc-school-title">{{ $school['name'] ?? 'School' }}</div>
+                                                <?php if ($replies > 0): ?>
+                                                    <span class="rc-replied-badge">{{ $replies }} {{ $replies === 1 ? 'reply' : 'replies' }}</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="rc-school-mini">
+                                                <span>Views {{ $views }}</span>
+                                                <span>Clicks {{ $clicks }}</span>
+                                                <span>Replies {{ $replies }}</span>
+                                                <span>{{ $school['coach_count'] ?? 0 }} coaches</span>
+                                            </div>
+                                        </div>
+                                        <div class="rc-lead-bar"><span style="width:{{ $bar }}%"></span></div>
+                                        <div class="rc-lead-score">{{ $score }}</div>
+                                <?php if ($engagedSchoolId !== ''): ?>
+                                    </button>
+                                <?php else: ?>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -1834,30 +2615,59 @@
                     <div class="rc-dashboard-card">
                         <div class="rc-dashboard-section-title"><h2>Suggested next steps</h2></div>
                         <div class="rc-step-list">
-                            @foreach($dashboardRecommendations as $index => $step)
-                                <div class="rc-step-row"><div class="rc-step-index">{{ $index + 1 }}</div><div><div class="rc-step-title">{{ $step['title'] ?? 'Next step' }}</div><div class="rc-step-copy">{{ $step['copy'] ?? '' }}</div></div><a class="rc-btn rc-btn-primary" href="{{ $step['url'] ?? '#' }}">{{ $step['label'] ?? 'Open' }} →</a></div>
-                            @endforeach
+                            <?php $recommendationRows = is_array($dashboardRecommendations ?? null) ? array_values($dashboardRecommendations) : collect($dashboardRecommendations ?? [])->values()->all(); ?>
+                            <?php foreach ($recommendationRows as $recommendationIndex => $recommendationStep): ?>
+                                <div class="rc-step-row"><div class="rc-step-index"><?php echo e($recommendationIndex + 1); ?></div><div><div class="rc-step-title"><?php echo e($recommendationStep['title'] ?? 'Next step'); ?></div><div class="rc-step-copy"><?php echo e($recommendationStep['copy'] ?? ''); ?></div></div><a class="rc-btn rc-btn-primary" href="<?php echo e($recommendationStep['url'] ?? '#'); ?>"><?php echo e($recommendationStep['label'] ?? 'Open'); ?> →</a></div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                     <div class="rc-dashboard-card">
                         <div class="rc-dashboard-section-title"><h2>Recent activity</h2></div>
                         <div class="rc-activity-list">
-                            @forelse($dashboardRecentActivity as $activity)
-                                <div class="rc-step-row" style="grid-template-columns:2.35rem minmax(0,1fr)"><div class="rc-step-index" style="background:#334155">{{ strtoupper(substr((string) ($activity['type'] ?? 'A'),0,1)) }}</div><div><div class="rc-step-title">{{ $activity['title'] ?? 'Activity' }}</div><div class="rc-step-copy">{{ $activity['copy'] ?? '' }} @if(!empty($activity['time']))· {{ \Illuminate\Support\Carbon::parse($activity['time'])->diffForHumans() }}@endif</div></div></div>
-                            @empty
-                                <div class="rc-activity-empty">No tracked activity yet. Sent emails, campaigns, replies, and list actions will show here.</div>
-                            @endforelse
+                            <?php $recentActivityRows = is_array($dashboardRecentActivity ?? null) ? $dashboardRecentActivity : []; ?>
+                            <?php if (empty($recentActivityRows)): ?>
+                                <div class="rc-activity-empty">No activity yet. Sent emails, replies, saved schools, and list actions will show here.</div>
+                            <?php else: ?>
+                                <?php foreach ($recentActivityRows as $recentActivityRow): ?>
+                                    <?php
+                                        $activityUrl = $recentActivityRow['url'] ?? \App\Filament\Pages\CoachDatabaseConversations::getUrl();
+                                        $activityCopy = trim(strip_tags((string) ($recentActivityRow['copy'] ?? '')));
+                                        $activityTypeRaw = strtolower((string) ($recentActivityRow['type'] ?? 'activity'));
+                                        $activityType = strtoupper(substr($activityTypeRaw, 0, 1));
+                                        $activityTitle = $recentActivityRow['title'] ?? 'Activity';
+                                        $activityTime = $recentActivityRow['time'] ?? null;
+                                        $activityHasImage = (bool) ($recentActivityRow['has_image'] ?? false) || preg_match('/\.(png|jpe?g|gif|webp)(\?|$)/i', $activityCopy);
+                                        $activityHasFile = (bool) ($recentActivityRow['has_file'] ?? false) || (! $activityHasImage && preg_match('/\.(pdf|docx?|xlsx?|pptx?|zip)(\?|$)/i', $activityCopy));
+                                        $activityAssetLabel = $activityHasImage ? 'Image attached' : ($activityHasFile ? 'File attached' : '');
+                                        if ($activityHasImage || $activityHasFile) {
+                                            $activityCopy = trim(preg_replace('/https?:\/\/\S+/i', '', $activityCopy));
+                                            if ($activityCopy === '') { $activityCopy = 'Conversation includes an attachment.'; }
+                                        }
+                                    ?>
+                                    <div class="rc-activity-card<?php echo ($activityHasImage || $activityHasFile) ? ' has-asset' : ''; ?>">
+                                        <div class="rc-step-index" style="background:#334155"><?php echo e($activityType); ?></div>
+                                        <div>
+                                            <div class="rc-step-title"><?php echo e($activityTitle); ?></div>
+                                            <div class="rc-activity-copy"><?php echo e($activityCopy); ?></div>
+                                            <?php if ($activityAssetLabel !== ''): ?><div class="rc-activity-asset"><?php echo $activityHasImage ? '▧' : '▣'; ?> <?php echo e($activityAssetLabel); ?></div><?php endif; ?>
+                                            <div class="rc-activity-meta"><?php echo e($activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans() : 'Recent'); ?></div>
+                                        </div>
+                                        <a class="rc-btn rc-activity-view" href="<?php echo e($activityUrl); ?>">View</a>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
-                    <div class="rc-dashboard-card rc-list-box">
-                        <div class="rc-dashboard-section-title"><h2>Your lists</h2><a class="rc-btn" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}">Manage →</a></div>
-                        <div class="rc-list-pills">
-                            @forelse($dashboardLists as $list)
-                                <div class="rc-list-pill"><span>{{ $list['label'] ?? $list['name'] ?? 'List' }}</span><span class="rc-list-count">{{ (int) ($list['schools_count'] ?? $list['school_count'] ?? $list['coaches_count'] ?? $list['coach_count'] ?? 0) }}</span></div>
-                            @empty
-                                <div class="rc-activity-empty">Create recruiting lists from the Schools page.</div>
-                            @endforelse
-                        </div>
+                </div>
+
+                <div class="rc-dashboard-card rc-list-box">
+                    <div class="rc-dashboard-section-title"><h2>Your lists</h2><a class="rc-btn" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}">Manage →</a></div>
+                    <div class="rc-list-pills">
+                        @forelse($dashboardLists as $list)
+                            <a class="rc-list-pill" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}"><span>{{ $list['label'] ?? 'List' }}</span><span class="rc-list-count">{{ $list['schools_count'] ?? 0 }}</span></a>
+                        @empty
+                            <div class="rc-activity-empty">Create a recruiting list to organize target schools.</div>
+                        @endforelse
                     </div>
                 </div>
             </div>
@@ -1938,22 +2748,6 @@
                     <div class="rc-section-title">Favorite schools</div>
                     <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search favorite schools" wire:model.live.debounce.350ms="favoriteSchoolSearch" />
                     @include('filament.partials.coach-database-school-grid', ['schools' => $this->favoriteSchools, 'compact' => true])
-                </div>
-                <div class="rc-card rc-coach-panel">
-                    <div class="rc-section-title">Saved coaches</div>
-                    @forelse($this->savedCoaches as $coach)
-                        @include('filament.partials.coach-row', ['coach' => $coach])
-                    @empty
-                        <div class="rc-subtle">No saved coaches yet.</div>
-                    @endforelse
-                </div>
-                <div class="rc-card rc-coach-panel">
-                    <div class="rc-section-title">Favorite coaches</div>
-                    @forelse($this->favoriteCoaches as $coach)
-                        @include('filament.partials.coach-row', ['coach' => $coach])
-                    @empty
-                        <div class="rc-subtle">No favorite coaches yet.</div>
-                    @endforelse
                 </div>
             </div>
         @endif
@@ -2042,28 +2836,33 @@
                     <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationSchoolFilter" class="rc-loading-inline" style="margin-bottom:.65rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
 
                     <div class="rc-inbox-list">
-                        @forelse($this->filteredConversations as $conversation)
-                            @php
-                                $conversationId = (string) ($conversation['id'] ?? '');
-                                $contactName = (string) ($conversation['contact_name'] ?? $conversation['name'] ?? 'Coach');
-                                $initials = collect(explode(' ', $contactName))->filter()->map(fn($part) => substr($part,0,1))->take(2)->implode('');
-                                $lastMessage = strip_tags((string) ($conversation['last_message'] ?? $conversation['snippet'] ?? 'No preview available.'));
-                            @endphp
-                            <button type="button" class="rc-thread-card {{ $selectedConversationId === $conversationId ? 'is-selected' : '' }}" wire:click="selectConversation(@js($conversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($conversationId))">
-                                <span class="rc-avatar-mini">{{ strtoupper($initials ?: 'C') }}</span>
-                                <span style="min-width:0">
-                                    <span class="rc-thread-subject">{{ $contactName }}</span>
-                                    <span class="rc-choice-sub">{{ $conversation['school'] ?? $conversation['company_name'] ?? $conversation['email'] ?? 'School unavailable' }}</span>
-                                    <span class="rc-thread-preview">{{ $lastMessage }}</span>
-                                </span>
-                                <span style="display:grid;gap:.35rem;justify-items:end">
-                                    <span class="rc-subtle">{{ $conversation['updated_at'] ?? $conversation['last_message_at'] ?? '' }}</span>
-                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 6.75L2.25 6.75" /></svg>
-                                </span>
-                            </button>
-                        @empty
+                        <?php $inboxConversations = collect($this->filteredConversations ?? [])->values()->all(); ?>
+                        <?php if (empty($inboxConversations)): ?>
                             <div class="rc-empty"><strong>No email threads found.</strong><span>Try another search or school filter.</span></div>
-                        @endforelse
+                        <?php else: ?>
+                            <?php foreach ($inboxConversations as $inboxConversation): ?>
+                                <?php
+                                    $inboxConversationId = (string) ($inboxConversation['id'] ?? '');
+                                    $inboxContactName = (string) ($inboxConversation['contact_name'] ?? $inboxConversation['name'] ?? 'Coach');
+                                    $inboxInitials = collect(explode(' ', $inboxContactName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                    $inboxLastMessage = strip_tags((string) ($inboxConversation['last_message'] ?? $inboxConversation['snippet'] ?? 'No preview available.'));
+                                    $inboxSchoolLine = (string) ($inboxConversation['school'] ?? $inboxConversation['company_name'] ?? $inboxConversation['email'] ?? 'School unavailable');
+                                    $inboxUpdatedAt = (string) ($inboxConversation['updated_at'] ?? $inboxConversation['last_message_at'] ?? '');
+                                ?>
+                                <button type="button" class="rc-thread-card <?php echo $selectedConversationId === $inboxConversationId ? 'is-selected' : ''; ?>" wire:click="selectConversation(<?php echo \Illuminate\Support\Js::from($inboxConversationId); ?>)" wire:loading.attr="disabled" wire:target="selectConversation(<?php echo \Illuminate\Support\Js::from($inboxConversationId); ?>)">
+                                    <span class="rc-avatar-mini"><?php echo e(strtoupper($inboxInitials ?: 'C')); ?></span>
+                                    <span style="min-width:0">
+                                        <span class="rc-thread-subject"><?php echo e($inboxContactName); ?></span>
+                                        <span class="rc-choice-sub"><?php echo e($inboxSchoolLine); ?></span>
+                                        <span class="rc-thread-preview"><?php echo e($inboxLastMessage); ?></span>
+                                    </span>
+                                    <span style="display:grid;gap:.35rem;justify-items:end">
+                                        <span class="rc-subtle"><?php echo e($inboxUpdatedAt); ?></span>
+                                        <span class="rc-mail-dot">✉</span>
+                                    </span>
+                                </button>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -2222,7 +3021,7 @@
                                         </div>
                                     </div>
                                     <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
+                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
                                     <div
                                         x-ref="editor"
                                         class="rc-rich-editor rc-native-editor"
@@ -2452,7 +3251,7 @@
                                         </div>
                                     </div>
                                     <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
+                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
                                 <div
                                     x-ref="editor"
                                     class="rc-rich-editor rc-native-editor"
@@ -2645,7 +3444,7 @@
                                         </div>
                                     </div>
                                     <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
+                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
                                 <div
                                     x-ref="editor"
                                     class="rc-rich-editor rc-native-editor"
@@ -2801,7 +3600,7 @@
                                         </div>
                                     </div>
                                     <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image to GHL</div>
+                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
                                     <div
                                         x-ref="editor"
                                         class="rc-rich-editor rc-native-editor"
@@ -2826,22 +3625,127 @@
         @endif
 
         @if($this->selectedSchool)
-            <div class="rc-drawer" wire:key="school-drawer">
-                <div class="rc-drawer-panel">
-                    <div class="rc-top"><div><div class="rc-title">{{ $this->selectedSchool['name'] }}</div><div class="rc-subtle">{{ $this->selectedSchool['conference'] ?? 'Conference unavailable' }} · {{ $this->selectedSchool['division'] ?? 'Division unavailable' }}</div></div><button class="rc-btn" wire:click="closeSchool">Close</button></div>
-                    <div class="rc-school-modal-actions">
-                        @php($schoolId = $this->selectedSchool['id'])
-                        <button class="rc-btn" wire:click="{{ ($this->selectedSchool['is_saved'] ?? false) ? 'unsaveSchoolById' : 'saveSchoolById' }}('{{ $schoolId }}')" wire:loading.attr="disabled" wire:target="saveSchoolById('{{ $schoolId }}'),unsaveSchoolById('{{ $schoolId }}')">
-                            {{ ($this->selectedSchool['is_saved'] ?? false) ? 'Saved' : 'Save' }}
-                        </button>
-                        <button class="rc-btn" wire:click="{{ ($this->selectedSchool['is_favorite'] ?? false) ? 'unfavoriteSchoolById' : 'favoriteSchoolById' }}('{{ $schoolId }}')" wire:loading.attr="disabled" wire:target="favoriteSchoolById('{{ $schoolId }}'),unfavoriteSchoolById('{{ $schoolId }}')">
-                            {{ ($this->selectedSchool['is_favorite'] ?? false) ? 'Favorited' : 'Favorite' }}
-                        </button>
-                        <button class="rc-btn rc-btn-primary" type="button" wire:click="composeEmailSchool('{{ $schoolId }}')">Email coaches</button>
+            @php
+                $slideSchool = $this->selectedSchool;
+                $slideSchoolId = (string) ($slideSchool['id'] ?? '');
+                $slideSchoolName = (string) ($slideSchool['name'] ?? 'School');
+                $slideDivision = (string) ($slideSchool['division'] ?? 'Division');
+                $slideConference = (string) ($slideSchool['conference'] ?? 'Conference unavailable');
+                $slideLocation = trim((string) (($slideSchool['city'] ?? '') . ((!empty($slideSchool['city']) && !empty($slideSchool['state'])) ? ', ' : '') . ($slideSchool['state'] ?? '')));
+                $slideCoaches = collect($slideSchool['coaches'] ?? [])->values();
+                $slideReplies = (int) ($slideSchool['replies'] ?? $slideSchool['coach_replies'] ?? 0);
+                $slideClicks = (int) ($slideSchool['link_clicks'] ?? $slideSchool['trigger_link_clicks'] ?? $slideSchool['trigger_clicks'] ?? 0);
+                $slideViews = (int) (($slideSchool['profile_views'] ?? 0) + ($slideSchool['highlight_views'] ?? 0));
+                $slideEmails = (int) ($slideSchool['emails_sent'] ?? $slideSchool['sent_emails'] ?? $slideSchool['email_count'] ?? 0);
+                $slideTexts = (int) ($slideSchool['texts_sent'] ?? $slideSchool['sms_count'] ?? 0);
+                $slideScore = (int) ($slideSchool['lead_score'] ?? $slideSchool['engagement_score'] ?? max(0, ($slideReplies * 20) + ($slideClicks * 6) + ($slideViews * 2)));
+                $slidePlayers = (int) ($slideSchool['players_count'] ?? $slideSchool['roster_count'] ?? $slideSchool['players'] ?? 0);
+                $slideUpperclass = (int) ($slideSchool['upperclass_count'] ?? $slideSchool['upperclass'] ?? 0);
+                $slideUnderclass = (int) ($slideSchool['underclass_count'] ?? $slideSchool['underclass'] ?? 0);
+                $slideHasRoster = $slidePlayers > 0 || $slideUpperclass > 0 || $slideUnderclass > 0;
+                if (! $slideHasRoster) {
+                    $slidePlayers = $slidePlayers ?: $slideCoaches->count();
+                    $slideUpperclass = (int) floor($slidePlayers * .35);
+                    $slideUnderclass = max(0, $slidePlayers - $slideUpperclass);
+                }
+            @endphp
+
+            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
+                <div class="rc-drawer-panel rc-school-modal-panel" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
+
+                    <div class="rc-school-modal-hero">
+                        <div class="rc-school-modal-main">
+                            <span class="rc-school-division-pill">{{ $slideDivision }}</span>
+                            <h2>{{ $slideSchoolName }}</h2>
+                            <div class="rc-school-modal-meta">
+                                <span>◎ {{ $slideConference }}</span>
+                                @if($slideLocation !== '')
+                                    <span>· {{ $slideLocation }}</span>
+                                @endif
+                            </div>
+
+                            <div class="rc-school-modal-actions">
+                                @if($slideSchool['is_favorite'] ?? false)
+                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
+                                        ♡ Favorited
+                                    </button>
+                                @else
+                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
+                                        ♡ Favorite
+                                    </button>
+                                @endif
+
+                                @if($slideSchool['is_saved'] ?? false)
+                                    <button class="rc-school-action" type="button" wire:click="unsaveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unsaveSchoolById">
+                                        ✓ Saved
+                                    </button>
+                                @else
+                                    <button class="rc-school-action" type="button" wire:click="saveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="saveSchoolById">
+                                        + Add to list
+                                    </button>
+                                @endif
+
+                                <button class="rc-school-action" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})">
+                                    ✉ Email coaches
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="rc-school-score-wrap">
+                            <div class="rc-school-score-ring">{{ max(0, min(100, $slideScore)) }}</div>
+                            <div class="rc-school-score-label">{{ $slideScore >= 70 ? 'HOT' : ($slideScore >= 35 ? 'WARM' : 'NEW') }}</div>
+                        </div>
                     </div>
-                    @foreach($this->selectedSchool['coaches'] ?? [] as $coach)
-                        @include('filament.partials.coach-row', ['coach' => $coach])
-                    @endforeach
+
+                    <div class="rc-school-modal-rule"></div>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Coaching staff ({{ number_format($slideCoaches->count()) }})</div>
+                        <div class="rc-school-coach-list rc-school-modal-coaches">
+                            @forelse($slideCoaches as $coach)
+                                @php
+                                    $coachName = (string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach');
+                                    $coachTitle = (string) ($coach['title'] ?? $coach['position'] ?? 'Coach');
+                                    $coachEmail = (string) ($coach['email'] ?? '');
+                                    $coachInitials = collect(explode(' ', $coachName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                @endphp
+                                <div class="rc-school-coach-card">
+                                    <div class="rc-school-coach-avatar">{{ strtoupper($coachInitials ?: 'C') }}</div>
+                                    <div class="rc-school-coach-info">
+                                        <strong>{{ $coachName }}</strong>
+                                        <span>{{ $coachTitle }}</span>
+                                        @if($coachEmail !== '')
+                                            <a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>
+                                        @endif
+                                    </div>
+                                    @if($coachEmail !== '')
+                                        <button class="rc-school-copy-btn" type="button" x-on:click="navigator.clipboard?.writeText(@js($coachEmail))" title="Copy email">▣</button>
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="rc-empty">No coaches loaded for this school yet.</div>
+                            @endforelse
+                        </div>
+                    </section>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Roster & stats</div>
+                        <div class="rc-school-stat-grid">
+                            <div class="rc-school-stat-card"><span>♙</span><strong>{{ number_format($slidePlayers) }}</strong><small>Players</small></div>
+                            <div class="rc-school-stat-card"><span>◉</span><strong>{{ number_format($slideUpperclass) }}</strong><small>Upperclass</small></div>
+                            <div class="rc-school-stat-card"><span>#</span><strong>{{ number_format($slideUnderclass) }}</strong><small>Underclass</small></div>
+                        </div>
+                    </section>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Communications</div>
+                        <div class="rc-school-stat-grid">
+                            <div class="rc-school-stat-card"><span>✉</span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
+                            <div class="rc-school-stat-card"><span>↗</span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
+                            <div class="rc-school-stat-card"><span>↩</span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                        </div>
+                    </section>
                 </div>
             </div>
         @endif

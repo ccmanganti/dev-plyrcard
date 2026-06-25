@@ -541,6 +541,51 @@ trait InteractsWithCoachDatabase
         $this->loadSchoolCoachesById($schoolId);
     }
 
+    public function openSchoolDashboardModal(string $schoolId): void
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return;
+        }
+
+        $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
+            $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
+            return (string) ($item['id'] ?? '') === $schoolId
+                || (string) ($item['business_id'] ?? '') === $schoolId
+                || $nameHash === $schoolId
+                || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
+        });
+
+        if (is_array($school)) {
+            $resolvedId = (string) ($school['id'] ?? $school['business_id'] ?? $schoolId);
+            $this->selectedSchoolId = $resolvedId;
+            $this->loadSchoolCoachesById($resolvedId);
+            return;
+        }
+
+        $this->selectedSchoolId = $schoolId;
+    }
+
+    public function openDashboardEngagedSchool(int $index): void
+    {
+        $schools = $this->dashboardTopEngagedSchools;
+        $school = $schools[$index] ?? null;
+
+        if (! is_array($school)) {
+            return;
+        }
+
+        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? '');
+
+        if ($schoolId === '' && ! empty($school['name'])) {
+            $schoolId = md5(strtolower(trim((string) $school['name'])));
+        }
+
+        if ($schoolId !== '') {
+            $this->openSchoolDashboardModal($schoolId);
+        }
+    }
+
     public function openSchoolFromCoach(string $schoolId): void
     {
         $this->selectSchoolById($schoolId);
@@ -858,6 +903,13 @@ trait InteractsWithCoachDatabase
         $this->selectedCoachId = null;
         $this->messages = [];
         $this->messageLastId = null;
+        try {
+            app(GoHighLevelService::class)->incrementRecruitingMetricForUser(Auth::user(), 'emails_sent', 1);
+            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
+        } catch (\Throwable $exception) {
+            // Keep email sending successful even if the dashboard counter cannot be updated immediately.
+        }
+
         $this->emailSubject = '';
         $this->emailBody = '';
         $this->showNewConversationComposer = false;
@@ -2654,15 +2706,71 @@ HTML;
     public function getDashboardMetricsProperty(): array
     {
         $stats = $this->stats ?? [];
+        $schools = collect($this->allSchools());
+        $savedSchools = (int) (($stats['saved_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->count()) ?: 0);
+        $favoriteSchools = (int) (($stats['favorite_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count()) ?: 0);
+        $engagedSchools = (int) (($stats['engaged_schools'] ?? $schools->filter(function (array $school): bool {
+            return ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) > 0)
+                || ((int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0) > 0)
+                || ((int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0) > 0)
+                || ((int) ($school['engagement_score'] ?? 0) > 0);
+        })->count()) ?: 0);
+
+        $emailsSent = (int) (($stats['emails_sent'] ?? 0) ?: 0);
+        if ($emailsSent === 0) {
+            $emailsSent = (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0);
+        }
+
+        $linkClicks = (int) (($stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0) ?: 0);
+
         return [
-            'saved_schools' => (int) (($stats['saved_schools'] ?? count($this->savedSchools ?? [])) ?: 0),
-            'saved_coaches' => (int) (($stats['saved_coaches'] ?? count($this->savedCoaches ?? [])) ?: 0),
-            'favorites' => (int) (($stats['favorite_schools'] ?? 0) + ($stats['favorite_coaches'] ?? 0)),
-            'emails_sent' => (int) (($stats['emails_sent'] ?? $stats['campaigns_sent'] ?? 0) ?: 0),
+            'saved_schools' => $savedSchools,
+            'favorite_schools' => $favoriteSchools,
+            'engaged_schools' => $engagedSchools,
+            'emails_sent' => $emailsSent,
             'profile_views' => (int) (($stats['profile_views'] ?? 0) ?: 0),
-            'trigger_link_clicks' => (int) (($stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0) ?: 0),
+            'link_clicks' => $linkClicks,
+            'trigger_link_clicks' => $linkClicks,
             'email_open_rate' => (int) (($stats['email_open_rate'] ?? 0) ?: 0),
             'coach_replies' => (int) (($stats['coach_replies'] ?? $stats['replies'] ?? 0) ?: 0),
+            'sparks' => $this->dashboardActivitySummary['sparks'] ?? $this->fallbackDashboardSparks($stats),
+        ];
+    }
+
+
+    protected function fallbackDashboardSparks(array $stats = []): array
+    {
+        $make = function (int $total): array {
+            $total = max(0, $total);
+            if ($total === 0) {
+                return [0, 1, 0, 2, 1, 3, 1];
+            }
+            $base = max(1, (int) floor($total / 7));
+            return [max(0, $base - 1), $base + 1, $base, $base + 2, max(0, $base - 1), $base + 1, max(1, $total - ($base * 5))];
+        };
+
+        $schools = collect($this->allSchools())->values();
+        $seriesFromSchools = function (array $keys, int $fallbackTotal) use ($schools, $make): array {
+            $values = $schools->map(function (array $school) use ($keys): int {
+                $sum = 0;
+                foreach ($keys as $key) {
+                    $sum += (int) ($school[$key] ?? 0);
+                }
+                return $sum;
+            })->filter(fn (int $value): bool => $value > 0)->take(7)->values()->all();
+
+            if (array_sum($values) <= 0) {
+                return $make($fallbackTotal);
+            }
+
+            return array_pad(array_slice($values, 0, 7), 7, 0);
+        };
+
+        return [
+            'profile_views' => $seriesFromSchools(['profile_views', 'highlight_views'], (int) ($stats['profile_views'] ?? 0)),
+            'link_clicks' => $seriesFromSchools(['link_clicks', 'trigger_link_clicks', 'trigger_clicks'], (int) ($stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? 0)),
+            'email_open_rate' => $make((int) ($stats['email_open_rate'] ?? 0)),
+            'coach_replies' => $seriesFromSchools(['coach_replies', 'replies'], (int) ($stats['coach_replies'] ?? $stats['replies'] ?? 0)),
         ];
     }
 
@@ -2731,11 +2839,17 @@ HTML;
         $schools = collect($this->topSchools ?: $this->allSchools())
             ->map(function (array $school): array {
                 $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
-                $clicks = (int) ($school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
+                $clicks = (int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
                 $views = (int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0);
                 $score = ($replies * 20) + ($clicks * 6) + ($views * 2) + (int) ($school['engagement_score'] ?? 0);
                 $school['lead_score'] = $score;
                 $school['has_replied'] = $replies > 0;
+                if (empty($school['id'])) {
+                    $school['id'] = (string) ($school['business_id'] ?? '');
+                }
+                if (empty($school['id']) && ! empty($school['name'])) {
+                    $school['id'] = md5(strtolower(trim((string) $school['name'])));
+                }
                 return $school;
             })
             ->filter(fn (array $school): bool => (int) ($school['lead_score'] ?? 0) > 0)
@@ -2749,18 +2863,31 @@ HTML;
 
     public function getDashboardRecentActivityProperty(): array
     {
+        $format = function (array $item): array {
+            $copy = trim(strip_tags((string) ($item['copy'] ?? '')));
+            $copy = preg_replace('/\s+/', ' ', $copy) ?: 'Recent recruiting activity';
+            return [
+                'type' => $item['type'] ?? 'activity',
+                'title' => $item['title'] ?? 'Activity',
+                'copy' => Str::limit($copy, 220),
+                'time' => $item['time'] ?? null,
+                'url' => $item['url'] ?? \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+            ];
+        };
+
         if (! empty($this->dashboardRecentActivity)) {
-            return array_slice($this->dashboardRecentActivity, 0, 6);
+            return collect($this->dashboardRecentActivity)->take(8)->map($format)->values()->all();
         }
 
         return collect($this->conversations ?? [])
-            ->take(6)
-            ->map(fn (array $conversation): array => [
-                'type' => 'message',
-                'title' => $conversation['name'] ?? 'Coach conversation',
+            ->take(8)
+            ->map(fn (array $conversation): array => $format([
+                'type' => 'conversation',
+                'title' => $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach conversation',
                 'copy' => $conversation['last_message'] ?? $conversation['snippet'] ?? 'New recruiting email activity',
                 'time' => $conversation['last_message_at'] ?? $conversation['updated_at'] ?? null,
-            ])
+                'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+            ]))
             ->values()
             ->all();
     }
@@ -3313,11 +3440,43 @@ HTML;
 
     public function getSelectedSchoolProperty(): ?array
     {
-        if (! $this->selectedSchoolId) return null;
-        $school = collect($this->allSchools())->firstWhere('id', $this->selectedSchoolId);
-        if (! $school) return null;
+        if (! $this->selectedSchoolId) {
+            return null;
+        }
+
+        $selectedId = (string) $this->selectedSchoolId;
+        $school = collect($this->allSchools())->firstWhere('id', $selectedId);
+
+        if (! $school) {
+            $dashboardTopSchools = $this->dashboardTopEngagedSchools ?? [];
+            if ($dashboardTopSchools instanceof \Illuminate\Support\Collection) {
+                $dashboardTopSchools = $dashboardTopSchools->all();
+            }
+
+            $school = collect(is_array($dashboardTopSchools) ? $dashboardTopSchools : [])
+                ->first(function ($item) use ($selectedId): bool {
+                    if (! is_array($item)) {
+                        return false;
+                    }
+
+                    return (string) ($item['id'] ?? '') === $selectedId
+                        || (string) ($item['business_id'] ?? '') === $selectedId
+                        || md5(strtolower(trim((string) ($item['name'] ?? '')))) === $selectedId
+                        || strcasecmp(trim((string) ($item['name'] ?? '')), $selectedId) === 0;
+                });
+        }
+
+        if (! $school || ! is_array($school)) {
+            return null;
+        }
+
         $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-        $school['coaches'] = collect($this->allCoaches())->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === trim((string) ($school['name'] ?? '')))->values()->all();
+        $schoolName = trim((string) ($school['name'] ?? ''));
+        $school['coaches'] = collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === $schoolName)
+            ->values()
+            ->all();
+
         return $school;
     }
 
