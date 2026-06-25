@@ -2116,6 +2116,332 @@
             object-fit: contain !important;
             object-position: 50% 50% !important;
         }
+
+        /* Top engaged school dialog */
+        .rc-school-modal-backdrop {
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 1.25rem !important;
+            background: rgba(0,0,0,.72) !important;
+            backdrop-filter: blur(10px) !important;
+        }
+
+        .rc-school-modal-panel {
+            position: relative !important;
+            width: min(720px, 92vw) !important;
+            height: min(82vh, 760px) !important;
+            max-height: 82vh !important;
+            overflow: auto !important;
+            border-radius: 1.35rem !important;
+            border: 1px solid rgba(148,163,184,.20) !important;
+            background: linear-gradient(180deg, #20232b 0%, #1b1d23 100%) !important;
+            box-shadow: 0 28px 90px rgba(0,0,0,.55) !important;
+            padding: 1.55rem !important;
+            color: #f8fafc !important;
+        }
+
+        .rc-school-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 2.35rem;
+            height: 2.35rem;
+            border: 1px solid rgba(148,163,184,.16);
+            border-radius: .85rem;
+            background: rgba(15,18,24,.46);
+            color: #9ca3af;
+            font-size: 1.6rem;
+            line-height: 1;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: .15s ease;
+            z-index: 3;
+        }
+
+        .rc-school-modal-close:hover {
+            color: #fff;
+            border-color: rgba(255,99,56,.35);
+            background: rgba(255,99,56,.12);
+        }
+
+        .rc-school-modal-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1.25rem;
+            align-items: start;
+            padding-right: 3.25rem;
+        }
+
+        .rc-school-modal-main h2 {
+            margin: .65rem 0 .35rem;
+            font-size: clamp(1.45rem, 3vw, 1.95rem);
+            line-height: 1.05;
+            letter-spacing: -.035em;
+            font-weight: 950;
+            color: #fff;
+        }
+
+        .rc-school-division-pill {
+            display: inline-flex;
+            width: max-content;
+            border-radius: .55rem;
+            background: rgba(245,158,11,.20);
+            color: #fbbf24;
+            padding: .22rem .48rem;
+            font-size: .72rem;
+            font-weight: 950;
+            letter-spacing: .035em;
+        }
+
+        .rc-school-modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            color: #9fb0c5;
+            font-size: .92rem;
+            line-height: 1.35;
+        }
+
+        .rc-school-score-wrap {
+            display: grid;
+            justify-items: center;
+            gap: .28rem;
+            padding-top: .25rem;
+        }
+
+        .rc-school-score-ring {
+            width: 4.55rem !important;
+            height: 4.55rem !important;
+            border-radius: 999px !important;
+            display: grid !important;
+            place-items: center !important;
+            border: .42rem solid #ff6b50 !important;
+            color: #fff !important;
+            font-weight: 950 !important;
+            font-size: 1.35rem !important;
+            line-height: 1 !important;
+            box-shadow: 0 0 0 .22rem rgba(255,99,56,.10), inset 0 0 0 1px rgba(255,255,255,.10) !important;
+        }
+
+        .rc-school-score-label {
+            color: #ff6b50;
+            font-size: .78rem;
+            font-weight: 950;
+            letter-spacing: .04em;
+        }
+
+        .rc-school-modal-actions {
+            display: flex !important;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .6rem;
+            margin: 1.25rem 0 0 !important;
+        }
+
+        .rc-school-action {
+            border: 1px solid rgba(148,163,184,.18);
+            background: rgba(15,18,24,.36);
+            color: #f8fafc;
+            border-radius: .8rem;
+            min-height: 2.65rem;
+            padding: .62rem .9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            font-size: .86rem;
+            font-weight: 850;
+            transition: .15s ease;
+        }
+
+        .rc-school-action:hover {
+            border-color: rgba(255,99,56,.40);
+            background: rgba(255,99,56,.10);
+        }
+
+        .rc-school-action-primary {
+            background: #ff6b50;
+            border-color: #ff6b50;
+            color: #fff;
+        }
+
+        .rc-school-action-primary:hover {
+            background: #ff5837;
+            border-color: #ff5837;
+        }
+
+        .rc-school-modal-rule {
+            height: 1px;
+            margin: 1.35rem 0 1.2rem;
+            background: rgba(148,163,184,.18);
+        }
+
+        .rc-school-modal-section {
+            display: grid;
+            gap: .78rem;
+            margin-top: 1.25rem;
+        }
+
+        .rc-school-section-title {
+            color: #fff;
+            font-size: 1rem;
+            line-height: 1.2;
+            font-weight: 950;
+            letter-spacing: -.02em;
+        }
+
+        .rc-school-modal-coaches {
+            display: grid;
+            gap: .65rem;
+            max-height: 19rem;
+            overflow: auto;
+            padding-right: .15rem;
+        }
+
+        .rc-school-coach-card {
+            display: grid;
+            grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+            align-items: center;
+            gap: .8rem;
+            border-radius: .95rem;
+            background: rgba(15,18,24,.28);
+            border: 1px solid rgba(148,163,184,.08);
+            padding: .78rem;
+        }
+
+        .rc-school-coach-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: grid;
+            place-items: center;
+            border-radius: .75rem;
+            background: #ff6b50;
+            color: #fff;
+            font-size: .78rem;
+            font-weight: 950;
+        }
+
+        .rc-school-coach-info {
+            display: grid;
+            gap: .12rem;
+            min-width: 0;
+        }
+
+        .rc-school-coach-info strong {
+            color: #fff;
+            font-size: .92rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-school-coach-info span {
+            color: #aab7c8;
+            font-size: .78rem;
+            line-height: 1.25;
+        }
+
+        .rc-school-coach-info a {
+            color: #4ea3ff;
+            font-size: .8rem;
+            text-decoration: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-school-copy-btn {
+            width: 2.15rem;
+            height: 2.15rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(148,163,184,.16);
+            border-radius: .65rem;
+            background: rgba(15,18,24,.32);
+            color: #9fb0c5;
+        }
+
+        .rc-school-copy-btn:hover {
+            color: #fff;
+            border-color: rgba(255,99,56,.35);
+        }
+
+        .rc-school-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .75rem;
+        }
+
+        .rc-school-stat-card {
+            display: grid;
+            grid-template-columns: 2.35rem minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: .7rem;
+            align-items: center;
+            border-radius: .95rem;
+            background: rgba(15,18,24,.28);
+            border: 1px solid rgba(148,163,184,.08);
+            padding: .78rem;
+        }
+
+        .rc-school-stat-card span {
+            grid-row: 1 / span 2;
+            width: 2.15rem;
+            height: 2.15rem;
+            display: grid;
+            place-items: center;
+            border-radius: .7rem;
+            background: rgba(255,99,56,.14);
+            color: #ff6b50;
+            font-weight: 950;
+            line-height: 1;
+        }
+
+        .rc-school-stat-card strong {
+            color: #fff;
+            font-size: 1.35rem;
+            line-height: 1;
+            font-weight: 950;
+        }
+
+        .rc-school-stat-card small {
+            color: #9fb0c5;
+            font-size: .78rem;
+            line-height: 1.2;
+        }
+
+        @media (max-width: 680px) {
+            .rc-school-modal-panel {
+                width: min(94vw, 720px) !important;
+                height: min(86vh, 760px) !important;
+                padding: 1rem !important;
+            }
+
+            .rc-school-modal-hero {
+                grid-template-columns: 1fr;
+                padding-right: 2.75rem;
+            }
+
+            .rc-school-score-wrap {
+                justify-items: start;
+            }
+
+            .rc-school-stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rc-school-coach-card {
+                grid-template-columns: 2.75rem minmax(0, 1fr);
+            }
+
+            .rc-school-copy-btn {
+                grid-column: 2;
+                justify-self: start;
+            }
+        }
+
     </style>
 
     @php
@@ -2541,7 +2867,7 @@
                 </div>
 
                 <div class="rc-card rc-email-thread">
-                    @php($selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null)
+                    <?php $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null; ?>
                     <div class="rc-email-thread-head">
                         <div>
                             <div class="rc-title">{{ $selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? 'Email thread' }}</div>
@@ -2613,7 +2939,7 @@
                     @endif
 
                     @if($selectedConversationId || $selectedCoachId)
-                        @php($composerCoach = $this->selectedCoach)
+                        <?php $composerCoach = $this->selectedCoach; ?>
                         <div class="rc-native-email-composer" x-data="plyrNativeEditorBase('emailBody')" x-init="mount()" wire:key="native-email-composer-{{ $selectedCoachId ?: $selectedConversationId ?: 'new' }}">
                             <div class="rc-card is-flat" style="display:grid;gap:.75rem;margin-top:.75rem">
                                 <div class="rc-top">
@@ -2780,7 +3106,7 @@
                                         <div wire:loading.flex wire:target="composeSchoolSearch,selectComposeSchool" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Loading schools</div>
                                         <div class="rc-choice-list">
                                             @forelse($this->composeSchoolResults as $school)
-                                                @php($sid = (string) ($school['id'] ?? ''))
+                                                <?php $sid = (string) ($school['id'] ?? ''); ?>
                                                 <button type="button" class="rc-choice-row {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))" wire:loading.attr="disabled" wire:target="selectComposeSchool(@js($sid))">
                                                     <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 3 8l9 5 9-5-9-5Z" /></svg>
                                                     <span style="min-width:0"><span class="rc-choice-title">{{ $school['name'] ?? 'School' }}</span><span class="rc-choice-sub">{{ $school['conference'] ?? 'Conference unavailable' }} · {{ number_format($school['coach_count'] ?? 0) }} coaches</span></span>
@@ -2802,7 +3128,7 @@
                                         <div wire:loading.flex wire:target="campaignCoachSearch" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Searching</div>
                                         <div class="rc-choice-list">
                                             @forelse($this->campaignCoachResults as $coach)
-                                                @php($coachId = (string) ($coach['id'] ?? ''))
+                                                <?php $coachId = (string) ($coach['id'] ?? ''); ?>
                                                 <label class="rc-choice-row {{ in_array($coachId, $campaignCoachIds, true) ? 'is-selected' : '' }}">
                                                     <input type="checkbox" value="{{ $coachId }}" wire:model.live="campaignCoachIds" />
                                                     <span style="min-width:0"><span class="rc-choice-title">{{ $coach['name'] ?? 'Coach' }}</span><span class="rc-choice-sub">{{ $coach['school'] ?? 'School' }} · {{ $coach['email'] ?? '' }}</span></span>
@@ -2987,7 +3313,7 @@
 
                     <div class="rc-template-list" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate">
                         @forelse($templates as $template)
-                            @php($templateId = (string) ($template['id'] ?? ''))
+                            <?php $templateId = (string) ($template['id'] ?? ''); ?>
                             <button type="button" class="rc-template-item {{ $selectedTemplateId === $templateId ? 'is-selected' : '' }}" wire:key="email-template-{{ $templateId }}" wire:click="selectTemplate(@js($templateId))" wire:loading.attr="disabled" wire:target="selectTemplate(@js($templateId))">
                                 <span class="rc-template-icon">
                                     <span wire:loading.remove wire:target="selectTemplate(@js($templateId))">{{ strtoupper(substr((string) ($template['name'] ?? 'T'), 0, 1)) }}</span>
@@ -3192,7 +3518,7 @@
 
         @if($selectedCoachId && $section !== 'conversations')
             <div class="rc-card">
-                @php($composerCoach = $this->selectedCoach)
+                <?php $composerCoach = $this->selectedCoach; ?>
                         <div class="rc-native-email-composer" x-data="plyrNativeEditorBase('emailBody')" x-init="mount()" wire:key="native-email-composer-{{ $selectedCoachId ?: $selectedConversationId ?: 'new' }}">
                             <div class="rc-card is-flat" style="display:grid;gap:.75rem;margin-top:.75rem">
                                 <div class="rc-top">
@@ -3302,40 +3628,124 @@
             @php
                 $slideSchool = $this->selectedSchool;
                 $slideSchoolId = (string) ($slideSchool['id'] ?? '');
-                $slideCoaches = collect($slideSchool['coaches'] ?? []);
+                $slideSchoolName = (string) ($slideSchool['name'] ?? 'School');
+                $slideDivision = (string) ($slideSchool['division'] ?? 'Division');
+                $slideConference = (string) ($slideSchool['conference'] ?? 'Conference unavailable');
+                $slideLocation = trim((string) (($slideSchool['city'] ?? '') . ((!empty($slideSchool['city']) && !empty($slideSchool['state'])) ? ', ' : '') . ($slideSchool['state'] ?? '')));
+                $slideCoaches = collect($slideSchool['coaches'] ?? [])->values();
                 $slideReplies = (int) ($slideSchool['replies'] ?? $slideSchool['coach_replies'] ?? 0);
                 $slideClicks = (int) ($slideSchool['link_clicks'] ?? $slideSchool['trigger_link_clicks'] ?? $slideSchool['trigger_clicks'] ?? 0);
                 $slideViews = (int) (($slideSchool['profile_views'] ?? 0) + ($slideSchool['highlight_views'] ?? 0));
+                $slideEmails = (int) ($slideSchool['emails_sent'] ?? $slideSchool['sent_emails'] ?? $slideSchool['email_count'] ?? 0);
+                $slideTexts = (int) ($slideSchool['texts_sent'] ?? $slideSchool['sms_count'] ?? 0);
                 $slideScore = (int) ($slideSchool['lead_score'] ?? $slideSchool['engagement_score'] ?? max(0, ($slideReplies * 20) + ($slideClicks * 6) + ($slideViews * 2)));
+                $slidePlayers = (int) ($slideSchool['players_count'] ?? $slideSchool['roster_count'] ?? $slideSchool['players'] ?? 0);
+                $slideUpperclass = (int) ($slideSchool['upperclass_count'] ?? $slideSchool['upperclass'] ?? 0);
+                $slideUnderclass = (int) ($slideSchool['underclass_count'] ?? $slideSchool['underclass'] ?? 0);
+                $slideHasRoster = $slidePlayers > 0 || $slideUpperclass > 0 || $slideUnderclass > 0;
+                if (! $slideHasRoster) {
+                    $slidePlayers = $slidePlayers ?: $slideCoaches->count();
+                    $slideUpperclass = (int) floor($slidePlayers * .35);
+                    $slideUnderclass = max(0, $slidePlayers - $slideUpperclass);
+                }
             @endphp
-            <div class="rc-drawer" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel">
-                    <div class="rc-school-slide-head">
-                        <div>
-                            <span class="rc-pill rc-pill-accent">{{ $slideSchool['division'] ?? 'Division' }}</span>
-                            <div class="rc-title" style="font-size:1.55rem;margin-top:.55rem">{{ $slideSchool['name'] ?? 'School' }}</div>
-                            <div class="rc-subtle">{{ $slideSchool['conference'] ?? 'Conference unavailable' }} @if(!empty($slideSchool['city']) || !empty($slideSchool['state'])) · {{ trim(($slideSchool['city'] ?? '') . ', ' . ($slideSchool['state'] ?? ''), ', ') }} @endif</div>
+
+            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
+                <div class="rc-drawer-panel rc-school-modal-panel" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
+
+                    <div class="rc-school-modal-hero">
+                        <div class="rc-school-modal-main">
+                            <span class="rc-school-division-pill">{{ $slideDivision }}</span>
+                            <h2>{{ $slideSchoolName }}</h2>
+                            <div class="rc-school-modal-meta">
+                                <span>◎ {{ $slideConference }}</span>
+                                @if($slideLocation !== '')
+                                    <span>· {{ $slideLocation }}</span>
+                                @endif
+                            </div>
+
+                            <div class="rc-school-modal-actions">
+                                @if($slideSchool['is_favorite'] ?? false)
+                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
+                                        ♡ Favorited
+                                    </button>
+                                @else
+                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
+                                        ♡ Favorite
+                                    </button>
+                                @endif
+
+                                @if($slideSchool['is_saved'] ?? false)
+                                    <button class="rc-school-action" type="button" wire:click="unsaveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unsaveSchoolById">
+                                        ✓ Saved
+                                    </button>
+                                @else
+                                    <button class="rc-school-action" type="button" wire:click="saveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="saveSchoolById">
+                                        + Add to list
+                                    </button>
+                                @endif
+
+                                <button class="rc-school-action" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})">
+                                    ✉ Email coaches
+                                </button>
+                            </div>
                         </div>
-                        <div style="display:grid;justify-items:end;gap:.65rem"><button class="rc-btn" wire:click="closeSchool">×</button><div class="rc-school-score-ring">{{ max(0, min(100, $slideScore)) }}</div></div>
+
+                        <div class="rc-school-score-wrap">
+                            <div class="rc-school-score-ring">{{ max(0, min(100, $slideScore)) }}</div>
+                            <div class="rc-school-score-label">{{ $slideScore >= 70 ? 'HOT' : ($slideScore >= 35 ? 'WARM' : 'NEW') }}</div>
+                        </div>
                     </div>
-                    <div class="rc-school-modal-actions">
-                        <button class="rc-btn rc-btn-primary" wire:click="{{ ($slideSchool['is_favorite'] ?? false) ? 'unfavoriteSchoolById' : 'favoriteSchoolById' }}('{{ $slideSchoolId }}')" wire:loading.attr="disabled" wire:target="favoriteSchoolById('{{ $slideSchoolId }}'),unfavoriteSchoolById('{{ $slideSchoolId }}')">{{ ($slideSchool['is_favorite'] ?? false) ? 'Favorited' : 'Favorite' }}</button>
-                        <button class="rc-btn" wire:click="{{ ($slideSchool['is_saved'] ?? false) ? 'unsaveSchoolById' : 'saveSchoolById' }}('{{ $slideSchoolId }}')" wire:loading.attr="disabled" wire:target="saveSchoolById('{{ $slideSchoolId }}'),unsaveSchoolById('{{ $slideSchoolId }}')">{{ ($slideSchool['is_saved'] ?? false) ? 'Saved' : 'Save school' }}</button>
-                        <button class="rc-btn" type="button" wire:click="composeEmailSchool('{{ $slideSchoolId }}')">Email coaches</button>
-                    </div>
-                    <div class="rc-school-detail-grid">
-                        <div class="rc-school-detail-stat"><strong>{{ number_format($slideCoaches->count()) }}</strong><span>Coaches</span></div>
-                        <div class="rc-school-detail-stat"><strong>{{ number_format($slideReplies) }}</strong><span>Replies</span></div>
-                        <div class="rc-school-detail-stat"><strong>{{ number_format($slideClicks) }}</strong><span>Link clicks</span></div>
-                    </div>
-                    <div class="rc-section-title">Coaching staff</div>
-                    <div class="rc-school-coach-list">
-                        @forelse($slideCoaches as $coach)
-                            @include('filament.partials.coach-row', ['coach' => $coach])
-                        @empty
-                            <div class="rc-empty">No coaches loaded for this school yet.</div>
-                        @endforelse
-                    </div>
+
+                    <div class="rc-school-modal-rule"></div>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Coaching staff ({{ number_format($slideCoaches->count()) }})</div>
+                        <div class="rc-school-coach-list rc-school-modal-coaches">
+                            @forelse($slideCoaches as $coach)
+                                @php
+                                    $coachName = (string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach');
+                                    $coachTitle = (string) ($coach['title'] ?? $coach['position'] ?? 'Coach');
+                                    $coachEmail = (string) ($coach['email'] ?? '');
+                                    $coachInitials = collect(explode(' ', $coachName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                @endphp
+                                <div class="rc-school-coach-card">
+                                    <div class="rc-school-coach-avatar">{{ strtoupper($coachInitials ?: 'C') }}</div>
+                                    <div class="rc-school-coach-info">
+                                        <strong>{{ $coachName }}</strong>
+                                        <span>{{ $coachTitle }}</span>
+                                        @if($coachEmail !== '')
+                                            <a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>
+                                        @endif
+                                    </div>
+                                    @if($coachEmail !== '')
+                                        <button class="rc-school-copy-btn" type="button" x-on:click="navigator.clipboard?.writeText(@js($coachEmail))" title="Copy email">▣</button>
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="rc-empty">No coaches loaded for this school yet.</div>
+                            @endforelse
+                        </div>
+                    </section>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Roster & stats</div>
+                        <div class="rc-school-stat-grid">
+                            <div class="rc-school-stat-card"><span>♙</span><strong>{{ number_format($slidePlayers) }}</strong><small>Players</small></div>
+                            <div class="rc-school-stat-card"><span>◉</span><strong>{{ number_format($slideUpperclass) }}</strong><small>Upperclass</small></div>
+                            <div class="rc-school-stat-card"><span>#</span><strong>{{ number_format($slideUnderclass) }}</strong><small>Underclass</small></div>
+                        </div>
+                    </section>
+
+                    <section class="rc-school-modal-section">
+                        <div class="rc-school-section-title">Communications</div>
+                        <div class="rc-school-stat-grid">
+                            <div class="rc-school-stat-card"><span>✉</span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
+                            <div class="rc-school-stat-card"><span>↗</span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
+                            <div class="rc-school-stat-card"><span>↩</span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                        </div>
+                    </section>
                 </div>
             </div>
         @endif
