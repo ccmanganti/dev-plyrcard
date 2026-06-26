@@ -2442,6 +2442,295 @@
             }
         }
 
+
+
+        /* v80 PLYRCard recruiting dashboard redesign: Filament light/dark aware */
+        .rc-home-dashboard {
+            display: grid;
+            gap: 1.35rem;
+            color: #0f172a;
+            padding: .15rem 0 1rem;
+        }
+        .dark .rc-home-dashboard { color: #f8fafc; }
+        .rc-home-topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: .55rem;
+        }
+        .rc-home-topbar h1 {
+            margin: 0;
+            font-size: clamp(1.35rem, 2.7vw, 2rem);
+            line-height: 1.1;
+            letter-spacing: -.04em;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .dark .rc-home-topbar h1 { color: #fff; }
+        .rc-home-topbar p,
+        .rc-home-panel-head p {
+            margin: .28rem 0 0;
+            color: #7c8799;
+            font-size: .86rem;
+        }
+        .dark .rc-home-topbar p,
+        .dark .rc-home-panel-head p { color: #94a3b8; }
+        .rc-home-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: .7rem;
+            flex-wrap: wrap;
+        }
+        .rc-home-search {
+            min-width: min(28rem, 48vw);
+            height: 2.65rem;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            border: 1px solid #e5e7eb;
+            border-radius: .85rem;
+            background: rgba(255,255,255,.92);
+            color: #94a3b8;
+            padding: 0 .75rem;
+            box-shadow: 0 8px 24px rgba(15,23,42,.08);
+        }
+        .dark .rc-home-search {
+            border-color: rgba(148,163,184,.18);
+            background: rgba(17,24,39,.82);
+            box-shadow: none;
+        }
+        .rc-home-search input {
+            border: 0;
+            outline: 0;
+            box-shadow: none !important;
+            background: transparent;
+            min-width: 0;
+            flex: 1;
+            font-size: .84rem;
+            color: inherit;
+        }
+        .rc-home-search kbd {
+            border: 1px solid #e5e7eb;
+            border-radius: .45rem;
+            padding: .08rem .36rem;
+            color: #94a3b8;
+            font-size: .7rem;
+            font-weight: 700;
+        }
+        .dark .rc-home-search kbd { border-color: rgba(148,163,184,.2); }
+        .rc-home-icon-btn,
+        .rc-home-new-email,
+        .rc-home-panel-head a,
+        .rc-home-outline-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e5e7eb;
+            border-radius: .85rem;
+            min-height: 2.45rem;
+            padding: .55rem .85rem;
+            background: #fff;
+            color: #0f172a;
+            font-size: .82rem;
+            font-weight: 800;
+            text-decoration: none;
+            box-shadow: 0 4px 14px rgba(15,23,42,.06);
+        }
+        .dark .rc-home-icon-btn,
+        .dark .rc-home-panel-head a,
+        .dark .rc-home-outline-btn {
+            border-color: rgba(148,163,184,.18);
+            background: rgba(17,24,39,.72);
+            color: #e5e7eb;
+            box-shadow: none;
+        }
+        .rc-home-new-email {
+            background: #ff6338;
+            border-color: #ff6338;
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(255,99,56,.25);
+        }
+        .rc-home-stats {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        .rc-home-stat-card,
+        .rc-home-panel {
+            border: 1px solid #e7eaf0;
+            background: rgba(255,255,255,.96);
+            border-radius: 1.1rem;
+            box-shadow: 0 8px 22px rgba(15,23,42,.07);
+        }
+        .dark .rc-home-stat-card,
+        .dark .rc-home-panel {
+            border-color: rgba(148,163,184,.16);
+            background: rgba(24,29,39,.88);
+            box-shadow: none;
+        }
+        .rc-home-stat-card {
+            min-height: 7.6rem;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 2.65rem minmax(0,1fr);
+            align-content: start;
+            gap: .55rem .8rem;
+        }
+        .rc-home-stat-icon,
+        .rc-home-activity-icon {
+            width: 2.65rem;
+            height: 2.65rem;
+            border-radius: 999px;
+            display: inline-grid;
+            place-items: center;
+            font-weight: 900;
+            line-height: 1;
+            flex: 0 0 auto;
+        }
+        .rc-home-stat-card.is-coral .rc-home-stat-icon { background: rgba(255,99,56,.13); color: #ff6338; }
+        .rc-home-stat-card.is-blue .rc-home-stat-icon { background: rgba(59,130,246,.13); color: #3b82f6; }
+        .rc-home-stat-card.is-gold .rc-home-stat-icon { background: rgba(245,158,11,.14); color: #f59e0b; }
+        .rc-home-stat-card.is-green .rc-home-stat-icon { background: rgba(16,185,129,.13); color: #10b981; }
+        .rc-home-stat-card.is-indigo .rc-home-stat-icon { background: rgba(96,165,250,.14); color: #60a5fa; }
+        .rc-home-stat-copy { min-width: 0; }
+        .rc-home-stat-label { color: #7c8799; font-size: .78rem; font-weight: 800; }
+        .dark .rc-home-stat-label { color: #94a3b8; }
+        .rc-home-stat-value { color: #0f172a; font-size: 1.45rem; line-height: 1; font-weight: 950; letter-spacing: -.04em; margin-top: .15rem; }
+        .dark .rc-home-stat-value { color: #fff; }
+        .rc-home-progress {
+            grid-column: 1 / -1;
+            height: .42rem;
+            background: #eef1f6;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: .2rem;
+        }
+        .dark .rc-home-progress { background: rgba(148,163,184,.16); }
+        .rc-home-progress span { display: block; height: 100%; border-radius: inherit; background: #ff6338; }
+        .rc-home-stat-sub {
+            grid-column: 1 / -1;
+            color: #7c8799;
+            font-size: .76rem;
+        }
+        .rc-home-stat-card.is-blue .rc-home-stat-sub,
+        .rc-home-stat-card.is-green .rc-home-stat-sub { color: #059669; font-weight: 800; }
+        .dark .rc-home-stat-sub { color: #94a3b8; }
+        .dark .rc-home-stat-card.is-blue .rc-home-stat-sub,
+        .dark .rc-home-stat-card.is-green .rc-home-stat-sub { color: #34d399; }
+        .rc-home-main-grid,
+        .rc-home-lower-grid {
+            display: grid;
+            grid-template-columns: minmax(0,1fr) minmax(320px,.82fr);
+            gap: 1rem;
+        }
+        .rc-home-panel { padding: 1.2rem; }
+        .rc-home-panel-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .rc-home-panel-head h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1rem;
+            line-height: 1.15;
+            font-weight: 900;
+            letter-spacing: -.025em;
+        }
+        .dark .rc-home-panel-head h2 { color: #fff; }
+        .rc-progress-layout {
+            display: grid;
+            grid-template-columns: 12.5rem minmax(0,1fr);
+            gap: 1.35rem;
+            align-items: center;
+        }
+        .rc-readiness-ring {
+            width: 9.7rem;
+            height: 9.7rem;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            background: conic-gradient(#ff6338 calc(var(--ready) * 1%), #edf0f5 0);
+            margin-inline: auto;
+            position: relative;
+        }
+        .dark .rc-readiness-ring { background: conic-gradient(#ff6f51 calc(var(--ready) * 1%), rgba(148,163,184,.18) 0); }
+        .rc-readiness-ring:before {
+            content: "";
+            position: absolute;
+            inset: 1rem;
+            border-radius: inherit;
+            background: #fff;
+        }
+        .dark .rc-readiness-ring:before { background: #181d27; }
+        .rc-readiness-ring div { position: relative; display: grid; justify-items: center; gap: .25rem; text-align: center; }
+        .rc-readiness-ring strong { font-size: 1.75rem; line-height: 1; color: #0f172a; font-weight: 950; }
+        .dark .rc-readiness-ring strong { color: #fff; }
+        .rc-readiness-ring span { color: #7c8799; font-size: .75rem; }
+        .rc-check-list { display: grid; gap: .78rem; }
+        .rc-check-row { display: grid; grid-template-columns: 1.35rem minmax(0,1fr); gap: .65rem; align-items: start; }
+        .rc-check-dot { width: 1.05rem; height: 1.05rem; border-radius: 999px; border: 2px solid #94a3b8; display: grid; place-items: center; color: #10b981; font-size: .72rem; font-weight: 950; }
+        .rc-check-row.is-done .rc-check-dot { border-color: #10b981; }
+        .rc-check-row strong { display: block; color: #0f172a; font-size: .86rem; line-height: 1.2; }
+        .dark .rc-check-row strong { color: #fff; }
+        .rc-check-row small { display: block; color: #7c8799; font-size: .78rem; margin-top: .15rem; }
+        .rc-home-outline-btn { width: 100%; margin-top: .25rem; }
+        .rc-home-activity-list { display: grid; gap: .78rem; max-height: 20rem; overflow: auto; padding-right: .25rem; }
+        .rc-home-activity { display: grid; grid-template-columns: 2.35rem minmax(0,1fr) auto; gap: .75rem; align-items: center; text-decoration: none; color: inherit; }
+        .rc-home-activity-icon { width: 2.05rem; height: 2.05rem; font-size: .8rem; background: rgba(59,130,246,.13); color: #3b82f6; }
+        .rc-home-activity-icon.is-coral { background: rgba(255,99,56,.13); color: #ff6338; }
+        .rc-home-activity-icon.is-green { background: rgba(16,185,129,.13); color: #10b981; }
+        .rc-home-activity-copy { min-width: 0; display: grid; gap: .12rem; }
+        .rc-home-activity-copy strong { color: #0f172a; font-size: .84rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dark .rc-home-activity-copy strong { color: #fff; }
+        .rc-home-activity-copy small { color: #7c8799; font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rc-home-activity-time { color: #94a3b8; font-size: .74rem; white-space: nowrap; }
+        .rc-radar-panel { grid-column: 1; }
+        .rc-radar-schools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .85rem; }
+        .rc-radar-card {
+            border: 1px solid #e7eaf0;
+            background: #fff;
+            border-radius: .9rem;
+            overflow: hidden;
+            padding: 0 0 .8rem;
+            text-align: left;
+            display: grid;
+            gap: .28rem;
+            color: #0f172a;
+        }
+        .dark .rc-radar-card { border-color: rgba(148,163,184,.16); background: rgba(17,24,39,.72); color: #fff; }
+        .rc-radar-logo { height: 5.25rem; display: grid; place-items: center; background: #f3f4f6; color: #0f172a; font-weight: 950; font-size: 1.15rem; }
+        .dark .rc-radar-logo { background: #fff; color: #111827; }
+        .rc-radar-card strong, .rc-radar-card small, .rc-radar-card em { margin-inline: .8rem; }
+        .rc-radar-card strong { font-size: .84rem; line-height: 1.15; }
+        .rc-radar-card small { color: #7c8799; font-size: .73rem; }
+        .rc-radar-card em { width: max-content; border-radius: 999px; background: rgba(16,185,129,.12); color: #059669; padding: .22rem .48rem; font-size: .7rem; font-style: normal; font-weight: 900; margin-top: .25rem; }
+        .rc-interested-list { display: grid; gap: .85rem; }
+        .rc-interested-row { display: grid; grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto; gap: .75rem; align-items: center; border: 0; background: transparent; text-align: left; color: inherit; padding: 0; }
+        .rc-interested-rank { color: #94a3b8; font-weight: 900; font-size: .82rem; }
+        .rc-interested-logo { width: 2.35rem; height: 2.35rem; border-radius: .55rem; display: grid; place-items: center; background: #fff; color: #111827; border: 1px solid #e5e7eb; font-size: .72rem; font-weight: 950; }
+        .rc-interested-row strong { display: block; color: #0f172a; font-size: .84rem; line-height: 1.2; }
+        .dark .rc-interested-row strong { color: #fff; }
+        .rc-interested-row small { color: #7c8799; font-size: .73rem; }
+        .rc-interested-row b { color: #ff6338; font-weight: 950; }
+        .rc-home-empty { color: #7c8799; font-size: .86rem; padding: 1rem; }
+        .dark .rc-home-empty { color: #94a3b8; }
+        @media (max-width: 1180px) {
+            .rc-home-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+            .rc-home-main-grid, .rc-home-lower-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 760px) {
+            .rc-home-topbar { display: grid; }
+            .rc-home-search { min-width: 0; width: 100%; }
+            .rc-home-actions { justify-content: stretch; }
+            .rc-home-stats, .rc-radar-schools { grid-template-columns: 1fr; }
+            .rc-progress-layout { grid-template-columns: 1fr; }
+        }
+
     </style>
 
     @php
@@ -2499,176 +2788,179 @@
         @if($section === 'dashboard')
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools)->take(5)->values()->all();
-                $dashboardLists = collect($lists ?? [])->take(8)->values()->all();
-                $dashboardRecommendations = collect($this->dashboardRecommendations)->values()->all();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity)->values()->all();
+                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                $dashboardRecommendations = collect($this->dashboardRecommendations ?? [])->values()->all();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
                 $sparks = $dashboardMetrics['sparks'] ?? [];
+                $authUser = auth()->user();
+                $athleteName = trim((string) ($authUser?->name ?? 'there'));
+                $firstName = trim(strtok($athleteName ?: 'there', ' '));
+                $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
+                $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? 0);
+                $profileViews = (int) ($dashboardMetrics['profile_views'] ?? 0);
+                $emailOpenRate = (int) (($dashboardMetrics['email_open_rate'] ?? 0) ?: 0);
+                $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
+                $emailsSent = (int) ($dashboardMetrics['emails_sent'] ?? 0);
+                $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
+                $readinessScore = min(100, max(12, 45 + min(25, $savedSchools * 4) + min(15, $favoriteSchools * 3) + min(10, $emailsSent) + min(10, $coachReplies * 2)));
+                $profileCompletion = min(100, max(40, $readinessScore + 5));
                 $sparkPoints = function ($key) use ($sparks) {
-                    $values = collect($sparks[$key] ?? [1,2,1,3,2,2,3])->map(fn ($v) => (int) $v)->values();
-                    if ($values->isEmpty()) { $values = collect([1,2,1,3,2,2,3]); }
-                    if ((int) $values->sum() === 0) { $values = collect([0,1,0,2,1,3,1]); }
+                    $values = collect($sparks[$key] ?? [1,2,1,3,2,4,2])->map(fn ($v) => (int) $v)->values();
+                    if ($values->isEmpty() || (int) $values->sum() === 0) { $values = collect([1,2,1,3,2,4,2]); }
                     $max = max(1, (int) $values->max());
                     return $values->values()->map(function ($value, $i) use ($values, $max) {
-                        $x = $values->count() <= 1 ? 0 : round(($i / max(1, $values->count() - 1)) * 220, 2);
-                        $y = round(38 - (($value / $max) * 26), 2);
+                        $x = $values->count() <= 1 ? 0 : round(($i / max(1, $values->count() - 1)) * 120, 2);
+                        $y = round(26 - (($value / $max) * 18), 2);
                         return $x . ',' . $y;
                     })->implode(' ');
                 };
-                $dashboardStats = [
-                    ['name' => 'Schools Saved', 'value' => $dashboardMetrics['saved_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA+klEQVR4nO3Y0Q7CIBBEUdb4/7+MTxpNgGo7O2vCPW9NDLDDlhpaAwAAAAAA2ExUTt5776+FRJSs5VYxaWufxY+eXUoCmBVbEYI9gKMi3SHY3rszhTnOBUsHnN1VRzekB3BUxNEuZ4eQ2mKrxY8K//X3CmkdcKaYVZFZnZASwJWddIcgbaur73vWWCuyDlAv2HU4SgLI2i1HCLJXYLQY5cmdNf796gAzERHKQ0s93pPsDHjfjaxvdsYc8s9g9v939fjSAFyXGsp5yi5E/kXaITjzze457wS27wACqF5Ate0DsB+CVdffM9t3AAFUL6Da9gEAAAAAAABgNw9U/Xg0K1OcwgAAAABJRU5ErkJggg==', 'color' => '#ff6b50'],
-                    ['name' => 'Favorite Schools', 'value' => $dashboardMetrics['favorite_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABDUlEQVR4nO2YQQ7DIAwEocr/v0wvQYoqtaLEyzpi5lxqs15jQikAAAAAAACwntZac8Z/OYNnwCpAr77TBTjAFdjd+500DnAJkkYAFxYBsti/lGQOcAizXIBM1S8lmQMcLBVgpPqrHbK9A+rMomx93Km1/r2fKQfMBFIzm9PtjbjdcLcYt88ApxsiYocmv8oNkaKHToEVboiOET4GlSIo/ltasaiWUIoqvQiFHFLittr+JigVIKIF1JMFB7gTcCMTINK6yjbY3gGHM/h1xG33LP45310fVZKgv6o5stFv6xUiLXNAPRn9rTqfjvwMmH6pOdc97iJ0TTj6W8D9+jSEMslHCAAAAAAAAAAA6XkDiTVoQnfOMe0AAAAASUVORK5CYII=', 'color' => '#f6b13f'],
-                    ['name' => 'Engaged Schools', 'value' => $dashboardMetrics['engaged_schools'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA/UlEQVR4nO3aQQ7CMBBD0V/uf+ewIRKLqrBobFfxu0A0nhloo0JVVVVVVVWAMcZQnvdSHvaLungIC2Br40N9bsQEOAqfIgJwsgfg7D6YA3AXDwET8O04jkN9pi2AhO6DKYCU4iFsBRzkASR1H4ImwPEDCOIA0roPIEv9ruLvnpSYFfjHijWRBJA4+tPyAFJHf3rECqz8h1gaQPLoT8sCSB/96RErsNKSAJ7SfRA+CJ25Ckr1aNwVcB2c0H0InAD1W2FcAGpRAWxzKXq2/1tciCSKCMDVfQgIwFk89FbYOwHu7kPACrjZAkjovpzrM5gr26+AVFr3q6qqqqo29gZjQmAtbz8YKwAAAABJRU5ErkJggg==', 'color' => '#5ca7e8'],
-                    ['name' => 'Total Emails Sent', 'value' => $dashboardMetrics['emails_sent'] ?? 0, 'icon' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA2UlEQVR4nO3XQQ7DMAhEUah6/yu7KzZRajkxDIry36ZSF3aGguuYAQAAAAAAAADew7MWGmOMrLVWufv2838yHqQjfNa+2wXoCp+1f0oHPNnrC/BVbXTnwFKMl6wDroZRnS3SEVgNpTxYS0Yg2v0sSHx3NhKz4LM1d5R2wGzuj0FWwlcoPwTd3f+FW/k1K8Obif4F7rRvdfAgPQRXQ6nCmwnvAWHWDcrgoe0mGGGPn2qtV+Hu8GZFI9D9hnjF61+GKMDuAp3zm7F/Sgd0FaG7+AAAAAAAAADwOD/TLVRCK+Pf4QAAAABJRU5ErkJggg==', 'color' => '#2dd4bf'],
+                $quickStats = [
+                    ['label' => 'Profile Completion', 'value' => $profileCompletion . '%', 'sub' => 'Keep it up!', 'icon' => 'graduation-cap', 'tone' => 'coral', 'progress' => $profileCompletion],
+                    ['label' => 'Profile Views', 'value' => number_format($profileViews), 'sub' => 'tracked visits', 'icon' => 'eye', 'tone' => 'blue', 'spark' => 'profile_views'],
+                    ['label' => 'Favorites', 'value' => number_format($favoriteSchools), 'sub' => 'Schools saved', 'icon' => 'star', 'tone' => 'gold'],
+                    ['label' => 'Coach Engagement', 'value' => '+' . number_format(max(0, $coachReplies + $engagedSchools)) . '%', 'sub' => 'vs last 30 days', 'icon' => 'mail', 'tone' => 'green'],
+                    ['label' => 'Emails Sent', 'value' => number_format($emailsSent), 'sub' => 'This month', 'icon' => 'chart', 'tone' => 'indigo'],
                 ];
-                $engagementMetrics = [
-                    ['key' => 'profile_views', 'name' => 'Profile Views', 'value' => $dashboardMetrics['profile_views'] ?? 0, 'icon' => 'data:image/png;base64,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'],
-                    ['key' => 'link_clicks', 'name' => 'Link Clicks', 'value' => $dashboardMetrics['link_clicks'] ?? ($dashboardMetrics['trigger_link_clicks'] ?? 0), 'icon' => 'data:image/png;base64,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'],
-                    ['key' => 'email_open_rate', 'name' => 'Email Open Rate', 'value' => (($dashboardMetrics['email_open_rate'] ?? 0) ?: 0) . '%', 'icon' => 'data:image/png;base64,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'],
-                    ['key' => 'coach_replies', 'name' => 'Coach Replies', 'value' => $dashboardMetrics['coach_replies'] ?? 0, 'icon' => 'data:image/png;base64,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'],
+                $progressItems = [
+                    ['label' => 'PLYR Profile', 'state' => 'Complete', 'done' => true],
+                    ['label' => 'Social Media Platforms', 'state' => 'Complete', 'done' => true],
+                    ['label' => 'Highlights', 'state' => $profileViews > 0 ? 'Complete' : 'In progress', 'done' => $profileViews > 0],
+                    ['label' => 'Coach Outreach', 'state' => $emailsSent > 0 ? 'Complete' : 'In progress', 'done' => $emailsSent > 0],
+                    ['label' => 'My List', 'state' => $savedSchools > 0 ? 'In Progress' : 'Not started', 'done' => false],
+                    ['label' => 'Academics / GPA', 'state' => 'Not started', 'done' => false],
                 ];
+                $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
+                if (empty($radarSchools)) {
+                    $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
+                }
             @endphp
 
-            <div class="rc-dashboard">
-                <div class="rc-dashboard-hero">
-                    <h1>Your recruiting command center</h1>
-                    <p>Track saved schools, engagement, email performance, link activity, and recent actions.</p>
+            <div class="rc-home-dashboard">
+                <div class="rc-home-topbar">
+                    <div>
+                        <h1>Welcome back, {{ $firstName ?: 'there' }} <span aria-hidden="true">👋</span></h1>
+                        <p>Here's what's happening with your recruiting journey.</p>
+                    </div>
+                    <div class="rc-home-actions">
+                        <div class="rc-home-search">
+                            <span>⌕</span>
+                            <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search" />
+                            <kbd>⌘K</kbd>
+                        </div>
+                        <button class="rc-home-icon-btn" type="button" aria-label="Theme follows Filament">☾</button>
+                        <a class="rc-home-new-email" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">+ New Email</a>
+                    </div>
                 </div>
 
-                <div class="rc-dashboard-stat-grid">
-                    @foreach($dashboardStats as $stat)
-                        <div class="rc-dashboard-card rc-dashboard-stat is-centered" style="--stat-color:{{ $stat['color'] }}">
-                            <div>
-                                <div class="rc-dashboard-icon"><img class="rc-png-icon" src="{{ $stat['icon'] }}" alt="" /></div>
-                                <div class="rc-dashboard-number">{{ number_format((int) ($stat['value'] ?? 0)) }}</div>
-                                <div class="rc-dashboard-label">{{ $stat['name'] }}</div>
+                <div class="rc-home-stats">
+                    @foreach($quickStats as $stat)
+                        <div class="rc-home-stat-card is-{{ $stat['tone'] }}">
+                            <div class="rc-home-stat-icon" aria-hidden="true">
+                                @if($stat['icon'] === 'graduation-cap') ✉
+                                @elseif($stat['icon'] === 'eye') ◉
+                                @elseif($stat['icon'] === 'star') ☆
+                                @elseif($stat['icon'] === 'mail') ✉
+                                @else ↗
+                                @endif
+                            </div>
+                            <div class="rc-home-stat-copy">
+                                <div class="rc-home-stat-label">{{ $stat['label'] }}</div>
+                                <div class="rc-home-stat-value">{{ $stat['value'] }}</div>
+                            </div>
+                            @if(isset($stat['progress']))
+                                <div class="rc-home-progress"><span style="width: {{ (int) $stat['progress'] }}%"></span></div>
+                            @endif
+                            <div class="rc-home-stat-sub">{{ $stat['sub'] }}</div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="rc-home-main-grid">
+                    <section class="rc-home-panel rc-progress-panel">
+                        <div class="rc-home-panel-head"><h2>Recruiting Progress</h2></div>
+                        <div class="rc-progress-layout">
+                            <div class="rc-readiness-ring" style="--ready: {{ $readinessScore }};">
+                                <div><strong>{{ $readinessScore }}%</strong><span>Recruiting Readiness</span></div>
+                            </div>
+                            <div class="rc-check-list">
+                                @foreach($progressItems as $item)
+                                    <div class="rc-check-row {{ $item['done'] ? 'is-done' : '' }}">
+                                        <span class="rc-check-dot">{{ $item['done'] ? '✓' : '' }}</span>
+                                        <span><strong>{{ $item['label'] }}</strong><small>{{ $item['state'] }}</small></span>
+                                    </div>
+                                @endforeach
+                                <a class="rc-home-outline-btn" href="#">View Full Checklist</a>
                             </div>
                         </div>
-                    @endforeach
-                </div>
+                    </section>
 
-                <div class="rc-dashboard-section-title">
-                    <h2>Engagement</h2>
-                    
-                </div>
-
-                <div class="rc-dashboard-engagement">
-                    @foreach($engagementMetrics as $metric)
-                        <div class="rc-dashboard-card rc-metric-card">
-                            <div class="rc-metric-head"><div class="rc-dashboard-icon"><img class="rc-png-icon" src="{{ $metric['icon'] }}" alt="" /></div></div>
-                            <div><div class="rc-metric-value">{{ is_numeric($metric['value']) ? number_format((int) $metric['value']) : $metric['value'] }}</div><div class="rc-metric-name">{{ $metric['name'] }}</div></div>
-                            <svg class="rc-spark" viewBox="0 0 220 44" preserveAspectRatio="none"><polygon points="0,44 {{ $sparkPoints($metric['key']) }} 220,44" /><polyline points="{{ $sparkPoints($metric['key']) }}" /></svg>
+                    <section class="rc-home-panel rc-recent-panel">
+                        <div class="rc-home-panel-head"><h2>Recent Activity</h2><a href="#">View All</a></div>
+                        <div class="rc-home-activity-list">
+                            @forelse($dashboardRecentActivity as $activity)
+                                @php
+                                    $activityCopy = trim(strip_tags((string) ($activity['copy'] ?? '')));
+                                    $activityTitle = (string) ($activity['title'] ?? 'Recruiting activity');
+                                    $activityTime = $activity['time'] ?? null;
+                                    $activityType = strtolower((string) ($activity['type'] ?? 'activity'));
+                                @endphp
+                                <a class="rc-home-activity" href="{{ $activity['url'] ?? '#' }}">
+                                    <span class="rc-home-activity-icon is-{{ str_contains($activityType, 'reply') ? 'green' : (str_contains($activityType, 'email') ? 'coral' : 'blue') }}">{{ str_contains($activityType, 'reply') ? '↩' : (str_contains($activityType, 'email') ? '✉' : '◉') }}</span>
+                                    <span class="rc-home-activity-copy"><strong>{{ $activityTitle }}</strong><small>{{ $activityCopy ?: 'Recruiting update' }}</small></span>
+                                    <span class="rc-home-activity-time">{{ $activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans(null, true) . ' ago' : 'Recent' }}</span>
+                                </a>
+                            @empty
+                                <div class="rc-home-empty">Recent views, emails, replies, and list actions will appear here.</div>
+                            @endforelse
                         </div>
-                    @endforeach
+                    </section>
                 </div>
 
-                <div class="rc-dashboard-card">
-                    <div class="rc-dashboard-section-title"><h2>Top 5 Engaged Schools</h2><div class="rc-subtle">Ranked by replies, reply volume, and link activity</div></div>
-                    <div class="rc-engaged-list">
-                        <?php $engagedSchools = array_values(is_array($dashboardTopSchools ?? null) ? $dashboardTopSchools : []); ?>
-                        <?php if (empty($engagedSchools)): ?>
-                            <div class="rc-activity-empty">Your most engaged schools will appear after coaches reply, view your profile, or click recruiting links.</div>
-                        <?php else: ?>
-                            <?php foreach ($engagedSchools as $engagedIndex => $school): ?>
-                                <?php
-                                    $engagedSchoolId = (string) ($school['id'] ?? $school['business_id'] ?? '');
-                                    if ($engagedSchoolId === '' && ! empty($school['name'])) { $engagedSchoolId = md5(strtolower(trim((string) $school['name']))); }
-                                    $score = (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0);
-                                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0));
-                                    $clicks = (int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
-                                    $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
-                                    $bar = max(8, min(100, $score));
-                                ?>
-                                <?php if ($engagedSchoolId !== ''): ?>
-                                    <button type="button" class="rc-engaged-row" wire:click="openDashboardEngagedSchool({{ (int) $engagedIndex }})" wire:loading.attr="disabled" wire:target="openDashboardEngagedSchool">
-                                <?php else: ?>
-                                    <div class="rc-engaged-row" role="group" aria-label="Engaged school">
-                                <?php endif; ?>
-                                        <div class="rc-rank {{ $engagedIndex > 2 ? 'is-muted' : '' }}">{{ $engagedIndex + 1 }}</div>
-                                        <div style="min-width:0;text-align:left">
-                                            <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-                                                <div class="rc-school-title">{{ $school['name'] ?? 'School' }}</div>
-                                                <?php if ($replies > 0): ?>
-                                                    <span class="rc-replied-badge">{{ $replies }} {{ $replies === 1 ? 'reply' : 'replies' }}</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="rc-school-mini">
-                                                <span>Views {{ $views }}</span>
-                                                <span>Clicks {{ $clicks }}</span>
-                                                <span>Replies {{ $replies }}</span>
-                                                <span>{{ $school['coach_count'] ?? 0 }} coaches</span>
-                                            </div>
-                                        </div>
-                                        <div class="rc-lead-bar"><span style="width:{{ $bar }}%"></span></div>
-                                        <div class="rc-lead-score">{{ $score }}</div>
-                                <?php if ($engagedSchoolId !== ''): ?>
-                                    </button>
-                                <?php else: ?>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="rc-dashboard-bottom">
-                    <div class="rc-dashboard-card">
-                        <div class="rc-dashboard-section-title"><h2>Suggested next steps</h2></div>
-                        <div class="rc-step-list">
-                            <?php $recommendationRows = is_array($dashboardRecommendations ?? null) ? array_values($dashboardRecommendations) : collect($dashboardRecommendations ?? [])->values()->all(); ?>
-                            <?php foreach ($recommendationRows as $recommendationIndex => $recommendationStep): ?>
-                                <div class="rc-step-row"><div class="rc-step-index"><?php echo e($recommendationIndex + 1); ?></div><div><div class="rc-step-title"><?php echo e($recommendationStep['title'] ?? 'Next step'); ?></div><div class="rc-step-copy"><?php echo e($recommendationStep['copy'] ?? ''); ?></div></div><a class="rc-btn rc-btn-primary" href="<?php echo e($recommendationStep['url'] ?? '#'); ?>"><?php echo e($recommendationStep['label'] ?? 'Open'); ?> →</a></div>
-                            <?php endforeach; ?>
+                <div class="rc-home-lower-grid">
+                    <section class="rc-home-panel rc-radar-panel">
+                        <div class="rc-home-panel-head"><div><h2>On The Radar</h2><p>Based on your profile and preferences</p></div><a href="#">View All</a></div>
+                        <div class="rc-radar-schools">
+                            @forelse($radarSchools as $school)
+                                @php
+                                    $schoolName = (string) ($school['name'] ?? 'School');
+                                    $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
+                                    $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
+                                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                @endphp
+                                <button type="button" class="rc-radar-card" wire:click="openSchoolDashboardModal(@js($school['id'] ?? $school['business_id'] ?? $schoolName))">
+                                    <span class="rc-radar-logo">{{ strtoupper($initials ?: 'PC') }}</span>
+                                    <strong>{{ $schoolName }}</strong>
+                                    <small>{{ $schoolConference }}</small>
+                                    <em>{{ $match }}% Match</em>
+                                </button>
+                            @empty
+                                <div class="rc-home-empty">Schools will appear here as your recruiting list grows.</div>
+                            @endforelse
                         </div>
-                    </div>
-                    <div class="rc-dashboard-card">
-                        <div class="rc-dashboard-section-title"><h2>Recent activity</h2></div>
-                        <div class="rc-activity-list">
-                            <?php $recentActivityRows = is_array($dashboardRecentActivity ?? null) ? $dashboardRecentActivity : []; ?>
-                            <?php if (empty($recentActivityRows)): ?>
-                                <div class="rc-activity-empty">No activity yet. Sent emails, replies, saved schools, and list actions will show here.</div>
-                            <?php else: ?>
-                                <?php foreach ($recentActivityRows as $recentActivityRow): ?>
-                                    <?php
-                                        $activityUrl = $recentActivityRow['url'] ?? \App\Filament\Pages\CoachDatabaseConversations::getUrl();
-                                        $activityCopy = trim(strip_tags((string) ($recentActivityRow['copy'] ?? '')));
-                                        $activityTypeRaw = strtolower((string) ($recentActivityRow['type'] ?? 'activity'));
-                                        $activityType = strtoupper(substr($activityTypeRaw, 0, 1));
-                                        $activityTitle = $recentActivityRow['title'] ?? 'Activity';
-                                        $activityTime = $recentActivityRow['time'] ?? null;
-                                        $activityHasImage = (bool) ($recentActivityRow['has_image'] ?? false) || preg_match('/\.(png|jpe?g|gif|webp)(\?|$)/i', $activityCopy);
-                                        $activityHasFile = (bool) ($recentActivityRow['has_file'] ?? false) || (! $activityHasImage && preg_match('/\.(pdf|docx?|xlsx?|pptx?|zip)(\?|$)/i', $activityCopy));
-                                        $activityAssetLabel = $activityHasImage ? 'Image attached' : ($activityHasFile ? 'File attached' : '');
-                                        if ($activityHasImage || $activityHasFile) {
-                                            $activityCopy = trim(preg_replace('/https?:\/\/\S+/i', '', $activityCopy));
-                                            if ($activityCopy === '') { $activityCopy = 'Conversation includes an attachment.'; }
-                                        }
-                                    ?>
-                                    <div class="rc-activity-card<?php echo ($activityHasImage || $activityHasFile) ? ' has-asset' : ''; ?>">
-                                        <div class="rc-step-index" style="background:#334155"><?php echo e($activityType); ?></div>
-                                        <div>
-                                            <div class="rc-step-title"><?php echo e($activityTitle); ?></div>
-                                            <div class="rc-activity-copy"><?php echo e($activityCopy); ?></div>
-                                            <?php if ($activityAssetLabel !== ''): ?><div class="rc-activity-asset"><?php echo $activityHasImage ? '▧' : '▣'; ?> <?php echo e($activityAssetLabel); ?></div><?php endif; ?>
-                                            <div class="rc-activity-meta"><?php echo e($activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans() : 'Recent'); ?></div>
-                                        </div>
-                                        <a class="rc-btn rc-activity-view" href="<?php echo e($activityUrl); ?>">View</a>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+                    </section>
 
-                <div class="rc-dashboard-card rc-list-box">
-                    <div class="rc-dashboard-section-title"><h2>Your lists</h2><a class="rc-btn" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}">Manage →</a></div>
-                    <div class="rc-list-pills">
-                        @forelse($dashboardLists as $list)
-                            <a class="rc-list-pill" href="{{ \App\Filament\Pages\CoachDatabaseLists::getUrl() }}"><span>{{ $list['label'] ?? 'List' }}</span><span class="rc-list-count">{{ $list['schools_count'] ?? 0 }}</span></a>
-                        @empty
-                            <div class="rc-activity-empty">Create a recruiting list to organize target schools.</div>
-                        @endforelse
-                    </div>
+                    <section class="rc-home-panel rc-interested-panel">
+                        <div class="rc-home-panel-head"><h2>Schools Most Interested</h2><span>Last 30 days</span></div>
+                        <div class="rc-interested-list">
+                            @forelse(collect($dashboardTopSchools)->take(4)->values()->all() as $rank => $school)
+                                @php
+                                    $schoolName = (string) ($school['name'] ?? 'School');
+                                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
+                                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                @endphp
+                                <button type="button" class="rc-interested-row" wire:click="openDashboardEngagedSchool({{ (int) $rank }})">
+                                    <span class="rc-interested-rank">{{ $rank + 1 }}</span>
+                                    <span class="rc-interested-logo">{{ strtoupper($initials ?: 'S') }}</span>
+                                    <span><strong>{{ $schoolName }}</strong><small>Profile views</small></span>
+                                    <b>{{ $score }}</b>
+                                </button>
+                            @empty
+                                <div class="rc-home-empty">Interested schools will appear here after views, replies, or link clicks.</div>
+                            @endforelse
+                        </div>
+                        <a class="rc-home-outline-btn" href="#">View Full Analytics</a>
+                    </section>
                 </div>
             </div>
         @endif
