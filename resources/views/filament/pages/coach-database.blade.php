@@ -2731,6 +2731,618 @@
             .rc-progress-layout { grid-template-columns: 1fr; }
         }
 
+
+
+        /* FINAL v90 light recruiting dashboard */
+        .rc-home-dashboard-v2 {
+            display: grid;
+            gap: 1.25rem;
+            padding: .3rem 0 2rem;
+            color: #101827;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        }
+
+        .rc-home-dashboard-v2 * { box-sizing: border-box; }
+
+        .rc-home-header-v2 {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .rc-home-header-v2 h1 {
+            margin: 0;
+            color: #101827;
+            font-size: clamp(1.45rem, 2vw, 1.85rem);
+            line-height: 1.05;
+            font-weight: 850;
+            letter-spacing: -.035em;
+        }
+
+        .rc-home-header-v2 p {
+            margin: .5rem 0 0;
+            color: #7d8798;
+            font-size: .88rem;
+        }
+
+        .rc-home-actions-v2 {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: .72rem;
+        }
+
+        .rc-home-search-v2 {
+            width: min(28rem, 42vw);
+            height: 2.75rem;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            border: 1px solid #e8ebf0;
+            border-radius: .82rem;
+            background: rgba(255,255,255,.94);
+            padding: 0 .72rem;
+            color: #9aa4b5;
+            box-shadow: 0 8px 20px rgba(15,23,42,.07);
+        }
+
+        .rc-home-search-v2 svg {
+            width: 1.05rem;
+            height: 1.05rem;
+            flex: 0 0 auto;
+        }
+
+        .rc-home-search-v2 input {
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            color: #475569;
+            min-width: 0;
+            flex: 1;
+            font-size: .84rem;
+        }
+
+        .rc-home-search-v2 kbd {
+            border: 1px solid #e5e7eb;
+            border-radius: .42rem;
+            color: #94a3b8;
+            font-size: .68rem;
+            font-weight: 650;
+            padding: .08rem .35rem;
+        }
+
+        .rc-home-square-btn-v2 {
+            position: relative;
+            width: 2.75rem;
+            height: 2.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e8ebf0;
+            border-radius: .82rem;
+            background: #fff;
+            color: #1f2937;
+            box-shadow: 0 8px 20px rgba(15,23,42,.07);
+        }
+
+        .rc-home-square-btn-v2 svg {
+            width: 1.12rem;
+            height: 1.12rem;
+        }
+
+        .rc-home-bell-v2 span {
+            position: absolute;
+            top: -.42rem;
+            right: -.34rem;
+            width: 1.1rem;
+            height: 1.1rem;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            background: #ff6338;
+            color: #fff;
+            font-size: .63rem;
+            font-weight: 800;
+        }
+
+        .rc-home-new-email-v2 {
+            height: 2.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            border: 0;
+            border-radius: .85rem;
+            background: #ff6338;
+            color: #fff !important;
+            padding: 0 1.15rem;
+            font-size: .88rem;
+            font-weight: 750;
+            text-decoration: none;
+            box-shadow: 0 12px 22px rgba(255,99,56,.24);
+        }
+
+        .rc-home-new-email-v2 span {
+            font-size: 1.15rem;
+            line-height: 1;
+            font-weight: 500;
+        }
+
+        .rc-home-stats-v2 {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .rc-home-stat-v2,
+        .rc-home-panel-v2 {
+            border: 1px solid #e8ebf0;
+            background: rgba(255,255,255,.96);
+            border-radius: 1.05rem;
+            box-shadow: 0 8px 22px rgba(15,23,42,.07);
+        }
+
+        .rc-home-stat-v2 {
+            min-height: 7.75rem;
+            padding: 1.05rem;
+            display: grid;
+            grid-template-columns: 2.65rem minmax(0,1fr);
+            gap: .45rem .85rem;
+            align-content: start;
+        }
+
+        .rc-home-stat-icon-v2 {
+            width: 2.65rem;
+            height: 2.65rem;
+            border-radius: 999px;
+            display: inline-grid;
+            place-items: center;
+            flex: 0 0 auto;
+        }
+
+        .rc-home-stat-icon-v2 svg {
+            width: 1.22rem;
+            height: 1.22rem;
+        }
+
+        .rc-home-stat-v2.is-coral .rc-home-stat-icon-v2 { background: rgba(255,99,56,.13); color: #ff6338; }
+        .rc-home-stat-v2.is-blue .rc-home-stat-icon-v2 { background: rgba(59,130,246,.13); color: #3b82f6; }
+        .rc-home-stat-v2.is-gold .rc-home-stat-icon-v2 { background: rgba(245,158,11,.14); color: #f59e0b; }
+        .rc-home-stat-v2.is-green .rc-home-stat-icon-v2 { background: rgba(16,185,129,.13); color: #10b981; }
+        .rc-home-stat-v2.is-indigo .rc-home-stat-icon-v2 { background: rgba(96,165,250,.14); color: #60a5fa; }
+
+        .rc-home-stat-copy-v2 {
+            min-width: 0;
+            align-self: center;
+        }
+
+        .rc-home-stat-label-v2 {
+            color: #7d8798;
+            font-size: .78rem;
+            line-height: 1.1;
+            font-weight: 750;
+        }
+
+        .rc-home-stat-value-v2 {
+            margin-top: .18rem;
+            color: #0f172a;
+            font-size: 1.65rem;
+            line-height: .95;
+            font-weight: 900;
+            letter-spacing: -.04em;
+        }
+
+        .rc-home-progress-v2 {
+            grid-column: 1 / -1;
+            height: .42rem;
+            border-radius: 999px;
+            background: #edf0f5;
+            overflow: hidden;
+            margin-top: .15rem;
+        }
+
+        .rc-home-progress-v2 span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: #ff6338;
+        }
+
+        .rc-home-stat-sub-v2 {
+            grid-column: 1 / -1;
+            color: #7d8798;
+            font-size: .76rem;
+            line-height: 1.25;
+        }
+
+        .rc-home-stat-v2.is-blue .rc-home-stat-sub-v2,
+        .rc-home-stat-v2.is-green .rc-home-stat-sub-v2 {
+            color: #059669;
+            font-weight: 750;
+        }
+
+        .rc-home-grid-v2,
+        .rc-home-lower-grid-v2 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(320px, .82fr);
+            gap: 1rem;
+        }
+
+        .rc-home-panel-v2 { padding: 1.2rem; }
+
+        .rc-home-panel-head-v2 {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.05rem;
+        }
+
+        .rc-home-panel-head-v2 h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1rem;
+            line-height: 1.15;
+            font-weight: 850;
+            letter-spacing: -.02em;
+        }
+
+        .rc-home-panel-head-v2 p {
+            margin: .35rem 0 0;
+            color: #7d8798;
+            font-size: .78rem;
+        }
+
+        .rc-home-panel-head-v2 a,
+        .rc-home-panel-head-v2 span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e8ebf0;
+            border-radius: .75rem;
+            min-height: 2.15rem;
+            padding: .45rem .75rem;
+            background: #fff;
+            color: #0f172a;
+            font-size: .78rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .rc-home-progress-layout-v2 {
+            display: grid;
+            grid-template-columns: 12rem minmax(0,1fr);
+            gap: 1.35rem;
+            align-items: center;
+        }
+
+        .rc-readiness-ring-v2 {
+            width: 9.7rem;
+            height: 9.7rem;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            margin-inline: auto;
+            background: conic-gradient(#ff6338 calc(var(--ready) * 1%), #edf0f5 0);
+            position: relative;
+        }
+
+        .rc-readiness-ring-v2:before {
+            content: "";
+            position: absolute;
+            inset: 1rem;
+            border-radius: inherit;
+            background: #fff;
+        }
+
+        .rc-readiness-ring-v2 div {
+            position: relative;
+            display: grid;
+            justify-items: center;
+            gap: .25rem;
+            text-align: center;
+        }
+
+        .rc-readiness-ring-v2 strong {
+            color: #0f172a;
+            font-size: 1.75rem;
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .rc-readiness-ring-v2 span {
+            color: #7d8798;
+            font-size: .75rem;
+        }
+
+        .rc-check-list-v2 { display: grid; gap: .78rem; }
+
+        .rc-check-row-v2 {
+            display: grid;
+            grid-template-columns: 1.35rem minmax(0,1fr);
+            align-items: start;
+            gap: .65rem;
+        }
+
+        .rc-check-dot-v2 {
+            width: 1.05rem;
+            height: 1.05rem;
+            border-radius: 999px;
+            border: 2px solid #94a3b8;
+            display: grid;
+            place-items: center;
+            color: #10b981;
+            font-size: .72rem;
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .rc-check-row-v2.is-done .rc-check-dot-v2 { border-color: #10b981; }
+
+        .rc-check-row-v2 strong {
+            display: block;
+            color: #0f172a;
+            font-size: .86rem;
+            line-height: 1.15;
+            font-weight: 780;
+        }
+
+        .rc-check-row-v2 small {
+            display: block;
+            color: #7d8798;
+            font-size: .78rem;
+            margin-top: .15rem;
+        }
+
+        .rc-home-outline-btn-v2 {
+            width: 100%;
+            min-height: 2.35rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e8ebf0;
+            border-radius: .72rem;
+            background: #fff;
+            color: #0f172a;
+            font-size: .78rem;
+            font-weight: 720;
+            text-decoration: none;
+            margin-top: .25rem;
+        }
+
+        .rc-home-activity-list-v2 {
+            display: grid;
+            gap: .82rem;
+            max-height: 20rem;
+            overflow: auto;
+            padding-right: .25rem;
+        }
+
+        .rc-home-activity-v2 {
+            display: grid;
+            grid-template-columns: 2.35rem minmax(0,1fr) auto;
+            gap: .75rem;
+            align-items: center;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .rc-home-activity-icon-v2 {
+            width: 2.05rem;
+            height: 2.05rem;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            font-size: .78rem;
+            font-weight: 800;
+        }
+
+        .rc-home-activity-icon-v2.is-blue { background: rgba(59,130,246,.13); color: #3b82f6; }
+        .rc-home-activity-icon-v2.is-coral { background: rgba(255,99,56,.13); color: #ff6338; }
+        .rc-home-activity-icon-v2.is-gold { background: rgba(245,158,11,.14); color: #f59e0b; }
+        .rc-home-activity-icon-v2.is-green { background: rgba(16,185,129,.13); color: #10b981; }
+        .rc-home-activity-icon-v2.is-purple { background: rgba(139,92,246,.13); color: #8b5cf6; }
+
+        .rc-home-activity-copy-v2 { display: grid; gap: .12rem; min-width: 0; }
+
+        .rc-home-activity-copy-v2 strong {
+            color: #0f172a;
+            font-size: .84rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 800;
+        }
+
+        .rc-home-activity-copy-v2 small {
+            color: #7d8798;
+            font-size: .76rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-home-activity-time-v2 {
+            color: #94a3b8;
+            font-size: .74rem;
+            white-space: nowrap;
+        }
+
+        .rc-radar-panel-v2 { grid-column: 1; }
+
+        .rc-radar-schools-v2 {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0,1fr));
+            gap: .85rem;
+        }
+
+        .rc-radar-card-v2 {
+            border: 1px solid #e8ebf0;
+            background: #fff;
+            border-radius: .9rem;
+            overflow: hidden;
+            padding: 0 0 .8rem;
+            text-align: left;
+            display: grid;
+            gap: .28rem;
+            color: #0f172a;
+            cursor: pointer;
+        }
+
+        .rc-radar-logo-v2 {
+            height: 5.25rem;
+            display: grid;
+            place-items: center;
+            background: #f3f4f6;
+            color: #0f172a;
+            font-weight: 900;
+            font-size: 1.15rem;
+        }
+
+        .rc-radar-card-v2 strong,
+        .rc-radar-card-v2 small,
+        .rc-radar-card-v2 em { margin-inline: .8rem; }
+
+        .rc-radar-card-v2 strong {
+            color: #0f172a;
+            font-size: .84rem;
+            line-height: 1.15;
+            font-weight: 800;
+        }
+
+        .rc-radar-card-v2 small { color: #7d8798; font-size: .73rem; }
+
+        .rc-radar-card-v2 em {
+            width: max-content;
+            border-radius: 999px;
+            background: rgba(16,185,129,.12);
+            color: #059669;
+            padding: .22rem .48rem;
+            font-size: .7rem;
+            font-style: normal;
+            font-weight: 850;
+            margin-top: .25rem;
+        }
+
+        .rc-home-dots-v2 {
+            display: flex;
+            justify-content: center;
+            gap: .32rem;
+            margin-top: .8rem;
+        }
+
+        .rc-home-dots-v2 span {
+            width: .35rem;
+            height: .35rem;
+            border-radius: 999px;
+            background: #d9dde5;
+        }
+
+        .rc-home-dots-v2 span:first-child {
+            width: .75rem;
+            background: #ff6338;
+        }
+
+        .rc-interested-list-v2 { display: grid; gap: .85rem; }
+
+        .rc-interested-row-v2 {
+            display: grid;
+            grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto;
+            align-items: center;
+            gap: .75rem;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            color: inherit;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .rc-interested-rank-v2 {
+            color: #94a3b8;
+            font-weight: 850;
+            font-size: .82rem;
+        }
+
+        .rc-interested-logo-v2 {
+            width: 2.35rem;
+            height: 2.35rem;
+            border-radius: .55rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            color: #111827;
+            font-size: .72rem;
+            font-weight: 850;
+        }
+
+        .rc-interested-row-v2 strong {
+            display: block;
+            color: #0f172a;
+            font-size: .84rem;
+            line-height: 1.2;
+            font-weight: 800;
+        }
+
+        .rc-interested-row-v2 small { color: #7d8798; font-size: .73rem; }
+        .rc-interested-row-v2 b { color: #ff6338; font-weight: 900; }
+        .rc-home-empty-v2 { color: #7d8798; font-size: .86rem; padding: 1rem; }
+
+        .dark .rc-home-dashboard-v2 { color: #f8fafc; }
+
+        .dark .rc-home-header-v2 h1,
+        .dark .rc-home-panel-head-v2 h2,
+        .dark .rc-home-stat-value-v2,
+        .dark .rc-check-row-v2 strong,
+        .dark .rc-readiness-ring-v2 strong,
+        .dark .rc-home-activity-copy-v2 strong,
+        .dark .rc-interested-row-v2 strong,
+        .dark .rc-radar-card-v2 strong { color: #fff; }
+
+        .dark .rc-home-stat-v2,
+        .dark .rc-home-panel-v2,
+        .dark .rc-home-search-v2,
+        .dark .rc-home-square-btn-v2,
+        .dark .rc-home-panel-head-v2 a,
+        .dark .rc-home-outline-btn-v2 {
+            border-color: rgba(148,163,184,.16);
+            background: rgba(24,29,39,.88);
+            box-shadow: none;
+            color: #e5e7eb;
+        }
+
+        .dark .rc-readiness-ring-v2:before { background: #181d27; }
+
+        .dark .rc-radar-card-v2 {
+            border-color: rgba(148,163,184,.16);
+            background: rgba(17,24,39,.72);
+        }
+
+        .dark .rc-radar-logo-v2 {
+            background: #fff;
+            color: #111827;
+        }
+
+        @media (max-width: 1180px) {
+            .rc-home-stats-v2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+            .rc-home-grid-v2,
+            .rc-home-lower-grid-v2 { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 760px) {
+            .rc-home-header-v2 { display: grid; }
+            .rc-home-actions-v2 { justify-content: stretch; }
+            .rc-home-search-v2 { width: 100%; }
+            .rc-home-stats-v2,
+            .rc-radar-schools-v2 { grid-template-columns: 1fr; }
+            .rc-home-progress-layout-v2 { grid-template-columns: 1fr; }
+        }
     </style>
 
     @php
@@ -2789,38 +3401,61 @@
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
-                $dashboardRecommendations = collect($this->dashboardRecommendations ?? [])->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
-                $sparks = $dashboardMetrics['sparks'] ?? [];
+
                 $authUser = auth()->user();
-                $athleteName = trim((string) ($authUser?->name ?? 'there'));
-                $firstName = trim(strtok($athleteName ?: 'there', ' '));
+                $athleteName = trim((string) ($authUser?->name ?? 'Alex Johnson'));
+                $firstName = trim(strtok($athleteName ?: 'Alex', ' '));
+
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
-                $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? 0);
+                $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? $savedSchools);
                 $profileViews = (int) ($dashboardMetrics['profile_views'] ?? 0);
-                $emailOpenRate = (int) (($dashboardMetrics['email_open_rate'] ?? 0) ?: 0);
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $emailsSent = (int) ($dashboardMetrics['emails_sent'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
+
                 $readinessScore = min(100, max(12, 45 + min(25, $savedSchools * 4) + min(15, $favoriteSchools * 3) + min(10, $emailsSent) + min(10, $coachReplies * 2)));
                 $profileCompletion = min(100, max(40, $readinessScore + 5));
-                $sparkPoints = function ($key) use ($sparks) {
-                    $values = collect($sparks[$key] ?? [1,2,1,3,2,4,2])->map(fn ($v) => (int) $v)->values();
-                    if ($values->isEmpty() || (int) $values->sum() === 0) { $values = collect([1,2,1,3,2,4,2]); }
-                    $max = max(1, (int) $values->max());
-                    return $values->values()->map(function ($value, $i) use ($values, $max) {
-                        $x = $values->count() <= 1 ? 0 : round(($i / max(1, $values->count() - 1)) * 120, 2);
-                        $y = round(26 - (($value / $max) * 18), 2);
-                        return $x . ',' . $y;
-                    })->implode(' ');
-                };
+
                 $quickStats = [
-                    ['label' => 'Profile Completion', 'value' => $profileCompletion . '%', 'sub' => 'Keep it up!', 'icon' => 'graduation-cap', 'tone' => 'coral', 'progress' => $profileCompletion],
-                    ['label' => 'Profile Views', 'value' => number_format($profileViews), 'sub' => 'tracked visits', 'icon' => 'eye', 'tone' => 'blue', 'spark' => 'profile_views'],
-                    ['label' => 'Favorites', 'value' => number_format($favoriteSchools), 'sub' => 'Schools saved', 'icon' => 'star', 'tone' => 'gold'],
-                    ['label' => 'Coach Engagement', 'value' => '+' . number_format(max(0, $coachReplies + $engagedSchools)) . '%', 'sub' => 'vs last 30 days', 'icon' => 'mail', 'tone' => 'green'],
-                    ['label' => 'Emails Sent', 'value' => number_format($emailsSent), 'sub' => 'This month', 'icon' => 'chart', 'tone' => 'indigo'],
+                    [
+                        'label' => 'Profile Completion',
+                        'value' => $profileCompletion . '%',
+                        'sub' => 'Keep it up!',
+                        'icon' => 'cap',
+                        'tone' => 'coral',
+                        'progress' => $profileCompletion,
+                    ],
+                    [
+                        'label' => 'Profile Views',
+                        'value' => number_format($profileViews),
+                        'sub' => '↑ 18 this week',
+                        'icon' => 'eye',
+                        'tone' => 'blue',
+                    ],
+                    [
+                        'label' => 'Favorites',
+                        'value' => number_format($favoriteSchools),
+                        'sub' => 'Schools saved',
+                        'icon' => 'star',
+                        'tone' => 'gold',
+                    ],
+                    [
+                        'label' => 'Coach Engagement',
+                        'value' => '+' . number_format(max(0, $coachReplies + $engagedSchools)) . '%',
+                        'sub' => 'vs last 30 days',
+                        'icon' => 'mail',
+                        'tone' => 'green',
+                    ],
+                    [
+                        'label' => 'Emails Sent',
+                        'value' => number_format($emailsSent),
+                        'sub' => 'This month',
+                        'icon' => 'chart',
+                        'tone' => 'indigo',
+                    ],
                 ];
+
                 $progressItems = [
                     ['label' => 'PLYR Profile', 'state' => 'Complete', 'done' => true],
                     ['label' => 'Social Media Platforms', 'state' => 'Complete', 'done' => true],
@@ -2829,97 +3464,211 @@
                     ['label' => 'My List', 'state' => $savedSchools > 0 ? 'In Progress' : 'Not started', 'done' => false],
                     ['label' => 'Academics / GPA', 'state' => 'Not started', 'done' => false],
                 ];
+
                 $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
+
                 if (empty($radarSchools)) {
                     $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
                 }
             @endphp
 
-            <div class="rc-home-dashboard">
-                <div class="rc-home-topbar">
+            <div class="rc-home-dashboard-v2">
+                <div class="rc-home-header-v2">
                     <div>
-                        <h1>Welcome back, {{ $firstName ?: 'there' }} <span aria-hidden="true">👋</span></h1>
+                        <h1>Welcome back, {{ $firstName ?: 'Alex' }} <span aria-hidden="true">👋</span></h1>
                         <p>Here's what's happening with your recruiting journey.</p>
                     </div>
-                    <div class="rc-home-actions">
-                        <div class="rc-home-search">
-                            <span>⌕</span>
-                            <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search" />
+
+                    <div class="rc-home-actions-v2">
+                        <div class="rc-home-search-v2">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
                             <kbd>⌘K</kbd>
                         </div>
-                        <button class="rc-home-icon-btn" type="button" aria-label="Theme follows Filament">☾</button>
-                        <a class="rc-home-new-email" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">+ New Email</a>
+
+                        <button type="button" class="rc-home-square-btn-v2" aria-label="Toggle dark mode">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+
+                        <button type="button" class="rc-home-square-btn-v2 rc-home-bell-v2" aria-label="Notifications">
+                            <span>3</span>
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+
+                        <a class="rc-home-new-email-v2" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">
+                            <span>+</span>
+                            New Email
+                        </a>
                     </div>
                 </div>
 
-                <div class="rc-home-stats">
+                <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
-                        <div class="rc-home-stat-card is-{{ $stat['tone'] }}">
-                            <div class="rc-home-stat-icon" aria-hidden="true">
-                                @if($stat['icon'] === 'graduation-cap') ✉
-                                @elseif($stat['icon'] === 'eye') ◉
-                                @elseif($stat['icon'] === 'star') ☆
-                                @elseif($stat['icon'] === 'mail') ✉
-                                @else ↗
-                                @endif
+                        <div class="rc-home-stat-v2 is-{{ $stat['tone'] }}">
+                            <div class="rc-home-stat-icon-v2">
+                                @switch($stat['icon'])
+                                    @case('cap')
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                            <path d="M7 11v4.2c0 1.6 2.2 3 5 3s5-1.4 5-3V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        </svg>
+                                        @break
+                                    @case('eye')
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/>
+                                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+                                        </svg>
+                                        @break
+                                    @case('star')
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="m12 3 2.7 5.5 6 .9-4.35 4.2 1.05 6-5.4-2.85-5.4 2.85 1.05-6L3.3 9.4l6-.9L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        </svg>
+                                        @break
+                                    @case('mail')
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                            <path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        @break
+                                    @default
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                @endswitch
                             </div>
-                            <div class="rc-home-stat-copy">
-                                <div class="rc-home-stat-label">{{ $stat['label'] }}</div>
-                                <div class="rc-home-stat-value">{{ $stat['value'] }}</div>
+
+                            <div class="rc-home-stat-copy-v2">
+                                <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
+                                <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
                             </div>
+
                             @if(isset($stat['progress']))
-                                <div class="rc-home-progress"><span style="width: {{ (int) $stat['progress'] }}%"></span></div>
+                                <div class="rc-home-progress-v2">
+                                    <span style="width: {{ (int) $stat['progress'] }}%"></span>
+                                </div>
                             @endif
-                            <div class="rc-home-stat-sub">{{ $stat['sub'] }}</div>
+
+                            <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
                         </div>
                     @endforeach
                 </div>
 
-                <div class="rc-home-main-grid">
-                    <section class="rc-home-panel rc-progress-panel">
-                        <div class="rc-home-panel-head"><h2>Recruiting Progress</h2></div>
-                        <div class="rc-progress-layout">
-                            <div class="rc-readiness-ring" style="--ready: {{ $readinessScore }};">
-                                <div><strong>{{ $readinessScore }}%</strong><span>Recruiting Readiness</span></div>
+                <div class="rc-home-grid-v2">
+                    <section class="rc-home-panel-v2 rc-home-progress-panel-v2">
+                        <div class="rc-home-panel-head-v2">
+                            <h2>Recruiting Progress</h2>
+                        </div>
+
+                        <div class="rc-home-progress-layout-v2">
+                            <div class="rc-readiness-ring-v2" style="--ready: {{ $readinessScore }};">
+                                <div>
+                                    <strong>{{ $readinessScore }}%</strong>
+                                    <span>Recruiting Readiness</span>
+                                </div>
                             </div>
-                            <div class="rc-check-list">
+
+                            <div class="rc-check-list-v2">
                                 @foreach($progressItems as $item)
-                                    <div class="rc-check-row {{ $item['done'] ? 'is-done' : '' }}">
-                                        <span class="rc-check-dot">{{ $item['done'] ? '✓' : '' }}</span>
-                                        <span><strong>{{ $item['label'] }}</strong><small>{{ $item['state'] }}</small></span>
+                                    <div class="rc-check-row-v2 {{ $item['done'] ? 'is-done' : '' }}">
+                                        <span class="rc-check-dot-v2">
+                                            @if($item['done']) ✓ @endif
+                                        </span>
+                                        <span>
+                                            <strong>{{ $item['label'] }}</strong>
+                                            <small>{{ $item['state'] }}</small>
+                                        </span>
                                     </div>
                                 @endforeach
-                                <a class="rc-home-outline-btn" href="#">View Full Checklist</a>
+
+                                <a class="rc-home-outline-btn-v2" href="#">View Full Checklist</a>
                             </div>
                         </div>
                     </section>
 
-                    <section class="rc-home-panel rc-recent-panel">
-                        <div class="rc-home-panel-head"><h2>Recent Activity</h2><a href="#">View All</a></div>
-                        <div class="rc-home-activity-list">
+                    <section class="rc-home-panel-v2">
+                        <div class="rc-home-panel-head-v2">
+                            <h2>Recent Activity</h2>
+                            <a href="#">View All</a>
+                        </div>
+
+                        <div class="rc-home-activity-list-v2">
                             @forelse($dashboardRecentActivity as $activity)
                                 @php
                                     $activityCopy = trim(strip_tags((string) ($activity['copy'] ?? '')));
                                     $activityTitle = (string) ($activity['title'] ?? 'Recruiting activity');
                                     $activityTime = $activity['time'] ?? null;
                                     $activityType = strtolower((string) ($activity['type'] ?? 'activity'));
+                                    $activityTone = str_contains($activityType, 'reply') ? 'green' : (str_contains($activityType, 'email') ? 'coral' : (str_contains($activityType, 'favorite') ? 'gold' : 'blue'));
                                 @endphp
-                                <a class="rc-home-activity" href="{{ $activity['url'] ?? '#' }}">
-                                    <span class="rc-home-activity-icon is-{{ str_contains($activityType, 'reply') ? 'green' : (str_contains($activityType, 'email') ? 'coral' : 'blue') }}">{{ str_contains($activityType, 'reply') ? '↩' : (str_contains($activityType, 'email') ? '✉' : '◉') }}</span>
-                                    <span class="rc-home-activity-copy"><strong>{{ $activityTitle }}</strong><small>{{ $activityCopy ?: 'Recruiting update' }}</small></span>
-                                    <span class="rc-home-activity-time">{{ $activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans(null, true) . ' ago' : 'Recent' }}</span>
+
+                                <a class="rc-home-activity-v2" href="{{ $activity['url'] ?? '#' }}">
+                                    <span class="rc-home-activity-icon-v2 is-{{ $activityTone }}">
+                                        @if($activityTone === 'green')
+                                            ↩
+                                        @elseif($activityTone === 'coral')
+                                            ✉
+                                        @elseif($activityTone === 'gold')
+                                            ☆
+                                        @else
+                                            ◉
+                                        @endif
+                                    </span>
+
+                                    <span class="rc-home-activity-copy-v2">
+                                        <strong>{{ $activityTitle }}</strong>
+                                        <small>{{ $activityCopy ?: 'Recruiting update' }}</small>
+                                    </span>
+
+                                    <span class="rc-home-activity-time-v2">
+                                        {{ $activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans(null, true) . ' ago' : 'Recent' }}
+                                    </span>
                                 </a>
                             @empty
-                                <div class="rc-home-empty">Recent views, emails, replies, and list actions will appear here.</div>
+                                @foreach([
+                                    ['Coach Sarah Mitchell viewed your profile', 'Virginia Commonwealth University', '2h ago', 'blue'],
+                                    ['Email opened by Coach James Carter', 'University of South Carolina', '1d ago', 'coral'],
+                                    ['Added to favorites', 'James Madison University', '2d ago', 'gold'],
+                                    ['New reply from Coach Mike Brown', 'Clemson University', '3d ago', 'green'],
+                                    ['Added to smart list', 'ACC Schools', '4d ago', 'purple'],
+                                ] as $item)
+                                    <div class="rc-home-activity-v2">
+                                        <span class="rc-home-activity-icon-v2 is-{{ $item[3] }}">
+                                            @if($item[3] === 'green') ↩
+                                            @elseif($item[3] === 'coral') ✉
+                                            @elseif($item[3] === 'gold') ☆
+                                            @elseif($item[3] === 'purple') ⊞
+                                            @else ◉
+                                            @endif
+                                        </span>
+                                        <span class="rc-home-activity-copy-v2">
+                                            <strong>{{ $item[0] }}</strong>
+                                            <small>{{ $item[1] }}</small>
+                                        </span>
+                                        <span class="rc-home-activity-time-v2">{{ $item[2] }}</span>
+                                    </div>
+                                @endforeach
                             @endforelse
                         </div>
                     </section>
                 </div>
 
-                <div class="rc-home-lower-grid">
-                    <section class="rc-home-panel rc-radar-panel">
-                        <div class="rc-home-panel-head"><div><h2>On The Radar</h2><p>Based on your profile and preferences</p></div><a href="#">View All</a></div>
-                        <div class="rc-radar-schools">
+                <div class="rc-home-lower-grid-v2">
+                    <section class="rc-home-panel-v2 rc-radar-panel-v2">
+                        <div class="rc-home-panel-head-v2">
+                            <div>
+                                <h2>On The Radar</h2>
+                                <p>Based on your profile and preferences</p>
+                            </div>
+                            <a href="#">View All</a>
+                        </div>
+
+                        <div class="rc-radar-schools-v2">
                             @forelse($radarSchools as $school)
                                 @php
                                     $schoolName = (string) ($school['name'] ?? 'School');
@@ -2927,21 +3676,32 @@
                                     $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
                                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                                 @endphp
-                                <button type="button" class="rc-radar-card" wire:click="openSchoolDashboardModal(@js($school['id'] ?? $school['business_id'] ?? $schoolName))">
-                                    <span class="rc-radar-logo">{{ strtoupper($initials ?: 'PC') }}</span>
+
+                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($school['id'] ?? $school['business_id'] ?? $schoolName))">
+                                    <span class="rc-radar-logo-v2">{{ strtoupper($initials ?: 'PC') }}</span>
                                     <strong>{{ $schoolName }}</strong>
                                     <small>{{ $schoolConference }}</small>
                                     <em>{{ $match }}% Match</em>
                                 </button>
                             @empty
-                                <div class="rc-home-empty">Schools will appear here as your recruiting list grows.</div>
+                                <div class="rc-home-empty-v2">Schools will appear here as your recruiting list grows.</div>
                             @endforelse
+                        </div>
+
+                        <div class="rc-home-dots-v2">
+                            <span></span>
+                            <span></span>
+                            <span></span>
                         </div>
                     </section>
 
-                    <section class="rc-home-panel rc-interested-panel">
-                        <div class="rc-home-panel-head"><h2>Schools Most Interested</h2><span>Last 30 days</span></div>
-                        <div class="rc-interested-list">
+                    <section class="rc-home-panel-v2">
+                        <div class="rc-home-panel-head-v2">
+                            <h2>Schools Most Interested</h2>
+                            <span>Last 30 days</span>
+                        </div>
+
+                        <div class="rc-interested-list-v2">
                             @forelse(collect($dashboardTopSchools)->take(4)->values()->all() as $rank => $school)
                                 @php
                                     $schoolName = (string) ($school['name'] ?? 'School');
@@ -2949,17 +3709,37 @@
                                     $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
                                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                                 @endphp
-                                <button type="button" class="rc-interested-row" wire:click="openDashboardEngagedSchool({{ (int) $rank }})">
-                                    <span class="rc-interested-rank">{{ $rank + 1 }}</span>
-                                    <span class="rc-interested-logo">{{ strtoupper($initials ?: 'S') }}</span>
-                                    <span><strong>{{ $schoolName }}</strong><small>Profile views</small></span>
+
+                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) $rank }})">
+                                    <span class="rc-interested-rank-v2">{{ $rank + 1 }}</span>
+                                    <span class="rc-interested-logo-v2">{{ strtoupper($initials ?: 'S') }}</span>
+                                    <span>
+                                        <strong>{{ $schoolName }}</strong>
+                                        <small>Profile views</small>
+                                    </span>
                                     <b>{{ $score }}</b>
                                 </button>
                             @empty
-                                <div class="rc-home-empty">Interested schools will appear here after views, replies, or link clicks.</div>
+                                @foreach([
+                                    ['Virginia Commonwealth', 'VCU', 14],
+                                    ['University of Maryland', 'M', 9],
+                                    ['Florida State', 'FS', 7],
+                                    ['Indiana University', 'IU', 6],
+                                ] as $rank => $school)
+                                    <button type="button" class="rc-interested-row-v2">
+                                        <span class="rc-interested-rank-v2">{{ $rank + 1 }}</span>
+                                        <span class="rc-interested-logo-v2">{{ $school[1] }}</span>
+                                        <span>
+                                            <strong>{{ $school[0] }}</strong>
+                                            <small>Profile views</small>
+                                        </span>
+                                        <b>{{ $school[2] }}</b>
+                                    </button>
+                                @endforeach
                             @endforelse
                         </div>
-                        <a class="rc-home-outline-btn" href="#">View Full Analytics</a>
+
+                        <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
                     </section>
                 </div>
             </div>
