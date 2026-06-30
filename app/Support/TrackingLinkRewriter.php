@@ -13,13 +13,16 @@ class TrackingLinkRewriter
             return $html;
         }
 
-        $rewritten = $this->rewriteAnchorHrefs($html, $context);
-
-        return $rewritten ?: $html;
+        return $this->rewriteAnchorHrefs($html, $context) ?: $html;
     }
 
     public function appendOpenPixel(string $html, array $context = []): string
     {
+        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        if ($contactId === '') {
+            return $html;
+        }
+
         $token = $this->makeToken(array_merge($context, [
             'event_type' => 'email_open',
             'platform' => 'email',
@@ -41,6 +44,11 @@ class TrackingLinkRewriter
         $destinationUrl = trim($destinationUrl);
 
         if ($destinationUrl === '' || $this->shouldSkipUrl($destinationUrl)) {
+            return $destinationUrl;
+        }
+
+        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        if ($contactId === '') {
             return $destinationUrl;
         }
 
@@ -85,19 +93,15 @@ class TrackingLinkRewriter
 
     protected function rewriteAnchorHrefs(string $html, array $context): string
     {
-        $callback = function (array $matches) use ($context): string {
-            $prefix = $matches[1];
+        return preg_replace_callback('/(<a\b[^>]*?\bhref=["\'])([^"\']+)(["\'][^>]*>)/i', function (array $matches) use ($context): string {
             $url = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $suffix = $matches[3];
 
             if ($this->shouldSkipUrl($url)) {
                 return $matches[0];
             }
 
-            return $prefix . e($this->trackedUrl($url, $context)) . $suffix;
-        };
-
-        return preg_replace_callback('/(<a\b[^>]*?\bhref=["\'])([^"\']+)(["\'][^>]*>)/i', $callback, $html) ?: $html;
+            return $matches[1] . e($this->trackedUrl($url, $context)) . $matches[3];
+        }, $html) ?: $html;
     }
 
     protected function shouldSkipUrl(string $url): bool

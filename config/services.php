@@ -52,7 +52,7 @@ return [
     ],
 
     'tracking' => [
-        'base_url' => env('TRACKING_BASE_URL', env('APP_URL')),
+        'base_url' => env('TRACKING_BASE_URL', env('APP_URL', 'https://plyrcard.com')),
     ],
 
 

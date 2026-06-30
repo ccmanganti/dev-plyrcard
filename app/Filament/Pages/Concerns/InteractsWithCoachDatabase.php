@@ -863,6 +863,23 @@ trait InteractsWithCoachDatabase
     }
 
 
+    protected function recruitingDashboardActivityCacheKey($user): string
+    {
+        return 'coach-database:dashboard-activity:' . ($user?->id ?? 'guest') . ':' . md5((string) ($user?->ghl_location_id ?? '') . '|' . substr((string) ($user?->ghl_api_key ?? ''), -12));
+    }
+
+    protected function persistDashboardStatsAfterTracking($user): void
+    {
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $snapshot['stats'] = array_merge($snapshot['stats'] ?? [], $this->stats ?? []);
+        $snapshot['cached_at'] = now()->toDateTimeString();
+        $this->storeSnapshot($snapshot);
+
+        if ($user) {
+            Cache::forget($this->recruitingDashboardActivityCacheKey($user));
+        }
+    }
+
     public function loadDashboardActivity(): void
     {
         if (! $this->allowed || $this->locked) {
@@ -874,10 +891,12 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        $cacheKey = 'coach-database:dashboard-activity:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? '') . '|' . substr((string) ($user->ghl_api_key ?? ''), -12));
-        $summary = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user): array {
-            return app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
-        });
+        // Dashboard tracking numbers come from live contact custom fields.
+        // Do not keep the old 10-minute cached summary here, otherwise GHL can be
+        // updated while the dashboard still shows stale zero values.
+        $cacheKey = $this->recruitingDashboardActivityCacheKey($user);
+        Cache::forget($cacheKey);
+        $summary = app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
 
         if (! is_array($summary)) {
             return;
@@ -909,16 +928,6 @@ trait InteractsWithCoachDatabase
             $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
         } catch (\Throwable $exception) {
             // Keep email sending successful even if the dashboard counter cannot be updated immediately.
-        }
-
-        try {
-            app(GoHighLevelService::class)->incrementTrackingEmailSentForUser(Auth::user(), $contactId, [
-                'source' => 'coach_database_email',
-                'subject' => $subject,
-                'host' => request()->getHost(),
-            ]);
-        } catch (\Throwable $exception) {
-            // Do not fail the email if the tracking counter cannot sync immediately.
         }
 
         $this->emailSubject = '';
@@ -1000,6 +1009,11 @@ trait InteractsWithCoachDatabase
 
     public function sendEmail(): void
     {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
         $subject = trim($this->emailSubject);
         $body = trim($this->emailBody);
         $plainBody = trim(strip_tags($body));
@@ -1020,17 +1034,35 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        $contactId = trim((string) $contactId);
         $trackingContext = [
-            'athlete_id' => Auth::id(),
+            'athlete_id' => $user->id,
             'contact_id' => $contactId,
             'ghl_contact_id' => $contactId,
-            'source' => 'coach_database_email',
             'email_subject' => $subject,
+            'source' => 'coach_database_email',
         ];
 
-        $body = app(TrackingLinkRewriter::class)->rewriteHtml($body, $trackingContext);
-        $body = app(TrackingLinkRewriter::class)->appendOpenPixel($body, $trackingContext);
-        $plainBody = trim(strip_tags($body));
+        try {
+            app(GoHighLevelService::class)->ensureRecruitingTrackingFieldsForUser($user);
+        } catch (\Throwable $exception) {
+            \Log::warning('Recruiting tracking field preparation failed before email send.', [
+                'contact_id' => $contactId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        $trackedBody = $body;
+        try {
+            $rewriter = app(TrackingLinkRewriter::class);
+            $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
+            $trackedBody = $rewriter->appendOpenPixel($trackedBody, $trackingContext);
+        } catch (\Throwable $exception) {
+            \Log::warning('Recruiting email link rewrite failed. Sending original body.', [
+                'contact_id' => $contactId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         $payload = [
             'contact_id' => $contactId,
@@ -1038,21 +1070,45 @@ trait InteractsWithCoachDatabase
             'conversation_id' => $this->selectedConversationId,
             'conversationId' => $this->selectedConversationId,
             'subject' => $subject,
-            'body' => $body,
-            'html' => $body,
-            'text' => $plainBody,
-            'fromName' => (string) (Auth::user()->name ?? 'PLYRCard'),
+            'body' => $trackedBody,
+            'html' => $trackedBody,
+            'text' => trim(strip_tags($trackedBody)),
+            'fromName' => (string) ($user->name ?? 'PLYRCard'),
             'to' => $to,
             'emailTo' => $to,
         ];
 
         $this->isSendingEmail = true;
-        $result = app(CoachDatabaseService::class)->sendEmailMessageForUser(Auth::user(), $payload);
+        $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
         $this->isSendingEmail = false;
 
         if (! ($result['success'] ?? false)) {
             Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to send email.')->danger()->send();
             return;
+        }
+
+        try {
+            $trackResult = app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
+                'source' => 'coach_database_email',
+                'subject' => $subject,
+                'to' => $to,
+                'host' => request()?->getHost(),
+            ]);
+
+            \Log::info('Recruiting email sent tracking result.', [
+                'contact_id' => $contactId,
+                'tracked' => (bool) ($trackResult['success'] ?? false),
+                'result' => $trackResult,
+            ]);
+
+            $this->stats['email_sent_count'] = (int) ($this->stats['email_sent_count'] ?? 0) + 1;
+            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
+            $this->persistDashboardStatsAfterTracking($user);
+        } catch (\Throwable $exception) {
+            \Log::warning('Recruiting email sent tracking failed.', [
+                'contact_id' => $contactId,
+                'error' => $exception->getMessage(),
+            ]);
         }
 
         $this->emailSubject = '';
@@ -1064,6 +1120,8 @@ trait InteractsWithCoachDatabase
             $this->messageLastId = null;
             $this->loadConversationMessages();
         }
+
+        $this->loadDashboardActivity();
 
         Notification::make()->title('Recruiting Center')->body('Email sent.')->success()->send();
     }
@@ -1548,6 +1606,14 @@ HTML;
             return;
         }
 
+        try {
+            app(GoHighLevelService::class)->ensureRecruitingTrackingFieldsForUser($user);
+        } catch (\Throwable $exception) {
+            \Log::warning('Recruiting tracking field preparation failed before campaign send.', [
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
         $this->isSendingCampaign = true;
         $this->resolveComposeGraphicUpload();
         $html = $this->buildComposeHtml($bodyText);
@@ -1555,16 +1621,37 @@ HTML;
         $failed = 0;
 
         foreach ($recipients as $coach) {
+            $contactId = trim((string) ($coach['id'] ?? ''));
             $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
             $personalizedBody = $this->replaceCampaignTokens($html, $coach);
 
+            $trackingContext = [
+                'athlete_id' => $user->id,
+                'contact_id' => $contactId,
+                'ghl_contact_id' => $contactId,
+                'email_subject' => $personalizedSubject,
+                'source' => 'coach_database_campaign_email',
+            ];
+
+            $trackedBody = $personalizedBody;
+            try {
+                $rewriter = app(TrackingLinkRewriter::class);
+                $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
+                $trackedBody = $rewriter->appendOpenPixel($trackedBody, $trackingContext);
+            } catch (\Throwable $exception) {
+                \Log::warning('Recruiting campaign link rewrite failed. Sending original body.', [
+                    'contact_id' => $contactId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
             $payload = [
-                'contact_id' => (string) ($coach['id'] ?? ''),
-                'contactId' => (string) ($coach['id'] ?? ''),
+                'contact_id' => $contactId,
+                'contactId' => $contactId,
                 'subject' => $personalizedSubject,
-                'body' => $personalizedBody,
-                'html' => $personalizedBody,
-                'text' => trim(strip_tags($personalizedBody)),
+                'body' => $trackedBody,
+                'html' => $trackedBody,
+                'text' => trim(strip_tags($trackedBody)),
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
@@ -1573,12 +1660,33 @@ HTML;
             $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
             if ($result['success'] ?? false) {
                 $sent++;
+
+                try {
+                    app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
+                        'source' => 'coach_database_campaign_email',
+                        'subject' => $personalizedSubject,
+                        'to' => (string) ($coach['email'] ?? ''),
+                        'host' => request()?->getHost(),
+                    ]);
+                } catch (\Throwable $exception) {
+                    \Log::warning('Recruiting campaign sent tracking failed.', [
+                        'contact_id' => $contactId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             } else {
                 $failed++;
             }
         }
 
         $this->isSendingCampaign = false;
+
+        if ($sent > 0) {
+            $this->stats['email_sent_count'] = (int) ($this->stats['email_sent_count'] ?? 0) + $sent;
+            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + $sent;
+            $this->persistDashboardStatsAfterTracking($user);
+            $this->loadDashboardActivity();
+        }
 
         $message = 'Sent to ' . number_format($sent) . ' coach' . ($sent === 1 ? '' : 'es') . ($failed ? '. Failed: ' . number_format($failed) . '.' : '.');
         $notification = Notification::make()->title('Compose Email')->body($message);
@@ -2730,8 +2838,30 @@ HTML;
     {
         $stats = $this->stats ?? [];
         $schools = collect($this->allSchools());
+
         $savedSchools = (int) (($stats['saved_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->count()) ?: 0);
         $favoriteSchools = (int) (($stats['favorite_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count()) ?: 0);
+
+        $trackedWebsiteViews = (int) ($stats['view_profile_website'] ?? $stats['website_clicks'] ?? 0);
+        $trackedInstagramViews = (int) ($stats['view_profile_instagram'] ?? $stats['instagram_clicks'] ?? 0);
+        $trackedYoutubeViews = (int) ($stats['view_profile_youtube'] ?? $stats['youtube_clicks'] ?? 0);
+        $trackedXViews = (int) ($stats['view_profile_x'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0);
+        $trackedEmailProfileLinks = (int) ($stats['view_profile_email_link'] ?? 0);
+
+        $trackedProfileTotal = (int) ($stats['view_profile_total'] ?? 0);
+        if ($trackedProfileTotal === 0) {
+            $trackedProfileTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks;
+        }
+
+        $emailSentCount = (int) ($stats['email_sent_count'] ?? $stats['emails_sent'] ?? 0);
+        if ($emailSentCount === 0) {
+            $emailSentCount = (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0);
+        }
+
+        $emailOpenCount = (int) ($stats['email_open_count'] ?? $stats['email_opens'] ?? 0);
+        $emailClickCount = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? $stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0);
+        $linkClicks = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks + $emailClickCount;
+
         $engagedSchools = (int) (($stats['engaged_schools'] ?? $schools->filter(function (array $school): bool {
             return ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) > 0)
                 || ((int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0) > 0)
@@ -2739,19 +2869,21 @@ HTML;
                 || ((int) ($school['engagement_score'] ?? 0) > 0);
         })->count()) ?: 0);
 
-        $emailsSent = (int) (($stats['emails_sent'] ?? 0) ?: 0);
-        if ($emailsSent === 0) {
-            $emailsSent = (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0);
-        }
-
-        $linkClicks = (int) (($stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0) ?: 0);
-
         return [
             'saved_schools' => $savedSchools,
             'favorite_schools' => $favoriteSchools,
             'engaged_schools' => $engagedSchools,
-            'emails_sent' => $emailsSent,
-            'profile_views' => (int) (($stats['profile_views'] ?? 0) ?: 0),
+            'emails_sent' => $emailSentCount,
+            'email_sent_count' => $emailSentCount,
+            'email_open_count' => $emailOpenCount,
+            'email_click_count' => $emailClickCount,
+            'profile_views' => $trackedProfileTotal,
+            'view_profile_total' => $trackedProfileTotal,
+            'view_profile_website' => $trackedWebsiteViews,
+            'view_profile_instagram' => $trackedInstagramViews,
+            'view_profile_youtube' => $trackedYoutubeViews,
+            'view_profile_x' => $trackedXViews,
+            'view_profile_email_link' => $trackedEmailProfileLinks,
             'link_clicks' => $linkClicks,
             'trigger_link_clicks' => $linkClicks,
             'email_open_rate' => (int) (($stats['email_open_rate'] ?? 0) ?: 0),

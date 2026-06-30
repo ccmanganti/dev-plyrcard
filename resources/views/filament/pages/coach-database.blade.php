@@ -3617,7 +3617,7 @@
         };
 
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
-        $formattedTagSyncedAt = $formatRecruitingTimestamp($tagSyncedAt ?? null);
+        $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
     @endphp
 
     <div
@@ -3640,7 +3640,7 @@
                     </button>
                 @endif
                 @if($formattedCachedAt)<span class="rc-pill">Updated {{ $formattedCachedAt }}</span>@endif
-                @if($formattedTagSyncedAt && in_array($section, ['favorites', 'lists'], true))<span class="rc-pill">Tags synced {{ $formattedTagSyncedAt }}</span>@endif
+                @if($formattedTagUpdatedAt && in_array($section, ['favorites', 'lists'], true))<span class="rc-pill">Tags synced {{ $formattedTagUpdatedAt }}</span>@endif
             </div>
         </div>
 
@@ -3668,21 +3668,18 @@
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
                 $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? $savedSchools);
 
-                // GHL tracking custom-field metrics. These keys are produced by the updated
-                // GoHighLevelService / CoachDatabaseService tracking flow.
                 $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $trackedYoutubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
                 $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $trackedProfileTotal = (int) ($dashboardMetrics['view_profile_total'] ?? 0);
-                $profileViews = $trackedProfileTotal > 0
-                    ? $trackedProfileTotal
-                    : max(0, (int) ($dashboardMetrics['profile_views'] ?? 0));
+                $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
+                $trackedProfileTotal = $trackedProfileComponentTotal;
+                $profileViews = $trackedProfileTotal;
 
                 $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
-                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? 0);
-                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? 0);
+                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
+                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailsSent = $emailSentCount;
 
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
@@ -3711,7 +3708,7 @@
                     [
                         'label' => 'Profile Views',
                         'value' => number_format($profileViews),
-                        'sub' => 'GHL view_profile_total',
+                        'sub' => 'Tracked profile activity',
                         'icon' => 'eye',
                         'tone' => 'blue',
                         'target' => 'profile-views',
@@ -3727,7 +3724,7 @@
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
-                        'sub' => 'Tracked GHL opens, clicks, replies',
+                        'sub' => 'Tracked opens, clicks, replies',
                         'icon' => 'mail',
                         'tone' => 'green',
                         'target' => 'coach-engagement',
@@ -3735,7 +3732,7 @@
                     [
                         'label' => 'Emails Sent',
                         'value' => number_format($emailsSent),
-                        'sub' => 'GHL email_sent_count',
+                        'sub' => 'Tracked emails sent',
                         'icon' => 'chart',
                         'tone' => 'indigo',
                         'target' => 'emails-sent',
@@ -4047,20 +4044,20 @@
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $profileViewsTotal = (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0);
                 $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
                 $xViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $emailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+                $profileViewsTotal = $websiteViews + $instagramViews + $youtubeViews + $xViews + $emailLinkViews;
                 $profilePrograms = max(0, (int) ($dashboardMetrics['engaged_schools'] ?? $dashboardTopSchools->count()));
 
                 $profileBreakdownRows = collect([
-                    ['title' => 'Website profile link', 'copy' => 'GHL custom field: view_profile_website', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Synced'],
-                    ['title' => 'Instagram profile link', 'copy' => 'GHL custom field: view_profile_instagram', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Synced'],
-                    ['title' => 'YouTube highlight link', 'copy' => 'GHL custom field: view_profile_youtube', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Synced'],
-                    ['title' => 'X profile link', 'copy' => 'GHL custom field: view_profile_x', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Synced'],
-                    ['title' => 'Email profile link', 'copy' => 'GHL custom field: view_profile_email_link', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Synced'],
+                    ['title' => 'Website profile link', 'copy' => 'Website profile clicks', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Updated'],
+                    ['title' => 'Instagram profile link', 'copy' => 'Instagram profile clicks', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Updated'],
+                    ['title' => 'YouTube highlight link', 'copy' => 'YouTube profile clicks', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Updated'],
+                    ['title' => 'X profile link', 'copy' => 'X profile clicks', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Updated'],
+                    ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
                 ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
 
                 $activityProfileRows = $dashboardRecentActivity
@@ -4074,7 +4071,7 @@
 
                         return [
                             'title' => $title,
-                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked GHL profile activity'))) ?: 'Tracked GHL profile activity',
+                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity',
                             'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
                             'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
                             'logo' => $activity['logo'] ?? null,
@@ -4092,7 +4089,7 @@
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Profile Views</h1>
-                        <p>GHL-backed profile views from tracked website, Instagram, YouTube, X, and email links.</p>
+                        <p>Tracked profile views from website, Instagram, YouTube, X, and email links.</p>
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -4101,13 +4098,13 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>GHL field: view_profile_total</em></div></div>
+                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Tracked total</em></div></div>
                     <div class="rc-detail-stat-v2 is-coral"><span>⌁</span><div><small>Website + Email</small><strong>{{ number_format($websiteViews + $emailLinkViews) }}</strong><em>Website profile and email links</em></div></div>
                     <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Social Clicks</small><strong>{{ number_format($instagramViews + $youtubeViews + $xViews) }}</strong><em>Instagram, YouTube, and X</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>GHL Profile View Breakdown</h2><span>● Synced from GHL</span></header>
+                    <header><h2>Profile View Breakdown</h2><span>● Updated</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
                             <button type="button" class="rc-detail-row-v2">
@@ -4126,7 +4123,7 @@
                                 <span class="rc-detail-chevron-v2">›</span>
                             </button>
                         @empty
-                            <div class="rc-home-empty-v2">Profile view activity will appear here after coaches click tracked GHL links.</div>
+                            <div class="rc-home-empty-v2">Profile view activity will appear here after coaches click tracked links.</div>
                         @endforelse
                     </div>
                 </section>
@@ -4143,19 +4140,19 @@
                 $igClicks = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $ytClicks = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
                 $emailLinkClicks = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? 0);
-                $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? 0);
+                $emailClicks = (int) ($dashboardMetrics['Click count'] ?? 0);
+                $emailOpens = (int) ($dashboardMetrics['Open count'] ?? 0);
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
 
                 $coachEngagementRows = collect([
-                    ['title' => 'Website profile clicks', 'copy' => 'GHL custom field: view_profile_website', 'platform' => 'Website', 'platform_class' => 'is-blue', 'platform_icon' => '⌁', 'clicks' => $websiteClicks, 'time_label' => 'Synced'],
-                    ['title' => 'Instagram clicks', 'copy' => 'GHL custom field: view_profile_instagram', 'platform' => 'Instagram', 'platform_class' => 'is-pink', 'platform_icon' => '◎', 'clicks' => $igClicks, 'time_label' => 'Synced'],
-                    ['title' => 'YouTube clicks', 'copy' => 'GHL custom field: view_profile_youtube', 'platform' => 'YouTube', 'platform_class' => 'is-red', 'platform_icon' => '▶', 'clicks' => $ytClicks, 'time_label' => 'Synced'],
-                    ['title' => 'X clicks', 'copy' => 'GHL custom field: view_profile_x', 'platform' => 'X', 'platform_class' => 'is-neutral', 'platform_icon' => '𝕏', 'clicks' => $xClicks, 'time_label' => 'Synced'],
-                    ['title' => 'Email profile-link clicks', 'copy' => 'GHL custom field: view_profile_email_link', 'platform' => 'Email Link', 'platform_class' => 'is-coral', 'platform_icon' => '✉', 'clicks' => $emailLinkClicks, 'time_label' => 'Synced'],
-                    ['title' => 'Email clicks', 'copy' => 'GHL custom field: email_click_count', 'platform' => 'Email Click', 'platform_class' => 'is-coral', 'platform_icon' => '↗', 'clicks' => $emailClicks, 'time_label' => 'Synced'],
-                    ['title' => 'Email opens', 'copy' => 'GHL custom field: email_open_count', 'platform' => 'Email Open', 'platform_class' => 'is-green', 'platform_icon' => '◉', 'clicks' => $emailOpens, 'time_label' => 'Synced'],
-                    ['title' => 'Coach replies', 'copy' => 'GHL conversation replies / existing coach reply metric', 'platform' => 'Reply', 'platform_class' => 'is-purple', 'platform_icon' => '↩', 'clicks' => $coachReplies, 'time_label' => 'Synced'],
+                    ['title' => 'Website profile clicks', 'copy' => 'Website profile clicks', 'platform' => 'Website', 'platform_class' => 'is-blue', 'platform_icon' => '⌁', 'clicks' => $websiteClicks, 'time_label' => 'Updated'],
+                    ['title' => 'Instagram clicks', 'copy' => 'Instagram profile clicks', 'platform' => 'Instagram', 'platform_class' => 'is-pink', 'platform_icon' => '◎', 'clicks' => $igClicks, 'time_label' => 'Updated'],
+                    ['title' => 'YouTube clicks', 'copy' => 'YouTube profile clicks', 'platform' => 'YouTube', 'platform_class' => 'is-red', 'platform_icon' => '▶', 'clicks' => $ytClicks, 'time_label' => 'Updated'],
+                    ['title' => 'X clicks', 'copy' => 'X profile clicks', 'platform' => 'X', 'platform_class' => 'is-neutral', 'platform_icon' => '𝕏', 'clicks' => $xClicks, 'time_label' => 'Updated'],
+                    ['title' => 'Email profile-link clicks', 'copy' => 'Profile links clicked from email', 'platform' => 'Email Link', 'platform_class' => 'is-coral', 'platform_icon' => '✉', 'clicks' => $emailLinkClicks, 'time_label' => 'Updated'],
+                    ['title' => 'Email clicks', 'copy' => 'Email links clicked', 'platform' => 'Email Click', 'platform_class' => 'is-coral', 'platform_icon' => '↗', 'clicks' => $emailClicks, 'time_label' => 'Updated'],
+                    ['title' => 'Email opens', 'copy' => 'Emails opened', 'platform' => 'Email Open', 'platform_class' => 'is-green', 'platform_icon' => '◉', 'clicks' => $emailOpens, 'time_label' => 'Updated'],
+                    ['title' => 'Coach replies', 'copy' => 'Coach replies and responses', 'platform' => 'Reply', 'platform_class' => 'is-purple', 'platform_icon' => '↩', 'clicks' => $coachReplies, 'time_label' => 'Updated'],
                 ])->filter(fn (array $row): bool => (int) ($row['clicks'] ?? 0) > 0)->values();
 
                 if ($coachEngagementRows->isEmpty()) {
@@ -4168,7 +4165,7 @@
 
                         return [
                             'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
-                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'GHL activity'))) ?: 'GHL activity',
+                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked activity'))) ?: 'Tracked activity',
                             'platform' => $platform,
                             'platform_class' => $platformClass,
                             'platform_icon' => $platformIcon,
@@ -4183,7 +4180,7 @@
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Coach Engagement</h1>
-                        <p>GHL-backed tracking for social clicks, email opens, email clicks, and replies.</p>
+                        <p>Tracking for social clicks, email opens, email clicks, and replies.</p>
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -4192,13 +4189,13 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X</small><strong>{{ number_format($xClicks) }}</strong><em>view_profile_x</em></div></div>
-                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>view_profile_instagram</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>view_profile_youtube</em></div></div>
+                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X</small><strong>{{ number_format($xClicks) }}</strong><em>X clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>Instagram clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>YouTube clicks</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>GHL Engagement Breakdown</h2><span>● Synced from GHL</span></header>
+                    <header><h2>Engagement Breakdown</h2><span>● Updated</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
                             <button type="button" class="rc-detail-row-v2">
@@ -4223,8 +4220,8 @@
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
                 $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
-                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? 0);
-                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? 0);
+                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
+                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
 
                 $emailRows = $dashboardRecentActivity
@@ -4237,7 +4234,7 @@
                         return [
                             'rank' => $index + 1,
                             'title' => (string) ($row['title'] ?? 'Email activity'),
-                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked GHL email event'))) ?: 'Tracked GHL email event',
+                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked email event'))) ?: 'Tracked email event',
                             'type' => (string) ($row['type'] ?? 'Email'),
                             'count' => (int) ($row['count'] ?? $row['clicks'] ?? 1),
                             'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
@@ -4246,10 +4243,10 @@
 
                 if ($emailRows->isEmpty()) {
                     $emailRows = collect([
-                        ['rank' => 1, 'title' => 'Emails sent', 'copy' => 'GHL custom field: email_sent_count', 'type' => 'Sent', 'count' => $emailSentCount, 'time_label' => 'Synced'],
-                        ['rank' => 2, 'title' => 'Emails opened', 'copy' => 'GHL custom field: email_open_count', 'type' => 'Open', 'count' => $emailOpenCount, 'time_label' => 'Synced'],
-                        ['rank' => 3, 'title' => 'Email links clicked', 'copy' => 'GHL custom field: email_click_count', 'type' => 'Click', 'count' => $emailClickCount, 'time_label' => 'Synced'],
-                        ['rank' => 4, 'title' => 'Email profile links clicked', 'copy' => 'GHL custom field: view_profile_email_link', 'type' => 'Profile Link', 'count' => $emailProfileLinkCount, 'time_label' => 'Synced'],
+                        ['rank' => 1, 'title' => 'Emails sent', 'copy' => 'Emails sent from the recruiting center', 'type' => 'Sent', 'count' => $emailSentCount, 'time_label' => 'Updated'],
+                        ['rank' => 2, 'title' => 'Emails opened', 'copy' => 'Emails opened', 'type' => 'Open', 'count' => $emailOpenCount, 'time_label' => 'Updated'],
+                        ['rank' => 3, 'title' => 'Email links clicked', 'copy' => 'Email links clicked', 'type' => 'Click', 'count' => $emailClickCount, 'time_label' => 'Updated'],
+                        ['rank' => 4, 'title' => 'Email profile links clicked', 'copy' => 'Profile links clicked from email', 'type' => 'Profile Link', 'count' => $emailProfileLinkCount, 'time_label' => 'Updated'],
                     ])->filter(fn (array $row): bool => (int) ($row['count'] ?? 0) > 0)->values()->map(function ($row, $index) {
                         $row['rank'] = $index + 1;
                         return $row;
@@ -4261,7 +4258,7 @@
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Emails Sent</h1>
-                        <p>GHL-backed email sending, open, and click tracking from Coach Database emails.</p>
+                        <p>Email sending, opens, and link clicks from recruiting emails.</p>
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -4270,13 +4267,13 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-coral"><span>✉</span><div><small>Sent</small><strong>{{ number_format($emailSentCount) }}</strong><em>email_sent_count</em></div></div>
-                    <div class="rc-detail-stat-v2 is-blue"><span>◉</span><div><small>Opened</small><strong>{{ number_format($emailOpenCount) }}</strong><em>email_open_count</em></div></div>
-                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>Clicked</small><strong>{{ number_format($emailClickCount) }}</strong><em>email_click_count</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span>✉</span><div><small>Sent</small><strong>{{ number_format($emailSentCount) }}</strong><em>Sent email count</em></div></div>
+                    <div class="rc-detail-stat-v2 is-blue"><span>◉</span><div><small>Opened</small><strong>{{ number_format($emailOpenCount) }}</strong><em>Open count</em></div></div>
+                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>Clicked</small><strong>{{ number_format($emailClickCount) }}</strong><em>Click count</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>GHL Email Tracking</h2><span>● Synced from GHL</span></header>
+                    <header><h2>Email Tracking</h2><span>● Updated</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($emailRows as $emailRow)
                             <button type="button" class="rc-detail-row-v2">
@@ -4289,7 +4286,7 @@
                                 <span class="rc-detail-chevron-v2">›</span>
                             </button>
                         @empty
-                            <div class="rc-home-empty-v2">Email tracking will appear here after Coach Database emails are sent and opened/clicked.</div>
+                            <div class="rc-home-empty-v2">Email activity will appear here after recruiting emails are sent and opened/clicked.</div>
                         @endforelse
                     </div>
                 </section>
