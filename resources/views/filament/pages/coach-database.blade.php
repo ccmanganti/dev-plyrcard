@@ -3301,6 +3301,8 @@
         }
 
         @media (max-width: 760px) {
+            .rc-home-welcome-copy-v2 h1,
+            .rc-home-welcome-copy-v2 p { white-space: normal !important; }
             .rc-home-header-v2 { display: grid; }
             .rc-home-actions-v2 { justify-content: stretch; }
             .rc-home-search-v2 { width: 100%; }
@@ -3312,8 +3314,25 @@
 
         /* Dashboard functional-card + detail page fixes */
         .rc-home-header-v2 {
-            grid-template-columns: minmax(26rem, 1fr) minmax(34rem, auto) !important;
+            display: grid !important;
+            grid-template-columns: minmax(34rem, 1fr) minmax(34rem, auto) !important;
             align-items: start !important;
+            column-gap: 1rem !important;
+        }
+
+        .rc-home-welcome-copy-v2 {
+            min-width: 0 !important;
+            max-width: none !important;
+        }
+
+        .rc-home-welcome-copy-v2 h1,
+        .rc-home-welcome-copy-v2 p {
+            white-space: nowrap !important;
+            max-width: none !important;
+        }
+
+        .rc-home-welcome-copy-v2 p {
+            overflow: visible !important;
         }
 
         .rc-home-actions-v2 {
@@ -3618,6 +3637,24 @@
 
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
         $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
+
+        $formatActivityTimeLabel = function ($time): string {
+            if (! $time) {
+                return 'Recent';
+            }
+
+            try {
+                $timeValue = \Illuminate\Support\Carbon::parse($time);
+
+                if ($timeValue->lessThan(now()->subYears(3)) || $timeValue->greaterThan(now()->addDay())) {
+                    return 'Recent';
+                }
+
+                return $timeValue->diffForHumans();
+            } catch (\Throwable $exception) {
+                return 'Recent';
+            }
+        };
     @endphp
 
     <div
@@ -3754,7 +3791,25 @@
                     $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
                 }
 
-                $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) {
+                $formatActivityTimeLabel = function ($time): string {
+                    if (! $time) {
+                        return 'Recent';
+                    }
+
+                    try {
+                        $timeValue = \Illuminate\Support\Carbon::parse($time);
+
+                        if ($timeValue->lessThan(now()->subYears(3)) || $timeValue->greaterThan(now()->addDay())) {
+                            return 'Recent';
+                        }
+
+                        return $timeValue->diffForHumans();
+                    } catch (\Throwable $exception) {
+                        return 'Recent';
+                    }
+                };
+
+                $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) use ($formatActivityTimeLabel) {
                     $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
                     $tone = 'blue';
                     $icon = '◉';
@@ -3774,6 +3829,18 @@
                     }
 
                     $time = $activity['time'] ?? null;
+                    $timeLabel = 'Recent';
+
+                    if ($time) {
+                        try {
+                            $timeValue = \Illuminate\Support\Carbon::parse($time);
+                            $timeLabel = $timeValue->lessThan(now()->subYears(3))
+                                ? 'Recent'
+                                : $timeValue->diffForHumans();
+                        } catch (\Throwable $exception) {
+                            $timeLabel = 'Recent';
+                        }
+                    }
 
                     return [
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
@@ -3781,19 +3848,9 @@
                         'url' => $activity['url'] ?? '#',
                         'tone' => $tone,
                         'icon' => $icon,
-                        'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                        'time_label' => $timeLabel,
                     ];
                 })->values();
-
-                if ($dashboardActivityRows->isEmpty()) {
-                    $dashboardActivityRows = collect([
-                        ['title' => 'Coach Sarah Mitchell viewed your profile', 'copy' => 'Virginia Commonwealth University', 'time_label' => '2h ago', 'tone' => 'blue', 'icon' => '◉', 'url' => '#'],
-                        ['title' => 'Email opened by Coach James Carter', 'copy' => 'University of South Carolina', 'time_label' => '1d ago', 'tone' => 'coral', 'icon' => '✉', 'url' => '#'],
-                        ['title' => 'Added to favorites', 'copy' => 'James Madison University', 'time_label' => '2d ago', 'tone' => 'gold', 'icon' => '☆', 'url' => '#'],
-                        ['title' => 'New reply from Coach Mike Brown', 'copy' => 'Clemson University', 'time_label' => '3d ago', 'tone' => 'green', 'icon' => '↩', 'url' => '#'],
-                        ['title' => 'Added to smart list', 'copy' => 'ACC Schools', 'time_label' => '4d ago', 'tone' => 'purple', 'icon' => '⊞', 'url' => '#'],
-                    ]);
-                }
 
 
                 $radarSchoolRows = collect($radarSchools)->map(function ($school) {
@@ -3846,7 +3903,7 @@
 
             <div class="rc-home-dashboard-v2">
                 <div class="rc-home-header-v2">
-                    <div>
+                    <div class="rc-home-welcome-copy-v2">
                         <h1>Welcome back, {{ $firstName ?: 'Alex' }} <span aria-hidden="true">👋</span></h1>
                         <p>Here's what's happening with your recruiting journey.</p>
                     </div>
@@ -4064,7 +4121,7 @@
                     ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
                     ->take(8)
                     ->values()
-                    ->map(function ($activity, $index) {
+                    ->map(function ($activity, $index) use ($formatActivityTimeLabel) {
                         $title = (string) ($activity['title'] ?? 'Coach viewed profile');
                         $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                         $time = $activity['time'] ?? null;
@@ -4076,7 +4133,7 @@
                             'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
                             'logo' => $activity['logo'] ?? null,
                             'initials' => strtoupper($initials ?: 'PV'),
-                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                            'time_label' => $formatActivityTimeLabel($time),
                         ];
                     });
 
@@ -4156,7 +4213,7 @@
                 ])->filter(fn (array $row): bool => (int) ($row['clicks'] ?? 0) > 0)->values();
 
                 if ($coachEngagementRows->isEmpty()) {
-                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) {
+                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) use ($formatActivityTimeLabel) {
                         $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
                         $platformLower = strtolower($platform);
                         $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : 'is-neutral');
@@ -4170,7 +4227,7 @@
                             'platform_class' => $platformClass,
                             'platform_icon' => $platformIcon,
                             'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
-                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                            'time_label' => $formatActivityTimeLabel($time),
                         ];
                     })->values();
                 }
@@ -4228,7 +4285,7 @@
                     ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'email'))
                     ->take(12)
                     ->values()
-                    ->map(function ($row, $index) {
+                    ->map(function ($row, $index) use ($formatActivityTimeLabel) {
                         $time = $row['time'] ?? null;
 
                         return [
@@ -4237,7 +4294,7 @@
                             'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked email event'))) ?: 'Tracked email event',
                             'type' => (string) ($row['type'] ?? 'Email'),
                             'count' => (int) ($row['count'] ?? $row['clicks'] ?? 1),
-                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                            'time_label' => $formatActivityTimeLabel($time),
                         ];
                     });
 

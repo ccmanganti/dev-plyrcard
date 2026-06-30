@@ -870,14 +870,7 @@ trait InteractsWithCoachDatabase
 
     protected function persistDashboardStatsAfterTracking($user): void
     {
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $snapshot['stats'] = array_merge($snapshot['stats'] ?? [], $this->stats ?? []);
-        $snapshot['cached_at'] = now()->toDateTimeString();
-        $this->storeSnapshot($snapshot);
-
-        if ($user) {
-            Cache::forget($this->recruitingDashboardActivityCacheKey($user));
-        }
+        $this->persistDashboardStatsAndActivity($user);
     }
 
     public function loadDashboardActivity(): void
@@ -891,20 +884,27 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Dashboard tracking numbers come from live contact custom fields.
-        // Do not keep the old 10-minute cached summary here, otherwise GHL can be
-        // updated while the dashboard still shows stale zero values.
-        $cacheKey = $this->recruitingDashboardActivityCacheKey($user);
-        Cache::forget($cacheKey);
-        $summary = app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
+        // Always fetch current tracking values for the dashboard.
+        // The tracking counters are stored remotely and can change immediately after a send/click,
+        // so a cached dashboard summary causes the UI to flash the right value and then fall back.
+        try {
+            Cache::forget($this->recruitingDashboardActivityCacheKey($user));
+            $summary = app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
+        } catch (\Throwable $exception) {
+            \Log::warning('Recruiting dashboard activity refresh failed.', [
+                'user_id' => $user->id ?? null,
+                'error' => $exception->getMessage(),
+            ]);
+            $summary = [];
+        }
 
-        if (! is_array($summary)) {
+        if (! is_array($summary) || empty($summary)) {
             return;
         }
 
         $remoteStats = $summary['stats'] ?? [];
         if (is_array($remoteStats)) {
-            $this->stats = array_merge($this->stats, array_filter($remoteStats, fn ($value) => $value !== null));
+            $this->stats = $this->mergeDashboardTrackingStats($this->stats ?? [], $remoteStats);
         }
 
         $recent = $summary['recent_activity'] ?? [];
@@ -913,6 +913,66 @@ trait InteractsWithCoachDatabase
 
         if (empty($this->conversations) && ! empty($summary['conversations']) && is_array($summary['conversations'])) {
             $this->conversations = array_values($summary['conversations']);
+        }
+
+        $this->persistDashboardStatsAndActivity($user);
+    }
+
+    protected function mergeDashboardTrackingStats(array $baseStats, array $remoteStats): array
+    {
+        $merged = array_merge($baseStats, array_filter($remoteStats, fn ($value) => $value !== null));
+
+        foreach ($this->dashboardTrackingStatKeys() as $key) {
+            $merged[$key] = max((int) ($baseStats[$key] ?? 0), (int) ($remoteStats[$key] ?? 0), (int) ($merged[$key] ?? 0));
+        }
+
+        $profileBreakdown = (int) ($merged['view_profile_website'] ?? 0)
+            + (int) ($merged['view_profile_instagram'] ?? 0)
+            + (int) ($merged['view_profile_youtube'] ?? 0)
+            + (int) ($merged['view_profile_x'] ?? 0)
+            + (int) ($merged['view_profile_email_link'] ?? 0);
+
+        $merged['view_profile_total'] = max((int) ($merged['view_profile_total'] ?? 0), $profileBreakdown);
+        $merged['profile_views'] = max((int) ($merged['profile_views'] ?? 0), (int) ($merged['view_profile_total'] ?? 0));
+        $merged['emails_sent'] = max((int) ($merged['emails_sent'] ?? 0), (int) ($merged['email_sent_count'] ?? 0));
+        $merged['email_opens'] = max((int) ($merged['email_opens'] ?? 0), (int) ($merged['email_open_count'] ?? 0));
+        $merged['link_clicks'] = max((int) ($merged['link_clicks'] ?? 0), (int) ($merged['email_click_count'] ?? 0) + $profileBreakdown);
+        $merged['trigger_link_clicks'] = max((int) ($merged['trigger_link_clicks'] ?? 0), (int) ($merged['link_clicks'] ?? 0));
+
+        return $merged;
+    }
+
+    protected function dashboardTrackingStatKeys(): array
+    {
+        return [
+            'view_profile_total',
+            'view_profile_website',
+            'view_profile_instagram',
+            'view_profile_youtube',
+            'view_profile_x',
+            'view_profile_email_link',
+            'email_sent_count',
+            'email_open_count',
+            'email_click_count',
+            'emails_sent',
+            'email_opens',
+            'link_clicks',
+            'trigger_link_clicks',
+            'coach_replies',
+        ];
+    }
+
+    protected function persistDashboardStatsAndActivity($user = null): void
+    {
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $snapshot['stats'] = $this->mergeDashboardTrackingStats($snapshot['stats'] ?? [], $this->stats ?? []);
+        $snapshot['dashboard_recent_activity'] = $this->dashboardRecentActivity ?? [];
+        $snapshot['dashboard_activity_summary'] = $this->dashboardActivitySummary ?? [];
+        $snapshot['cached_at'] = now()->toDateTimeString();
+        $this->storeSnapshot($snapshot);
+
+        if ($user) {
+            Cache::forget($this->recruitingDashboardActivityCacheKey($user));
         }
     }
 
@@ -2813,8 +2873,16 @@ HTML;
 
     protected function rebuildAndStoreSnapshot(array $snapshot): void
     {
+        $existingStats = $this->mergeDashboardTrackingStats($snapshot['stats'] ?? [], $this->stats ?? []);
+        $existingRecentActivity = $snapshot['dashboard_recent_activity'] ?? $this->dashboardRecentActivity ?? [];
+        $existingActivitySummary = $snapshot['dashboard_activity_summary'] ?? $this->dashboardActivitySummary ?? [];
+
         $dashboard = app(CoachDatabaseService::class)->rebuildFromSchoolCompanySnapshot($snapshot['schools'] ?? [], $snapshot['coaches'] ?? [], Auth::user(), $snapshot['custom_list_tags'] ?? []);
+        $dashboard['stats'] = $this->mergeDashboardTrackingStats($dashboard['stats'] ?? [], $existingStats);
+
         $snapshot = array_merge($snapshot, $dashboard, [
+            'dashboard_recent_activity' => $existingRecentActivity,
+            'dashboard_activity_summary' => $existingActivitySummary,
             'loaded_schools_count' => count($dashboard['schools'] ?? []),
             'loaded_contacts_count' => count($dashboard['coaches'] ?? []),
             'cached_at' => now()->toDateTimeString(),
@@ -3999,6 +4067,12 @@ HTML;
         $this->lists = $snapshot['lists'] ?? [];
         $this->stats = $snapshot['stats'] ?? [];
         $this->topSchools = $snapshot['top_schools'] ?? [];
+        if (isset($snapshot['dashboard_recent_activity']) && is_array($snapshot['dashboard_recent_activity'])) {
+            $this->dashboardRecentActivity = array_values($snapshot['dashboard_recent_activity']);
+        }
+        if (isset($snapshot['dashboard_activity_summary']) && is_array($snapshot['dashboard_activity_summary'])) {
+            $this->dashboardActivitySummary = $snapshot['dashboard_activity_summary'];
+        }
         $this->nextBusinessSkip = $snapshot['next_business_skip'] ?? 0;
         $this->remoteTotalSchools = $snapshot['remote_total_schools'] ?? null;
         $this->loadedSchoolsCount = (int) ($snapshot['loaded_schools_count'] ?? count($snapshot['schools'] ?? []));

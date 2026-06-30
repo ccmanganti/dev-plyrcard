@@ -2077,6 +2077,10 @@ class GoHighLevelService
     private function transformCoachContact(array $contact): array
     {
         $customFields = collect($contact['customFields'] ?? []);
+        // Keep contact-list transforms fast. Full tracking-field maps are resolved only
+        // by dashboard/tracking methods that need them; this prevents undefined variables
+        // and avoids per-contact field API calls while loading the coach list.
+        $trackingFieldMap = [];
 
         $defaultFieldIds = [
             'school_name' => 'mVRCvtpkuGo8eCgj2EkW',
@@ -2170,15 +2174,15 @@ class GoHighLevelService
             'profile_view_count' => $this->numericCustomFieldFromContact($contact, ['profile_view_count', 'profileViews', 'profile_views', 'plyrcard_profile_views']),
             'highlight_view_count' => $this->numericCustomFieldFromContact($contact, ['highlight_view_count', 'highlightViews', 'highlight_views', 'youtube_clicks']),
             'trigger_link_click_count' => $this->numericCustomFieldFromContact($contact, ['trigger_link_click_count', 'triggerLinkClicks', 'trigger_link_clicks', 'link_clicks', 'website_clicks', 'social_clicks', 'youtube_clicks', 'instagram_clicks', 'x_clicks', 'plyrcard_link_clicks', 'stats.clicks']),
-            'view_profile_total' => $this->numericCustomFieldFromContact($contact, ['view_profile_total']),
-            'view_profile_website' => $this->numericCustomFieldFromContact($contact, ['view_profile_website']),
-            'view_profile_instagram' => $this->numericCustomFieldFromContact($contact, ['view_profile_instagram']),
-            'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube']),
-            'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x']),
-            'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link']),
-            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count']),
-            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count']),
-            'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count']),
+            'view_profile_total' => $this->numericCustomFieldFromContact($contact, ['view_profile_total'], $trackingFieldMap),
+            'view_profile_website' => $this->numericCustomFieldFromContact($contact, ['view_profile_website'], $trackingFieldMap),
+            'view_profile_instagram' => $this->numericCustomFieldFromContact($contact, ['view_profile_instagram'], $trackingFieldMap),
+            'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube'], $trackingFieldMap),
+            'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x'], $trackingFieldMap),
+            'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link'], $trackingFieldMap),
+            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
+            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
+            'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
             'coach_reply_count' => $this->numericCustomFieldFromContact($contact, ['coach_reply_count', 'replyCount', 'replies', 'email_replies', 'plyrcard_coach_replies', 'stats.replies']),
             'valid_email' => $contact['validEmail'] ?? null,
             'dnd' => $contact['dnd'] ?? false,
@@ -4193,27 +4197,32 @@ class GoHighLevelService
             return [];
         }
 
-        try {
-            $response = Http::withHeaders(['Version' => '2021-07-28'])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->get("{$this->baseUrl}/contacts/{$contactId}");
+        $cacheKey = 'recruiting-tracking-contact-detail:' . md5($locationId . '|' . $contactId);
 
-            if ($response->failed()) {
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addSeconds((int) config('ghl.coach_database.tracking_contact_cache_seconds', 45)), function () use ($contactId, $locationId, $token): array {
+            try {
+                $response = Http::withHeaders(['Version' => '2021-07-28'])
+                    ->connectTimeout((int) config('ghl.coach_database.tracking_http_connect_timeout', 3))
+                    ->timeout((int) config('ghl.coach_database.tracking_http_timeout', 6))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get("{$this->baseUrl}/contacts/{$contactId}");
+
+                if ($response->failed()) {
+                    return [];
+                }
+
+                $data = $response->json() ?? [];
+                $contact = $data['contact'] ?? $data;
+                return is_array($contact) ? $contact : [];
+            } catch (\Throwable $exception) {
+                Log::warning('Recruiting metric contact fetch skipped.', ['contact_id' => $contactId, 'error' => $exception->getMessage()]);
                 return [];
             }
-
-            $data = $response->json() ?? [];
-            $contact = $data['contact'] ?? $data;
-            return is_array($contact) ? $contact : [];
-        } catch (\Throwable $exception) {
-            Log::warning('Recruiting metric contact fetch skipped.', ['contact_id' => $contactId, 'error' => $exception->getMessage()]);
-            return [];
-        }
+        });
     }
 
-    protected function numericCustomFieldFromContact(array $contact, array $keys): int
+    protected function numericCustomFieldFromContact(array $contact, array $keys, array $trackingFieldMap = []): int
     {
         $direct = $this->firstNumericValue($contact, $keys);
         if ($direct > 0) {
@@ -4222,6 +4231,23 @@ class GoHighLevelService
 
         $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $key));
         $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
+
+        foreach ($keys as $key) {
+            $field = $trackingFieldMap[$key] ?? null;
+
+            if (! is_array($field)) {
+                continue;
+            }
+
+            foreach (['id', '_id', 'key', 'fieldKey', 'name', 'label'] as $identifierKey) {
+                $identifier = $field[$identifierKey] ?? null;
+                if (filled($identifier)) {
+                    $normalizedKeys[] = $normalize($identifier);
+                }
+            }
+        }
+
+        $normalizedKeys = collect($normalizedKeys)->filter()->unique()->values()->all();
 
         // GHL responses are not consistent. Sometimes contact custom fields come back
         // as a list of objects, sometimes as an associative object keyed by field key/id.
@@ -4273,8 +4299,211 @@ class GoHighLevelService
         return 0;
     }
 
+    protected function stringCustomFieldFromContact(array $contact, array $keys, array $trackingFieldMap = []): string
+    {
+        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $key));
+        $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
+
+        foreach ($keys as $key) {
+            $field = $trackingFieldMap[$key] ?? null;
+
+            if (! is_array($field)) {
+                continue;
+            }
+
+            foreach (['id', '_id', 'key', 'fieldKey', 'name', 'label'] as $identifierKey) {
+                $identifier = $field[$identifierKey] ?? null;
+                if (filled($identifier)) {
+                    $normalizedKeys[] = $normalize($identifier);
+                }
+            }
+        }
+
+        $normalizedKeys = collect($normalizedKeys)->filter()->unique()->values()->all();
+        $rawCustomFields = $contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? [];
+
+        if (is_array($rawCustomFields) && ! array_is_list($rawCustomFields)) {
+            foreach ($rawCustomFields as $fieldKey => $fieldValue) {
+                if (! in_array($normalize($fieldKey), $normalizedKeys, true)) {
+                    continue;
+                }
+
+                if (is_scalar($fieldValue)) {
+                    return trim((string) $fieldValue);
+                }
+
+                if (is_array($fieldValue)) {
+                    $value = $fieldValue['value'] ?? $fieldValue['field_value'] ?? $fieldValue['valueString'] ?? $fieldValue['stringValue'] ?? $fieldValue['text'] ?? null;
+                    if (is_scalar($value)) {
+                        return trim((string) $value);
+                    }
+                }
+            }
+        }
+
+        foreach ($rawCustomFields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $fieldKeys = collect([
+                $field['key'] ?? null,
+                $field['name'] ?? null,
+                $field['fieldKey'] ?? null,
+                $field['customFieldId'] ?? null,
+                $field['fieldId'] ?? null,
+                $field['id'] ?? null,
+            ])->filter()->map($normalize)->all();
+
+            if (! array_intersect($normalizedKeys, $fieldKeys)) {
+                continue;
+            }
+
+            $value = $field['value'] ?? $field['field_value'] ?? $field['valueString'] ?? $field['stringValue'] ?? $field['text'] ?? null;
+            if (is_scalar($value)) {
+                return trim((string) $value);
+            }
+        }
+
+        foreach ($keys as $key) {
+            $value = data_get($contact, $key);
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return '';
+    }
+
+    protected function normalizeRecruitingActivityTime(mixed $value): ?string
+    {
+        if (! is_scalar($value) || trim((string) $value) === '') {
+            return null;
+        }
+
+        try {
+            $time = \Illuminate\Support\Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        // Ignore epoch/default placeholder dates that make the UI say things like "20 years ago".
+        if ($time->lessThan(now()->subYears((int) config('ghl.coach_database.activity_max_age_years', 3)))) {
+            return null;
+        }
+
+        if ($time->greaterThan(now()->addDay())) {
+            return null;
+        }
+
+        return $time->toIso8601String();
+    }
+
+    protected function contactDisplayNameForActivity(array $contact): string
+    {
+        $name = $contact['name']
+            ?? $contact['contactName']
+            ?? trim((string) (($contact['firstName'] ?? $contact['first_name'] ?? '') . ' ' . ($contact['lastName'] ?? $contact['last_name'] ?? '')))
+            ?: null;
+
+        return filled($name) ? (string) $name : 'Coach contact';
+    }
+
+    protected function trackingActivityTitle(string $source, string $platform, array $metrics): string
+    {
+        $source = strtolower(trim($source));
+        $platform = strtolower(trim($platform));
+
+        if (str_contains($source, 'email_sent') || ((int) ($metrics['email_sent_count'] ?? 0) > 0 && ! str_contains($source, 'open') && ! str_contains($source, 'click'))) {
+            return 'Email sent';
+        }
+
+        if (str_contains($source, 'email_open') || str_contains($source, 'open')) {
+            return 'Email opened';
+        }
+
+        if (str_contains($source, 'email') && str_contains($source, 'click')) {
+            return 'Email link clicked';
+        }
+
+        return match ($platform) {
+            'instagram' => 'Instagram link clicked',
+            'youtube' => 'YouTube link clicked',
+            'x' => 'X link clicked',
+            'website' => 'Website link clicked',
+            'email' => 'Profile link clicked',
+            default => 'Recruiting activity updated',
+        };
+    }
+
+    protected function getRecruitingTrackingRecentActivityForUser(User $user, string $locationId, ?string $tokenOverride = null, array $trackingFieldMap = []): array
+    {
+        $contactIds = [];
+
+        $ownerContactId = $this->resolveRecruitingTrackingOwnerContactId($user, $locationId, $tokenOverride);
+        if ($ownerContactId) {
+            $contactIds[] = $ownerContactId;
+        }
+
+        $contactIds = collect($contactIds)
+            ->merge($this->recentRecruitingTrackingContactIdsForUser($user, $locationId))
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->take((int) config('ghl.coach_database.tracking_activity_contact_limit', 12))
+            ->values()
+            ->all();
+
+        return collect($contactIds)
+            ->map(function (string $contactId) use ($locationId, $tokenOverride, $trackingFieldMap): ?array {
+                $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride);
+                if (empty($contact)) {
+                    return null;
+                }
+
+                $metrics = $this->getRecruitingTrackingMetricsFromContact($contact, $trackingFieldMap);
+                if (array_sum(array_map('intval', $metrics)) <= 0) {
+                    return null;
+                }
+
+                $time = $this->normalizeRecruitingActivityTime(
+                    $this->stringCustomFieldFromContact($contact, ['last_profile_view_at'], $trackingFieldMap)
+                        ?: ($contact['updatedAt'] ?? $contact['lastActivity'] ?? $contact['dateUpdated'] ?? null)
+                );
+
+                if (! $time) {
+                    return null;
+                }
+
+                $platform = $this->stringCustomFieldFromContact($contact, ['last_clicked_platform'], $trackingFieldMap) ?: 'email';
+                $source = $this->stringCustomFieldFromContact($contact, ['last_profile_view_source'], $trackingFieldMap) ?: 'tracking';
+                $destination = $this->stringCustomFieldFromContact($contact, ['last_clicked_url'], $trackingFieldMap);
+                $name = $this->contactDisplayNameForActivity($contact);
+
+                return [
+                    'type' => 'tracking',
+                    'title' => $this->trackingActivityTitle($source, $platform, $metrics) . ' by ' . $name,
+                    'copy' => $destination !== '' ? Str::limit($destination, 120) : ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact activity'),
+                    'time' => $time,
+                    'url' => null,
+                    'has_image' => false,
+                    'has_file' => false,
+                    'metrics' => $metrics,
+                ];
+            })
+            ->filter()
+            ->sortByDesc(fn (array $item): int => strtotime((string) ($item['time'] ?? '')) ?: 0)
+            ->values()
+            ->all();
+    }
+
     protected function getAthleteRecruitingMetricSnapshot(User $user, string $locationId, ?string $tokenOverride = null): array
     {
+        $token = $this->tokenForLocation($locationId, $tokenOverride);
+        $trackingFieldMap = $locationId && $token
+            ? $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false)
+            : [];
+
         $contactId = $user->ghl_contact_id ?: $this->findContactIdByEmail($user->email, $locationId, $tokenOverride);
         if (! $contactId) {
             return [];
@@ -4287,20 +4516,20 @@ class GoHighLevelService
 
         $keys = $this->getRecruitingMetricCustomFieldKeys();
         return [
-            'profile_views' => $this->numericCustomFieldFromContact($contact, $keys['profile_views']),
-            'link_clicks' => $this->numericCustomFieldFromContact($contact, $keys['link_clicks']),
-            'email_opens' => $this->numericCustomFieldFromContact($contact, $keys['email_opens']),
-            'coach_replies' => $this->numericCustomFieldFromContact($contact, $keys['coach_replies']),
-            'emails_sent' => $this->numericCustomFieldFromContact($contact, $keys['emails_sent']),
-            'view_profile_total' => $this->numericCustomFieldFromContact($contact, ['view_profile_total']),
-            'view_profile_website' => $this->numericCustomFieldFromContact($contact, ['view_profile_website']),
-            'view_profile_instagram' => $this->numericCustomFieldFromContact($contact, ['view_profile_instagram']),
-            'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube']),
-            'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x']),
-            'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link']),
-            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count']),
-            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count']),
-            'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count']),
+            'profile_views' => $this->numericCustomFieldFromContact($contact, $keys['profile_views'], $trackingFieldMap),
+            'link_clicks' => $this->numericCustomFieldFromContact($contact, $keys['link_clicks'], $trackingFieldMap),
+            'email_opens' => $this->numericCustomFieldFromContact($contact, $keys['email_opens'], $trackingFieldMap),
+            'coach_replies' => $this->numericCustomFieldFromContact($contact, $keys['coach_replies'], $trackingFieldMap),
+            'emails_sent' => $this->numericCustomFieldFromContact($contact, $keys['emails_sent'], $trackingFieldMap),
+            'view_profile_total' => $this->numericCustomFieldFromContact($contact, ['view_profile_total'], $trackingFieldMap),
+            'view_profile_website' => $this->numericCustomFieldFromContact($contact, ['view_profile_website'], $trackingFieldMap),
+            'view_profile_instagram' => $this->numericCustomFieldFromContact($contact, ['view_profile_instagram'], $trackingFieldMap),
+            'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube'], $trackingFieldMap),
+            'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x'], $trackingFieldMap),
+            'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link'], $trackingFieldMap),
+            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
+            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
+            'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
             'contact_id' => $contactId,
         ];
     }
@@ -4359,20 +4588,20 @@ class GoHighLevelService
         }
     }
 
-    protected function getRecruitingTrackingMetricsFromContact(array $contact): array
+    protected function getRecruitingTrackingMetricsFromContact(array $contact, array $trackingFieldMap = []): array
     {
-        $website = $this->numericCustomFieldFromContact($contact, ['view_profile_website']);
-        $instagram = $this->numericCustomFieldFromContact($contact, ['view_profile_instagram']);
-        $youtube = $this->numericCustomFieldFromContact($contact, ['view_profile_youtube']);
-        $x = $this->numericCustomFieldFromContact($contact, ['view_profile_x']);
-        $emailProfile = $this->numericCustomFieldFromContact($contact, ['view_profile_email_link']);
-        $total = $this->numericCustomFieldFromContact($contact, ['view_profile_total']);
+        $website = $this->numericCustomFieldFromContact($contact, ['view_profile_website'], $trackingFieldMap);
+        $instagram = $this->numericCustomFieldFromContact($contact, ['view_profile_instagram'], $trackingFieldMap);
+        $youtube = $this->numericCustomFieldFromContact($contact, ['view_profile_youtube'], $trackingFieldMap);
+        $x = $this->numericCustomFieldFromContact($contact, ['view_profile_x'], $trackingFieldMap);
+        $emailProfile = $this->numericCustomFieldFromContact($contact, ['view_profile_email_link'], $trackingFieldMap);
+        $total = $this->numericCustomFieldFromContact($contact, ['view_profile_total'], $trackingFieldMap);
 
         if ($total <= 0) {
             $total = $website + $instagram + $youtube + $x + $emailProfile;
         }
 
-        $emailClicks = $this->numericCustomFieldFromContact($contact, ['email_click_count']);
+        $emailClicks = $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap);
 
         return [
             'view_profile_total' => $total,
@@ -4381,13 +4610,13 @@ class GoHighLevelService
             'view_profile_youtube' => $youtube,
             'view_profile_x' => $x,
             'view_profile_email_link' => $emailProfile,
-            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count']),
-            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count']),
+            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
+            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $emailClicks,
             'profile_views' => $total,
-            'email_opens' => $this->numericCustomFieldFromContact($contact, ['email_open_count']),
+            'email_opens' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'link_clicks' => $website + $instagram + $youtube + $x + $emailProfile + $emailClicks,
-            'emails_sent' => $this->numericCustomFieldFromContact($contact, ['email_sent_count']),
+            'emails_sent' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
         ];
     }
 
@@ -4411,28 +4640,84 @@ class GoHighLevelService
         return $merged;
     }
 
+    protected function recruitingTrackingRecentContactsCacheKey(User $user, string $locationId): string
+    {
+        return 'recruiting-tracking-recent-contacts:' . $user->id . ':' . md5($locationId);
+    }
+
+    protected function rememberRecruitingTrackingContactId(?User $user, string $locationId, string $contactId): void
+    {
+        if (! $user || trim($contactId) === '' || trim($locationId) === '') {
+            return;
+        }
+
+        $cacheKey = $this->recruitingTrackingRecentContactsCacheKey($user, $locationId);
+        $ids = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        $ids = collect(is_array($ids) ? $ids : [])
+            ->prepend(trim($contactId))
+            ->filter()
+            ->unique()
+            ->take((int) config('ghl.coach_database.tracking_recent_contact_limit', 40))
+            ->values()
+            ->all();
+
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $ids, now()->addDays(30));
+    }
+
+    protected function recentRecruitingTrackingContactIdsForUser(User $user, string $locationId): array
+    {
+        $cacheKey = $this->recruitingTrackingRecentContactsCacheKey($user, $locationId);
+
+        return collect(\Illuminate\Support\Facades\Cache::get($cacheKey, []))
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->take((int) config('ghl.coach_database.tracking_recent_contact_limit', 40))
+            ->values()
+            ->all();
+    }
+
     protected function getRecruitingTrackingMetricSumForUser(User $user, string $locationId, ?string $tokenOverride = null): array
     {
-        $result = $this->getAllContacts(
-            locationId: $locationId,
-            tokenOverride: $tokenOverride,
-            limit: (int) config('ghl.coach_database.page_limit', 100),
-            maxPages: (int) config('ghl.coach_database.tracking_metric_max_pages', config('ghl.coach_database.max_pages', 25)),
-        );
+        $token = $this->tokenForLocation($locationId, $tokenOverride);
+        $trackingFieldMap = $locationId && $token
+            ? $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false)
+            : [];
 
-        if (! ($result['success'] ?? false)) {
-            return ['success' => false, 'totals' => [], 'count' => 0, 'error' => $result['error'] ?? null];
+        if (! $locationId || ! $token) {
+            return ['success' => false, 'totals' => [], 'count' => 0, 'error' => 'Missing recruiting data connection.'];
         }
+
+        // IMPORTANT: do not fetch every contact detail on dashboard load.
+        // Full contact detail calls are slow and can exceed PHP's 30-second limit.
+        // Instead, read only the sender aggregate contact plus contacts that were
+        // actually touched by tracking routes / email sends and remembered in cache.
+        $contactIds = [];
+
+        $ownerContactId = $this->resolveRecruitingTrackingOwnerContactId($user, $locationId, $tokenOverride);
+        if ($ownerContactId) {
+            $contactIds[] = $ownerContactId;
+        }
+
+        $contactIds = collect($contactIds)
+            ->merge($this->recentRecruitingTrackingContactIdsForUser($user, $locationId))
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->take((int) config('ghl.coach_database.tracking_dashboard_detail_limit', 25))
+            ->values()
+            ->all();
 
         $totals = [];
         $trackedContacts = 0;
 
-        foreach (($result['contacts'] ?? []) as $contact) {
-            if (! is_array($contact)) {
+        foreach ($contactIds as $contactId) {
+            $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride);
+            if (empty($contact)) {
                 continue;
             }
 
-            $metrics = $this->getRecruitingTrackingMetricsFromContact($contact);
+            $metrics = $this->getRecruitingTrackingMetricsFromContact($contact, $trackingFieldMap);
             if (array_sum(array_map('intval', $metrics)) <= 0) {
                 continue;
             }
@@ -4441,11 +4726,19 @@ class GoHighLevelService
             $trackedContacts++;
         }
 
+        $merged = ! empty($totals)
+            ? $this->mergeRecruitingMetricTotals(...$totals)
+            : $this->mergeRecruitingMetricTotals([]);
+
         return [
             'success' => true,
-            'totals' => $this->mergeRecruitingMetricTotals(...$totals),
+            'totals' => $merged,
             'count' => $trackedContacts,
-            'debug' => $result['debug'] ?? [],
+            'debug' => [[
+                'stage' => 'tracking_metrics_from_recent_contacts',
+                'contact_ids_checked' => count($contactIds),
+                'tracked_contacts' => $trackedContacts,
+            ]],
         ];
     }
 
@@ -4459,8 +4752,10 @@ class GoHighLevelService
             return ['success' => false, 'stats' => [], 'recent_activity' => [], 'conversations' => [], 'error' => 'Missing recruiting data connection.'];
         }
 
+        $trackingFieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
         $athleteMetrics = $this->getAthleteRecruitingMetricSnapshot($user, $locationId, $credentials['token_override']);
         $contactMetricSummary = $this->getRecruitingTrackingMetricSumForUser($user, $locationId, $credentials['token_override']);
+        $trackingRecentActivity = $this->getRecruitingTrackingRecentActivityForUser($user, $locationId, $credentials['token_override'], $trackingFieldMap);
         $contactMetrics = is_array($contactMetricSummary['totals'] ?? null) ? $contactMetricSummary['totals'] : [];
 
         $trackedEmailSent = max((int) ($athleteMetrics['email_sent_count'] ?? 0), (int) ($contactMetrics['email_sent_count'] ?? 0));
@@ -4514,24 +4809,46 @@ class GoHighLevelService
             $emailOpenRate = (int) round(($emailOpens / max(1, $emailsSent)) * 100);
         }
 
-        $recent = collect($conversations)
-            ->map(function (array $conversation): array {
-                $rawLast = (string) ($conversation['last_message'] ?? 'Recent email conversation activity');
-                $copy = trim(strip_tags($rawLast));
-                $hasImage = (bool) ($conversation['has_image'] ?? false) || preg_match('/<img\b|\.(png|jpe?g|gif|webp)(\?|$)/i', $rawLast);
-                $hasFile = (bool) ($conversation['has_file'] ?? false) || (! $hasImage && preg_match('/\.(pdf|docx?|xlsx?|pptx?|zip)(\?|$)/i', $rawLast));
-                return [
-                    'type' => 'conversation',
-                    'title' => $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach conversation',
-                    'copy' => Str::limit(preg_replace('/\s+/', ' ', $copy), 160),
-                    'time' => $conversation['last_message_at'] ?? null,
-                    'url' => null,
-                    'has_image' => $hasImage,
-                    'has_file' => $hasFile,
-                    'metrics' => ['coach_replies' => 1],
-                ];
-            })
-            ->merge($campaignSummary['recent_activity'] ?? [])
+        $recent = collect($trackingRecentActivity)
+            ->merge(collect($conversations)
+                ->map(function (array $conversation): ?array {
+                    $time = $this->normalizeRecruitingActivityTime(
+                        $conversation['last_message_at']
+                        ?? $conversation['lastMessageAt']
+                        ?? $conversation['lastMessageDate']
+                        ?? $conversation['updatedAt']
+                        ?? null
+                    );
+
+                    if (! $time) {
+                        return null;
+                    }
+
+                    $rawLast = (string) ($conversation['last_message'] ?? 'Recent email conversation activity');
+                    $copy = trim(strip_tags($rawLast));
+                    $hasImage = (bool) ($conversation['has_image'] ?? false) || preg_match('/<img\b|\.(png|jpe?g|gif|webp)(\?|$)/i', $rawLast);
+                    $hasFile = (bool) ($conversation['has_file'] ?? false) || (! $hasImage && preg_match('/\.(pdf|docx?|xlsx?|pptx?|zip)(\?|$)/i', $rawLast));
+
+                    return [
+                        'type' => 'conversation',
+                        'title' => $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach conversation',
+                        'copy' => Str::limit(preg_replace('/\s+/', ' ', $copy), 160),
+                        'time' => $time,
+                        'url' => null,
+                        'has_image' => $hasImage,
+                        'has_file' => $hasFile,
+                        'metrics' => ['coach_replies' => 1],
+                    ];
+                })
+                ->filter())
+            ->merge(collect($campaignSummary['recent_activity'] ?? [])->map(function (array $item): ?array {
+                $time = $this->normalizeRecruitingActivityTime($item['time'] ?? null);
+                if (! $time) {
+                    return null;
+                }
+                $item['time'] = $time;
+                return $item;
+            })->filter())
             ->sortByDesc(fn (array $item): int => strtotime((string) ($item['time'] ?? '')) ?: 0)
             ->take(8)
             ->values()
@@ -4635,7 +4952,7 @@ class GoHighLevelService
                 $sentCampaigns++;
             }
 
-            $time = $campaign['sentAt'] ?? $campaign['lastSentAt'] ?? $campaign['updatedAt'] ?? $campaign['createdAt'] ?? data_get($campaign, 'data.updatedAt');
+            $time = $this->normalizeRecruitingActivityTime($campaign['sentAt'] ?? $campaign['lastSentAt'] ?? $campaign['updatedAt'] ?? $campaign['createdAt'] ?? data_get($campaign, 'data.updatedAt'));
             if ($time) {
                 $recent[] = [
                     'type' => 'campaign',
@@ -4832,6 +5149,11 @@ class GoHighLevelService
             textUpdates: $textUpdates,
         );
 
+        if ($recipientResult['success'] ?? false) {
+            $this->rememberRecruitingTrackingContactId($user, $locationId, $contactId);
+            \Illuminate\Support\Facades\Cache::forget('recruiting-tracking-contact-detail:' . md5($locationId . '|' . $contactId));
+        }
+
         $athleteResult = null;
         $athleteContactId = $this->resolveRecruitingTrackingOwnerContactId($user, $locationId, $tokenOverride);
         if ($athleteContactId && $athleteContactId !== $contactId) {
@@ -4843,6 +5165,11 @@ class GoHighLevelService
                 incrementKeys: $increments,
                 textUpdates: $textUpdates,
             );
+
+            if ($athleteResult['success'] ?? false) {
+                $this->rememberRecruitingTrackingContactId($user, $locationId, $athleteContactId);
+                \Illuminate\Support\Facades\Cache::forget('recruiting-tracking-contact-detail:' . md5($locationId . '|' . $athleteContactId));
+            }
         }
 
         return [
