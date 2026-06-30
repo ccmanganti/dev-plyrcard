@@ -51,5 +51,9 @@ return [
         'company_id' => env('GHL_COMPANY_ID'),
     ],
 
+    'tracking' => [
+        'base_url' => env('TRACKING_BASE_URL', env('APP_URL')),
+    ],
+
 
 ];

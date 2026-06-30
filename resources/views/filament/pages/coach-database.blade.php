@@ -2815,40 +2815,6 @@
             padding: .08rem .35rem;
         }
 
-        .rc-home-square-btn-v2 {
-            position: relative;
-            width: 2.75rem;
-            height: 2.75rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid #e8ebf0;
-            border-radius: .82rem;
-            background: #fff;
-            color: #1f2937;
-            box-shadow: 0 8px 20px rgba(15,23,42,.07);
-        }
-
-        .rc-home-square-btn-v2 svg {
-            width: 1.12rem;
-            height: 1.12rem;
-        }
-
-        .rc-home-bell-v2 span {
-            position: absolute;
-            top: -.42rem;
-            right: -.34rem;
-            width: 1.1rem;
-            height: 1.1rem;
-            border-radius: 999px;
-            display: grid;
-            place-items: center;
-            background: #ff6338;
-            color: #fff;
-            font-size: .63rem;
-            font-weight: 800;
-        }
-
         .rc-home-new-email-v2 {
             height: 2.75rem;
             display: inline-flex;
@@ -3308,7 +3274,6 @@
         .dark .rc-home-stat-v2,
         .dark .rc-home-panel-v2,
         .dark .rc-home-search-v2,
-        .dark .rc-home-square-btn-v2,
         .dark .rc-home-panel-head-v2 a,
         .dark .rc-home-outline-btn-v2 {
             border-color: rgba(148,163,184,.16);
@@ -3343,6 +3308,299 @@
             .rc-radar-schools-v2 { grid-template-columns: 1fr; }
             .rc-home-progress-layout-v2 { grid-template-columns: 1fr; }
         }
+
+
+        /* Dashboard functional-card + detail page fixes */
+        .rc-home-header-v2 {
+            grid-template-columns: minmax(26rem, 1fr) minmax(34rem, auto) !important;
+            align-items: start !important;
+        }
+
+        .rc-home-actions-v2 {
+            display: grid !important;
+            grid-template-columns: minmax(21rem, 27rem) auto !important;
+            align-items: center !important;
+            justify-content: end !important;
+            gap: .75rem !important;
+            width: auto !important;
+        }
+
+        .rc-home-search-v2 {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .rc-home-new-email-v2 {
+            width: auto !important;
+            min-width: 7.6rem !important;
+            max-width: 8.8rem !important;
+            padding-inline: 1rem !important;
+            white-space: nowrap !important;
+        }
+
+        .rc-home-stat-v2 {
+            border: 1px solid #e8ebf0;
+            text-align: left;
+            color: inherit;
+        }
+
+        button.rc-home-stat-v2 {
+            cursor: default;
+            appearance: none;
+        }
+
+        .rc-home-stat-v2.is-clickable {
+            cursor: pointer;
+            transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+        }
+
+        .rc-home-stat-v2.is-clickable:hover {
+            border-color: #ff6338 !important;
+            box-shadow: 0 0 0 3px rgba(255, 99, 56, .12), 0 12px 28px rgba(15, 23, 42, .08) !important;
+            transform: translateY(-1px);
+        }
+
+        .rc-detail-page-v2 {
+            display: grid;
+            gap: 1rem;
+            color: #101827;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        }
+
+        .rc-detail-header-v2 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .rc-detail-header-v2 h1 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.8rem;
+            line-height: 1.1;
+            font-weight: 850;
+            letter-spacing: -.035em;
+        }
+
+        .rc-detail-header-v2 p {
+            margin: .45rem 0 0;
+            color: #7d8798;
+            font-size: .95rem;
+        }
+
+        .rc-detail-search-v2 {
+            height: 2.8rem;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            border: 1px solid #e8ebf0;
+            border-radius: .85rem;
+            background: #fff;
+            padding: 0 .8rem;
+            color: #94a3b8;
+            box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        }
+
+        .rc-detail-search-v2 svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
+        .rc-detail-search-v2 input {
+            min-width: 0;
+            flex: 1;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            font-size: .85rem;
+            color: #475569;
+        }
+
+        .rc-detail-stats-v2 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .rc-detail-stat-v2,
+        .rc-detail-table-v2 {
+            border: 1px solid #e8ebf0;
+            background: rgba(255,255,255,.96);
+            border-radius: 1.05rem;
+            box-shadow: 0 8px 22px rgba(15,23,42,.06);
+        }
+
+        .rc-detail-stat-v2 {
+            min-height: 7.5rem;
+            padding: 1.05rem;
+            display: grid;
+            grid-template-columns: 3rem minmax(0,1fr);
+            gap: .8rem;
+            align-items: start;
+        }
+
+        .rc-detail-stat-v2 > span {
+            width: 3rem;
+            height: 3rem;
+            border-radius: .85rem;
+            display: grid;
+            place-items: center;
+            font-weight: 850;
+        }
+
+        .rc-detail-stat-v2 small {
+            display: block;
+            color: #64748b;
+            font-size: .84rem;
+            font-weight: 700;
+        }
+
+        .rc-detail-stat-v2 strong {
+            display: block;
+            margin-top: .2rem;
+            color: #0f172a;
+            font-size: 2rem;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: -.04em;
+        }
+
+        .rc-detail-stat-v2 em {
+            display: block;
+            margin-top: .55rem;
+            color: #7d8798;
+            font-size: .82rem;
+            font-style: normal;
+        }
+
+        .rc-detail-stat-v2.is-blue > span { background: rgba(59,130,246,.13); color: #3b82f6; }
+        .rc-detail-stat-v2.is-coral > span { background: rgba(255,99,56,.13); color: #ff6338; }
+        .rc-detail-stat-v2.is-purple > span { background: rgba(139,92,246,.13); color: #8b5cf6; }
+        .rc-detail-stat-v2.is-neutral > span { background: #eceef3; color: #111827; }
+        .rc-detail-stat-v2.is-pink > span { background: rgba(236,72,153,.14); color: #ec4899; }
+        .rc-detail-stat-v2.is-red > span { background: rgba(239,68,68,.13); color: #ef4444; }
+
+        .rc-detail-table-v2 { overflow: hidden; }
+        .rc-detail-table-v2 header {
+            min-height: 3.55rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0 1.15rem;
+            border-bottom: 1px solid #edf0f5;
+        }
+
+        .rc-detail-table-v2 h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 850;
+        }
+
+        .rc-detail-table-v2 header span {
+            color: #10b981;
+            font-size: .78rem;
+            font-weight: 750;
+        }
+
+        .rc-detail-rows-v2 { display: grid; }
+        .rc-detail-row-v2 {
+            width: 100%;
+            min-height: 4.35rem;
+            display: grid;
+            grid-template-columns: 2rem 2.45rem minmax(0, 1fr) auto 3rem 4.75rem 1rem;
+            align-items: center;
+            gap: .75rem;
+            border: 0;
+            border-bottom: 1px solid #f0f2f6;
+            background: transparent;
+            padding: .65rem 1.15rem;
+            text-align: left;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .rc-detail-row-v2:hover { background: #fafafa; }
+        .rc-detail-row-v2:last-child { border-bottom: 0; }
+        .rc-detail-rank-v2 { color: #94a3b8; font-size: .8rem; font-weight: 800; }
+        .rc-detail-avatar-v2,
+        .rc-detail-platform-icon-v2 {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: .7rem;
+            display: grid;
+            place-items: center;
+            background: #f1f3f7;
+            color: #111827;
+            font-size: .86rem;
+            font-weight: 800;
+            overflow: hidden;
+        }
+
+        .rc-detail-avatar-v2 img { width: 100%; height: 100%; object-fit: contain; }
+        .rc-detail-platform-icon-v2.is-red { background: rgba(239,68,68,.12); color: #ef4444; }
+        .rc-detail-platform-icon-v2.is-pink { background: rgba(236,72,153,.14); color: #ec4899; }
+        .rc-detail-platform-icon-v2.is-neutral { background: #eceef3; color: #111827; }
+
+        .rc-detail-person-v2 { min-width: 0; display: grid; gap: .15rem; }
+        .rc-detail-person-v2 strong {
+            color: #0f172a;
+            font-size: .88rem;
+            line-height: 1.2;
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-detail-person-v2 strong em {
+            margin-left: .35rem;
+            border-radius: .35rem;
+            background: rgba(255,99,56,.13);
+            color: #ff6338;
+            padding: .08rem .28rem;
+            font-size: .62rem;
+            font-style: normal;
+            font-weight: 800;
+            vertical-align: middle;
+        }
+
+        .rc-detail-person-v2 small {
+            color: #7d8798;
+            font-size: .78rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-detail-pill-v2 {
+            border-radius: 999px;
+            background: rgba(255,99,56,.12);
+            color: #ff6338;
+            padding: .28rem .55rem;
+            font-size: .72rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .rc-detail-pill-v2.is-pink { background: rgba(236,72,153,.14); color: #ec4899; }
+        .rc-detail-pill-v2.is-red { background: rgba(239,68,68,.13); color: #ef4444; }
+        .rc-detail-pill-v2.is-neutral { background: #eceef3; color: #111827; }
+
+        .rc-detail-count-v2 { display: grid; justify-items: center; color: #7d8798; }
+        .rc-detail-count-v2 b { color: #ff6338; font-size: 1.1rem; line-height: 1; font-weight: 900; }
+        .rc-detail-count-v2 small { font-size: .68rem; }
+        .rc-detail-time-v2 { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
+        .rc-detail-chevron-v2 { color: #94a3b8; font-size: 1.35rem; }
+
+        @media (max-width: 1180px) {
+            .rc-home-header-v2,
+            .rc-detail-header-v2 { grid-template-columns: 1fr !important; }
+            .rc-home-actions-v2 { justify-content: stretch !important; grid-template-columns: 1fr auto !important; }
+            .rc-detail-stats-v2 { grid-template-columns: 1fr; }
+            .rc-detail-row-v2 { grid-template-columns: 2.35rem minmax(0, 1fr) auto; }
+            .rc-detail-rank-v2, .rc-detail-time-v2, .rc-detail-chevron-v2 { display: none; }
+        }
+
     </style>
 
     @php
@@ -3409,10 +3667,34 @@
 
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
                 $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? $savedSchools);
-                $profileViews = (int) ($dashboardMetrics['profile_views'] ?? 0);
+
+                // GHL tracking custom-field metrics. These keys are produced by the updated
+                // GoHighLevelService / CoachDatabaseService tracking flow.
+                $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
+                $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $trackedYoutubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
+                $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+                $trackedProfileTotal = (int) ($dashboardMetrics['view_profile_total'] ?? 0);
+                $profileViews = $trackedProfileTotal > 0
+                    ? $trackedProfileTotal
+                    : max(0, (int) ($dashboardMetrics['profile_views'] ?? 0));
+
+                $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
+                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? 0);
+                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? 0);
+                $emailsSent = $emailSentCount;
+
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
-                $emailsSent = (int) ($dashboardMetrics['emails_sent'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
+                $coachEngagementTotal = $trackedWebsiteViews
+                    + $trackedInstagramViews
+                    + $trackedYoutubeViews
+                    + $trackedXViews
+                    + $trackedEmailLinkViews
+                    + $emailClickCount
+                    + $emailOpenCount
+                    + $coachReplies;
 
                 $readinessScore = min(100, max(12, 45 + min(25, $savedSchools * 4) + min(15, $favoriteSchools * 3) + min(10, $emailsSent) + min(10, $coachReplies * 2)));
                 $profileCompletion = min(100, max(40, $readinessScore + 5));
@@ -3429,9 +3711,10 @@
                     [
                         'label' => 'Profile Views',
                         'value' => number_format($profileViews),
-                        'sub' => '↑ 18 this week',
+                        'sub' => 'GHL view_profile_total',
                         'icon' => 'eye',
                         'tone' => 'blue',
+                        'target' => 'profile-views',
                     ],
                     [
                         'label' => 'Favorites',
@@ -3439,20 +3722,23 @@
                         'sub' => 'Schools saved',
                         'icon' => 'star',
                         'tone' => 'gold',
+                        'target' => 'favorites',
                     ],
                     [
                         'label' => 'Coach Engagement',
-                        'value' => '+' . number_format(max(0, $coachReplies + $engagedSchools)) . '%',
-                        'sub' => 'vs last 30 days',
+                        'value' => number_format($coachEngagementTotal),
+                        'sub' => 'Tracked GHL opens, clicks, replies',
                         'icon' => 'mail',
                         'tone' => 'green',
+                        'target' => 'coach-engagement',
                     ],
                     [
                         'label' => 'Emails Sent',
                         'value' => number_format($emailsSent),
-                        'sub' => 'This month',
+                        'sub' => 'GHL email_sent_count',
                         'icon' => 'chart',
                         'tone' => 'indigo',
+                        'target' => 'emails-sent',
                     ],
                 ];
 
@@ -3470,6 +3756,95 @@
                 if (empty($radarSchools)) {
                     $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
                 }
+
+                $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) {
+                    $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
+                    $tone = 'blue';
+                    $icon = '◉';
+
+                    if (str_contains($activityType, 'reply')) {
+                        $tone = 'green';
+                        $icon = '↩';
+                    } elseif (str_contains($activityType, 'email')) {
+                        $tone = 'coral';
+                        $icon = '✉';
+                    } elseif (str_contains($activityType, 'favorite')) {
+                        $tone = 'gold';
+                        $icon = '☆';
+                    } elseif (str_contains($activityType, 'smart')) {
+                        $tone = 'purple';
+                        $icon = '⊞';
+                    }
+
+                    $time = $activity['time'] ?? null;
+
+                    return [
+                        'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
+                        'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
+                        'url' => $activity['url'] ?? '#',
+                        'tone' => $tone,
+                        'icon' => $icon,
+                        'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                    ];
+                })->values();
+
+                if ($dashboardActivityRows->isEmpty()) {
+                    $dashboardActivityRows = collect([
+                        ['title' => 'Coach Sarah Mitchell viewed your profile', 'copy' => 'Virginia Commonwealth University', 'time_label' => '2h ago', 'tone' => 'blue', 'icon' => '◉', 'url' => '#'],
+                        ['title' => 'Email opened by Coach James Carter', 'copy' => 'University of South Carolina', 'time_label' => '1d ago', 'tone' => 'coral', 'icon' => '✉', 'url' => '#'],
+                        ['title' => 'Added to favorites', 'copy' => 'James Madison University', 'time_label' => '2d ago', 'tone' => 'gold', 'icon' => '☆', 'url' => '#'],
+                        ['title' => 'New reply from Coach Mike Brown', 'copy' => 'Clemson University', 'time_label' => '3d ago', 'tone' => 'green', 'icon' => '↩', 'url' => '#'],
+                        ['title' => 'Added to smart list', 'copy' => 'ACC Schools', 'time_label' => '4d ago', 'tone' => 'purple', 'icon' => '⊞', 'url' => '#'],
+                    ]);
+                }
+
+
+                $radarSchoolRows = collect($radarSchools)->map(function ($school) {
+                    $schoolName = (string) ($school['name'] ?? 'School');
+                    $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
+                    $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
+                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+
+                    return [
+                        'id' => $school['id'] ?? $school['business_id'] ?? $schoolName,
+                        'name' => $schoolName,
+                        'conference' => $schoolConference,
+                        'match' => $match,
+                        'initials' => strtoupper($initials ?: 'PC'),
+                    ];
+                })->values();
+
+                if ($radarSchoolRows->isEmpty()) {
+                    $radarSchoolRows = collect([
+                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU'],
+                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU'],
+                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU'],
+                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF'],
+                    ]);
+                }
+
+                $interestedSchoolRows = collect($dashboardTopSchools)->take(4)->values()->map(function ($school, $rank) {
+                    $schoolName = (string) ($school['name'] ?? 'School');
+                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
+                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+
+                    return [
+                        'rank' => $rank + 1,
+                        'name' => $schoolName,
+                        'score' => $score,
+                        'initials' => strtoupper($initials ?: 'S'),
+                    ];
+                })->values();
+
+                if ($interestedSchoolRows->isEmpty()) {
+                    $interestedSchoolRows = collect([
+                        ['rank' => 1, 'name' => 'Virginia Commonwealth', 'score' => 14, 'initials' => 'VCU'],
+                        ['rank' => 2, 'name' => 'University of Maryland', 'score' => 9, 'initials' => 'M'],
+                        ['rank' => 3, 'name' => 'Florida State', 'score' => 7, 'initials' => 'FS'],
+                        ['rank' => 4, 'name' => 'Indiana University', 'score' => 6, 'initials' => 'IU'],
+                    ]);
+                }
             @endphp
 
             <div class="rc-home-dashboard-v2">
@@ -3479,38 +3854,36 @@
                         <p>Here's what's happening with your recruiting journey.</p>
                     </div>
 
-                    <div class="rc-home-actions-v2">
+                    <form class="rc-home-actions-v2" wire:submit.prevent="$set('section', 'schools')">
                         <div class="rc-home-search-v2">
                             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                             <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
-                            <kbd>⌘K</kbd>
+                            <kbd>Enter</kbd>
                         </div>
-
-                        <button type="button" class="rc-home-square-btn-v2" aria-label="Toggle dark mode">
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-
-                        <button type="button" class="rc-home-square-btn-v2 rc-home-bell-v2" aria-label="Notifications">
-                            <span>3</span>
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
 
                         <a class="rc-home-new-email-v2" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">
                             <span>+</span>
                             New Email
                         </a>
-                    </div>
+                    </form>
                 </div>
 
                 <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
-                        <div class="rc-home-stat-v2 is-{{ $stat['tone'] }}">
+                        @if(! empty($stat['target']))
+                            <button
+                                type="button"
+                                class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
+                                wire:click="$set('section', @js($stat['target']))"
+                            >
+                        @else
+                            <button
+                                type="button"
+                                class="rc-home-stat-v2 is-{{ $stat['tone'] }}"
+                            >
+                        @endif
                             <div class="rc-home-stat-icon-v2">
                                 @switch($stat['icon'])
                                     @case('cap')
@@ -3555,7 +3928,7 @@
                             @endif
 
                             <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
-                        </div>
+                        </button>
                     @endforeach
                 </div>
 
@@ -3598,62 +3971,18 @@
                         </div>
 
                         <div class="rc-home-activity-list-v2">
-                            @forelse($dashboardRecentActivity as $activity)
-                                @php
-                                    $activityCopy = trim(strip_tags((string) ($activity['copy'] ?? '')));
-                                    $activityTitle = (string) ($activity['title'] ?? 'Recruiting activity');
-                                    $activityTime = $activity['time'] ?? null;
-                                    $activityType = strtolower((string) ($activity['type'] ?? 'activity'));
-                                    $activityTone = str_contains($activityType, 'reply') ? 'green' : (str_contains($activityType, 'email') ? 'coral' : (str_contains($activityType, 'favorite') ? 'gold' : 'blue'));
-                                @endphp
-
-                                <a class="rc-home-activity-v2" href="{{ $activity['url'] ?? '#' }}">
-                                    <span class="rc-home-activity-icon-v2 is-{{ $activityTone }}">
-                                        @if($activityTone === 'green')
-                                            ↩
-                                        @elseif($activityTone === 'coral')
-                                            ✉
-                                        @elseif($activityTone === 'gold')
-                                            ☆
-                                        @else
-                                            ◉
-                                        @endif
-                                    </span>
+                            @foreach($dashboardActivityRows as $activityRow)
+                                <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                                    <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
 
                                     <span class="rc-home-activity-copy-v2">
-                                        <strong>{{ $activityTitle }}</strong>
-                                        <small>{{ $activityCopy ?: 'Recruiting update' }}</small>
+                                        <strong>{{ $activityRow['title'] ?? 'Recruiting activity' }}</strong>
+                                        <small>{{ $activityRow['copy'] ?? 'Recruiting update' }}</small>
                                     </span>
 
-                                    <span class="rc-home-activity-time-v2">
-                                        {{ $activityTime ? \Illuminate\Support\Carbon::parse($activityTime)->diffForHumans(null, true) . ' ago' : 'Recent' }}
-                                    </span>
+                                    <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
                                 </a>
-                            @empty
-                                @foreach([
-                                    ['Coach Sarah Mitchell viewed your profile', 'Virginia Commonwealth University', '2h ago', 'blue'],
-                                    ['Email opened by Coach James Carter', 'University of South Carolina', '1d ago', 'coral'],
-                                    ['Added to favorites', 'James Madison University', '2d ago', 'gold'],
-                                    ['New reply from Coach Mike Brown', 'Clemson University', '3d ago', 'green'],
-                                    ['Added to smart list', 'ACC Schools', '4d ago', 'purple'],
-                                ] as $item)
-                                    <div class="rc-home-activity-v2">
-                                        <span class="rc-home-activity-icon-v2 is-{{ $item[3] }}">
-                                            @if($item[3] === 'green') ↩
-                                            @elseif($item[3] === 'coral') ✉
-                                            @elseif($item[3] === 'gold') ☆
-                                            @elseif($item[3] === 'purple') ⊞
-                                            @else ◉
-                                            @endif
-                                        </span>
-                                        <span class="rc-home-activity-copy-v2">
-                                            <strong>{{ $item[0] }}</strong>
-                                            <small>{{ $item[1] }}</small>
-                                        </span>
-                                        <span class="rc-home-activity-time-v2">{{ $item[2] }}</span>
-                                    </div>
-                                @endforeach
-                            @endforelse
+                            @endforeach
                         </div>
                     </section>
                 </div>
@@ -3669,23 +3998,14 @@
                         </div>
 
                         <div class="rc-radar-schools-v2">
-                            @forelse($radarSchools as $school)
-                                @php
-                                    $schoolName = (string) ($school['name'] ?? 'School');
-                                    $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
-                                    $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
-                                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                                @endphp
-
-                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($school['id'] ?? $school['business_id'] ?? $schoolName))">
-                                    <span class="rc-radar-logo-v2">{{ strtoupper($initials ?: 'PC') }}</span>
-                                    <strong>{{ $schoolName }}</strong>
-                                    <small>{{ $schoolConference }}</small>
-                                    <em>{{ $match }}% Match</em>
+                            @foreach($radarSchoolRows as $radarSchool)
+                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
+                                    <span class="rc-radar-logo-v2">{{ $radarSchool['initials'] }}</span>
+                                    <strong>{{ $radarSchool['name'] }}</strong>
+                                    <small>{{ $radarSchool['conference'] }}</small>
+                                    <em>{{ $radarSchool['match'] }}% Match</em>
                                 </button>
-                            @empty
-                                <div class="rc-home-empty-v2">Schools will appear here as your recruiting list grows.</div>
-                            @endforelse
+                            @endforeach
                         </div>
 
                         <div class="rc-home-dots-v2">
@@ -3702,46 +4022,277 @@
                         </div>
 
                         <div class="rc-interested-list-v2">
-                            @forelse(collect($dashboardTopSchools)->take(4)->values()->all() as $rank => $school)
-                                @php
-                                    $schoolName = (string) ($school['name'] ?? 'School');
-                                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
-                                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
-                                    $initials = collect(explode(' ', $schoolName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                                @endphp
-
-                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) $rank }})">
-                                    <span class="rc-interested-rank-v2">{{ $rank + 1 }}</span>
-                                    <span class="rc-interested-logo-v2">{{ strtoupper($initials ?: 'S') }}</span>
+                            @foreach($interestedSchoolRows as $interestedSchool)
+                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
+                                    <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
+                                    <span class="rc-interested-logo-v2">{{ $interestedSchool['initials'] }}</span>
                                     <span>
-                                        <strong>{{ $schoolName }}</strong>
+                                        <strong>{{ $interestedSchool['name'] }}</strong>
                                         <small>Profile views</small>
                                     </span>
-                                    <b>{{ $score }}</b>
+                                    <b>{{ $interestedSchool['score'] }}</b>
                                 </button>
-                            @empty
-                                @foreach([
-                                    ['Virginia Commonwealth', 'VCU', 14],
-                                    ['University of Maryland', 'M', 9],
-                                    ['Florida State', 'FS', 7],
-                                    ['Indiana University', 'IU', 6],
-                                ] as $rank => $school)
-                                    <button type="button" class="rc-interested-row-v2">
-                                        <span class="rc-interested-rank-v2">{{ $rank + 1 }}</span>
-                                        <span class="rc-interested-logo-v2">{{ $school[1] }}</span>
-                                        <span>
-                                            <strong>{{ $school[0] }}</strong>
-                                            <small>Profile views</small>
-                                        </span>
-                                        <b>{{ $school[2] }}</b>
-                                    </button>
-                                @endforeach
-                            @endforelse
+                            @endforeach
                         </div>
 
                         <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
                     </section>
                 </div>
+            </div>
+        @endif
+
+        @if($section === 'profile-views')
+            @php
+                $dashboardMetrics = $this->dashboardMetrics;
+                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
+
+                $profileViewsTotal = (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0);
+                $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
+                $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $xViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
+                $emailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+                $profilePrograms = max(0, (int) ($dashboardMetrics['engaged_schools'] ?? $dashboardTopSchools->count()));
+
+                $profileBreakdownRows = collect([
+                    ['title' => 'Website profile link', 'copy' => 'GHL custom field: view_profile_website', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Synced'],
+                    ['title' => 'Instagram profile link', 'copy' => 'GHL custom field: view_profile_instagram', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Synced'],
+                    ['title' => 'YouTube highlight link', 'copy' => 'GHL custom field: view_profile_youtube', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Synced'],
+                    ['title' => 'X profile link', 'copy' => 'GHL custom field: view_profile_x', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Synced'],
+                    ['title' => 'Email profile link', 'copy' => 'GHL custom field: view_profile_email_link', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Synced'],
+                ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
+
+                $activityProfileRows = $dashboardRecentActivity
+                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
+                    ->take(8)
+                    ->values()
+                    ->map(function ($activity, $index) {
+                        $title = (string) ($activity['title'] ?? 'Coach viewed profile');
+                        $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                        $time = $activity['time'] ?? null;
+
+                        return [
+                            'title' => $title,
+                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked GHL profile activity'))) ?: 'Tracked GHL profile activity',
+                            'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
+                            'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
+                            'logo' => $activity['logo'] ?? null,
+                            'initials' => strtoupper($initials ?: 'PV'),
+                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                        ];
+                    });
+
+                $profileViewRows = $activityProfileRows->merge($profileBreakdownRows)->values()->map(function ($row, $index) {
+                    return array_merge($row, ['rank' => $index + 1]);
+                });
+            @endphp
+
+            <div class="rc-detail-page-v2">
+                <div class="rc-detail-header-v2">
+                    <div>
+                        <h1>Profile Views</h1>
+                        <p>GHL-backed profile views from tracked website, Instagram, YouTube, X, and email links.</p>
+                    </div>
+                    <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
+                    </form>
+                </div>
+
+                <div class="rc-detail-stats-v2">
+                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>GHL field: view_profile_total</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span>⌁</span><div><small>Website + Email</small><strong>{{ number_format($websiteViews + $emailLinkViews) }}</strong><em>Website profile and email links</em></div></div>
+                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Social Clicks</small><strong>{{ number_format($instagramViews + $youtubeViews + $xViews) }}</strong><em>Instagram, YouTube, and X</em></div></div>
+                </div>
+
+                <section class="rc-detail-table-v2">
+                    <header><h2>GHL Profile View Breakdown</h2><span>● Synced from GHL</span></header>
+                    <div class="rc-detail-rows-v2">
+                        @forelse($profileViewRows as $profileRow)
+                            <button type="button" class="rc-detail-row-v2">
+                                <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
+                                <span class="rc-detail-avatar-v2">
+                                    @if(! empty($profileRow['logo']))
+                                        <img src="{{ $profileRow['logo'] }}" alt="{{ $profileRow['title'] }}">
+                                    @else
+                                        {{ $profileRow['initials'] }}
+                                    @endif
+                                </span>
+                                <span class="rc-detail-person-v2"><strong>{{ $profileRow['title'] }}</strong><small>{{ $profileRow['copy'] }}</small></span>
+                                <span class="rc-detail-pill-v2">{{ $profileRow['type'] }}</span>
+                                <span class="rc-detail-count-v2"><b>{{ $profileRow['views'] }}</b><small>{{ \Illuminate\Support\Str::plural('view', $profileRow['views']) }}</small></span>
+                                <span class="rc-detail-time-v2">{{ $profileRow['time_label'] }}</span>
+                                <span class="rc-detail-chevron-v2">›</span>
+                            </button>
+                        @empty
+                            <div class="rc-home-empty-v2">Profile view activity will appear here after coaches click tracked GHL links.</div>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+        @endif
+
+        @if($section === 'coach-engagement')
+            @php
+                $dashboardMetrics = $this->dashboardMetrics;
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
+
+                $websiteClicks = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
+                $xClicks = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
+                $igClicks = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $ytClicks = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $emailLinkClicks = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+                $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? 0);
+                $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? 0);
+                $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
+
+                $coachEngagementRows = collect([
+                    ['title' => 'Website profile clicks', 'copy' => 'GHL custom field: view_profile_website', 'platform' => 'Website', 'platform_class' => 'is-blue', 'platform_icon' => '⌁', 'clicks' => $websiteClicks, 'time_label' => 'Synced'],
+                    ['title' => 'Instagram clicks', 'copy' => 'GHL custom field: view_profile_instagram', 'platform' => 'Instagram', 'platform_class' => 'is-pink', 'platform_icon' => '◎', 'clicks' => $igClicks, 'time_label' => 'Synced'],
+                    ['title' => 'YouTube clicks', 'copy' => 'GHL custom field: view_profile_youtube', 'platform' => 'YouTube', 'platform_class' => 'is-red', 'platform_icon' => '▶', 'clicks' => $ytClicks, 'time_label' => 'Synced'],
+                    ['title' => 'X clicks', 'copy' => 'GHL custom field: view_profile_x', 'platform' => 'X', 'platform_class' => 'is-neutral', 'platform_icon' => '𝕏', 'clicks' => $xClicks, 'time_label' => 'Synced'],
+                    ['title' => 'Email profile-link clicks', 'copy' => 'GHL custom field: view_profile_email_link', 'platform' => 'Email Link', 'platform_class' => 'is-coral', 'platform_icon' => '✉', 'clicks' => $emailLinkClicks, 'time_label' => 'Synced'],
+                    ['title' => 'Email clicks', 'copy' => 'GHL custom field: email_click_count', 'platform' => 'Email Click', 'platform_class' => 'is-coral', 'platform_icon' => '↗', 'clicks' => $emailClicks, 'time_label' => 'Synced'],
+                    ['title' => 'Email opens', 'copy' => 'GHL custom field: email_open_count', 'platform' => 'Email Open', 'platform_class' => 'is-green', 'platform_icon' => '◉', 'clicks' => $emailOpens, 'time_label' => 'Synced'],
+                    ['title' => 'Coach replies', 'copy' => 'GHL conversation replies / existing coach reply metric', 'platform' => 'Reply', 'platform_class' => 'is-purple', 'platform_icon' => '↩', 'clicks' => $coachReplies, 'time_label' => 'Synced'],
+                ])->filter(fn (array $row): bool => (int) ($row['clicks'] ?? 0) > 0)->values();
+
+                if ($coachEngagementRows->isEmpty()) {
+                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) {
+                        $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
+                        $platformLower = strtolower($platform);
+                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : 'is-neutral');
+                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : '𝕏');
+                        $time = $row['time'] ?? null;
+
+                        return [
+                            'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
+                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'GHL activity'))) ?: 'GHL activity',
+                            'platform' => $platform,
+                            'platform_class' => $platformClass,
+                            'platform_icon' => $platformIcon,
+                            'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
+                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                        ];
+                    })->values();
+                }
+            @endphp
+
+            <div class="rc-detail-page-v2">
+                <div class="rc-detail-header-v2">
+                    <div>
+                        <h1>Coach Engagement</h1>
+                        <p>GHL-backed tracking for social clicks, email opens, email clicks, and replies.</p>
+                    </div>
+                    <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
+                    </form>
+                </div>
+
+                <div class="rc-detail-stats-v2">
+                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X</small><strong>{{ number_format($xClicks) }}</strong><em>view_profile_x</em></div></div>
+                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>view_profile_instagram</em></div></div>
+                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>view_profile_youtube</em></div></div>
+                </div>
+
+                <section class="rc-detail-table-v2">
+                    <header><h2>GHL Engagement Breakdown</h2><span>● Synced from GHL</span></header>
+                    <div class="rc-detail-rows-v2">
+                        @forelse($coachEngagementRows as $engagementRow)
+                            <button type="button" class="rc-detail-row-v2">
+                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
+                                <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
+                                <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
+                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $engagementRow['clicks']) }}</small></span>
+                                <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] }}</span>
+                                <span class="rc-detail-chevron-v2">›</span>
+                            </button>
+                        @empty
+                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked links or open emails.</div>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+        @endif
+
+        @if($section === 'emails-sent')
+            @php
+                $dashboardMetrics = $this->dashboardMetrics;
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
+
+                $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
+                $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? 0);
+                $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? 0);
+                $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+
+                $emailRows = $dashboardRecentActivity
+                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'email'))
+                    ->take(12)
+                    ->values()
+                    ->map(function ($row, $index) {
+                        $time = $row['time'] ?? null;
+
+                        return [
+                            'rank' => $index + 1,
+                            'title' => (string) ($row['title'] ?? 'Email activity'),
+                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked GHL email event'))) ?: 'Tracked GHL email event',
+                            'type' => (string) ($row['type'] ?? 'Email'),
+                            'count' => (int) ($row['count'] ?? $row['clicks'] ?? 1),
+                            'time_label' => $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans(null, true) . ' ago' : 'Recent',
+                        ];
+                    });
+
+                if ($emailRows->isEmpty()) {
+                    $emailRows = collect([
+                        ['rank' => 1, 'title' => 'Emails sent', 'copy' => 'GHL custom field: email_sent_count', 'type' => 'Sent', 'count' => $emailSentCount, 'time_label' => 'Synced'],
+                        ['rank' => 2, 'title' => 'Emails opened', 'copy' => 'GHL custom field: email_open_count', 'type' => 'Open', 'count' => $emailOpenCount, 'time_label' => 'Synced'],
+                        ['rank' => 3, 'title' => 'Email links clicked', 'copy' => 'GHL custom field: email_click_count', 'type' => 'Click', 'count' => $emailClickCount, 'time_label' => 'Synced'],
+                        ['rank' => 4, 'title' => 'Email profile links clicked', 'copy' => 'GHL custom field: view_profile_email_link', 'type' => 'Profile Link', 'count' => $emailProfileLinkCount, 'time_label' => 'Synced'],
+                    ])->filter(fn (array $row): bool => (int) ($row['count'] ?? 0) > 0)->values()->map(function ($row, $index) {
+                        $row['rank'] = $index + 1;
+                        return $row;
+                    });
+                }
+            @endphp
+
+            <div class="rc-detail-page-v2">
+                <div class="rc-detail-header-v2">
+                    <div>
+                        <h1>Emails Sent</h1>
+                        <p>GHL-backed email sending, open, and click tracking from Coach Database emails.</p>
+                    </div>
+                    <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
+                    </form>
+                </div>
+
+                <div class="rc-detail-stats-v2">
+                    <div class="rc-detail-stat-v2 is-coral"><span>✉</span><div><small>Sent</small><strong>{{ number_format($emailSentCount) }}</strong><em>email_sent_count</em></div></div>
+                    <div class="rc-detail-stat-v2 is-blue"><span>◉</span><div><small>Opened</small><strong>{{ number_format($emailOpenCount) }}</strong><em>email_open_count</em></div></div>
+                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>Clicked</small><strong>{{ number_format($emailClickCount) }}</strong><em>email_click_count</em></div></div>
+                </div>
+
+                <section class="rc-detail-table-v2">
+                    <header><h2>GHL Email Tracking</h2><span>● Synced from GHL</span></header>
+                    <div class="rc-detail-rows-v2">
+                        @forelse($emailRows as $emailRow)
+                            <button type="button" class="rc-detail-row-v2">
+                                <span class="rc-detail-rank-v2">#{{ $emailRow['rank'] }}</span>
+                                <span class="rc-detail-avatar-v2">✉</span>
+                                <span class="rc-detail-person-v2"><strong>{{ $emailRow['title'] }}</strong><small>{{ $emailRow['copy'] }}</small></span>
+                                <span class="rc-detail-pill-v2">{{ $emailRow['type'] }}</span>
+                                <span class="rc-detail-count-v2"><b>{{ $emailRow['count'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $emailRow['count']) }}</small></span>
+                                <span class="rc-detail-time-v2">{{ $emailRow['time_label'] }}</span>
+                                <span class="rc-detail-chevron-v2">›</span>
+                            </button>
+                        @empty
+                            <div class="rc-home-empty-v2">Email tracking will appear here after Coach Database emails are sent and opened/clicked.</div>
+                        @endforelse
+                    </div>
+                </section>
             </div>
         @endif
 

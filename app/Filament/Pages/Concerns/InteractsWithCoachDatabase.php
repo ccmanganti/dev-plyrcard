@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
 use App\Services\GoHighLevelService;
+use App\Support\TrackingLinkRewriter;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -910,6 +911,16 @@ trait InteractsWithCoachDatabase
             // Keep email sending successful even if the dashboard counter cannot be updated immediately.
         }
 
+        try {
+            app(GoHighLevelService::class)->incrementTrackingEmailSentForUser(Auth::user(), $contactId, [
+                'source' => 'coach_database_email',
+                'subject' => $subject,
+                'host' => request()->getHost(),
+            ]);
+        } catch (\Throwable $exception) {
+            // Do not fail the email if the tracking counter cannot sync immediately.
+        }
+
         $this->emailSubject = '';
         $this->emailBody = '';
         $this->showNewConversationComposer = false;
@@ -1008,6 +1019,18 @@ trait InteractsWithCoachDatabase
             Notification::make()->title('Recruiting Center')->body('Choose a coach with an email before sending.')->danger()->send();
             return;
         }
+
+        $trackingContext = [
+            'athlete_id' => Auth::id(),
+            'contact_id' => $contactId,
+            'ghl_contact_id' => $contactId,
+            'source' => 'coach_database_email',
+            'email_subject' => $subject,
+        ];
+
+        $body = app(TrackingLinkRewriter::class)->rewriteHtml($body, $trackingContext);
+        $body = app(TrackingLinkRewriter::class)->appendOpenPixel($body, $trackingContext);
+        $plainBody = trim(strip_tags($body));
 
         $payload = [
             'contact_id' => $contactId,

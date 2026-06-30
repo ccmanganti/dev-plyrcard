@@ -10,7 +10,14 @@ use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\TrackingController;
 
+
+Route::get('/track/click/{token}', [TrackingController::class, 'click'])
+    ->name('track.click');
+
+Route::get('/track/open/{token}.gif', [TrackingController::class, 'open'])
+    ->name('track.open');
 
 require __DIR__ . '/club_referrals.php';
 /*

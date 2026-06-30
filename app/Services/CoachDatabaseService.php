@@ -418,9 +418,12 @@ class CoachDatabaseService
 
     protected function buildStats(Collection $coaches, Collection $schools): array
     {
-        $profileViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['profile_view_count'] ?? 0), (bool) ($coach['viewed_profile'] ?? false) ? 1 : 0));
+        $profileViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['profile_view_count'] ?? 0), (int) ($coach['view_profile_total'] ?? 0), (bool) ($coach['viewed_profile'] ?? false) ? 1 : 0));
         $highlightViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['highlight_view_count'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0));
-        $linkClicks = $coaches->sum(fn (array $coach): int => max((int) ($coach['trigger_link_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0));
+        $linkClicks = $coaches->sum(fn (array $coach): int => max((int) ($coach['trigger_link_click_count'] ?? 0), (int) ($coach['email_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0));
+        $emailSent = $coaches->sum(fn (array $coach): int => (int) ($coach['email_sent_count'] ?? 0));
+        $emailOpens = $coaches->sum(fn (array $coach): int => (int) ($coach['email_open_count'] ?? 0));
+        $emailClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['email_click_count'] ?? 0));
         $replies = $coaches->sum(fn (array $coach): int => max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0));
 
         return [
@@ -433,6 +436,12 @@ class CoachDatabaseService
             'profile_views' => $profileViews,
             'highlight_views' => $highlightViews,
             'trigger_link_clicks' => $linkClicks,
+            'email_sent_count' => $emailSent,
+            'emails_sent' => $emailSent,
+            'email_open_count' => $emailOpens,
+            'email_opens' => $emailOpens,
+            'email_click_count' => $emailClicks,
+            'email_clicks' => $emailClicks,
             'coach_replies' => $replies,
         ];
     }
@@ -501,6 +510,19 @@ class CoachDatabaseService
             'engaged' => (bool) ($coach['engaged'] ?? false),
             'replied' => (bool) ($coach['replied'] ?? false),
             'trigger_link_clicked' => (bool) ($coach['trigger_link_clicked'] ?? false),
+            'profile_view_count' => max((int) ($coach['profile_view_count'] ?? 0), (int) ($coach['view_profile_total'] ?? 0)),
+            'view_profile_total' => (int) ($coach['view_profile_total'] ?? $coach['profile_view_count'] ?? 0),
+            'view_profile_website' => (int) ($coach['view_profile_website'] ?? 0),
+            'view_profile_instagram' => (int) ($coach['view_profile_instagram'] ?? 0),
+            'view_profile_youtube' => (int) ($coach['view_profile_youtube'] ?? 0),
+            'view_profile_x' => (int) ($coach['view_profile_x'] ?? 0),
+            'view_profile_email_link' => (int) ($coach['view_profile_email_link'] ?? 0),
+            'highlight_view_count' => (int) ($coach['highlight_view_count'] ?? 0),
+            'trigger_link_click_count' => max((int) ($coach['trigger_link_click_count'] ?? 0), (int) ($coach['email_click_count'] ?? 0)),
+            'email_sent_count' => (int) ($coach['email_sent_count'] ?? 0),
+            'email_open_count' => (int) ($coach['email_open_count'] ?? 0),
+            'email_click_count' => (int) ($coach['email_click_count'] ?? 0),
+            'coach_reply_count' => (int) ($coach['coach_reply_count'] ?? 0),
         ];
     }
 

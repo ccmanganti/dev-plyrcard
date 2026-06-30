@@ -2167,9 +2167,18 @@ class GoHighLevelService
             'engaged' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.engaged', 'engaged'), 'clicked', 'opened', 'replied']),
             'replied' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.replied', 'replied'), 'coach replied', 'email replied']),
             'trigger_link_clicked' => $this->contactHasAnyTag($contact, [config('ghl.coach_database.tags.trigger_link_clicked', 'trigger link clicked'), 'trigger link clicked', 'profile link clicked', 'website clicked', 'social clicked', 'instagram clicked', 'x clicked', 'youtube clicked', 'highlight link clicked']),
-            'profile_view_count' => $this->numericCustomFieldFromContact($contact, ['profile_view_count', 'profileViews', 'profile_views', 'plyrcard_profile_views']),
+            'profile_view_count' => $this->numericCustomFieldFromContact($contact, ['view_profile_total', 'profile_view_count', 'profileViews', 'profile_views', 'plyrcard_profile_views']),
+            'view_profile_total' => $this->numericCustomFieldFromContact($contact, ['view_profile_total']),
+            'view_profile_website' => $this->numericCustomFieldFromContact($contact, ['view_profile_website']),
+            'view_profile_instagram' => $this->numericCustomFieldFromContact($contact, ['view_profile_instagram']),
+            'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube']),
+            'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x']),
+            'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link']),
             'highlight_view_count' => $this->numericCustomFieldFromContact($contact, ['highlight_view_count', 'highlightViews', 'highlight_views', 'youtube_clicks']),
-            'trigger_link_click_count' => $this->numericCustomFieldFromContact($contact, ['trigger_link_click_count', 'triggerLinkClicks', 'trigger_link_clicks', 'link_clicks', 'website_clicks', 'social_clicks', 'youtube_clicks', 'instagram_clicks', 'x_clicks', 'plyrcard_link_clicks', 'stats.clicks']),
+            'trigger_link_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count', 'view_profile_email_link', 'trigger_link_click_count', 'triggerLinkClicks', 'trigger_link_clicks', 'link_clicks', 'website_clicks', 'social_clicks', 'youtube_clicks', 'instagram_clicks', 'x_clicks', 'plyrcard_link_clicks', 'stats.clicks']),
+            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count']),
+            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count']),
+            'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count']),
             'coach_reply_count' => $this->numericCustomFieldFromContact($contact, ['coach_reply_count', 'replyCount', 'replies', 'email_replies', 'plyrcard_coach_replies', 'stats.replies']),
             'valid_email' => $contact['validEmail'] ?? null,
             'dnd' => $contact['dnd'] ?? false,
@@ -4169,11 +4178,11 @@ class GoHighLevelService
     protected function getRecruitingMetricCustomFieldKeys(): array
     {
         return [
-            'profile_views' => ['plyrcard_profile_views', 'profile_views', 'profile_view_count'],
-            'link_clicks' => ['plyrcard_link_clicks', 'link_clicks', 'trigger_link_clicks', 'trigger_link_click_count'],
-            'email_opens' => ['plyrcard_email_opens', 'email_opens', 'opened_emails'],
+            'profile_views' => ['view_profile_total', 'plyrcard_profile_views', 'profile_views', 'profile_view_count'],
+            'link_clicks' => ['email_click_count', 'view_profile_email_link', 'plyrcard_link_clicks', 'link_clicks', 'trigger_link_clicks', 'trigger_link_click_count'],
+            'email_opens' => ['email_open_count', 'plyrcard_email_opens', 'email_opens', 'opened_emails'],
             'coach_replies' => ['plyrcard_coach_replies', 'coach_replies', 'replies', 'coach_reply_count'],
-            'emails_sent' => ['plyrcard_total_emails_sent', 'emails_sent', 'total_emails_sent'],
+            'emails_sent' => ['email_sent_count', 'plyrcard_total_emails_sent', 'emails_sent', 'total_emails_sent'],
         ];
     }
 
@@ -4555,5 +4564,292 @@ class GoHighLevelService
 
         return 0;
     }
+
+
+public function trackingCustomFieldDefinitions(): array
+{
+    return [
+        'view_profile_total' => ['name' => 'PLYRCard View Profile Total', 'dataType' => 'NUMERICAL'],
+        'view_profile_website' => ['name' => 'PLYRCard View Profile Website', 'dataType' => 'NUMERICAL'],
+        'view_profile_instagram' => ['name' => 'PLYRCard View Profile Instagram', 'dataType' => 'NUMERICAL'],
+        'view_profile_youtube' => ['name' => 'PLYRCard View Profile YouTube', 'dataType' => 'NUMERICAL'],
+        'view_profile_x' => ['name' => 'PLYRCard View Profile X', 'dataType' => 'NUMERICAL'],
+        'view_profile_email_link' => ['name' => 'PLYRCard View Profile Email Link', 'dataType' => 'NUMERICAL'],
+        'email_sent_count' => ['name' => 'PLYRCard Email Sent Count', 'dataType' => 'NUMERICAL'],
+        'email_open_count' => ['name' => 'PLYRCard Email Open Count', 'dataType' => 'NUMERICAL'],
+        'email_click_count' => ['name' => 'PLYRCard Email Click Count', 'dataType' => 'NUMERICAL'],
+        'last_profile_view_source' => ['name' => 'PLYRCard Last Profile View Source', 'dataType' => 'TEXT'],
+        'last_profile_view_at' => ['name' => 'PLYRCard Last Profile View At', 'dataType' => 'TEXT'],
+        'last_clicked_url' => ['name' => 'PLYRCard Last Clicked URL', 'dataType' => 'TEXT'],
+        'last_clicked_platform' => ['name' => 'PLYRCard Last Clicked Platform', 'dataType' => 'TEXT'],
+        'last_tracking_host' => ['name' => 'PLYRCard Last Tracking Host', 'dataType' => 'TEXT'],
+    ];
+}
+
+public function incrementTrackingFieldsForUser(?User $user, string $contactId, string $platform, string $eventType = 'link_click', array $metadata = []): array
+{
+    $contactId = trim($contactId);
+    if ($contactId === '') {
+        return ['success' => false, 'error' => 'Missing GHL contact ID.'];
+    }
+
+    $credentials = $user ? $this->credentialsForUser($user) : [
+        'location_id' => config('ghl.location_id'),
+        'token_override' => null,
+    ];
+
+    $locationId = $credentials['location_id'] ?: config('ghl.location_id');
+    $tokenOverride = $credentials['token_override'] ?? null;
+    $token = $this->tokenForLocation($locationId, $tokenOverride);
+
+    if (! $locationId || ! $token) {
+        return ['success' => false, 'error' => 'Missing GHL location or token.'];
+    }
+
+    $platform = $this->normalizeTrackingPlatform($platform);
+    $eventType = strtolower(trim($eventType));
+    $source = strtolower((string) ($metadata['source'] ?? ''));
+
+    $this->ensureTrackingCustomFieldsForLocation($locationId, $token);
+
+    $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride);
+
+    $incrementKeys = [];
+
+    if (in_array($eventType, ['email_sent', 'sent'], true)) {
+        $incrementKeys[] = 'email_sent_count';
+    } elseif (in_array($eventType, ['email_open', 'open'], true)) {
+        $incrementKeys[] = 'email_open_count';
+    } else {
+        if (str_contains($source, 'email') || in_array($eventType, ['email_click', 'click_email'], true)) {
+            $incrementKeys[] = 'email_click_count';
+        }
+
+        $incrementKeys[] = 'view_profile_total';
+
+        if ($platform === 'email') {
+            $incrementKeys[] = 'view_profile_email_link';
+        } else {
+            $incrementKeys[] = 'view_profile_' . $platform;
+        }
+    }
+
+    $incrementKeys = collect($incrementKeys)->filter()->unique()->values()->all();
+    $customFields = [];
+    $nextValues = [];
+
+    foreach ($incrementKeys as $key) {
+        $current = $this->numericCustomFieldFromContact($contact, [$key]);
+        $next = $current + 1;
+        $nextValues[$key] = $next;
+        $customFields[] = $this->trackingCustomFieldPayload($locationId, $key, $next);
+    }
+
+    $now = now()->toIso8601String();
+    $textUpdates = [
+        'last_profile_view_source' => $source ?: $eventType,
+        'last_profile_view_at' => $now,
+        'last_clicked_url' => (string) ($metadata['destination_url'] ?? ''),
+        'last_clicked_platform' => $platform,
+        'last_tracking_host' => (string) ($metadata['host'] ?? request()?->getHost() ?? ''),
+    ];
+
+    foreach ($textUpdates as $key => $value) {
+        if ($value !== '') {
+            $customFields[] = $this->trackingCustomFieldPayload($locationId, $key, $value);
+        }
+    }
+
+    try {
+        $response = Http::withHeaders(['Version' => config('ghl.version', '2021-07-28')])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->put("{$this->baseUrl}/contacts/{$contactId}", ['customFields' => $customFields]);
+
+        if ($response->failed()) {
+            Log::error('PLYRCard GHL tracking update failed.', [
+                'contact_id' => $contactId,
+                'location_id' => $locationId,
+                'platform' => $platform,
+                'event_type' => $eventType,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'custom_fields' => $customFields,
+            ]);
+
+            return ['success' => false, 'error' => 'GHL tracking update failed.', 'status' => $response->status()];
+        }
+
+        return [
+            'success' => true,
+            'contact_id' => $contactId,
+            'location_id' => $locationId,
+            'platform' => $platform,
+            'event_type' => $eventType,
+            'increments' => $nextValues,
+        ];
+    } catch (\Throwable $exception) {
+        Log::error('PLYRCard GHL tracking exception.', [
+            'contact_id' => $contactId,
+            'platform' => $platform,
+            'event_type' => $eventType,
+            'error' => $exception->getMessage(),
+        ]);
+
+        return ['success' => false, 'error' => $exception->getMessage()];
+    }
+}
+
+public function incrementTrackingEmailSentForUser(?User $user, string $contactId, array $metadata = []): array
+{
+    return $this->incrementTrackingFieldsForUser($user, $contactId, 'email', 'email_sent', $metadata);
+}
+
+protected function normalizeTrackingPlatform(?string $platform): string
+{
+    $platform = strtolower(trim((string) $platform));
+    $platform = str_replace(['twitter', 'twitter_x'], 'x', $platform);
+
+    return in_array($platform, ['website', 'instagram', 'youtube', 'x', 'email'], true)
+        ? $platform
+        : 'website';
+}
+
+protected function trackingCustomFieldPayload(string $locationId, string $key, mixed $value): array
+{
+    $field = $this->trackingCustomFieldMap($locationId)[$key] ?? [];
+
+    $payload = [
+        'key' => $field['fieldKey'] ?? $field['key'] ?? $key,
+        'field_value' => $value,
+    ];
+
+    if (! empty($field['id'])) {
+        $payload['id'] = $field['id'];
+    }
+
+    return $payload;
+}
+
+protected function trackingCustomFieldMap(string $locationId): array
+{
+    return \Illuminate\Support\Facades\Cache::get($this->trackingCustomFieldCacheKey($locationId), []);
+}
+
+protected function ensureTrackingCustomFieldsForLocation(string $locationId, string $token): array
+{
+    $cacheKey = $this->trackingCustomFieldCacheKey($locationId);
+
+    return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addHours(12), function () use ($locationId, $token): array {
+        $existing = $this->getLocationCustomFields($locationId, $token);
+        $map = [];
+
+        foreach ($existing as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $keys = collect([
+                $field['fieldKey'] ?? null,
+                $field['key'] ?? null,
+                $field['name'] ?? null,
+            ])->filter()->map(fn ($value): string => strtolower(str_replace([' ', '-'], '_', (string) $value)))->all();
+
+            foreach ($this->trackingCustomFieldDefinitions() as $key => $definition) {
+                $normalizedName = strtolower(str_replace([' ', '-'], '_', (string) ($definition['name'] ?? $key)));
+                if (in_array($key, $keys, true) || in_array($normalizedName, $keys, true)) {
+                    $map[$key] = [
+                        'id' => $field['id'] ?? $field['_id'] ?? null,
+                        'key' => $key,
+                        'fieldKey' => $field['fieldKey'] ?? $field['key'] ?? $key,
+                    ];
+                }
+            }
+        }
+
+        foreach ($this->trackingCustomFieldDefinitions() as $key => $definition) {
+            if (isset($map[$key])) {
+                continue;
+            }
+
+            $created = $this->createLocationCustomField($locationId, $token, $key, $definition);
+            $map[$key] = [
+                'id' => $created['id'] ?? $created['_id'] ?? null,
+                'key' => $key,
+                'fieldKey' => $created['fieldKey'] ?? $created['key'] ?? $key,
+            ];
+        }
+
+        return $map;
+    });
+}
+
+protected function trackingCustomFieldCacheKey(string $locationId): string
+{
+    return 'ghl:tracking-custom-fields:' . $locationId;
+}
+
+protected function getLocationCustomFields(string $locationId, string $token): array
+{
+    try {
+        $response = Http::withHeaders(['Version' => config('ghl.version', '2021-07-28')])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->get("{$this->baseUrl}/locations/{$locationId}/customFields");
+
+        if ($response->failed()) {
+            Log::warning('GHL custom field list failed.', ['location_id' => $locationId, 'status' => $response->status(), 'body' => $response->body()]);
+            return [];
+        }
+
+        $data = $response->json() ?? [];
+        $fields = $data['customFields'] ?? $data['customField'] ?? $data['fields'] ?? $data['data'] ?? [];
+
+        return is_array($fields) ? array_values(array_filter($fields, 'is_array')) : [];
+    } catch (\Throwable $exception) {
+        Log::warning('GHL custom field list exception.', ['location_id' => $locationId, 'error' => $exception->getMessage()]);
+        return [];
+    }
+}
+
+protected function createLocationCustomField(string $locationId, string $token, string $key, array $definition): array
+{
+    $payload = [
+        'locationId' => $locationId,
+        'name' => $definition['name'] ?? str($key)->headline()->toString(),
+        'dataType' => $definition['dataType'] ?? 'TEXT',
+        'placeholder' => $definition['name'] ?? $key,
+    ];
+
+    try {
+        $response = Http::withHeaders(['Version' => config('ghl.version', '2021-07-28')])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->post("{$this->baseUrl}/locations/{$locationId}/customFields", $payload);
+
+        if ($response->failed()) {
+            Log::warning('GHL custom field create failed. Will still try updating by key.', [
+                'location_id' => $locationId,
+                'key' => $key,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            return ['key' => $key, 'fieldKey' => $key];
+        }
+
+        $data = $response->json() ?? [];
+        $field = $data['customField'] ?? $data['field'] ?? $data['data'] ?? $data;
+
+        return is_array($field) ? $field : ['key' => $key, 'fieldKey' => $key];
+    } catch (\Throwable $exception) {
+        Log::warning('GHL custom field create exception. Will still try updating by key.', ['location_id' => $locationId, 'key' => $key, 'error' => $exception->getMessage()]);
+        return ['key' => $key, 'fieldKey' => $key];
+    }
+}
+
 
 }
