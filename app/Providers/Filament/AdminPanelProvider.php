@@ -25,6 +25,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -578,8 +579,657 @@ class AdminPanelProvider extends PanelProvider
                                 max-width: none !important;
                             }
                         }
+
+
+                        /* Headerless admin shell: keep logo and navigation together in the sidebar. */
+                        .fi-topbar,
+                        .fi-header,
+                        header.fi-header,
+                        .fi-ta-header,
+                        .fi-page-header {
+                            display: none !important;
+                            height: 0 !important;
+                            min-height: 0 !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            border: 0 !important;
+                            overflow: hidden !important;
+                        }
+
+                        html,
+                        body,
+                        .fi-body,
+                        .fi-layout,
+                        .fi-main-ctn,
+                        .fi-main,
+                        .fi-page,
+                        .fi-page-content {
+                            margin-top: 0 !important;
+                            padding-top: 0 !important;
+                        }
+
+                        .fi-main-ctn {
+                            min-height: 100vh !important;
+                        }
+
+                        .fi-main {
+                            padding-top: 1.5rem !important;
+                        }
+
+                        .fi-sidebar {
+                            top: 0 !important;
+                        }
+
+                        .fi-sidebar-nav,
+                        .fi-sidebar-nav-groups {
+                            padding-top: 0 !important;
+                            margin-top: 0 !important;
+                        }
+
+                        .fi-sidebar {
+                            min-height: 100vh !important;
+                            border-right: 1px solid rgba(226, 232, 240, .8) !important;
+                            background: #ffffff !important;
+                        }
+
+                        .dark .fi-sidebar {
+                            border-right-color: rgba(148, 163, 184, .14) !important;
+                            background: #020617 !important;
+                        }
+
+                        .fi-sidebar-header {
+                            min-height: 5rem !important;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72) !important;
+                            margin-bottom: .35rem !important;
+                        }
+
+                        .dark .fi-sidebar-header {
+                            border-bottom-color: rgba(148, 163, 184, .12) !important;
+                        }
+
+                        /* The original Filament sidebar header is hidden because we render the brand inside the nav itself. */
+                        .fi-sidebar-header {
+                            display: none !important;
+                        }
+
+                        .plyr-sidebar-brand-wrap {
+                            padding: 1.15rem .55rem 1.05rem .55rem;
+                            margin: 0 0 .55rem 0;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72);
+                            overflow: hidden;
+                        }
+
+                        .dark .plyr-sidebar-brand-wrap {
+                            border-bottom-color: rgba(148, 163, 184, .12);
+                        }
+
+                        .plyr-sidebar-brand {
+                            display: flex;
+                            align-items: center;
+                            width: 100%;
+                            max-width: 10.75rem;
+                            text-decoration: none;
+                            overflow: hidden;
+                        }
+
+                        .plyr-sidebar-brand img {
+                            display: block !important;
+                            height: 2.85rem;
+                            width: auto;
+                            max-width: 10.5rem;
+                            object-fit: contain;
+                            object-position: left center;
+                            flex: 0 0 auto;
+                        }
+
+                        .plyr-sidebar-user-actions {
+                            width: calc(100% - .55rem);
+                            border-radius: 1rem;
+                            border: 1px solid rgba(226, 232, 240, .95);
+                            background: rgba(255, 255, 255, .9);
+                            box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+                            overflow: hidden;
+                        }
+
+                        .dark .plyr-sidebar-user-actions {
+                            border-color: rgba(148, 163, 184, .16);
+                            background: rgba(15, 23, 42, .74);
+                            box-shadow: none;
+                        }
+
+                        .plyr-sidebar-user-action,
+                        .plyr-sidebar-user-action-button {
+                            width: 100%;
+                            min-height: 2.55rem;
+                            display: flex;
+                            align-items: center;
+                            gap: .72rem;
+                            padding: .62rem .78rem;
+                            border: 0;
+                            background: transparent;
+                            color: #1f2937;
+                            text-decoration: none;
+                            font-size: .86rem;
+                            font-weight: 500;
+                            text-align: left;
+                            cursor: pointer;
+                            transition: background .18s ease, color .18s ease;
+                        }
+
+                        .plyr-sidebar-user-action:hover,
+                        .plyr-sidebar-user-action-button:hover {
+                            background: rgba(243, 244, 246, .95);
+                            color: var(--plyr-orange);
+                        }
+
+                        .dark .plyr-sidebar-user-action,
+                        .dark .plyr-sidebar-user-action-button {
+                            color: #e5e7eb;
+                        }
+
+                        .dark .plyr-sidebar-user-action:hover,
+                        .dark .plyr-sidebar-user-action-button:hover {
+                            background: rgba(30, 41, 59, .72);
+                            color: #ff8a70;
+                        }
+
+                        .plyr-sidebar-user-action svg,
+                        .plyr-sidebar-user-action-button svg {
+                            width: 1.05rem;
+                            height: 1.05rem;
+                            color: #8b95a7;
+                            flex: 0 0 auto;
+                        }
+
+                        .plyr-sidebar-user-action:hover svg,
+                        .plyr-sidebar-user-action-button:hover svg {
+                            color: currentColor;
+                        }
+
+                        .plyr-sidebar-user-actions-separator {
+                            height: 1px;
+                            background: rgba(226, 232, 240, .9);
+                            margin: .25rem .78rem;
+                        }
+
+                        .dark .plyr-sidebar-user-actions-separator {
+                            background: rgba(148, 163, 184, .14);
+                        }
+
+                        .plyr-sidebar-user-action-danger,
+                        .plyr-sidebar-user-action-danger svg {
+                            color: var(--plyr-orange) !important;
+                        }
+
+                        .plyr-sidebar-user-action-danger:hover,
+                        .plyr-sidebar-user-action-danger:hover svg {
+                            color: #e14f2d !important;
+                        }
+
+
+
+                        /* Final sidebar logo/account polish. */
+                        [x-cloak] {
+                            display: none !important;
+                        }
+
+                        .fi-sidebar-header {
+                            display: none !important;
+                            height: 0 !important;
+                            min-height: 0 !important;
+                            max-height: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            overflow: hidden !important;
+                        }
+
+                        .fi-sidebar-nav {
+                            padding-top: 0 !important;
+                        }
+
+                        .plyr-sidebar-brand-wrap {
+                            padding: 1.25rem 1.05rem 1.15rem 1.05rem !important;
+                            margin: 0 0 .75rem 0 !important;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72) !important;
+                            background: transparent !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .dark .plyr-sidebar-brand-wrap {
+                            border-bottom-color: rgba(148, 163, 184, .14) !important;
+                            background: transparent !important;
+                        }
+
+                        .plyr-sidebar-brand {
+                            display: inline-flex !important;
+                            align-items: center !important;
+                            width: auto !important;
+                            max-width: 11.5rem !important;
+                            height: auto !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            background: transparent !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .plyr-sidebar-brand:hover {
+                            background: transparent !important;
+                            box-shadow: none !important;
+                            transform: none !important;
+                        }
+
+                        .plyr-sidebar-brand img {
+                            display: block !important;
+                            height: auto !important;
+                            width: min(13.1rem, 100%) !important;
+                            max-width: 13.1rem !important;
+                            object-fit: contain !important;
+                            object-position: left center !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            background: transparent !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                        }
+
+                        .plyr-sidebar-brand-logo-dark {
+                            display: none !important;
+                        }
+
+                        .dark .plyr-sidebar-brand-logo-light {
+                            display: none !important;
+                        }
+
+                        .dark .plyr-sidebar-brand-logo-dark {
+                            display: block !important;
+                        }
+
+                        .plyr-sidebar-account {
+                            position: relative;
+                            width: calc(100% - .55rem);
+                        }
+
+                        .plyr-sidebar-account .plyr-sidebar-profile {
+                            width: 100%;
+                            cursor: pointer;
+                        }
+
+                        .plyr-sidebar-account-trigger {
+                            border: 1px solid rgba(255, 99, 56, .55) !important;
+                        }
+
+                        .plyr-sidebar-user-actions {
+                            position: absolute;
+                            left: 0;
+                            right: 0;
+                            bottom: calc(100% + .55rem);
+                            z-index: 30;
+                            width: 100% !important;
+                            opacity: 0;
+                            visibility: hidden;
+                            transform: translateY(.35rem) scale(.985);
+                            transform-origin: bottom center;
+                            pointer-events: none;
+                            transition:
+                                opacity .16s ease,
+                                visibility .16s ease,
+                                transform .16s ease;
+                        }
+
+                        .plyr-sidebar-account:hover .plyr-sidebar-user-actions,
+                        .plyr-sidebar-account:focus-within .plyr-sidebar-user-actions,
+                        .plyr-sidebar-account[data-open="true"] .plyr-sidebar-user-actions {
+                            opacity: 1;
+                            visibility: visible;
+                            transform: translateY(0) scale(1);
+                            pointer-events: auto;
+                        }
+
+                        .plyr-sidebar-footer > .plyr-sidebar-profile {
+                            display: none !important;
+                        }
+
+
+
+                        /* Clean single sidebar brand logo: no active background, no duplicate logo, no card. */
+                        .plyr-sidebar-brand-wrap,
+                        .fi-sidebar .plyr-sidebar-brand-wrap {
+                            padding: 1.15rem 1.15rem 1rem 1.15rem !important;
+                            margin: 0 0 .7rem 0 !important;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72) !important;
+                            background: transparent !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .dark .plyr-sidebar-brand-wrap,
+                        .dark .fi-sidebar .plyr-sidebar-brand-wrap {
+                            border-bottom-color: rgba(148, 163, 184, .14) !important;
+                            background: transparent !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand,
+                        .fi-sidebar a.plyr-sidebar-brand:hover,
+                        .fi-sidebar a.plyr-sidebar-brand:focus,
+                        .fi-sidebar a.plyr-sidebar-brand[data-plyr-active="true"],
+                        .fi-sidebar a.plyr-sidebar-brand.plyr-sidebar-item-active {
+                            display: inline-flex !important;
+                            width: auto !important;
+                            min-height: 0 !important;
+                            height: auto !important;
+                            max-width: 11.5rem !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            gap: 0 !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            background: transparent !important;
+                            color: inherit !important;
+                            box-shadow: none !important;
+                            transform: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand img.plyr-sidebar-brand-logo {
+                            display: block !important;
+                            height: auto !important;
+                            width: min(13.1rem, 100%) !important;
+                            max-width: 13.1rem !important;
+                            object-fit: contain !important;
+                            object-position: left center !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                        }
+
+
+
+                        /* Final fix: larger plain logo, stable account flyout, dashboard dark toggle. */
+
+                        .fi-topbar,
+                        .fi-sidebar-header .fi-logo,
+                        .fi-sidebar-header .fi-brand,
+                        .fi-sidebar-header a:not(.plyr-sidebar-brand),
+                        .fi-sidebar-header img:not(.plyr-sidebar-brand-logo) {
+                            display: none !important;
+                            height: 0 !important;
+                            min-height: 0 !important;
+                            max-height: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            overflow: hidden !important;
+                        }
+
+                        .fi-sidebar-header,
+                        .fi-sidebar-header *:not(.plyr-sidebar-brand):not(.plyr-sidebar-brand *) {
+                            display: none !important;
+                            height: 0 !important;
+                            min-height: 0 !important;
+                            max-height: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            overflow: hidden !important;
+                        }
+
+                        .fi-sidebar .plyr-sidebar-brand-wrap {
+                            padding: 1.65rem 1.15rem 1.35rem 1.15rem !important;
+                            margin: 0 0 1.15rem 0 !important;
+                            background: transparent !important;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72) !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .dark .fi-sidebar .plyr-sidebar-brand-wrap {
+                            background: transparent !important;
+                            border-bottom-color: rgba(148, 163, 184, .14) !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand,
+                        .fi-sidebar a.plyr-sidebar-brand:hover,
+                        .fi-sidebar a.plyr-sidebar-brand:focus,
+                        .fi-sidebar a.plyr-sidebar-brand[data-plyr-active="true"] {
+                            display: inline-flex !important;
+                            align-items: center !important;
+                            width: auto !important;
+                            min-height: 0 !important;
+                            height: auto !important;
+                            max-width: none !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            gap: 0 !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                            transform: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand img.plyr-sidebar-brand-logo {
+                            display: block !important;
+                            height: 5.35rem !important;
+                            width: auto !important;
+                            max-width: 14.9rem !important;
+                            object-fit: contain !important;
+                            object-position: left center !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                        }
+
+                        .plyr-sidebar-account {
+                            position: relative !important;
+                            isolation: isolate;
+                        }
+
+                        .plyr-sidebar-account::before {
+                            content: "";
+                            position: absolute;
+                            left: 0;
+                            right: 0;
+                            bottom: 100%;
+                            height: .8rem;
+                            z-index: 29;
+                        }
+
+                        .plyr-sidebar-account .plyr-sidebar-user-actions {
+                            bottom: calc(100% + .18rem) !important;
+                            z-index: 50 !important;
+                            pointer-events: none;
+                        }
+
+                        .plyr-sidebar-account:hover .plyr-sidebar-user-actions,
+                        .plyr-sidebar-account:focus-within .plyr-sidebar-user-actions,
+                        .plyr-sidebar-account[data-open="true"] .plyr-sidebar-user-actions {
+                            pointer-events: auto !important;
+                        }
+
+                        .rc-home-dark-toggle-v2 {
+                            width: 2.65rem;
+                            height: 2.65rem;
+                            display: inline-grid;
+                            place-items: center;
+                            border: 1px solid #e5e7eb;
+                            border-radius: .85rem;
+                            background: rgba(255,255,255,.94);
+                            color: #0f172a;
+                            box-shadow: 0 8px 24px rgba(15,23,42,.08);
+                            cursor: pointer;
+                            transition: transform .18s ease, border-color .18s ease, background .18s ease;
+                        }
+
+                        .rc-home-dark-toggle-v2:hover {
+                            transform: translateY(-1px);
+                            border-color: rgba(255, 99, 56, .35);
+                        }
+
+                        .rc-home-dark-toggle-v2 svg {
+                            width: 1.12rem;
+                            height: 1.12rem;
+                        }
+
+                        .rc-home-dark-toggle-v2 .rc-dark-icon-sun { display: none; }
+                        .dark .rc-home-dark-toggle-v2 {
+                            border-color: rgba(148,163,184,.18);
+                            background: rgba(17,24,39,.82);
+                            color: #f8fafc;
+                            box-shadow: none;
+                        }
+                        .dark .rc-home-dark-toggle-v2 .rc-dark-icon-moon { display: none; }
+                        .dark .rc-home-dark-toggle-v2 .rc-dark-icon-sun { display: block; }
+
+                        /* Final override: bigger sidebar logo + true square custom dark toggle. */
+                        .fi-sidebar .plyr-sidebar-brand-wrap,
+                        .fi-sidebar .plyr-sidebar-brand-wrap:hover,
+                        .dark .fi-sidebar .plyr-sidebar-brand-wrap {
+                            padding: 1.35rem 1rem 1.1rem 1rem !important;
+                            margin: 0 0 1.1rem 0 !important;
+                            background: transparent !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand,
+                        .fi-sidebar a.plyr-sidebar-brand:hover,
+                        .fi-sidebar a.plyr-sidebar-brand:focus,
+                        .fi-sidebar a.plyr-sidebar-brand:active,
+                        .fi-sidebar a.plyr-sidebar-brand[data-plyr-active="true"] {
+                            background: transparent !important;
+                            border: 0 !important;
+                            box-shadow: none !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border-radius: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            transform: none !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand img.plyr-sidebar-brand-logo {
+                            display: block !important;
+                            width: min(13.1rem, 100%) !important;
+                            max-width: 13.1rem !important;
+                            height: auto !important;
+                            max-height: 4rem !important;
+                            min-width: 0 !important;
+                            object-fit: contain !important;
+                            object-position: left center !important;
+                            background: transparent !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                        }
+
+                        .rc-home-dark-toggle-v2,
+                        button.rc-home-dark-toggle-v2,
+                        [data-plyr-dark-toggle].rc-home-dark-toggle-v2 {
+                            inline-size: 2.75rem !important;
+                            block-size: 2.75rem !important;
+                            width: 2.75rem !important;
+                            min-width: 2.75rem !important;
+                            max-width: 2.75rem !important;
+                            height: 2.75rem !important;
+                            min-height: 2.75rem !important;
+                            max-height: 2.75rem !important;
+                            aspect-ratio: 1 / 1 !important;
+                            padding: 0 !important;
+                            border-radius: .9rem !important;
+                            display: inline-grid !important;
+                            place-items: center !important;
+                            flex: 0 0 2.75rem !important;
+                            overflow: hidden !important;
+                        }
+
+
+                        /* Final sticky sidebar logo fix: visible while sidebar nav scrolls, never clipped. */
+                        .fi-sidebar .plyr-sidebar-brand-wrap {
+                            position: sticky !important;
+                            top: 0 !important;
+                            z-index: 80 !important;
+                            display: flex !important;
+                            align-items: center !important;
+                            padding: 1.05rem 1rem 1rem 1rem !important;
+                            margin: 0 0 1rem 0 !important;
+                            min-height: 5.75rem !important;
+                            width: 100% !important;
+                            background: #ffffff !important;
+                            border-bottom: 1px solid rgba(226, 232, 240, .72) !important;
+                            overflow: visible !important;
+                            transform: translateZ(0) !important;
+                        }
+
+                        .dark .fi-sidebar .plyr-sidebar-brand-wrap {
+                            background: #020617 !important;
+                            border-bottom-color: rgba(148, 163, 184, .14) !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand {
+                            display: flex !important;
+                            align-items: center !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            min-height: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            background: transparent !important;
+                            border: 0 !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                        }
+
+                        .fi-sidebar a.plyr-sidebar-brand img.plyr-sidebar-brand-logo {
+                            display: block !important;
+                            width: 11.65rem !important;
+                            max-width: 100% !important;
+                            height: auto !important;
+                            max-height: 3.6rem !important;
+                            object-fit: contain !important;
+                            object-position: left center !important;
+                            background: transparent !important;
+                            border: 0 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                        }
+
+                        .fi-sidebar-nav {
+                            scroll-padding-top: 6rem !important;
+                        }
                     </style>
                 HTML,
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_NAV_START,
+                fn (): string => Blade::render(<<<'BLADE'
+                    <div class="plyr-sidebar-brand-wrap">
+                        <a href="{{ url('/admin/coach-database') }}" class="plyr-sidebar-brand" aria-label="PLYRCARD Dashboard">
+                            <img
+                                src="{{ asset('logoDark.png') }}"
+                                data-light-src="{{ asset('logoDark.png') }}"
+                                data-dark-src="{{ asset('logo.png') }}"
+                                alt="PLYRCARD"
+                                class="plyr-sidebar-brand-logo"
+                            >
+                        </a>
+                    </div>
+                BLADE),
             )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_END,
@@ -597,7 +1247,21 @@ class AdminPanelProvider extends PanelProvider
                         $user->last_name ?? null,
                     ])->filter()->implode(' ')) ?: 'My Profile';
 
-                    $profileUrl = ProfileResource::getUrl('index');
+                    $profileUrl = Route::has('filament.admin.auth.profile')
+                        ? route('filament.admin.auth.profile')
+                        : ProfileResource::getUrl('index');
+
+                    $editProfileUrl = $profileUrl;
+
+                    $changePasswordUrl = Route::has('filament.admin.pages.force-password-change')
+                        ? route('filament.admin.pages.force-password-change')
+                        : url('/admin/force-password-change');
+
+                    $logoutUrl = Route::has('filament.admin.auth.logout')
+                        ? route('filament.admin.auth.logout')
+                        : url('/admin/logout');
+
+                    $managePlanUrl = url('/admin');
 
                     $avatarUrl = null;
 
@@ -633,22 +1297,65 @@ class AdminPanelProvider extends PanelProvider
 
                     return Blade::render(<<<'BLADE'
                         <div class="plyr-sidebar-footer">
-                            <a href="{{ $profileUrl }}" class="plyr-sidebar-profile">
-                                <span class="plyr-sidebar-avatar">
-                                    <img src="{{ $avatarUrl }}" alt="{{ $name }}">
-                                </span>
+                            <div class="plyr-sidebar-account" x-data="{ open: false, closeTimer: null, show() { clearTimeout(this.closeTimer); this.open = true }, hide() { clearTimeout(this.closeTimer); this.closeTimer = setTimeout(() => this.open = false, 220) } }" x-bind:data-open="open ? 'true' : 'false'" x-on:mouseenter="show()" x-on:mouseleave="hide()">
+                                <div class="plyr-sidebar-user-actions" x-cloak x-show="open" x-transition.opacity.scale.origin.bottom aria-label="Account options">
+                                    <a href="{{ $profileUrl }}" class="plyr-sidebar-user-action">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M20 21a8 8 0 0 0-16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                            <path d="M12 13a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.8"/>
+                                        </svg>
+                                        <span>View Profile</span>
+                                    </a>
 
-                                <span class="plyr-sidebar-profile-main">
-                                    <span class="plyr-sidebar-profile-name">{{ $name }}</span>
-                                    <span class="plyr-sidebar-profile-link">View Profile</span>
-                                </span>
+                                    <a href="{{ $editProfileUrl }}" class="plyr-sidebar-user-action">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                            <path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        </svg>
+                                        <span>Edit Profile</span>
+                                    </a>
 
-                                <svg class="plyr-sidebar-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                    <path d="M6.5 8L10 11.5L13.5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </a>
+                                    <a href="{{ $changePasswordUrl }}" class="plyr-sidebar-user-action">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M12 15.5v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                            <path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                            <path d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" stroke-width="1.8"/>
+                                        </svg>
+                                        <span>Change Password</span>
+                                    </a>
 
-                            <div class="plyr-sidebar-plan" aria-label="Current plan">
+                                    <div class="plyr-sidebar-user-actions-separator"></div>
+
+                                    <form method="POST" action="{{ $logoutUrl }}">
+                                        @csrf
+                                        <button type="submit" class="plyr-sidebar-user-action-button plyr-sidebar-user-action-danger">
+                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="M15 17l5-5l-5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                <path d="M20 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                                <path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                            </svg>
+                                            <span>Sign Out</span>
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <button type="button" class="plyr-sidebar-profile plyr-sidebar-account-trigger" x-on:click="open = ! open" x-on:keydown.escape.window="open = false" aria-label="Open account menu">
+                                    <span class="plyr-sidebar-avatar">
+                                        <img src="{{ $avatarUrl }}" alt="{{ $name }}">
+                                    </span>
+
+                                    <span class="plyr-sidebar-profile-main">
+                                        <span class="plyr-sidebar-profile-name">{{ $name }}</span>
+                                        <span class="plyr-sidebar-profile-link">View Profile</span>
+                                    </span>
+
+                                    <svg class="plyr-sidebar-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true" x-bind:style="open ? 'transform: rotate(180deg)' : ''">
+                                        <path d="M6.5 8L10 11.5L13.5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <a href="{{ $managePlanUrl }}" class="plyr-sidebar-plan" aria-label="Manage current plan">
                                 <span class="plyr-sidebar-plan-icon">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M13 2L5 13H11L10 22L19 10H13L13 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -657,14 +1364,18 @@ class AdminPanelProvider extends PanelProvider
 
                                 <span class="plyr-sidebar-plan-main">
                                     <span class="plyr-sidebar-plan-name">{{ $planLabel }}</span>
-                                    <span class="plyr-sidebar-plan-link">Current Plan</span>
+                                    <span class="plyr-sidebar-plan-link">Manage Plan</span>
                                 </span>
-                            </div>
+                            </a>
                         </div>
                     BLADE, [
                         'user' => $user,
                         'name' => $name,
                         'profileUrl' => $profileUrl,
+                        'editProfileUrl' => $editProfileUrl,
+                        'changePasswordUrl' => $changePasswordUrl,
+                        'logoutUrl' => $logoutUrl,
+                        'managePlanUrl' => $managePlanUrl,
                         'avatarUrl' => $avatarUrl,
                         'planLabel' => $planLabel,
                     ]);
@@ -685,6 +1396,113 @@ class AdminPanelProvider extends PanelProvider
                                 const ORANGE_SOFT_HOVER = 'rgba(255, 99, 56, .21)';
                                 const GREY_ICON = '#8b95a7';
                                 const GREY_ICON_BG = '#eef1f5';
+
+                                try {
+                                    const savedTheme = localStorage.getItem('theme') || localStorage.getItem('filament-theme') || localStorage.getItem('color-theme') || localStorage.getItem('plyr-theme');
+
+                                    if (savedTheme === 'dark' || savedTheme === 'light') {
+                                        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+                                        document.body.classList.toggle('dark', savedTheme === 'dark');
+                                        document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+                                    }
+                                } catch (error) {}
+
+                                function isPlyrDarkModeActive() {
+                                    return document.documentElement.classList.contains('dark') || document.body.classList.contains('dark');
+                                }
+
+                                function updatePlyrDarkButtons() {
+                                    const isDark = isPlyrDarkModeActive();
+
+                                    document.querySelectorAll('[data-plyr-dark-toggle]').forEach(function (button) {
+                                        button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+                                        button.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                                    });
+                                }
+
+                                function findNativeFilamentDarkToggle() {
+                                    const selectors = [
+                                        'button[aria-label*=\"dark\" i]',
+                                        'button[aria-label*=\"theme\" i]',
+                                        'button[title*=\"dark\" i]',
+                                        'button[title*=\"theme\" i]',
+                                        '[data-theme-toggle]',
+                                        '[data-filament-theme-toggle]'
+                                    ];
+
+                                    return selectors
+                                        .flatMap(function (selector) { return Array.from(document.querySelectorAll(selector)); })
+                                        .find(function (element) {
+                                            return ! element.closest('[data-plyr-dark-toggle]') && ! element.closest('.rc-home-dark-toggle-v2');
+                                        }) || null;
+                                }
+
+                                function fallbackToggleFilamentDarkMode() {
+                                    const shouldBeDark = ! isPlyrDarkModeActive();
+
+                                    document.documentElement.classList.toggle('dark', shouldBeDark);
+                                    document.body.classList.toggle('dark', shouldBeDark);
+
+                                    try {
+                                        localStorage.setItem('theme', shouldBeDark ? 'dark' : 'light');
+                                        localStorage.setItem('filament-theme', shouldBeDark ? 'dark' : 'light');
+                                        localStorage.setItem('color-theme', shouldBeDark ? 'dark' : 'light');
+                                    } catch (error) {}
+
+                                    document.dispatchEvent(new CustomEvent('plyr:dark-mode-toggled', { detail: { dark: shouldBeDark } }));
+                                }
+
+                                function applyPlyrDarkMode(shouldBeDark) {
+                                    document.documentElement.classList.toggle('dark', shouldBeDark);
+                                    document.body.classList.toggle('dark', shouldBeDark);
+                                    document.documentElement.style.colorScheme = shouldBeDark ? 'dark' : 'light';
+
+                                    try {
+                                        localStorage.setItem('theme', shouldBeDark ? 'dark' : 'light');
+                                        localStorage.setItem('filament-theme', shouldBeDark ? 'dark' : 'light');
+                                        localStorage.setItem('color-theme', shouldBeDark ? 'dark' : 'light');
+                                        localStorage.setItem('plyr-theme', shouldBeDark ? 'dark' : 'light');
+                                    } catch (error) {}
+
+                                    document.dispatchEvent(new CustomEvent('plyr:dark-mode-toggled', { detail: { dark: shouldBeDark } }));
+                                    window.dispatchEvent(new CustomEvent('plyr:dark-mode-toggled', { detail: { dark: shouldBeDark } }));
+                                }
+
+                                function togglePlyrDarkMode() {
+                                    const shouldBeDark = ! isPlyrDarkModeActive();
+
+                                    applyPlyrDarkMode(shouldBeDark);
+
+                                    setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }, 25);
+                                    setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }, 200);
+                                    setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }, 700);
+                                }
+
+                                document.addEventListener('click', function (event) {
+                                    const toggle = event.target.closest('[data-plyr-dark-toggle]');
+
+                                    if (! toggle) {
+                                        return;
+                                    }
+
+                                    event.preventDefault();
+                                    togglePlyrDarkMode();
+                                });
+
+                                function syncPlyrSidebarLogo() {
+                                    const logo = document.querySelector('.plyr-sidebar-brand-logo');
+
+                                    if (! logo) {
+                                        return;
+                                    }
+
+                                    const isDark = document.documentElement.classList.contains('dark') || document.body.classList.contains('dark');
+                                    const nextSrc = isDark ? logo.getAttribute('data-dark-src') : logo.getAttribute('data-light-src');
+
+                                    if (nextSrc && logo.getAttribute('src') !== nextSrc) {
+                                        logo.setAttribute('src', nextSrc);
+                                    }
+                                }
 
                                 function normalizePath(url) {
                                     try {
@@ -773,7 +1591,7 @@ class AdminPanelProvider extends PanelProvider
                                     const currentPath = window.location.pathname.replace(/\/+$/, '');
                                     const sidebarLinks = Array.from(document.querySelectorAll('.fi-sidebar a[href]'))
                                         .filter(function (link) {
-                                            return ! link.closest('.plyr-sidebar-footer');
+                                            return ! link.closest('.plyr-sidebar-footer') && ! link.closest('.plyr-sidebar-brand-wrap') && ! link.classList.contains('plyr-sidebar-brand');
                                         });
 
                                     sidebarLinks.forEach(resetSidebarLink);
@@ -802,14 +1620,21 @@ class AdminPanelProvider extends PanelProvider
                                     }
                                 }
 
+                                syncPlyrSidebarLogo();
+                                updatePlyrDarkButtons();
                                 applyPlyrSidebarActiveState();
 
-                                setTimeout(applyPlyrSidebarActiveState, 50);
-                                setTimeout(applyPlyrSidebarActiveState, 250);
-                                setTimeout(applyPlyrSidebarActiveState, 800);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 50);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 250);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 800);
 
-                                document.addEventListener('livewire:navigated', applyPlyrSidebarActiveState);
-                                document.addEventListener('livewire:update', applyPlyrSidebarActiveState);
+                                document.addEventListener('livewire:navigated', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); });
+                                document.addEventListener('livewire:update', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); });
+
+                                if (window.MutationObserver) {
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+                                }
                             });
                         </script>
                     HTML;

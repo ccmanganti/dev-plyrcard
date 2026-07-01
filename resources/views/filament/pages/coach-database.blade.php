@@ -3357,6 +3357,109 @@
             white-space: nowrap !important;
         }
 
+
+
+        /* Header action fix: search + dark mode row, New Email on the next line. */
+        .rc-home-header-v2 {
+            align-items: start !important;
+        }
+
+        .rc-home-actions-v2 {
+            display: grid !important;
+            grid-template-columns: minmax(22rem, 30rem) auto !important;
+            grid-template-areas:
+                "search dark"
+                ". email" !important;
+            align-items: center !important;
+            justify-content: end !important;
+            gap: .75rem !important;
+            width: auto !important;
+        }
+
+        .rc-home-search-v2 {
+            grid-area: search !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .rc-home-dark-toggle-v2 {
+            grid-area: dark !important;
+            width: 2.75rem !important;
+            min-width: 2.75rem !important;
+            max-width: 2.75rem !important;
+            height: 2.75rem !important;
+            min-height: 2.75rem !important;
+            max-height: 2.75rem !important;
+            aspect-ratio: 1 / 1 !important;
+            flex: 0 0 2.75rem !important;
+            padding: 0 !important;
+            display: inline-grid !important;
+            place-items: center !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: .85rem !important;
+            background: rgba(255,255,255,.94) !important;
+            color: #0f172a !important;
+            box-shadow: 0 8px 24px rgba(15,23,42,.08) !important;
+            cursor: pointer !important;
+            transition: transform .18s ease, border-color .18s ease, background .18s ease !important;
+        }
+
+        .rc-home-dark-toggle-v2:hover {
+            transform: translateY(-1px) !important;
+            border-color: rgba(255, 99, 56, .35) !important;
+        }
+
+        .rc-home-dark-toggle-v2 svg {
+            width: 1.1rem !important;
+            height: 1.1rem !important;
+        }
+
+        .rc-home-dark-toggle-v2 .rc-dark-icon-sun {
+            display: none !important;
+        }
+
+        .dark .rc-home-dark-toggle-v2 {
+            border-color: rgba(148,163,184,.18) !important;
+            background: rgba(17,24,39,.82) !important;
+            color: #f8fafc !important;
+            box-shadow: none !important;
+        }
+
+        .dark .rc-home-dark-toggle-v2 .rc-dark-icon-moon {
+            display: none !important;
+        }
+
+        .dark .rc-home-dark-toggle-v2 .rc-dark-icon-sun {
+            display: block !important;
+        }
+
+        .rc-home-new-email-v2 {
+            grid-area: email !important;
+            justify-self: end !important;
+            width: auto !important;
+            min-width: 8.4rem !important;
+            max-width: none !important;
+            padding-inline: 1rem !important;
+            white-space: nowrap !important;
+        }
+
+        @media (max-width: 760px) {
+            .rc-home-actions-v2 {
+                grid-template-columns: 1fr auto !important;
+                grid-template-areas:
+                    "search dark"
+                    "email email" !important;
+                justify-content: stretch !important;
+                width: 100% !important;
+            }
+
+            .rc-home-new-email-v2 {
+                justify-self: stretch !important;
+                width: 100% !important;
+            }
+        }
+
+
         .rc-home-stat-v2 {
             border: 1px solid #e8ebf0;
             text-align: left;
@@ -3620,7 +3723,80 @@
             .rc-detail-rank-v2, .rc-detail-time-v2, .rc-detail-chevron-v2 { display: none; }
         }
 
-    </style>
+
+
+        /* Coach dashboard top meta cleanup. */
+        .rc-load-status { display: none !important; }
+        .rc-home-dashboard-v2 .rc-top:empty { display: none !important; }
+
+    
+
+        /* Final header alignment: search + square dark toggle sit on the right edge. */
+        .rc-home-header-v2 {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) minmax(34rem, 45rem) !important;
+            column-gap: 1.25rem !important;
+            align-items: start !important;
+        }
+
+        .rc-home-actions-v2 {
+            justify-self: end !important;
+            width: 100% !important;
+            max-width: 45rem !important;
+            display: grid !important;
+            grid-template-columns: minmax(28rem, 1fr) 3rem !important;
+            grid-template-areas:
+                "search dark"
+                ". email" !important;
+            justify-content: end !important;
+            align-items: center !important;
+            gap: .75rem !important;
+        }
+
+        .rc-home-search-v2 {
+            grid-area: search !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .rc-home-dark-toggle-v2,
+        button.rc-home-dark-toggle-v2,
+        [data-plyr-dark-toggle].rc-home-dark-toggle-v2 {
+            grid-area: dark !important;
+            width: 3rem !important;
+            min-width: 3rem !important;
+            max-width: 3rem !important;
+            height: 3rem !important;
+            min-height: 3rem !important;
+            max-height: 3rem !important;
+            aspect-ratio: 1 / 1 !important;
+            padding: 0 !important;
+            border-radius: .95rem !important;
+            display: inline-grid !important;
+            place-items: center !important;
+            justify-self: end !important;
+            flex: 0 0 3rem !important;
+            box-sizing: border-box !important;
+        }
+
+        .rc-home-new-email-v2 {
+            grid-area: email !important;
+            justify-self: end !important;
+            margin-top: .2rem !important;
+        }
+
+        @media (max-width: 1100px) {
+            .rc-home-header-v2 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .rc-home-actions-v2 {
+                justify-self: stretch !important;
+                max-width: none !important;
+                grid-template-columns: minmax(0, 1fr) 3rem !important;
+            }
+        }
+</style>
 
     @php
         $formatRecruitingTimestamp = function ($value) {
@@ -3663,23 +3839,18 @@
         wire:poll.visible.8s="pollRealtime"
         x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
     >
-        <div class="rc-top">
-            <div class="rc-load-status"><span class="rc-load-status-icon">⌁</span><span>{{ number_format($loadedSchoolsCount) }} schools</span><span>·</span><span>{{ number_format($loadedContactsCount) }} coaches</span>@if($isLoadingDataset)<span>·</span><span>syncing…</span>@endif</div>
-            <div class="rc-toolbar">
-                <button class="rc-btn" type="button" wire:click="refreshData" wire:loading.attr="disabled" wire:target="refreshData">
-                    <span wire:loading.remove wire:target="refreshData">Refresh data</span>
-                    <span wire:loading.flex wire:target="refreshData" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Refreshing</span>
-                </button>
-                @if(in_array($section, ['favorites', 'lists'], true))
+        @if(in_array($section, ['favorites', 'lists'], true))
+            <div class="rc-top">
+                <div></div>
+                <div class="rc-toolbar">
                     <button class="rc-btn" type="button" wire:click="syncLatestContactTags" wire:loading.attr="disabled" wire:target="syncLatestContactTags,syncTagsIfStale">
                         <span wire:loading.remove wire:target="syncLatestContactTags,syncTagsIfStale">Sync saved/list tags</span>
                         <span wire:loading.flex wire:target="syncLatestContactTags,syncTagsIfStale" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Syncing</span>
                     </button>
-                @endif
-                @if($formattedCachedAt)<span class="rc-pill">Updated {{ $formattedCachedAt }}</span>@endif
-                @if($formattedTagUpdatedAt && in_array($section, ['favorites', 'lists'], true))<span class="rc-pill">Tags synced {{ $formattedTagUpdatedAt }}</span>@endif
+                    @if($formattedTagUpdatedAt)<span class="rc-pill">Tags synced {{ $formattedTagUpdatedAt }}</span>@endif
+                </div>
             </div>
-        </div>
+        @endif
 
         @if($isLoadingDataset)
             <div class="rc-card is-flat">
@@ -3916,6 +4087,16 @@
                             <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
                             <kbd>Enter</kbd>
                         </div>
+
+                        <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
+                            <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <svg class="rc-dark-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/>
+                                <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                            </svg>
+                        </button>
 
                         <a class="rc-home-new-email-v2" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">
                             <span>+</span>

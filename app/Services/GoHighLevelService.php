@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\Website;
+use App\Support\TrackingLinkRewriter;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -2183,6 +2184,8 @@ class GoHighLevelService
             'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
             'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
+            'email_delivered_count' => $this->numericCustomFieldFromContact($contact, ['email_delivered_count'], $trackingFieldMap),
+            'email_failed_count' => $this->numericCustomFieldFromContact($contact, ['email_failed_count'], $trackingFieldMap),
             'coach_reply_count' => $this->numericCustomFieldFromContact($contact, ['coach_reply_count', 'replyCount', 'replies', 'email_replies', 'plyrcard_coach_replies', 'stats.replies']),
             'valid_email' => $contact['validEmail'] ?? null,
             'dnd' => $contact['dnd'] ?? false,
@@ -2650,6 +2653,44 @@ class GoHighLevelService
             return ['success' => false, 'error' => 'Subject and message are required.'];
         }
 
+        $trackingContext = array_merge((array) ($payload['tracking_context'] ?? []), [
+            'athlete_id' => $user->id,
+            'athlete_name' => (string) ($user->name ?? ''),
+            'athlete_email' => (string) ($user->email ?? ''),
+            'contact_id' => (string) $contactId,
+            'ghl_contact_id' => (string) $contactId,
+            'email_subject' => $subject,
+            'source' => (string) ($payload['tracking_source'] ?? $payload['source'] ?? 'coach_database_email'),
+            'from_name' => $fromName,
+            'from_email' => $fromEmail,
+        ]);
+
+        foreach ([
+            'website_url', 'profile_url', 'public_profile_url', 'athlete_profile_url', 'plyrcard_url',
+            'instagram_url', 'instagram', 'youtube_url', 'youtube', 'x_url', 'twitter_url', 'x', 'twitter',
+        ] as $trackingKey) {
+            if (! isset($trackingContext[$trackingKey]) && filled($payload[$trackingKey] ?? null)) {
+                $trackingContext[$trackingKey] = $payload[$trackingKey];
+            }
+        }
+
+        try {
+            $html = app(TrackingLinkRewriter::class)->prepareTrackedEmailHtml($html, $user, $trackingContext);
+            $text = trim(strip_tags($html));
+
+            Log::info('Recruiting tracked email body prepared.', [
+                'contact_id' => $contactId,
+                'has_open_pixel' => str_contains($html, '/track/open/'),
+                'tracked_link_count' => substr_count($html, '/track/click/'),
+                'tracking_base_url' => rtrim((string) (config('services.tracking.base_url') ?: config('app.tracking_base_url') ?: env('TRACKING_BASE_URL') ?: config('app.url')), '/'),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting email signature/link tracking preparation failed. Sending original body.', [
+                'contact_id' => $contactId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
         $payloads = [];
 
         $base = array_filter([
@@ -2657,8 +2698,12 @@ class GoHighLevelService
             'contactId' => $contactId,
             'conversationId' => $conversationId,
             'subject' => $subject,
+            // Send the tracked HTML through every body key used by the conversation API.
+            // If only the plain-text message is sent, the open pixel/signature links never exist in the delivered email.
             'html' => $html,
-            'message' => $text,
+            'body' => $html,
+            'message' => $html,
+            'text' => $text,
             'emailTo' => $to,
             'fromEmail' => $fromEmail,
             'emailFrom' => $fromEmail,
@@ -2675,8 +2720,10 @@ class GoHighLevelService
             'conversationId' => $conversationId,
             'type' => 'Email',
             'subject' => $subject,
+            'html' => $html,
             'body' => $html,
-            'message' => $text,
+            'message' => $html,
+            'text' => $text,
             'emailTo' => $to,
             'fromEmail' => $fromEmail,
             'emailFrom' => $fromEmail,
@@ -2714,6 +2761,39 @@ class GoHighLevelService
                     $data = $response->json() ?? [];
 
                     if ($response->successful()) {
+                        try {
+                            Log::info('Recruiting email send succeeded. Incrementing email_sent_count.', [
+                                'contact_id' => $contactId,
+                                'to' => $to,
+                                'subject' => $subject,
+                                'endpoint' => $endpoint,
+                                'version' => $version,
+                            ]);
+
+                            $trackingResult = $this->trackRecruitingEmailSentForUser($user, (string) $contactId, [
+                                'source' => 'coach_database_email_send_service',
+                                'subject' => $subject,
+                                'to' => $to,
+                                'host' => request()?->getHost(),
+                                'sent_at' => now()->toIso8601String(),
+                                'message_id' => (string) ($data['messageId'] ?? $data['id'] ?? data_get($data, 'message.id') ?? ''),
+                            ]);
+
+                            Log::info('Recruiting email_sent_count increment attempted after send.', [
+                                'contact_id' => $contactId,
+                                'tracked' => (bool) ($trackingResult['success'] ?? false),
+                                'recipient_increments' => data_get($trackingResult, 'recipient.increments', []),
+                                'athlete_increments' => data_get($trackingResult, 'athlete.increments', []),
+                            ]);
+                        } catch (\Throwable $exception) {
+                            Log::warning('Recruiting email sent counter failed after send.', [
+                                'contact_id' => $contactId,
+                                'to' => $to,
+                                'subject' => $subject,
+                                'error' => $exception->getMessage(),
+                            ]);
+                        }
+
                         return ['success' => true, 'message' => $data['message'] ?? $data, 'raw' => $data];
                     }
 
@@ -4190,7 +4270,7 @@ class GoHighLevelService
         ];
     }
 
-    protected function fetchContactForDashboard(string $contactId, string $locationId, ?string $tokenOverride = null): array
+    protected function fetchContactForDashboard(string $contactId, string $locationId, ?string $tokenOverride = null, bool $forceFresh = false): array
     {
         $token = $this->tokenForLocation($locationId, $tokenOverride);
         if (! $contactId || ! $locationId || ! $token) {
@@ -4198,6 +4278,10 @@ class GoHighLevelService
         }
 
         $cacheKey = 'recruiting-tracking-contact-detail:' . md5($locationId . '|' . $contactId);
+
+        if ($forceFresh) {
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+        }
 
         return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addSeconds((int) config('ghl.coach_database.tracking_contact_cache_seconds', 45)), function () use ($contactId, $locationId, $token): array {
             try {
@@ -4229,6 +4313,42 @@ class GoHighLevelService
             return $direct;
         }
 
+        $normalizedKeys = $this->normalizedRecruitingTrackingLookupKeys($keys, $trackingFieldMap);
+
+        // Common HighLevel shapes first.
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+            $rawCustomFields = data_get($contact, $containerKey, []);
+            $value = $this->numericCustomFieldFromRawContainer($rawCustomFields, $normalizedKeys);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        // Some GHL responses nest the real contact object one level deeper.
+        foreach (['contact', 'data', 'result'] as $nestedKey) {
+            $nested = data_get($contact, $nestedKey);
+            if (is_array($nested)) {
+                foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+                    $value = $this->numericCustomFieldFromRawContainer(data_get($nested, $containerKey, []), $normalizedKeys);
+                    if ($value !== null) {
+                        return $value;
+                    }
+                }
+            }
+        }
+
+        // Last resort: recursively scan the full contact payload for an object whose
+        // id/key/fieldKey/name matches the tracking field, then extract its value.
+        $recursive = $this->recursiveNumericCustomFieldLookup($contact, $normalizedKeys);
+        if ($recursive !== null) {
+            return $recursive;
+        }
+
+        return 0;
+    }
+
+    protected function normalizedRecruitingTrackingLookupKeys(array $keys, array $trackingFieldMap = []): array
+    {
         $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $key));
         $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
 
@@ -4239,7 +4359,7 @@ class GoHighLevelService
                 continue;
             }
 
-            foreach (['id', '_id', 'key', 'fieldKey', 'name', 'label'] as $identifierKey) {
+            foreach (['id', '_id', 'key', 'fieldKey', 'name', 'label', 'customFieldId', 'fieldId'] as $identifierKey) {
                 $identifier = $field[$identifierKey] ?? null;
                 if (filled($identifier)) {
                     $normalizedKeys[] = $normalize($identifier);
@@ -4247,27 +4367,26 @@ class GoHighLevelService
             }
         }
 
-        $normalizedKeys = collect($normalizedKeys)->filter()->unique()->values()->all();
+        return collect($normalizedKeys)->filter()->unique()->values()->all();
+    }
 
-        // GHL responses are not consistent. Sometimes contact custom fields come back
-        // as a list of objects, sometimes as an associative object keyed by field key/id.
-        $rawCustomFields = $contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? [];
+    protected function numericCustomFieldFromRawContainer(mixed $rawCustomFields, array $normalizedKeys): ?int
+    {
+        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $key));
 
-        if (is_array($rawCustomFields) && ! array_is_list($rawCustomFields)) {
+        if (! is_array($rawCustomFields) || empty($rawCustomFields)) {
+            return null;
+        }
+
+        if (! array_is_list($rawCustomFields)) {
             foreach ($rawCustomFields as $fieldKey => $fieldValue) {
                 if (! in_array($normalize($fieldKey), $normalizedKeys, true)) {
                     continue;
                 }
 
-                if (is_numeric($fieldValue)) {
-                    return (int) $fieldValue;
-                }
-
-                if (is_array($fieldValue)) {
-                    $value = $fieldValue['value'] ?? $fieldValue['field_value'] ?? $fieldValue['valueString'] ?? $fieldValue['stringValue'] ?? $fieldValue['text'] ?? null;
-                    if (is_numeric($value)) {
-                        return (int) $value;
-                    }
+                $extracted = $this->extractNumericTrackingValue($fieldValue);
+                if ($extracted !== null) {
+                    return $extracted;
                 }
             }
         }
@@ -4280,23 +4399,117 @@ class GoHighLevelService
             $fieldKeys = collect([
                 $field['key'] ?? null,
                 $field['name'] ?? null,
+                $field['label'] ?? null,
                 $field['fieldKey'] ?? null,
                 $field['customFieldId'] ?? null,
                 $field['fieldId'] ?? null,
                 $field['id'] ?? null,
+                $field['_id'] ?? null,
             ])->filter()->map($normalize)->all();
 
             if (! array_intersect($normalizedKeys, $fieldKeys)) {
                 continue;
             }
 
-            $value = $field['value'] ?? $field['field_value'] ?? $field['valueString'] ?? $field['stringValue'] ?? $field['text'] ?? null;
-            if (is_numeric($value)) {
-                return (int) $value;
+            $value = $this->extractNumericTrackingValue($field);
+            if ($value !== null) {
+                return $value;
             }
         }
 
-        return 0;
+        return null;
+    }
+
+    protected function recursiveNumericCustomFieldLookup(mixed $value, array $normalizedKeys, int $depth = 0): ?int
+    {
+        if ($depth > 12 || ! is_array($value)) {
+            return null;
+        }
+
+        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $key));
+        $fieldKeys = collect([
+            $value['key'] ?? null,
+            $value['name'] ?? null,
+            $value['label'] ?? null,
+            $value['fieldKey'] ?? null,
+            $value['customFieldId'] ?? null,
+            $value['fieldId'] ?? null,
+            $value['id'] ?? null,
+            $value['_id'] ?? null,
+        ])->filter()->map($normalize)->all();
+
+        if (array_intersect($normalizedKeys, $fieldKeys)) {
+            $extracted = $this->extractNumericTrackingValue($value);
+            if ($extracted !== null) {
+                return $extracted;
+            }
+        }
+
+        foreach ($value as $childKey => $child) {
+            if (! is_array($child)) {
+                continue;
+            }
+
+            $found = $this->recursiveNumericCustomFieldLookup($child, $normalizedKeys, $depth + 1);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    protected function extractNumericTrackingValue(mixed $value): ?int
+    {
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if (preg_match('/^-?\d+$/', $trimmed)) {
+                return (int) $trimmed;
+            }
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        foreach (['value', 'field_value', 'fieldValue', 'numberValue', 'valueNumber', 'valueString', 'stringValue', 'text', 'number', 'count'] as $key) {
+            if (! array_key_exists($key, $value)) {
+                continue;
+            }
+
+            $candidate = $value[$key];
+
+            if (is_numeric($candidate)) {
+                return (int) $candidate;
+            }
+
+            if (is_string($candidate) && preg_match('/^-?\d+$/', trim($candidate))) {
+                return (int) trim($candidate);
+            }
+
+            if (is_array($candidate)) {
+                $nestedValue = $this->extractNumericTrackingValue($candidate);
+                if ($nestedValue !== null) {
+                    return $nestedValue;
+                }
+            }
+        }
+
+        foreach ($value as $nested) {
+            if (is_numeric($nested)) {
+                return (int) $nested;
+            }
+
+            if (is_string($nested) && preg_match('/^-?\d+$/', trim($nested))) {
+                return (int) trim($nested);
+            }
+        }
+
+        return null;
     }
 
     protected function stringCustomFieldFromContact(array $contact, array $keys, array $trackingFieldMap = []): string
@@ -4530,6 +4743,8 @@ class GoHighLevelService
             'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
             'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
+            'email_delivered_count' => $this->numericCustomFieldFromContact($contact, ['email_delivered_count'], $trackingFieldMap),
+            'email_failed_count' => $this->numericCustomFieldFromContact($contact, ['email_failed_count'], $trackingFieldMap),
             'contact_id' => $contactId,
         ];
     }
@@ -5054,6 +5269,11 @@ class GoHighLevelService
             'email_sent_count' => ['name' => 'email_sent_count', 'dataType' => 'NUMERICAL'],
             'email_open_count' => ['name' => 'email_open_count', 'dataType' => 'NUMERICAL'],
             'email_click_count' => ['name' => 'email_click_count', 'dataType' => 'NUMERICAL'],
+            'email_delivered_count' => ['name' => 'email_delivered_count', 'dataType' => 'NUMERICAL'],
+            'email_failed_count' => ['name' => 'email_failed_count', 'dataType' => 'NUMERICAL'],
+            'last_email_status' => ['name' => 'last_email_status', 'dataType' => 'TEXT'],
+            'last_email_message_id' => ['name' => 'last_email_message_id', 'dataType' => 'TEXT'],
+            'last_email_sent_at' => ['name' => 'last_email_sent_at', 'dataType' => 'TEXT'],
             'last_profile_view_source' => ['name' => 'last_profile_view_source', 'dataType' => 'TEXT'],
             'last_profile_view_at' => ['name' => 'last_profile_view_at', 'dataType' => 'TEXT'],
             'last_clicked_url' => ['name' => 'last_clicked_url', 'dataType' => 'TEXT'],
@@ -5216,9 +5436,9 @@ class GoHighLevelService
             return ['success' => false, 'error' => 'Missing recruiting data connection.'];
         }
 
-        $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, true);
-        $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride);
-        $current = $this->numericCustomFieldFromContact($contact, [$fieldKey]);
+        $trackingFieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, true);
+        $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride, true);
+        $current = $this->numericCustomFieldFromContact($contact, [$fieldKey], $trackingFieldMap);
         $next = max(0, $current + max(1, $amount));
         $payload = ['customFields' => [$this->recruitingTrackingFieldPayload($locationId, $fieldKey, $next)]];
 
@@ -5259,6 +5479,16 @@ class GoHighLevelService
             return $keys;
         }
 
+        if (in_array($eventType, ['email_delivered', 'delivered'], true)) {
+            $keys[] = 'email_delivered_count';
+            return $keys;
+        }
+
+        if (in_array($eventType, ['email_failed', 'failed', 'bounced', 'email_bounced'], true)) {
+            $keys[] = 'email_failed_count';
+            return $keys;
+        }
+
         if (str_contains($source, 'email') || in_array($eventType, ['email_click', 'click_email'], true)) {
             $keys[] = 'email_click_count';
         }
@@ -5276,20 +5506,47 @@ class GoHighLevelService
         $destinationUrl = (string) ($metadata['destination_url'] ?? '');
         $source = (string) ($metadata['source'] ?? $eventType);
 
-        return array_filter([
+        $updates = [
             'last_profile_view_source' => $source,
             'last_profile_view_at' => now()->toIso8601String(),
             'last_clicked_url' => $destinationUrl,
             'last_clicked_platform' => $platform,
             'last_tracking_host' => (string) ($metadata['host'] ?? request()?->getHost() ?? ''),
-        ], fn ($value): bool => $value !== null && $value !== '');
+        ];
+
+        if (in_array(strtolower(trim($eventType)), ['email_sent', 'sent'], true)) {
+            $updates['last_email_status'] = 'sent';
+            $updates['last_email_sent_at'] = (string) ($metadata['sent_at'] ?? now()->toIso8601String());
+        }
+
+        if (in_array(strtolower(trim($eventType)), ['email_delivered', 'delivered'], true)) {
+            $updates['last_email_status'] = 'delivered';
+        }
+
+        if (in_array(strtolower(trim($eventType)), ['email_failed', 'failed', 'bounced', 'email_bounced'], true)) {
+            $updates['last_email_status'] = 'failed';
+        }
+
+        if (filled($metadata['message_id'] ?? null)) {
+            $updates['last_email_message_id'] = (string) $metadata['message_id'];
+        }
+
+        return array_filter($updates, fn ($value): bool => $value !== null && $value !== '');
     }
 
     protected function incrementRecruitingContactTrackingFields(string $contactId, string $locationId, ?string $tokenOverride, string $token, array $incrementKeys, array $textUpdates = []): array
     {
-        $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride);
+        // Read from the latest remote contact using the actual custom-field ID map.
+        // This is important because GHL often returns contact custom fields by ID,
+        // not by the human-readable field name like email_sent_count.
+        $trackingFieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
+        $remoteContact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride, true);
+        $cachedContact = \Illuminate\Support\Facades\Cache::get($this->recruitingTrackingContactDetailCacheKey($locationId, $contactId), []);
+        $cachedCounters = \Illuminate\Support\Facades\Cache::get($this->recruitingTrackingCounterCacheKey($locationId, $contactId), []);
+
         $customFields = [];
         $nextValues = [];
+        $currentValues = [];
 
         foreach ($incrementKeys as $key) {
             $key = $this->normalizeRecruitingTrackingKey($key);
@@ -5297,8 +5554,13 @@ class GoHighLevelService
                 continue;
             }
 
-            $current = $this->numericCustomFieldFromContact($contact, [$key]);
+            $remoteCurrent = $this->numericCustomFieldFromContact($remoteContact, [$key], $trackingFieldMap);
+            $cachedContactCurrent = is_array($cachedContact) ? $this->numericCustomFieldFromContact($cachedContact, [$key], $trackingFieldMap) : 0;
+            $cachedCounterCurrent = is_array($cachedCounters) ? (int) ($cachedCounters[$key] ?? 0) : 0;
+            $current = max($remoteCurrent, $cachedContactCurrent, $cachedCounterCurrent);
             $next = $current + 1;
+
+            $currentValues[$key] = $current;
             $nextValues[$key] = $next;
             $customFields[] = $this->recruitingTrackingFieldPayload($locationId, $key, $next);
         }
@@ -5328,12 +5590,131 @@ class GoHighLevelService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'custom_fields' => $customFields,
+                'current_values' => $currentValues,
+                'next_values' => $nextValues,
             ]);
 
             return ['success' => false, 'error' => 'Tracking update failed.', 'status' => $response->status()];
         }
 
-        return ['success' => true, 'contact_id' => $contactId, 'increments' => $nextValues];
+        $updatedContact = $this->applyRecruitingTrackingValuesToCachedContact(
+            is_array($remoteContact) ? $remoteContact : [],
+            $locationId,
+            $contactId,
+            $nextValues,
+            $textUpdates
+        );
+
+        $counterCache = is_array($cachedCounters) ? $cachedCounters : [];
+        foreach ($nextValues as $key => $value) {
+            $counterCache[$key] = max((int) ($counterCache[$key] ?? 0), (int) $value);
+        }
+        \Illuminate\Support\Facades\Cache::put(
+            $this->recruitingTrackingCounterCacheKey($locationId, $contactId),
+            $counterCache,
+            now()->addDays(14)
+        );
+
+        Log::info('Recruiting tracking counters updated.', [
+            'contact_id' => $contactId,
+            'location_id' => $locationId,
+            'current_values' => $currentValues,
+            'next_values' => $nextValues,
+        ]);
+
+        return ['success' => true, 'contact_id' => $contactId, 'increments' => $nextValues, 'contact' => $updatedContact];
+    }
+
+
+    protected function recruitingTrackingCounterCacheKey(string $locationId, string $contactId): string
+    {
+        return 'recruiting-tracking-counters:' . md5($locationId . '|' . $contactId);
+    }
+
+    protected function recruitingTrackingContactDetailCacheKey(string $locationId, string $contactId): string
+    {
+        return 'recruiting-tracking-contact-detail:' . md5($locationId . '|' . $contactId);
+    }
+
+    protected function applyRecruitingTrackingValuesToCachedContact(array $contact, string $locationId, string $contactId, array $numericValues = [], array $textValues = []): array
+    {
+        $values = array_merge($numericValues, $textValues);
+        if (empty($values)) {
+            return $contact;
+        }
+
+        foreach ($values as $key => $value) {
+            $normalizedKey = $this->normalizeRecruitingTrackingKey((string) $key);
+            if ($normalizedKey === '') {
+                continue;
+            }
+
+            $contact[$normalizedKey] = $value;
+            $rawCustomFields = $contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? [];
+
+            if (! is_array($rawCustomFields)) {
+                $rawCustomFields = [];
+            }
+
+            $updated = false;
+
+            if (! array_is_list($rawCustomFields)) {
+                $rawCustomFields[$normalizedKey] = $value;
+                $updated = true;
+            } else {
+                $payload = $this->recruitingTrackingFieldPayload($locationId, $normalizedKey, $value);
+                $wanted = collect([
+                    $normalizedKey,
+                    $payload['id'] ?? null,
+                    $payload['key'] ?? null,
+                ])->filter()->map(fn ($item): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $item)))->all();
+
+                foreach ($rawCustomFields as &$field) {
+                    if (! is_array($field)) {
+                        continue;
+                    }
+
+                    $candidates = collect([
+                        $field['id'] ?? null,
+                        $field['_id'] ?? null,
+                        $field['key'] ?? null,
+                        $field['name'] ?? null,
+                        $field['fieldKey'] ?? null,
+                        $field['customFieldId'] ?? null,
+                        $field['fieldId'] ?? null,
+                    ])->filter()->map(fn ($item): string => strtolower(str_replace([' ', '-', '.', ':'], '_', (string) $item)))->all();
+
+                    if (array_intersect($wanted, $candidates)) {
+                        $field['value'] = $value;
+                        $field['field_value'] = $value;
+                        $updated = true;
+                        break;
+                    }
+                }
+                unset($field);
+
+                if (! $updated) {
+                    $rawCustomFields[] = [
+                        'id' => $payload['id'] ?? null,
+                        'key' => $payload['key'] ?? $normalizedKey,
+                        'fieldKey' => $payload['key'] ?? $normalizedKey,
+                        'name' => $normalizedKey,
+                        'value' => $value,
+                        'field_value' => $value,
+                    ];
+                }
+            }
+
+            $contact['customFields'] = $rawCustomFields;
+        }
+
+        \Illuminate\Support\Facades\Cache::put(
+            $this->recruitingTrackingContactDetailCacheKey($locationId, $contactId),
+            $contact,
+            now()->addDays(14)
+        );
+
+        return $contact;
     }
 
     protected function resolveRecruitingTrackingOwnerContactId(?User $user, string $locationId, ?string $tokenOverride = null): ?string
@@ -5348,6 +5729,39 @@ class GoHighLevelService
         }
 
         return $this->findContactIdByEmail($user->email, $locationId, $tokenOverride);
+    }
+
+
+    /**
+     * Track a known delivery/status change from a message-status webhook or poller.
+     * Use this only when the provider confirms the status; app-side code cannot know
+     * true delivery by itself.
+     */
+    public function trackRecruitingEmailStatusForUser(?User $user, string $contactId, string $status, array $metadata = []): array
+    {
+        $status = strtolower(trim($status));
+
+        $eventType = match (true) {
+            in_array($status, ['delivered', 'delivery', 'sent_delivered'], true) => 'email_delivered',
+            in_array($status, ['failed', 'failure', 'bounced', 'bounce', 'undelivered'], true) => 'email_failed',
+            default => '',
+        };
+
+        if ($eventType === '') {
+            return ['success' => false, 'error' => 'Unsupported email status for tracking.', 'status' => $status];
+        }
+
+        return $this->trackRecruitingEventForUser(
+            user: $user,
+            contactId: $contactId,
+            platform: 'email',
+            eventType: $eventType,
+            metadata: array_merge($metadata, [
+                'source' => 'email_status_' . $status,
+                'status' => $status,
+                'host' => request()?->getHost(),
+            ]),
+        );
     }
 
     protected function normalizeRecruitingTrackingPlatform(?string $platform): string
