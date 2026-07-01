@@ -1513,6 +1513,32 @@ class AdminPanelProvider extends PanelProvider
                                     }
                                 }
 
+                                function updateDiscoverSchoolsNavigation() {
+                                    const compassSvg = '<svg class="fi-sidebar-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M15.8 8.2l-2.1 5.5l-5.5 2.1l2.1-5.5l5.5-2.1Z"></path><circle cx="12" cy="12" r="1"></circle></svg>';
+
+                                    Array.from(document.querySelectorAll('.fi-sidebar a[href]')).forEach(function (link) {
+                                        if (link.closest('.plyr-sidebar-footer') || link.closest('.plyr-sidebar-brand-wrap')) {
+                                            return;
+                                        }
+
+                                        const label = link.querySelector('.fi-sidebar-item-label') || link.querySelector('span');
+                                        const labelText = (label ? label.textContent : '').trim();
+                                        const href = (link.getAttribute('href') || '').toLowerCase();
+
+                                        if (labelText === 'Schools' && (href.includes('schools') || href.includes('coach-database'))) {
+                                            if (label) {
+                                                label.textContent = 'Discover Schools';
+                                            }
+
+                                            const icon = link.querySelector('.fi-sidebar-item-icon, svg');
+
+                                            if (icon && ! icon.closest('.plyr-sidebar-brand-wrap')) {
+                                                icon.outerHTML = compassSvg;
+                                            }
+                                        }
+                                    });
+                                }
+
                                 function resetSidebarLink(link) {
                                     link.classList.remove('plyr-sidebar-item-active');
                                     link.removeAttribute('data-plyr-active');
@@ -1622,18 +1648,19 @@ class AdminPanelProvider extends PanelProvider
 
                                 syncPlyrSidebarLogo();
                                 updatePlyrDarkButtons();
+                                updateDiscoverSchoolsNavigation();
                                 applyPlyrSidebarActiveState();
 
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 50);
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 250);
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); }, 800);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 50);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 250);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 800);
 
-                                document.addEventListener('livewire:navigated', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); });
-                                document.addEventListener('livewire:update', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); applyPlyrSidebarActiveState(); });
+                                document.addEventListener('livewire:navigated', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); });
+                                document.addEventListener('livewire:update', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); });
 
                                 if (window.MutationObserver) {
-                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
                                 }
                             });
                         </script>

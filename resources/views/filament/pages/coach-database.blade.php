@@ -3080,6 +3080,45 @@
             margin-top: .25rem;
         }
 
+        .rc-profile-milestones-v2 {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .42rem;
+            margin-top: .2rem;
+        }
+
+        .rc-profile-milestones-v2 span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.7rem;
+            border-radius: 999px;
+            border: 1px solid #e8ebf0;
+            background: #f8fafc;
+            color: #7d8798;
+            padding: .28rem .55rem;
+            font-size: .68rem;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+
+        .rc-profile-milestones-v2 span.is-unlocked {
+            border-color: rgba(255, 99, 56, .24);
+            background: rgba(255, 99, 56, .1);
+            color: #ff6338;
+        }
+
+        .dark .rc-profile-milestones-v2 span {
+            border-color: rgba(148, 163, 184, .16);
+            background: rgba(148, 163, 184, .08);
+            color: #94a3b8;
+        }
+
+        .dark .rc-profile-milestones-v2 span.is-unlocked {
+            border-color: rgba(255, 99, 56, .28);
+            background: rgba(255, 99, 56, .12);
+            color: #ff8a70;
+        }
+
         .rc-home-activity-list-v2 {
             display: grid;
             gap: .82rem;
@@ -3901,14 +3940,225 @@
                     + $emailOpenCount
                     + $coachReplies;
 
-                $readinessScore = min(100, max(12, 45 + min(25, $savedSchools * 4) + min(15, $favoriteSchools * 3) + min(10, $emailsSent) + min(10, $coachReplies * 2)));
-                $profileCompletion = min(100, max(40, $readinessScore + 5));
+                $profileCompletion = 0;
+                $profileUrl = '#';
+                $profileMissingSections = [];
+                $profileSectionProgress = [];
+                $profileAchievements = [];
+
+                if ($authUser) {
+                    try {
+                        $profileCompletion = (int) app(\App\Services\ProfileCompletionService::class)->calculate($authUser);
+                    } catch (\Throwable $exception) {
+                        $profileHasValue = function (mixed $value): bool {
+                            if (is_null($value)) {
+                                return false;
+                            }
+
+                            if (is_string($value)) {
+                                return trim($value) !== '';
+                            }
+
+                            if (is_array($value)) {
+                                return count(array_filter($value, fn ($item) => ! is_null($item) && $item !== '')) > 0;
+                            }
+
+                            return true;
+                        };
+
+                        $coreFields = [
+                            'first_name',
+                            'last_name',
+                            'email',
+                            'phone',
+                            'birth',
+                            'gender',
+                            'country',
+                            'city',
+                            'sport',
+                            'height',
+                            'weight',
+                            'player_bio',
+                            'player_image',
+                            'plyrcard_image',
+                            'school_id',
+                            'club_id',
+                            'league_id',
+                            'featured_video_url',
+                            'ig_handle',
+                        ];
+
+                        $sportSpecificFields = [
+                            'position',
+                            'dominant_foot',
+                            'jersey_number',
+                            'max_speed',
+                            'natl_team_exp',
+                            'national_team_id',
+                            'national_team_period',
+                        ];
+
+                        $completedCore = collect($coreFields)
+                            ->filter(fn ($field) => $profileHasValue($authUser->{$field} ?? null))
+                            ->count();
+
+                        $corePercentage = count($coreFields)
+                            ? ($completedCore / count($coreFields)) * 100
+                            : 0;
+
+                        $completedSportSpecific = collect($sportSpecificFields)
+                            ->filter(fn ($field) => $profileHasValue($authUser->{$field} ?? null))
+                            ->count();
+
+                        $sportBonus = count($sportSpecificFields)
+                            ? ($completedSportSpecific / count($sportSpecificFields)) * 10
+                            : 0;
+
+                        $profileCompletion = (int) min(100, round($corePercentage + $sportBonus));
+                    }
+
+                    try {
+                        $profileUrl = \App\Filament\Resources\Profiles\ProfileResource::getUrl('index');
+                    } catch (\Throwable $exception) {
+                        $profileUrl = url('/admin/profiles');
+                    }
+
+                    $profileHasValue = function (mixed $value): bool {
+                        if (is_null($value)) {
+                            return false;
+                        }
+
+                        if (is_string($value)) {
+                            return trim($value) !== '';
+                        }
+
+                        if (is_array($value)) {
+                            return count(array_filter($value, fn ($item) => ! is_null($item) && $item !== '')) > 0;
+                        }
+
+                        return true;
+                    };
+
+                    $profileSections = [
+                        [
+                            'key' => 'basic-information',
+                            'title' => 'Basic Information',
+                            'items' => [
+                                'first_name' => 'First name',
+                                'last_name' => 'Last name',
+                                'email' => 'Email',
+                                'phone' => 'Phone',
+                                'birth' => 'Birth date',
+                                'gender' => 'Gender',
+                            ],
+                        ],
+                        [
+                            'key' => 'location',
+                            'title' => 'Location',
+                            'items' => [
+                                'country' => 'Country',
+                                'city' => 'City',
+                            ],
+                        ],
+                        [
+                            'key' => 'athletic-profile',
+                            'title' => 'Athletic Profile',
+                            'items' => [
+                                'sport' => 'Sport',
+                                'position' => 'Position',
+                                'dominant_foot' => 'Dominant foot',
+                                'height' => 'Height',
+                                'weight' => 'Weight',
+                                'jersey_number' => 'Jersey number',
+                                'max_speed' => 'Max speed',
+                                'player_bio' => 'Player bio',
+                            ],
+                        ],
+                        [
+                            'key' => 'associations',
+                            'title' => 'Associations',
+                            'items' => [
+                                'school_id' => 'School',
+                                'club_id' => 'Club',
+                                'league_id' => 'League',
+                            ],
+                        ],
+                        [
+                            'key' => 'media-branding',
+                            'title' => 'Media & Branding',
+                            'items' => [
+                                'player_image' => 'Profile photo',
+                                'plyrcard_image' => 'PlyrCard image',
+                                'featured_video_url' => 'Featured video',
+                                'ig_handle' => 'Instagram handle',
+                            ],
+                        ],
+                        [
+                            'key' => 'national-team',
+                            'title' => 'National Team',
+                            'items' => [
+                                'natl_team_exp' => 'National team experience',
+                                'national_team_id' => 'National team',
+                                'national_team_period' => 'National team period',
+                            ],
+                        ],
+                    ];
+
+                    $profileSectionProgress = collect($profileSections)
+                        ->map(function (array $section) use ($authUser, $profileUrl, $profileHasValue) {
+                            $totalCount = count($section['items']);
+                            $missingItems = collect($section['items'])
+                                ->filter(fn ($label, $field) => ! $profileHasValue($authUser->{$field} ?? null))
+                                ->map(function ($label) use ($profileUrl, $section) {
+                                    return [
+                                        'label' => $label,
+                                        'url' => $profileUrl . '?section=' . $section['key'],
+                                    ];
+                                })
+                                ->values()
+                                ->all();
+
+                            return [
+                                'key' => $section['key'],
+                                'title' => $section['title'],
+                                'count' => count($missingItems),
+                                'total' => $totalCount,
+                                'items' => $missingItems,
+                                'url' => $profileUrl . '?section=' . $section['key'],
+                            ];
+                        })
+                        ->values()
+                        ->all();
+
+                    $profileMissingSections = collect($profileSectionProgress)
+                        ->filter(fn (array $section) => $section['count'] > 0)
+                        ->values()
+                        ->all();
+
+                    $profileAchievements = collect([
+                        ['label' => 'Starter', 'threshold' => 25],
+                        ['label' => 'Rising Talent', 'threshold' => 50],
+                        ['label' => 'Scouted Ready', 'threshold' => 75],
+                        ['label' => 'PlyrCard Complete', 'threshold' => 100],
+                    ])->map(function (array $milestone) use ($profileCompletion): array {
+                        return [
+                            'label' => $milestone['label'],
+                            'threshold' => $milestone['threshold'],
+                            'unlocked' => $profileCompletion >= $milestone['threshold'],
+                        ];
+                    })->all();
+                }
+
+                $readinessScore = $profileCompletion;
+                $profileCompletionSubtext = empty($profileMissingSections)
+                    ? 'Profile complete!'
+                    : count($profileMissingSections) . ' section' . (count($profileMissingSections) === 1 ? '' : 's') . ' to finish';
 
                 $quickStats = [
                     [
                         'label' => 'Profile Completion',
                         'value' => $profileCompletion . '%',
-                        'sub' => 'Keep it up!',
+                        'sub' => $profileCompletionSubtext,
                         'icon' => 'cap',
                         'tone' => 'coral',
                         'progress' => $profileCompletion,
@@ -3947,14 +4197,23 @@
                     ],
                 ];
 
-                $progressItems = [
-                    ['label' => 'PLYR Profile', 'state' => 'Complete', 'done' => true],
-                    ['label' => 'Social Media Platforms', 'state' => 'Complete', 'done' => true],
-                    ['label' => 'Highlights', 'state' => $profileViews > 0 ? 'Complete' : 'In progress', 'done' => $profileViews > 0],
-                    ['label' => 'Coach Outreach', 'state' => $emailsSent > 0 ? 'Complete' : 'In progress', 'done' => $emailsSent > 0],
-                    ['label' => 'My List', 'state' => $savedSchools > 0 ? 'In Progress' : 'Not started', 'done' => false],
-                    ['label' => 'Academics / GPA', 'state' => 'Not started', 'done' => false],
-                ];
+                $progressItems = collect($profileSectionProgress)
+                    ->map(function (array $section) {
+                        $missingCount = (int) ($section['count'] ?? 0);
+                        $totalCount = max(1, (int) ($section['total'] ?? 1));
+                        $completedCount = max(0, $totalCount - $missingCount);
+
+                        return [
+                            'label' => $section['title'],
+                            'state' => $missingCount === 0
+                                ? 'Complete'
+                                : $completedCount . '/' . $totalCount . ' complete · ' . $missingCount . ' missing',
+                            'done' => $missingCount === 0,
+                            'url' => $section['url'] ?? '#',
+                        ];
+                    })
+                    ->values()
+                    ->all();
 
                 $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
 
@@ -4170,14 +4429,14 @@
                 <div class="rc-home-grid-v2">
                     <section class="rc-home-panel-v2 rc-home-progress-panel-v2">
                         <div class="rc-home-panel-head-v2">
-                            <h2>Recruiting Progress</h2>
+                            <h2>Profile Progress</h2>
                         </div>
 
                         <div class="rc-home-progress-layout-v2">
                             <div class="rc-readiness-ring-v2" style="--ready: {{ $readinessScore }};">
                                 <div>
-                                    <strong>{{ $readinessScore }}%</strong>
-                                    <span>Recruiting Readiness</span>
+                                    <strong>{{ $profileCompletion }}%</strong>
+                                    <span>Profile Completion</span>
                                 </div>
                             </div>
 
@@ -4194,7 +4453,15 @@
                                     </div>
                                 @endforeach
 
-                                <a class="rc-home-outline-btn-v2" href="#">View Full Checklist</a>
+                                <div class="rc-profile-milestones-v2">
+                                    @foreach($profileAchievements as $achievement)
+                                        <span class="{{ $achievement['unlocked'] ? 'is-unlocked' : '' }}">
+                                            {{ $achievement['label'] }}
+                                        </span>
+                                    @endforeach
+                                </div>
+
+                                <a class="rc-home-outline-btn-v2" href="{{ $profileUrl }}">Complete Profile</a>
                             </div>
                         </div>
                     </section>
@@ -4532,66 +4799,108 @@
         @endif
 
         @if($section === 'schools')
-            <div class="rc-page-heading">
-                <h1>Find schools</h1>
-                <div class="rc-subtle">Search {{ number_format($loadedSchoolsCount) }} women’s soccer programs by name, coach, division, or conference.</div>
-            </div>
+            @php
+                $discoverSchoolCount = (int) ($this->filteredSchoolsCount ?? 0);
+                $discoverLoadedCount = (int) ($loadedSchoolsCount ?? 0);
+                $discoverSearchTotal = max($discoverSchoolCount, $discoverLoadedCount);
+                $discoverDivisionTabs = [
+                    '' => 'All Divisions',
+                    'NCAA D-I' => 'NCAA D-I',
+                    'NCAA D-II' => 'NCAA D-II',
+                    'NCAA D-III' => 'NCAA D-III',
+                    'NAIA' => 'NAIA',
+                    'NJCAA' => 'NJCAA',
+                ];
+                $discoverShownCount = count($this->filteredSchools ?? []);
+            @endphp
 
-            <div class="rc-search-hero">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                <input class="rc-input" placeholder="Search school, coach, or conference..." wire:model.live.debounce.350ms="search" />
-                <button class="rc-btn" type="button" wire:click="clearSchoolFilters" wire:loading.attr="disabled" wire:target="clearSchoolFilters">
-                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v5l-4 3v-8L3 4Z" /></svg>
-                    Reset
-                </button>
-            </div>
+            <style>
+                .rc-discover-schools-page { display:grid; gap:1.15rem; }
+                .rc-discover-toolbar { display:grid; gap:.95rem; }
+                .rc-discover-search { position:relative; display:flex; align-items:center; min-height:3.05rem; border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; box-shadow:0 12px 34px rgba(15,23,42,.06); overflow:hidden; }
+                .rc-discover-search svg { width:1.12rem; height:1.12rem; color:var(--rc-muted); margin-left:1rem; flex:0 0 auto; }
+                .rc-discover-search input { width:100%; border:0 !important; background:transparent !important; box-shadow:none !important; outline:none !important; min-height:3.05rem; padding:0 1rem; color:var(--rc-text); font-size:.96rem; }
+                .rc-discover-filter-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,330px); gap:.8rem; align-items:center; }
+                .rc-discover-tabs { display:flex; align-items:center; gap:.35rem; padding:.27rem; border-radius:.95rem; background:rgba(148,163,184,.08); overflow:auto; }
+                .rc-discover-tab { border:0; min-height:2.25rem; border-radius:.72rem; background:transparent; color:var(--rc-muted); padding:0 .95rem; font-weight:800; white-space:nowrap; transition:background .18s ease,color .18s ease,box-shadow .18s ease; }
+                .rc-discover-tab:hover { color:var(--rc-text); background:rgba(255,255,255,.72); }
+                .rc-discover-tab.is-active { color:#fff; background:var(--rc-accent); box-shadow:0 10px 24px rgba(255,99,56,.22); }
+                .dark .rc-discover-tab:hover { background:rgba(15,23,42,.75); }
+                .rc-discover-select { width:100%; min-height:2.75rem; border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); color:var(--rc-text); padding:0 .9rem; font-weight:700; }
+                .rc-discover-results-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.1rem 0 -.15rem; flex-wrap:wrap; }
+                .rc-discover-count { color:var(--rc-muted); font-size:.9rem; font-weight:700; display:flex; align-items:center; gap:.7rem; }
+                .rc-discover-select-all { display:inline-flex; align-items:center; gap:.45rem; color:var(--rc-text); font-weight:800; }
+                .rc-discover-select-all input { width:1.05rem; height:1.05rem; border-radius:.35rem; accent-color:var(--rc-accent); }
+                .rc-discover-view-toggle { display:inline-flex; align-items:center; gap:.25rem; padding:.25rem; border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); box-shadow:0 10px 24px rgba(15,23,42,.06); }
+                .rc-discover-view-toggle button { width:2.25rem; height:2.25rem; display:inline-grid; place-items:center; border:0; border-radius:.65rem; color:var(--rc-muted); background:transparent; }
+                .rc-discover-view-toggle button.is-active { color:var(--rc-accent); background:var(--rc-accent-soft); }
+                .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+                .rc-discover-schools-page .rc-school-card { min-height:9.25rem; border-radius:1rem; border:1px solid var(--rc-border); background:var(--rc-surface); box-shadow:0 12px 28px rgba(15,23,42,.06); padding:1rem; }
+                .rc-discover-schools-page .rc-school-card h3 { font-size:.98rem; line-height:1.2; margin:.2rem 0 .2rem; }
+                .rc-discover-schools-page .rc-school-conference { min-height:2rem; font-size:.78rem; line-height:1.25; }
+                .rc-discover-schools-page .rc-badge { background:rgba(255,99,56,.12); color:var(--rc-accent); border:0; font-size:.72rem; padding:.35rem .55rem; }
+                @media (max-width:1400px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+                @media (max-width:1100px) { .rc-discover-filter-row { grid-template-columns:1fr; } .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+                @media (max-width:700px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:1fr; } }
+            </style>
 
-            <div class="rc-school-filter-box">
-                <div>
-                    <span class="rc-filter-label">Division</span>
-                    <div class="rc-chip-row">
-                        @foreach(['NCAA D-I','NCAA D-II','NCAA D-III','NAIA','NJCAA'] as $division)
-                            <button type="button" class="rc-filter-chip {{ $divisionFilter === $division ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($division))">{{ $division }}</button>
-                        @endforeach
+            <div class="rc-discover-schools-page">
+                <div class="rc-page-heading" style="margin-bottom:0;">
+                    <h1>Discover Schools</h1>
+                    <div class="rc-subtle">Find programs, coaches, conferences, and divisions that match your recruiting goals.</div>
+                </div>
+
+                <div class="rc-discover-toolbar">
+                    <label class="rc-discover-search" aria-label="Search schools and coaches">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+                        <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
+                    </label>
+
+                    <div class="rc-discover-filter-row">
+                        <div class="rc-discover-tabs" aria-label="Division filter">
+                            @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
+                                <button type="button" class="rc-discover-tab {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">
+                                    {{ $divisionLabel }}
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <select class="rc-discover-select" wire:model.live="conferenceFilter" aria-label="Conference filter">
+                            <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
+                            @foreach($this->conferences as $conference)
+                                <option value="{{ $conference }}">{{ $conference }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
-                <label>
-                    <span class="rc-filter-label">Conference</span>
-                    <select class="rc-select" style="width:100%" wire:model.live="conferenceFilter">
-                        <option value="">All conferences</option>
-                        @foreach($this->conferences as $conference)
-                            <option value="{{ $conference }}">{{ $conference }}</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label>
-                    <span class="rc-filter-label">Sort</span>
-                    <select class="rc-select" style="width:100%" wire:model.live="sort">
-                        <option value="name">School A–Z</option>
-                        <option value="coach_count">Most coaches</option>
-                    </select>
-                </label>
-            </div>
 
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.85rem 0 .25rem;flex-wrap:wrap">
-                <div class="rc-subtle"><strong>{{ number_format($this->filteredSchoolsCount) }}</strong> schools</div>
-                <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-                    <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
-                    <div class="rc-school-view-toggle" aria-label="School view">
-                        <button type="button" class="rc-btn {{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                        </button>
-                        <button type="button" class="rc-btn {{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
-                        </button>
+                <div class="rc-discover-results-row">
+                    <div class="rc-discover-count">
+                        <span>{{ number_format($discoverSchoolCount) }} schools</span>
+                        <label class="rc-discover-select-all">
+                            <input type="checkbox" disabled>
+                            <span>Select All ({{ number_format($discoverShownCount) }})</span>
+                        </label>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                        <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
+                        <div class="rc-discover-view-toggle" aria-label="School view">
+                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            </button>
+                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode])
-            @if($this->canLoadMoreSchools)
-                <div style="margin-top:1rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
-            @endif
+                @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode])
+                @if($this->canLoadMoreSchools)
+                    <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
+                @endif
+            </div>
         @endif
 
         @if($section === 'favorites')
