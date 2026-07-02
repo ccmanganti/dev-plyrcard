@@ -3753,6 +3753,124 @@
         .rc-detail-time-v2 { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
         .rc-detail-chevron-v2 { color: #94a3b8; font-size: 1.35rem; }
 
+
+        .rc-stats-drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            display: flex;
+            justify-content: flex-end;
+            background: rgba(15, 23, 42, .28);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            animation: rcDrawerBackdropIn .18s ease both;
+        }
+
+        .dark .rc-stats-drawer-backdrop {
+            background: rgba(2, 6, 23, .52);
+        }
+
+        .rc-stats-drawer-panel {
+            width: min(760px, calc(100vw - 1.25rem));
+            height: 100vh;
+            overflow-y: auto;
+            background: var(--rc-bg);
+            border-left: 1px solid var(--rc-border);
+            box-shadow: -24px 0 70px rgba(15, 23, 42, .18);
+            padding: 1.2rem;
+            animation: rcStatsDrawerIn .24s cubic-bezier(.22, 1, .36, 1) both;
+        }
+
+        .dark .rc-stats-drawer-panel {
+            box-shadow: -24px 0 70px rgba(0, 0, 0, .45);
+        }
+
+        .rc-stats-drawer-panel .rc-detail-page-v2 {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            min-height: auto;
+        }
+
+        .rc-stats-drawer-close {
+            position: sticky;
+            top: .2rem;
+            z-index: 2;
+            margin-left: auto;
+            margin-bottom: .75rem;
+            width: 2.6rem;
+            height: 2.6rem;
+            border-radius: .9rem;
+            border: 1px solid var(--rc-border);
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            line-height: 1;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+            transition: transform .18s ease, border-color .18s ease, color .18s ease;
+        }
+
+        .rc-stats-drawer-close:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 99, 56, .35);
+            color: #ff6338;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-header-v2 {
+            grid-template-columns: 1fr;
+            gap: .85rem;
+            margin-bottom: 1rem;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-search-v2 {
+            display: none;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-stats-v2 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2 {
+            grid-template-columns: 2.4rem minmax(0, 1fr) auto auto;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-chevron-v2 {
+            display: none;
+        }
+
+        @keyframes rcStatsDrawerIn {
+            from { transform: translateX(100%); opacity: .6; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes rcDrawerBackdropIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media (max-width: 760px) {
+            .rc-stats-drawer-panel {
+                width: 100vw;
+                padding: 1rem;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-stats-v2 {
+                grid-template-columns: 1fr;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-row-v2 {
+                grid-template-columns: 2.35rem minmax(0, 1fr) auto;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-rank-v2,
+            .rc-stats-drawer-panel .rc-detail-time-v2 {
+                display: none;
+            }
+        }
+
         @media (max-width: 1180px) {
             .rc-home-header-v2,
             .rc-detail-header-v2 { grid-template-columns: 1fr !important; }
@@ -3835,6 +3953,323 @@
                 grid-template-columns: minmax(0, 1fr) 3rem !important;
             }
         }
+
+        /* v72 stat drawer: keep background blur on page only, panel itself stays solid */
+        .rc-stats-drawer-panel {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            isolation: isolate;
+        }
+
+        .dark .rc-stats-drawer-panel {
+            background: #0f172a !important;
+            background-color: #0f172a !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-page-v2,
+        .rc-stats-drawer-panel .rc-detail-header-v2,
+        .rc-stats-drawer-panel .rc-detail-search-v2,
+        .rc-stats-drawer-panel .rc-detail-stats-v2,
+        .rc-stats-drawer-panel .rc-detail-list-v2,
+        .rc-stats-drawer-panel .rc-detail-row-v2 {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-page-v2 {
+            background: #ffffff !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-page-v2 {
+            background: #0f172a !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2,
+        .rc-stats-drawer-panel .rc-detail-search-v2,
+        .rc-stats-drawer-panel .rc-detail-stat-card-v2,
+        .rc-stats-drawer-panel .rc-detail-card-v2 {
+            background-color: #ffffff !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-row-v2,
+        .dark .rc-stats-drawer-panel .rc-detail-search-v2,
+        .dark .rc-stats-drawer-panel .rc-detail-stat-card-v2,
+        .dark .rc-stats-drawer-panel .rc-detail-card-v2 {
+            background-color: #111827 !important;
+        }
+
+
+        /* v73 stat drawer: responsive panel, proper close button, faster slide animations */
+        .rc-stats-drawer-backdrop {
+            align-items: stretch !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            will-change: opacity !important;
+        }
+
+        .rc-stats-drawer-panel {
+            width: min(780px, 92vw) !important;
+            max-width: 100vw !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            overflow-y: auto !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch !important;
+            transform: translateX(0);
+            will-change: transform, opacity !important;
+        }
+
+        .rc-stats-drawer-panel[x-cloak],
+        .rc-stats-drawer-backdrop[x-cloak] {
+            display: none !important;
+        }
+
+        .rc-stats-drawer-close {
+            position: sticky !important;
+            top: .75rem !important;
+            z-index: 20 !important;
+            cursor: pointer !important;
+            user-select: none !important;
+            transition: transform .12s ease, background-color .12s ease, border-color .12s ease, color .12s ease !important;
+        }
+
+        .rc-stats-drawer-close:active {
+            transform: scale(.94) !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-table-v2 {
+            overflow: visible !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-rows-v2 {
+            display: grid !important;
+            gap: .75rem !important;
+        }
+
+        @media (max-width: 900px) {
+            .rc-stats-drawer-panel {
+                width: min(620px, 94vw) !important;
+                padding: 1rem !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .rc-stats-drawer-backdrop {
+                justify-content: stretch !important;
+            }
+
+            .rc-stats-drawer-panel {
+                width: 100vw !important;
+                height: 100dvh !important;
+                max-height: 100dvh !important;
+                border-left: 0 !important;
+                border-radius: 0 !important;
+                padding: .9rem !important;
+            }
+
+            .rc-stats-drawer-close {
+                top: .5rem !important;
+                width: 2.45rem !important;
+                height: 2.45rem !important;
+                border-radius: .85rem !important;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-header-v2 h1 {
+                font-size: 1.45rem !important;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-stat-v2 {
+                min-width: 0 !important;
+            }
+        }
+
+
+
+        /* v74 stat drawer detail layout: match reference detail pages while keeping blur slider. */
+        .rc-stats-drawer-panel {
+            width: min(1120px, calc(100vw - 4rem)) !important;
+            padding: 2rem 2.2rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-page-v2 {
+            gap: 1.25rem !important;
+            background: transparent !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-header-v2 {
+            display: block !important;
+            margin-bottom: .55rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-header-v2 h1 {
+            font-size: 1.65rem !important;
+            line-height: 1.12 !important;
+            letter-spacing: -.04em !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-header-v2 p {
+            font-size: .95rem !important;
+            color: #7b879b !important;
+            margin-top: .45rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-stats-v2 {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 1.05rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-stat-v2 {
+            min-height: 8rem !important;
+            border-radius: 1.05rem !important;
+            padding: 1.1rem 1.2rem !important;
+            background: #ffffff !important;
+            border: 1px solid #e8ebf0 !important;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .07) !important;
+            grid-template-columns: 3rem minmax(0, 1fr) !important;
+            align-items: start !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-stat-v2 {
+            background: #111827 !important;
+            border-color: rgba(148, 163, 184, .16) !important;
+            box-shadow: none !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-stat-v2 > span {
+            width: 2.85rem !important;
+            height: 2.85rem !important;
+            border-radius: .85rem !important;
+            font-size: 1.1rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-stat-v2 strong {
+            margin-top: .15rem !important;
+            font-size: 1.85rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-table-v2 {
+            overflow: hidden !important;
+            border-radius: 1.05rem !important;
+            background: #ffffff !important;
+            border: 1px solid #e8ebf0 !important;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .07) !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-table-v2 {
+            background: #111827 !important;
+            border-color: rgba(148, 163, 184, .16) !important;
+            box-shadow: none !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-table-v2 header {
+            min-height: 3.75rem !important;
+            background: inherit !important;
+            padding: 0 1.25rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-table-v2 header span {
+            color: #10b981 !important;
+            font-weight: 800 !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-rows-v2 {
+            gap: 0 !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2 {
+            min-height: 4.65rem !important;
+            display: grid !important;
+            grid-template-columns: 2rem 2.6rem minmax(0, 1fr) auto 4.1rem 5.3rem 1rem !important;
+            gap: .85rem !important;
+            padding: .72rem 1.25rem !important;
+            border-bottom: 1px solid #f0f2f6 !important;
+            background: #ffffff !important;
+            border-radius: 0 !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-row-v2 {
+            background: #111827 !important;
+            border-bottom-color: rgba(148, 163, 184, .13) !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2:hover {
+            background: #fafafa !important;
+        }
+
+        .dark .rc-stats-drawer-panel .rc-detail-row-v2:hover {
+            background: #0f172a !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-chevron-v2,
+        .rc-stats-drawer-panel .rc-detail-rank-v2,
+        .rc-stats-drawer-panel .rc-detail-time-v2 {
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-platform-icon-v2,
+        .rc-stats-drawer-panel .rc-detail-avatar-v2 {
+            width: 2.45rem !important;
+            height: 2.45rem !important;
+            border-radius: .72rem !important;
+        }
+
+        .rc-home-stat-v2:not(.is-clickable) {
+            cursor: default !important;
+        }
+
+
+        /* Engagement drawer rows have no rank column, so keep them aligned like the reference layout. */
+        .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement {
+            grid-template-columns: 2.6rem minmax(0, 1fr) auto 4.1rem 5.3rem 1rem !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 {
+            min-width: 0 !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 strong,
+        .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 small {
+            max-width: 100% !important;
+        }
+
+        .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-pill-v2 {
+            width: auto !important;
+            max-width: max-content !important;
+            justify-self: end !important;
+        }
+
+        @media (max-width: 980px) {
+            .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement {
+                grid-template-columns: 2.45rem minmax(0, 1fr) auto !important;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .rc-stats-drawer-panel {
+                width: 100vw !important;
+                padding: 1rem !important;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-stats-v2 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-row-v2 {
+                grid-template-columns: 2.45rem minmax(0, 1fr) auto !important;
+            }
+
+            .rc-stats-drawer-panel .rc-detail-rank-v2,
+            .rc-stats-drawer-panel .rc-detail-pill-v2,
+            .rc-stats-drawer-panel .rc-detail-time-v2,
+            .rc-stats-drawer-panel .rc-detail-chevron-v2 {
+                display: none !important;
+            }
+        }
+
 </style>
 
     @php
@@ -3870,6 +4305,10 @@
                 return 'Recent';
             }
         };
+
+
+        $statDrawerSections = ['profile-views', 'coach-engagement'];
+        $isStatDrawerOpen = in_array($section, $statDrawerSections, true);
     @endphp
 
     <div
@@ -3902,7 +4341,7 @@
             <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
         @endif
 
-        @if($section === 'dashboard')
+        @if($section === 'dashboard' || $isStatDrawerOpen)
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
@@ -4193,7 +4632,6 @@
                         'sub' => 'Tracked emails sent',
                         'icon' => 'chart',
                         'tone' => 'indigo',
-                        'target' => 'emails-sent',
                     ],
                 ];
 
@@ -4590,7 +5028,30 @@
                 });
             @endphp
 
-            <div class="rc-detail-page-v2">
+            <div class="rc-stats-drawer-backdrop"
+                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @keydown.escape.window="close()"
+                @click.self="close()">
+                <aside class="rc-stats-drawer-panel"
+                    role="dialog"
+                    aria-modal="true"
+                    x-show="open"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="translate-x-full opacity-80"
+                    x-transition:enter-end="translate-x-0 opacity-100"
+                    x-transition:leave="transition ease-in duration-120"
+                    x-transition:leave-start="translate-x-0 opacity-100"
+                    x-transition:leave-end="translate-x-full opacity-80">
+                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Profile Views</h1>
@@ -4603,13 +5064,13 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Tracked total</em></div></div>
-                    <div class="rc-detail-stat-v2 is-coral"><span>⌁</span><div><small>Website + Email</small><strong>{{ number_format($websiteViews + $emailLinkViews) }}</strong><em>Website profile and email links</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Social Clicks</small><strong>{{ number_format($instagramViews + $youtubeViews + $xViews) }}</strong><em>Instagram, YouTube, and X</em></div></div>
+                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>↑ {{ number_format(max(0, $profileViewsTotal)) }} tracked views</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Coaches</small><strong>{{ number_format(max(0, $profileViewRows->count())) }}</strong><em>Viewed your profile</em></div></div>
+                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Programs</small><strong>{{ number_format($profilePrograms) }}</strong><em>Showing interest</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>Profile View Breakdown</h2><span>● Updated</span></header>
+                    <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
                             <button type="button" class="rc-detail-row-v2">
@@ -4632,6 +5093,8 @@
                         @endforelse
                     </div>
                 </section>
+            </div>
+                </aside>
             </div>
         @endif
 
@@ -4681,11 +5144,34 @@
                 }
             @endphp
 
-            <div class="rc-detail-page-v2">
+            <div class="rc-stats-drawer-backdrop"
+                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @keydown.escape.window="close()"
+                @click.self="close()">
+                <aside class="rc-stats-drawer-panel"
+                    role="dialog"
+                    aria-modal="true"
+                    x-show="open"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="translate-x-full opacity-80"
+                    x-transition:enter-end="translate-x-0 opacity-100"
+                    x-transition:leave="transition ease-in duration-120"
+                    x-transition:leave-start="translate-x-0 opacity-100"
+                    x-transition:leave-end="translate-x-full opacity-80">
+                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Coach Engagement</h1>
-                        <p>Tracking for social clicks, email opens, email clicks, and replies.</p>
+                        <p>How coaches are engaging with your social platforms, and who's clicking through.</p>
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -4694,16 +5180,16 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X</small><strong>{{ number_format($xClicks) }}</strong><em>X clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>Instagram clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>YouTube clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X (Twitter)</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>Engagement Breakdown</h2><span>● Updated</span></header>
+                    <header><h2>Who's Clicking</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
-                            <button type="button" class="rc-detail-row-v2">
+                            <button type="button" class="rc-detail-row-v2 is-engagement">
                                 <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
                                 <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
                                 <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
@@ -4716,6 +5202,8 @@
                         @endforelse
                     </div>
                 </section>
+            </div>
+                </aside>
             </div>
         @endif
 
@@ -4759,7 +5247,30 @@
                 }
             @endphp
 
-            <div class="rc-detail-page-v2">
+            <div class="rc-stats-drawer-backdrop"
+                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @keydown.escape.window="close()"
+                @click.self="close()">
+                <aside class="rc-stats-drawer-panel"
+                    role="dialog"
+                    aria-modal="true"
+                    x-show="open"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="translate-x-full opacity-80"
+                    x-transition:enter-end="translate-x-0 opacity-100"
+                    x-transition:leave="transition ease-in duration-120"
+                    x-transition:leave-start="translate-x-0 opacity-100"
+                    x-transition:leave-end="translate-x-full opacity-80">
+                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Emails Sent</h1>
@@ -4795,6 +5306,8 @@
                         @endforelse
                     </div>
                 </section>
+            </div>
+                </aside>
             </div>
         @endif
 
