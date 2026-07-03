@@ -3160,19 +3160,243 @@ HTML;
     }
 
     public function getDashboardSchoolsProperty(): array { return collect($this->allSchools())->take(8)->values()->all(); }
+
+    public function getGlobalSearchSuggestionsProperty(): array
+    {
+        $query = $this->normalizeSearchText($this->search);
+
+        if ($query === '') {
+            return [
+                'schools' => [],
+                'coaches' => [],
+                'conferences' => [],
+                'divisions' => [],
+                'lists' => [],
+                'total' => 0,
+            ];
+        }
+
+        $schools = collect($this->allSchools())
+            ->filter(fn (array $school): bool => str_contains($this->schoolSearchHaystack($school), $query))
+            ->take(5)
+            ->map(function (array $school): array {
+                return [
+                    'type' => 'school',
+                    'category' => 'School',
+                    'label' => (string) ($school['name'] ?? 'School'),
+                    'detail' => trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • ')),
+                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
+                    'value' => (string) ($school['name'] ?? ''),
+                    'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
+                ];
+            })
+            ->values();
+
+        $coaches = collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => str_contains($this->coachSearchHaystack($coach), $query))
+            ->take(5)
+            ->map(function (array $coach): array {
+                return [
+                    'type' => 'coach',
+                    'category' => 'Coach',
+                    'label' => (string) ($coach['name'] ?? 'Coach'),
+                    'detail' => trim(collect([$coach['title'] ?? null, $coach['school'] ?? null])->filter()->implode(' • ')),
+                    'id' => (string) ($coach['id'] ?? ''),
+                    'value' => (string) ($coach['name'] ?? $coach['email'] ?? ''),
+                    'logo_url' => (string) ($coach['logo_url'] ?? $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? ''),
+                ];
+            })
+            ->values();
+
+        $conferences = collect($this->allSchools())
+            ->pluck('conference')
+            ->filter()
+            ->unique(fn ($conference): string => strtolower(trim((string) $conference)))
+            ->filter(fn ($conference): bool => str_contains($this->normalizeSearchText([$conference, $this->conferenceSearchTokens($conference)]), $query))
+            ->take(5)
+            ->map(function ($conference): array {
+                $count = collect($this->allSchools())
+                    ->filter(fn (array $school): bool => strcasecmp(trim((string) ($school['conference'] ?? '')), trim((string) $conference)) === 0)
+                    ->count();
+
+                return [
+                    'type' => 'conference',
+                    'category' => 'Conference',
+                    'label' => (string) $conference,
+                    'detail' => number_format($count) . ' school' . ($count === 1 ? '' : 's'),
+                    'id' => '',
+                    'value' => (string) $conference,
+                    'logo_url' => '',
+                ];
+            })
+            ->values();
+
+        $divisions = collect($this->allSchools())
+            ->pluck('division')
+            ->filter()
+            ->unique(fn ($division): string => $this->normalizeDivisionValue($division) ?: strtolower(trim((string) $division)))
+            ->filter(fn ($division): bool => str_contains($this->normalizeSearchText([$division, $this->normalizeDivisionValue($division)]), $query))
+            ->take(5)
+            ->map(function ($division): array {
+                $normalized = $this->normalizeDivisionValue($division);
+                $count = collect($this->allSchools())
+                    ->filter(fn (array $school): bool => $this->divisionMatches($school['division'] ?? '', $normalized ?: (string) $division))
+                    ->count();
+
+                return [
+                    'type' => 'division',
+                    'category' => 'Division',
+                    'label' => (string) $division,
+                    'detail' => number_format($count) . ' school' . ($count === 1 ? '' : 's'),
+                    'id' => $normalized,
+                    'value' => (string) $division,
+                    'logo_url' => '',
+                ];
+            })
+            ->values();
+
+        $lists = collect($this->lists)
+            ->filter(function (array $list) use ($query): bool {
+                return str_contains($this->normalizeSearchText([
+                    $list['label'] ?? '',
+                    $list['name'] ?? '',
+                    $list['key'] ?? '',
+                    $list['tag'] ?? '',
+                ]), $query);
+            })
+            ->take(5)
+            ->map(function (array $list): array {
+                $key = (string) ($list['key'] ?? '');
+                $tag = strtolower(trim((string) ($list['tag'] ?? '')));
+                $schoolCount = collect($this->allSchools())
+                    ->filter(fn (array $school): bool => in_array($key, $school['list_keys'] ?? [], true))
+                    ->count();
+                $coachCount = collect($this->allCoaches())
+                    ->filter(function (array $coach) use ($tag): bool {
+                        return $tag !== '' && collect($coach['tags'] ?? [])
+                            ->contains(fn ($existing): bool => strtolower(trim((string) $existing)) === $tag);
+                    })
+                    ->count();
+
+                return [
+                    'type' => 'list',
+                    'category' => 'Student List',
+                    'label' => (string) ($list['label'] ?? Str::headline($key ?: 'List')),
+                    'detail' => trim(number_format($schoolCount) . ' schools • ' . number_format($coachCount) . ' coaches'),
+                    'id' => $key,
+                    'value' => (string) ($list['label'] ?? $key),
+                    'logo_url' => '',
+                ];
+            })
+            ->values();
+
+        $groups = [
+            'schools' => $schools->all(),
+            'coaches' => $coaches->all(),
+            'conferences' => $conferences->all(),
+            'divisions' => $divisions->all(),
+            'lists' => $lists->all(),
+        ];
+
+        $groups['total'] = collect($groups)->filter(fn ($items, string $key): bool => $key !== 'total')->sum(fn ($items): int => count($items));
+
+        return $groups;
+    }
+
+    public function selectGlobalSearchSuggestion(string $type, string $value = '', string $id = ''): void
+    {
+        $type = strtolower(trim($type));
+        $value = trim($value);
+        $id = trim($id);
+
+        match ($type) {
+            'school' => $this->jumpToSchoolSearchResult($value, $id),
+            'coach' => $this->jumpToCoachSearchResult($value, $id),
+            'conference' => $this->jumpToConferenceSearchResult($value),
+            'division' => $this->jumpToDivisionSearchResult($value, $id),
+            'list' => $this->jumpToListSearchResult($id, $value),
+            default => null,
+        };
+    }
+
+    protected function jumpToSchoolSearchResult(string $value, string $id = ''): void
+    {
+        $this->section = 'schools';
+        $this->search = $value;
+        $this->coachSearch = '';
+        $this->divisionFilter = '';
+        $this->conferenceFilter = '';
+        $this->schoolDisplayLimit = 24;
+
+        if ($id !== '') {
+            $this->selectedSchoolId = $id;
+            $this->loadSchoolCoachesById($id);
+        }
+    }
+
+    protected function jumpToCoachSearchResult(string $value, string $id = ''): void
+    {
+        $this->section = 'coaches';
+        $this->search = $value;
+        $this->coachSearch = $value;
+        $this->divisionFilter = '';
+        $this->conferenceFilter = '';
+        $this->coachDisplayLimit = 40;
+        $this->selectedCoachId = $id !== '' ? $id : null;
+    }
+
+    protected function jumpToConferenceSearchResult(string $value): void
+    {
+        $this->section = 'schools';
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->divisionFilter = '';
+        $this->conferenceFilter = $value;
+        $this->schoolDisplayLimit = 24;
+    }
+
+    protected function jumpToDivisionSearchResult(string $value, string $id = ''): void
+    {
+        $this->section = 'schools';
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->conferenceFilter = '';
+        $this->divisionFilter = $id !== '' ? $id : $this->normalizeDivisionValue($value);
+        $this->schoolDisplayLimit = 24;
+    }
+
+    protected function jumpToListSearchResult(string $id, string $value = ''): void
+    {
+        $this->section = 'lists';
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->listSchoolSearch = '';
+        $this->selectedListKey = $id !== '' ? $id : (collect($this->lists)->firstWhere('label', $value)['key'] ?? '');
+    }
+
+    public function clearGlobalSearch(): void
+    {
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->divisionFilter = '';
+        $this->conferenceFilter = '';
+        $this->favoriteSchoolSearch = '';
+        $this->listSchoolSearch = '';
+    }
+
     public function getFilteredSchoolsProperty(): array { return $this->filteredSchoolsQuery()->take($this->schoolDisplayLimit)->values()->all(); }
     public function getFilteredSchoolsCountProperty(): int { return $this->filteredSchoolsQuery()->count(); }
     public function getCanLoadMoreSchoolsProperty(): bool { return $this->filteredSchoolsCount > count($this->filteredSchools); }
     public function getFilteredCoachesProperty(): array { return $this->filteredCoachesQuery()->take($this->coachDisplayLimit)->values()->all(); }
     public function getFilteredCoachesCountProperty(): int { return $this->filteredCoachesQuery()->count(); }
     public function getCanLoadMoreCoachesProperty(): bool { return $this->filteredCoachesCount > count($this->filteredCoaches); }
-    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false)), $this->favoriteSchoolSearch)->values()->all(); }
+    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all(); }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
     public function getSavedSchoolsProperty(): array
     {
-        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false)), $this->favoriteSchoolSearch)->values()->all();
+        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all();
     }
 
     public function getSavedCoachesProperty(): array
@@ -3219,7 +3443,7 @@ HTML;
         }
 
         return $this->filterSchoolsForSearch(collect($this->allSchools())
-            ->filter(fn (array $school): bool => in_array((string) ($list['key'] ?? ''), $school['list_keys'] ?? [], true)), $this->listSchoolSearch)
+            ->filter(fn (array $school): bool => in_array((string) ($list['key'] ?? ''), $school['list_keys'] ?? [], true)), $this->listSchoolSearch !== '' ? $this->listSchoolSearch : $this->search)
             ->values()
             ->all();
     }
@@ -3233,10 +3457,14 @@ HTML;
             return [];
         }
 
+        $query = $this->normalizeSearchText($this->listSchoolSearch !== '' ? $this->listSchoolSearch : $this->search);
+
         return collect($this->allCoaches())
-            ->filter(function (array $coach) use ($tag): bool {
-                return collect($coach['tags'] ?? [])
+            ->filter(function (array $coach) use ($tag, $query): bool {
+                $inList = collect($coach['tags'] ?? [])
                     ->contains(fn ($existing): bool => strtolower(trim((string) $existing)) === $tag);
+
+                return $inList && ($query === '' || str_contains($this->coachSearchHaystack($coach), $query));
             })
             ->values()
             ->all();
@@ -3970,6 +4198,54 @@ HTML;
         return array_values($coaches);
     }
 
+    protected function listTokensForSchool(array $school): array
+    {
+        $keys = collect($school['list_keys'] ?? [])
+            ->map(fn ($key): string => trim((string) $key))
+            ->filter()
+            ->values();
+
+        if ($keys->isEmpty()) {
+            return [];
+        }
+
+        return collect($this->lists)
+            ->filter(fn (array $list): bool => $keys->contains((string) ($list['key'] ?? '')))
+            ->flatMap(fn (array $list): array => [
+                $list['label'] ?? '',
+                $list['name'] ?? '',
+                $list['key'] ?? '',
+                $list['tag'] ?? '',
+            ])
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    protected function listTokensForCoach(array $coach): array
+    {
+        $tags = collect($coach['tags'] ?? [])
+            ->map(fn ($tag): string => strtolower(trim((string) $tag)))
+            ->filter()
+            ->values();
+
+        if ($tags->isEmpty()) {
+            return [];
+        }
+
+        return collect($this->lists)
+            ->filter(fn (array $list): bool => $tags->contains(strtolower(trim((string) ($list['tag'] ?? '')))))
+            ->flatMap(fn (array $list): array => [
+                $list['label'] ?? '',
+                $list['name'] ?? '',
+                $list['key'] ?? '',
+                $list['tag'] ?? '',
+            ])
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function coachSearchHaystack(array $coach): string
     {
         return $this->normalizeSearchText([
@@ -3987,6 +4263,7 @@ HTML;
             $coach['city'] ?? '',
             $coach['state'] ?? '',
             $coach['tags'] ?? [],
+            $this->listTokensForCoach($coach),
         ]);
     }
 
@@ -4020,6 +4297,7 @@ HTML;
             $school['state'] ?? '',
             $school['head_coach']['name'] ?? '',
             $school['head_coach']['title'] ?? '',
+            $this->listTokensForSchool($school),
         ], $coaches));
     }
 

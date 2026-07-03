@@ -4420,6 +4420,191 @@
             }
         }
 
+
+
+        .rc-global-search-wrapper,
+        .rc-home-search-v2,
+        .rc-detail-search-v2,
+        .rc-discover-search {
+            position: relative;
+        }
+
+        .rc-global-search-bar {
+            display: grid;
+            grid-template-columns: minmax(18rem, 1fr) auto auto;
+            gap: .55rem;
+            align-items: center;
+            margin-bottom: .9rem;
+        }
+
+        .rc-global-search-shell {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            border: 1px solid var(--rc-border);
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            border-radius: 1rem;
+            padding: .55rem .65rem;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+        }
+
+        .rc-global-search-shell svg {
+            width: 1.08rem;
+            height: 1.08rem;
+            color: var(--rc-muted);
+            flex: 0 0 auto;
+        }
+
+        .rc-global-search-shell input {
+            width: 100%;
+            border: 0 !important;
+            background: transparent !important;
+            color: var(--rc-text);
+            box-shadow: none !important;
+            outline: none !important;
+            min-height: 2.35rem;
+            font-size: .92rem;
+        }
+
+        .rc-global-search-clear {
+            border: 0;
+            background: transparent;
+            color: var(--rc-muted);
+            width: 1.75rem;
+            height: 1.75rem;
+            display: inline-grid;
+            place-items: center;
+            border-radius: 999px;
+            font-weight: 900;
+        }
+
+        .rc-global-search-clear:hover {
+            color: var(--rc-accent);
+            background: var(--rc-accent-soft);
+        }
+
+        .rc-global-suggestions {
+            position: absolute;
+            z-index: 80;
+            top: calc(100% + .5rem);
+            left: 0;
+            right: 0;
+            min-width: min(34rem, 92vw);
+            border: 1px solid var(--rc-border);
+            border-radius: 1rem;
+            background: var(--rc-surface);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+            padding: .45rem;
+            display: grid;
+            gap: .35rem;
+            max-height: 28rem;
+            overflow: auto;
+        }
+
+        .rc-global-suggestion-group {
+            display: grid;
+            gap: .25rem;
+        }
+
+        .rc-global-suggestion-heading {
+            color: var(--rc-muted);
+            font-size: .66rem;
+            font-weight: 900;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+            padding: .5rem .55rem .2rem;
+        }
+
+        .rc-global-suggestion-item {
+            width: 100%;
+            border: 0;
+            border-radius: .78rem;
+            background: transparent;
+            color: var(--rc-text);
+            display: grid;
+            grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+            gap: .65rem;
+            align-items: center;
+            text-align: left;
+            padding: .52rem .55rem;
+            cursor: pointer;
+        }
+
+        .rc-global-suggestion-item:hover {
+            background: var(--rc-accent-soft);
+        }
+
+        .rc-global-suggestion-icon {
+            width: 2.2rem;
+            height: 2.2rem;
+            border-radius: .68rem;
+            background: #fff;
+            color: var(--rc-accent);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 950;
+            border: 1px solid rgba(148, 163, 184, .2);
+            overflow: hidden;
+        }
+
+        .rc-global-suggestion-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .rc-global-suggestion-copy {
+            min-width: 0;
+            display: grid;
+            gap: .1rem;
+        }
+
+        .rc-global-suggestion-copy strong {
+            font-size: .82rem;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rc-global-suggestion-copy small {
+            color: var(--rc-muted);
+            font-size: .72rem;
+            line-height: 1.25;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rc-global-suggestion-category {
+            border-radius: 999px;
+            background: var(--rc-soft);
+            color: var(--rc-muted);
+            padding: .22rem .5rem;
+            font-size: .66rem;
+            font-weight: 850;
+            white-space: nowrap;
+        }
+
+        .rc-global-search-empty {
+            color: var(--rc-muted);
+            font-size: .78rem;
+            padding: .75rem;
+        }
+
+        @media (max-width: 760px) {
+            .rc-global-search-bar {
+                grid-template-columns: 1fr auto auto;
+            }
+            .rc-global-suggestions {
+                min-width: 0;
+            }
+        }
 </style>
 
     @php
@@ -4459,6 +4644,19 @@
 
         $statDrawerSections = ['profile-views', 'coach-engagement'];
         $isStatDrawerOpen = in_array($section, $statDrawerSections, true);
+        $globalSearchSuggestions = $this->globalSearchSuggestions;
+        $globalSearchHasSuggestions = (int) ($globalSearchSuggestions['total'] ?? 0) > 0;
+        $globalSearchGroups = [
+            'schools' => 'Schools',
+            'coaches' => 'Coaches',
+            'conferences' => 'Conferences',
+            'divisions' => 'Divisions',
+            'lists' => 'Student Lists',
+        ];
+        $globalSearchInitials = function (string $label): string {
+            $initials = collect(explode(' ', trim($label)))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+            return strtoupper($initials ?: '•');
+        };
     @endphp
 
     <div
@@ -4488,6 +4686,57 @@
 
         @if($reason || $error)
             <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
+        @endif
+
+        @if(! ($section === 'dashboard' || $isStatDrawerOpen))
+            <div class="rc-global-search-bar">
+                <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    <input type="search" placeholder="Search schools, coaches, conferences, divisions, student lists..." wire:model.live.debounce.300ms="search">
+                    @if($search !== '')
+                        <button type="button" class="rc-global-search-clear" wire:click="clearGlobalSearch" aria-label="Clear search">×</button>
+                    @endif
+
+                            @if($search !== '')
+                                <div class="rc-global-suggestions">
+                                    @if($globalSearchHasSuggestions)
+                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
+                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
+                                                <div class="rc-global-suggestion-group">
+                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
+                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
+                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
+                                                            <span class="rc-global-suggestion-icon">
+                                                                @if(! empty($suggestion['logo_url']))
+                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
+                                                                @else
+                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
+                                                                @endif
+                                                            </span>
+                                                            <span class="rc-global-suggestion-copy">
+                                                                <strong>{{ $suggestion['label'] }}</strong>
+                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
+                                                            </span>
+                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
+                                    @endif
+                                </div>
+                            @endif
+                </div>
+                <button type="button" class="rc-home-refresh-v2" wire:click="refreshData" wire:loading.attr="disabled" wire:target="refreshData,startBackgroundLoad,loadNextBatch" aria-label="Reload Recruiting Center data" title="Reload data from GHL">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
+                    <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <svg class="rc-dark-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                </button>
+            </div>
         @endif
 
         @if($section === 'dashboard' || $isStatDrawerOpen)
@@ -4941,8 +5190,44 @@
                             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
-                            <kbd>Enter</kbd>
+                            <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
+                            @if($search !== '')
+                                <button type="button" class="rc-global-search-clear" wire:click="clearGlobalSearch" aria-label="Clear search">×</button>
+                            @else
+                                <kbd>Enter</kbd>
+                            @endif
+
+                            @if($search !== '')
+                                <div class="rc-global-suggestions">
+                                    @if($globalSearchHasSuggestions)
+                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
+                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
+                                                <div class="rc-global-suggestion-group">
+                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
+                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
+                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
+                                                            <span class="rc-global-suggestion-icon">
+                                                                @if(! empty($suggestion['logo_url']))
+                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
+                                                                @else
+                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
+                                                                @endif
+                                                            </span>
+                                                            <span class="rc-global-suggestion-copy">
+                                                                <strong>{{ $suggestion['label'] }}</strong>
+                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
+                                                            </span>
+                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
 
                         <button
@@ -5244,7 +5529,39 @@
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
+                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
+
+                            @if($search !== '')
+                                <div class="rc-global-suggestions">
+                                    @if($globalSearchHasSuggestions)
+                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
+                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
+                                                <div class="rc-global-suggestion-group">
+                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
+                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
+                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
+                                                            <span class="rc-global-suggestion-icon">
+                                                                @if(! empty($suggestion['logo_url']))
+                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
+                                                                @else
+                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
+                                                                @endif
+                                                            </span>
+                                                            <span class="rc-global-suggestion-copy">
+                                                                <strong>{{ $suggestion['label'] }}</strong>
+                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
+                                                            </span>
+                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
+                                    @endif
+                                </div>
+                            @endif
                     </form>
                 </div>
 
@@ -5549,10 +5866,42 @@
                 </div>
 
                 <div class="rc-discover-toolbar">
-                    <label class="rc-discover-search" aria-label="Search schools and coaches">
+                    <div class="rc-discover-search" role="search" aria-label="Search schools and coaches">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                        <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
-                    </label>
+                        <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs, coaches, conferences, divisions, and lists..." wire:model.live.debounce.350ms="search" />
+
+                            @if($search !== '')
+                                <div class="rc-global-suggestions">
+                                    @if($globalSearchHasSuggestions)
+                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
+                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
+                                                <div class="rc-global-suggestion-group">
+                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
+                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
+                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
+                                                            <span class="rc-global-suggestion-icon">
+                                                                @if(! empty($suggestion['logo_url']))
+                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
+                                                                @else
+                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
+                                                                @endif
+                                                            </span>
+                                                            <span class="rc-global-suggestion-copy">
+                                                                <strong>{{ $suggestion['label'] }}</strong>
+                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
+                                                            </span>
+                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
+                                    @endif
+                                </div>
+                            @endif
+                    </div>
 
                     <div class="rc-discover-filter-row">
                         <div class="rc-discover-tabs" aria-label="Division filter">
