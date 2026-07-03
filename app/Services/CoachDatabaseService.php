@@ -94,6 +94,11 @@ class CoachDatabaseService
         ];
     }
 
+    public function getRemoteRecruitingCounts(User $user): array
+    {
+        return $this->goHighLevelService->getRecruitingRemoteCountsForUser($user);
+    }
+
     public function actionTags(?User $user = null, array $customListTags = []): array
     {
         $defaults = [
@@ -360,10 +365,17 @@ class CoachDatabaseService
                     ->all();
 
                 $score = $this->schoolEngagementScore($schoolCoaches);
+                $logoUrl = $schoolCoaches
+                    ->map(fn (array $coach): ?string => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null)
+                    ->filter(fn (?string $url): bool => filled($url))
+                    ->first();
 
                 return [
                     'id' => str($school)->slug()->toString(),
                     'name' => $school,
+                    'logo_url' => $logoUrl,
+                    'school_logo_url' => $logoUrl,
+                    'business_logo_url' => $logoUrl,
                     'conference' => $first['conference'] ?? null,
                     'division' => $first['division'] ?? null,
                     'state' => $first['state'] ?? null,
@@ -404,6 +416,7 @@ class CoachDatabaseService
                         ->map(fn (array $school): array => [
                             'id' => $school['id'] ?? null,
                             'name' => $school['name'] ?? null,
+                            'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null,
                             'conference' => $school['conference'] ?? null,
                             'division' => $school['division'] ?? null,
                             'coach_count' => $school['coach_count'] ?? 0,
@@ -469,6 +482,9 @@ class CoachDatabaseService
                 'name' => $school['name'] ?? null,
                 'conference' => $school['conference'] ?? null,
                 'division' => $school['division'] ?? null,
+                'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null,
+                'school_logo_url' => $school['school_logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? null,
+                'business_logo_url' => $school['business_logo_url'] ?? $school['logo_url'] ?? $school['school_logo_url'] ?? null,
                 'coach_count' => $school['coach_count'] ?? 0,
                 'profile_views' => $school['profile_views'] ?? 0,
                 'highlight_views' => $school['highlight_views'] ?? 0,
@@ -513,6 +529,11 @@ class CoachDatabaseService
             'email' => $coach['email'] ?? null,
             'phone' => $coach['phone'] ?? null,
             'school' => $coach['school'] ?? null,
+            'school_id' => $coach['school_id'] ?? null,
+            'business_id' => $coach['business_id'] ?? null,
+            'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
+            'business_logo_url' => $coach['business_logo_url'] ?? $coach['school_logo_url'] ?? $coach['logo_url'] ?? null,
+            'logo_url' => $coach['logo_url'] ?? $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? null,
             'conference' => $coach['conference'] ?? null,
             'division' => $coach['division'] ?? null,
             'title' => $coach['title'] ?? null,
@@ -552,6 +573,8 @@ class CoachDatabaseService
             'name' => $coach['name'] ?? null,
             'email' => $coach['email'] ?? null,
             'title' => $coach['title'] ?? null,
+            'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
+            'logo_url' => $coach['logo_url'] ?? $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? null,
         ];
     }
 
@@ -818,6 +841,9 @@ class CoachDatabaseService
                 'id' => $school['id'] ?? $school['business_id'] ?? ($built['id'] ?? $nameKey),
                 'business_id' => $school['business_id'] ?? $school['id'] ?? ($built['business_id'] ?? null),
                 'name' => $school['name'] ?? ($built['name'] ?? 'Unnamed School'),
+                'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? $built['logo_url'] ?? $built['school_logo_url'] ?? $built['business_logo_url'] ?? null,
+                'school_logo_url' => $school['school_logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? $built['school_logo_url'] ?? $built['logo_url'] ?? $built['business_logo_url'] ?? null,
+                'business_logo_url' => $school['business_logo_url'] ?? $school['logo_url'] ?? $school['school_logo_url'] ?? $built['business_logo_url'] ?? $built['logo_url'] ?? $built['school_logo_url'] ?? null,
                 'conference' => $school['conference'] ?? ($built['conference'] ?? null),
                 'division' => $school['division'] ?? ($built['division'] ?? null),
                 'coach_count' => $coachCount,

@@ -326,6 +326,7 @@ trait InteractsWithCoachDatabase
         }
     }
 
+
     protected function mergeContactsIntoSnapshot(array &$snapshot, array $contacts): void
     {
         $contacts = collect($contacts)
@@ -354,6 +355,9 @@ trait InteractsWithCoachDatabase
                     'id' => 'school-' . Str::slug($name),
                     'business_id' => null,
                     'name' => $name,
+                    'logo_url' => $first['school_logo_url'] ?? $first['business_logo_url'] ?? $first['logo_url'] ?? null,
+                    'school_logo_url' => $first['school_logo_url'] ?? $first['business_logo_url'] ?? $first['logo_url'] ?? null,
+                    'business_logo_url' => $first['business_logo_url'] ?? $first['school_logo_url'] ?? $first['logo_url'] ?? null,
                     'conference' => $first['conference'] ?? null,
                     'division' => $first['division'] ?? null,
                     'city' => $first['city'] ?? null,
@@ -366,7 +370,36 @@ trait InteractsWithCoachDatabase
             ->filter()
             ->values();
 
+        $contactSchoolData = $contacts
+            ->filter(fn (array $coach): bool => filled($coach['school'] ?? null))
+            ->groupBy(fn (array $coach): string => strtolower(trim((string) ($coach['school'] ?? ''))))
+            ->map(function (Collection $group): array {
+                $first = $group->first() ?: [];
+
+                return [
+                    'logo_url' => $first['school_logo_url'] ?? $first['business_logo_url'] ?? $first['logo_url'] ?? null,
+                    'school_logo_url' => $first['school_logo_url'] ?? $first['business_logo_url'] ?? $first['logo_url'] ?? null,
+                    'business_logo_url' => $first['business_logo_url'] ?? $first['school_logo_url'] ?? $first['logo_url'] ?? null,
+                    'conference' => $first['conference'] ?? null,
+                    'division' => $first['division'] ?? null,
+                    'city' => $first['city'] ?? null,
+                    'state' => $first['state'] ?? null,
+                ];
+            });
+
         $snapshot['schools'] = $existingSchools
+            ->map(function (array $school) use ($contactSchoolData): array {
+                $key = strtolower(trim((string) ($school['name'] ?? '')));
+                $incoming = $contactSchoolData->get($key, []);
+
+                foreach (['logo_url', 'school_logo_url', 'business_logo_url', 'conference', 'division', 'city', 'state'] as $field) {
+                    if (blank($school[$field] ?? null) && filled($incoming[$field] ?? null)) {
+                        $school[$field] = $incoming[$field];
+                    }
+                }
+
+                return $school;
+            })
             ->merge($missingSchools)
             ->filter(fn ($school): bool => is_array($school) && filled($school['id'] ?? null))
             ->unique('id')
@@ -464,27 +497,36 @@ trait InteractsWithCoachDatabase
             return $school;
         }
 
-        $coaches = collect($snapshot['coaches'] ?? [])
-            ->merge($result['coaches'] ?? [])
-            ->filter(fn ($coach): bool => is_array($coach) && filled($coach['id'] ?? null))
-            ->unique('id')
-            ->values()
-            ->all();
+        $coaches = $this->mergeCoachRowsById($snapshot['coaches'] ?? [], $result['coaches'] ?? []);
 
         $snapshot['coaches'] = $coaches;
         $snapshot['schools'] = collect($snapshot['schools'] ?? [])->map(function (array $existing) use ($school, $result): array {
             if ((string) ($existing['id'] ?? '') !== (string) ($school['id'] ?? '')) {
                 return $existing;
             }
+
+            $logoUrl = collect($result['coaches'] ?? [])
+                ->filter(fn ($coach): bool => is_array($coach))
+                ->map(fn (array $coach): ?string => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null)
+                ->filter(fn (?string $url): bool => filled($url))
+                ->first();
+
+            $firstCoach = collect($result['coaches'] ?? [])->first(fn ($coach): bool => is_array($coach)) ?: [];
+
             $existing['coaches_loaded'] = true;
             $existing['coach_count'] = count($result['coaches'] ?? []);
+            $existing['logo_url'] = $existing['logo_url'] ?? $logoUrl;
+            $existing['school_logo_url'] = $existing['school_logo_url'] ?? $logoUrl;
+            $existing['business_logo_url'] = $existing['business_logo_url'] ?? $logoUrl;
+            $existing['conference'] = $existing['conference'] ?? ($firstCoach['conference'] ?? null);
+            $existing['division'] = $existing['division'] ?? ($firstCoach['division'] ?? null);
             return $existing;
         })->values()->all();
 
         return $school;
     }
 
-    public function refreshData(): void
+    public function refreshData(bool $notify = true, string $message = 'Refreshing recruiting data.'): void
     {
         Cache::forget($this->activeCacheKey());
         $this->schoolDisplayLimit = 24;
@@ -492,7 +534,9 @@ trait InteractsWithCoachDatabase
         $this->selectedSchoolId = null;
         $this->startBackgroundLoad(true);
 
-        Notification::make()->title('Recruiting Center')->body('Refreshing recruiting data.')->success()->send();
+        if ($notify) {
+            Notification::make()->title('Recruiting Center')->body($message)->success()->send();
+        }
     }
 
     public function loadMoreSchools(): void

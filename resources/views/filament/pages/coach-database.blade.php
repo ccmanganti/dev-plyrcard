@@ -648,13 +648,86 @@
             font-size:.82rem;
         }
 
-        .rc-school-list-logo {
+        .rc-school-list-logo-box,
+        .rc-school-card-logo-box,
+        .rc-coach-school-logo-wrap {
             width:2rem;
             height:2rem;
             border-radius:.55rem;
-            object-fit:contain;
-            background:var(--rc-soft);
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            overflow:hidden;
+            background:#ffffff;
+            color:#111827;
+            border:1px solid var(--rc-border);
             flex:0 0 auto;
+            font-size:.72rem;
+            font-weight:900;
+            letter-spacing:.02em;
+        }
+
+        .rc-school-card-logo-box {
+            width:2.45rem;
+            height:2.45rem;
+            border-radius:.7rem;
+        }
+
+        .rc-school-list-logo,
+        .rc-school-card-logo,
+        .rc-coach-school-logo {
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            object-position:center;
+            display:block;
+            background:#fff;
+        }
+
+        .rc-school-logo-placeholder,
+        .rc-logo-initials {
+            color:#111827;
+            background:#ffffff;
+            font-size:.72rem;
+            font-weight:900;
+            letter-spacing:.02em;
+        }
+
+        .rc-logo-fallback-text {
+            display:none;
+        }
+
+        .is-missing-logo .rc-logo-fallback-text {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:100%;
+            height:100%;
+        }
+
+        .is-missing-logo img {
+            display:none !important;
+        }
+
+        .rc-school-card-title {
+            min-width:0;
+            display:flex;
+            align-items:center;
+            gap:.58rem;
+            border:0;
+            background:transparent;
+            color:var(--rc-text);
+            padding:0;
+            text-align:left;
+            cursor:pointer;
+            font-weight:750;
+        }
+
+        .rc-school-card-title span:last-child {
+            display:-webkit-box;
+            -webkit-line-clamp:2;
+            -webkit-box-orient:vertical;
+            overflow:hidden;
         }
 
         .rc-school-list-actions {
@@ -3203,10 +3276,24 @@
             height: 5.25rem;
             display: grid;
             place-items: center;
-            background: #f3f4f6;
-            color: #0f172a;
-            font-weight: 900;
+            background: #ffffff;
+            color: #111827;
+            font-weight: 950;
             font-size: 1.15rem;
+            overflow: hidden;
+            border-bottom: 1px solid #eef2f7;
+        }
+
+        .rc-radar-logo-v2 img {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            object-fit: contain;
+            object-position: center;
+            padding: .75rem;
+            box-sizing: border-box;
         }
 
         .rc-radar-card-v2 strong,
@@ -3285,6 +3372,16 @@
             color: #111827;
             font-size: .72rem;
             font-weight: 850;
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+
+        .rc-interested-logo-v2 img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            padding: .18rem;
         }
 
         .rc-interested-row-v2 strong {
@@ -3405,10 +3502,10 @@
 
         .rc-home-actions-v2 {
             display: grid !important;
-            grid-template-columns: minmax(22rem, 30rem) auto !important;
+            grid-template-columns: minmax(22rem, 30rem) auto auto !important;
             grid-template-areas:
-                "search dark"
-                ". email" !important;
+                "search refresh dark"
+                ". email email" !important;
             align-items: center !important;
             justify-content: end !important;
             gap: .75rem !important;
@@ -3470,6 +3567,59 @@
 
         .dark .rc-home-dark-toggle-v2 .rc-dark-icon-sun {
             display: block !important;
+        }
+
+
+
+        .rc-home-refresh-v2 {
+            grid-area: refresh !important;
+            width: 3rem !important;
+            min-width: 3rem !important;
+            max-width: 3rem !important;
+            height: 3rem !important;
+            min-height: 3rem !important;
+            max-height: 3rem !important;
+            aspect-ratio: 1 / 1 !important;
+            padding: 0 !important;
+            border-radius: .95rem !important;
+            display: inline-grid !important;
+            place-items: center !important;
+            justify-self: end !important;
+            flex: 0 0 3rem !important;
+            box-sizing: border-box !important;
+            border: 1px solid #e5e7eb !important;
+            background: rgba(255,255,255,.94) !important;
+            color: #0f172a !important;
+            box-shadow: 0 8px 24px rgba(15,23,42,.08) !important;
+            cursor: pointer !important;
+            transition: transform .18s ease, border-color .18s ease, background .18s ease, opacity .18s ease !important;
+        }
+
+        .rc-home-refresh-v2:hover {
+            transform: translateY(-1px) !important;
+            border-color: rgba(255, 99, 56, .35) !important;
+        }
+
+        .rc-home-refresh-v2 svg {
+            width: 1.12rem !important;
+            height: 1.12rem !important;
+        }
+
+        .rc-home-refresh-v2[disabled] {
+            opacity: .62 !important;
+            cursor: wait !important;
+            transform: none !important;
+        }
+
+        .rc-home-refresh-v2[disabled] svg {
+            animation: rcSpin .75s linear infinite;
+        }
+
+        .dark .rc-home-refresh-v2 {
+            border-color: rgba(148,163,184,.18) !important;
+            background: rgba(17,24,39,.82) !important;
+            color: #f8fafc !important;
+            box-shadow: none !important;
         }
 
         .rc-home-new-email-v2 {
@@ -3901,10 +4051,10 @@
             width: 100% !important;
             max-width: 45rem !important;
             display: grid !important;
-            grid-template-columns: minmax(28rem, 1fr) 3rem !important;
+            grid-template-columns: minmax(28rem, 1fr) 3rem 3rem !important;
             grid-template-areas:
-                "search dark"
-                ". email" !important;
+                "search refresh dark"
+                ". email email" !important;
             justify-content: end !important;
             align-items: center !important;
             gap: .75rem !important;
@@ -4314,7 +4464,6 @@
     <div
         class="rc-wrap"
         x-data
-        wire:poll.visible.8s="pollRealtime"
         x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
     >
         @if(in_array($section, ['favorites', 'lists'], true))
@@ -4726,6 +4875,15 @@
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
                     $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                    $logoUrl = trim((string) (
+                        $school['logo_url']
+                        ?? $school['school_logo_url']
+                        ?? $school['business_logo_url']
+                        ?? data_get($school, 'head_coach.logo_url')
+                        ?? data_get($school, 'head_coach.school_logo_url')
+                        ?? data_get($school, 'head_coach.business_logo_url')
+                        ?? ''
+                    ));
 
                     return [
                         'id' => $school['id'] ?? $school['business_id'] ?? $schoolName,
@@ -4733,15 +4891,16 @@
                         'conference' => $schoolConference,
                         'match' => $match,
                         'initials' => strtoupper($initials ?: 'PC'),
+                        'logo_url' => $logoUrl,
                     ];
                 })->values();
 
                 if ($radarSchoolRows->isEmpty()) {
                     $radarSchoolRows = collect([
-                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU'],
-                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU'],
-                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU'],
-                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF'],
+                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU', 'logo_url' => ''],
+                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU', 'logo_url' => ''],
+                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU', 'logo_url' => ''],
+                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF', 'logo_url' => ''],
                     ]);
                 }
 
@@ -4756,6 +4915,7 @@
                         'name' => $schoolName,
                         'score' => $score,
                         'initials' => strtoupper($initials ?: 'S'),
+                        'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
                     ];
                 })->values();
 
@@ -4784,6 +4944,21 @@
                             <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
                             <kbd>Enter</kbd>
                         </div>
+
+                        <button
+                            type="button"
+                            class="rc-home-refresh-v2"
+                            wire:click="refreshData"
+                            wire:loading.attr="disabled"
+                            wire:target="refreshData,startBackgroundLoad,loadNextBatch"
+                            aria-label="Reload Recruiting Center data"
+                            title="Reload data from GHL"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
 
                         <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
                             <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -4940,7 +5115,12 @@
                         <div class="rc-radar-schools-v2">
                             @foreach($radarSchoolRows as $radarSchool)
                                 <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
-                                    <span class="rc-radar-logo-v2">{{ $radarSchool['initials'] }}</span>
+                                    <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
+                                        @if(! empty($radarSchool['logo_url']))
+                                            <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
+                                        @endif
+                                        <span class="rc-logo-fallback-text">{{ $radarSchool['initials'] }}</span>
+                                    </span>
                                     <strong>{{ $radarSchool['name'] }}</strong>
                                     <small>{{ $radarSchool['conference'] }}</small>
                                     <em>{{ $radarSchool['match'] }}% Match</em>
@@ -4965,7 +5145,12 @@
                             @foreach($interestedSchoolRows as $interestedSchool)
                                 <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
-                                    <span class="rc-interested-logo-v2">{{ $interestedSchool['initials'] }}</span>
+                                    <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
+                                        @if(! empty($interestedSchool['logo_url']))
+                                            <img src="{{ $interestedSchool['logo_url'] }}" alt="{{ $interestedSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-interested-logo-v2').classList.add('is-missing-logo')">
+                                        @endif
+                                        <span class="rc-logo-fallback-text">{{ $interestedSchool['initials'] }}</span>
+                                    </span>
                                     <span>
                                         <strong>{{ $interestedSchool['name'] }}</strong>
                                         <small>Profile views</small>

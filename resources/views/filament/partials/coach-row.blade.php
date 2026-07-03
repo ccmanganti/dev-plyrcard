@@ -1,47 +1,60 @@
 @php
     $coachId = (string) ($coach['id'] ?? '');
-    $favoriteAction = ($coach['is_favorite_coach'] ?? false) ? 'unfavoriteCoach' : 'favoriteCoach';
-    $saveAction = ($coach['is_saved_coach'] ?? false) ? 'unsaveCoach' : 'saveCoach';
-    $coachName = trim((string) ($coach['name'] ?? '')) ?: trim(((string) ($coach['first_name'] ?? '')).' '.((string) ($coach['last_name'] ?? ''))) ?: 'Coach';
-    $coachTitle = trim((string) ($coach['title'] ?? '')) ?: 'Coach';
-    $coachSchool = trim((string) ($coach['school'] ?? '')) ?: 'School unavailable';
+    $coachName = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Coach';
+    $coachTitle = trim((string) ($coach['title'] ?? 'Coach'));
+    $coachSchool = trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''));
+    $coachConference = trim((string) ($coach['conference'] ?? ''));
+    $coachDivision = trim((string) ($coach['division'] ?? ''));
     $coachEmail = trim((string) ($coach['email'] ?? ''));
-    $coachTags = collect($coach['tags'] ?? [])->map(fn ($tag) => strtolower(trim((string) $tag)))->all();
-    $coachListLabels = collect($lists ?? [])
-        ->filter(function ($list) use ($coachTags) {
-            $listTag = strtolower(trim((string) ($list['tag'] ?? '')));
-            return $listTag !== '' && in_array($listTag, $coachTags, true);
-        })
-        ->pluck('label')
-        ->filter()
-        ->values();
+    $schoolLogoUrl = trim((string) ($coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? ''));
+    $coachInitials = collect(explode(' ', $coachName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+    $coachInitials = strtoupper($coachInitials ?: 'C');
+    $schoolInitials = collect(explode(' ', $coachSchool))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+    $schoolInitials = strtoupper($schoolInitials ?: $coachInitials);
+    $coachTags = collect($coach['tags'] ?? [])->map(fn ($tag) => trim((string) $tag))->filter()->values();
 @endphp
 
-<article class="rc-coach-row rc-pulse" wire:key="coach-row-{{ $coachId ?: md5(json_encode($coach)) }}">
+<div class="rc-coach-row">
     <div class="rc-coach-main">
-        <div class="rc-coach-avatar" aria-hidden="true">
-            {{ strtoupper(substr($coachName, 0, 1)) }}
+        <div class="rc-coach-avatar rc-coach-school-logo-wrap rc-school-logo-placeholder {{ $schoolLogoUrl === '' ? 'is-missing-logo' : '' }}">
+            @if($schoolLogoUrl !== '')
+                <img class="rc-coach-school-logo" src="{{ $schoolLogoUrl }}" alt="{{ $coachSchool !== '' ? $coachSchool . ' logo' : 'School logo' }}" loading="lazy" onerror="this.closest('.rc-coach-school-logo-wrap').classList.add('is-missing-logo')">
+            @endif
+            <span class="rc-logo-fallback-text">{{ $schoolInitials }}</span>
         </div>
 
         <div class="rc-coach-copy">
             <div class="rc-coach-heading">
                 <h3>{{ $coachName }}</h3>
                 <div class="rc-coach-badges">
-                    @if($coach['is_saved_coach'] ?? false)
-                        <span class="rc-pill rc-pill-accent">Saved</span>
-                    @endif
                     @if($coach['is_favorite_coach'] ?? false)
                         <span class="rc-pill rc-pill-accent">Favorite</span>
                     @endif
-                    @if($coachListLabels->isNotEmpty())
-                        <span class="rc-pill">{{ $coachListLabels->count() }} {{ $coachListLabels->count() === 1 ? 'list' : 'lists' }}</span>
+                    @if($coach['is_saved_coach'] ?? false)
+                        <span class="rc-pill">Saved</span>
+                    @endif
+                    @if($coach['viewed_profile'] ?? false)
+                        <span class="rc-pill rc-pill-accent">Viewed profile</span>
+                    @endif
+                    @if($coach['viewed_highlights'] ?? false)
+                        <span class="rc-pill rc-pill-accent">Viewed highlights</span>
                     @endif
                 </div>
             </div>
 
             <div class="rc-coach-meta">
-                <span>{{ $coachTitle }}</span>
-                <span>{{ $coachSchool }}</span>
+                @if($coachTitle !== '')
+                    <span>{{ $coachTitle }}</span>
+                @endif
+                @if($coachSchool !== '')
+                    <span>{{ $coachSchool }}</span>
+                @endif
+                @if($coachConference !== '')
+                    <span>{{ $coachConference }}</span>
+                @endif
+                @if($coachDivision !== '')
+                    <span>{{ $coachDivision }}</span>
+                @endif
                 @if($coachEmail !== '')
                     <span>{{ $coachEmail }}</span>
                 @endif
@@ -50,47 +63,22 @@
     </div>
 
     <div class="rc-coach-actions">
-        <button class="rc-btn rc-btn-primary" type="button" wire:click="composeToCoach('{{ $coachId }}')" wire:loading.attr="disabled" wire:target="composeToCoach('{{ $coachId }}')">
-            <span wire:loading.remove wire:target="composeToCoach('{{ $coachId }}')">Email</span>
-            <span wire:loading.flex wire:target="composeToCoach('{{ $coachId }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span></span>
-        </button>
+        @if($coachId !== '')
+            @if($coach['is_favorite_coach'] ?? false)
+                <button type="button" class="rc-btn rc-btn-compact" wire:click="unfavoriteCoach({{ \Illuminate\Support\Js::from($coachId) }})" wire:loading.attr="disabled" wire:target="unfavoriteCoach">★</button>
+            @else
+                <button type="button" class="rc-btn rc-btn-compact" wire:click="favoriteCoach({{ \Illuminate\Support\Js::from($coachId) }})" wire:loading.attr="disabled" wire:target="favoriteCoach">☆</button>
+            @endif
 
-        <div class="rc-action-menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
-            <button class="rc-icon-button rc-action-trigger" type="button" @click="open = !open" :aria-expanded="open.toString()" aria-label="Coach actions">
-                <span aria-hidden="true">⋯</span>
-            </button>
+            @if($coach['is_saved_coach'] ?? false)
+                <button type="button" class="rc-btn rc-btn-compact" wire:click="unsaveCoach({{ \Illuminate\Support\Js::from($coachId) }})" wire:loading.attr="disabled" wire:target="unsaveCoach">Saved</button>
+            @else
+                <button type="button" class="rc-btn rc-btn-compact" wire:click="saveCoach({{ \Illuminate\Support\Js::from($coachId) }})" wire:loading.attr="disabled" wire:target="saveCoach">Save</button>
+            @endif
+        @endif
 
-            <div class="rc-menu-panel" x-cloak x-show="open" x-transition.origin.top.right>
-                <button class="rc-menu-item" type="button" wire:click="{{ $saveAction }}('{{ $coachId }}')" wire:loading.attr="disabled" wire:target="saveCoach('{{ $coachId }}'),unsaveCoach('{{ $coachId }}')" @click="open = false">
-                    <span wire:loading.remove wire:target="saveCoach('{{ $coachId }}'),unsaveCoach('{{ $coachId }}')">{{ ($coach['is_saved_coach'] ?? false) ? 'Remove saved coach' : 'Save coach' }}</span>
-                    <span wire:loading.flex wire:target="saveCoach('{{ $coachId }}'),unsaveCoach('{{ $coachId }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Updating</span>
-                </button>
-
-                <button class="rc-menu-item" type="button" wire:click="{{ $favoriteAction }}('{{ $coachId }}')" wire:loading.attr="disabled" wire:target="favoriteCoach('{{ $coachId }}'),unfavoriteCoach('{{ $coachId }}')" @click="open = false">
-                    <span wire:loading.remove wire:target="favoriteCoach('{{ $coachId }}'),unfavoriteCoach('{{ $coachId }}')">{{ ($coach['is_favorite_coach'] ?? false) ? 'Remove favorite coach' : 'Favorite coach' }}</span>
-                    <span wire:loading.flex wire:target="favoriteCoach('{{ $coachId }}'),unfavoriteCoach('{{ $coachId }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Updating</span>
-                </button>
-
-                @if($coach['school_id'] ?? null)
-                    <button class="rc-menu-item" type="button" wire:click="openSchoolFromCoach('{{ $coach['school_id'] }}')" @click="open = false">Open school</button>
-                @endif
-
-                @if(!empty($lists))
-                    <div class="rc-menu-label">Lists</div>
-                    @foreach($lists as $list)
-                        @php
-                            $listKey = (string) ($list['key'] ?? '');
-                            $listLabel = (string) ($list['label'] ?? 'List');
-                            $listTag = strtolower(trim((string) ($list['tag'] ?? '')));
-                            $inList = $listTag !== '' && in_array($listTag, $coachTags, true);
-                        @endphp
-                        <button class="rc-menu-item" type="button" wire:click="{{ $inList ? 'removeCoachFromList' : 'addCoachToList' }}('{{ $coachId }}','{{ $listKey }}')" wire:loading.attr="disabled" wire:target="addCoachToList('{{ $coachId }}','{{ $listKey }}'),removeCoachFromList('{{ $coachId }}','{{ $listKey }}')" @click="open = false">
-                            <span wire:loading.remove wire:target="addCoachToList('{{ $coachId }}','{{ $listKey }}'),removeCoachFromList('{{ $coachId }}','{{ $listKey }}')">{{ $inList ? 'Remove from ' : 'Add to ' }}{{ $listLabel }}</span>
-                            <span wire:loading.flex wire:target="addCoachToList('{{ $coachId }}','{{ $listKey }}'),removeCoachFromList('{{ $coachId }}','{{ $listKey }}')" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Updating</span>
-                        </button>
-                    @endforeach
-                @endif
-            </div>
-        </div>
+        @if($coachEmail !== '')
+            <a class="rc-btn rc-btn-compact rc-btn-primary" href="mailto:{{ $coachEmail }}">Email</a>
+        @endif
     </div>
-</article>
+</div>

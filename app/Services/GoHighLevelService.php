@@ -23,6 +23,49 @@ class GoHighLevelService
         return filled(config('ghl.token')) && filled(config('ghl.location_id'));
     }
 
+    public function getRecruitingRemoteCountsForUser(User $user): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = $credentials['location_id'];
+        $tokenOverride = $credentials['token_override'];
+
+        if (! $locationId || ! $this->tokenForLocation($locationId, $tokenOverride)) {
+            return [
+                'success' => false,
+                'schools_total' => null,
+                'coaches_total' => null,
+                'error' => 'Missing recruiting data connection.',
+            ];
+        }
+
+        $schoolsResult = $this->getBusinessesPage(
+            locationId: $locationId,
+            tokenOverride: $tokenOverride,
+            skip: 0,
+            limit: 1,
+        );
+
+        $contactsResult = $this->getContactsPage(
+            locationId: $locationId,
+            tokenOverride: $tokenOverride,
+            startAfter: null,
+            startAfterId: null,
+            limit: 1,
+        );
+
+        $schoolsTotal = $schoolsResult['total'] ?? null;
+        $coachesTotal = $contactsResult['total'] ?? null;
+
+        return [
+            'success' => (bool) (($schoolsResult['success'] ?? false) && ($contactsResult['success'] ?? false)),
+            'schools_total' => is_numeric($schoolsTotal) ? (int) $schoolsTotal : (int) ($schoolsResult['count'] ?? 0),
+            'coaches_total' => is_numeric($coachesTotal) ? (int) $coachesTotal : (int) ($contactsResult['count'] ?? 0),
+            'schools_error' => $schoolsResult['error'] ?? null,
+            'coaches_error' => $contactsResult['error'] ?? null,
+            'checked_at' => now()->toDateTimeString(),
+        ];
+    }
+
     public function dashboardCommands(): array
     {
         return collect(config('ghl.commands', []))
@@ -2086,6 +2129,7 @@ class GoHighLevelService
         $defaultFieldIds = [
             'school_name' => 'mVRCvtpkuGo8eCgj2EkW',
             'school_conference' => '0fPOQNgzOiFmemKNwQ4k',
+            'school_division' => config('ghl.coach_database.custom_fields.school_division'),
             'coach_title' => 'r0iC4KEiNp0JFygWViui',
             'coach_external_id' => 'D5Ca9PLSFG3dZdrsaIlV',
         ];
@@ -2139,6 +2183,10 @@ class GoHighLevelService
             ?? $contact['business_name']
             ?? $getCustomField('school_name');
 
+        $schoolLogoUrl = $this->schoolLogoUrlFromRecord($contact);
+        $contactConference = $this->stringCustomFieldFromRecord($contact, ['contact.conference', 'school_conference', 'conference', 'Conference', 'School Conference']) ?: $getCustomField('school_conference');
+        $contactDivision = $this->stringCustomFieldFromRecord($contact, ['contact.division', 'school_division', 'division', 'Division', 'School Division']) ?: $getCustomField('school_division');
+
         $name = $contact['contactName']
             ?? trim(($contact['firstName'] ?? '') . ' ' . ($contact['lastName'] ?? ''));
 
@@ -2155,10 +2203,13 @@ class GoHighLevelService
             'school' => $school,
             'company_name' => $school,
             'school_or_company' => $school,
+            'school_logo_url' => $schoolLogoUrl,
+            'business_logo_url' => $schoolLogoUrl,
+            'logo_url' => $schoolLogoUrl,
             'title' => $getCustomField('coach_title'),
             'sport' => $getCustomField('coach_sport'),
-            'conference' => $getCustomField('school_conference'),
-            'division' => $getCustomField('school_division'),
+            'conference' => $contactConference,
+            'division' => $contactDivision,
             'external_id' => $getCustomField('coach_external_id'),
             'state' => $getCustomField('school_state'),
             'city' => $getCustomField('school_city'),
@@ -2210,10 +2261,16 @@ class GoHighLevelService
             ?? $transformed['school']
             ?? null;
 
+        $businessLogoUrl = $this->schoolLogoUrlFromRecord($business);
+        $logoUrl = $transformed['school_logo_url'] ?? $businessLogoUrl;
+
         $transformed['business_id'] = $businessId;
         $transformed['school'] = $businessName;
         $transformed['company_name'] = $businessName;
         $transformed['school_or_company'] = $businessName;
+        $transformed['school_logo_url'] = $logoUrl;
+        $transformed['business_logo_url'] = $businessLogoUrl ?: $logoUrl;
+        $transformed['logo_url'] = $logoUrl;
 
         $transformed['school_email'] = $business['email'] ?? null;
         $transformed['school_phone'] = $business['phone'] ?? null;
@@ -2510,10 +2567,14 @@ class GoHighLevelService
                 $coach = $this->transformCoachContact($contact);
                 $coach['business_id'] = $businessId;
                 if ($school) {
+                    $schoolLogoUrl = $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null;
                     $coach['school_id'] = $school['id'] ?? $businessId;
                     $coach['school'] = $school['name'] ?? ($coach['school'] ?? null);
                     $coach['conference'] = $school['conference'] ?? ($coach['conference'] ?? null);
                     $coach['division'] = $school['division'] ?? ($coach['division'] ?? null);
+                    $coach['school_logo_url'] = $coach['school_logo_url'] ?? $schoolLogoUrl;
+                    $coach['business_logo_url'] = $coach['business_logo_url'] ?? $schoolLogoUrl;
+                    $coach['logo_url'] = $coach['logo_url'] ?? $schoolLogoUrl;
                 }
                 return $coach;
             })
@@ -4040,25 +4101,36 @@ class GoHighLevelService
 
     protected function transformSchoolBusiness(array $business): array
     {
-        $customFields = collect($business['customFields'] ?? []);
-        $field = function (string $key) use ($customFields): ?string {
-            $match = $customFields->first(function ($item) use ($key): bool {
-                return is_array($item) && strtolower((string) ($item['key'] ?? $item['fieldKey'] ?? '')) === strtolower($key);
-            });
+        $field = function (array|string $keys) use ($business): ?string {
+            $keys = is_array($keys) ? $keys : [$keys];
+            $value = $this->stringCustomFieldFromRecord($business, $keys);
 
-            if (! is_array($match)) {
-                return null;
-            }
-
-            return $match['valueString'] ?? $match['value'] ?? $match['valueText'] ?? null;
+            return $value !== '' ? $value : null;
         };
 
+        $logoUrl = $this->schoolLogoUrlFromRecord($business);
+
         return [
-            'id' => (string) ($business['id'] ?? ''),
-            'business_id' => (string) ($business['id'] ?? ''),
-            'name' => (string) ($business['name'] ?? 'Unnamed School'),
-            'conference' => $field('conference'),
-            'division' => $field('division'),
+            'id' => (string) ($business['id'] ?? $business['_id'] ?? ''),
+            'business_id' => (string) ($business['id'] ?? $business['_id'] ?? ''),
+            'name' => (string) ($business['name'] ?? $business['businessName'] ?? $business['companyName'] ?? $business['title'] ?? 'Unnamed School'),
+            'logo_url' => $logoUrl,
+            'school_logo_url' => $logoUrl,
+            'business_logo_url' => $logoUrl,
+            'conference' => $field([
+                'business.conference',
+                'conference',
+                'Conference',
+                'school_conference',
+                'School Conference',
+            ]),
+            'division' => $field([
+                'business.division',
+                'division',
+                'Division',
+                'school_division',
+                'School Division',
+            ]),
             'city' => $business['city'] ?? null,
             'state' => $business['state'] ?? null,
             'website' => $business['website'] ?? null,
@@ -4510,6 +4582,327 @@ class GoHighLevelService
         }
 
         return null;
+    }
+
+    protected function schoolLogoFieldKeys(): array
+    {
+        return collect([
+            config('ghl.coach_database.custom_fields.school_logo'),
+            config('ghl.coach_database.custom_fields.schoolLogo'),
+
+            // Exact GHL merge-field keys used in the Recruiting Center account.
+            // Contact custom field merge token: {{contact.school_logo}}
+            // Business / school custom field merge token: {{business.logo}}
+            'contact.school_logo',
+            'business.logo',
+
+            // Human-readable names and common aliases.
+            'School Logo',
+            'School logo',
+            'school_logo',
+            'schoolLogo',
+            'school logo',
+            'logo',
+            'logo_url',
+            'logoUrl',
+            'company_logo',
+            'company.logo',
+            'business_logo',
+            'business.logo_url',
+            'Company Logo',
+            'Business Logo',
+        ])
+            ->filter()
+            ->map(fn ($key): string => (string) $key)
+            ->unique(fn (string $key): string => strtolower($key))
+            ->values()
+            ->all();
+    }
+
+    protected function schoolLogoUrlFromRecord(array $record): ?string
+    {
+        // Primary path: exact GHL custom field keys / merge fields.
+        // Contact field: {{contact.school_logo}}
+        // Business field: {{business.logo}}
+        $url = $this->stringCustomFieldFromRecord($record, $this->schoolLogoFieldKeys());
+
+        if ($url === '') {
+            $url = $this->extractCustomFieldScalarValue(
+                $record['school_logo_url']
+                ?? $record['schoolLogoUrl']
+                ?? $record['business_logo_url']
+                ?? $record['businessLogoUrl']
+                ?? $record['company_logo_url']
+                ?? $record['companyLogoUrl']
+                ?? $record['logo_url']
+                ?? $record['logoUrl']
+                ?? $record['logo']
+                ?? $record['image']
+                ?? $record['imageUrl']
+                ?? ''
+            );
+        }
+
+        // Some GHL endpoints return custom field rows with only an internal custom
+        // field id and a value. In that case we cannot match the merge key, so for
+        // logo fields we fall back to the first image-looking URL found inside the
+        // custom fields payload. This is intentionally limited to image/CDN URLs so
+        // normal website fields do not become school logos.
+        if ($url === '') {
+            $url = $this->imageUrlFromCustomFields($record);
+        }
+
+        return $this->normalizeRemoteImageUrl($url);
+    }
+
+    protected function normalizeRemoteImageUrl(?string $url): ?string
+    {
+        $url = trim((string) $url);
+
+        if ($url === '') {
+            return null;
+        }
+
+        if (str_starts_with($url, '//')) {
+            $url = 'https:' . $url;
+        }
+
+        if (! Str::startsWith($url, ['http://', 'https://'])) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    protected function imageUrlFromCustomFields(array $record): string
+    {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+            $rawCustomFields = data_get($record, $containerKey, []);
+
+            if (! is_array($rawCustomFields)) {
+                continue;
+            }
+
+            foreach ($rawCustomFields as $fieldKey => $fieldValue) {
+                $resolved = $this->extractCustomFieldScalarValue($fieldValue);
+
+                if ($resolved === '') {
+                    continue;
+                }
+
+                if ($this->looksLikeRemoteImageUrl($resolved)) {
+                    return $resolved;
+                }
+            }
+        }
+
+        foreach (['contact', 'business', 'company', 'data', 'result'] as $nestedKey) {
+            $nested = data_get($record, $nestedKey);
+
+            if (is_array($nested)) {
+                $resolved = $this->imageUrlFromCustomFields($nested);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    protected function looksLikeRemoteImageUrl(string $url): bool
+    {
+        $url = trim($url);
+
+        if ($url === '') {
+            return false;
+        }
+
+        if (str_starts_with($url, '//')) {
+            $url = 'https:' . $url;
+        }
+
+        if (! Str::startsWith($url, ['http://', 'https://'])) {
+            return false;
+        }
+
+        $lower = strtolower(parse_url($url, PHP_URL_PATH) ?: $url);
+
+        if (preg_match('/\.(png|jpe?g|webp|gif|svg)(\?|$)/i', $lower)) {
+            return true;
+        }
+
+        return str_contains(strtolower($url), 'cloudinary')
+            || str_contains(strtolower($url), 'storage.googleapis')
+            || str_contains(strtolower($url), 'amazonaws.com')
+            || str_contains(strtolower($url), 'cdn')
+            || str_contains(strtolower($url), 'image')
+            || str_contains(strtolower($url), 'logo');
+    }
+
+    protected function stringCustomFieldFromRecord(array $record, array $keys): string
+    {
+        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', trim((string) $key)));
+        $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
+
+        $matches = function (mixed $candidate) use ($normalize, $normalizedKeys): bool {
+            if (! is_scalar($candidate)) {
+                return false;
+            }
+
+            $candidate = $normalize($candidate);
+
+            if ($candidate === '') {
+                return false;
+            }
+
+            foreach ($normalizedKeys as $key) {
+                if ($candidate === $key) {
+                    return true;
+                }
+
+                // GHL often exposes custom field keys as contact.school_logo or
+                // business.logo. This lets school_logo match contact_school_logo,
+                // and logo match business_logo, without relying on the internal ID.
+                if (str_ends_with($candidate, '_' . $key)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $record)) {
+                $resolved = $this->extractCustomFieldScalarValue($record[$key]);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+
+            $value = data_get($record, $key);
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+
+            if (is_array($value)) {
+                $resolved = $this->extractCustomFieldScalarValue($value);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+            $rawCustomFields = data_get($record, $containerKey, []);
+
+            if (! is_array($rawCustomFields)) {
+                continue;
+            }
+
+            if (! array_is_list($rawCustomFields)) {
+                foreach ($rawCustomFields as $fieldKey => $fieldValue) {
+                    if (! $matches($fieldKey)) {
+                        continue;
+                    }
+
+                    $resolved = $this->extractCustomFieldScalarValue($fieldValue);
+
+                    if ($resolved !== '') {
+                        return $resolved;
+                    }
+                }
+
+                continue;
+            }
+
+            foreach ($rawCustomFields as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $fieldKeys = [
+                    $field['id'] ?? null,
+                    $field['_id'] ?? null,
+                    $field['key'] ?? null,
+                    $field['name'] ?? null,
+                    $field['label'] ?? null,
+                    $field['fieldKey'] ?? null,
+                    $field['field_key'] ?? null,
+                    $field['customFieldId'] ?? null,
+                    $field['custom_field_id'] ?? null,
+                    $field['fieldId'] ?? null,
+                    $field['field_id'] ?? null,
+                ];
+
+                if (! collect($fieldKeys)->filter()->contains(fn ($candidate): bool => $matches($candidate))) {
+                    continue;
+                }
+
+                $resolved = $this->extractCustomFieldScalarValue($field);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        foreach (['contact', 'business', 'company', 'data', 'result'] as $nestedKey) {
+            $nested = data_get($record, $nestedKey);
+
+            if (is_array($nested)) {
+                $resolved = $this->stringCustomFieldFromRecord($nested, $keys);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    protected function extractCustomFieldScalarValue(mixed $value): string
+    {
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if (! is_array($value)) {
+            return '';
+        }
+
+        foreach (['value', 'field_value', 'valueString', 'value_string', 'stringValue', 'valueText', 'text', 'url', 'link', 'mediaUrl', 'fileUrl', 'downloadUrl', 'thumbnailUrl', 'src'] as $key) {
+            $candidate = $value[$key] ?? null;
+
+            if (is_scalar($candidate) && trim((string) $candidate) !== '') {
+                return trim((string) $candidate);
+            }
+
+            if (is_array($candidate)) {
+                $resolved = $this->extractCustomFieldScalarValue($candidate);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        foreach ($value as $child) {
+            if (is_array($child)) {
+                $resolved = $this->extractCustomFieldScalarValue($child);
+
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+        }
+
+        return '';
     }
 
     protected function stringCustomFieldFromContact(array $contact, array $keys, array $trackingFieldMap = []): string
