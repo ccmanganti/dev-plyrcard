@@ -2236,6 +2236,10 @@ class GoHighLevelService
             'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
             'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
+            'website_click_count' => $this->numericCustomFieldFromContact($contact, ['website_click_count'], $trackingFieldMap),
+            'instagram_click_count' => $this->numericCustomFieldFromContact($contact, ['instagram_click_count'], $trackingFieldMap),
+            'youtube_click_count' => $this->numericCustomFieldFromContact($contact, ['youtube_click_count'], $trackingFieldMap),
+            'x_click_count' => $this->numericCustomFieldFromContact($contact, ['x_click_count'], $trackingFieldMap),
             'email_delivered_count' => $this->numericCustomFieldFromContact($contact, ['email_delivered_count'], $trackingFieldMap),
             'email_failed_count' => $this->numericCustomFieldFromContact($contact, ['email_failed_count'], $trackingFieldMap),
             'coach_reply_count' => $this->numericCustomFieldFromContact($contact, ['coach_reply_count', 'replyCount', 'replies', 'email_replies', 'plyrcard_coach_replies', 'stats.replies']),
@@ -2697,6 +2701,7 @@ class GoHighLevelService
         $text = trim((string) ($payload['text'] ?? strip_tags($html)));
         $to = $payload['to'] ?? $payload['emailTo'] ?? null;
         $fromName = trim((string) ($payload['fromName'] ?? $payload['senderName'] ?? $user->name ?? 'PLYRCard'));
+        $skipInternalSentTracking = (bool) ($payload['skip_internal_sent_tracking'] ?? false);
         $fromEmail = trim((string) ($payload['fromEmail'] ?? $payload['emailFrom'] ?? ''));
 
         if ($fromEmail === '') {
@@ -2823,8 +2828,9 @@ class GoHighLevelService
                     $data = $response->json() ?? [];
 
                     if ($response->successful()) {
-                        try {
-                            Log::info('Recruiting email send succeeded. Incrementing email_sent_count.', [
+                        if (! $skipInternalSentTracking) {
+                            try {
+                                Log::info('Recruiting email send succeeded. Incrementing email_sent_count.', [
                                 'contact_id' => $contactId,
                                 'to' => $to,
                                 'subject' => $subject,
@@ -2847,13 +2853,14 @@ class GoHighLevelService
                                 'recipient_increments' => data_get($trackingResult, 'recipient.increments', []),
                                 'athlete_increments' => data_get($trackingResult, 'athlete.increments', []),
                             ]);
-                        } catch (\Throwable $exception) {
-                            Log::warning('Recruiting email sent counter failed after send.', [
-                                'contact_id' => $contactId,
-                                'to' => $to,
-                                'subject' => $subject,
-                                'error' => $exception->getMessage(),
-                            ]);
+                            } catch (\Throwable $exception) {
+                                Log::warning('Recruiting email sent counter failed after send.', [
+                                    'contact_id' => $contactId,
+                                    'to' => $to,
+                                    'subject' => $subject,
+                                    'error' => $exception->getMessage(),
+                                ]);
+                            }
                         }
 
                         return ['success' => true, 'message' => $data['message'] ?? $data, 'raw' => $data];
@@ -4336,7 +4343,7 @@ class GoHighLevelService
     {
         return [
             'profile_views' => ['view_profile_total', 'plyrcard_profile_views', 'profile_views', 'profile_view_count'],
-            'link_clicks' => ['email_click_count', 'view_profile_website', 'view_profile_instagram', 'view_profile_youtube', 'view_profile_x', 'view_profile_email_link', 'plyrcard_link_clicks', 'link_clicks', 'trigger_link_clicks', 'trigger_link_click_count'],
+            'link_clicks' => ['email_click_count', 'website_click_count', 'instagram_click_count', 'youtube_click_count', 'x_click_count', 'view_profile_website', 'view_profile_instagram', 'view_profile_youtube', 'view_profile_x', 'view_profile_email_link', 'plyrcard_link_clicks', 'link_clicks', 'trigger_link_clicks', 'trigger_link_click_count'],
             'email_opens' => ['email_open_count', 'plyrcard_email_opens', 'email_opens', 'opened_emails'],
             'coach_replies' => ['plyrcard_coach_replies', 'coach_replies', 'replies', 'coach_reply_count'],
             'emails_sent' => ['email_sent_count', 'plyrcard_total_emails_sent', 'emails_sent', 'total_emails_sent'],
@@ -5087,10 +5094,39 @@ class GoHighLevelService
                 $destination = $this->stringCustomFieldFromContact($contact, ['last_clicked_url'], $trackingFieldMap);
                 $name = $this->contactDisplayNameForActivity($contact);
 
+                $activityTitle = $this->trackingActivityTitle($source, $platform, $metrics);
+                $eventCount = max(1, (int) match ($platform) {
+                    'instagram' => $metrics['instagram_click_count'] ?? 0,
+                    'youtube' => $metrics['youtube_click_count'] ?? 0,
+                    'x' => $metrics['x_click_count'] ?? 0,
+                    'website' => $metrics['website_click_count'] ?? 0,
+                    'email' => $metrics['email_click_count'] ?? $metrics['email_sent_count'] ?? $metrics['email_open_count'] ?? 0,
+                    default => $metrics['email_click_count'] ?? $metrics['view_profile_total'] ?? 0,
+                });
+
+                if (str_contains(strtolower($activityTitle), 'email sent')) {
+                    $title = 'Email sent to ' . $name;
+                    $copy = ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact') . ' • ' . number_format($eventCount) . ' ' . Str::plural('email', $eventCount);
+                } elseif (str_contains(strtolower($activityTitle), 'clicked')) {
+                    $platformLabel = match ($platform) {
+                        'instagram' => 'Instagram',
+                        'youtube' => 'YouTube',
+                        'x' => 'X',
+                        'website' => 'Website',
+                        'email' => 'Email link',
+                        default => Str::headline($platform),
+                    };
+                    $title = $name;
+                    $copy = 'Clicked ' . $platformLabel . ' ' . number_format($eventCount) . ' ' . Str::plural('time', $eventCount) . ($destination !== '' ? ' • ' . Str::limit($destination, 90) : '');
+                } else {
+                    $title = $activityTitle . ' to ' . $name;
+                    $copy = $destination !== '' ? Str::limit($destination, 120) : ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact activity');
+                }
+
                 return [
                     'type' => 'tracking',
-                    'title' => $this->trackingActivityTitle($source, $platform, $metrics) . ' by ' . $name,
-                    'copy' => $destination !== '' ? Str::limit($destination, 120) : ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact activity'),
+                    'title' => $title,
+                    'copy' => $copy,
                     'time' => $time,
                     'url' => null,
                     'has_image' => false,
@@ -5212,6 +5248,12 @@ class GoHighLevelService
         }
 
         $emailClicks = $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap);
+        $websiteClicks = $this->numericCustomFieldFromContact($contact, ['website_click_count'], $trackingFieldMap);
+        $instagramClicks = $this->numericCustomFieldFromContact($contact, ['instagram_click_count'], $trackingFieldMap);
+        $youtubeClicks = $this->numericCustomFieldFromContact($contact, ['youtube_click_count'], $trackingFieldMap);
+        $xClicks = $this->numericCustomFieldFromContact($contact, ['x_click_count'], $trackingFieldMap);
+        $emailSent = $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap);
+        $emailOpen = $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap);
 
         return [
             'view_profile_total' => $total,
@@ -5220,13 +5262,17 @@ class GoHighLevelService
             'view_profile_youtube' => $youtube,
             'view_profile_x' => $x,
             'view_profile_email_link' => $emailProfile,
-            'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
-            'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
+            'email_sent_count' => $emailSent,
+            'email_open_count' => $emailOpen,
             'email_click_count' => $emailClicks,
+            'website_click_count' => $websiteClicks,
+            'instagram_click_count' => $instagramClicks,
+            'youtube_click_count' => $youtubeClicks,
+            'x_click_count' => $xClicks,
             'profile_views' => $total,
-            'email_opens' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
-            'link_clicks' => $website + $instagram + $youtube + $x + $emailProfile + $emailClicks,
-            'emails_sent' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
+            'email_opens' => $emailOpen,
+            'link_clicks' => $emailClicks + $websiteClicks + $instagramClicks + $youtubeClicks + $xClicks,
+            'emails_sent' => $emailSent,
         ];
     }
 
@@ -5236,6 +5282,7 @@ class GoHighLevelService
             'view_profile_total', 'view_profile_website', 'view_profile_instagram',
             'view_profile_youtube', 'view_profile_x', 'view_profile_email_link',
             'email_sent_count', 'email_open_count', 'email_click_count',
+            'website_click_count', 'instagram_click_count', 'youtube_click_count', 'x_click_count',
             'profile_views', 'email_opens', 'link_clicks', 'emails_sent',
         ];
 
@@ -5371,6 +5418,10 @@ class GoHighLevelService
         $trackedEmailSent = max((int) ($athleteMetrics['email_sent_count'] ?? 0), (int) ($contactMetrics['email_sent_count'] ?? 0));
         $trackedEmailOpens = max((int) ($athleteMetrics['email_open_count'] ?? 0), (int) ($contactMetrics['email_open_count'] ?? 0));
         $trackedEmailClicks = max((int) ($athleteMetrics['email_click_count'] ?? 0), (int) ($contactMetrics['email_click_count'] ?? 0));
+        $trackedWebsiteClicks = max((int) ($athleteMetrics['website_click_count'] ?? 0), (int) ($contactMetrics['website_click_count'] ?? 0));
+        $trackedInstagramClicks = max((int) ($athleteMetrics['instagram_click_count'] ?? 0), (int) ($contactMetrics['instagram_click_count'] ?? 0));
+        $trackedYoutubeClicks = max((int) ($athleteMetrics['youtube_click_count'] ?? 0), (int) ($contactMetrics['youtube_click_count'] ?? 0));
+        $trackedXClicks = max((int) ($athleteMetrics['x_click_count'] ?? 0), (int) ($contactMetrics['x_click_count'] ?? 0));
         $trackedProfileTotal = max((int) ($athleteMetrics['view_profile_total'] ?? 0), (int) ($contactMetrics['view_profile_total'] ?? 0));
         $trackedWebsiteViews = max((int) ($athleteMetrics['view_profile_website'] ?? 0), (int) ($contactMetrics['view_profile_website'] ?? 0));
         $trackedInstagramViews = max((int) ($athleteMetrics['view_profile_instagram'] ?? 0), (int) ($contactMetrics['view_profile_instagram'] ?? 0));
@@ -5411,8 +5462,9 @@ class GoHighLevelService
         $campaignSummary = $this->getEmailCampaignActivityForLocation($locationId, $token);
         $campaignEmailsSent = (int) ($campaignSummary['emails_sent'] ?? 0) + $personalEmailsSent;
         $emailsSent = max($campaignEmailsSent, (int) ($athleteMetrics['emails_sent'] ?? 0), $trackedEmailSent);
+        $trackedEmailSent = max($trackedEmailSent, $emailsSent);
         $coachReplies = max((int) ($campaignSummary['coach_replies'] ?? 0) + $conversationReplies, (int) ($athleteMetrics['coach_replies'] ?? 0));
-        $linkClicks = max((int) ($campaignSummary['trigger_link_clicks'] ?? 0), (int) ($athleteMetrics['link_clicks'] ?? 0), (int) ($contactMetrics['link_clicks'] ?? 0), $trackedEmailClicks + $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks);
+        $linkClicks = max((int) ($campaignSummary['trigger_link_clicks'] ?? 0), (int) ($athleteMetrics['link_clicks'] ?? 0), (int) ($contactMetrics['link_clicks'] ?? 0), $trackedEmailClicks + $trackedWebsiteClicks + $trackedInstagramClicks + $trackedYoutubeClicks + $trackedXClicks);
         $emailOpens = max((int) ($campaignSummary['email_opens'] ?? 0), (int) ($athleteMetrics['email_opens'] ?? 0), $trackedEmailOpens);
         $emailOpenRate = (int) ($campaignSummary['email_open_rate'] ?? 0);
         if ($emailOpenRate <= 0 && $emailsSent > 0 && $emailOpens > 0) {
@@ -5475,6 +5527,10 @@ class GoHighLevelService
                 'email_open_count' => $trackedEmailOpens,
                 'email_sent_count' => $trackedEmailSent,
                 'email_click_count' => $trackedEmailClicks,
+                'website_click_count' => $trackedWebsiteClicks,
+                'instagram_click_count' => $trackedInstagramClicks,
+                'youtube_click_count' => $trackedYoutubeClicks,
+                'x_click_count' => $trackedXClicks,
                 'link_clicks' => $linkClicks,
                 'trigger_link_clicks' => $linkClicks,
                 'coach_replies' => $coachReplies,
@@ -5665,6 +5721,10 @@ class GoHighLevelService
             'email_sent_count' => ['name' => 'email_sent_count', 'dataType' => 'NUMERICAL'],
             'email_open_count' => ['name' => 'email_open_count', 'dataType' => 'NUMERICAL'],
             'email_click_count' => ['name' => 'email_click_count', 'dataType' => 'NUMERICAL'],
+            'website_click_count' => ['name' => 'website_click_count', 'dataType' => 'NUMERICAL'],
+            'instagram_click_count' => ['name' => 'instagram_click_count', 'dataType' => 'NUMERICAL'],
+            'youtube_click_count' => ['name' => 'youtube_click_count', 'dataType' => 'NUMERICAL'],
+            'x_click_count' => ['name' => 'x_click_count', 'dataType' => 'NUMERICAL'],
             'email_delivered_count' => ['name' => 'email_delivered_count', 'dataType' => 'NUMERICAL'],
             'email_failed_count' => ['name' => 'email_failed_count', 'dataType' => 'NUMERICAL'],
             'last_email_status' => ['name' => 'last_email_status', 'dataType' => 'TEXT'],
@@ -5958,38 +6018,52 @@ class GoHighLevelService
     {
         $eventType = strtolower(trim($eventType));
         $source = strtolower((string) ($metadata['source'] ?? ''));
+        $platform = $this->normalizeRecruitingTrackingPlatform($platform);
         $keys = [];
 
         if (in_array($eventType, ['email_sent', 'sent'], true)) {
-            $keys[] = 'email_sent_count';
-            return $keys;
+            return ['email_sent_count'];
         }
 
         if (in_array($eventType, ['email_open', 'open'], true)) {
-            $keys[] = 'email_open_count';
-            return $keys;
+            return ['email_open_count'];
         }
 
         if (in_array($eventType, ['email_delivered', 'delivered'], true)) {
-            $keys[] = 'email_delivered_count';
-            return $keys;
+            return ['email_delivered_count'];
         }
 
         if (in_array($eventType, ['email_failed', 'failed', 'bounced', 'email_bounced'], true)) {
-            $keys[] = 'email_failed_count';
-            return $keys;
+            return ['email_failed_count'];
         }
 
-        if (str_contains($source, 'email') || in_array($eventType, ['email_click', 'click_email'], true)) {
-            $keys[] = 'email_click_count';
+        if (in_array($eventType, ['profile_view'], true)) {
+            $keys[] = 'view_profile_total';
+            $keys[] = $platform === 'email' ? 'view_profile_email_link' : 'view_profile_' . $platform;
+            return collect($keys)->filter()->unique()->values()->all();
         }
 
-        $keys[] = 'view_profile_total';
-        $keys[] = $platform === 'email'
-            ? 'view_profile_email_link'
-            : 'view_profile_' . $platform;
+        if (in_array($eventType, ['link_click', 'click', 'email_click', 'click_email'], true)) {
+            if (str_contains($source, 'email') || in_array($eventType, ['email_click', 'click_email'], true)) {
+                $keys[] = 'email_click_count';
+            }
 
-        return collect($keys)->filter()->unique()->values()->all();
+            $platformClickKey = match ($platform) {
+                'instagram' => 'instagram_click_count',
+                'youtube' => 'youtube_click_count',
+                'x' => 'x_click_count',
+                'website', 'email' => 'website_click_count',
+                default => null,
+            };
+
+            if ($platformClickKey) {
+                $keys[] = $platformClickKey;
+            }
+
+            return collect($keys)->filter()->unique()->values()->all();
+        }
+
+        return [];
     }
 
     protected function enrichRecruitingTrackingMetadataFromContact(array $metadata, string $contactId, string $locationId, ?string $tokenOverride): array
@@ -6382,11 +6456,18 @@ class GoHighLevelService
             'emails_sent' => 'email_sent_count',
             'email_opens' => 'email_open_count',
             'email_clicks' => 'email_click_count',
+            'website_click_count' => 'website_click_count',
+            'instagram_click_count' => 'instagram_click_count',
+            'youtube_click_count' => 'youtube_click_count',
+            'x_click_count' => 'x_click_count',
             'profile_views' => 'view_profile_total',
             'website_clicks' => 'view_profile_website',
             'instagram_clicks' => 'view_profile_instagram',
             'youtube_clicks' => 'view_profile_youtube',
-            'x_clicks' => 'view_profile_x',
+            'x_clicks' => 'x_click_count',
+            'instagram_social_clicks' => 'instagram_click_count',
+            'youtube_social_clicks' => 'youtube_click_count',
+            'website_social_clicks' => 'website_click_count',
             'qr_clicks' => 'view_profile_qr',
             'qr_profile_views' => 'view_profile_qr',
         ];
@@ -6599,6 +6680,166 @@ class GoHighLevelService
 
         // If creation is blocked by permissions, still try updating by key. Some locations accept key-only updates.
         return ['key' => $key, 'fieldKey' => $key, 'name' => $name];
+    }
+
+
+    /**
+     * Export the current GHL contact dataset to a local CSV snapshot in one paged pass.
+     *
+     * GHL remains the source of truth. This file is only a temporary/cache artifact used
+     * by the hourly/manual stats sync so Livewire never has to loop through contacts in
+     * the browser request. The CSV includes the normalized coach row plus the raw custom
+     * fields JSON and flattened custom-field columns for debugging/recovery.
+     */
+    public function exportRecruitingContactsCsvForUser(User $user, string $absolutePath): array
+    {
+        $credentials = $this->credentialsForUser($user);
+
+        $result = $this->getAllContacts(
+            locationId: $credentials['location_id'],
+            tokenOverride: $credentials['token_override'],
+            limit: (int) config('ghl.coach_database.stats_export_page_limit', config('ghl.coach_database.contact_page_limit', 100)),
+            maxPages: (int) config('ghl.coach_database.stats_export_max_pages', config('ghl.coach_database.max_pages', 500)),
+        );
+
+        if (! ($result['success'] ?? false)) {
+            return [
+                'success' => false,
+                'path' => $absolutePath,
+                'count' => 0,
+                'error' => $result['error'] ?? 'Unable to export GHL contacts.',
+                'debug' => $result['debug'] ?? [],
+            ];
+        }
+
+        $contacts = collect($result['contacts'] ?? [])
+            ->filter(fn ($contact): bool => is_array($contact))
+            ->values();
+
+        $rows = [];
+        $headers = collect([
+            'id', 'first_name', 'last_name', 'name', 'email', 'phone', 'title',
+            'school', 'company_name', 'business_id', 'conference', 'division',
+            'city', 'state', 'school_logo_url', 'business_logo_url', 'logo_url',
+            'tags_json', 'custom_fields_json',
+        ]);
+
+        foreach ($contacts as $contact) {
+            $coach = $this->transformCoachContact($contact);
+            $customFields = $this->flattenCustomFieldsForCsv($contact);
+
+            $row = array_merge($coach, $customFields, [
+                'tags_json' => json_encode($coach['tags'] ?? $contact['tags'] ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'custom_fields_json' => json_encode($contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? $contact['customFieldValues'] ?? $contact['custom_field_values'] ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ]);
+
+            foreach (array_keys($row) as $key) {
+                if (! $headers->contains($key)) {
+                    $headers->push($key);
+                }
+            }
+
+            $rows[] = $row;
+        }
+
+        $directory = dirname($absolutePath);
+        if (! is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        $handle = fopen($absolutePath, 'w');
+        if (! $handle) {
+            return [
+                'success' => false,
+                'path' => $absolutePath,
+                'count' => 0,
+                'error' => 'Unable to create recruiting stats CSV export.',
+            ];
+        }
+
+        $headers = $headers->values()->all();
+        fputcsv($handle, $headers);
+
+        foreach ($rows as $row) {
+            fputcsv($handle, array_map(function ($header) use ($row): string {
+                $value = $row[$header] ?? '';
+
+                if (is_array($value) || is_object($value)) {
+                    return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '';
+                }
+
+                return is_scalar($value) ? (string) $value : '';
+            }, $headers));
+        }
+
+        fclose($handle);
+
+        return [
+            'success' => true,
+            'path' => $absolutePath,
+            'count' => count($rows),
+            'total' => $result['total'] ?? count($rows),
+            'debug' => $result['debug'] ?? [],
+        ];
+    }
+
+    protected function flattenCustomFieldsForCsv(array $contact): array
+    {
+        $containers = [
+            $contact['customFields'] ?? null,
+            $contact['customField'] ?? null,
+            $contact['custom_fields'] ?? null,
+            $contact['customFieldValues'] ?? null,
+            $contact['custom_field_values'] ?? null,
+        ];
+
+        $fields = [];
+        $normalize = function ($key): string {
+            $key = strtolower(trim((string) $key));
+            $key = preg_replace('/[^a-z0-9]+/', '_', $key) ?: '';
+            return trim($key, '_');
+        };
+
+        foreach ($containers as $container) {
+            if (! is_array($container)) {
+                continue;
+            }
+
+            if (! array_is_list($container)) {
+                foreach ($container as $key => $value) {
+                    $fieldKey = $normalize($key);
+                    if ($fieldKey === '') {
+                        continue;
+                    }
+                    $fields['custom_' . $fieldKey] = $this->extractCustomFieldScalarValue($value);
+                }
+                continue;
+            }
+
+            foreach ($container as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $key = $field['fieldKey']
+                    ?? $field['key']
+                    ?? $field['name']
+                    ?? $field['label']
+                    ?? $field['id']
+                    ?? $field['customFieldId']
+                    ?? $field['fieldId']
+                    ?? null;
+
+                $fieldKey = $normalize($key);
+                if ($fieldKey === '') {
+                    continue;
+                }
+
+                $fields['custom_' . $fieldKey] = $this->extractCustomFieldScalarValue($field);
+            }
+        }
+
+        return $fields;
     }
 
 }

@@ -9,7 +9,10 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\PhpExecutableFinder;
+use Symfony\Component\Process\Process;
 use Livewire\WithFileUploads;
 
 trait InteractsWithCoachDatabase
@@ -526,16 +529,134 @@ trait InteractsWithCoachDatabase
         return $school;
     }
 
-    public function refreshData(bool $notify = true, string $message = 'Refreshing recruiting data.'): void
+    /**
+     * Backward-compatible default refresh action.
+     *
+     * The header reload button now exposes two actions:
+     * - refreshStatsOnly(): lightweight one-pass GHL stats sync
+     * - refreshCoachDatabase(): full Coach Database dataset reload
+     *
+     * Keep refreshData() as the default/stats action so older buttons, keyboard
+     * shortcuts, or links still perform the safer lightweight refresh.
+     */
+    public function refreshData(bool $notify = true, string $message = 'Syncing recruiting stats from GHL.'): void
     {
-        Cache::forget($this->activeCacheKey());
+        $this->refreshStatsOnly($notify, $message);
+    }
+
+    public function refreshStatsOnly(bool $notify = true, string $message = 'Syncing recruiting stats from GHL.'): void
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return;
+        }
+
+        $this->error = null;
+        $this->startRecruitingStatsSyncInBackground($user);
+
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        if (is_array($snapshot)) {
+            $this->hydrateFromSnapshot($snapshot);
+        }
+
+        $this->isLoadingDataset = false;
+        $this->hasMoreData = (bool) ($snapshot['has_more_data'] ?? false);
+
+        if ($notify) {
+            Notification::make()
+                ->title('Recruiting Center')
+                ->body('Stats sync started in the background. The dashboard will use the latest cached stats now; refresh again in a moment to see the newly exported GHL values.')
+                ->success()
+                ->send();
+        }
+    }
+
+    protected function startRecruitingStatsSyncInBackground($user): void
+    {
+        $lockKey = 'recruiting:stats-sync-running:' . $user->id;
+        $statusKey = 'recruiting:stats-sync-status:' . $user->id;
+
+        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(20))) {
+            Cache::put($statusKey, [
+                'status' => 'already_running',
+                'started_at' => Cache::get($lockKey),
+                'user_id' => $user->id,
+            ], now()->addMinutes(30));
+            return;
+        }
+
+        Cache::put($statusKey, [
+            'status' => 'running',
+            'started_at' => now()->toDateTimeString(),
+            'user_id' => $user->id,
+        ], now()->addMinutes(30));
+
+        $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
+        $artisan = base_path('artisan');
+        $logPath = storage_path('logs/recruiting-stats-sync-' . $user->id . '.log');
+
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                    . ' recruiting:sync-stats --user=' . (int) $user->id . ' --force --release-lock > ' . escapeshellarg($logPath) . ' 2>&1';
+                pclose(popen($command, 'r'));
+                return;
+            }
+
+            $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                . ' recruiting:sync-stats --user=' . (int) $user->id . ' --force --release-lock > ' . escapeshellarg($logPath) . ' 2>&1 &';
+
+            Process::fromShellCommandline($command, base_path())->run();
+        } catch (\Throwable $exception) {
+            Cache::forget($lockKey);
+            Cache::put($statusKey, [
+                'status' => 'failed_to_start',
+                'error' => $exception->getMessage(),
+                'user_id' => $user->id,
+                'failed_at' => now()->toDateTimeString(),
+            ], now()->addMinutes(30));
+
+            Log::warning('Unable to start recruiting stats sync in background.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    public function refreshCoachDatabase(bool $notify = true): void
+    {
+        if (! $this->allowed || $this->locked) {
+            return;
+        }
+
         $this->schoolDisplayLimit = 24;
         $this->coachDisplayLimit = 40;
         $this->selectedSchoolId = null;
+        $this->selectedCoachId = null;
+        $this->selectedConversationId = null;
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->conversationSearch = '';
+        $this->conversationSchoolFilter = '';
+        $this->composeSchoolSearch = '';
+        $this->favoriteSchoolSearch = '';
+        $this->listSchoolSearch = '';
+        $this->divisionFilter = '';
+        $this->conferenceFilter = '';
+        $this->error = null;
+
+        $this->isLoadingDataset = true;
+        $this->hasMoreData = true;
+
         $this->startBackgroundLoad(true);
 
         if ($notify) {
-            Notification::make()->title('Recruiting Center')->body($message)->success()->send();
+            Notification::make()
+                ->title('Recruiting Center')
+                ->body('Reloading the full Coach Database from GHL. This can take a moment for large datasets.')
+                ->success()
+                ->send();
         }
     }
 
@@ -979,8 +1100,13 @@ trait InteractsWithCoachDatabase
         $merged['view_profile_total'] = max((int) ($merged['view_profile_total'] ?? 0), $profileBreakdown);
         $merged['profile_views'] = max((int) ($merged['profile_views'] ?? 0), (int) ($merged['view_profile_total'] ?? 0));
         $merged['emails_sent'] = max((int) ($merged['emails_sent'] ?? 0), (int) ($merged['email_sent_count'] ?? 0));
+        $merged['email_sent_count'] = max((int) ($merged['email_sent_count'] ?? 0), (int) ($merged['emails_sent'] ?? 0));
         $merged['email_opens'] = max((int) ($merged['email_opens'] ?? 0), (int) ($merged['email_open_count'] ?? 0));
-        $merged['link_clicks'] = max((int) ($merged['link_clicks'] ?? 0), (int) ($merged['email_click_count'] ?? 0) + $profileBreakdown);
+        $socialClicks = (int) ($merged['website_click_count'] ?? 0)
+            + (int) ($merged['instagram_click_count'] ?? 0)
+            + (int) ($merged['youtube_click_count'] ?? 0)
+            + (int) ($merged['x_click_count'] ?? 0);
+        $merged['link_clicks'] = max((int) ($merged['link_clicks'] ?? 0), (int) ($merged['email_click_count'] ?? 0) + $socialClicks);
         $merged['trigger_link_clicks'] = max((int) ($merged['trigger_link_clicks'] ?? 0), (int) ($merged['link_clicks'] ?? 0));
 
         return $merged;
@@ -998,6 +1124,10 @@ trait InteractsWithCoachDatabase
             'email_sent_count',
             'email_open_count',
             'email_click_count',
+            'website_click_count',
+            'instagram_click_count',
+            'youtube_click_count',
+            'x_click_count',
             'emails_sent',
             'email_opens',
             'link_clicks',
@@ -1145,6 +1275,13 @@ trait InteractsWithCoachDatabase
             'ghl_contact_id' => $contactId,
             'email_subject' => $subject,
             'source' => 'coach_database_email',
+            'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+            'ghl_business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+            'coach_name' => $coach['name'] ?? $conversation['contact_name'] ?? null,
+            'coach_email' => $to,
+            'school' => $coach['school'] ?? $coach['company_name'] ?? null,
+            'school_name' => $coach['school'] ?? $coach['company_name'] ?? null,
+            'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
         ];
 
         try {
@@ -1180,6 +1317,7 @@ trait InteractsWithCoachDatabase
             'fromName' => (string) ($user->name ?? 'PLYRCard'),
             'to' => $to,
             'emailTo' => $to,
+            'skip_internal_sent_tracking' => true,
         ];
 
         $this->isSendingEmail = true;
@@ -1396,7 +1534,7 @@ trait InteractsWithCoachDatabase
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
-        $this->templateBody = $this->templateHtmlForNativeEditor($template);
+        $this->templateBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
         $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
     }
 
@@ -1452,7 +1590,7 @@ HTML;
 
         $this->isSavingTemplate = true;
         $this->resolveTemplateGraphicUpload();
-        $html = $this->buildTemplateHtml($bodyText);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($this->buildTemplateHtml($bodyText));
 
         $shouldUpdateGhl = $this->selectedTemplateId
             && ! $this->templateIsNew
@@ -1657,10 +1795,10 @@ HTML;
         $this->campaignSubject = $this->templateSubject($template);
         $this->campaignPreviewText = $this->templatePreviewText($template);
         $this->composeGraphicUrl = '';
-        $this->campaignBody = $this->templateHtmlForNativeEditor($template);
+        $this->campaignBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
 
         if (trim($this->campaignBody) === '') {
-            $this->campaignBody = $this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? ''))));
+            $this->campaignBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
         }
     }
 
@@ -1720,7 +1858,7 @@ HTML;
 
         $this->isSendingCampaign = true;
         $this->resolveComposeGraphicUpload();
-        $html = $this->buildComposeHtml($bodyText);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($this->buildComposeHtml($bodyText));
         $sent = 0;
         $failed = 0;
 
@@ -1766,6 +1904,7 @@ HTML;
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
+                'skip_internal_sent_tracking' => true,
             ];
 
             $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
@@ -1918,7 +2057,7 @@ HTML;
             '{{CoachFirstName}}', '{{CoachLastName}}', '{{CoachName}}', '{{SchoolName}}', '{{CoachTitle}}',
             '{{AthleteName}}', '{{GraduationYear}}', '{{Position}}', '{{ClubTeam}}', '{{GPA}}',
             '{{AthleteEmail}}', '{{AthletePhone}}', '{{HighlightLink}}', '{{ProfileLink}}',
-            '{{InstagramLink}}', '{{TwitterLink}}', '{{YoutubeLink}}',
+            '{{InstagramLink}}', '{{TwitterLink}}', '{{XLink}}', '{{YoutubeLink}}', '{{YouTubeLink}}',
         ], true);
     }
 
@@ -1963,11 +2102,13 @@ HTML;
             '{{GPA}}' => '4.0',
             '{{AthleteEmail}}' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], 'athlete@example.com'),
             '{{AthletePhone}}' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '(555) 123-4567'),
-            '{{HighlightLink}}' => $this->firstUserTokenText(['highlight_link', 'highlights_link', 'highlightLink'], 'https://plyrcard.com/highlights'),
-            '{{ProfileLink}}' => $this->firstUserTokenText(['profile_link', 'plyrcard_link', 'profileLink'], 'https://plyrcard.com/profile'),
-            '{{InstagramLink}}' => $this->firstUserTokenText(['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'], 'https://instagram.com/yourhandle'),
-            '{{TwitterLink}}' => $this->firstUserTokenText(['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'], 'https://x.com/yourhandle'),
-            '{{YoutubeLink}}' => $this->firstUserTokenText(['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'], 'https://youtube.com/@yourhandle'),
+            '{{HighlightLink}}' => $this->userHighlightUrl('https://plyrcard.com/highlights'),
+            '{{ProfileLink}}' => $this->userProfileUrl('https://plyrcard.com/profile'),
+            '{{InstagramLink}}' => $this->userSocialUrl('instagram', 'https://instagram.com/yourhandle'),
+            '{{TwitterLink}}' => $this->userSocialUrl('x', 'https://x.com/yourhandle'),
+            '{{XLink}}' => $this->userSocialUrl('x', 'https://x.com/yourhandle'),
+            '{{YoutubeLink}}' => $this->userSocialUrl('youtube', 'https://youtube.com/@yourhandle'),
+            '{{YouTubeLink}}' => $this->userSocialUrl('youtube', 'https://youtube.com/@yourhandle'),
         ];
 
         return strtr($value, $samples);
@@ -2024,6 +2165,76 @@ HTML;
         }
 
         return $fallback;
+    }
+
+
+    /**
+     * Templates should store stable merge tokens, not generated /track URLs.
+     * Tracking URLs are generated at send time per coach/contact so old templates
+     * automatically use the newest cross-domain tracking format without being recreated.
+     */
+    protected function normalizeTemplateLinksForCurrentTracking(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        return preg_replace_callback('/<a\b(?=[^>]*\bhref\s*=)([^>]*)>(.*?)<\/a>/is', function (array $matches): string {
+            $anchor = $matches[0];
+            $attributes = $matches[1] ?? '';
+            $innerHtml = $matches[2] ?? '';
+
+            if (! preg_match('/\bhref\s*=\s*(["\'])(.*?)\1/is', $attributes, $hrefMatch)) {
+                return $anchor;
+            }
+
+            $href = html_entity_decode((string) ($hrefMatch[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $token = $this->templateMergeTokenForHref($href, $anchor, $innerHtml);
+
+            if ($token === null) {
+                return $anchor;
+            }
+
+            return preg_replace('/\bhref\s*=\s*(["\'])(.*?)\1/is', 'href="' . $token . '"', $anchor, 1) ?: $anchor;
+        }, $html) ?: $html;
+    }
+
+    protected function templateMergeTokenForHref(string $href, string $anchorHtml = '', string $innerHtml = ''): ?string
+    {
+        $href = trim($href);
+        if ($href === '') {
+            return null;
+        }
+
+        $lowerHref = strtolower($href);
+        if (Str::startsWith($lowerHref, ['#', 'mailto:', 'tel:', 'sms:', 'javascript:', 'data:'])) {
+            return null;
+        }
+
+        $haystack = strtolower(strip_tags(html_entity_decode($anchorHtml . ' ' . $innerHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . ' ' . $anchorHtml . ' ' . $href);
+        $isTracked = str_contains($lowerHref, '/track/click/') || str_contains($lowerHref, '/track/profile/') || str_contains($lowerHref, '/track/open/');
+
+        if (str_contains($haystack, 'instagram') || str_contains($lowerHref, 'instagram.com')) {
+            return '{{InstagramLink}}';
+        }
+
+        if (str_contains($haystack, 'youtube') || str_contains($haystack, 'youtu.be') || str_contains($lowerHref, 'youtube.com') || str_contains($lowerHref, 'youtu.be')) {
+            return '{{YoutubeLink}}';
+        }
+
+        if (str_contains($haystack, 'twitter') || str_contains($haystack, ' x ') || str_contains($haystack, 'aria-label="x"') || str_contains($lowerHref, 'x.com') || str_contains($lowerHref, 'twitter.com')) {
+            return '{{XLink}}';
+        }
+
+        if (str_contains($haystack, 'highlight') || str_contains($haystack, 'watch') || str_contains($haystack, 'video') || str_contains($lowerHref, 'youtube.com/watch') || str_contains($lowerHref, 'youtu.be/')) {
+            return '{{HighlightLink}}';
+        }
+
+        if ($isTracked || str_contains($haystack, 'profile') || str_contains($haystack, 'plyrcard') || str_contains($lowerHref, 'plyrcard.com') || str_contains($lowerHref, 'dev.plyrcard.com') || str_contains($lowerHref, '127.0.0.1') || str_contains($lowerHref, 'localhost')) {
+            return '{{ProfileLink}}';
+        }
+
+        return null;
     }
 
     protected function buildTemplateHtml(string $text): string
@@ -2713,11 +2924,13 @@ HTML;
             'GPA' => $this->userTokenText('gpa', '[GPA]'),
             'AthleteEmail' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], '[Email]'),
             'AthletePhone' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '[Phone]'),
-            'HighlightLink' => $this->firstUserTokenText(['highlight_link', 'highlights_link', 'highlightLink'], '[Highlight Link]'),
-            'ProfileLink' => $this->firstUserTokenText(['profile_link', 'plyrcard_link', 'profileLink'], '[Profile Link]'),
-            'InstagramLink' => $this->firstUserTokenText(['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'], '#'),
-            'TwitterLink' => $this->firstUserTokenText(['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'], '#'),
-            'YoutubeLink' => $this->firstUserTokenText(['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'], '#'),
+            'HighlightLink' => $this->userHighlightUrl('[Highlight Link]'),
+            'ProfileLink' => $this->userProfileUrl('[Profile Link]'),
+            'InstagramLink' => $this->userSocialUrl('instagram', '#'),
+            'TwitterLink' => $this->userSocialUrl('x', '#'),
+            'XLink' => $this->userSocialUrl('x', '#'),
+            'YoutubeLink' => $this->userSocialUrl('youtube', '#'),
+            'YouTubeLink' => $this->userSocialUrl('youtube', '#'),
         ];
 
         $aliases = [
@@ -2742,9 +2955,11 @@ HTML;
             'AthletePhone' => ['athlete_phone', 'player_phone', 'phone', 'phone_number', 'mobile'],
             'HighlightLink' => ['highlight_link', 'highlights_link', 'highlightLink'],
             'ProfileLink' => ['profile_link', 'plyrcard_link', 'profileLink'],
-            'InstagramLink' => ['instagram_link', 'instagram_url', 'instagram', 'social_links.instagram', 'social.instagram'],
-            'TwitterLink' => ['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'],
-            'YoutubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'social_links.youtube', 'social.youtube'],
+            'InstagramLink' => ['instagram_link', 'instagram_url', 'instagram', 'ig_handle', 'social_links.instagram', 'social.instagram'],
+            'TwitterLink' => ['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'x_handle', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'],
+            'XLink' => ['x_link', 'x_url', 'x', 'twitter_link', 'twitter_url', 'x_handle'],
+            'YoutubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'yt_url', 'social_links.youtube', 'social.youtube'],
+            'YouTubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'yt_url', 'social_links.youtube', 'social.youtube'],
         ];
 
         foreach ($values as $canonical => $value) {
@@ -2763,6 +2978,138 @@ HTML;
         }
 
         return $content;
+    }
+
+    protected function userProfileUrl(string $fallback = ''): string
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return $fallback;
+        }
+
+        foreach (['profile_link', 'plyrcard_link', 'profileLink', 'website_url', 'public_url', 'url'] as $key) {
+            $value = $this->tokenText(data_get($user, $key), '');
+            if ($this->isUsableTemplateUrl($value)) {
+                return $this->normalizeTemplateUrl($value);
+            }
+        }
+
+        try {
+            $website = method_exists($user, 'activeWebsite') ? $user->activeWebsite()->first() : null;
+            foreach (['url', 'public_url', 'website_url', 'slug', 'name'] as $key) {
+                $value = $this->tokenText(data_get($website, $key), '');
+                if ($this->isUsableTemplateUrl($value)) {
+                    return $this->normalizeTemplateUrl($value);
+                }
+                if ($value !== '' && ! str_contains($value, ' ')) {
+                    return rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . '/' . ltrim($value, '/');
+                }
+            }
+        } catch (\Throwable $exception) {
+            // Fall back below.
+        }
+
+        $slug = Str::of(trim((string) ($user->first_name ?? '') . ' ' . (string) ($user->last_name ?? '')))
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', '-')
+            ->trim('-')
+            ->toString();
+
+        if ($slug !== '') {
+            return rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . '/' . $slug;
+        }
+
+        return $fallback;
+    }
+
+    protected function userHighlightUrl(string $fallback = ''): string
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return $fallback;
+        }
+
+        foreach (['featured_video_url', 'yt_url', 'youtube_url', 'highlight_link', 'highlights_link', 'highlightLink'] as $key) {
+            $value = $this->tokenText(data_get($user, $key), '');
+            if ($this->isUsableTemplateUrl($value)) {
+                return $this->normalizeTemplateUrl($value);
+            }
+        }
+
+        $profile = $this->userProfileUrl('');
+        return $profile !== '' ? rtrim($profile, '/') . '#highlights' : $fallback;
+    }
+
+    protected function userSocialUrl(string $platform, string $fallback = ''): string
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return $fallback;
+        }
+
+        $platform = strtolower(trim($platform));
+        $value = match ($platform) {
+            'instagram' => $this->firstUserTokenText(['ig_handle', 'instagram', 'instagram_handle', 'instagram_url'], ''),
+            'x', 'twitter' => $this->firstUserTokenText(['x_handle', 'x', 'twitter', 'twitter_handle', 'x_url', 'twitter_url'], ''),
+            'youtube', 'yt' => $this->firstUserTokenText(['yt_url', 'youtube_url', 'youtube', 'youtube_channel'], ''),
+            default => '',
+        };
+
+        $url = $this->normalizeSocialUrl($platform, $value);
+        return $url !== '' ? $url : $fallback;
+    }
+
+    protected function normalizeSocialUrl(string $platform, string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || $value === '#') {
+            return '';
+        }
+
+        if (Str::startsWith($value, ['http://', 'https://'])) {
+            return $value;
+        }
+
+        $handle = ltrim($value, '@');
+        $platform = strtolower(trim($platform));
+
+        if ($platform === 'instagram') {
+            return 'https://instagram.com/' . $handle;
+        }
+
+        if (in_array($platform, ['x', 'twitter'], true)) {
+            return 'https://x.com/' . $handle;
+        }
+
+        if (in_array($platform, ['youtube', 'yt'], true)) {
+            if (str_contains($handle, '.')) {
+                return 'https://' . $handle;
+            }
+            return 'https://youtube.com/@' . ltrim($handle, '@');
+        }
+
+        return str_contains($value, '.') ? 'https://' . $value : '';
+    }
+
+    protected function isUsableTemplateUrl(string $value): bool
+    {
+        $value = trim($value);
+        return $value !== '' && $value !== '#' && ! str_starts_with($value, '[');
+    }
+
+    protected function normalizeTemplateUrl(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || $value === '#') {
+            return $value;
+        }
+        if (Str::startsWith($value, ['http://', 'https://'])) {
+            return $value;
+        }
+        if (Str::startsWith($value, '/')) {
+            return rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . $value;
+        }
+        return str_contains($value, '.') ? 'https://' . $value : rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . '/' . ltrim($value, '/');
     }
 
     protected function userTokenText(string $key, string $fallback = ''): string
@@ -2986,14 +3333,12 @@ HTML;
             $trackedProfileTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks;
         }
 
-        $emailSentCount = (int) ($stats['email_sent_count'] ?? $stats['emails_sent'] ?? 0);
-        if ($emailSentCount === 0) {
-            $emailSentCount = (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0);
-        }
+        $emailSentCount = max((int) ($stats['email_sent_count'] ?? 0), (int) ($stats['emails_sent'] ?? 0), (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0));
 
         $emailOpenCount = (int) ($stats['email_open_count'] ?? $stats['email_opens'] ?? 0);
-        $emailClickCount = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? $stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0);
-        $linkClicks = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks + $emailClickCount;
+        $emailClickCount = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
+        $socialClickCount = (int) ($stats['website_click_count'] ?? $stats['website_clicks'] ?? 0) + (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0) + (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0) + (int) ($stats['x_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0);
+        $linkClicks = max((int) ($stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0), $emailClickCount + $socialClickCount);
 
         $engagedSchools = (int) (($stats['engaged_schools'] ?? $schools->filter(function (array $school): bool {
             return ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) > 0)
@@ -3010,6 +3355,10 @@ HTML;
             'email_sent_count' => $emailSentCount,
             'email_open_count' => $emailOpenCount,
             'email_click_count' => $emailClickCount,
+            'website_click_count' => (int) ($stats['website_click_count'] ?? $stats['website_clicks'] ?? 0),
+            'instagram_click_count' => (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
+            'youtube_click_count' => (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
+            'x_click_count' => (int) ($stats['x_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
             'profile_views' => $trackedProfileTotal,
             'view_profile_total' => $trackedProfileTotal,
             'view_profile_website' => $trackedWebsiteViews,
@@ -3025,6 +3374,59 @@ HTML;
         ];
     }
 
+
+    public function getCoachEngagementRowsProperty(): array
+    {
+        $platforms = [
+            'website' => ['label' => 'Website', 'key' => 'website_click_count', 'class' => 'is-blue', 'icon' => '⌁'],
+            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count', 'class' => 'is-pink', 'icon' => '◎'],
+            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count', 'class' => 'is-red', 'icon' => '▶'],
+            'x' => ['label' => 'X', 'key' => 'x_click_count', 'class' => 'is-neutral', 'icon' => '𝕏'],
+            'email' => ['label' => 'Email link', 'key' => 'email_click_count', 'class' => 'is-coral', 'icon' => '↗'],
+        ];
+
+        return collect($this->allCoaches())
+            ->filter(fn ($coach): bool => is_array($coach) && filled($coach['id'] ?? null))
+            ->flatMap(function (array $coach) use ($platforms): array {
+                $rows = [];
+                $coachName = trim((string) ($coach['name'] ?? 'Coach contact')) ?: 'Coach contact';
+                $school = trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''));
+                $lastPlatform = strtolower(trim((string) ($coach['last_clicked_platform'] ?? '')));
+                $lastUrl = trim((string) ($coach['last_clicked_url'] ?? ''));
+                $lastTime = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
+
+                foreach ($platforms as $platform => $config) {
+                    $count = (int) ($coach[$config['key']] ?? 0);
+                    if ($count <= 0) {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'coach_id' => (string) ($coach['id'] ?? ''),
+                        'coach_name' => $coachName,
+                        'school' => $school,
+                        'title' => $coachName,
+                        'copy' => $school !== ''
+                            ? $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count) . ' • ' . $school
+                            : $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count),
+                        'platform' => $config['label'],
+                        'platform_key' => $platform,
+                        'platform_class' => $config['class'],
+                        'platform_icon' => $config['icon'],
+                        'clicks' => $count,
+                        'url' => $lastPlatform === $platform ? $lastUrl : '',
+                        'time' => $lastTime,
+                        'time_label' => $lastTime ? \Carbon\Carbon::parse($lastTime)->diffForHumans() : 'Synced',
+                    ];
+                }
+
+                return $rows;
+            })
+            ->sortByDesc(fn (array $row): int => (int) ($row['clicks'] ?? 0))
+            ->take(30)
+            ->values()
+            ->all();
+    }
 
     protected function fallbackDashboardSparks(array $stats = []): array
     {

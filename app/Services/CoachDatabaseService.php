@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class CoachDatabaseService
@@ -97,6 +98,178 @@ class CoachDatabaseService
     public function getRemoteRecruitingCounts(User $user): array
     {
         return $this->goHighLevelService->getRecruitingRemoteCountsForUser($user);
+    }
+
+
+    /**
+     * Build the same cache key used by the Livewire Recruiting Center page.
+     *
+     * This lets the hourly command refresh the dashboard snapshot in the background
+     * without needing a local analytics database. GHL remains the source of truth;
+     * this cache is only the fast dashboard read model.
+     */
+    public function recruitingSnapshotCacheKey(User $user): string
+    {
+        return 'coach-database:v10:' . ($user->id ?: 'guest') . ':' . Str::slug((string) ($user->ghl_location_id ?: 'default'));
+    }
+
+    public function cachedRecruitingSnapshotForUser(User $user): ?array
+    {
+        $snapshot = Cache::get($this->recruitingSnapshotCacheKey($user));
+
+        return is_array($snapshot) ? $snapshot : null;
+    }
+
+    /**
+     * Sync all contact-level recruiting custom field values from GHL in one paged pass,
+     * aggregate them, and store the result in Laravel cache for the dashboard.
+     *
+     * This avoids live dashboard math across many API requests. Tracking routes still
+     * write to GHL custom fields, while the dashboard reads this hourly/manual cache.
+     */
+    public function syncRecruitingStatsForUser(User $user, bool $force = false): array
+    {
+        if (! config('ghl.coach_database.enabled', true)) {
+            return $this->locked('Recruiting Center is currently disabled.');
+        }
+
+        if (! $this->canAccess($user)) {
+            return $this->locked('Coach Database is available on paid plans.');
+        }
+
+        if (! $this->hasGhlConnection($user)) {
+            return [
+                'success' => false,
+                'allowed' => false,
+                'locked' => false,
+                'reason' => 'Missing recruiting data connection.',
+                'coaches' => [],
+                'schools' => [],
+                'lists' => $this->emptyLists($user),
+                'stats' => $this->emptyStats(),
+                'top_schools' => [],
+                'error' => 'Missing recruiting data connection.',
+            ];
+        }
+
+        $cacheKey = $this->recruitingSnapshotCacheKey($user);
+        $existingSnapshot = Cache::get($cacheKey, []);
+        $existingSnapshot = is_array($existingSnapshot) ? $existingSnapshot : [];
+
+        $exportPath = $this->recruitingStatsCsvPath($user);
+        $result = $this->goHighLevelService->exportRecruitingContactsCsvForUser($user, $exportPath);
+
+        if (! ($result['success'] ?? false)) {
+            $existingSnapshot['stats_sync_failed_at'] = now()->toDateTimeString();
+            $existingSnapshot['stats_sync_error'] = $result['error'] ?? 'Unable to export recruiting contacts from GHL.';
+            Cache::put($cacheKey, $existingSnapshot, now()->addHours((int) config('ghl.coach_database.cache_hours', 12)));
+
+            return array_merge($existingSnapshot, [
+                'success' => false,
+                'error' => $existingSnapshot['stats_sync_error'],
+            ]);
+        }
+
+        $csvRows = $this->readRecruitingStatsCsv($exportPath);
+
+        $coaches = collect($csvRows)
+            ->filter(fn ($coach): bool => is_array($coach) && filled($coach['id'] ?? null))
+            ->map(fn (array $coach): array => $this->slimCoach($coach))
+            ->filter(fn (array $coach): bool => filled($coach['school'] ?? null))
+            ->unique('id')
+            ->values()
+            ->all();
+
+        $customListTags = is_array($existingSnapshot['custom_list_tags'] ?? null)
+            ? $existingSnapshot['custom_list_tags']
+            : [];
+
+        $existingSchools = is_array($existingSnapshot['schools'] ?? null)
+            ? $existingSnapshot['schools']
+            : [];
+
+        $dashboard = $this->rebuildFromSchoolCompanySnapshot(
+            schools: $existingSchools,
+            coaches: $coaches,
+            user: $user,
+            customListTags: $customListTags,
+        );
+
+        $snapshot = array_merge($existingSnapshot, $dashboard, [
+            'success' => true,
+            'allowed' => true,
+            'locked' => false,
+            'reason' => null,
+            'error' => null,
+            'custom_list_tags' => $customListTags,
+            'loaded_schools_count' => count($dashboard['schools'] ?? []),
+            'loaded_contacts_count' => count($dashboard['coaches'] ?? []),
+            'remote_total_contacts' => $result['total'] ?? $result['count'] ?? count($coaches),
+            'contacts_have_more' => false,
+            'has_more_data' => false,
+            'stats_synced_at' => now()->toDateTimeString(),
+            'stats_sync_mode' => 'csv_export',
+            'stats_csv_path' => $result['path'] ?? $exportPath,
+            'stats_csv_contact_count' => $result['count'] ?? count($coaches),
+            'cached_at' => now()->toDateTimeString(),
+            'stats_sync_error' => null,
+        ]);
+
+        Cache::put($cacheKey, $snapshot, now()->addHours((int) config('ghl.coach_database.cache_hours', 12)));
+
+        return $snapshot;
+    }
+
+
+    protected function recruitingStatsCsvPath(User $user): string
+    {
+        return storage_path('app/recruiting/stats/user_' . $user->id . '/contacts.csv');
+    }
+
+    protected function readRecruitingStatsCsv(string $path): array
+    {
+        if (! is_file($path) || ! is_readable($path)) {
+            return [];
+        }
+
+        $handle = fopen($path, 'r');
+        if (! $handle) {
+            return [];
+        }
+
+        $headers = fgetcsv($handle) ?: [];
+        $headers = array_map(fn ($header): string => trim((string) $header), $headers);
+        $rows = [];
+
+        while (($values = fgetcsv($handle)) !== false) {
+            $row = [];
+            foreach ($headers as $index => $header) {
+                if ($header === '') {
+                    continue;
+                }
+
+                $value = $values[$index] ?? null;
+                if (in_array($header, ['tags', 'tags_json', 'list_keys', 'custom_fields_json'], true)) {
+                    $decoded = json_decode((string) $value, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $row[$header === 'tags_json' ? 'tags' : $header] = $decoded;
+                        continue;
+                    }
+                }
+
+                $row[$header] = $value;
+            }
+
+            if (! isset($row['tags']) && isset($row['tags_json']) && is_array($row['tags_json'])) {
+                $row['tags'] = $row['tags_json'];
+            }
+
+            $rows[] = $row;
+        }
+
+        fclose($handle);
+
+        return $rows;
     }
 
     public function actionTags(?User $user = null, array $customListTags = []): array
@@ -384,10 +557,10 @@ class CoachDatabaseService
                     'head_coach' => $this->slimHeadCoach($headCoach),
                     'is_saved' => $schoolCoaches->contains(fn (array $coach): bool => $this->coachHasSavedSchoolFlag($coach)),
                     'is_favorite' => $schoolCoaches->contains(fn (array $coach): bool => $this->coachHasFavoriteSchoolFlag($coach)),
-                    'profile_views' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_profile'] ?? false))->count(),
-                    'highlight_views' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_highlights'] ?? false))->count(),
-                    'replies' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['replied'] ?? false))->count(),
-                    'trigger_link_clicks' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['trigger_link_clicked'] ?? false))->count(),
+                    'profile_views' => $schoolCoaches->sum(fn (array $coach): int => max((int) ($coach['profile_view_count'] ?? 0), (int) ($coach['view_profile_total'] ?? 0), (bool) ($coach['viewed_profile'] ?? false) ? 1 : 0)),
+                    'highlight_views' => $schoolCoaches->sum(fn (array $coach): int => max((int) ($coach['highlight_view_count'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0)),
+                    'replies' => $schoolCoaches->sum(fn (array $coach): int => max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0)),
+                    'trigger_link_clicks' => $schoolCoaches->sum(fn (array $coach): int => max((int) ($coach['trigger_link_click_count'] ?? 0), (int) ($coach['email_click_count'] ?? 0), (int) ($coach['website_click_count'] ?? 0), (int) ($coach['instagram_click_count'] ?? 0), (int) ($coach['youtube_click_count'] ?? 0), (int) ($coach['x_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0)),
                     'engagement_score' => $score,
                     'list_keys' => $listKeys,
                 ];
@@ -440,9 +613,13 @@ class CoachDatabaseService
         $emailSent = $coaches->sum(fn (array $coach): int => (int) ($coach['email_sent_count'] ?? 0));
         $emailOpens = $coaches->sum(fn (array $coach): int => (int) ($coach['email_open_count'] ?? 0));
         $emailClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['email_click_count'] ?? 0));
+        $websiteClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['website_click_count'] ?? 0));
+        $instagramClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['instagram_click_count'] ?? 0));
+        $youtubeClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['youtube_click_count'] ?? 0));
+        $xClicks = $coaches->sum(fn (array $coach): int => (int) ($coach['x_click_count'] ?? 0));
 
         $highlightViews = $coaches->sum(fn (array $coach): int => max((int) ($coach['highlight_view_count'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0));
-        $linkClicks = $emailClicks + $websiteViews + $instagramViews + $youtubeViews + $xViews + $emailProfileClicks;
+        $linkClicks = $emailClicks + $websiteClicks + $instagramClicks + $youtubeClicks + $xClicks + $emailProfileClicks;
         $replies = $coaches->sum(fn (array $coach): int => max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0));
 
         return [
@@ -462,6 +639,12 @@ class CoachDatabaseService
             'view_profile_youtube' => $youtubeViews,
             'view_profile_x' => $xViews,
             'view_profile_email_link' => $emailProfileClicks,
+            'website_clicks' => $websiteClicks,
+            'instagram_clicks' => $instagramClicks,
+            'youtube_clicks' => $youtubeClicks,
+            'x_clicks' => $xClicks,
+            'twitter_clicks' => $xClicks,
+            'social_clicks' => $instagramClicks + $youtubeClicks + $xClicks,
             'email_sent_count' => $emailSent,
             'email_open_count' => $emailOpens,
             'email_click_count' => $emailClicks,
@@ -553,6 +736,10 @@ class CoachDatabaseService
                 + ((int) ($coach['view_profile_youtube'] ?? 0) * 4)
                 + ((int) ($coach['view_profile_x'] ?? 0) * 3)
                 + ((int) ($coach['view_profile_email_link'] ?? 0) * 4)
+                + ((int) ($coach['website_click_count'] ?? 0) * 4)
+                + ((int) ($coach['instagram_click_count'] ?? 0) * 4)
+                + ((int) ($coach['youtube_click_count'] ?? 0) * 5)
+                + ((int) ($coach['x_click_count'] ?? 0) * 4)
                 + ((int) ($coach['email_open_count'] ?? 0) * 2)
                 + ((int) ($coach['email_click_count'] ?? 0) * 4)
                 + ((bool) ($coach['viewed_profile'] ?? false) ? 5 : 0)
@@ -563,6 +750,38 @@ class CoachDatabaseService
                 + ((bool) ($coach['is_favorite_coach'] ?? false) ? 2 : 0)
                 + ((bool) ($coach['is_saved_coach'] ?? false) ? 1 : 0);
         });
+    }
+
+    protected function recruitingIntFromRow(array $row, array $keys): int
+    {
+        $max = 0;
+
+        foreach ($keys as $key) {
+            $normalized = strtolower(trim((string) $key));
+            $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?: '';
+            $normalized = trim($normalized, '_');
+
+            foreach (array_unique([$key, $normalized, 'custom_' . $normalized, 'custom_contact_' . $normalized, 'custom_business_' . $normalized]) as $candidateKey) {
+                if (! array_key_exists($candidateKey, $row)) {
+                    continue;
+                }
+
+                $value = $row[$candidateKey];
+                if (is_numeric($value)) {
+                    $max = max($max, (int) $value);
+                    continue;
+                }
+
+                if (is_string($value) && trim($value) !== '') {
+                    $numbers = preg_replace('/[^0-9.-]/', '', $value);
+                    if ($numbers !== '' && is_numeric($numbers)) {
+                        $max = max($max, (int) $numbers);
+                    }
+                }
+            }
+        }
+
+        return $max;
     }
 
     protected function slimCoach(array $coach): array
@@ -597,18 +816,27 @@ class CoachDatabaseService
             'engaged' => (bool) ($coach['engaged'] ?? false),
             'replied' => (bool) ($coach['replied'] ?? false),
             'trigger_link_clicked' => (bool) ($coach['trigger_link_clicked'] ?? false),
-            'view_profile_total' => (int) ($coach['view_profile_total'] ?? 0),
-            'view_profile_website' => (int) ($coach['view_profile_website'] ?? 0),
-            'view_profile_instagram' => (int) ($coach['view_profile_instagram'] ?? 0),
-            'view_profile_youtube' => (int) ($coach['view_profile_youtube'] ?? 0),
-            'view_profile_x' => (int) ($coach['view_profile_x'] ?? 0),
-            'view_profile_email_link' => (int) ($coach['view_profile_email_link'] ?? 0),
-            'email_sent_count' => (int) ($coach['email_sent_count'] ?? 0),
-            'email_open_count' => (int) ($coach['email_open_count'] ?? 0),
-            'email_click_count' => (int) ($coach['email_click_count'] ?? 0),
-            'profile_view_count' => (int) max((int) ($coach['profile_view_count'] ?? 0), (int) ($coach['view_profile_total'] ?? 0)),
-            'trigger_link_click_count' => (int) max((int) ($coach['trigger_link_click_count'] ?? 0), (int) ($coach['email_click_count'] ?? 0)),
-            'coach_reply_count' => (int) ($coach['coach_reply_count'] ?? 0),
+            'view_profile_total' => $profileTotal = $this->recruitingIntFromRow($coach, ['view_profile_total', 'profile_view_total', 'profile_views', 'profile_view_count']),
+            'view_profile_website' => $this->recruitingIntFromRow($coach, ['view_profile_website']),
+            'view_profile_instagram' => $this->recruitingIntFromRow($coach, ['view_profile_instagram']),
+            'view_profile_youtube' => $this->recruitingIntFromRow($coach, ['view_profile_youtube']),
+            'view_profile_x' => $this->recruitingIntFromRow($coach, ['view_profile_x']),
+            'view_profile_email_link' => $this->recruitingIntFromRow($coach, ['view_profile_email_link']),
+            'email_sent_count' => $this->recruitingIntFromRow($coach, ['email_sent_count', 'emails_sent', 'total_emails_sent']),
+            'email_open_count' => $this->recruitingIntFromRow($coach, ['email_open_count', 'email_opens', 'open_count']),
+            'email_click_count' => $emailClickCount = $this->recruitingIntFromRow($coach, ['email_click_count', 'email_clicks', 'click_count']),
+            'website_click_count' => $websiteClickCount = $this->recruitingIntFromRow($coach, ['website_click_count', 'website_clicks']),
+            'instagram_click_count' => $instagramClickCount = $this->recruitingIntFromRow($coach, ['instagram_click_count', 'instagram_clicks']),
+            'youtube_click_count' => $youtubeClickCount = $this->recruitingIntFromRow($coach, ['youtube_click_count', 'youtube_clicks']),
+            'x_click_count' => $xClickCount = $this->recruitingIntFromRow($coach, ['x_click_count', 'x_clicks', 'twitter_clicks']),
+            'email_delivered_count' => $this->recruitingIntFromRow($coach, ['email_delivered_count']),
+            'email_failed_count' => $this->recruitingIntFromRow($coach, ['email_failed_count']),
+            'last_clicked_platform' => $coach['last_clicked_platform'] ?? $coach['custom_last_clicked_platform'] ?? $coach['custom_contact_last_clicked_platform'] ?? null,
+            'last_clicked_url' => $coach['last_clicked_url'] ?? $coach['custom_last_clicked_url'] ?? $coach['custom_contact_last_clicked_url'] ?? null,
+            'last_profile_view_at' => $coach['last_profile_view_at'] ?? $coach['custom_last_profile_view_at'] ?? $coach['custom_contact_last_profile_view_at'] ?? null,
+            'profile_view_count' => (int) max((int) ($coach['profile_view_count'] ?? 0), $profileTotal),
+            'trigger_link_click_count' => (int) max((int) ($coach['trigger_link_click_count'] ?? 0), $emailClickCount, $websiteClickCount, $instagramClickCount, $youtubeClickCount, $xClickCount),
+            'coach_reply_count' => $this->recruitingIntFromRow($coach, ['coach_reply_count', 'reply_count', 'replies']),
         ];
     }
 

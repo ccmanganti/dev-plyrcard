@@ -3627,6 +3627,97 @@
             box-shadow: none !important;
         }
 
+
+        .rc-refresh-dropdown-v2 {
+            position: relative !important;
+            grid-area: refresh !important;
+            justify-self: end !important;
+            flex: 0 0 auto !important;
+            z-index: 35 !important;
+        }
+
+        .rc-refresh-menu-v2 {
+            position: absolute !important;
+            top: calc(100% + .55rem) !important;
+            right: 0 !important;
+            width: min(18rem, 86vw) !important;
+            border: 1px solid rgba(226,232,240,.95) !important;
+            border-radius: 1rem !important;
+            background: rgba(255,255,255,.98) !important;
+            color: #0f172a !important;
+            box-shadow: 0 18px 46px rgba(15,23,42,.16) !important;
+            padding: .42rem !important;
+            z-index: 80 !important;
+        }
+
+        .rc-refresh-menu-item-v2 {
+            width: 100% !important;
+            border: 0 !important;
+            background: transparent !important;
+            color: inherit !important;
+            display: grid !important;
+            grid-template-columns: 2.15rem minmax(0,1fr) !important;
+            gap: .65rem !important;
+            align-items: center !important;
+            text-align: left !important;
+            padding: .68rem .7rem !important;
+            border-radius: .78rem !important;
+            cursor: pointer !important;
+        }
+
+        .rc-refresh-menu-item-v2:hover {
+            background: rgba(255,99,56,.09) !important;
+        }
+
+        .rc-refresh-menu-item-v2 svg {
+            width: 1rem !important;
+            height: 1rem !important;
+        }
+
+        .rc-refresh-menu-icon-v2 {
+            width: 2.15rem !important;
+            height: 2.15rem !important;
+            border-radius: .72rem !important;
+            display: inline-grid !important;
+            place-items: center !important;
+            background: rgba(255,99,56,.1) !important;
+            color: #ff6338 !important;
+        }
+
+        .rc-refresh-menu-copy-v2 {
+            min-width: 0 !important;
+            display: grid !important;
+            gap: .12rem !important;
+        }
+
+        .rc-refresh-menu-copy-v2 strong {
+            font-size: .82rem !important;
+            line-height: 1.2 !important;
+            font-weight: 800 !important;
+            color: inherit !important;
+        }
+
+        .rc-refresh-menu-copy-v2 small {
+            font-size: .72rem !important;
+            line-height: 1.3 !important;
+            color: #64748b !important;
+        }
+
+        .dark .rc-refresh-menu-v2 {
+            border-color: rgba(148,163,184,.18) !important;
+            background: rgba(15,23,42,.98) !important;
+            color: #f8fafc !important;
+            box-shadow: 0 18px 46px rgba(0,0,0,.32) !important;
+        }
+
+        .dark .rc-refresh-menu-item-v2:hover {
+            background: rgba(255,99,56,.15) !important;
+        }
+
+        .dark .rc-refresh-menu-copy-v2 small {
+            color: rgba(203,213,225,.72) !important;
+        }
+
         .rc-home-new-email-v2 {
             grid-area: email !important;
             justify-self: end !important;
@@ -4786,9 +4877,29 @@
                                 </div>
                             @endif
                 </div>
-                <button type="button" class="rc-home-refresh-v2" wire:click="refreshData" wire:loading.attr="disabled" wire:target="refreshData,startBackgroundLoad,loadNextBatch" aria-label="Reload Recruiting Center data" title="Reload data from GHL">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
+                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+                    <button
+                        type="button"
+                        class="rc-home-refresh-v2"
+                        x-on:click="open = ! open"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
+                        aria-label="Open refresh options"
+                        title="Refresh options"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
+                            <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                        </button>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
+                            <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Clear cache and reload schools, coaches, logos, tags, filters, and stats from GHL.</small></span>
+                        </button>
+                    </div>
+                </div>
                 <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
                     <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <svg class="rc-dark-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
@@ -4821,9 +4932,13 @@
                 $trackedProfileTotal = $trackedProfileComponentTotal;
                 $profileViews = $trackedProfileTotal;
 
-                $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
+                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
+                $socialClickCount = (int) ($dashboardMetrics['website_click_count'] ?? 0)
+                    + (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
+                    + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
+                    + (int) ($dashboardMetrics['x_click_count'] ?? 0);
                 $emailsSent = $emailSentCount;
 
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
@@ -4834,6 +4949,7 @@
                     + $trackedXViews
                     + $trackedEmailLinkViews
                     + $emailClickCount
+                    + $socialClickCount
                     + $emailOpenCount
                     + $coachReplies;
 
@@ -5306,20 +5422,29 @@
                             @endif
                         </div>
 
-                        <button
-                            type="button"
-                            class="rc-home-refresh-v2"
-                            wire:click="refreshData"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshData,startBackgroundLoad,loadNextBatch"
-                            aria-label="Reload Recruiting Center data"
-                            title="Reload data from GHL"
-                        >
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
+                        <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+                            <button
+                                type="button"
+                                class="rc-home-refresh-v2"
+                                x-on:click="open = ! open"
+                                wire:loading.attr="disabled"
+                                wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
+                                aria-label="Open refresh options"
+                                title="Refresh options"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
+                                <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
+                                    <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                    <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                                </button>
+                                <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
+                                    <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+                                    <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Clear cache and reload schools, coaches, logos, tags, filters, and stats from GHL.</small></span>
+                                </button>
+                            </div>
+                        </div>
 
                         <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
                             <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -5681,32 +5806,23 @@
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $websiteClicks = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
-                $xClicks = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
-                $igClicks = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
-                $ytClicks = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $websiteClicks = (int) ($dashboardMetrics['website_click_count'] ?? $dashboardMetrics['website_clicks'] ?? 0);
+                $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
+                $igClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $ytClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
                 $emailLinkClicks = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $emailClicks = (int) ($dashboardMetrics['Click count'] ?? 0);
-                $emailOpens = (int) ($dashboardMetrics['Open count'] ?? 0);
+                $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? $dashboardMetrics['Click count'] ?? 0);
+                $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? $dashboardMetrics['Open count'] ?? 0);
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
 
-                $coachEngagementRows = collect([
-                    ['title' => 'Website profile clicks', 'copy' => 'Website profile clicks', 'platform' => 'Website', 'platform_class' => 'is-blue', 'platform_icon' => '⌁', 'clicks' => $websiteClicks, 'time_label' => 'Updated'],
-                    ['title' => 'Instagram clicks', 'copy' => 'Instagram profile clicks', 'platform' => 'Instagram', 'platform_class' => 'is-pink', 'platform_icon' => '◎', 'clicks' => $igClicks, 'time_label' => 'Updated'],
-                    ['title' => 'YouTube clicks', 'copy' => 'YouTube profile clicks', 'platform' => 'YouTube', 'platform_class' => 'is-red', 'platform_icon' => '▶', 'clicks' => $ytClicks, 'time_label' => 'Updated'],
-                    ['title' => 'X clicks', 'copy' => 'X profile clicks', 'platform' => 'X', 'platform_class' => 'is-neutral', 'platform_icon' => '𝕏', 'clicks' => $xClicks, 'time_label' => 'Updated'],
-                    ['title' => 'Email profile-link clicks', 'copy' => 'Profile links clicked from email', 'platform' => 'Email Link', 'platform_class' => 'is-coral', 'platform_icon' => '✉', 'clicks' => $emailLinkClicks, 'time_label' => 'Updated'],
-                    ['title' => 'Email clicks', 'copy' => 'Email links clicked', 'platform' => 'Email Click', 'platform_class' => 'is-coral', 'platform_icon' => '↗', 'clicks' => $emailClicks, 'time_label' => 'Updated'],
-                    ['title' => 'Email opens', 'copy' => 'Emails opened', 'platform' => 'Email Open', 'platform_class' => 'is-green', 'platform_icon' => '◉', 'clicks' => $emailOpens, 'time_label' => 'Updated'],
-                    ['title' => 'Coach replies', 'copy' => 'Coach replies and responses', 'platform' => 'Reply', 'platform_class' => 'is-purple', 'platform_icon' => '↩', 'clicks' => $coachReplies, 'time_label' => 'Updated'],
-                ])->filter(fn (array $row): bool => (int) ($row['clicks'] ?? 0) > 0)->values();
+                $coachEngagementRows = collect($this->coachEngagementRows ?? []);
 
                 if ($coachEngagementRows->isEmpty()) {
                     $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) use ($formatActivityTimeLabel) {
                         $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
                         $platformLower = strtolower($platform);
-                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : 'is-neutral');
-                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : '𝕏');
+                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : (str_contains($platformLower, 'website') ? 'is-blue' : 'is-neutral'));
+                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : (str_contains($platformLower, 'website') ? '⌁' : '𝕏'));
                         $time = $row['time'] ?? null;
 
                         return [
@@ -5790,7 +5906,7 @@
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $emailSentCount = (int) ($dashboardMetrics['email_sent_count'] ?? $dashboardMetrics['emails_sent'] ?? 0);
+                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
