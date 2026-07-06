@@ -2232,6 +2232,7 @@ class GoHighLevelService
             'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube'], $trackingFieldMap),
             'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x'], $trackingFieldMap),
             'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link'], $trackingFieldMap),
+            'view_profile_qr' => $this->numericCustomFieldFromContact($contact, ['view_profile_qr'], $trackingFieldMap),
             'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
             'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
@@ -5133,6 +5134,7 @@ class GoHighLevelService
             'view_profile_youtube' => $this->numericCustomFieldFromContact($contact, ['view_profile_youtube'], $trackingFieldMap),
             'view_profile_x' => $this->numericCustomFieldFromContact($contact, ['view_profile_x'], $trackingFieldMap),
             'view_profile_email_link' => $this->numericCustomFieldFromContact($contact, ['view_profile_email_link'], $trackingFieldMap),
+            'view_profile_qr' => $this->numericCustomFieldFromContact($contact, ['view_profile_qr'], $trackingFieldMap),
             'email_sent_count' => $this->numericCustomFieldFromContact($contact, ['email_sent_count'], $trackingFieldMap),
             'email_open_count' => $this->numericCustomFieldFromContact($contact, ['email_open_count'], $trackingFieldMap),
             'email_click_count' => $this->numericCustomFieldFromContact($contact, ['email_click_count'], $trackingFieldMap),
@@ -5659,6 +5661,7 @@ class GoHighLevelService
             'view_profile_youtube' => ['name' => 'view_profile_youtube', 'dataType' => 'NUMERICAL'],
             'view_profile_x' => ['name' => 'view_profile_x', 'dataType' => 'NUMERICAL'],
             'view_profile_email_link' => ['name' => 'view_profile_email_link', 'dataType' => 'NUMERICAL'],
+            'view_profile_qr' => ['name' => 'view_profile_qr', 'dataType' => 'NUMERICAL'],
             'email_sent_count' => ['name' => 'email_sent_count', 'dataType' => 'NUMERICAL'],
             'email_open_count' => ['name' => 'email_open_count', 'dataType' => 'NUMERICAL'],
             'email_click_count' => ['name' => 'email_click_count', 'dataType' => 'NUMERICAL'],
@@ -5672,6 +5675,16 @@ class GoHighLevelService
             'last_clicked_url' => ['name' => 'last_clicked_url', 'dataType' => 'TEXT'],
             'last_clicked_platform' => ['name' => 'last_clicked_platform', 'dataType' => 'TEXT'],
             'last_tracking_host' => ['name' => 'last_tracking_host', 'dataType' => 'TEXT'],
+            'last_profile_view_contact_id' => ['name' => 'last_profile_view_contact_id', 'dataType' => 'TEXT'],
+            'last_profile_view_coach_name' => ['name' => 'last_profile_view_coach_name', 'dataType' => 'TEXT'],
+            'last_profile_view_coach_email' => ['name' => 'last_profile_view_coach_email', 'dataType' => 'TEXT'],
+            'last_profile_view_school' => ['name' => 'last_profile_view_school', 'dataType' => 'TEXT'],
+            'last_profile_view_business_id' => ['name' => 'last_profile_view_business_id', 'dataType' => 'TEXT'],
+            'last_profile_view_school_logo_url' => ['name' => 'last_profile_view_school_logo_url', 'dataType' => 'TEXT'],
+            'last_profile_view_platform' => ['name' => 'last_profile_view_platform', 'dataType' => 'TEXT'],
+            'last_profile_view_url' => ['name' => 'last_profile_view_url', 'dataType' => 'TEXT'],
+            'last_profile_view_referrer' => ['name' => 'last_profile_view_referrer', 'dataType' => 'TEXT'],
+            'profile_view_event_json' => ['name' => 'profile_view_event_json', 'dataType' => 'TEXT'],
         ];
     }
 
@@ -5718,8 +5731,25 @@ class GoHighLevelService
         );
     }
 
+    public function trackRecruitingProfileViewForUser(?User $user, string $contactId, array $metadata = []): array
+    {
+        return $this->trackRecruitingEventForUser(
+            user: $user,
+            contactId: $contactId,
+            platform: (string) ($metadata['platform'] ?? 'website'),
+            eventType: 'profile_view',
+            metadata: $metadata,
+        );
+    }
+
     /**
      * Main tracking entry point. Works for click, open, and sent events.
+     *
+     * Smooth GHL-only behavior:
+     * - profile views are deduped in cache before any GHL API call;
+     * - custom-field IDs are cached and not refreshed on every hit;
+     * - counters use local cache after the first remote read, so valid views usually make only one GHL update call;
+     * - high-volume tracking events do not update the athlete aggregate contact, only the coach/contact record.
      */
     public function trackRecruitingEventForUser(?User $user, string $contactId, string $platform, string $eventType = 'link_click', array $metadata = []): array
     {
@@ -5744,7 +5774,34 @@ class GoHighLevelService
 
         $platform = $this->normalizeRecruitingTrackingPlatform($platform);
         $eventType = strtolower(trim($eventType));
-        $fields = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, true);
+        $metadata = array_merge($metadata, [
+            'contact_id' => $metadata['contact_id'] ?? $contactId,
+            'ghl_contact_id' => $metadata['ghl_contact_id'] ?? $contactId,
+        ]);
+
+        if ($this->shouldSkipRecruitingTrackingByDedupe($locationId, $contactId, $platform, $eventType, $metadata)) {
+            Log::info('Recruiting tracking skipped by dedupe cache.', [
+                'contact_id' => $contactId,
+                'platform' => $platform,
+                'event_type' => $eventType,
+                'athlete_id' => $metadata['athlete_id'] ?? null,
+            ]);
+
+            return [
+                'success' => true,
+                'skipped' => true,
+                'reason' => 'deduped',
+                'contact_id' => $contactId,
+                'platform' => $platform,
+                'event_type' => $eventType,
+            ];
+        }
+
+        // Only fetch the contact when the tracking token did not already carry coach/school metadata.
+        $metadata = $this->enrichRecruitingTrackingMetadataFromContact($metadata, $contactId, $locationId, $tokenOverride);
+
+        // Do not force refresh here. GHL field IDs are stable and cached for smooth, low-call tracking.
+        $fields = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
 
         if (empty($fields)) {
             return ['success' => false, 'error' => 'Tracking fields could not be prepared.'];
@@ -5764,24 +5821,28 @@ class GoHighLevelService
 
         if ($recipientResult['success'] ?? false) {
             $this->rememberRecruitingTrackingContactId($user, $locationId, $contactId);
-            \Illuminate\Support\Facades\Cache::forget('recruiting-tracking-contact-detail:' . md5($locationId . '|' . $contactId));
+            // Keep the warmed contact cache when possible. The increment method already updates it locally.
         }
 
         $athleteResult = null;
-        $athleteContactId = $this->resolveRecruitingTrackingOwnerContactId($user, $locationId, $tokenOverride);
-        if ($athleteContactId && $athleteContactId !== $contactId) {
-            $athleteResult = $this->incrementRecruitingContactTrackingFields(
-                contactId: $athleteContactId,
-                locationId: $locationId,
-                tokenOverride: $tokenOverride,
-                token: $token,
-                incrementKeys: $increments,
-                textUpdates: $textUpdates,
-            );
+        $athleteContactId = null;
 
-            if ($athleteResult['success'] ?? false) {
-                $this->rememberRecruitingTrackingContactId($user, $locationId, $athleteContactId);
-                \Illuminate\Support\Facades\Cache::forget('recruiting-tracking-contact-detail:' . md5($locationId . '|' . $athleteContactId));
+        if ($this->shouldUpdateRecruitingOwnerAggregate($eventType)) {
+            $athleteContactId = $this->resolveRecruitingTrackingOwnerContactId($user, $locationId, $tokenOverride);
+
+            if ($athleteContactId && $athleteContactId !== $contactId) {
+                $athleteResult = $this->incrementRecruitingContactTrackingFields(
+                    contactId: $athleteContactId,
+                    locationId: $locationId,
+                    tokenOverride: $tokenOverride,
+                    token: $token,
+                    incrementKeys: $increments,
+                    textUpdates: $textUpdates,
+                );
+
+                if ($athleteResult['success'] ?? false) {
+                    $this->rememberRecruitingTrackingContactId($user, $locationId, $athleteContactId);
+                }
             }
         }
 
@@ -5794,6 +5855,43 @@ class GoHighLevelService
             'recipient' => $recipientResult,
             'athlete' => $athleteResult,
         ];
+    }
+
+    protected function shouldSkipRecruitingTrackingByDedupe(string $locationId, string $contactId, string $platform, string $eventType, array $metadata = []): bool
+    {
+        if (! in_array($eventType, ['profile_view'], true)) {
+            return false;
+        }
+
+        $minutes = (int) config('ghl.coach_database.profile_view_dedupe_minutes', 45);
+        if ($minutes <= 0) {
+            return false;
+        }
+
+        $athleteId = (string) ($metadata['athlete_id'] ?? $metadata['user_id'] ?? 'unknown-athlete');
+        $destination = strtolower(trim((string) ($metadata['destination_url'] ?? $metadata['profile_url'] ?? '')));
+        $source = strtolower(trim((string) ($metadata['source'] ?? '')));
+
+        $fingerprint = implode('|', [
+            $locationId,
+            $contactId,
+            $athleteId,
+            $platform,
+            $eventType,
+            $source,
+            $destination,
+        ]);
+
+        $cacheKey = 'recruiting-profile-view-dedupe:' . md5($fingerprint);
+
+        return ! \Illuminate\Support\Facades\Cache::add($cacheKey, true, now()->addMinutes($minutes));
+    }
+
+    protected function shouldUpdateRecruitingOwnerAggregate(string $eventType): bool
+    {
+        // Keep high-volume view/open/click tracking to one GHL contact update.
+        // Sent/delivered/failed statuses are lower-volume and can still update the athlete aggregate contact.
+        return in_array($eventType, ['email_sent', 'sent', 'email_delivered', 'delivered', 'email_failed', 'failed', 'bounced', 'email_bounced'], true);
     }
 
     /**
@@ -5894,17 +5992,103 @@ class GoHighLevelService
         return collect($keys)->filter()->unique()->values()->all();
     }
 
+    protected function enrichRecruitingTrackingMetadataFromContact(array $metadata, string $contactId, string $locationId, ?string $tokenOverride): array
+    {
+        $metadata['contact_id'] = $metadata['contact_id'] ?? $contactId;
+        $metadata['ghl_contact_id'] = $metadata['ghl_contact_id'] ?? $contactId;
+
+        $needsCoach = blank($metadata['coach_name'] ?? null)
+            || blank($metadata['coach_email'] ?? null)
+            || blank($metadata['school'] ?? null)
+            || blank($metadata['business_id'] ?? null)
+            || blank($metadata['school_logo_url'] ?? null);
+
+        if (! $needsCoach) {
+            return $metadata;
+        }
+
+        try {
+            $contact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride, true);
+            if (! is_array($contact) || empty($contact)) {
+                return $metadata;
+            }
+
+            $coach = $this->transformCoachContact($contact);
+
+            return array_merge([
+                'coach_name' => $coach['name'] ?? null,
+                'coach_email' => $coach['email'] ?? null,
+                'school' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'school_name' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'business_id' => $coach['business_id'] ?? null,
+                'ghl_business_id' => $coach['business_id'] ?? null,
+                'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
+            ], array_filter($metadata, fn ($value): bool => ! is_null($value) && $value !== ''));
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting tracking metadata enrichment failed.', [
+                'contact_id' => $contactId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $metadata;
+        }
+    }
+
+    protected function profileViewEventJson(string $platform, string $eventType, array $metadata = []): string
+    {
+        $event = [
+            'event_type' => $eventType,
+            'platform' => $platform,
+            'source' => $metadata['source'] ?? null,
+            'occurred_at' => $metadata['occurred_at'] ?? now()->toIso8601String(),
+            'contact_id' => $metadata['contact_id'] ?? $metadata['ghl_contact_id'] ?? null,
+            'coach_name' => $metadata['coach_name'] ?? $metadata['contact_name'] ?? null,
+            'coach_email' => $metadata['coach_email'] ?? $metadata['contact_email'] ?? null,
+            'school' => $metadata['school'] ?? $metadata['school_name'] ?? $metadata['company_name'] ?? null,
+            'business_id' => $metadata['business_id'] ?? $metadata['ghl_business_id'] ?? $metadata['company_id'] ?? null,
+            'school_logo_url' => $metadata['school_logo_url'] ?? $metadata['business_logo_url'] ?? $metadata['logo_url'] ?? null,
+            'url' => $metadata['destination_url'] ?? null,
+            'referrer' => $metadata['referrer'] ?? null,
+            'host' => $metadata['host'] ?? null,
+        ];
+
+        return substr(json_encode(array_filter($event, fn ($value): bool => ! is_null($value) && $value !== ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 0, 1900);
+    }
+
     protected function trackingTextUpdates(string $platform, string $eventType, array $metadata = []): array
     {
         $destinationUrl = (string) ($metadata['destination_url'] ?? '');
         $source = (string) ($metadata['source'] ?? $eventType);
 
+        $occurredAt = (string) ($metadata['occurred_at'] ?? now()->toIso8601String());
+        $contactId = (string) ($metadata['contact_id'] ?? $metadata['ghl_contact_id'] ?? '');
+        $coachName = (string) ($metadata['coach_name'] ?? $metadata['contact_name'] ?? '');
+        $coachEmail = (string) ($metadata['coach_email'] ?? $metadata['contact_email'] ?? '');
+        $school = (string) ($metadata['school'] ?? $metadata['school_name'] ?? $metadata['company_name'] ?? '');
+        $businessId = (string) ($metadata['business_id'] ?? $metadata['ghl_business_id'] ?? $metadata['company_id'] ?? '');
+        $schoolLogoUrl = (string) ($metadata['school_logo_url'] ?? $metadata['business_logo_url'] ?? $metadata['logo_url'] ?? '');
+        $referrer = (string) ($metadata['referrer'] ?? '');
+
         $updates = [
             'last_profile_view_source' => $source,
-            'last_profile_view_at' => now()->toIso8601String(),
+            'last_profile_view_at' => $occurredAt,
             'last_clicked_url' => $destinationUrl,
             'last_clicked_platform' => $platform,
             'last_tracking_host' => (string) ($metadata['host'] ?? request()?->getHost() ?? ''),
+            'last_profile_view_contact_id' => $contactId,
+            'last_profile_view_coach_name' => $coachName,
+            'last_profile_view_coach_email' => $coachEmail,
+            'last_profile_view_school' => $school,
+            'last_profile_view_business_id' => $businessId,
+            'last_profile_view_school_logo_url' => $schoolLogoUrl,
+            'last_profile_view_platform' => $platform,
+            'last_profile_view_url' => $destinationUrl,
+            'last_profile_view_referrer' => $referrer,
+            'profile_view_event_json' => $this->profileViewEventJson($platform, $eventType, array_merge($metadata, [
+                'occurred_at' => $occurredAt,
+                'destination_url' => $destinationUrl,
+                'source' => $source,
+            ])),
         ];
 
         if (in_array(strtolower(trim($eventType)), ['email_sent', 'sent'], true)) {
@@ -5929,25 +6113,38 @@ class GoHighLevelService
 
     protected function incrementRecruitingContactTrackingFields(string $contactId, string $locationId, ?string $tokenOverride, string $token, array $incrementKeys, array $textUpdates = []): array
     {
-        // Read from the latest remote contact using the actual custom-field ID map.
-        // This is important because GHL often returns contact custom fields by ID,
-        // not by the human-readable field name like email_sent_count.
         $trackingFieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
-        $remoteContact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride, true);
-        $cachedContact = \Illuminate\Support\Facades\Cache::get($this->recruitingTrackingContactDetailCacheKey($locationId, $contactId), []);
         $cachedCounters = \Illuminate\Support\Facades\Cache::get($this->recruitingTrackingCounterCacheKey($locationId, $contactId), []);
+        $cachedContact = \Illuminate\Support\Facades\Cache::get($this->recruitingTrackingContactDetailCacheKey($locationId, $contactId), []);
+
+        $normalizedIncrementKeys = collect($incrementKeys)
+            ->map(fn ($key): string => $this->normalizeRecruitingTrackingKey((string) $key))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $hasWarmCounters = is_array($cachedCounters)
+            && ! empty($normalizedIncrementKeys)
+            && collect($normalizedIncrementKeys)->every(fn (string $key): bool => array_key_exists($key, $cachedCounters));
+
+        $remoteContact = [];
+        if (! $hasWarmCounters) {
+            // First valid event for this contact/counter after cache warmup may need one read.
+            // Later valid events can update GHL with one request using the cached counter values.
+            $remoteContact = $this->fetchContactForDashboard($contactId, $locationId, $tokenOverride, true);
+        } elseif (is_array($cachedContact)) {
+            $remoteContact = $cachedContact;
+        }
 
         $customFields = [];
         $nextValues = [];
         $currentValues = [];
 
-        foreach ($incrementKeys as $key) {
-            $key = $this->normalizeRecruitingTrackingKey($key);
-            if ($key === '') {
-                continue;
-            }
-
-            $remoteCurrent = $this->numericCustomFieldFromContact($remoteContact, [$key], $trackingFieldMap);
+        foreach ($normalizedIncrementKeys as $key) {
+            $remoteCurrent = is_array($remoteContact) && ! empty($remoteContact)
+                ? $this->numericCustomFieldFromContact($remoteContact, [$key], $trackingFieldMap)
+                : 0;
             $cachedContactCurrent = is_array($cachedContact) ? $this->numericCustomFieldFromContact($cachedContact, [$key], $trackingFieldMap) : 0;
             $cachedCounterCurrent = is_array($cachedCounters) ? (int) ($cachedCounters[$key] ?? 0) : 0;
             $current = max($remoteCurrent, $cachedContactCurrent, $cachedCounterCurrent);
@@ -5970,7 +6167,8 @@ class GoHighLevelService
         }
 
         $response = Http::withHeaders(['Version' => config('ghl.version', '2021-07-28')])
-            ->timeout((int) config('ghl.timeout', 20))
+            ->connectTimeout((int) config('ghl.coach_database.tracking_http_connect_timeout', 3))
+            ->timeout((int) config('ghl.coach_database.tracking_http_timeout', 8))
             ->withToken($token)
             ->acceptJson()
             ->asJson()
@@ -5985,6 +6183,7 @@ class GoHighLevelService
                 'custom_fields' => $customFields,
                 'current_values' => $currentValues,
                 'next_values' => $nextValues,
+                'used_cached_counters' => $hasWarmCounters,
             ]);
 
             return ['success' => false, 'error' => 'Tracking update failed.', 'status' => $response->status()];
@@ -6005,7 +6204,7 @@ class GoHighLevelService
         \Illuminate\Support\Facades\Cache::put(
             $this->recruitingTrackingCounterCacheKey($locationId, $contactId),
             $counterCache,
-            now()->addDays(14)
+            now()->addDays((int) config('ghl.coach_database.tracking_counter_cache_days', 14))
         );
 
         Log::info('Recruiting tracking counters updated.', [
@@ -6013,9 +6212,16 @@ class GoHighLevelService
             'location_id' => $locationId,
             'current_values' => $currentValues,
             'next_values' => $nextValues,
+            'used_cached_counters' => $hasWarmCounters,
         ]);
 
-        return ['success' => true, 'contact_id' => $contactId, 'increments' => $nextValues, 'contact' => $updatedContact];
+        return [
+            'success' => true,
+            'contact_id' => $contactId,
+            'increments' => $nextValues,
+            'contact' => $updatedContact,
+            'used_cached_counters' => $hasWarmCounters,
+        ];
     }
 
 
@@ -6162,7 +6368,7 @@ class GoHighLevelService
         $platform = strtolower(trim((string) $platform));
         $platform = str_replace(['twitter', 'twitter_x'], 'x', $platform);
 
-        return in_array($platform, ['website', 'instagram', 'youtube', 'x', 'email'], true)
+        return in_array($platform, ['website', 'instagram', 'youtube', 'x', 'email', 'qr'], true)
             ? $platform
             : 'website';
     }
@@ -6181,6 +6387,8 @@ class GoHighLevelService
             'instagram_clicks' => 'view_profile_instagram',
             'youtube_clicks' => 'view_profile_youtube',
             'x_clicks' => 'view_profile_x',
+            'qr_clicks' => 'view_profile_qr',
+            'qr_profile_views' => 'view_profile_qr',
         ];
 
         $key = $aliases[$key] ?? $key;
@@ -6196,7 +6404,7 @@ class GoHighLevelService
             \Illuminate\Support\Facades\Cache::forget($cacheKey);
         }
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addHours(6), function () use ($locationId, $token): array {
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addHours((int) config('ghl.coach_database.tracking_field_cache_hours', 24)), function () use ($locationId, $token): array {
             $existing = $this->getRecruitingLocationCustomFields($locationId, $token);
             $map = $this->mapRecruitingTrackingFields($existing);
 

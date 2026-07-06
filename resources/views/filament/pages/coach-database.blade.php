@@ -4807,7 +4807,10 @@
                 $firstName = trim(strtok($athleteName ?: 'Alex', ' '));
 
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
-                $favoriteSchools = (int) ($dashboardMetrics['favorite_schools'] ?? $savedSchools);
+                $favoriteSchools = max(
+                    (int) ($dashboardMetrics['favorite_schools'] ?? 0),
+                    count($this->favoriteSchools ?? []),
+                );
 
                 $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
@@ -5176,10 +5179,25 @@
                 })->values();
 
 
-                $radarSchoolRows = collect($radarSchools)->map(function ($school) {
+                $radarScoreForSchool = function ($school): int {
+                    return max(
+                        (int) ($school['lead_score'] ?? 0),
+                        (int) ($school['engagement_score'] ?? 0),
+                        ((int) ($school['profile_views'] ?? 0) * 5)
+                            + ((int) ($school['highlight_views'] ?? 0) * 4)
+                            + ((int) ($school['trigger_link_clicks'] ?? $school['link_clicks'] ?? 0) * 3)
+                            + ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) * 10)
+                            + ((int) ($school['coach_count'] ?? 0))
+                    );
+                };
+
+                $maxRadarScore = max(1, collect($radarSchools)->map(fn ($school) => $radarScoreForSchool($school))->max() ?: 1);
+
+                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool, $maxRadarScore) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
-                    $match = max(80, min(99, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 88)));
+                    $rawScore = $radarScoreForSchool($school);
+                    $match = $rawScore > 0 ? max(1, min(100, (int) round(($rawScore / $maxRadarScore) * 100))) : 0;
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                     $logoUrl = trim((string) (
                         $school['logo_url']
@@ -5196,6 +5214,7 @@
                         'name' => $schoolName,
                         'conference' => $schoolConference,
                         'match' => $match,
+                        'score' => $rawScore,
                         'initials' => strtoupper($initials ?: 'PC'),
                         'logo_url' => $logoUrl,
                     ];

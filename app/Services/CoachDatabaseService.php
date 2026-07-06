@@ -382,8 +382,8 @@ class CoachDatabaseService
                     'city' => $first['city'] ?? null,
                     'coach_count' => $schoolCoaches->count(),
                     'head_coach' => $this->slimHeadCoach($headCoach),
-                    'is_saved' => $schoolCoaches->contains(fn (array $coach): bool => (bool) ($coach['is_saved_school'] ?? false)),
-                    'is_favorite' => $schoolCoaches->contains(fn (array $coach): bool => (bool) ($coach['is_favorite_school'] ?? false)),
+                    'is_saved' => $schoolCoaches->contains(fn (array $coach): bool => $this->coachHasSavedSchoolFlag($coach)),
+                    'is_favorite' => $schoolCoaches->contains(fn (array $coach): bool => $this->coachHasFavoriteSchoolFlag($coach)),
                     'profile_views' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_profile'] ?? false))->count(),
                     'highlight_views' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['viewed_highlights'] ?? false))->count(),
                     'replies' => $schoolCoaches->filter(fn (array $coach): bool => (bool) ($coach['replied'] ?? false))->count(),
@@ -448,8 +448,8 @@ class CoachDatabaseService
         return [
             'total_schools' => $schools->count(),
             'total_coaches' => $coaches->count(),
-            'saved_schools' => $schools->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->count(),
-            'favorite_schools' => $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count(),
+            'saved_schools' => $schools->filter(fn (array $school): bool => $this->schoolHasSavedFlag($school))->count(),
+            'favorite_schools' => $schools->filter(fn (array $school): bool => $this->schoolHasFavoriteFlag($school))->count(),
             'saved_coaches' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['is_saved_coach'] ?? false))->count(),
             'favorite_coaches' => $coaches->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->count(),
             'profile_views' => $profileViews,
@@ -495,6 +495,52 @@ class CoachDatabaseService
             ])
             ->values()
             ->all();
+    }
+
+    protected function schoolHasFavoriteFlag(array $school): bool
+    {
+        if ((bool) ($school['is_favorite'] ?? false) || (bool) ($school['is_favorite_school'] ?? false)) {
+            return true;
+        }
+
+        return collect($school['list_keys'] ?? [])
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->contains(fn (string $key): bool => str_contains($key, 'favorite'));
+    }
+
+    protected function schoolHasSavedFlag(array $school): bool
+    {
+        if ((bool) ($school['is_saved'] ?? false) || (bool) ($school['is_saved_school'] ?? false)) {
+            return true;
+        }
+
+        return collect($school['list_keys'] ?? [])
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->contains(fn (string $key): bool => str_contains($key, 'saved'));
+    }
+
+    protected function coachHasFavoriteSchoolFlag(array $coach): bool
+    {
+        if ((bool) ($coach['is_favorite_school'] ?? false)) {
+            return true;
+        }
+
+        return $this->hasTag($coach['tags'] ?? [], $this->favoriteSchoolTag())
+            || collect($coach['tags'] ?? [])
+                ->map(fn ($tag): string => strtolower(trim((string) (is_array($tag) ? ($tag['tag'] ?? $tag['name'] ?? $tag['value'] ?? '') : $tag))))
+                ->contains(fn (string $tag): bool => str_contains($tag, 'favorite school'));
+    }
+
+    protected function coachHasSavedSchoolFlag(array $coach): bool
+    {
+        if ((bool) ($coach['is_saved_school'] ?? false)) {
+            return true;
+        }
+
+        return $this->hasTag($coach['tags'] ?? [], $this->savedSchoolTag())
+            || collect($coach['tags'] ?? [])
+                ->map(fn ($tag): string => strtolower(trim((string) (is_array($tag) ? ($tag['tag'] ?? $tag['name'] ?? $tag['value'] ?? '') : $tag))))
+                ->contains(fn (string $tag): bool => str_contains($tag, 'saved school'));
     }
 
     protected function schoolEngagementScore(Collection $schoolCoaches): int

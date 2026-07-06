@@ -1733,6 +1733,13 @@ HTML;
                 'athlete_id' => $user->id,
                 'contact_id' => $contactId,
                 'ghl_contact_id' => $contactId,
+                'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+                'ghl_business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+                'coach_name' => $coach['name'] ?? null,
+                'coach_email' => $coach['email'] ?? null,
+                'school' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'school_name' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
                 'email_subject' => $personalizedSubject,
                 'source' => 'coach_database_campaign_email',
             ];
@@ -2951,8 +2958,22 @@ HTML;
         $stats = $this->stats ?? [];
         $schools = collect($this->allSchools());
 
-        $savedSchools = (int) (($stats['saved_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->count()) ?: 0);
-        $favoriteSchools = (int) (($stats['favorite_schools'] ?? $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count()) ?: 0);
+        $savedSchoolsFromRows = $schools->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school))->count();
+        $favoriteSchoolsFromRows = $schools->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school))->count();
+        $savedSchoolsFromLists = $this->schoolCountFromListLabels(['saved', 'saved schools']);
+        $favoriteSchoolsFromLists = $this->schoolCountFromListLabels(['favorite', 'favorites', 'favorite schools']);
+
+        $savedSchools = max(
+            (int) (($stats['saved_schools'] ?? 0) ?: 0),
+            $savedSchoolsFromRows,
+            $savedSchoolsFromLists,
+        );
+
+        $favoriteSchools = max(
+            (int) (($stats['favorite_schools'] ?? 0) ?: 0),
+            $favoriteSchoolsFromRows,
+            $favoriteSchoolsFromLists,
+        );
 
         $trackedWebsiteViews = (int) ($stats['view_profile_website'] ?? $stats['website_clicks'] ?? 0);
         $trackedInstagramViews = (int) ($stats['view_profile_instagram'] ?? $stats['instagram_clicks'] ?? 0);
@@ -3458,18 +3479,99 @@ HTML;
     public function getFilteredCoachesProperty(): array { return $this->filteredCoachesQuery()->take($this->coachDisplayLimit)->values()->all(); }
     public function getFilteredCoachesCountProperty(): int { return $this->filteredCoachesQuery()->count(); }
     public function getCanLoadMoreCoachesProperty(): bool { return $this->filteredCoachesCount > count($this->filteredCoaches); }
-    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all(); }
+    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all(); }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
     public function getSavedSchoolsProperty(): array
     {
-        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all();
+        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all();
     }
 
     public function getSavedCoachesProperty(): array
     {
         return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_saved_coach'] ?? false))->take(120)->values()->all();
+    }
+
+    protected function schoolRowHasFavoriteFlag(array $school): bool
+    {
+        if ((bool) ($school['is_favorite'] ?? false) || (bool) ($school['is_favorite_school'] ?? false)) {
+            return true;
+        }
+
+        $listKeys = collect($school['list_keys'] ?? [])
+            ->merge($school['lists'] ?? [])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter();
+
+        if ($listKeys->contains(fn (string $key): bool => str_contains($key, 'favorite'))) {
+            return true;
+        }
+
+        $tags = collect($school['tags'] ?? [])
+            ->map(fn ($tag): string => strtolower(trim((string) (is_array($tag) ? ($tag['tag'] ?? $tag['name'] ?? $tag['value'] ?? '') : $tag))))
+            ->filter();
+
+        return $tags->contains(strtolower(app(CoachDatabaseService::class)->favoriteSchoolTag()))
+            || $tags->contains(fn (string $tag): bool => str_contains($tag, 'favorite school'));
+    }
+
+    protected function schoolRowHasSavedFlag(array $school): bool
+    {
+        if ((bool) ($school['is_saved'] ?? false) || (bool) ($school['is_saved_school'] ?? false)) {
+            return true;
+        }
+
+        $listKeys = collect($school['list_keys'] ?? [])
+            ->merge($school['lists'] ?? [])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter();
+
+        if ($listKeys->contains(fn (string $key): bool => str_contains($key, 'saved'))) {
+            return true;
+        }
+
+        $tags = collect($school['tags'] ?? [])
+            ->map(fn ($tag): string => strtolower(trim((string) (is_array($tag) ? ($tag['tag'] ?? $tag['name'] ?? $tag['value'] ?? '') : $tag))))
+            ->filter();
+
+        return $tags->contains(strtolower(app(CoachDatabaseService::class)->savedSchoolTag()))
+            || $tags->contains(fn (string $tag): bool => str_contains($tag, 'saved school'));
+    }
+
+    protected function schoolCountFromListLabels(array $needles): int
+    {
+        $needles = collect($needles)
+            ->map(fn (string $needle): string => strtolower(trim($needle)))
+            ->filter()
+            ->values();
+
+        if ($needles->isEmpty()) {
+            return 0;
+        }
+
+        return collect($this->lists ?? [])
+            ->filter(function (array $list) use ($needles): bool {
+                $haystack = strtolower(trim(implode(' ', array_filter([
+                    $list['key'] ?? null,
+                    $list['label'] ?? null,
+                    $list['tag'] ?? null,
+                ], fn ($value): bool => is_scalar($value) && trim((string) $value) !== ''))));
+
+                return $needles->contains(fn (string $needle): bool => str_contains($haystack, $needle));
+            })
+            ->sum(function (array $list): int {
+                $schools = $list['schools'] ?? [];
+
+                if (is_array($schools) && count($schools) > 0) {
+                    return collect($schools)
+                        ->filter(fn ($school): bool => is_array($school) && filled($school['id'] ?? $school['name'] ?? null))
+                        ->unique(fn (array $school): string => strtolower(trim((string) ($school['id'] ?? $school['name'] ?? ''))))
+                        ->count();
+                }
+
+                return (int) (($list['schools_count'] ?? 0) ?: 0);
+            });
     }
 
     protected function filterSchoolsForSearch(Collection $schools, string $query): Collection

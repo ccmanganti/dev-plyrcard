@@ -26,6 +26,23 @@ class TrackingController extends Controller
         return redirect()->away($destination);
     }
 
+    public function profile(string $token, Request $request, TrackingLinkRewriter $rewriter, GoHighLevelService $goHighLevelService): RedirectResponse
+    {
+        $payload = $this->safeDecode($rewriter, $token);
+        $destination = trim((string) ($payload['destination_url'] ?? ''));
+
+        if ($destination === '' || ! preg_match('/^https?:\/\//i', $destination)) {
+            abort(404);
+        }
+
+        $payload['event_type'] = 'profile_view';
+        $payload['source'] = $payload['source'] ?? 'profile_tracking_link';
+
+        $this->track($payload, $request, $rewriter, $goHighLevelService, 'profile_view');
+
+        return redirect()->away($destination);
+    }
+
     public function open(string $token, Request $request, TrackingLinkRewriter $rewriter, GoHighLevelService $goHighLevelService): Response
     {
         $payload = $this->safeDecode($rewriter, $token);
@@ -62,20 +79,34 @@ class TrackingController extends Controller
         $eventType = (string) ($payload['event_type'] ?? $fallbackEventType);
 
         try {
+            $metadata = [
+                'contact_id' => $contactId,
+                'ghl_contact_id' => $contactId,
+                'business_id' => $payload['business_id'] ?? $payload['ghl_business_id'] ?? $payload['company_id'] ?? null,
+                'ghl_business_id' => $payload['ghl_business_id'] ?? $payload['business_id'] ?? $payload['company_id'] ?? null,
+                'coach_name' => $payload['coach_name'] ?? $payload['contact_name'] ?? null,
+                'coach_email' => $payload['coach_email'] ?? $payload['contact_email'] ?? null,
+                'school' => $payload['school'] ?? $payload['school_name'] ?? $payload['company_name'] ?? null,
+                'school_name' => $payload['school_name'] ?? $payload['school'] ?? $payload['company_name'] ?? null,
+                'school_logo_url' => $payload['school_logo_url'] ?? $payload['business_logo_url'] ?? $payload['logo_url'] ?? null,
+                'destination_url' => $destination,
+                'source' => $payload['source'] ?? 'tracked_link',
+                'subject' => $payload['email_subject'] ?? null,
+                'email_subject' => $payload['email_subject'] ?? null,
+                'host' => $request->getHost(),
+                'full_url' => $request->fullUrl(),
+                'referrer' => $request->headers->get('referer'),
+                'ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 500),
+                'occurred_at' => now()->toIso8601String(),
+            ];
+
             $result = $goHighLevelService->trackRecruitingEventForUser(
                 user: $user,
                 contactId: $contactId,
                 platform: $platform ?: 'website',
                 eventType: $eventType,
-                metadata: [
-                    'destination_url' => $destination,
-                    'source' => $payload['source'] ?? 'tracked_link',
-                    'subject' => $payload['email_subject'] ?? null,
-                    'host' => $request->getHost(),
-                    'full_url' => $request->fullUrl(),
-                    'ip' => $request->ip(),
-                    'user_agent' => substr((string) $request->userAgent(), 0, 500),
-                ],
+                metadata: array_filter($metadata, fn ($value): bool => ! is_null($value) && $value !== ''),
             );
 
             Log::info('Recruiting tracking processed.', [

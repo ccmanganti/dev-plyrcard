@@ -58,6 +58,10 @@ class TrackingLinkRewriter
             return $destinationUrl;
         }
 
+        if (($context['event_type'] ?? null) === 'profile_view' || $this->isProfileDestinationUrl($destinationUrl, $context)) {
+            return $this->trackedProfileUrl($destinationUrl, $context);
+        }
+
         $payload = array_merge($context, [
             'event_type' => $context['event_type'] ?? 'link_click',
             'platform' => $context['platform'] ?? $this->detectPlatform($destinationUrl),
@@ -65,6 +69,29 @@ class TrackingLinkRewriter
         ]);
 
         return rtrim($this->trackingBaseUrl(), '/') . '/track/click/' . $this->makeToken($payload);
+    }
+
+    public function trackedProfileUrl(string $profileUrl, array $context = []): string
+    {
+        $profileUrl = trim($profileUrl);
+
+        if ($profileUrl === '' || $this->shouldSkipUrl($profileUrl)) {
+            return $profileUrl;
+        }
+
+        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        if ($contactId === '') {
+            return $profileUrl;
+        }
+
+        $payload = array_merge($context, [
+            'event_type' => 'profile_view',
+            'platform' => $context['platform'] ?? $this->detectPlatform($profileUrl),
+            'source' => $context['source'] ?? 'profile_tracking_link',
+            'destination_url' => $profileUrl,
+        ]);
+
+        return rtrim($this->trackingBaseUrl(), '/') . '/track/profile/' . $this->makeToken($payload);
     }
 
 
@@ -129,6 +156,25 @@ class TrackingLinkRewriter
     public function decodeToken(string $token): array
     {
         $token = trim($token);
+
+        if (str_contains($token, '.')) {
+            [$encodedPayload, $signature] = array_pad(explode('.', $token, 2), 2, '');
+            $secret = $this->trackingSharedSecret();
+
+            if ($secret !== '' && $encodedPayload !== '' && $signature !== '') {
+                $expected = hash_hmac('sha256', $encodedPayload, $secret);
+
+                if (hash_equals($expected, $signature)) {
+                    $json = $this->base64UrlDecode($encodedPayload);
+                    $payload = json_decode($json, true);
+
+                    return is_array($payload) ? $payload : [];
+                }
+            }
+
+            return [];
+        }
+
         $padded = strtr($token, '-_', '+/');
         $padded .= str_repeat('=', (4 - strlen($padded) % 4) % 4);
 
@@ -283,7 +329,7 @@ class TrackingLinkRewriter
             return true;
         }
 
-        if (str_contains($lower, '/track/click/') || str_contains($lower, '/track/open/')) {
+        if (str_contains($lower, '/track/click/') || str_contains($lower, '/track/open/') || str_contains($lower, '/track/profile/')) {
             return true;
         }
 
@@ -297,9 +343,83 @@ class TrackingLinkRewriter
             'tracking_host' => request()?->getHost(),
         ], $payload);
 
-        $encrypted = Crypt::encryptString(json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $secret = $this->trackingSharedSecret();
+
+        if ($secret !== '') {
+            $encodedPayload = $this->base64UrlEncode($json);
+            return $encodedPayload . '.' . hash_hmac('sha256', $encodedPayload, $secret);
+        }
+
+        $encrypted = Crypt::encryptString($json);
 
         return rtrim(strtr(base64_encode($encrypted), '+/', '-_'), '=');
+    }
+
+
+    protected function isProfileDestinationUrl(string $url, array $context = []): bool
+    {
+        if (empty($context['athlete_id']) && empty($context['profile_url']) && empty($context['public_profile_url']) && empty($context['athlete_profile_url']) && empty($context['plyrcard_url'])) {
+            return false;
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+
+        if ($host === '') {
+            return false;
+        }
+
+        $knownHosts = collect([
+            parse_url((string) config('app.url'), PHP_URL_HOST),
+            parse_url((string) config('services.tracking.base_url'), PHP_URL_HOST),
+            parse_url((string) env('PLYRCARD_TRACKING_BASE_URL'), PHP_URL_HOST),
+            parse_url((string) env('TRACKING_BASE_URL'), PHP_URL_HOST),
+            'plyrcard.com',
+            'dev.plyrcard.com',
+        ])->filter()->map(fn ($value): string => preg_replace('/^www\./', '', strtolower((string) $value)))->unique()->all();
+
+        $host = preg_replace('/^www\./', '', $host) ?: $host;
+
+        if (! in_array($host, $knownHosts, true)) {
+            return false;
+        }
+
+        if (str_contains($path, '/track/')) {
+            return false;
+        }
+
+        foreach (['profile_url', 'public_profile_url', 'athlete_profile_url', 'plyrcard_url', 'website_url'] as $key) {
+            $profileUrl = trim((string) ($context[$key] ?? ''));
+            if ($profileUrl !== '' && rtrim($profileUrl, '/') === rtrim($url, '/')) {
+                return true;
+            }
+        }
+
+        return $path !== '' && ! str_contains($path, '/admin');
+    }
+
+    protected function trackingSharedSecret(): string
+    {
+        return trim((string) (
+            config('services.tracking.shared_secret')
+            ?: config('app.tracking_shared_secret')
+            ?: env('PLYRCARD_TRACKING_TOKEN_SECRET')
+            ?: env('TRACKING_TOKEN_SECRET')
+        ));
+    }
+
+    protected function base64UrlEncode(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    protected function base64UrlDecode(string $value): string
+    {
+        $padded = strtr($value, '-_', '+/');
+        $padded .= str_repeat('=', (4 - strlen($padded) % 4) % 4);
+
+        return (string) base64_decode($padded, true);
     }
 
     protected function trackingBaseUrl(): string
@@ -307,6 +427,7 @@ class TrackingLinkRewriter
         return rtrim((string) (
             config('services.tracking.base_url')
             ?: config('app.tracking_base_url')
+            ?: env('PLYRCARD_TRACKING_BASE_URL')
             ?: env('TRACKING_BASE_URL')
             ?: config('app.url')
             ?: request()?->getSchemeAndHttpHost()
