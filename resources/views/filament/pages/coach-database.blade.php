@@ -2776,7 +2776,8 @@
             color: #0f172a;
         }
         .dark .rc-radar-card { border-color: rgba(148,163,184,.16); background: rgba(17,24,39,.72); color: #fff; }
-        .rc-radar-logo { height: 5.25rem; display: grid; place-items: center; background: #f3f4f6; color: #0f172a; font-weight: 950; font-size: 1.15rem; }
+        .rc-radar-logo { height: 5.25rem; display: flex; align-items: center; justify-content: center; background: #fff; color: #0f172a; font-weight: 950; font-size: 1.15rem; overflow: hidden; padding: .75rem; box-sizing: border-box; }
+        .rc-radar-logo img { width: auto !important; height: auto !important; max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; object-position: center; display: block; padding: 0 !important; }
         .dark .rc-radar-logo { background: #fff; color: #111827; }
         .rc-radar-card strong, .rc-radar-card small, .rc-radar-card em { margin-inline: .8rem; }
         .rc-radar-card strong { font-size: .84rem; line-height: 1.15; }
@@ -3274,26 +3275,30 @@
 
         .rc-radar-logo-v2 {
             height: 5.25rem;
-            display: grid;
-            place-items: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: #ffffff;
             color: #111827;
             font-weight: 950;
             font-size: 1.15rem;
             overflow: hidden;
             border-bottom: 1px solid #eef2f7;
+            padding: .75rem;
+            box-sizing: border-box;
         }
 
         .rc-radar-logo-v2 img {
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
+            width: auto !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
             display: block;
-            object-fit: contain;
+            object-fit: contain !important;
             object-position: center;
-            padding: .75rem;
+            padding: 0 !important;
             box-sizing: border-box;
+            flex: 0 1 auto;
         }
 
         .rc-radar-card-v2 strong,
@@ -4605,6 +4610,58 @@
                 min-width: 0;
             }
         }
+
+
+        /* v9 header/search refinements. Keeps the dashboard top tighter and prevents the search from dominating the header. */
+        .rc-home-dashboard-v2 {
+            padding-top: 0 !important;
+            margin-top: -1rem !important;
+        }
+
+        .rc-home-header-v2 {
+            margin-top: -.35rem !important;
+            margin-bottom: .85rem !important;
+            grid-template-columns: minmax(0, 1fr) minmax(28rem, 39rem) !important;
+        }
+
+        .rc-home-actions-v2 {
+            max-width: 39rem !important;
+            grid-template-columns: minmax(22rem, 33rem) 3rem 3rem !important;
+            gap: .65rem !important;
+        }
+
+        .rc-home-search-v2,
+        .rc-global-search-shell {
+            max-width: 33rem !important;
+        }
+
+        .rc-global-suggestions {
+            z-index: 95 !important;
+        }
+
+        @media (max-width: 1180px) {
+            .rc-home-dashboard-v2 {
+                margin-top: -.35rem !important;
+            }
+
+            .rc-home-header-v2 {
+                grid-template-columns: 1fr !important;
+                row-gap: .85rem !important;
+            }
+
+            .rc-home-actions-v2 {
+                justify-self: stretch !important;
+                width: 100% !important;
+                max-width: none !important;
+                grid-template-columns: minmax(0, 1fr) 3rem 3rem !important;
+            }
+
+            .rc-home-search-v2,
+            .rc-global-search-shell {
+                max-width: none !important;
+            }
+        }
+
 </style>
 
     @php
@@ -5857,7 +5914,59 @@
                 @media (max-width:1400px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
                 @media (max-width:1100px) { .rc-discover-filter-row { grid-template-columns:1fr; } .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
                 @media (max-width:700px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:1fr; } }
-            </style>
+            
+
+        /* v9 header/search refinements. Keeps the dashboard top tighter and prevents the search from dominating the header. */
+        .rc-home-dashboard-v2 {
+            padding-top: 0 !important;
+            margin-top: -1rem !important;
+        }
+
+        .rc-home-header-v2 {
+            margin-top: -.35rem !important;
+            margin-bottom: .85rem !important;
+            grid-template-columns: minmax(0, 1fr) minmax(28rem, 39rem) !important;
+        }
+
+        .rc-home-actions-v2 {
+            max-width: 39rem !important;
+            grid-template-columns: minmax(22rem, 33rem) 3rem 3rem !important;
+            gap: .65rem !important;
+        }
+
+        .rc-home-search-v2,
+        .rc-global-search-shell {
+            max-width: 33rem !important;
+        }
+
+        .rc-global-suggestions {
+            z-index: 95 !important;
+        }
+
+        @media (max-width: 1180px) {
+            .rc-home-dashboard-v2 {
+                margin-top: -.35rem !important;
+            }
+
+            .rc-home-header-v2 {
+                grid-template-columns: 1fr !important;
+                row-gap: .85rem !important;
+            }
+
+            .rc-home-actions-v2 {
+                justify-self: stretch !important;
+                width: 100% !important;
+                max-width: none !important;
+                grid-template-columns: minmax(0, 1fr) 3rem 3rem !important;
+            }
+
+            .rc-home-search-v2,
+            .rc-global-search-shell {
+                max-width: none !important;
+            }
+        }
+
+</style>
 
             <div class="rc-discover-schools-page">
                 <div class="rc-page-heading" style="margin-bottom:0;">

@@ -3321,28 +3321,96 @@ HTML;
 
     protected function jumpToSchoolSearchResult(string $value, string $id = ''): void
     {
+        $school = $this->resolveSchoolSearchTarget($value, $id);
+        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $id);
+
         $this->section = 'schools';
-        $this->search = $value;
+        $this->search = '';
         $this->coachSearch = '';
         $this->divisionFilter = '';
         $this->conferenceFilter = '';
         $this->schoolDisplayLimit = 24;
 
-        if ($id !== '') {
-            $this->selectedSchoolId = $id;
-            $this->loadSchoolCoachesById($id);
+        if ($schoolId !== '') {
+            $this->openSchoolDashboardModal($schoolId);
         }
     }
 
     protected function jumpToCoachSearchResult(string $value, string $id = ''): void
     {
-        $this->section = 'coaches';
-        $this->search = $value;
-        $this->coachSearch = $value;
+        $coach = $this->resolveCoachSearchTarget($value, $id);
+        $school = is_array($coach) ? $this->resolveSchoolForCoachSearchTarget($coach) : null;
+        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? '');
+
+        $this->section = 'schools';
+        $this->search = '';
+        $this->coachSearch = '';
         $this->divisionFilter = '';
         $this->conferenceFilter = '';
         $this->coachDisplayLimit = 40;
-        $this->selectedCoachId = $id !== '' ? $id : null;
+        $this->selectedCoachId = (string) ($coach['id'] ?? $id ?: '') ?: null;
+
+        if ($schoolId !== '') {
+            $this->openSchoolDashboardModal($schoolId);
+        }
+    }
+
+    protected function resolveCoachSearchTarget(string $value, string $id = ''): ?array
+    {
+        $normalizedValue = $this->normalizeSearchText($value);
+
+        return collect($this->allCoaches())->first(function (array $coach) use ($id, $normalizedValue): bool {
+            if ($id !== '' && (string) ($coach['id'] ?? '') === $id) {
+                return true;
+            }
+
+            if ($normalizedValue === '') {
+                return false;
+            }
+
+            return str_contains($this->normalizeSearchText([
+                $coach['name'] ?? '',
+                $coach['email'] ?? '',
+                $coach['phone'] ?? '',
+                $coach['school'] ?? '',
+            ]), $normalizedValue);
+        });
+    }
+
+    protected function resolveSchoolSearchTarget(string $value, string $id = ''): ?array
+    {
+        $normalizedValue = $this->normalizeSearchText($value);
+
+        return collect($this->allSchools())->first(function (array $school) use ($id, $normalizedValue): bool {
+            if ($id !== '' && in_array($id, [(string) ($school['id'] ?? ''), (string) ($school['business_id'] ?? '')], true)) {
+                return true;
+            }
+
+            if ($normalizedValue === '') {
+                return false;
+            }
+
+            return str_contains($this->schoolSearchHaystack($school), $normalizedValue);
+        });
+    }
+
+    protected function resolveSchoolForCoachSearchTarget(array $coach): ?array
+    {
+        $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['companyId'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''));
+        $normalizedSchoolName = $this->normalizeSearchText($schoolName);
+
+        return collect($this->allSchools())->first(function (array $school) use ($businessId, $normalizedSchoolName): bool {
+            if ($businessId !== '' && in_array($businessId, [(string) ($school['business_id'] ?? ''), (string) ($school['id'] ?? '')], true)) {
+                return true;
+            }
+
+            if ($normalizedSchoolName === '') {
+                return false;
+            }
+
+            return $this->normalizeSearchText($school['name'] ?? '') === $normalizedSchoolName;
+        });
     }
 
     protected function jumpToConferenceSearchResult(string $value): void
