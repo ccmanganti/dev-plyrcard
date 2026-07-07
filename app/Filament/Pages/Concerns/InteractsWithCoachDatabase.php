@@ -57,6 +57,7 @@ trait InteractsWithCoachDatabase
     public string $sort = 'name';
     public string $schoolViewMode = 'grid';
     public string $newListName = '';
+    public bool $showNewListComposer = false;
     public string $selectedListKey = '';
 
     public int $schoolDisplayLimit = 24;
@@ -100,6 +101,7 @@ trait InteractsWithCoachDatabase
     public string $campaignOriginalHtml = '';
     public bool $campaignTemplateIsDesign = false;
     public array $campaignEditableBlocks = [];
+    public array $selectedSchoolIds = [];
     public string $campaignTargetMode = 'coaches';
     public string $campaignCoachSearch = '';
     public array $campaignCoachIds = [];
@@ -687,6 +689,7 @@ trait InteractsWithCoachDatabase
         $this->selectedListKey = 'custom:' . $key;
         $this->rebuildAndStoreSnapshot($snapshot);
         $this->newListName = '';
+        $this->showNewListComposer = false;
         Notification::make()->title('Recruiting Center')->body('List created. Add a school or coach to save it to recruiting contacts.')->success()->send();
     }
 
@@ -699,6 +702,52 @@ trait InteractsWithCoachDatabase
     public function clearSelectedList(): void
     {
         $this->selectedListKey = '';
+    }
+
+    public function startAddingSchoolsToList(string $listKey): void
+    {
+        $listKey = trim($listKey);
+        if ($listKey === '') {
+            return;
+        }
+
+        $this->selectedListKey = $listKey;
+        $this->section = 'schools';
+
+        Notification::make()
+            ->title('My Lists')
+            ->body('Choose schools in Discover Schools, then use Add to List to save them.')
+            ->success()
+            ->send();
+    }
+
+    public function deleteCustomList(string $listKey): void
+    {
+        $listKey = trim($listKey);
+        if ($listKey === '') {
+            return;
+        }
+
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $custom = collect($snapshot['custom_list_tags'] ?? []);
+        $normalizedKey = str_starts_with($listKey, 'custom:') ? substr($listKey, 7) : $listKey;
+
+        $custom->forget($listKey);
+        $custom->forget($normalizedKey);
+
+        $snapshot['custom_list_tags'] = $custom->all();
+
+        if ($this->selectedListKey === $listKey || $this->selectedListKey === $normalizedKey) {
+            $this->selectedListKey = '';
+        }
+
+        $this->rebuildAndStoreSnapshot($snapshot);
+
+        Notification::make()
+            ->title('My Lists')
+            ->body('List removed. Existing GHL contact tags are left untouched.')
+            ->success()
+            ->send();
     }
 
     public function selectSchoolById(string $schoolId): void
@@ -3959,12 +4008,301 @@ HTML;
         $this->listSchoolSearch = '';
     }
 
-    public function getFilteredSchoolsProperty(): array { return $this->filteredSchoolsQuery()->take($this->schoolDisplayLimit)->values()->all(); }
+    public function getFilteredSchoolsProperty(): array
+    {
+        return $this->filteredSchoolsQuery()
+            ->take($this->schoolDisplayLimit)
+            ->map(fn (array $school): array => $this->hydrateSchoolRowForDisplay($school))
+            ->values()
+            ->all();
+    }
     public function getFilteredSchoolsCountProperty(): int { return $this->filteredSchoolsQuery()->count(); }
     public function getCanLoadMoreSchoolsProperty(): bool { return $this->filteredSchoolsCount > count($this->filteredSchools); }
     public function getFilteredCoachesProperty(): array { return $this->filteredCoachesQuery()->take($this->coachDisplayLimit)->values()->all(); }
     public function getFilteredCoachesCountProperty(): int { return $this->filteredCoachesQuery()->count(); }
     public function getCanLoadMoreCoachesProperty(): bool { return $this->filteredCoachesCount > count($this->filteredCoaches); }
+
+    protected function normalizeSchoolLogoCandidate(mixed $value): string
+    {
+        if (is_null($value)) {
+            return '';
+        }
+
+        if (is_array($value)) {
+            foreach (['url', 'value', 'src', 'link', 'mediaUrl', 'fileUrl', 'downloadUrl', 'thumbnailUrl'] as $key) {
+                if (array_key_exists($key, $value)) {
+                    $resolved = $this->normalizeSchoolLogoCandidate($value[$key]);
+                    if ($resolved !== '') {
+                        return $resolved;
+                    }
+                }
+            }
+
+            foreach ($value as $child) {
+                $resolved = $this->normalizeSchoolLogoCandidate($child);
+                if ($resolved !== '') {
+                    return $resolved;
+                }
+            }
+
+            return '';
+        }
+
+        if (! is_scalar($value)) {
+            return '';
+        }
+
+        $url = trim(html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $url = trim($url, " \t\n\r\0\x0B\"'");
+
+        if ($url === '') {
+            return '';
+        }
+
+        if (str_starts_with($url, '//')) {
+            return 'https:' . $url;
+        }
+
+        $lower = strtolower($url);
+        if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://')) {
+            return $url;
+        }
+
+        return '';
+    }
+
+    protected function logoUrlFromCustomFieldContainers(array $row): string
+    {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
+            $raw = data_get($row, $containerKey, []);
+
+            if (! is_array($raw)) {
+                continue;
+            }
+
+            foreach ($raw as $fieldKey => $fieldValue) {
+                $identifiers = [$fieldKey];
+
+                if (is_array($fieldValue)) {
+                    foreach (['id', '_id', 'key', 'name', 'label', 'fieldKey', 'field_key', 'customFieldId', 'custom_field_id', 'fieldId', 'field_id', 'mergeField', 'merge_field', 'placeholder', 'slug'] as $identifierKey) {
+                        $identifiers[] = $fieldValue[$identifierKey] ?? null;
+                    }
+                }
+
+                $isLogoField = collect($identifiers)->contains(fn ($identifier): bool => $this->looksLikeLogoIdentifier($identifier));
+                $url = $this->normalizeSchoolLogoCandidate($fieldValue);
+
+                if ($isLogoField && $url !== '') {
+                    return $url;
+                }
+            }
+        }
+
+        foreach (['contact', 'business', 'company', 'data', 'result'] as $nestedKey) {
+            $nested = data_get($row, $nestedKey);
+            if (is_array($nested)) {
+                $url = $this->logoUrlFromCustomFieldContainers($nested);
+                if ($url !== '') {
+                    return $url;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    protected function looksLikeLogoIdentifier(mixed $identifier): bool
+    {
+        if (! is_scalar($identifier)) {
+            return false;
+        }
+
+        $key = strtolower(trim((string) $identifier));
+        $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
+        $key = str_replace([' ', '-', '.', ':', '/', '\\'], '_', $key);
+
+        return $key === 'logo'
+            || $key === 'business_logo'
+            || $key === 'business_logo_url'
+            || $key === 'school_logo'
+            || $key === 'school_logo_url'
+            || $key === 'contact_school_logo'
+            || str_ends_with($key, '_logo')
+            || str_contains($key, 'school_logo')
+            || str_contains($key, 'business_logo');
+    }
+
+    protected function logoUrlForSchoolRow(array $school): string
+    {
+        $candidates = [
+            $school['logo_url'] ?? null,
+            $school['school_logo_url'] ?? null,
+            $school['business_logo_url'] ?? null,
+            $school['logo'] ?? null,
+            $school['school_logo'] ?? null,
+            $school['business_logo'] ?? null,
+            $school['business.logo'] ?? null,
+            $school['contact.school_logo'] ?? null,
+            data_get($school, 'business.logo'),
+            data_get($school, 'business.logo_url'),
+            data_get($school, 'business.school_logo'),
+            data_get($school, 'contact.school_logo'),
+            data_get($school, 'customFields.logo'),
+            data_get($school, 'customFields.business.logo'),
+            data_get($school, 'customFields.school_logo'),
+            data_get($school, 'custom_fields.logo'),
+            data_get($school, 'custom_fields.business.logo'),
+            data_get($school, 'custom_fields.school_logo'),
+            data_get($school, 'customFieldValues.logo'),
+            data_get($school, 'customFieldValues.business.logo'),
+            data_get($school, 'customFieldValues.school_logo'),
+            data_get($school, 'head_coach.logo_url'),
+            data_get($school, 'head_coach.school_logo_url'),
+            data_get($school, 'head_coach.business_logo_url'),
+            data_get($school, 'head_coach.logo'),
+            data_get($school, 'head_coach.school_logo'),
+            data_get($school, 'head_coach.business.logo'),
+            data_get($school, 'head_coach.contact.school_logo'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $url = $this->normalizeSchoolLogoCandidate($candidate);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        $url = $this->logoUrlFromCustomFieldContainers($school);
+        if ($url !== '') {
+            return $url;
+        }
+
+        foreach (($school['coaches'] ?? []) as $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+
+            $url = $this->logoUrlForCoachRow($coach);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        return '';
+    }
+
+    protected function logoUrlForCoachRow(array $coach): string
+    {
+        foreach ([
+            $coach['logo_url'] ?? null,
+            $coach['school_logo_url'] ?? null,
+            $coach['business_logo_url'] ?? null,
+            $coach['logo'] ?? null,
+            $coach['school_logo'] ?? null,
+            $coach['business_logo'] ?? null,
+            $coach['business.logo'] ?? null,
+            $coach['contact.school_logo'] ?? null,
+            data_get($coach, 'business.logo'),
+            data_get($coach, 'contact.school_logo'),
+            data_get($coach, 'customFields.logo'),
+            data_get($coach, 'customFields.business.logo'),
+            data_get($coach, 'customFields.school_logo'),
+            data_get($coach, 'custom_fields.logo'),
+            data_get($coach, 'custom_fields.business.logo'),
+            data_get($coach, 'custom_fields.school_logo'),
+            data_get($coach, 'customFieldValues.logo'),
+            data_get($coach, 'customFieldValues.business.logo'),
+            data_get($coach, 'customFieldValues.school_logo'),
+        ] as $candidate) {
+            $url = $this->normalizeSchoolLogoCandidate($candidate);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        $url = $this->logoUrlFromCustomFieldContainers($coach);
+        if ($url !== '') {
+            return $url;
+        }
+
+        return '';
+    }
+
+    protected function logoUrlFromDashboardSchoolReference(array $school): string
+    {
+        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
+        $schoolNameKey = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+
+        $candidateRows = collect($this->topSchools ?? [])
+            ->merge($this->dashboardTopEngagedSchools ?? [])
+            ->merge($this->allSchools())
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+
+        foreach ($candidateRows as $row) {
+            $rowBusinessId = trim((string) ($row['business_id'] ?? $row['id'] ?? ''));
+            $rowNameKey = $this->normalizeSchoolMatchKey((string) ($row['name'] ?? ''));
+
+            $matchesBusiness = $businessId !== '' && $rowBusinessId !== '' && $businessId === $rowBusinessId;
+            $matchesName = $schoolNameKey !== '' && $rowNameKey !== '' && $schoolNameKey === $rowNameKey;
+
+            if (! $matchesBusiness && ! $matchesName) {
+                continue;
+            }
+
+            $url = $this->logoUrlForSchoolRow($row);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        // Last fallback: pull directly from any coach/contact row for the same school.
+        foreach ($this->coachesForSchoolSearch($school) as $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+
+            $url = $this->logoUrlForCoachRow($coach);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        return '';
+    }
+
+    protected function hydrateSchoolRowForDisplay(array $school): array
+    {
+        $coaches = $this->coachesForSchoolSearch($school);
+        if (! empty($coaches)) {
+            $school['coaches'] = $coaches;
+        }
+
+        $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
+        if (blank($headCoach['name'] ?? null) && ! empty($coaches)) {
+            $headCoach = collect($coaches)->first(function (array $coach): bool {
+                return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
+            }) ?: ($coaches[0] ?? []);
+            if (is_array($headCoach)) {
+                $school['head_coach'] = $headCoach;
+            }
+        }
+
+        $logoUrl = $this->logoUrlForSchoolRow($school);
+
+        if ($logoUrl === '') {
+            $logoUrl = $this->logoUrlFromDashboardSchoolReference($school);
+        }
+
+        if ($logoUrl !== '') {
+            $school['logo_url'] = $logoUrl;
+            $school['school_logo_url'] = $school['school_logo_url'] ?? $logoUrl;
+            $school['business_logo_url'] = $school['business_logo_url'] ?? $logoUrl;
+        }
+
+        return $school;
+    }
+
     public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all(); }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
@@ -4631,8 +4969,32 @@ HTML;
         return $school;
     }
 
-    public function getDivisionsProperty(): array { return collect($this->allSchools())->pluck('division')->filter()->unique()->sort()->values()->all(); }
-    public function getConferencesProperty(): array { return collect($this->allSchools())->pluck('conference')->filter()->unique()->sort()->values()->all(); }
+    public function getDivisionsProperty(): array
+    {
+        return collect($this->allSchools())
+            ->pluck('division')
+            ->filter()
+            ->unique(fn ($division): string => $this->normalizeDivisionValue($division) ?: strtolower(trim((string) $division)))
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function getConferencesProperty(): array
+    {
+        $divisionFilter = trim((string) $this->divisionFilter);
+
+        return collect($this->allSchools())
+            ->filter(function (array $school) use ($divisionFilter): bool {
+                return $divisionFilter === '' || $this->divisionMatches($school['division'] ?? '', $divisionFilter);
+            })
+            ->pluck('conference')
+            ->filter()
+            ->unique(fn ($conference): string => strtolower(trim((string) $conference)))
+            ->sort()
+            ->values()
+            ->all();
+    }
 
     public function clearSchoolFilters(): void
     {
@@ -4642,9 +5004,137 @@ HTML;
         $this->sort = 'name';
     }
 
+
+    public function toggleSchoolSelection(string $schoolId): void
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return;
+        }
+
+        $ids = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => (string) $id)
+            ->filter()
+            ->values();
+
+        if ($ids->contains($schoolId)) {
+            $this->selectedSchoolIds = $ids->reject(fn (string $id): bool => $id === $schoolId)->values()->all();
+            return;
+        }
+
+        $this->selectedSchoolIds = $ids->push($schoolId)->unique()->values()->all();
+    }
+
+    public function clearSelectedSchools(): void
+    {
+        $this->selectedSchoolIds = [];
+    }
+
+    public function toggleVisibleSchoolsSelection(): void
+    {
+        $visibleIds = collect($this->filteredSchools)
+            ->map(fn (array $school): string => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))))
+            ->filter()
+            ->values();
+
+        if ($visibleIds->isEmpty()) {
+            return;
+        }
+
+        $current = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => (string) $id)
+            ->filter()
+            ->values();
+
+        $allVisibleSelected = $visibleIds->every(fn (string $id): bool => $current->contains($id));
+
+        if ($allVisibleSelected) {
+            $this->selectedSchoolIds = $current
+                ->reject(fn (string $id): bool => $visibleIds->contains($id))
+                ->values()
+                ->all();
+            return;
+        }
+
+        $this->selectedSchoolIds = $current
+            ->merge($visibleIds)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function getSelectedSchoolCountProperty(): int
+    {
+        return collect($this->selectedSchoolIds)->filter()->unique()->count();
+    }
+
+    public function getVisibleSchoolsSelectedProperty(): bool
+    {
+        $visibleIds = collect($this->filteredSchools)
+            ->map(fn (array $school): string => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))))
+            ->filter()
+            ->values();
+
+        if ($visibleIds->isEmpty()) {
+            return false;
+        }
+
+        $current = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => (string) $id)
+            ->filter();
+
+        return $visibleIds->every(fn (string $id): bool => $current->contains($id));
+    }
+
+    public function emailSelectedSchools(): void
+    {
+        $selectedIds = collect($this->selectedSchoolIds)->filter()->unique()->values();
+
+        if ($selectedIds->isEmpty()) {
+            Notification::make()->title('Recruiting Center')->body('Select at least one school first.')->danger()->send();
+            return;
+        }
+
+        $schools = collect($this->allSchools())
+            ->filter(function (array $school) use ($selectedIds): bool {
+                $id = (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? '')))));
+                return $selectedIds->contains($id);
+            })
+            ->values();
+
+        $coachIds = $schools
+            ->flatMap(fn (array $school): array => $this->contactIdsForSchool((string) ($school['id'] ?? $school['business_id'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->campaignCoachIds = $coachIds;
+        $this->campaignTargetMode = 'coaches';
+        $this->section = 'compose';
+
+        Notification::make()->title('Recruiting Center')->body('Selected schools were added to Compose Email.')->success()->send();
+    }
+
+    public function addSelectedSchoolsToList(string $listKey): void
+    {
+        $listKey = trim($listKey);
+        if ($listKey === '') {
+            return;
+        }
+
+        foreach (collect($this->selectedSchoolIds)->filter()->unique()->values() as $schoolId) {
+            $this->addSchoolToListById((string) $schoolId, $listKey);
+        }
+
+        Notification::make()->title('Recruiting Center')->body('Selected schools were added to the list.')->success()->send();
+    }
+
     public function setDivisionFilter(string $division): void
     {
         $this->divisionFilter = $this->divisionFilter === $division ? '' : $division;
+        $this->conferenceFilter = '';
+        $this->schoolDisplayLimit = 24;
     }
 
     public function setSchoolViewMode(string $mode): void
@@ -4832,14 +5322,15 @@ HTML;
     {
         $keys = [];
         $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-        $schoolName = strtolower(trim((string) ($school['name'] ?? '')));
+        $schoolName = trim((string) ($school['name'] ?? ''));
+        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
 
         if ($businessId !== '') {
             $keys[] = 'business:' . $businessId;
         }
 
         if ($schoolName !== '') {
-            $keys[] = 'school:' . $schoolName;
+            $keys[] = 'school:' . strtolower($schoolName);
         }
 
         $index = $this->schoolCoachSearchIndex();
@@ -4851,7 +5342,38 @@ HTML;
             }
         }
 
+        // Fallback: GHL business names and contact company names are not always
+        // identical, so exact indexing can miss the coaches that contain the
+        // contact.school_logo URL. Match by a normalized school name too.
+        if (empty($coaches) && $normalizedSchoolName !== '') {
+            foreach ($this->allCoaches() as $coach) {
+                if (! is_array($coach)) {
+                    continue;
+                }
+
+                $coachSchoolKey = $this->normalizeSchoolMatchKey((string) ($coach['school'] ?? $coach['company_name'] ?? $coach['school_or_company'] ?? ''));
+
+                if ($coachSchoolKey === '' || $coachSchoolKey !== $normalizedSchoolName) {
+                    continue;
+                }
+
+                $coachId = (string) ($coach['id'] ?? md5(json_encode($coach)));
+                $coaches[$coachId] = $coach;
+            }
+        }
+
         return array_values($coaches);
+    }
+
+    protected function normalizeSchoolMatchKey(string $value): string
+    {
+        $value = strtolower(trim($value));
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = preg_replace('/\b(the|university|college|school|of|at)\b/i', ' ', $value) ?: $value;
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?: $value;
+        $value = preg_replace('/\s+/', ' ', $value) ?: $value;
+
+        return trim($value);
     }
 
     protected function listTokensForSchool(array $school): array

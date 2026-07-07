@@ -42,7 +42,7 @@
 
         .rc-title {
             font-size: 1.125rem;
-            font-weight: 700;
+            font-weight: 500;
             letter-spacing: -.02em;
             line-height: 1.2;
         }
@@ -70,7 +70,7 @@
 
         .rc-stat-number {
             font-size: 1.35rem;
-            font-weight: 700;
+            font-weight: 500;
             letter-spacing: -.025em;
             line-height: 1;
         }
@@ -215,7 +215,7 @@
         .rc-coach-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
-            gap: .75rem;
+            gap: .6rem;
             align-items: center;
             padding: .72rem .78rem;
             border: 1px solid var(--rc-border);
@@ -232,7 +232,7 @@
         .rc-coach-main {
             display: grid;
             grid-template-columns: 2.35rem minmax(0, 1fr);
-            gap: .75rem;
+            gap: .6rem;
             align-items: center;
             min-width: 0;
         }
@@ -246,7 +246,7 @@
             justify-content: center;
             background: var(--rc-accent-soft);
             color: var(--rc-accent);
-            font-weight: 800;
+            font-weight: 600;
             font-size: .9rem;
         }
 
@@ -330,7 +330,7 @@
         }
 
         .rc-action-trigger {
-            font-weight: 900;
+            font-weight: 650;
             letter-spacing: .08em;
         }
 
@@ -377,7 +377,7 @@
             padding: .38rem .48rem;
             border-radius: .45rem;
             font-size: .72rem;
-            font-weight: 700;
+            font-weight: 500;
             line-height: 1.2;
             cursor: pointer;
         }
@@ -390,7 +390,7 @@
 
         .rc-school-list-check {
             font-size: .72rem;
-            font-weight: 900;
+            font-weight: 650;
         }
 
         .rc-school-list-empty {
@@ -439,7 +439,7 @@
             padding: .65rem .65rem .32rem;
             color: var(--rc-muted);
             font-size: .68rem;
-            font-weight: 800;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: .05em;
         }
@@ -556,7 +556,7 @@
             width: min(560px, 100%);
             height: 100%;
             background: var(--rc-surface);
-            padding: 1rem;
+            padding: .82rem;
             overflow: auto;
             box-shadow: -20px 0 40px rgba(15, 23, 42, .16);
         }
@@ -564,7 +564,7 @@
         .rc-empty {
             border: 1px dashed var(--rc-border);
             border-radius: .875rem;
-            padding: 1rem;
+            padding: .82rem;
             color: var(--rc-muted);
             font-size: .875rem;
             display: grid;
@@ -818,7 +818,7 @@
             color: var(--rc-accent);
             padding: .16rem .46rem;
             font-size: .68rem;
-            font-weight: 700;
+            font-weight: 500;
             line-height: 1.2;
         }
 
@@ -856,7 +856,7 @@
 
         .rc-section-title {
             font-size: .82rem;
-            font-weight: 700;
+            font-weight: 500;
             color: var(--rc-muted);
             text-transform: uppercase;
             letter-spacing: .04em;
@@ -872,7 +872,7 @@
         .rc-favorites-layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: .85rem;
+            gap: .6rem;
             align-items: start;
         }
 
@@ -1022,7 +1022,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: .75rem;
+            gap: .6rem;
         }
 
         .rc-template-list,
@@ -1041,9 +1041,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: .75rem;
+            gap: .6rem;
             border: 1px solid rgba(148, 163, 184, .14);
-            border-radius: 1rem;
+            border-radius: .85rem;
             padding: .78rem;
             background: rgba(255,255,255,.032);
             transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
@@ -1076,7 +1076,7 @@
             flex: 0 0 auto;
             background: rgba(255, 91, 50, .13);
             color: var(--rc-accent);
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-template-main {
@@ -1114,15 +1114,15 @@
 
         .rc-campaign-fields {
             display: grid;
-            gap: .7rem;
-            padding: 1rem;
+            gap: .6rem;
+            padding: .82rem;
         }
 
 
         .rc-campaign-compose {
             display: grid;
             gap: .82rem;
-            padding: 1rem;
+            padding: .82rem;
         }
         .rc-template-field-label {
             display:block;
@@ -1266,7 +1266,7 @@
             border-radius: .75rem;
             background: #ff5b32;
             color: #fff !important;
-            font-weight: 800;
+            font-weight: 600;
             text-decoration: none;
         }
 
@@ -1325,14 +1325,14 @@
             border-radius: 999px;
             padding: .35rem .55rem;
             font-size: .72rem;
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-campaign-editor {
             width: 100%;
             min-height: 17rem;
             border: 1px solid rgba(148, 163, 184, .24);
-            border-radius: .95rem;
+            border-radius: .82rem;
             background: rgba(2, 6, 23, .32);
             color: var(--rc-text);
             padding: .9rem;
@@ -1351,7 +1351,7 @@
 
         .rc-mini-preview-card {
             border: 1px solid rgba(148, 163, 184, .16);
-            border-radius: 1rem;
+            border-radius: .85rem;
             background: rgba(255,255,255,.026);
             padding: .75rem;
         }
@@ -1359,7 +1359,7 @@
         .rc-campaign-loading {
             border: 1px dashed rgba(148, 163, 184, .28);
             border-radius: .9rem;
-            padding: 1rem;
+            padding: .82rem;
             color: var(--rc-muted);
             display: flex;
             gap: .55rem;
@@ -1368,14 +1368,14 @@
         }
 
         .rc-campaign-preview-wrap {
-            padding: 1rem;
+            padding: .82rem;
             display: grid;
-            gap: .75rem;
+            gap: .6rem;
         }
 
         .rc-email-preview {
             border: 1px solid rgba(148, 163, 184, .22);
-            border-radius: 1rem;
+            border-radius: .85rem;
             overflow: hidden;
             background: #fff;
             color: #111827;
@@ -1385,7 +1385,7 @@
         .rc-email-subject {
             padding: .8rem 1rem;
             border-bottom: 1px solid #e5e7eb;
-            font-weight: 800;
+            font-weight: 600;
             color: #111827;
             background: #f9fafb;
             display: grid;
@@ -1415,7 +1415,7 @@
             background: rgba(3, 7, 18, .28);
             backdrop-filter: blur(1.5px);
             color: var(--rc-text);
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-template-loading-card {
@@ -1480,7 +1480,7 @@
         }
 
         .rc-email-body-fallback {
-            padding: 1rem;
+            padding: .82rem;
             min-height: 18rem;
             font-family: Arial, sans-serif;
             font-size: 14px;
@@ -1495,8 +1495,8 @@
 
         .rc-target-card {
             display: grid;
-            gap: .7rem;
-            padding: 1rem;
+            gap: .6rem;
+            padding: .82rem;
         }
 
         .rc-recipient-stat {
@@ -1558,7 +1558,7 @@
             background: rgba(255,255,255,.055);
             color: var(--rc-text);
             font-size: .78rem;
-            font-weight: 900;
+            font-weight: 650;
         }
 
         .rc-visual-tool:hover { border-color: rgba(255,91,50,.55); color:#fed7aa; }
@@ -1774,7 +1774,7 @@
         .rc-dashboard-hero p { max-width: 62rem; color:#a9b6c8; }
         .rc-dashboard-stat-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
         .rc-dashboard-stat { min-height: 9.65rem; }
-        .rc-dashboard-icon { border-radius: 1rem; }
+        .rc-dashboard-icon { border-radius: .85rem; }
         .rc-dashboard-icon img.rc-png-icon { width:1.35rem; height:1.35rem; display:block; object-fit:contain; }
         .rc-dashboard-number { font-size:2.55rem; }
         .rc-dashboard-label { font-size:.86rem; line-height:1.15; }
@@ -2251,7 +2251,7 @@
             font-size: clamp(1.45rem, 3vw, 1.95rem);
             line-height: 1.05;
             letter-spacing: -.035em;
-            font-weight: 950;
+            font-weight: 500;
             color: #fff;
         }
 
@@ -2263,7 +2263,7 @@
             color: #fbbf24;
             padding: .22rem .48rem;
             font-size: .72rem;
-            font-weight: 950;
+            font-weight: 500;
             letter-spacing: .035em;
         }
 
@@ -2272,7 +2272,7 @@
             flex-wrap: wrap;
             gap: .35rem;
             color: #9fb0c5;
-            font-size: .92rem;
+            font-size: .86rem;
             line-height: 1.35;
         }
 
@@ -2300,7 +2300,7 @@
         .rc-school-score-label {
             color: #ff6b50;
             font-size: .78rem;
-            font-weight: 950;
+            font-weight: 500;
             letter-spacing: .04em;
         }
 
@@ -2323,8 +2323,8 @@
             align-items: center;
             justify-content: center;
             gap: .45rem;
-            font-size: .86rem;
-            font-weight: 850;
+            font-size: .82rem;
+            font-weight: 650;
             transition: .15s ease;
         }
 
@@ -2360,7 +2360,7 @@
             color: #fff;
             font-size: 1rem;
             line-height: 1.2;
-            font-weight: 950;
+            font-weight: 500;
             letter-spacing: -.02em;
         }
 
@@ -2377,7 +2377,7 @@
             grid-template-columns: 2.75rem minmax(0, 1fr) auto;
             align-items: center;
             gap: .8rem;
-            border-radius: .95rem;
+            border-radius: .82rem;
             background: rgba(15,18,24,.28);
             border: 1px solid rgba(148,163,184,.08);
             padding: .78rem;
@@ -2392,7 +2392,7 @@
             background: #ff6b50;
             color: #fff;
             font-size: .78rem;
-            font-weight: 950;
+            font-weight: 500;
         }
 
         .rc-school-coach-info {
@@ -2403,7 +2403,7 @@
 
         .rc-school-coach-info strong {
             color: #fff;
-            font-size: .92rem;
+            font-size: .86rem;
             line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
@@ -2444,16 +2444,16 @@
         .rc-school-stat-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: .75rem;
+            gap: .6rem;
         }
 
         .rc-school-stat-card {
             display: grid;
             grid-template-columns: 2.35rem minmax(0, 1fr);
             grid-template-rows: auto auto;
-            column-gap: .7rem;
+            column-gap: .6rem;
             align-items: center;
-            border-radius: .95rem;
+            border-radius: .82rem;
             background: rgba(15,18,24,.28);
             border: 1px solid rgba(148,163,184,.08);
             padding: .78rem;
@@ -2468,7 +2468,7 @@
             border-radius: .7rem;
             background: rgba(255,99,56,.14);
             color: #ff6b50;
-            font-weight: 950;
+            font-weight: 500;
             line-height: 1;
         }
 
@@ -2476,7 +2476,7 @@
             color: #fff;
             font-size: 1.35rem;
             line-height: 1;
-            font-weight: 950;
+            font-weight: 500;
         }
 
         .rc-school-stat-card small {
@@ -2537,7 +2537,7 @@
             font-size: clamp(1.35rem, 2.7vw, 2rem);
             line-height: 1.1;
             letter-spacing: -.04em;
-            font-weight: 900;
+            font-weight: 650;
             color: #0f172a;
         }
         .dark .rc-home-topbar h1 { color: #fff; }
@@ -2545,7 +2545,7 @@
         .rc-home-panel-head p {
             margin: .28rem 0 0;
             color: #7c8799;
-            font-size: .86rem;
+            font-size: .82rem;
         }
         .dark .rc-home-topbar p,
         .dark .rc-home-panel-head p { color: #94a3b8; }
@@ -2553,7 +2553,7 @@
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            gap: .7rem;
+            gap: .6rem;
             flex-wrap: wrap;
         }
         .rc-home-search {
@@ -2590,7 +2590,7 @@
             padding: .08rem .36rem;
             color: #94a3b8;
             font-size: .7rem;
-            font-weight: 700;
+            font-weight: 500;
         }
         .dark .rc-home-search kbd { border-color: rgba(148,163,184,.2); }
         .rc-home-icon-btn,
@@ -2602,12 +2602,12 @@
             justify-content: center;
             border: 1px solid #e5e7eb;
             border-radius: .85rem;
-            min-height: 2.45rem;
+            min-height: 2.15rem;
             padding: .55rem .85rem;
             background: #fff;
             color: #0f172a;
             font-size: .82rem;
-            font-weight: 800;
+            font-weight: 600;
             text-decoration: none;
             box-shadow: 0 4px 14px rgba(15,23,42,.06);
         }
@@ -2645,7 +2645,7 @@
         }
         .rc-home-stat-card {
             min-height: 7.6rem;
-            padding: 1rem;
+            padding: .82rem;
             display: grid;
             grid-template-columns: 2.65rem minmax(0,1fr);
             align-content: start;
@@ -2658,7 +2658,7 @@
             border-radius: 999px;
             display: inline-grid;
             place-items: center;
-            font-weight: 900;
+            font-weight: 650;
             line-height: 1;
             flex: 0 0 auto;
         }
@@ -2668,9 +2668,9 @@
         .rc-home-stat-card.is-green .rc-home-stat-icon { background: rgba(16,185,129,.13); color: #10b981; }
         .rc-home-stat-card.is-indigo .rc-home-stat-icon { background: rgba(96,165,250,.14); color: #60a5fa; }
         .rc-home-stat-copy { min-width: 0; }
-        .rc-home-stat-label { color: #7c8799; font-size: .78rem; font-weight: 800; }
+        .rc-home-stat-label { color: #7c8799; font-size: .78rem; font-weight: 600; }
         .dark .rc-home-stat-label { color: #94a3b8; }
-        .rc-home-stat-value { color: #0f172a; font-size: 1.45rem; line-height: 1; font-weight: 950; letter-spacing: -.04em; margin-top: .15rem; }
+        .rc-home-stat-value { color: #0f172a; font-size: 1.45rem; line-height: 1; font-weight: 500; letter-spacing: -.04em; margin-top: .15rem; }
         .dark .rc-home-stat-value { color: #fff; }
         .rc-home-progress {
             grid-column: 1 / -1;
@@ -2688,7 +2688,7 @@
             font-size: .76rem;
         }
         .rc-home-stat-card.is-blue .rc-home-stat-sub,
-        .rc-home-stat-card.is-green .rc-home-stat-sub { color: #059669; font-weight: 800; }
+        .rc-home-stat-card.is-green .rc-home-stat-sub { color: #059669; font-weight: 600; }
         .dark .rc-home-stat-sub { color: #94a3b8; }
         .dark .rc-home-stat-card.is-blue .rc-home-stat-sub,
         .dark .rc-home-stat-card.is-green .rc-home-stat-sub { color: #34d399; }
@@ -2711,7 +2711,7 @@
             color: #0f172a;
             font-size: 1rem;
             line-height: 1.15;
-            font-weight: 900;
+            font-weight: 650;
             letter-spacing: -.025em;
         }
         .dark .rc-home-panel-head h2 { color: #fff; }
@@ -2741,19 +2741,19 @@
         }
         .dark .rc-readiness-ring:before { background: #181d27; }
         .rc-readiness-ring div { position: relative; display: grid; justify-items: center; gap: .25rem; text-align: center; }
-        .rc-readiness-ring strong { font-size: 1.75rem; line-height: 1; color: #0f172a; font-weight: 950; }
+        .rc-readiness-ring strong { font-size: 1.75rem; line-height: 1; color: #0f172a; font-weight: 500; }
         .dark .rc-readiness-ring strong { color: #fff; }
         .rc-readiness-ring span { color: #7c8799; font-size: .75rem; }
         .rc-check-list { display: grid; gap: .78rem; }
         .rc-check-row { display: grid; grid-template-columns: 1.35rem minmax(0,1fr); gap: .65rem; align-items: start; }
-        .rc-check-dot { width: 1.05rem; height: 1.05rem; border-radius: 999px; border: 2px solid #94a3b8; display: grid; place-items: center; color: #10b981; font-size: .72rem; font-weight: 950; }
+        .rc-check-dot { width: 1.05rem; height: 1.05rem; border-radius: 999px; border: 2px solid #94a3b8; display: grid; place-items: center; color: #10b981; font-size: .72rem; font-weight: 500; }
         .rc-check-row.is-done .rc-check-dot { border-color: #10b981; }
-        .rc-check-row strong { display: block; color: #0f172a; font-size: .86rem; line-height: 1.2; }
+        .rc-check-row strong { display: block; color: #0f172a; font-size: .82rem; line-height: 1.2; }
         .dark .rc-check-row strong { color: #fff; }
         .rc-check-row small { display: block; color: #7c8799; font-size: .78rem; margin-top: .15rem; }
         .rc-home-outline-btn { width: 100%; margin-top: .25rem; }
         .rc-home-activity-list { display: grid; gap: .78rem; max-height: 20rem; overflow: auto; padding-right: .25rem; }
-        .rc-home-activity { display: grid; grid-template-columns: 2.35rem minmax(0,1fr) auto; gap: .75rem; align-items: center; text-decoration: none; color: inherit; }
+        .rc-home-activity { display: grid; grid-template-columns: 2.35rem minmax(0,1fr) auto; gap: .6rem; align-items: center; text-decoration: none; color: inherit; }
         .rc-home-activity-icon { width: 2.05rem; height: 2.05rem; font-size: .8rem; background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-home-activity-icon.is-coral { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-home-activity-icon.is-green { background: rgba(16,185,129,.13); color: #10b981; }
@@ -2763,7 +2763,7 @@
         .rc-home-activity-copy small { color: #7c8799; font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .rc-home-activity-time { color: #94a3b8; font-size: .74rem; white-space: nowrap; }
         .rc-radar-panel { grid-column: 1; }
-        .rc-radar-schools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .85rem; }
+        .rc-radar-schools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .6rem; }
         .rc-radar-card {
             border: 1px solid #e7eaf0;
             background: #fff;
@@ -2776,22 +2776,22 @@
             color: #0f172a;
         }
         .dark .rc-radar-card { border-color: rgba(148,163,184,.16); background: rgba(17,24,39,.72); color: #fff; }
-        .rc-radar-logo { height: 5.25rem; display: flex; align-items: center; justify-content: center; background: #fff; color: #0f172a; font-weight: 950; font-size: 1.15rem; overflow: hidden; padding: .75rem; box-sizing: border-box; }
+        .rc-radar-logo { height: 5.25rem; display: flex; align-items: center; justify-content: center; background: #fff; color: #0f172a; font-weight: 500; font-size: 1.15rem; overflow: hidden; padding: .75rem; box-sizing: border-box; }
         .rc-radar-logo img { width: auto !important; height: auto !important; max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; object-position: center; display: block; padding: 0 !important; }
         .dark .rc-radar-logo { background: #fff; color: #111827; }
         .rc-radar-card strong, .rc-radar-card small, .rc-radar-card em { margin-inline: .8rem; }
         .rc-radar-card strong { font-size: .84rem; line-height: 1.15; }
         .rc-radar-card small { color: #7c8799; font-size: .73rem; }
-        .rc-radar-card em { width: max-content; border-radius: 999px; background: rgba(16,185,129,.12); color: #059669; padding: .22rem .48rem; font-size: .7rem; font-style: normal; font-weight: 900; margin-top: .25rem; }
-        .rc-interested-list { display: grid; gap: .85rem; }
-        .rc-interested-row { display: grid; grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto; gap: .75rem; align-items: center; border: 0; background: transparent; text-align: left; color: inherit; padding: 0; }
-        .rc-interested-rank { color: #94a3b8; font-weight: 900; font-size: .82rem; }
-        .rc-interested-logo { width: 2.35rem; height: 2.35rem; border-radius: .55rem; display: grid; place-items: center; background: #fff; color: #111827; border: 1px solid #e5e7eb; font-size: .72rem; font-weight: 950; }
+        .rc-radar-card em { width: max-content; border-radius: 999px; background: rgba(16,185,129,.12); color: #059669; padding: .22rem .48rem; font-size: .7rem; font-style: normal; font-weight: 650; margin-top: .25rem; }
+        .rc-interested-list { display: grid; gap: .6rem; }
+        .rc-interested-row { display: grid; grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto; gap: .6rem; align-items: center; border: 0; background: transparent; text-align: left; color: inherit; padding: 0; }
+        .rc-interested-rank { color: #94a3b8; font-weight: 650; font-size: .82rem; }
+        .rc-interested-logo { width: 2.35rem; height: 2.35rem; border-radius: .55rem; display: grid; place-items: center; background: #fff; color: #111827; border: 1px solid #e5e7eb; font-size: .72rem; font-weight: 500; }
         .rc-interested-row strong { display: block; color: #0f172a; font-size: .84rem; line-height: 1.2; }
         .dark .rc-interested-row strong { color: #fff; }
         .rc-interested-row small { color: #7c8799; font-size: .73rem; }
-        .rc-interested-row b { color: #ff6338; font-weight: 950; }
-        .rc-home-empty { color: #7c8799; font-size: .86rem; padding: 1rem; }
+        .rc-interested-row b { color: #ff6338; font-weight: 500; }
+        .rc-home-empty { color: #7c8799; font-size: .82rem; padding: .82rem; }
         .dark .rc-home-empty { color: #94a3b8; }
         @media (max-width: 1180px) {
             .rc-home-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -2828,10 +2828,11 @@
 
         .rc-home-header-v2 h1 {
             margin: 0;
+            white-space: nowrap;
             color: #101827;
             font-size: clamp(1.45rem, 2vw, 1.85rem);
             line-height: 1.05;
-            font-weight: 850;
+            font-weight: 650;
             letter-spacing: -.035em;
         }
 
@@ -2972,7 +2973,7 @@
             color: #0f172a;
             font-size: 1.65rem;
             line-height: .95;
-            font-weight: 900;
+            font-weight: 650;
             letter-spacing: -.04em;
         }
 
@@ -3027,7 +3028,7 @@
             color: #0f172a;
             font-size: 1rem;
             line-height: 1.15;
-            font-weight: 850;
+            font-weight: 650;
             letter-spacing: -.02em;
         }
 
@@ -3049,7 +3050,7 @@
             background: #fff;
             color: #0f172a;
             font-size: .78rem;
-            font-weight: 700;
+            font-weight: 500;
             text-decoration: none;
         }
 
@@ -3091,7 +3092,7 @@
             color: #0f172a;
             font-size: 1.75rem;
             line-height: 1;
-            font-weight: 900;
+            font-weight: 650;
         }
 
         .rc-readiness-ring-v2 span {
@@ -3118,7 +3119,7 @@
             color: #10b981;
             font-size: .72rem;
             line-height: 1;
-            font-weight: 900;
+            font-weight: 650;
         }
 
         .rc-check-row-v2.is-done .rc-check-dot-v2 { border-color: #10b981; }
@@ -3126,7 +3127,7 @@
         .rc-check-row-v2 strong {
             display: block;
             color: #0f172a;
-            font-size: .86rem;
+            font-size: .82rem;
             line-height: 1.15;
             font-weight: 780;
         }
@@ -3204,7 +3205,7 @@
         .rc-home-activity-v2 {
             display: grid;
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
-            gap: .75rem;
+            gap: .6rem;
             align-items: center;
             text-decoration: none;
             color: inherit;
@@ -3217,7 +3218,7 @@
             display: grid;
             place-items: center;
             font-size: .78rem;
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-home-activity-icon-v2.is-blue { background: rgba(59,130,246,.13); color: #3b82f6; }
@@ -3235,7 +3236,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-home-activity-copy-v2 small {
@@ -3257,7 +3258,7 @@
         .rc-radar-schools-v2 {
             display: grid;
             grid-template-columns: repeat(4, minmax(0,1fr));
-            gap: .85rem;
+            gap: .6rem;
         }
 
         .rc-radar-card-v2 {
@@ -3280,7 +3281,7 @@
             justify-content: center;
             background: #ffffff;
             color: #111827;
-            font-weight: 950;
+            font-weight: 500;
             font-size: 1.15rem;
             overflow: hidden;
             border-bottom: 1px solid #eef2f7;
@@ -3309,7 +3310,7 @@
             color: #0f172a;
             font-size: .84rem;
             line-height: 1.15;
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-radar-card-v2 small { color: #7d8798; font-size: .73rem; }
@@ -3322,7 +3323,7 @@
             padding: .22rem .48rem;
             font-size: .7rem;
             font-style: normal;
-            font-weight: 850;
+            font-weight: 650;
             margin-top: .25rem;
         }
 
@@ -3345,13 +3346,13 @@
             background: #ff6338;
         }
 
-        .rc-interested-list-v2 { display: grid; gap: .85rem; }
+        .rc-interested-list-v2 { display: grid; gap: .6rem; }
 
         .rc-interested-row-v2 {
             display: grid;
             grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto;
             align-items: center;
-            gap: .75rem;
+            gap: .6rem;
             border: 0;
             background: transparent;
             text-align: left;
@@ -3362,7 +3363,7 @@
 
         .rc-interested-rank-v2 {
             color: #94a3b8;
-            font-weight: 850;
+            font-weight: 650;
             font-size: .82rem;
         }
 
@@ -3376,7 +3377,7 @@
             background: #fff;
             color: #111827;
             font-size: .72rem;
-            font-weight: 850;
+            font-weight: 650;
             overflow: hidden;
             flex: 0 0 auto;
         }
@@ -3394,12 +3395,12 @@
             color: #0f172a;
             font-size: .84rem;
             line-height: 1.2;
-            font-weight: 800;
+            font-weight: 600;
         }
 
         .rc-interested-row-v2 small { color: #7d8798; font-size: .73rem; }
-        .rc-interested-row-v2 b { color: #ff6338; font-weight: 900; }
-        .rc-home-empty-v2 { color: #7d8798; font-size: .86rem; padding: 1rem; }
+        .rc-interested-row-v2 b { color: #ff6338; font-weight: 650; }
+        .rc-home-empty-v2 { color: #7d8798; font-size: .82rem; padding: .82rem; }
 
         .dark .rc-home-dashboard-v2 { color: #f8fafc; }
 
@@ -3786,7 +3787,7 @@
             color: #0f172a;
             font-size: 1.8rem;
             line-height: 1.1;
-            font-weight: 850;
+            font-weight: 650;
             letter-spacing: -.035em;
         }
 
@@ -3845,19 +3846,19 @@
         }
 
         .rc-detail-stat-v2 > span {
-            width: 3rem;
-            height: 3rem;
+            width: 2.75rem;
+            height: 2.75rem;
             border-radius: .85rem;
             display: grid;
             place-items: center;
-            font-weight: 850;
+            font-weight: 650;
         }
 
         .rc-detail-stat-v2 small {
             display: block;
             color: #64748b;
             font-size: .84rem;
-            font-weight: 700;
+            font-weight: 500;
         }
 
         .rc-detail-stat-v2 strong {
@@ -3866,7 +3867,7 @@
             color: #0f172a;
             font-size: 2rem;
             line-height: 1;
-            font-weight: 900;
+            font-weight: 650;
             letter-spacing: -.04em;
         }
 
@@ -3900,7 +3901,7 @@
             margin: 0;
             color: #0f172a;
             font-size: 1rem;
-            font-weight: 850;
+            font-weight: 650;
         }
 
         .rc-detail-table-v2 header span {
@@ -3916,7 +3917,7 @@
             display: grid;
             grid-template-columns: 2rem 2.45rem minmax(0, 1fr) auto 3rem 4.75rem 1rem;
             align-items: center;
-            gap: .75rem;
+            gap: .6rem;
             border: 0;
             border-bottom: 1px solid #f0f2f6;
             background: transparent;
@@ -3928,7 +3929,7 @@
 
         .rc-detail-row-v2:hover { background: #fafafa; }
         .rc-detail-row-v2:last-child { border-bottom: 0; }
-        .rc-detail-rank-v2 { color: #94a3b8; font-size: .8rem; font-weight: 800; }
+        .rc-detail-rank-v2 { color: #94a3b8; font-size: .8rem; font-weight: 600; }
         .rc-detail-avatar-v2,
         .rc-detail-platform-icon-v2 {
             width: 2.25rem;
@@ -3938,8 +3939,8 @@
             place-items: center;
             background: #f1f3f7;
             color: #111827;
-            font-size: .86rem;
-            font-weight: 800;
+            font-size: .82rem;
+            font-weight: 600;
             overflow: hidden;
         }
 
@@ -3953,7 +3954,7 @@
             color: #0f172a;
             font-size: .88rem;
             line-height: 1.2;
-            font-weight: 800;
+            font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -3967,7 +3968,7 @@
             padding: .08rem .28rem;
             font-size: .62rem;
             font-style: normal;
-            font-weight: 800;
+            font-weight: 600;
             vertical-align: middle;
         }
 
@@ -3985,7 +3986,7 @@
             color: #ff6338;
             padding: .28rem .55rem;
             font-size: .72rem;
-            font-weight: 800;
+            font-weight: 600;
             white-space: nowrap;
         }
 
@@ -3994,7 +3995,7 @@
         .rc-detail-pill-v2.is-neutral { background: #eceef3; color: #111827; }
 
         .rc-detail-count-v2 { display: grid; justify-items: center; color: #7d8798; }
-        .rc-detail-count-v2 b { color: #ff6338; font-size: 1.1rem; line-height: 1; font-weight: 900; }
+        .rc-detail-count-v2 b { color: #ff6338; font-size: 1.1rem; line-height: 1; font-weight: 650; }
         .rc-detail-count-v2 small { font-size: .68rem; }
         .rc-detail-time-v2 { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
         .rc-detail-chevron-v2 { color: #94a3b8; font-size: 1.35rem; }
@@ -4067,7 +4068,7 @@
 
         .rc-stats-drawer-panel .rc-detail-header-v2 {
             grid-template-columns: 1fr;
-            gap: .85rem;
+            gap: .6rem;
             margin-bottom: 1rem;
         }
 
@@ -4100,7 +4101,7 @@
         @media (max-width: 760px) {
             .rc-stats-drawer-panel {
                 width: 100vw;
-                padding: 1rem;
+                padding: .82rem;
             }
 
             .rc-stats-drawer-panel .rc-detail-stats-v2 {
@@ -4541,7 +4542,7 @@
             border: 1px solid var(--rc-border);
             background: var(--rc-surface);
             color: var(--rc-text);
-            border-radius: 1rem;
+            border-radius: .85rem;
             padding: .55rem .65rem;
             box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
         }
@@ -4561,7 +4562,7 @@
             box-shadow: none !important;
             outline: none !important;
             min-height: 2.35rem;
-            font-size: .92rem;
+            font-size: .86rem;
         }
 
         .rc-global-search-clear {
@@ -4573,7 +4574,7 @@
             display: inline-grid;
             place-items: center;
             border-radius: 999px;
-            font-weight: 900;
+            font-weight: 650;
         }
 
         .rc-global-search-clear:hover {
@@ -4589,7 +4590,7 @@
             right: 0;
             min-width: min(34rem, 92vw);
             border: 1px solid var(--rc-border);
-            border-radius: 1rem;
+            border-radius: .85rem;
             background: var(--rc-surface);
             box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
             padding: .45rem;
@@ -4607,7 +4608,7 @@
         .rc-global-suggestion-heading {
             color: var(--rc-muted);
             font-size: .66rem;
-            font-weight: 900;
+            font-weight: 650;
             letter-spacing: .07em;
             text-transform: uppercase;
             padding: .5rem .55rem .2rem;
@@ -4642,7 +4643,7 @@
             align-items: center;
             justify-content: center;
             font-size: .72rem;
-            font-weight: 950;
+            font-weight: 500;
             border: 1px solid rgba(148, 163, 184, .2);
             overflow: hidden;
         }
@@ -4683,7 +4684,7 @@
             color: var(--rc-muted);
             padding: .22rem .5rem;
             font-size: .66rem;
-            font-weight: 850;
+            font-weight: 650;
             white-space: nowrap;
         }
 
@@ -4753,6 +4754,373 @@
             }
         }
 
+        /* v25: right-side school drawer and Discover Schools UI matched to new reference. */
+        .rc-school-modal-backdrop,
+        .rc-drawer.rc-school-modal-backdrop {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 80 !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            background: rgba(15, 23, 42, .34) !important;
+            backdrop-filter: blur(3px) !important;
+        }
+
+        .rc-school-modal-panel,
+        .rc-drawer-panel.rc-school-modal-panel {
+            width: min(520px, 100vw) !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            margin: 0 !important;
+            overflow: auto !important;
+            border-radius: 1.35rem 0 0 1.35rem !important;
+            border: 0 !important;
+            border-left: 1px solid var(--rc-border) !important;
+            background: var(--rc-surface) !important;
+            color: var(--rc-text) !important;
+            box-shadow: -24px 0 70px rgba(15, 23, 42, .18) !important;
+            padding: 1.25rem !important;
+            transform: translateX(0) !important;
+            animation: rcSlideInRight .22s ease-out both !important;
+        }
+
+        .dark .rc-school-modal-panel,
+        .dark .rc-drawer-panel.rc-school-modal-panel {
+            background: rgb(18 18 22) !important;
+            color: var(--rc-text) !important;
+            border-left-color: rgba(148, 163, 184, .16) !important;
+            box-shadow: -28px 0 80px rgba(0, 0, 0, .45) !important;
+        }
+
+        @keyframes rcSlideInRight {
+            from { transform: translateX(100%); opacity: .7; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .rc-school-modal-close {
+            background: var(--rc-soft) !important;
+            border-color: var(--rc-border) !important;
+            color: var(--rc-muted) !important;
+        }
+
+        .rc-school-modal-close:hover {
+            color: var(--rc-accent) !important;
+            border-color: rgba(255, 99, 56, .36) !important;
+            background: var(--rc-accent-soft) !important;
+        }
+
+        .rc-school-modal-main h2,
+        .rc-school-section-title,
+        .rc-school-coach-info strong,
+        .rc-school-stat-card strong {
+            color: var(--rc-text) !important;
+        }
+
+        .rc-school-modal-meta,
+        .rc-school-coach-info span,
+        .rc-school-stat-card small {
+            color: var(--rc-muted) !important;
+        }
+
+        .rc-school-modal-rule {
+            background: var(--rc-border) !important;
+        }
+
+        .rc-school-action,
+        .rc-school-coach-card,
+        .rc-school-stat-card,
+        .rc-school-copy-btn {
+            background: var(--rc-soft) !important;
+            color: var(--rc-text) !important;
+            border-color: var(--rc-border) !important;
+        }
+
+        .rc-school-action-primary {
+            background: var(--rc-accent) !important;
+            border-color: var(--rc-accent) !important;
+            color: #fff !important;
+        }
+
+        .rc-school-score-ring {
+            color: var(--rc-text) !important;
+            background: var(--rc-surface) !important;
+        }
+
+        .rc-school-score-label { color: var(--rc-accent) !important; }
+
+        .rc-school-division-pill,
+        .rc-school-stat-card span,
+        .rc-school-coach-avatar {
+            background: var(--rc-accent-soft) !important;
+            color: var(--rc-accent) !important;
+        }
+
+        @media (max-width: 680px) {
+            .rc-school-modal-panel,
+            .rc-drawer-panel.rc-school-modal-panel {
+                width: 100vw !important;
+                border-radius: 0 !important;
+                padding: 1rem !important;
+            }
+        }
+
+        .rc-school-grid.rc-discover-school-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 1rem !important;
+        }
+
+        .rc-school-card.rc-discover-school-card {
+            min-height: 0 !important;
+            border: 1px solid var(--rc-border) !important;
+            border-radius: .95rem !important;
+            background: var(--rc-surface) !important;
+            padding: 1.1rem !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, .055) !important;
+            gap: 0 !important;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease !important;
+        }
+
+        .rc-school-card.rc-discover-school-card:hover {
+            transform: translateY(-1px) !important;
+            border-color: rgba(255, 99, 56, .28) !important;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .09) !important;
+        }
+
+        .rc-discover-card-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 1.7rem;
+            gap: .6rem;
+            align-items: start;
+        }
+
+        .rc-discover-card-title {
+            border: 0;
+            background: transparent;
+            padding: 0;
+            min-width: 0;
+            display: grid !important;
+            grid-template-columns: 3.2rem minmax(0, 1fr) !important;
+            gap: .8rem !important;
+            align-items: center !important;
+            color: var(--rc-text) !important;
+            text-align: left !important;
+            cursor: pointer;
+        }
+
+        .rc-school-card-logo-box,
+        .rc-school-list-logo-box {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: var(--rc-soft) !important;
+            border: 0 !important;
+            overflow: hidden !important;
+            flex: 0 0 auto !important;
+            position: relative !important;
+        }
+
+        .rc-school-card-logo-box {
+            width: 3.2rem !important;
+            height: 3.2rem !important;
+            border-radius: .75rem !important;
+            padding: .35rem !important;
+        }
+
+        .rc-school-list-logo-box {
+            width: 2.15rem !important;
+            height: 2.15rem !important;
+            border-radius: .55rem !important;
+            padding: .25rem !important;
+        }
+
+        .rc-school-card-logo,
+        .rc-school-list-logo {
+            width: auto !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+            display: block !important;
+        }
+
+        .rc-logo-fallback-text {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #334155;
+            font-size: .78rem;
+            font-weight: 500;
+            letter-spacing: -.02em;
+            background: #f3f4f6;
+        }
+
+        .dark .rc-logo-fallback-text { color: #e5e7eb; background: rgba(148, 163, 184, .12); }
+        .is-missing-logo .rc-logo-fallback-text { display: flex; }
+        .is-missing-logo img { display: none !important; }
+
+        .rc-discover-card-copy {
+            min-width: 0;
+            display: grid;
+            gap: .18rem;
+        }
+
+        .rc-discover-card-copy strong {
+            color: var(--rc-text);
+            font-size: .98rem;
+            line-height: 1.15;
+            font-weight: 650;
+            letter-spacing: -.025em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rc-discover-card-copy small {
+            color: var(--rc-muted);
+            font-size: .82rem;
+            line-height: 1.25;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .rc-discover-card-check,
+        .rc-discover-row-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.55rem;
+            height: 1.55rem;
+            border: 1px solid var(--rc-border);
+            border-radius: .45rem;
+            background: var(--rc-surface);
+            color: var(--rc-accent);
+            font-size: .8rem;
+            font-weight: 650;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+        }
+
+        .rc-discover-card-rule {
+            height: 1px;
+            background: var(--rc-border);
+            margin: .9rem 0 .85rem;
+            opacity: .72;
+        }
+
+        .rc-discover-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+        }
+
+        .rc-discover-division-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: .48rem;
+            background: rgba(255, 99, 56, .13);
+            color: var(--rc-accent);
+            padding: .34rem .55rem;
+            font-size: .72rem;
+            line-height: 1;
+            font-weight: 650;
+            white-space: nowrap;
+        }
+
+        .rc-discover-coach-count {
+            color: var(--rc-muted);
+            font-size: .82rem;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        .rc-school-list-table.rc-discover-school-list {
+            display: grid !important;
+            gap: 0 !important;
+            border: 1px solid var(--rc-border) !important;
+            border-radius: 1rem !important;
+            background: var(--rc-surface) !important;
+            overflow: hidden !important;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, .045) !important;
+        }
+
+        .rc-discover-school-list-head,
+        .rc-discover-school-list-row {
+            display: grid !important;
+            grid-template-columns: minmax(15rem, 1.45fr) minmax(10rem, 1.05fr) minmax(9rem, 1fr) minmax(13rem, 1.2fr) 4rem 2.5rem !important;
+            gap: 1rem !important;
+            align-items: center !important;
+        }
+
+        .rc-discover-school-list-head {
+            padding: .9rem 1.25rem !important;
+            background: var(--rc-soft) !important;
+            color: var(--rc-muted) !important;
+            font-size: .72rem !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
+            letter-spacing: .06em !important;
+        }
+
+        .rc-discover-school-list-row {
+            border: 0 !important;
+            border-top: 1px solid var(--rc-border) !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            padding: .88rem 1.25rem !important;
+            box-shadow: none !important;
+        }
+
+        .rc-discover-school-list-row:hover { background: var(--rc-soft) !important; }
+
+        .rc-discover-school-list-school {
+            display: grid !important;
+            grid-template-columns: 2.15rem minmax(0, 1fr) !important;
+            gap: .75rem !important;
+            align-items: center !important;
+            font-size: .9rem !important;
+            font-weight: 850 !important;
+        }
+
+        .rc-discover-school-list-name-copy,
+        .rc-discover-list-coach,
+        .rc-discover-list-muted,
+        .rc-discover-list-email {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rc-discover-list-coach { color: var(--rc-text); font-weight: 600; font-size: .82rem; }
+        .rc-discover-list-muted { color: var(--rc-muted); font-size: .82rem; }
+        .rc-discover-list-email a { color: #3b82f6; text-decoration: none; font-size: .82rem; }
+        .rc-discover-list-division { color: var(--rc-accent); font-size: .76rem; font-weight: 650; }
+        .rc-head-coach-chip { display:inline-flex; margin-left:.28rem; border-radius:.35rem; padding:.12rem .28rem; background:rgba(255,99,56,.13); color:var(--rc-accent); font-size:.62rem; font-weight:950; vertical-align:middle; }
+
+        .rc-discover-list-actions { justify-content: flex-end !important; }
+
+        @media (max-width: 1320px) {
+            .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+        }
+
+        @media (max-width: 1024px) {
+            .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+            .rc-discover-school-list-head { display: none !important; }
+            .rc-discover-school-list-row { grid-template-columns: 1fr auto !important; gap: .5rem !important; }
+            .rc-discover-school-list-row > :nth-child(n+2):nth-child(-n+5) { display: none !important; }
+        }
+
+        @media (max-width: 640px) {
+            .rc-school-grid.rc-discover-school-grid { grid-template-columns: 1fr !important; }
+        }
+
 </style>
 
     @php
@@ -4805,6 +5173,15 @@
             $initials = collect(explode(' ', trim($label)))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
             return strtoupper($initials ?: '•');
         };
+        $authUser = auth()->user();
+        $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
+        if ($athleteName === '') {
+            $athleteName = trim((string) (($authUser?->first_name ?? '') . ' ' . ($authUser?->last_name ?? '')));
+        }
+        if ($athleteName === '') {
+            $athleteName = trim((string) ($authUser?->name ?? ''));
+        }
+        $firstName = $athleteName !== '' ? $athleteName : 'Player';
     @endphp
 
     <div
@@ -4812,19 +5189,6 @@
         x-data
         x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
     >
-        @if(in_array($section, ['favorites', 'lists'], true))
-            <div class="rc-top">
-                <div></div>
-                <div class="rc-toolbar">
-                    <button class="rc-btn" type="button" wire:click="syncLatestContactTags" wire:loading.attr="disabled" wire:target="syncLatestContactTags,syncTagsIfStale">
-                        <span wire:loading.remove wire:target="syncLatestContactTags,syncTagsIfStale">Sync saved/list tags</span>
-                        <span wire:loading.flex wire:target="syncLatestContactTags,syncTagsIfStale" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Syncing</span>
-                    </button>
-                    @if($formattedTagUpdatedAt)<span class="rc-pill">Tags synced {{ $formattedTagUpdatedAt }}</span>@endif
-                </div>
-            </div>
-        @endif
-
         @if($isLoadingDataset)
             <div class="rc-card is-flat">
                 <div class="rc-subtle" style="margin-bottom:.5rem">Loading schools and coaches in the background. You can keep using the page.</div>
@@ -4836,7 +5200,7 @@
             <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
         @endif
 
-        @if(! ($section === 'dashboard' || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -4914,8 +5278,14 @@
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
-                $athleteName = trim((string) ($authUser?->name ?? 'Alex Johnson'));
-                $firstName = trim(strtok($athleteName ?: 'Alex', ' '));
+                $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
+                if ($athleteName === '') {
+                    $athleteName = trim((string) (($authUser?->first_name ?? '') . ' ' . ($authUser?->last_name ?? '')));
+                }
+                if ($athleteName === '') {
+                    $athleteName = trim((string) ($authUser?->name ?? ''));
+                }
+                $firstName = $athleteName !== '' ? $athleteName : 'Player';
 
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
                 $favoriteSchools = max(
@@ -5371,97 +5741,11 @@
             @endphp
 
             <div class="rc-home-dashboard-v2">
-                <div class="rc-home-header-v2">
-                    <div class="rc-home-welcome-copy-v2">
-                        <h1>Welcome back, {{ $firstName ?: 'Alex' }} <span aria-hidden="true">👋</span></h1>
-                        <p>Here's what's happening with your recruiting journey.</p>
-                    </div>
-
-                    <form class="rc-home-actions-v2" wire:submit.prevent="$set('section', 'schools')">
-                        <div class="rc-home-search-v2">
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
-                            @if($search !== '')
-                                <button type="button" class="rc-global-search-clear" wire:click="clearGlobalSearch" aria-label="Clear search">×</button>
-                            @else
-                                <kbd>Enter</kbd>
-                            @endif
-
-                            @if($search !== '')
-                                <div class="rc-global-suggestions">
-                                    @if($globalSearchHasSuggestions)
-                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
-                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
-                                                <div class="rc-global-suggestion-group">
-                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
-                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
-                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
-                                                            <span class="rc-global-suggestion-icon">
-                                                                @if(! empty($suggestion['logo_url']))
-                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
-                                                                @else
-                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
-                                                                @endif
-                                                            </span>
-                                                            <span class="rc-global-suggestion-copy">
-                                                                <strong>{{ $suggestion['label'] }}</strong>
-                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
-                                                            </span>
-                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
-                                                        </button>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-                                        @endforeach
-                                    @else
-                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
-
-                        <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
-                            <button
-                                type="button"
-                                class="rc-home-refresh-v2"
-                                x-on:click="open = ! open"
-                                wire:loading.attr="disabled"
-                                wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
-                                aria-label="Open refresh options"
-                                title="Refresh options"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            </button>
-                            <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
-                                <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
-                                    <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                    <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
-                                </button>
-                                <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
-                                    <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                                    <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Clear cache and reload schools, coaches, logos, tags, filters, and stats from GHL.</small></span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
-                            <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <svg class="rc-dark-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/>
-                                <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-                            </svg>
-                        </button>
-
-                        <a class="rc-home-new-email-v2" href="{{ \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl() }}">
-                            <span>+</span>
-                            New Email
-                        </a>
-                    </form>
-                </div>
+                @include('filament.partials.coach-database-header', [
+                    'firstName' => $firstName,
+                    'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                    'showNewEmail' => true,
+                ])
 
                 <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
@@ -6022,241 +6306,1326 @@
             @endphp
 
             <style>
-                .rc-discover-schools-page { display:grid; gap:1.15rem; }
-                .rc-discover-toolbar { display:grid; gap:.95rem; }
-                .rc-discover-search { position:relative; display:flex; align-items:center; min-height:3.05rem; border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; box-shadow:0 12px 34px rgba(15,23,42,.06); overflow:hidden; }
-                .rc-discover-search svg { width:1.12rem; height:1.12rem; color:var(--rc-muted); margin-left:1rem; flex:0 0 auto; }
-                .rc-discover-search input { width:100%; border:0 !important; background:transparent !important; box-shadow:none !important; outline:none !important; min-height:3.05rem; padding:0 1rem; color:var(--rc-text); font-size:.96rem; }
-                .rc-discover-filter-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,330px); gap:.8rem; align-items:center; }
-                .rc-discover-tabs { display:flex; align-items:center; gap:.35rem; padding:.27rem; border-radius:.95rem; background:rgba(148,163,184,.08); overflow:auto; }
-                .rc-discover-tab { border:0; min-height:2.25rem; border-radius:.72rem; background:transparent; color:var(--rc-muted); padding:0 .95rem; font-weight:800; white-space:nowrap; transition:background .18s ease,color .18s ease,box-shadow .18s ease; }
-                .rc-discover-tab:hover { color:var(--rc-text); background:rgba(255,255,255,.72); }
-                .rc-discover-tab.is-active { color:#fff; background:var(--rc-accent); box-shadow:0 10px 24px rgba(255,99,56,.22); }
-                .dark .rc-discover-tab:hover { background:rgba(15,23,42,.75); }
-                .rc-discover-select { width:100%; min-height:2.75rem; border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); color:var(--rc-text); padding:0 .9rem; font-weight:700; }
-                .rc-discover-results-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.1rem 0 -.15rem; flex-wrap:wrap; }
-                .rc-discover-count { color:var(--rc-muted); font-size:.9rem; font-weight:700; display:flex; align-items:center; gap:.7rem; }
-                .rc-discover-select-all { display:inline-flex; align-items:center; gap:.45rem; color:var(--rc-text); font-weight:800; }
-                .rc-discover-select-all input { width:1.05rem; height:1.05rem; border-radius:.35rem; accent-color:var(--rc-accent); }
-                .rc-discover-view-toggle { display:inline-flex; align-items:center; gap:.25rem; padding:.25rem; border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); box-shadow:0 10px 24px rgba(15,23,42,.06); }
-                .rc-discover-view-toggle button { width:2.25rem; height:2.25rem; display:inline-grid; place-items:center; border:0; border-radius:.65rem; color:var(--rc-muted); background:transparent; }
-                .rc-discover-view-toggle button.is-active { color:var(--rc-accent); background:var(--rc-accent-soft); }
-                .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
-                .rc-discover-schools-page .rc-school-card { min-height:9.25rem; border-radius:1rem; border:1px solid var(--rc-border); background:var(--rc-surface); box-shadow:0 12px 28px rgba(15,23,42,.06); padding:1rem; }
-                .rc-discover-schools-page .rc-school-card h3 { font-size:.98rem; line-height:1.2; margin:.2rem 0 .2rem; }
-                .rc-discover-schools-page .rc-school-conference { min-height:2rem; font-size:.78rem; line-height:1.25; }
-                .rc-discover-schools-page .rc-badge { background:rgba(255,99,56,.12); color:var(--rc-accent); border:0; font-size:.72rem; padding:.35rem .55rem; }
-                @media (max-width:1400px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-                @media (max-width:1100px) { .rc-discover-filter-row { grid-template-columns:1fr; } .rc-discover-schools-page .rc-school-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-                @media (max-width:700px) { .rc-discover-schools-page .rc-school-grid { grid-template-columns:1fr; } }
+                .rc-discover-v29 {
+                    display: grid;
+                    gap: .9rem;
+                    color: var(--rc-text);
+                }
+
+                .rc-discover-top-v29 {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    gap: 1rem;
+                    align-items: start;
+                    margin: -.65rem 0 .45rem;
+                }
+
+                .rc-discover-title-v29 h1 {
+                    margin: 0;
+                    color: var(--rc-text);
+                    font-size: clamp(1.65rem, 2.05vw, 2.05rem);
+                    line-height: 1.02;
+                    font-weight: 500;
+                    letter-spacing: -.035em;
+                }
+
+                .rc-discover-title-v29 p {
+                    margin: .45rem 0 0;
+                    color: var(--rc-muted);
+                    font-size: .82rem;
+                }
+
+                .rc-discover-actions-v29 {
+                    display: grid;
+                    grid-template-columns: minmax(28rem, 1fr) 3rem 3rem;
+                    gap: .6rem;
+                    align-items: start;
+                }
+
+                .rc-discover-actions-v29 .rc-home-search-v2 {
+                    width: 100%;
+                    max-width: none;
+                    min-height: 2.65rem;
+                    border-radius: .82rem;
+                }
+
+                .rc-discover-actions-v29 .rc-home-search-v2 input {
+                    min-height: 2.65rem;
+                    font-size: .86rem;
+                }
+
+                .rc-discover-actions-v29 .rc-home-refresh-v2,
+                .rc-discover-actions-v29 .rc-home-dark-toggle-v2 {
+                    width: 2.75rem;
+                    height: 2.75rem;
+                    min-height: 2.65rem;
+                    border-radius: .82rem;
+                }
+
+                .rc-discover-program-search-v27 {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    min-height: 2.65rem;
+                    border: 1px solid var(--rc-border);
+                    background: var(--rc-surface);
+                    border-radius: .82rem;
+                    box-shadow: 0 8px 20px rgba(15,23,42,.045);
+                    overflow: visible;
+                }
+
+                .rc-discover-program-search-v27 svg {
+                    width: 1.08rem;
+                    height: 1.08rem;
+                    color: var(--rc-muted);
+                    margin-left: 1rem;
+                    flex: 0 0 auto;
+                }
+
+                .rc-discover-program-search-v27 input {
+                    width: 100%;
+                    border: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                    min-height: 2.65rem;
+                    padding: 0 1rem;
+                    color: var(--rc-text);
+                    font-size: .95rem;
+                }
+
+                .rc-discover-filter-v27 {
+                    display: grid;
+                    grid-template-columns: minmax(0, 34rem) minmax(15rem, 20rem) 1fr;
+                    gap: .6rem;
+                    align-items: center;
+                }
+
+                .rc-discover-tabs-v27 {
+                    display: flex;
+                    align-items: center;
+                    gap: .28rem;
+                    padding: .25rem;
+                    border-radius: .9rem;
+                    background: var(--rc-soft);
+                    min-width: 0;
+                    overflow: auto;
+                }
+
+                .rc-discover-tab-v27 {
+                    border: 0;
+                    min-height: 2.15rem;
+                    border-radius: .68rem;
+                    background: transparent;
+                    color: var(--rc-muted);
+                    padding: 0 .82rem;
+                    font-size: .82rem;
+                    font-weight: 600;
+                    white-space: nowrap;
+                    transition: background .16s ease, color .16s ease;
+                }
+
+                .rc-discover-tab-v27.is-active {
+                    color: #fff;
+                    background: var(--rc-accent);
+                    box-shadow: 0 10px 22px rgba(255,99,56,.2);
+                }
+
+                .rc-discover-select-v27 {
+                    width: 100%;
+                    min-height: 2.55rem;
+                    border: 1px solid var(--rc-border);
+                    border-radius: .88rem;
+                    background: var(--rc-surface);
+                    color: var(--rc-text);
+                    padding: 0 .95rem;
+                    font-size: .86rem;
+                    font-weight: 500;
+                    box-shadow: 0 8px 20px rgba(15,23,42,.035);
+                }
+
+                .rc-discover-meta-v27 {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
+                    margin: .15rem 0 -.05rem;
+                    flex-wrap: wrap;
+                }
+
+                .rc-discover-count-v27 {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .6rem;
+                    color: var(--rc-muted);
+                    font-size: .9rem;
+                    font-weight: 600;
+                }
+
+                .rc-discover-count-v27 strong { color: var(--rc-text); }
+
+                .rc-discover-select-all-v27 {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .42rem;
+                    color: var(--rc-text);
+                    font-size: .84rem;
+                    font-weight: 650;
+                }
+
+                .rc-discover-select-all-v27 input {
+                    width: 1.05rem;
+                    height: 1.05rem;
+                    border-radius: .35rem;
+                    accent-color: var(--rc-accent);
+                }
+
+                .rc-discover-right-v27 {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .65rem;
+                }
+
+                .rc-discover-toggle-v27 {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .22rem;
+                    padding: .24rem;
+                    border: 1px solid var(--rc-border);
+                    border-radius: .85rem;
+                    background: var(--rc-surface);
+                    box-shadow: 0 10px 24px rgba(15,23,42,.06);
+                }
+
+                .rc-discover-toggle-v27 button {
+                    width: 2.35rem;
+                    height: 2.35rem;
+                    display: inline-grid;
+                    place-items: center;
+                    border: 0;
+                    border-radius: .65rem;
+                    color: var(--rc-muted);
+                    background: transparent;
+                }
+
+                .rc-discover-toggle-v27 button.is-active {
+                    color: var(--rc-accent);
+                    background: var(--rc-accent-soft);
+                }
+
+                .rc-discover-loading-v27 {
+                    position: relative;
+                    min-height: 12rem;
+                }
+
+                .rc-discover-loading-overlay-v27 {
+                    position: absolute;
+                    inset: 0;
+                    z-index: 30;
+                    display: none;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: .85rem;
+                    background: color-mix(in srgb, var(--rc-surface) 75%, transparent);
+                    backdrop-filter: blur(3px);
+                }
+
+                .rc-discover-loading-v27.is-loading .rc-discover-loading-overlay-v27 { display: flex; }
+
+                .rc-discover-v29 .rc-school-grid.rc-discover-school-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                    gap: 1rem;
+                }
+
+                .rc-discover-v29 .rc-school-card.rc-discover-school-card {
+                    min-height: 8.25rem;
+                    border: 1px solid var(--rc-border);
+                    border-radius: .85rem;
+                    background: var(--rc-surface);
+                    padding: .82rem;
+                    box-shadow: 0 8px 20px rgba(15,23,42,.045);
+                    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+                }
+
+                .rc-discover-v29 .rc-school-card.rc-discover-school-card:hover {
+                    transform: translateY(-1px);
+                    border-color: rgba(255,99,56,.3);
+                    box-shadow: 0 16px 34px rgba(15,23,42,.08);
+                }
+
+                .rc-discover-v29 .rc-discover-card-main {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) 1.7rem;
+                    gap: .6rem;
+                    align-items: start;
+                }
+
+                .rc-discover-v29 .rc-discover-card-title {
+                    display: grid;
+                    grid-template-columns: 3.15rem minmax(0, 1fr);
+                    gap: .8rem;
+                    align-items: center;
+                    border: 0;
+                    background: transparent;
+                    color: var(--rc-text);
+                    padding: 0;
+                    text-align: left;
+                    cursor: pointer;
+                    min-width: 0;
+                }
+
+                .rc-discover-v29 .rc-school-card-logo-box,
+                .rc-discover-v29 .rc-school-list-logo-box {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #f3f4f6;
+                    overflow: hidden;
+                    position: relative;
+                    flex: 0 0 auto;
+                }
+
+                .dark .rc-discover-v29 .rc-school-card-logo-box,
+                .dark .rc-discover-v29 .rc-school-list-logo-box {
+                    background: rgba(148,163,184,.12);
+                }
+
+                .rc-discover-v29 .rc-school-card-logo-box {
+                    width: 2.7rem;
+                    height: 2.7rem;
+                    border-radius: .78rem;
+                    padding: .4rem;
+                }
+
+                .rc-discover-v29 .rc-school-list-logo-box {
+                    width: 2.15rem;
+                    height: 2.15rem;
+                    border-radius: .55rem;
+                    padding: .25rem;
+                }
+
+                .rc-discover-v29 .rc-school-card-logo,
+                .rc-discover-v29 .rc-school-list-logo {
+                    width: auto;
+                    height: auto;
+                    max-width: 100%;
+                    max-height: 100%;
+                    object-fit: contain;
+                    display: block;
+                }
+
+                .rc-discover-v29 .rc-logo-fallback-text {
+                    position: absolute;
+                    inset: 0;
+                    display: none;
+                    align-items: center;
+                    justify-content: center;
+                    color: #0f172a;
+                    font-size: .76rem;
+                    font-weight: 500;
+                    background: #f3f4f6;
+                }
+
+                .dark .rc-discover-v29 .rc-logo-fallback-text {
+                    color: #e5e7eb;
+                    background: rgba(148,163,184,.12);
+                }
+
+                .rc-discover-v29 .is-missing-logo .rc-logo-fallback-text { display: flex; }
+                .rc-discover-v29 .is-missing-logo img { display: none; }
+
+                .rc-discover-v29 .rc-discover-card-copy {
+                    min-width: 0;
+                    display: grid;
+                    gap: .18rem;
+                }
+
+                .rc-discover-v29 .rc-discover-card-copy strong {
+                    color: var(--rc-text);
+                    font-size: .98rem;
+                    line-height: 1.15;
+                    font-weight: 920;
+                    letter-spacing: -.025em;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .rc-discover-v29 .rc-discover-card-copy small {
+                    color: var(--rc-muted);
+                    font-size: .8rem;
+                    line-height: 1.25;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+
+                .rc-discover-v29 .rc-discover-card-check,
+                .rc-discover-v29 .rc-discover-row-check {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 1.55rem;
+                    height: 1.55rem;
+                    border: 1px solid var(--rc-border);
+                    border-radius: .45rem;
+                    background: var(--rc-surface);
+                    color: var(--rc-accent);
+                    font-size: .82rem;
+                    font-weight: 500;
+                    box-shadow: 0 1px 3px rgba(15,23,42,.04);
+                }
+
+                .rc-discover-v29 .rc-discover-card-rule {
+                    height: 1px;
+                    background: var(--rc-border);
+                    margin: .92rem 0 .82rem;
+                    opacity: .75;
+                }
+
+                .rc-discover-v29 .rc-discover-card-footer {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: .6rem;
+                }
+
+                .rc-discover-v29 .rc-discover-division-pill {
+                    display: inline-flex;
+                    align-items: center;
+                    border-radius: .48rem;
+                    background: rgba(255,99,56,.13);
+                    color: var(--rc-accent);
+                    padding: .34rem .55rem;
+                    font-size: .72rem;
+                    line-height: 1;
+                    font-weight: 650;
+                    white-space: nowrap;
+                }
+
+                .rc-discover-v29 .rc-discover-coach-count {
+                    color: var(--rc-muted);
+                    font-size: .82rem;
+                    white-space: nowrap;
+                }
+
+                .rc-discover-v29 .rc-school-list-table.rc-discover-school-list {
+                    display: grid;
+                    gap: 0;
+                    border: 1px solid var(--rc-border);
+                    border-radius: .85rem;
+                    background: var(--rc-surface);
+                    overflow: hidden;
+                    box-shadow: 0 10px 26px rgba(15,23,42,.05);
+                }
+
+                .rc-discover-v29 .rc-discover-school-list-head,
+                .rc-discover-v29 .rc-discover-school-list-row {
+                    display: grid;
+                    grid-template-columns: minmax(15rem, 1.35fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(13rem, 1.2fr) 4rem 2.6rem;
+                    gap: 1rem;
+                    align-items: center;
+                }
+
+                .rc-discover-v29 .rc-discover-school-list-head {
+                    padding: .88rem 1.2rem;
+                    background: var(--rc-soft);
+                    color: var(--rc-muted);
+                    font-size: .72rem;
+                    font-weight: 650;
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                }
+
+                .rc-discover-v29 .rc-discover-school-list-row {
+                    border-top: 1px solid var(--rc-border);
+                    padding: .86rem 1.2rem;
+                    background: transparent;
+                    box-shadow: none;
+                }
+
+                .rc-discover-v29 .rc-discover-school-list-row:hover { background: var(--rc-soft); }
+
+                .rc-discover-v29 .rc-discover-school-list-school {
+                    display: grid;
+                    grid-template-columns: 2.15rem minmax(0, 1fr);
+                    gap: .6rem;
+                    align-items: center;
+                    border: 0;
+                    background: transparent;
+                    color: var(--rc-text);
+                    text-align: left;
+                    font-size: .88rem;
+                    font-weight: 650;
+                    cursor: pointer;
+                }
+
+                .rc-discover-v29 .rc-discover-school-list-name-copy,
+                .rc-discover-v29 .rc-discover-list-coach,
+                .rc-discover-v29 .rc-discover-list-muted,
+                .rc-discover-v29 .rc-discover-list-email {
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .rc-discover-v29 .rc-discover-list-coach { color: var(--rc-text); font-weight: 650; font-size: .82rem; }
+                .rc-discover-v29 .rc-discover-list-muted { color: var(--rc-muted); font-size: .82rem; }
+                .rc-discover-v29 .rc-discover-list-email a { color: #3b82f6; text-decoration: none; font-size: .82rem; }
+                .rc-discover-v29 .rc-discover-list-division { color: var(--rc-accent); font-size: .76rem; font-weight: 650; }
+                .rc-discover-v29 .rc-head-coach-chip { display:inline-flex; margin-left:.28rem; border-radius:.35rem; padding:.12rem .28rem; background:rgba(255,99,56,.13); color:var(--rc-accent); font-size:.62rem; font-weight:950; vertical-align:middle; }
+
+                @media (max-width: 1320px) {
+                    .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                    .rc-discover-filter-v27 { grid-template-columns: minmax(0, 1fr) minmax(16rem, 21rem); }
+                }
+
+
+
+                .rc-discover-bulk-v36 {
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.85rem;
+                    width:100%;
+                    min-height:3.6rem;
+                    padding:.75rem 1rem;
+                    margin:.45rem 0 .95rem;
+                    border-radius:.72rem;
+                    background:#18191f;
+                    color:#fff;
+                    box-shadow:0 14px 32px rgba(15,23,42,.13);
+                }
+
+                .dark .rc-discover-bulk-v36 {
+                    background:#111217;
+                    box-shadow:0 14px 32px rgba(0,0,0,.28);
+                }
+
+                .rc-discover-bulk-left-v36,
+                .rc-discover-bulk-actions-v36 {
+                    display:flex;
+                    align-items:center;
+                    gap:.7rem;
+                    min-width:0;
+                }
+
+                .rc-discover-bulk-count-v36 {
+                    font-size:.86rem;
+                    font-weight:700;
+                    white-space:nowrap;
+                }
+
+                .rc-discover-bulk-email-v36,
+                .rc-discover-bulk-list-v36 > button {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    gap:.42rem;
+                    min-height:2.35rem;
+                    padding:0 .9rem;
+                    border:0;
+                    border-radius:.62rem;
+                    font-size:.84rem;
+                    font-weight:700;
+                    line-height:1;
+                    cursor:pointer;
+                    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+                }
+
+                .rc-discover-bulk-email-v36 {
+                    background:#ff6338;
+                    color:#fff;
+                    box-shadow:0 10px 24px rgba(255,99,56,.22);
+                }
+
+                .rc-discover-bulk-list-v36 {
+                    position:relative;
+                    display:inline-flex;
+                }
+
+                .rc-discover-bulk-list-v36 > button {
+                    background:#fff;
+                    color:#273044;
+                    box-shadow:0 8px 18px rgba(0,0,0,.12);
+                }
+
+                .rc-discover-bulk-email-v36:hover,
+                .rc-discover-bulk-list-v36 > button:hover {
+                    transform:translateY(-1px);
+                }
+
+                .rc-discover-bulk-clear-v36 {
+                    border:0;
+                    background:transparent;
+                    color:#f8fafc;
+                    font-size:.78rem;
+                    font-weight:700;
+                    cursor:pointer;
+                    padding:.4rem .2rem;
+                    opacity:.92;
+                }
+
+                .rc-discover-bulk-clear-v36:hover {
+                    opacity:1;
+                    text-decoration:underline;
+                }
+
+                .rc-discover-bulk-menu-v36 {
+                    position:absolute;
+                    z-index:80;
+                    top:calc(100% + .45rem);
+                    left:0;
+                    min-width:12.5rem;
+                    max-height:15rem;
+                    overflow:auto;
+                    padding:.35rem;
+                    border:1px solid rgba(226,232,240,.85);
+                    border-radius:.75rem;
+                    background:#fff;
+                    color:#111827;
+                    box-shadow:0 20px 45px rgba(15,23,42,.18);
+                }
+
+                .dark .rc-discover-bulk-menu-v36 {
+                    border-color:rgba(63,63,70,.95);
+                    background:#18181b;
+                    color:#f4f4f5;
+                }
+
+                .rc-discover-bulk-option-v36 {
+                    width:100%;
+                    border:0;
+                    background:transparent;
+                    color:inherit;
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.5rem;
+                    padding:.55rem .65rem;
+                    border-radius:.55rem;
+                    text-align:left;
+                    font-size:.8rem;
+                    font-weight:650;
+                    cursor:pointer;
+                }
+
+                .rc-discover-bulk-option-v36:hover {
+                    background:rgba(255,99,56,.1);
+                    color:#ff6338;
+                }
+
+                .rc-discover-school-card.is-selected {
+                    border-color:#ff6338 !important;
+                    box-shadow:0 12px 30px rgba(255,99,56,.12), 0 1px 2px rgba(15,23,42,.05) !important;
+                }
+
+                .rc-discover-card-check.is-selected,
+                .rc-discover-row-check.is-selected {
+                    background:#ff6338 !important;
+                    border-color:#ff6338 !important;
+                    color:#fff !important;
+                    box-shadow:0 8px 18px rgba(255,99,56,.18);
+                }
+
+                @media (max-width: 1100px) {
+                    .rc-discover-top-v29 { grid-template-columns: 1fr; }
+                    .rc-discover-actions-v29 { justify-self: stretch; grid-template-columns: minmax(0, 1fr) 3rem 3rem; }
+                    .rc-discover-filter-v27 { grid-template-columns: 1fr; }
+                    .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .rc-discover-v29 .rc-discover-school-list-head { display: none; }
+                    .rc-discover-v29 .rc-discover-school-list-row { grid-template-columns: 1fr auto; gap: .5rem; }
+                    .rc-discover-v29 .rc-discover-school-list-row > :nth-child(n+2):nth-child(-n+5) { display: none; }
+                }
+
+                @media (max-width: 640px) {
+                    .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: 1fr; }
+                    .rc-discover-actions-v29 { grid-template-columns: 1fr 3rem 3rem; }
+                    .rc-discover-title-v29 h1 { font-size: 1.75rem; }
+                }
             
+                .rc-discover-top-v29 {
+                    display: grid !important;
+                    grid-template-columns: minmax(0, 1fr) minmax(34rem, 45rem) !important;
+                    column-gap: 1.25rem !important;
+                    align-items: start !important;
+                    margin: -.7rem 0 .55rem !important;
+                }
 
-        /* v9 header/search refinements. Keeps the dashboard top tighter and prevents the search from dominating the header. */
-        .rc-home-dashboard-v2 {
-            padding-top: 0 !important;
-            margin-top: -1rem !important;
-        }
+                .rc-discover-title-v29 h1 {
+                    white-space: nowrap;
+                    font-weight: 760 !important;
+                    font-size: clamp(1.6rem, 2.05vw, 2.05rem) !important;
+                    line-height: 1.05 !important;
+                }
 
-        .rc-home-header-v2 {
-            margin-top: -.35rem !important;
-            margin-bottom: .85rem !important;
-            grid-template-columns: minmax(0, 1fr) minmax(28rem, 39rem) !important;
-        }
+                .rc-discover-title-v29 p {
+                    font-size: .88rem !important;
+                    margin-top: .38rem !important;
+                }
 
-        .rc-home-actions-v2 {
-            max-width: 39rem !important;
-            grid-template-columns: minmax(22rem, 33rem) 3rem 3rem !important;
-            gap: .65rem !important;
-        }
+                .rc-discover-actions-v29 {
+                    justify-self: end !important;
+                    width: 100% !important;
+                    max-width: 45rem !important;
+                    display: grid !important;
+                    grid-template-columns: minmax(28rem, 1fr) 2.75rem 2.75rem !important;
+                    grid-template-areas: "search refresh dark" !important;
+                    justify-content: end !important;
+                    align-items: center !important;
+                    gap: .65rem !important;
+                }
 
-        .rc-home-search-v2,
-        .rc-global-search-shell {
-            max-width: 33rem !important;
-        }
+                .rc-discover-actions-v29 .rc-home-search-v2,
+                .rc-discover-program-search-v27 {
+                    min-height: 2.62rem !important;
+                    border-radius: .8rem !important;
+                }
 
-        .rc-global-suggestions {
-            z-index: 95 !important;
-        }
+                .rc-discover-actions-v29 .rc-home-search-v2 input,
+                .rc-discover-program-search-v27 input {
+                    min-height: 2.62rem !important;
+                    font-size: .86rem !important;
+                    font-weight: 400 !important;
+                }
 
-        @media (max-width: 1180px) {
-            .rc-home-dashboard-v2 {
-                margin-top: -.35rem !important;
-            }
+                .rc-discover-actions-v29 .rc-home-refresh-v2,
+                .rc-discover-actions-v29 .rc-home-dark-toggle-v2 {
+                    width: 2.75rem !important;
+                    min-width: 2.75rem !important;
+                    max-width: 2.75rem !important;
+                    height: 2.75rem !important;
+                    min-height: 2.75rem !important;
+                    max-height: 2.75rem !important;
+                    border-radius: .8rem !important;
+                }
 
-            .rc-home-header-v2 {
-                grid-template-columns: 1fr !important;
-                row-gap: .85rem !important;
-            }
+                .rc-discover-tabs-v27 {
+                    min-height: 2.55rem !important;
+                    padding: .2rem !important;
+                    border-radius: .78rem !important;
+                }
 
-            .rc-home-actions-v2 {
-                justify-self: stretch !important;
-                width: 100% !important;
-                max-width: none !important;
-                grid-template-columns: minmax(0, 1fr) 3rem 3rem !important;
-            }
+                .rc-discover-tab-v27 {
+                    min-height: 2.14rem !important;
+                    border-radius: .62rem !important;
+                    font-size: .8rem !important;
+                    font-weight: 600 !important;
+                }
 
-            .rc-home-search-v2,
-            .rc-global-search-shell {
-                max-width: none !important;
-            }
-        }
+                .rc-discover-select-v27 {
+                    min-height: 2.55rem !important;
+                    border-radius: .78rem !important;
+                    font-size: .86rem !important;
+                    font-weight: 500 !important;
+                }
 
+                .rc-discover-count-v27,
+                .rc-discover-select-all-v27,
+                .rc-discover-card-copy strong,
+                .rc-discover-list-coach {
+                    font-weight: 600 !important;
+                }
+
+
+
+                .rc-discover-bulk-v36 {
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.85rem;
+                    width:100%;
+                    min-height:3.6rem;
+                    padding:.75rem 1rem;
+                    margin:.45rem 0 .95rem;
+                    border-radius:.72rem;
+                    background:#18191f;
+                    color:#fff;
+                    box-shadow:0 14px 32px rgba(15,23,42,.13);
+                }
+
+                .dark .rc-discover-bulk-v36 {
+                    background:#111217;
+                    box-shadow:0 14px 32px rgba(0,0,0,.28);
+                }
+
+                .rc-discover-bulk-left-v36,
+                .rc-discover-bulk-actions-v36 {
+                    display:flex;
+                    align-items:center;
+                    gap:.7rem;
+                    min-width:0;
+                }
+
+                .rc-discover-bulk-count-v36 {
+                    font-size:.86rem;
+                    font-weight:700;
+                    white-space:nowrap;
+                }
+
+                .rc-discover-bulk-email-v36,
+                .rc-discover-bulk-list-v36 > button {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    gap:.42rem;
+                    min-height:2.35rem;
+                    padding:0 .9rem;
+                    border:0;
+                    border-radius:.62rem;
+                    font-size:.84rem;
+                    font-weight:700;
+                    line-height:1;
+                    cursor:pointer;
+                    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+                }
+
+                .rc-discover-bulk-email-v36 {
+                    background:#ff6338;
+                    color:#fff;
+                    box-shadow:0 10px 24px rgba(255,99,56,.22);
+                }
+
+                .rc-discover-bulk-list-v36 {
+                    position:relative;
+                    display:inline-flex;
+                }
+
+                .rc-discover-bulk-list-v36 > button {
+                    background:#fff;
+                    color:#273044;
+                    box-shadow:0 8px 18px rgba(0,0,0,.12);
+                }
+
+                .rc-discover-bulk-email-v36:hover,
+                .rc-discover-bulk-list-v36 > button:hover {
+                    transform:translateY(-1px);
+                }
+
+                .rc-discover-bulk-clear-v36 {
+                    border:0;
+                    background:transparent;
+                    color:#f8fafc;
+                    font-size:.78rem;
+                    font-weight:700;
+                    cursor:pointer;
+                    padding:.4rem .2rem;
+                    opacity:.92;
+                }
+
+                .rc-discover-bulk-clear-v36:hover {
+                    opacity:1;
+                    text-decoration:underline;
+                }
+
+                .rc-discover-bulk-menu-v36 {
+                    position:absolute;
+                    z-index:80;
+                    top:calc(100% + .45rem);
+                    left:0;
+                    min-width:12.5rem;
+                    max-height:15rem;
+                    overflow:auto;
+                    padding:.35rem;
+                    border:1px solid rgba(226,232,240,.85);
+                    border-radius:.75rem;
+                    background:#fff;
+                    color:#111827;
+                    box-shadow:0 20px 45px rgba(15,23,42,.18);
+                }
+
+                .dark .rc-discover-bulk-menu-v36 {
+                    border-color:rgba(63,63,70,.95);
+                    background:#18181b;
+                    color:#f4f4f5;
+                }
+
+                .rc-discover-bulk-option-v36 {
+                    width:100%;
+                    border:0;
+                    background:transparent;
+                    color:inherit;
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.5rem;
+                    padding:.55rem .65rem;
+                    border-radius:.55rem;
+                    text-align:left;
+                    font-size:.8rem;
+                    font-weight:650;
+                    cursor:pointer;
+                }
+
+                .rc-discover-bulk-option-v36:hover {
+                    background:rgba(255,99,56,.1);
+                    color:#ff6338;
+                }
+
+                .rc-discover-school-card.is-selected {
+                    border-color:#ff6338 !important;
+                    box-shadow:0 12px 30px rgba(255,99,56,.12), 0 1px 2px rgba(15,23,42,.05) !important;
+                }
+
+                .rc-discover-card-check.is-selected,
+                .rc-discover-row-check.is-selected {
+                    background:#ff6338 !important;
+                    border-color:#ff6338 !important;
+                    color:#fff !important;
+                    box-shadow:0 8px 18px rgba(255,99,56,.18);
+                }
+
+                @media (max-width: 1100px) {
+                    .rc-discover-top-v29 { grid-template-columns: 1fr !important; }
+                    .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
+                    .rc-discover-title-v29 h1 { white-space: normal; }
+                }
 </style>
 
-            <div class="rc-discover-schools-page">
-                <div class="rc-page-heading" style="margin-bottom:0;">
-                    <h1>Discover Schools</h1>
-                    <div class="rc-subtle">Find programs, coaches, conferences, and divisions that match your recruiting goals.</div>
+            <div class="rc-discover-v29">
+                @include('filament.partials.coach-database-header', [
+                    'firstName' => $firstName,
+                    'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                    'showNewEmail' => false,
+                ])
+
+                <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
                 </div>
 
-                <div class="rc-discover-toolbar">
-                    <div class="rc-discover-search" role="search" aria-label="Search schools and coaches">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                        <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs, coaches, conferences, divisions, and lists..." wire:model.live.debounce.350ms="search" />
-
-                            @if($search !== '')
-                                <div class="rc-global-suggestions">
-                                    @if($globalSearchHasSuggestions)
-                                        @foreach($globalSearchGroups as $groupKey => $groupLabel)
-                                            @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
-                                                <div class="rc-global-suggestion-group">
-                                                    <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
-                                                    @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
-                                                        <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
-                                                            <span class="rc-global-suggestion-icon">
-                                                                @if(! empty($suggestion['logo_url']))
-                                                                    <img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">
-                                                                @else
-                                                                    {{ $globalSearchInitials($suggestion['label'] ?? '') }}
-                                                                @endif
-                                                            </span>
-                                                            <span class="rc-global-suggestion-copy">
-                                                                <strong>{{ $suggestion['label'] }}</strong>
-                                                                <small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small>
-                                                            </span>
-                                                            <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
-                                                        </button>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-                                        @endforeach
-                                    @else
-                                        <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
-                                    @endif
-                                </div>
-                            @endif
+                <div class="rc-discover-filter-v27">
+                    <div class="rc-discover-tabs-v27" aria-label="Division filter">
+                        @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
+                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">{{ $divisionLabel }}</button>
+                        @endforeach
                     </div>
 
-                    <div class="rc-discover-filter-row">
-                        <div class="rc-discover-tabs" aria-label="Division filter">
-                            @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                                <button type="button" class="rc-discover-tab {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">
-                                    {{ $divisionLabel }}
-                                </button>
-                            @endforeach
-                        </div>
-
-                        <select class="rc-discover-select" wire:model.live="conferenceFilter" aria-label="Conference filter">
-                            <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
-                            @foreach($this->conferences as $conference)
-                                <option value="{{ $conference }}">{{ $conference }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <select class="rc-discover-select-v27" wire:model.live="conferenceFilter" aria-label="Conference filter">
+                        <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
+                        @foreach($this->conferences as $conference)
+                            <option value="{{ $conference }}">{{ $conference }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
-                <div class="rc-discover-results-row">
-                    <div class="rc-discover-count">
-                        <span>{{ number_format($discoverSchoolCount) }} schools</span>
-                        <label class="rc-discover-select-all">
-                            <input type="checkbox" disabled>
-                            <span>Select All ({{ number_format($discoverShownCount) }})</span>
-                        </label>
+                <div class="rc-discover-meta-v27">
+                    <div class="rc-discover-count-v27">
+                        <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
                     </div>
 
-                    <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                    <div class="rc-discover-right-v27">
                         <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
-                        <div class="rc-discover-view-toggle" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                            </button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
-                            </button>
+                        <div class="rc-discover-toggle-v27" aria-label="School view">
+                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
 
-                @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode])
+                @if($this->selectedSchoolCount > 0)
+                    <div class="rc-discover-bulk-v36" wire:key="discover-bulk-selection-bar">
+                        <div class="rc-discover-bulk-left-v36">
+                            <span class="rc-discover-bulk-count-v36">{{ number_format($this->selectedSchoolCount) }} {{ \Illuminate\Support\Str::plural('selected', $this->selectedSchoolCount) }}</span>
+                            <button type="button" class="rc-discover-bulk-email-v36" wire:click="emailSelectedSchools" wire:loading.attr="disabled" wire:target="emailSelectedSchools">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                                <span>Email</span>
+                            </button>
+                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" @click.outside="open = false">
+                                <button type="button" @click="open = ! open">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                    <span>Add to List</span>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
+                                    @forelse($this->lists as $list)
+                                        @php $listKey = (string) ($list['key'] ?? ''); @endphp
+                                        @if($listKey !== '')
+                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" @click="open = false">
+                                                <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
+                                                <span>+</span>
+                                            </button>
+                                        @endif
+                                    @empty
+                                        <div class="rc-school-list-empty">No lists yet.</div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="rc-discover-bulk-clear-v36" wire:click="clearSelectedSchools">Clear</button>
+                    </div>
+                @endif
+
+                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
+                    <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
+                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                </div>
+
                 @if($this->canLoadMoreSchools)
                     <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
                 @endif
             </div>
         @endif
 
+
         @if($section === 'favorites')
-            @if($isSyncingTags)<div class="rc-card is-flat rc-subtle"><span class="rc-spinner-mini"></span> Syncing saved and favorite tags…</div>@endif
-            <div class="rc-favorites-layout">
-                <div class="rc-card rc-favorites-panel">
-                    <div class="rc-section-title">Saved schools</div>
-                    <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search saved schools" wire:model.live.debounce.350ms="favoriteSchoolSearch" />
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->savedSchools, 'compact' => true])
+            <style>
+                .rc-favorites-v37 { display:grid; gap:1.05rem; margin-top:1.15rem; }
+                .rc-favorites-head-v37 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
+                .rc-favorites-title-v37 { display:grid; gap:.28rem; min-width:0; }
+                .rc-favorites-title-v37 h2 { margin:0; color:var(--rc-text); font-size:1.35rem; line-height:1.15; font-weight:750; letter-spacing:-.025em; }
+                .rc-favorites-title-v37 p { margin:0; color:var(--rc-muted); font-size:.9rem; line-height:1.35; }
+                .rc-favorites-actions-v37 { display:flex; align-items:center; justify-content:flex-end; gap:.6rem; flex-wrap:wrap; }
+                .rc-fav-view-toggle-v37 { display:inline-flex; align-items:center; gap:.28rem; padding:.22rem; border-radius:.86rem; background:var(--rc-surface); border:1px solid var(--rc-border); box-shadow:0 10px 24px rgba(15,23,42,.05); }
+                .rc-fav-view-toggle-v37 button { width:2.25rem; height:2.25rem; border:0; border-radius:.7rem; background:transparent; color:var(--rc-muted); display:grid; place-items:center; cursor:pointer; transition:.16s ease; }
+                .rc-fav-view-toggle-v37 button.is-active { color:#ff6338; background:#fff2ed; }
+                .dark .rc-fav-view-toggle-v37 button.is-active { background:rgba(255,99,56,.15); }
+                .rc-fav-discover-btn-v37 { min-height:2.55rem; padding:0 1rem; border-radius:.82rem; border:1px solid var(--rc-border); background:var(--rc-surface); color:var(--rc-text); display:inline-flex; align-items:center; gap:.45rem; font-size:.84rem; font-weight:650; text-decoration:none; box-shadow:0 10px 24px rgba(15,23,42,.05); }
+                .rc-favorites-grid-v37 { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+                .rc-favorite-card-v37 { border:1px solid var(--rc-border); border-radius:1.05rem; background:var(--rc-surface); box-shadow:0 14px 35px rgba(15,23,42,.07); padding:1.18rem; display:grid; gap:.85rem; min-height:13.6rem; }
+                .rc-favorite-top-v37 { display:flex; align-items:flex-start; justify-content:space-between; gap:.85rem; }
+                .rc-favorite-logo-v37 { width:3.3rem; height:3.3rem; border-radius:.75rem; border:1px solid var(--rc-border); background:#fff; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto; color:#111827; font-size:1.05rem; font-weight:700; }
+                .rc-favorite-logo-v37 img { display:block; width:100%; height:100%; object-fit:contain; object-position:center; background:#fff; }
+                .rc-favorite-logo-v37 .rc-logo-fallback-text { display:none; }
+                .rc-favorite-logo-v37.is-missing-logo .rc-logo-fallback-text { display:inline-flex; }
+                .rc-favorite-logo-v37.is-missing-logo img { display:none !important; }
+                .rc-favorite-star-v37 { width:2.2rem; height:2.2rem; border:0; border-radius:.65rem; display:grid; place-items:center; color:#f59e0b; background:#fff0cc; cursor:pointer; }
+                .rc-favorite-copy-v37 { display:grid; gap:.35rem; min-width:0; }
+                .rc-favorite-copy-v37 h3 { margin:0; color:var(--rc-text); font-size:.95rem; line-height:1.25; font-weight:700; letter-spacing:-.01em; }
+                .rc-favorite-copy-v37 p { margin:0; color:var(--rc-muted); font-size:.8rem; line-height:1.35; }
+                .rc-favorite-actions-v37 { display:flex; align-items:center; gap:.5rem; margin-top:auto; }
+                .rc-favorite-view-v37, .rc-favorite-remove-v37 { min-height:2.55rem; border-radius:.72rem; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; padding:0 .9rem; font-size:.84rem; font-weight:700; cursor:pointer; transition:.16s ease; }
+                .rc-favorite-view-v37 { border:1px solid #ff6338; color:#fff; background:#ff6338; box-shadow:0 10px 24px rgba(255,99,56,.22); min-width:7.25rem; }
+                .rc-favorite-remove-v37 { border:1px solid var(--rc-border); color:var(--rc-text); background:var(--rc-surface); min-width:6.5rem; }
+                .rc-favorites-list-v40 { border:1px solid var(--rc-border); border-radius:1rem; background:var(--rc-surface); box-shadow:0 14px 35px rgba(15,23,42,.055); overflow:hidden; max-width:78rem; }
+                .rc-fav-list-row-v40 { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:.8rem; align-items:center; padding:.8rem .95rem; border-top:1px solid var(--rc-border); }
+                .rc-fav-list-row-v40:first-child { border-top:0; }
+                .rc-fav-list-main-v40 { display:grid; grid-template-columns:2.25rem minmax(0,1fr); gap:.75rem; align-items:center; min-width:0; }
+                .rc-fav-list-logo-v40 { width:2.25rem; height:2.25rem; border-radius:.55rem; border:1px solid var(--rc-border); background:#fff; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; color:#111827; font-size:.78rem; font-weight:750; flex:0 0 auto; }
+                .rc-fav-list-logo-v40 img { width:100%; height:100%; object-fit:contain; object-position:center; display:block; background:#fff; }
+                .rc-fav-list-logo-v40 .rc-logo-fallback-text { display:none; }
+                .rc-fav-list-logo-v40.is-missing-logo .rc-logo-fallback-text { display:inline-flex; }
+                .rc-fav-list-logo-v40.is-missing-logo img { display:none !important; }
+                .rc-fav-list-copy-v40 { display:grid; gap:.1rem; min-width:0; }
+                .rc-fav-list-copy-v40 strong { color:var(--rc-text); font-size:.88rem; line-height:1.2; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                .rc-fav-list-copy-v40 span { color:var(--rc-muted); font-size:.76rem; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                .rc-fav-list-count-v40 { color:var(--rc-muted); font-size:.78rem; white-space:nowrap; }
+                .rc-fav-list-view-v40 { min-height:2.05rem; padding:0 .85rem; border-radius:.62rem; border:1px solid var(--rc-border); color:var(--rc-text); background:var(--rc-surface); display:inline-flex; align-items:center; justify-content:center; gap:.4rem; font-size:.78rem; font-weight:650; cursor:pointer; }
+                .rc-fav-list-remove-v40 { width:2rem; height:2rem; border:0; background:transparent; color:var(--rc-muted); display:grid; place-items:center; border-radius:.5rem; cursor:pointer; }
+                .rc-fav-list-remove-v40:hover { background:var(--rc-soft); color:#ff6338; }
+                .rc-favorites-empty-v37 { border:1px dashed var(--rc-border); border-radius:1rem; padding:1rem; color:var(--rc-muted); background:var(--rc-surface); }
+                .rc-favorites-loading-v37 { display:inline-flex; align-items:center; gap:.45rem; color:var(--rc-muted); font-size:.82rem; }
+                @media (max-width: 1280px) { .rc-favorites-grid-v37 { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+                @media (max-width: 900px) { .rc-favorites-head-v37 { align-items:flex-start; flex-direction:column; } .rc-favorites-grid-v37 { grid-template-columns:repeat(2,minmax(0,1fr)); } .rc-fav-list-row-v40 { grid-template-columns:minmax(0,1fr) auto; } .rc-fav-list-count-v40 { display:none; } }
+                @media (max-width: 640px) { .rc-favorites-grid-v37 { grid-template-columns:1fr; } }
+            </style>
+
+            @php
+                $favoriteSchoolRows = collect($this->favoriteSchools ?? [])->filter(fn ($school) => is_array($school))->values();
+                $favoriteInitialsFor = function (string $name): string {
+                    return strtoupper(collect(preg_split('/\s+/', trim($name)) ?: [])->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
+                };
+                $favoriteLogoUrlFor = function (array $school): string {
+                    foreach (['logo_url', 'school_logo_url', 'business_logo_url', 'logo', 'school_logo', 'business_logo'] as $key) {
+                        $value = $school[$key] ?? null;
+                        if (is_scalar($value)) {
+                            $url = trim((string) $value);
+                            if (str_starts_with(strtolower($url), 'http://') || str_starts_with(strtolower($url), 'https://') || str_starts_with($url, '//')) {
+                                return str_starts_with($url, '//') ? 'https:' . $url : $url;
+                            }
+                        }
+                    }
+                    foreach (['head_coach.logo_url', 'head_coach.school_logo_url', 'head_coach.business_logo_url'] as $key) {
+                        $url = trim((string) data_get($school, $key, ''));
+                        if (str_starts_with(strtolower($url), 'http://') || str_starts_with(strtolower($url), 'https://') || str_starts_with($url, '//')) {
+                            return str_starts_with($url, '//') ? 'https:' . $url : $url;
+                        }
+                    }
+                    return '';
+                };
+            @endphp
+
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                'showNewEmail' => false,
+            ])
+
+            <div class="rc-favorites-v37">
+                <div class="rc-favorites-head-v37">
+                    <div class="rc-favorites-title-v37">
+                        <h2>Favorites</h2>
+                        <p>Schools you’ve starred, saved for quick access.</p>
+                    </div>
+                    <div class="rc-favorites-actions-v37">
+                        <div class="rc-fav-view-toggle-v37" aria-label="Favorite school view options">
+                            <button type="button" class="{{ $schoolViewMode !== 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                            </button>
+                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                            </button>
+                        </div>
+                        <a class="rc-fav-discover-btn-v37" href="{{ \App\Filament\Pages\CoachDatabaseSchools::getUrl() }}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16 8-2.2 6.3L8 16l2.2-6.3L16 8Z"/></svg>
+                            Discover Schools
+                        </a>
+                    </div>
                 </div>
-                <div class="rc-card rc-favorites-panel">
-                    <div class="rc-section-title">Favorite schools</div>
-                    <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search favorite schools" wire:model.live.debounce.350ms="favoriteSchoolSearch" />
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->favoriteSchools, 'compact' => true])
-                </div>
+
+                @if($isSyncingTags)
+                    <div class="rc-favorites-loading-v37"><span class="rc-spinner-mini"></span> Syncing saved and favorite tags…</div>
+                @endif
+
+                @if($favoriteSchoolRows->isEmpty())
+                    <div class="rc-favorites-empty-v37">No favorite schools yet. Star a school from Discover Schools to keep it here.</div>
+                @elseif($schoolViewMode === 'list')
+                    <div class="rc-favorites-list-v40">
+                        @foreach($favoriteSchoolRows as $school)
+                            @php
+                                $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? '')))));
+                                $schoolName = trim((string) ($school['name'] ?? 'Unnamed School'));
+                                $conference = trim((string) ($school['conference'] ?? ''));
+                                $coachCount = (int) ($school['coach_count'] ?? 0);
+                                $logoUrl = $favoriteLogoUrlFor($school);
+                                $initials = $favoriteInitialsFor($schoolName);
+                            @endphp
+                            <div class="rc-fav-list-row-v40">
+                                <div class="rc-fav-list-main-v40">
+                                    <span class="rc-fav-list-logo-v40 {{ $logoUrl === '' ? 'is-missing-logo' : '' }}">
+                                        @if($logoUrl !== '')
+                                            <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.closest('.rc-fav-list-logo-v40').classList.add('is-missing-logo')">
+                                        @endif
+                                        <span class="rc-logo-fallback-text">{{ $initials }}</span>
+                                    </span>
+                                    <span class="rc-fav-list-copy-v40">
+                                        <strong>{{ $schoolName }}</strong>
+                                        <span>{{ $conference !== '' ? $conference : 'Conference unavailable' }}</span>
+                                    </span>
+                                </div>
+                                <span class="rc-fav-list-count-v40">{{ number_format($coachCount) }} {{ \Illuminate\Support\Str::plural('coach', $coachCount) }}</span>
+                                <button type="button" class="rc-fav-list-view-v40" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                                    View
+                                </button>
+                                <button type="button" class="rc-fav-list-remove-v40" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($schoolId) }})" aria-label="Remove {{ $schoolName }} from favorites">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="rc-favorites-grid-v37">
+                        @foreach($favoriteSchoolRows as $school)
+                            @php
+                                $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? '')))));
+                                $schoolName = trim((string) ($school['name'] ?? 'Unnamed School'));
+                                $conference = trim((string) ($school['conference'] ?? ''));
+                                $coachCount = (int) ($school['coach_count'] ?? 0);
+                                $logoUrl = $favoriteLogoUrlFor($school);
+                                $initials = $favoriteInitialsFor($schoolName);
+                            @endphp
+                            <article class="rc-favorite-card-v37">
+                                <div class="rc-favorite-top-v37">
+                                    <span class="rc-favorite-logo-v37 {{ $logoUrl === '' ? 'is-missing-logo' : '' }}">
+                                        @if($logoUrl !== '')
+                                            <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.closest('.rc-favorite-logo-v37').classList.add('is-missing-logo')">
+                                        @endif
+                                        <span class="rc-logo-fallback-text">{{ $initials }}</span>
+                                    </span>
+                                    <button type="button" class="rc-favorite-star-v37" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($schoolId) }})" aria-label="Remove {{ $schoolName }} from favorites">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 2.75 2.83 5.73 6.32.92-4.57 4.46 1.08 6.3L12 17.18l-5.66 2.98 1.08-6.3L2.85 9.4l6.32-.92L12 2.75Z"/></svg>
+                                    </button>
+                                </div>
+                                <div class="rc-favorite-copy-v37">
+                                    <h3>{{ $schoolName }}</h3>
+                                    <p>{{ $conference !== '' ? $conference : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ \Illuminate\Support\Str::plural('coach', $coachCount) }}</p>
+                                </div>
+                                <div class="rc-favorite-actions-v37">
+                                    <button type="button" class="rc-favorite-view-v37" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                                        View
+                                    </button>
+                                    <button type="button" class="rc-favorite-remove-v37" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($schoolId) }})">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                        Remove
+                                    </button>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         @endif
 
         @if($section === 'lists')
-            <div class="rc-grid" style="grid-template-columns:minmax(220px,300px) minmax(0,1fr)">
-                <div class="rc-card rc-grid">
-                    <div>
-                        <div class="rc-section-title">Create list</div>
-                        <div class="rc-toolbar">
-                            <input class="rc-input" style="flex:1" placeholder="Dream D1 schools" wire:model="newListName" />
-                            <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
-                                <span wire:loading.remove wire:target="createCustomList">Create</span>
-                                <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
-                            </button>
-                        </div>
+            <style>
+                .rc-my-lists-v41 { display:grid; gap:1.15rem; }
+                .rc-my-lists-head-v41 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-top:.25rem; }
+                .rc-my-lists-title-v41 h2 { margin:0; color:var(--rc-text); font-size:1.35rem; line-height:1.1; letter-spacing:-.025em; font-weight:750; }
+                .rc-my-lists-title-v41 p { margin:.45rem 0 0; color:var(--rc-muted); font-size:.9rem; line-height:1.4; }
+                .rc-new-list-btn-v41 { min-height:2.85rem; padding:0 1.15rem; border:0; border-radius:.9rem; display:inline-flex; align-items:center; justify-content:center; gap:.55rem; background:#ff6338; color:#fff; font-size:.9rem; font-weight:750; box-shadow:0 15px 30px rgba(255,99,56,.22); cursor:pointer; }
+                .rc-new-list-panel-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:1rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:flex; align-items:center; gap:.65rem; }
+                .rc-new-list-panel-v41 .rc-input { flex:1; min-height:2.65rem; width:100%; }
+                .rc-list-stack-v41 { display:grid; gap:1rem; }
+                .rc-list-card-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1.15rem; padding:1.05rem 1.2rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:grid; gap:1rem; }
+                .rc-list-card-head-v41 { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+                .rc-list-card-title-v41 { display:flex; align-items:center; gap:.7rem; min-width:0; }
+                .rc-list-dot-v41 { width:.72rem; height:.72rem; border-radius:999px; flex:0 0 auto; background:#ff6338; }
+                .rc-list-dot-v41.is-blue { background:#3b82f6; }
+                .rc-list-dot-v41.is-gold { background:#f59e0b; }
+                .rc-list-card-title-v41 strong { color:var(--rc-text); font-size:1rem; font-weight:750; line-height:1.2; }
+                .rc-list-count-pill-v41 { border-radius:999px; padding:.25rem .65rem; background:var(--rc-soft); color:var(--rc-muted); font-size:.78rem; line-height:1.2; white-space:nowrap; }
+                .rc-list-card-actions-v41 { display:inline-flex; align-items:center; gap:.45rem; flex:0 0 auto; }
+                .rc-list-icon-btn-v41 { width:2rem; height:2rem; border:0; border-radius:.65rem; background:transparent; color:var(--rc-muted); display:grid; place-items:center; cursor:pointer; transition:.16s ease; }
+                .rc-list-icon-btn-v41:hover, .rc-list-icon-btn-v41.is-active { background:var(--rc-soft); color:var(--rc-accent); }
+                .rc-list-chip-wrap-v41 { display:flex; flex-wrap:wrap; gap:.55rem; min-height:2.35rem; }
+                .rc-list-school-chip-v41 { display:inline-flex; align-items:center; gap:.55rem; border:1px solid var(--rc-border); border-radius:.65rem; background:var(--rc-soft); color:var(--rc-text); padding:.35rem .45rem; font-size:.82rem; font-weight:650; line-height:1.2; }
+                .rc-list-chip-logo-v41 { width:1.7rem; height:1.7rem; border-radius:.45rem; border:1px solid var(--rc-border); background:#fff; color:#111827; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto; font-size:.67rem; font-weight:800; }
+                .rc-list-chip-logo-v41 img { width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+                .rc-list-chip-remove-v41 { border:0; background:transparent; color:var(--rc-muted); width:1rem; height:1rem; display:grid; place-items:center; cursor:pointer; padding:0; }
+                .rc-list-chip-remove-v41:hover { color:#ff6338; }
+                .rc-list-empty-card-v41 { border:1px dashed var(--rc-border); border-radius:1rem; padding:1rem; color:var(--rc-muted); background:var(--rc-surface); }
+                .rc-list-selected-v41 { border-color:rgba(255,99,56,.42); box-shadow:0 14px 35px rgba(255,99,56,.08); }
+                .dark .rc-new-list-btn-v41 { box-shadow:0 15px 30px rgba(255,99,56,.16); }
+                @media (max-width: 780px) { .rc-my-lists-head-v41 { align-items:flex-start; flex-direction:column; } .rc-new-list-btn-v41 { width:100%; } .rc-list-card-head-v41 { align-items:flex-start; flex-direction:column; } }
+            </style>
+
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                'showNewEmail' => false,
+            ])
+
+            @php
+                $listRows = collect($lists ?? [])->filter(fn ($list) => is_array($list))->values();
+                $listDotClass = function (int $index): string {
+                    return match ($index % 3) { 1 => 'is-blue', 2 => 'is-gold', default => '' };
+                };
+                $listInitials = function (string $name): string {
+                    return strtoupper(collect(preg_split('/\s+/', trim($name)) ?: [])->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
+                };
+                $listLogoUrlFor = function (array $school): string {
+                    foreach (['logo_url', 'school_logo_url', 'business_logo_url', 'logo', 'school_logo', 'business_logo'] as $key) {
+                        $value = $school[$key] ?? null;
+                        if (is_scalar($value)) {
+                            $url = trim((string) $value);
+                            $lower = strtolower($url);
+                            if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($url, '//')) {
+                                return str_starts_with($url, '//') ? 'https:' . $url : $url;
+                            }
+                        }
+                    }
+                    foreach (['head_coach.logo_url', 'head_coach.school_logo_url', 'head_coach.business_logo_url'] as $key) {
+                        $url = trim((string) data_get($school, $key, ''));
+                        $lower = strtolower($url);
+                        if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($url, '//')) {
+                            return str_starts_with($url, '//') ? 'https:' . $url : $url;
+                        }
+                    }
+                    return '';
+                };
+                $schoolsForListKey = function (array $list): array {
+                    $listKey = (string) ($list['key'] ?? '');
+                    if ($listKey === '') {
+                        return [];
+                    }
+
+                    return collect($this->allSchools())
+                        ->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))
+                        ->values()
+                        ->all();
+                };
+            @endphp
+
+            <div class="rc-my-lists-v41">
+                <div class="rc-my-lists-head-v41">
+                    <div class="rc-my-lists-title-v41">
+                        <h2>My Lists</h2>
+                        <p>Organize schools into your own lists — Dream Schools, On the Radar, by conference, however you want.</p>
                     </div>
-                    <div>
-                        <div class="rc-section-title">Lists</div>
-                        <div class="rc-grid" style="gap:.45rem">
-                            @forelse($lists as $list)
-                                <button type="button" class="rc-btn rc-list-button {{ $selectedListKey === ($list['key'] ?? '') ? 'rc-btn-primary' : '' }}" wire:click="selectList('{{ $list['key'] }}')">
-                                    <span>{{ $list['label'] }}</span>
-                                    <span>{{ number_format($list['schools_count'] ?? 0) }} schools</span>
-                                </button>
-                            @empty
-                                <div class="rc-subtle">No lists found yet.</div>
-                            @endforelse
-                        </div>
-                    </div>
+                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        New List
+                    </button>
                 </div>
-                <div class="rc-card">
-                    @if($this->selectedList)
-                        <div class="rc-top" style="margin-bottom:.875rem">
-                            <div>
-                                <div class="rc-section-title" style="margin-bottom:.25rem">{{ $this->selectedList['label'] }}</div>
-                                <div class="rc-subtle">{{ number_format(count($this->selectedListSchools)) }} schools · {{ number_format(count($this->selectedListCoaches)) }} coaches</div>
+
+                @if($showNewListComposer)
+                    <div class="rc-new-list-panel-v41">
+                        <input class="rc-input" placeholder="New list name, e.g. Dream Schools" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
+                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
+                            <span wire:loading.remove wire:target="createCustomList">Create</span>
+                            <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
+                        </button>
+                        <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
+                    </div>
+                @endif
+
+                <div class="rc-list-stack-v41">
+                    @forelse($listRows as $listIndex => $list)
+                        @php
+                            $listKey = (string) ($list['key'] ?? '');
+                            $listLabel = (string) ($list['label'] ?? 'List');
+                            $listSchools = $schoolsForListKey($list);
+                            $schoolCount = count($listSchools);
+                            $isSelectedList = $selectedListKey === $listKey;
+                        @endphp
+                        <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
+                            <div class="rc-list-card-head-v41">
+                                <div class="rc-list-card-title-v41">
+                                    <span class="rc-list-dot-v41 {{ $listDotClass($listIndex) }}"></span>
+                                    <strong>{{ $listLabel }}</strong>
+                                    <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
+                                </div>
+                                <div class="rc-list-card-actions-v41">
+                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="startAddingSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" title="Add schools to {{ $listLabel }}" aria-label="Add schools to {{ $listLabel }}">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-icon-btn-v41 {{ $isSelectedList ? 'is-active' : '' }}" wire:click="selectList({{ \Illuminate\Support\Js::from($listKey) }})" title="Open {{ $listLabel }}" aria-label="Open {{ $listLabel }}">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="deleteCustomList({{ \Illuminate\Support\Js::from($listKey) }})" wire:confirm="Remove this list? This does not delete schools or coaches." title="Delete {{ $listLabel }}" aria-label="Delete {{ $listLabel }}">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    </button>
+                                </div>
                             </div>
-                            <button class="rc-btn" type="button" wire:click="clearSelectedList">Clear</button>
+
+                            <div class="rc-list-chip-wrap-v41">
+                                @forelse($listSchools as $school)
+                                    @php
+                                        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? '');
+                                        $schoolName = (string) ($school['name'] ?? 'School');
+                                        $logoUrl = $listLogoUrlFor($school);
+                                        $initials = $listInitials($schoolName);
+                                    @endphp
+                                    <span class="rc-list-school-chip-v41" wire:key="list-chip-{{ md5($listKey.'-'.$schoolId) }}">
+                                        <span class="rc-list-chip-logo-v41">
+                                            @if($logoUrl !== '')
+                                                <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            @else
+                                                {{ $initials }}
+                                            @endif
+                                        </span>
+                                        <button type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">{{ $schoolName }}</button>
+                                        <button type="button" class="rc-list-chip-remove-v41" wire:click="removeSchoolFromListById({{ \Illuminate\Support\Js::from($schoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" title="Remove {{ $schoolName }} from {{ $listLabel }}" aria-label="Remove {{ $schoolName }} from {{ $listLabel }}">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                        </button>
+                                    </span>
+                                @empty
+                                    <div class="rc-subtle">No schools in this list yet. Use the plus button to add schools from Discover Schools.</div>
+                                @endforelse
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rc-list-empty-card-v41">
+                            <strong>No lists yet.</strong>
+                            <div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div>
                         </div>
-                        <input class="rc-input rc-search-slim" style="width:100%" placeholder="Search schools in this list" wire:model.live.debounce.350ms="listSchoolSearch" />
-                        @include('filament.partials.coach-database-school-grid', ['schools' => $this->selectedListSchools, 'compact' => true])
-                        <div class="rc-section-title" style="margin-top:1.25rem">Coaches in this list</div>
-                        @forelse($this->selectedListCoaches as $coach)
-                            @include('filament.partials.coach-row', ['coach' => $coach])
-                        @empty
-                            <div class="rc-subtle">Add a school or coach to this list to see it here.</div>
-                        @endforelse
-                    @else
-                        <div class="rc-subtle">Choose a list to view its schools and coaches. You can add schools or coaches from school cards, coach rows, and the school drawer.</div>
-                    @endif
+                    @endforelse
                 </div>
             </div>
         @endif
@@ -7082,6 +8451,10 @@
             </div>
         @endif
 
+        <div class="rc-school-opening-overlay-v26" wire:loading.flex wire:target="openSchoolDashboardModal,openDashboardEngagedSchool,openSchoolFromCoach,selectSchoolById,selectGlobalSearchSuggestion">
+            <div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Opening school</div>
+        </div>
+
         @if($this->selectedSchool)
             @php
                 $slideSchool = $this->selectedSchool;
@@ -7097,19 +8470,10 @@
                 $slideEmails = (int) ($slideSchool['emails_sent'] ?? $slideSchool['sent_emails'] ?? $slideSchool['email_count'] ?? 0);
                 $slideTexts = (int) ($slideSchool['texts_sent'] ?? $slideSchool['sms_count'] ?? 0);
                 $slideScore = (int) ($slideSchool['lead_score'] ?? $slideSchool['engagement_score'] ?? max(0, ($slideReplies * 20) + ($slideClicks * 6) + ($slideViews * 2)));
-                $slidePlayers = (int) ($slideSchool['players_count'] ?? $slideSchool['roster_count'] ?? $slideSchool['players'] ?? 0);
-                $slideUpperclass = (int) ($slideSchool['upperclass_count'] ?? $slideSchool['upperclass'] ?? 0);
-                $slideUnderclass = (int) ($slideSchool['underclass_count'] ?? $slideSchool['underclass'] ?? 0);
-                $slideHasRoster = $slidePlayers > 0 || $slideUpperclass > 0 || $slideUnderclass > 0;
-                if (! $slideHasRoster) {
-                    $slidePlayers = $slidePlayers ?: $slideCoaches->count();
-                    $slideUpperclass = (int) floor($slidePlayers * .35);
-                    $slideUnderclass = max(0, $slidePlayers - $slideUpperclass);
-                }
             @endphp
 
             <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                <div class="rc-drawer-panel rc-school-modal-panel is-roster-free-v26" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
                     <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
 
                     <div class="rc-school-modal-hero">
@@ -7158,6 +8522,12 @@
 
                     <div class="rc-school-modal-rule"></div>
 
+                    <div class="rc-school-drawer-summary-v26">
+                        <div class="rc-school-stat-card"><span>👥</span><strong>{{ number_format($slideCoaches->count()) }}</strong><small>Coaches</small></div>
+                        <div class="rc-school-stat-card"><span>👁</span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
+                        <div class="rc-school-stat-card"><span>↗</span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
+                    </div>
+
                     <section class="rc-school-modal-section">
                         <div class="rc-school-section-title">Coaching staff ({{ number_format($slideCoaches->count()) }})</div>
                         <div class="rc-school-coach-list rc-school-modal-coaches">
@@ -7187,14 +8557,6 @@
                         </div>
                     </section>
 
-                    <section class="rc-school-modal-section">
-                        <div class="rc-school-section-title">Roster & stats</div>
-                        <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span>♙</span><strong>{{ number_format($slidePlayers) }}</strong><small>Players</small></div>
-                            <div class="rc-school-stat-card"><span>◉</span><strong>{{ number_format($slideUpperclass) }}</strong><small>Upperclass</small></div>
-                            <div class="rc-school-stat-card"><span>#</span><strong>{{ number_format($slideUnderclass) }}</strong><small>Underclass</small></div>
-                        </div>
-                    </section>
 
                     <section class="rc-school-modal-section">
                         <div class="rc-school-section-title">Communications</div>

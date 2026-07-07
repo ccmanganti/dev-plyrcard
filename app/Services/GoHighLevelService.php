@@ -2206,6 +2206,9 @@ class GoHighLevelService
             'school_logo_url' => $schoolLogoUrl,
             'business_logo_url' => $schoolLogoUrl,
             'logo_url' => $schoolLogoUrl,
+            'contact.school_logo' => $this->stringCustomFieldFromRecord($contact, ['contact.school_logo', 'school_logo', '{{contact.school_logo}}']) ?: $schoolLogoUrl,
+            'customFields' => $contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? $contact['customFieldValues'] ?? $contact['custom_field_values'] ?? $contact['customValues'] ?? $contact['custom_values'] ?? null,
+            'raw_contact' => $contact,
             'title' => $getCustomField('coach_title'),
             'sport' => $getCustomField('coach_sport'),
             'conference' => $contactConference,
@@ -4151,6 +4154,8 @@ class GoHighLevelService
             'is_favorite' => false,
             'engagement_score' => 0,
             'list_keys' => [],
+            'raw_business' => $business,
+            'customFields' => $business['customFields'] ?? $business['customField'] ?? $business['custom_fields'] ?? $business['customFieldValues'] ?? $business['custom_field_values'] ?? $business['customValues'] ?? $business['custom_values'] ?? null,
         ];
     }
 
@@ -4396,7 +4401,7 @@ class GoHighLevelService
         $normalizedKeys = $this->normalizedRecruitingTrackingLookupKeys($keys, $trackingFieldMap);
 
         // Common HighLevel shapes first.
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
             $rawCustomFields = data_get($contact, $containerKey, []);
             $value = $this->numericCustomFieldFromRawContainer($rawCustomFields, $normalizedKeys);
             if ($value !== null) {
@@ -4408,7 +4413,7 @@ class GoHighLevelService
         foreach (['contact', 'data', 'result'] as $nestedKey) {
             $nested = data_get($contact, $nestedKey);
             if (is_array($nested)) {
-                foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+                foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
                     $value = $this->numericCustomFieldFromRawContainer(data_get($nested, $containerKey, []), $normalizedKeys);
                     if ($value !== null) {
                         return $value;
@@ -4619,6 +4624,14 @@ class GoHighLevelService
             'business.logo_url',
             'Company Logo',
             'Business Logo',
+            'school logo url',
+            'schoolLogoUrl',
+            'logo image',
+            'Logo Image',
+            '{{business.logo}}',
+            '{{contact.school_logo}}',
+            'business_logo_url',
+            'school_logo_url',
         ])
             ->filter()
             ->map(fn ($key): string => (string) $key)
@@ -4684,7 +4697,13 @@ class GoHighLevelService
 
     protected function imageUrlFromCustomFields(array $record): string
     {
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+        $normalize = function ($key): string {
+            $key = trim((string) $key);
+            $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
+            return strtolower(str_replace([' ', '-', '.', ':', '/', '\\'], '_', trim($key)));
+        };
+
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
             $rawCustomFields = data_get($record, $containerKey, []);
 
             if (! is_array($rawCustomFields)) {
@@ -4692,10 +4711,39 @@ class GoHighLevelService
             }
 
             foreach ($rawCustomFields as $fieldKey => $fieldValue) {
+                $fieldIdentifiers = [$fieldKey];
+
+                if (is_array($fieldValue)) {
+                    foreach (['id', '_id', 'key', 'name', 'label', 'fieldKey', 'field_key', 'customFieldId', 'custom_field_id', 'fieldId', 'field_id', 'mergeField', 'merge_field', 'placeholder', 'slug'] as $identifierKey) {
+                        $fieldIdentifiers[] = $fieldValue[$identifierKey] ?? null;
+                    }
+                }
+
+                $isLogoField = collect($fieldIdentifiers)
+                    ->filter(fn ($identifier): bool => is_scalar($identifier) && trim((string) $identifier) !== '')
+                    ->map(fn ($identifier): string => $normalize($identifier))
+                    ->contains(function (string $identifier): bool {
+                        return $identifier === 'logo'
+                            || $identifier === 'business_logo'
+                            || $identifier === 'business_logo_url'
+                            || $identifier === 'school_logo'
+                            || $identifier === 'school_logo_url'
+                            || $identifier === 'contact_school_logo'
+                            || $identifier === 'business_logo_image'
+                            || str_ends_with($identifier, '_logo')
+                            || str_ends_with($identifier, '_school_logo')
+                            || str_contains($identifier, 'school_logo')
+                            || str_contains($identifier, 'business_logo');
+                    });
+
                 $resolved = $this->extractCustomFieldScalarValue($fieldValue);
 
                 if ($resolved === '') {
                     continue;
+                }
+
+                if ($isLogoField && $this->looksLikeRemoteUrl($resolved)) {
+                    return $resolved;
                 }
 
                 if ($this->looksLikeRemoteImageUrl($resolved)) {
@@ -4717,6 +4765,20 @@ class GoHighLevelService
         }
 
         return '';
+    }
+
+    protected function looksLikeRemoteUrl(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        if (str_starts_with($url, '//')) {
+            return true;
+        }
+
+        return Str::startsWith(strtolower($url), ['http://', 'https://']);
     }
 
     protected function looksLikeRemoteImageUrl(string $url): bool
@@ -4744,14 +4806,24 @@ class GoHighLevelService
         return str_contains(strtolower($url), 'cloudinary')
             || str_contains(strtolower($url), 'storage.googleapis')
             || str_contains(strtolower($url), 'amazonaws.com')
+            || str_contains(strtolower($url), 'cloudfront.net')
+            || str_contains(strtolower($url), 'digitaloceanspaces')
+            || str_contains(strtolower($url), 'leadconnectorhq')
+            || str_contains(strtolower($url), 'msgsndr')
             || str_contains(strtolower($url), 'cdn')
+            || str_contains(strtolower($url), 'media')
             || str_contains(strtolower($url), 'image')
             || str_contains(strtolower($url), 'logo');
     }
 
     protected function stringCustomFieldFromRecord(array $record, array $keys): string
     {
-        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', trim((string) $key)));
+        $normalize = function ($key): string {
+            $key = trim((string) $key);
+            $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
+            $key = preg_replace('/^custom[_\s-]*/i', '', $key) ?: $key;
+            return strtolower(str_replace([' ', '-', '.', ':', '/', '\\'], '_', trim($key)));
+        };
         $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
 
         $matches = function (mixed $candidate) use ($normalize, $normalizedKeys): bool {
@@ -4773,7 +4845,11 @@ class GoHighLevelService
                 // GHL often exposes custom field keys as contact.school_logo or
                 // business.logo. This lets school_logo match contact_school_logo,
                 // and logo match business_logo, without relying on the internal ID.
-                if (str_ends_with($candidate, '_' . $key)) {
+                if (str_ends_with($candidate, '_' . $key) || str_ends_with($key, '_' . $candidate)) {
+                    return true;
+                }
+
+                if (str_contains($candidate, 'logo') && str_contains($key, 'logo')) {
                     return true;
                 }
             }
@@ -4805,7 +4881,7 @@ class GoHighLevelService
             }
         }
 
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
             $rawCustomFields = data_get($record, $containerKey, []);
 
             if (! is_array($rawCustomFields)) {
@@ -4845,6 +4921,10 @@ class GoHighLevelService
                     $field['custom_field_id'] ?? null,
                     $field['fieldId'] ?? null,
                     $field['field_id'] ?? null,
+                    $field['mergeField'] ?? null,
+                    $field['merge_field'] ?? null,
+                    $field['placeholder'] ?? null,
+                    $field['slug'] ?? null,
                 ];
 
                 if (! collect($fieldKeys)->filter()->contains(fn ($candidate): bool => $matches($candidate))) {
