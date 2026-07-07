@@ -12,9 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TrackingController;
 
-Route::get('/track/click/{token}', [TrackingController::class, 'click'])->name('tracking.click');
-Route::get('/track/profile/{token}', [TrackingController::class, 'profile'])->name('tracking.profile');
-Route::get('/track/open/{token}.gif', [TrackingController::class, 'open'])->name('tracking.open');
+Route::get('/track/click/{token}', [TrackingController::class, 'click'])->where('token', '[^/]+')->name('tracking.click');
+Route::get('/track/profile/{token}', [TrackingController::class, 'profile'])->where('token', '[^/]+')->name('tracking.profile');
+Route::get('/track/open/{token}.gif', [TrackingController::class, 'open'])->where('token', '[^/]+')->name('tracking.open');
 
 require __DIR__ . '/club_referrals.php';
 /*

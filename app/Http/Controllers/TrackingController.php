@@ -99,6 +99,7 @@ class TrackingController extends Controller
                 'ip' => $request->ip(),
                 'user_agent' => substr((string) $request->userAgent(), 0, 500),
                 'occurred_at' => now()->toIso8601String(),
+                'tracking_signature_valid' => $payload['_tracking_signature_valid'] ?? null,
             ];
 
             $result = $goHighLevelService->trackRecruitingEventForUser(

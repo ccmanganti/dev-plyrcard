@@ -1557,9 +1557,9 @@ trait InteractsWithCoachDatabase
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
             <tr><td style="vertical-align:top;padding:0;"><div style="font-size:16px;font-weight:800;color:#111827;">{{AthleteName}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{GraduationYear}} • {{Position}} • {{ClubTeam}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{AthleteEmail}} • {{AthletePhone}}</div></td></tr>
             <tr><td style="padding-top:14px;">
-                <a href="{{InstagramLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="18" height="18" viewBox="0 0 24 24" role="img" aria-label="Instagram" style="display:block;"><path fill="#ffffff" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4c0 3.2-2.6 5.8-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8C2 4.6 4.6 2 7.8 2Zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6Zm9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg></span></a>
-                <a href="{{TwitterLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="17" height="17" viewBox="0 0 24 24" role="img" aria-label="X" style="display:block;"><path fill="#ffffff" d="M18.9 2h3.1l-6.8 7.8L23.2 22h-6.3l-4.9-7.3L6.4 22H3.3l7.3-8.4L2.8 2h6.4l4.4 6.6L18.9 2Zm-1.1 17.9h1.7L8.3 4H6.5l11.3 15.9Z"/></svg></span></a>
-                <a href="{{YoutubeLink}}" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="20" height="20" viewBox="0 0 24 24" role="img" aria-label="YouTube" style="display:block;"><path fill="#ffffff" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg></span></a>
+                <a href="{{InstagramLink}}" data-plyrcard-link="instagram" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="18" height="18" viewBox="0 0 24 24" role="img" aria-label="Instagram" style="display:block;"><path fill="#ffffff" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4c0 3.2-2.6 5.8-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8C2 4.6 4.6 2 7.8 2Zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6Zm9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg></span></a>
+                <a href="{{XLink}}" data-plyrcard-link="x" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="17" height="17" viewBox="0 0 24 24" role="img" aria-label="X" style="display:block;"><path fill="#ffffff" d="M18.9 2h3.1l-6.8 7.8L23.2 22h-6.3l-4.9-7.3L6.4 22H3.3l7.3-8.4L2.8 2h6.4l4.4 6.6L18.9 2Zm-1.1 17.9h1.7L8.3 4H6.5l11.3 15.9Z"/></svg></span></a>
+                <a href="{{YoutubeLink}}" data-plyrcard-link="youtube" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="20" height="20" viewBox="0 0 24 24" role="img" aria-label="YouTube" style="display:block;"><path fill="#ffffff" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg></span></a>
             </td></tr>
         </table>
     </div>
@@ -2211,18 +2211,47 @@ HTML;
             return null;
         }
 
-        $haystack = strtolower(strip_tags(html_entity_decode($anchorHtml . ' ' . $innerHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . ' ' . $anchorHtml . ' ' . $href);
-        $isTracked = str_contains($lowerHref, '/track/click/') || str_contains($lowerHref, '/track/profile/') || str_contains($lowerHref, '/track/open/');
+        $tracked = $this->decodedTrackingHref($href);
+        $trackedDestination = strtolower((string) ($tracked['destination_url'] ?? ''));
+        $trackedPlatform = strtolower((string) ($tracked['platform'] ?? ''));
+        $trackedEvent = strtolower((string) ($tracked['event_type'] ?? ''));
 
-        if (str_contains($haystack, 'instagram') || str_contains($lowerHref, 'instagram.com')) {
+        // If a saved GHL template already contains an old /track/... URL, decode the
+        // compact payload and convert it back to the stable merge token. This is the
+        // important self-healing step for social icon templates: even if GHL stripped
+        // aria-labels/classes from the SVG, the token payload still tells us the real
+        // platform and destination.
+        if ($trackedPlatform === 'instagram' || str_contains($trackedDestination, 'instagram.com')) {
             return '{{InstagramLink}}';
         }
 
-        if (str_contains($haystack, 'youtube') || str_contains($haystack, 'youtu.be') || str_contains($lowerHref, 'youtube.com') || str_contains($lowerHref, 'youtu.be')) {
+        if (in_array($trackedPlatform, ['youtube', 'yt'], true) || str_contains($trackedDestination, 'youtube.com') || str_contains($trackedDestination, 'youtu.be')) {
+            return str_contains($trackedEvent, 'profile') ? '{{HighlightLink}}' : '{{YoutubeLink}}';
+        }
+
+        if (in_array($trackedPlatform, ['x', 'twitter'], true) || str_contains($trackedDestination, 'x.com') || str_contains($trackedDestination, 'twitter.com')) {
+            return '{{XLink}}';
+        }
+
+        if ($trackedDestination !== '' && (str_contains($trackedDestination, 'plyrcard.com') || str_contains($trackedDestination, 'dev.plyrcard.com') || str_contains($trackedDestination, '127.0.0.1') || str_contains($trackedDestination, 'localhost'))) {
+            if (str_contains($trackedDestination, 'highlight') || str_contains($trackedDestination, '#highlights') || $trackedEvent === 'highlight_view') {
+                return '{{HighlightLink}}';
+            }
+            return '{{ProfileLink}}';
+        }
+
+        $haystack = strtolower(strip_tags(html_entity_decode($anchorHtml . ' ' . $innerHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . ' ' . $anchorHtml . ' ' . $href);
+        $isTracked = str_contains($lowerHref, '/track/click/') || str_contains($lowerHref, '/track/profile/') || str_contains($lowerHref, '/track/open/');
+
+        if (str_contains($haystack, 'data-plyrcard-link="instagram"') || str_contains($haystack, "data-plyrcard-link='instagram'") || str_contains($haystack, 'instagram') || str_contains($lowerHref, 'instagram.com')) {
+            return '{{InstagramLink}}';
+        }
+
+        if (str_contains($haystack, 'data-plyrcard-link="youtube"') || str_contains($haystack, "data-plyrcard-link='youtube'") || str_contains($haystack, 'youtube') || str_contains($haystack, 'youtu.be') || str_contains($lowerHref, 'youtube.com') || str_contains($lowerHref, 'youtu.be')) {
             return '{{YoutubeLink}}';
         }
 
-        if (str_contains($haystack, 'twitter') || str_contains($haystack, ' x ') || str_contains($haystack, 'aria-label="x"') || str_contains($lowerHref, 'x.com') || str_contains($lowerHref, 'twitter.com')) {
+        if (str_contains($haystack, 'data-plyrcard-link="x"') || str_contains($haystack, "data-plyrcard-link='x'") || str_contains($haystack, 'twitter') || str_contains($haystack, ' x ') || str_contains($haystack, 'aria-label="x"') || str_contains($lowerHref, 'x.com') || str_contains($lowerHref, 'twitter.com')) {
             return '{{XLink}}';
         }
 
@@ -2235,6 +2264,61 @@ HTML;
         }
 
         return null;
+    }
+
+    protected function decodedTrackingHref(string $href): array
+    {
+        $href = html_entity_decode(trim($href), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($href === '' || (! str_contains($href, '/track/click/') && ! str_contains($href, '/track/profile/'))) {
+            return [];
+        }
+
+        $path = parse_url($href, PHP_URL_PATH) ?: $href;
+        $token = '';
+        foreach (['/track/click/', '/track/profile/'] as $prefix) {
+            $pos = strpos($path, $prefix);
+            if ($pos !== false) {
+                $token = substr($path, $pos + strlen($prefix));
+                break;
+            }
+        }
+
+        $token = trim((string) preg_replace('/\.gif$/i', '', $token));
+        if ($token === '') {
+            return [];
+        }
+
+        $encoded = str_contains($token, '~') ? explode('~', $token, 2)[0] : (str_contains($token, '.') ? explode('.', $token, 2)[0] : '');
+        if ($encoded === '') {
+            return [];
+        }
+
+        $decoded = strtr($encoded, '-_', '+/');
+        $decoded .= str_repeat('=', (4 - strlen($decoded) % 4) % 4);
+        $json = base64_decode($decoded, true);
+        if (! is_string($json) || $json === '') {
+            return [];
+        }
+
+        $payload = json_decode($json, true);
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $aliases = [
+            'e' => 'event_type',
+            'd' => 'destination_url',
+            'p' => 'platform',
+            's' => 'source',
+        ];
+
+        foreach ($aliases as $alias => $key) {
+            if (array_key_exists($alias, $payload) && ! array_key_exists($key, $payload)) {
+                $payload[$key] = $payload[$alias];
+            }
+        }
+
+        return $payload;
     }
 
     protected function buildTemplateHtml(string $text): string

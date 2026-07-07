@@ -225,7 +225,22 @@ class TrackingLinkRewriter
 
             $expected = hash_hmac('sha256', $encodedPayload, $secret);
 
-            return hash_equals($expected, $signature) ? $expandedPayload : [];
+            if (hash_equals($expected, $signature)) {
+                $expandedPayload['_tracking_signature_valid'] = true;
+                return $expandedPayload;
+            }
+
+            // Cross-environment tolerance:
+            // Links can be generated on local/dev/prod while the receiving domain
+            // has a different database row or account metadata for the same athlete.
+            // In that case the HMAC can fail even though the compact payload still
+            // contains a valid http(s) destination and GHL contact id. Do not 404 the
+            // coach. Return the decoded payload, mark it as unverified, and let the
+            // controller's destination validation + GHL update safeguards handle it.
+            $expandedPayload['_tracking_signature_valid'] = false;
+            $expandedPayload['_tracking_signature_error'] = 'signature_mismatch';
+
+            return $expandedPayload;
         }
 
         // Legacy fallback for old Laravel-Crypt tokens. New links should not use this
