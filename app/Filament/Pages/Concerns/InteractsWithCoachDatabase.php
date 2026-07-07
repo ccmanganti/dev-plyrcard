@@ -57,6 +57,7 @@ trait InteractsWithCoachDatabase
     public string $sort = 'name';
     public string $schoolViewMode = 'grid';
     public string $newListName = '';
+    public string $newListColor = '#ff6338';
     public bool $showNewListComposer = false;
     public string $selectedListKey = '';
 
@@ -683,16 +684,39 @@ trait InteractsWithCoachDatabase
         $key = Str::slug($name);
         $tag = 'plyrcard:list:' . $key;
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $color = $this->normalizeListColor($this->newListColor);
+
         $custom = collect($snapshot['custom_list_tags'] ?? []);
-        $custom->put($key, ['key' => $key, 'label' => Str::headline($name), 'tag' => $tag, 'custom' => true]);
+        $custom->put($key, [
+            'key' => $key,
+            'label' => Str::headline($name),
+            'tag' => $tag,
+            'custom' => true,
+            'color' => $color,
+        ]);
         $snapshot['custom_list_tags'] = $custom->all();
         $this->selectedListKey = 'custom:' . $key;
         $this->rebuildAndStoreSnapshot($snapshot);
         $this->newListName = '';
+        $this->newListColor = '#ff6338';
         $this->showNewListComposer = false;
         Notification::make()->title('Recruiting Center')->body('List created. Add a school or coach to save it to recruiting contacts.')->success()->send();
     }
 
+    protected function normalizeListColor(?string $color): string
+    {
+        $color = strtolower(trim((string) $color));
+
+        $allowed = [
+            '#ff6338',
+            '#3b82f6',
+            '#22c55e',
+            '#f59e0b',
+            '#7c5cff',
+        ];
+
+        return in_array($color, $allowed, true) ? $color : '#ff6338';
+    }
 
     public function selectList(string $listKey): void
     {

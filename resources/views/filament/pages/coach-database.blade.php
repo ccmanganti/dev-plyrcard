@@ -7469,15 +7469,17 @@
                 .rc-my-lists-title-v41 h2 { margin:0; color:var(--rc-text); font-size:1.35rem; line-height:1.1; letter-spacing:-.025em; font-weight:750; }
                 .rc-my-lists-title-v41 p { margin:.45rem 0 0; color:var(--rc-muted); font-size:.9rem; line-height:1.4; }
                 .rc-new-list-btn-v41 { min-height:2.85rem; padding:0 1.15rem; border:0; border-radius:.9rem; display:inline-flex; align-items:center; justify-content:center; gap:.55rem; background:#ff6338; color:#fff; font-size:.9rem; font-weight:750; box-shadow:0 15px 30px rgba(255,99,56,.22); cursor:pointer; }
-                .rc-new-list-panel-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:1rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:flex; align-items:center; gap:.65rem; }
-                .rc-new-list-panel-v41 .rc-input { flex:1; min-height:2.65rem; width:100%; }
+                .rc-new-list-panel-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:1rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; align-items:center; gap:.65rem; }
+                .rc-new-list-panel-v41 .rc-input { flex:1; min-height:2.65rem; width:100%; border-color:#ff6338; }
+                .rc-list-color-picker-v42 { display:inline-flex; align-items:center; gap:.38rem; flex:0 0 auto; }
+                .rc-list-color-option-v42 { width:1.55rem; height:1.55rem; border-radius:.45rem; border:2px solid transparent; box-shadow:inset 0 0 0 1px rgba(15,23,42,.08); cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+                .rc-list-color-option-v42.is-selected { border-color:var(--rc-text); box-shadow:0 0 0 2px var(--rc-surface), 0 0 0 4px currentColor; }
+                .rc-list-color-option-v42 span { width:100%; height:100%; border-radius:.32rem; display:block; }
                 .rc-list-stack-v41 { display:grid; gap:1rem; }
                 .rc-list-card-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1.15rem; padding:1.05rem 1.2rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:grid; gap:1rem; }
                 .rc-list-card-head-v41 { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
                 .rc-list-card-title-v41 { display:flex; align-items:center; gap:.7rem; min-width:0; }
-                .rc-list-dot-v41 { width:.72rem; height:.72rem; border-radius:999px; flex:0 0 auto; background:#ff6338; }
-                .rc-list-dot-v41.is-blue { background:#3b82f6; }
-                .rc-list-dot-v41.is-gold { background:#f59e0b; }
+                .rc-list-dot-v41 { width:.72rem; height:.72rem; border-radius:999px; flex:0 0 auto; background:var(--list-color, #ff6338); }
                 .rc-list-card-title-v41 strong { color:var(--rc-text); font-size:1rem; font-weight:750; line-height:1.2; }
                 .rc-list-count-pill-v41 { border-radius:999px; padding:.25rem .65rem; background:var(--rc-soft); color:var(--rc-muted); font-size:.78rem; line-height:1.2; white-space:nowrap; }
                 .rc-list-card-actions-v41 { display:inline-flex; align-items:center; gap:.45rem; flex:0 0 auto; }
@@ -7492,6 +7494,7 @@
                 .rc-list-empty-card-v41 { border:1px dashed var(--rc-border); border-radius:1rem; padding:1rem; color:var(--rc-muted); background:var(--rc-surface); }
                 .rc-list-selected-v41 { border-color:rgba(255,99,56,.42); box-shadow:0 14px 35px rgba(255,99,56,.08); }
                 .dark .rc-new-list-btn-v41 { box-shadow:0 15px 30px rgba(255,99,56,.16); }
+                @media (max-width: 980px) { .rc-new-list-panel-v41 { grid-template-columns:1fr; align-items:stretch; } .rc-list-color-picker-v42 { justify-content:flex-start; } }
                 @media (max-width: 780px) { .rc-my-lists-head-v41 { align-items:flex-start; flex-direction:column; } .rc-new-list-btn-v41 { width:100%; } .rc-list-card-head-v41 { align-items:flex-start; flex-direction:column; } }
             </style>
 
@@ -7503,8 +7506,10 @@
 
             @php
                 $listRows = collect($lists ?? [])->filter(fn ($list) => is_array($list))->values();
-                $listDotClass = function (int $index): string {
-                    return match ($index % 3) { 1 => 'is-blue', 2 => 'is-gold', default => '' };
+                $listColorPalette = ['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'];
+                $safeListColor = function (?string $color, int $index = 0) use ($listColorPalette): string {
+                    $color = strtolower(trim((string) $color));
+                    return in_array($color, $listColorPalette, true) ? $color : $listColorPalette[$index % count($listColorPalette)];
                 };
                 $listInitials = function (string $name): string {
                     return strtoupper(collect(preg_split('/\s+/', trim($name)) ?: [])->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
@@ -7556,7 +7561,21 @@
 
                 @if($showNewListComposer)
                     <div class="rc-new-list-panel-v41">
-                        <input class="rc-input" placeholder="New list name, e.g. Dream Schools" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
+                        <input class="rc-input" placeholder="List name (e.g. Dream Schools)" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
+                        <div class="rc-list-color-picker-v42" aria-label="Choose list color">
+                            @foreach(['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'] as $colorOption)
+                                <button
+                                    type="button"
+                                    class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}"
+                                    style="color: {{ $colorOption }};"
+                                    wire:click="$set('newListColor', '{{ $colorOption }}')"
+                                    title="Use {{ $colorOption }}"
+                                    aria-label="Use list color {{ $colorOption }}"
+                                >
+                                    <span style="background: {{ $colorOption }};"></span>
+                                </button>
+                            @endforeach
+                        </div>
                         <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
                             <span wire:loading.remove wire:target="createCustomList">Create</span>
                             <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
@@ -7573,11 +7592,12 @@
                             $listSchools = $schoolsForListKey($list);
                             $schoolCount = count($listSchools);
                             $isSelectedList = $selectedListKey === $listKey;
+                            $listColor = $safeListColor($list['color'] ?? null, $listIndex);
                         @endphp
                         <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
                             <div class="rc-list-card-head-v41">
                                 <div class="rc-list-card-title-v41">
-                                    <span class="rc-list-dot-v41 {{ $listDotClass($listIndex) }}"></span>
+                                    <span class="rc-list-dot-v41" style="--list-color: {{ $listColor }};"></span>
                                     <strong>{{ $listLabel }}</strong>
                                     <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
                                 </div>
