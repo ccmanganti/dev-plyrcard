@@ -295,20 +295,46 @@ trait InteractsWithCoachDatabase
             }
         }
 
-        $schoolsToHydrate = collect($snapshot['schools'] ?? [])
-            ->filter(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null))
-            ->take((int) config('ghl.coach_database.businesses_per_batch', 10))
-            ->values();
+        /**
+         * Do not hydrate every school's coaches through /contacts/business during a normal
+         * Livewire refresh. That endpoint can timeout on larger GHL locations and it runs
+         * inside the browser request. We already load coaches through the paged Contacts
+         * endpoint above, then merge/group them into schools. If a specific school needs
+         * fresh coach rows later, load it on demand from the drawer/detail action.
+         *
+         * Set GHL_COACH_DATABASE_HYDRATE_SCHOOL_COACHES_ON_REFRESH=true only for small
+         * accounts where the per-business endpoint is fast enough.
+         */
+        $hydrateBusinessCoaches = (bool) config('ghl.coach_database.hydrate_school_coaches_on_refresh', false);
 
-        foreach ($schoolsToHydrate as $school) {
-            $school = $this->loadSchoolCoachesIntoSnapshot($school, $snapshot, $service, $user);
+        if ($hydrateBusinessCoaches) {
+            $schoolsToHydrate = collect($snapshot['schools'] ?? [])
+                ->filter(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null))
+                ->take((int) config('ghl.coach_database.businesses_per_batch', 2))
+                ->values();
+
+            foreach ($schoolsToHydrate as $school) {
+                $school = $this->loadSchoolCoachesIntoSnapshot($school, $snapshot, $service, $user);
+            }
+        } else {
+            $snapshot['schools'] = collect($snapshot['schools'] ?? [])
+                ->filter(fn ($school): bool => is_array($school))
+                ->map(function (array $school): array {
+                    $school['coaches_loaded'] = true;
+                    $school['coaches_loaded_from'] = $school['coaches_loaded_from'] ?? 'contacts_page';
+                    return $school;
+                })
+                ->values()
+                ->all();
         }
 
         $loadedPages++;
         $snapshot['loaded_pages'] = $loadedPages;
+        $hasUnhydratedSchools = $hydrateBusinessCoaches
+            && collect($snapshot['schools'] ?? [])->contains(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null));
         $snapshot['has_more_data'] = (bool) ($snapshot['businesses_have_more'] ?? false)
             || (bool) ($snapshot['contacts_have_more'] ?? false)
-            || collect($snapshot['schools'] ?? [])->contains(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null));
+            || $hasUnhydratedSchools;
         $snapshot['cached_at'] = now()->toDateTimeString();
 
         $this->rebuildAndStoreSnapshot($snapshot);
@@ -511,9 +537,31 @@ trait InteractsWithCoachDatabase
             return $school;
         }
 
-        $result = $service->getContactsForBusinessForUser($user, $businessId, 0, 100, $school);
+        try {
+            $result = $service->getContactsForBusinessForUser(
+                $user,
+                $businessId,
+                0,
+                (int) config('ghl.coach_database.business_contacts_page_limit', 50),
+                $school,
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting school coach hydration skipped after exception.', [
+                'user_id' => $user?->id,
+                'business_id' => $businessId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $school['coaches_loaded'] = true;
+            $school['coaches_load_failed'] = true;
+            $school['coaches_load_error'] = 'GHL timed out while loading this school coaches.';
+            return $school;
+        }
+
         if (! ($result['success'] ?? false)) {
-            $school['coaches_loaded'] = false;
+            $school['coaches_loaded'] = true;
+            $school['coaches_load_failed'] = true;
+            $school['coaches_load_error'] = $result['error'] ?? 'Unable to load coaches for this school.';
             return $school;
         }
 

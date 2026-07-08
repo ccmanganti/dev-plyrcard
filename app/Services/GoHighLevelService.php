@@ -674,13 +674,37 @@ class GoHighLevelService
                 $query['startAfter'] = $startAfter;
             }
 
-            $response = Http::withHeaders([
-                    'Version' => config('ghl.version', '2023-02-21'),
-                ])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->get("{$this->baseUrl}/contacts/business/{$businessId}", $query);
+            try {
+                $response = Http::withHeaders([
+                        'Version' => config('ghl.version', '2023-02-21'),
+                    ])
+                    ->connectTimeout((int) config('ghl.connect_timeout', 5))
+                    ->timeout((int) config('ghl.timeout', 12))
+                    ->retry((int) config('ghl.retries', 1), (int) config('ghl.retry_sleep_ms', 250), throw: false)
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get("{$this->baseUrl}/contacts/business/{$businessId}", $query);
+            } catch (\Illuminate\Http\Client\ConnectionException $exception) {
+                Log::warning('GHL contacts by business request timed out.', [
+                    'business_id' => $businessId,
+                    'location_id' => $locationId,
+                    'query' => $query,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return [
+                    'success' => false,
+                    'contacts' => $contacts->values()->all(),
+                    'count' => $contacts->count(),
+                    'error' => 'GHL timed out while loading coaches for this school.',
+                    'timed_out' => true,
+                    'debug' => array_merge($debug, [[
+                        'stage' => 'business_contacts_timeout',
+                        'business_id' => $businessId,
+                        'query' => $query,
+                    ]]),
+                ];
+            }
 
             $data = $response->json() ?? [];
 
@@ -2532,11 +2556,32 @@ class GoHighLevelService
                 'skip' => $nextSkip,
             ];
 
-            $response = Http::withHeaders(['Version' => config('ghl.version', '2023-02-21')])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->get("{$this->baseUrl}/contacts/business/{$businessId}", $query);
+            try {
+                $response = Http::withHeaders(['Version' => config('ghl.version', '2023-02-21')])
+                    ->connectTimeout((int) config('ghl.connect_timeout', 5))
+                    ->timeout((int) config('ghl.timeout', 12))
+                    ->retry((int) config('ghl.retries', 1), (int) config('ghl.retry_sleep_ms', 250), throw: false)
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get("{$this->baseUrl}/contacts/business/{$businessId}", $query);
+            } catch (\Illuminate\Http\Client\ConnectionException $exception) {
+                Log::warning('Recruiting school coach request timed out.', [
+                    'location_id' => $locationId,
+                    'business_id' => $businessId,
+                    'query' => $query,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return [
+                    'success' => false,
+                    'contacts' => $contacts->values()->all(),
+                    'coaches' => [],
+                    'has_more' => false,
+                    'next_skip' => null,
+                    'error' => 'GHL timed out while loading coaches for this school.',
+                    'timed_out' => true,
+                ];
+            }
 
             $data = $response->json() ?? [];
 
