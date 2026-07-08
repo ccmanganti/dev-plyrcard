@@ -2206,9 +2206,6 @@ class GoHighLevelService
             'school_logo_url' => $schoolLogoUrl,
             'business_logo_url' => $schoolLogoUrl,
             'logo_url' => $schoolLogoUrl,
-            'contact.school_logo' => $this->stringCustomFieldFromRecord($contact, ['contact.school_logo', 'school_logo', '{{contact.school_logo}}']) ?: $schoolLogoUrl,
-            'customFields' => $contact['customFields'] ?? $contact['customField'] ?? $contact['custom_fields'] ?? $contact['customFieldValues'] ?? $contact['custom_field_values'] ?? $contact['customValues'] ?? $contact['custom_values'] ?? null,
-            'raw_contact' => $contact,
             'title' => $getCustomField('coach_title'),
             'sport' => $getCustomField('coach_sport'),
             'conference' => $contactConference,
@@ -2704,8 +2701,31 @@ class GoHighLevelService
         $text = trim((string) ($payload['text'] ?? strip_tags($html)));
         $to = $payload['to'] ?? $payload['emailTo'] ?? null;
         $fromName = trim((string) ($payload['fromName'] ?? $payload['senderName'] ?? $user->name ?? 'PLYRCard'));
+        $cc = trim((string) ($payload['cc'] ?? $payload['emailCc'] ?? ''));
+        $bcc = trim((string) ($payload['bcc'] ?? $payload['emailBcc'] ?? ''));
         $skipInternalSentTracking = (bool) ($payload['skip_internal_sent_tracking'] ?? false);
         $fromEmail = trim((string) ($payload['fromEmail'] ?? $payload['emailFrom'] ?? ''));
+        $attachments = collect($payload['attachments'] ?? [])
+            ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
+            ->map(fn (array $attachment): array => [
+                'name' => trim((string) ($attachment['name'] ?? basename((string) ($attachment['url'] ?? 'Attachment')))),
+                'url' => trim((string) ($attachment['url'] ?? '')),
+                'mime_type' => $attachment['mime_type'] ?? $attachment['mimeType'] ?? null,
+                'size' => $attachment['size'] ?? null,
+            ])
+            ->values()
+            ->all();
+
+        if (! empty($attachments)) {
+            $attachmentLinks = collect($attachments)->map(function (array $attachment): string {
+                return '<li style="margin:6px 0"><a href="' . e((string) $attachment['url']) . '" target="_blank" rel="noopener noreferrer">' . e((string) ($attachment['name'] ?: 'Attachment')) . '</a></li>';
+            })->implode('');
+
+            if ($attachmentLinks !== '' && ! str_contains($html, 'data-plyrcard-attachments="1"')) {
+                $html .= '<div data-plyrcard-attachments="1" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $attachmentLinks . '</ul></div>';
+                $text = trim(strip_tags($html));
+            }
+        }
 
         if ($fromEmail === '') {
             $fromEmail = $this->defaultSenderEmailForUser($user);
@@ -2775,10 +2795,17 @@ class GoHighLevelService
             'message' => $html,
             'text' => $text,
             'emailTo' => $to,
+            'cc' => $cc !== '' ? $cc : null,
+            'bcc' => $bcc !== '' ? $bcc : null,
+            'emailCc' => $cc !== '' ? $cc : null,
+            'emailBcc' => $bcc !== '' ? $bcc : null,
             'fromEmail' => $fromEmail,
             'emailFrom' => $fromEmail,
             'fromName' => $fromName,
             'senderName' => $fromName,
+            'attachments' => ! empty($attachments) ? $attachments : null,
+            'attachmentUrls' => ! empty($attachments) ? collect($attachments)->pluck('url')->values()->all() : null,
+            'files' => ! empty($attachments) ? $attachments : null,
         ], fn ($value) => filled($value));
 
         $payloads[] = array_merge($base, ['type' => 'Email']);
@@ -2795,10 +2822,17 @@ class GoHighLevelService
             'message' => $html,
             'text' => $text,
             'emailTo' => $to,
+            'cc' => $cc !== '' ? $cc : null,
+            'bcc' => $bcc !== '' ? $bcc : null,
+            'emailCc' => $cc !== '' ? $cc : null,
+            'emailBcc' => $bcc !== '' ? $bcc : null,
             'fromEmail' => $fromEmail,
             'emailFrom' => $fromEmail,
             'fromName' => $fromName,
             'senderName' => $fromName,
+            'attachments' => ! empty($attachments) ? $attachments : null,
+            'attachmentUrls' => ! empty($attachments) ? collect($attachments)->pluck('url')->values()->all() : null,
+            'files' => ! empty($attachments) ? $attachments : null,
         ], fn ($value) => filled($value));
 
         $versions = array_values(array_unique(array_filter([
@@ -3499,17 +3533,17 @@ class GoHighLevelService
         }
 
         if (! is_object($file) || ! method_exists($file, 'getRealPath')) {
-            return ['success' => false, 'error' => 'Choose a valid image.'];
+            return ['success' => false, 'error' => 'Choose a valid file.'];
         }
 
         $path = (string) $file->getRealPath();
         if ($path === '' || ! is_file($path)) {
-            return ['success' => false, 'error' => 'Image upload could not be read.'];
+            return ['success' => false, 'error' => 'File upload could not be read.'];
         }
 
         $name = method_exists($file, 'getClientOriginalName')
             ? (string) $file->getClientOriginalName()
-            : ('plyrcard-template-image-' . now()->format('YmdHis') . '.jpg');
+            : ('plyrcard-upload-' . now()->format('YmdHis'));
 
         $mimeType = method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : 'image/jpeg';
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
@@ -3518,7 +3552,14 @@ class GoHighLevelService
                 'image/png' => '.png',
                 'image/gif' => '.gif',
                 'image/webp' => '.webp',
-                default => '.jpg',
+                'application/pdf' => '.pdf',
+                'video/mp4' => '.mp4',
+                'application/msword' => '.doc',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => '.docx',
+                'application/vnd.ms-excel' => '.xls',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => '.xlsx',
+                'text/plain' => '.txt',
+                default => '.bin',
             };
         }
 
@@ -3560,7 +3601,7 @@ class GoHighLevelService
             'name' => $name,
         ]];
 
-        $lastError = 'Unable to upload image.';
+        $lastError = 'Unable to upload file.';
         $lastStatus = null;
         $lastRaw = [];
         $attempts = [];
@@ -3571,7 +3612,7 @@ class GoHighLevelService
                     try {
                         $handle = fopen($path, 'r');
                         if (! $handle) {
-                            return ['success' => false, 'error' => 'Image upload could not be opened.'];
+                            return ['success' => false, 'error' => 'File upload could not be opened.'];
                         }
 
                         $response = Http::withHeaders(['Version' => $version])
@@ -3600,7 +3641,7 @@ class GoHighLevelService
                         ];
 
                         if (! $response->successful()) {
-                            $lastError = $this->extractApiErrorMessage($data, 'Unable to upload image.');
+                            $lastError = $this->extractApiErrorMessage($data, 'Unable to upload file.');
                             continue;
                         }
 
@@ -3635,7 +3676,7 @@ class GoHighLevelService
             }
         }
 
-        Log::error('GHL media upload failed.', [
+        Log::error('GHL media/file upload failed.', [
             'location_id' => $locationId,
             'status' => $lastStatus,
             'error' => $lastError,
@@ -4154,8 +4195,6 @@ class GoHighLevelService
             'is_favorite' => false,
             'engagement_score' => 0,
             'list_keys' => [],
-            'raw_business' => $business,
-            'customFields' => $business['customFields'] ?? $business['customField'] ?? $business['custom_fields'] ?? $business['customFieldValues'] ?? $business['custom_field_values'] ?? $business['customValues'] ?? $business['custom_values'] ?? null,
         ];
     }
 
@@ -4401,7 +4440,7 @@ class GoHighLevelService
         $normalizedKeys = $this->normalizedRecruitingTrackingLookupKeys($keys, $trackingFieldMap);
 
         // Common HighLevel shapes first.
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
             $rawCustomFields = data_get($contact, $containerKey, []);
             $value = $this->numericCustomFieldFromRawContainer($rawCustomFields, $normalizedKeys);
             if ($value !== null) {
@@ -4413,7 +4452,7 @@ class GoHighLevelService
         foreach (['contact', 'data', 'result'] as $nestedKey) {
             $nested = data_get($contact, $nestedKey);
             if (is_array($nested)) {
-                foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
+                foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
                     $value = $this->numericCustomFieldFromRawContainer(data_get($nested, $containerKey, []), $normalizedKeys);
                     if ($value !== null) {
                         return $value;
@@ -4624,14 +4663,6 @@ class GoHighLevelService
             'business.logo_url',
             'Company Logo',
             'Business Logo',
-            'school logo url',
-            'schoolLogoUrl',
-            'logo image',
-            'Logo Image',
-            '{{business.logo}}',
-            '{{contact.school_logo}}',
-            'business_logo_url',
-            'school_logo_url',
         ])
             ->filter()
             ->map(fn ($key): string => (string) $key)
@@ -4697,13 +4728,7 @@ class GoHighLevelService
 
     protected function imageUrlFromCustomFields(array $record): string
     {
-        $normalize = function ($key): string {
-            $key = trim((string) $key);
-            $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
-            return strtolower(str_replace([' ', '-', '.', ':', '/', '\\'], '_', trim($key)));
-        };
-
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
             $rawCustomFields = data_get($record, $containerKey, []);
 
             if (! is_array($rawCustomFields)) {
@@ -4711,39 +4736,10 @@ class GoHighLevelService
             }
 
             foreach ($rawCustomFields as $fieldKey => $fieldValue) {
-                $fieldIdentifiers = [$fieldKey];
-
-                if (is_array($fieldValue)) {
-                    foreach (['id', '_id', 'key', 'name', 'label', 'fieldKey', 'field_key', 'customFieldId', 'custom_field_id', 'fieldId', 'field_id', 'mergeField', 'merge_field', 'placeholder', 'slug'] as $identifierKey) {
-                        $fieldIdentifiers[] = $fieldValue[$identifierKey] ?? null;
-                    }
-                }
-
-                $isLogoField = collect($fieldIdentifiers)
-                    ->filter(fn ($identifier): bool => is_scalar($identifier) && trim((string) $identifier) !== '')
-                    ->map(fn ($identifier): string => $normalize($identifier))
-                    ->contains(function (string $identifier): bool {
-                        return $identifier === 'logo'
-                            || $identifier === 'business_logo'
-                            || $identifier === 'business_logo_url'
-                            || $identifier === 'school_logo'
-                            || $identifier === 'school_logo_url'
-                            || $identifier === 'contact_school_logo'
-                            || $identifier === 'business_logo_image'
-                            || str_ends_with($identifier, '_logo')
-                            || str_ends_with($identifier, '_school_logo')
-                            || str_contains($identifier, 'school_logo')
-                            || str_contains($identifier, 'business_logo');
-                    });
-
                 $resolved = $this->extractCustomFieldScalarValue($fieldValue);
 
                 if ($resolved === '') {
                     continue;
-                }
-
-                if ($isLogoField && $this->looksLikeRemoteUrl($resolved)) {
-                    return $resolved;
                 }
 
                 if ($this->looksLikeRemoteImageUrl($resolved)) {
@@ -4765,20 +4761,6 @@ class GoHighLevelService
         }
 
         return '';
-    }
-
-    protected function looksLikeRemoteUrl(string $url): bool
-    {
-        $url = trim($url);
-        if ($url === '') {
-            return false;
-        }
-
-        if (str_starts_with($url, '//')) {
-            return true;
-        }
-
-        return Str::startsWith(strtolower($url), ['http://', 'https://']);
     }
 
     protected function looksLikeRemoteImageUrl(string $url): bool
@@ -4806,24 +4788,14 @@ class GoHighLevelService
         return str_contains(strtolower($url), 'cloudinary')
             || str_contains(strtolower($url), 'storage.googleapis')
             || str_contains(strtolower($url), 'amazonaws.com')
-            || str_contains(strtolower($url), 'cloudfront.net')
-            || str_contains(strtolower($url), 'digitaloceanspaces')
-            || str_contains(strtolower($url), 'leadconnectorhq')
-            || str_contains(strtolower($url), 'msgsndr')
             || str_contains(strtolower($url), 'cdn')
-            || str_contains(strtolower($url), 'media')
             || str_contains(strtolower($url), 'image')
             || str_contains(strtolower($url), 'logo');
     }
 
     protected function stringCustomFieldFromRecord(array $record, array $keys): string
     {
-        $normalize = function ($key): string {
-            $key = trim((string) $key);
-            $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
-            $key = preg_replace('/^custom[_\s-]*/i', '', $key) ?: $key;
-            return strtolower(str_replace([' ', '-', '.', ':', '/', '\\'], '_', trim($key)));
-        };
+        $normalize = fn ($key): string => strtolower(str_replace([' ', '-', '.', ':'], '_', trim((string) $key)));
         $normalizedKeys = collect($keys)->map($normalize)->filter()->unique()->values()->all();
 
         $matches = function (mixed $candidate) use ($normalize, $normalizedKeys): bool {
@@ -4845,11 +4817,7 @@ class GoHighLevelService
                 // GHL often exposes custom field keys as contact.school_logo or
                 // business.logo. This lets school_logo match contact_school_logo,
                 // and logo match business_logo, without relying on the internal ID.
-                if (str_ends_with($candidate, '_' . $key) || str_ends_with($key, '_' . $candidate)) {
-                    return true;
-                }
-
-                if (str_contains($candidate, 'logo') && str_contains($key, 'logo')) {
+                if (str_ends_with($candidate, '_' . $key)) {
                     return true;
                 }
             }
@@ -4881,7 +4849,7 @@ class GoHighLevelService
             }
         }
 
-        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values'] as $containerKey) {
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values'] as $containerKey) {
             $rawCustomFields = data_get($record, $containerKey, []);
 
             if (! is_array($rawCustomFields)) {
@@ -4921,10 +4889,6 @@ class GoHighLevelService
                     $field['custom_field_id'] ?? null,
                     $field['fieldId'] ?? null,
                     $field['field_id'] ?? null,
-                    $field['mergeField'] ?? null,
-                    $field['merge_field'] ?? null,
-                    $field['placeholder'] ?? null,
-                    $field['slug'] ?? null,
                 ];
 
                 if (! collect($fieldKeys)->filter()->contains(fn ($candidate): bool => $matches($candidate))) {

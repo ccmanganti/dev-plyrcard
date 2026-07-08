@@ -49,6 +49,7 @@ trait InteractsWithCoachDatabase
     public string $coachSearch = '';
     public string $conversationSearch = '';
     public string $conversationSchoolFilter = '';
+    public string $conversationStatusFilter = 'all';
     public string $composeSchoolSearch = '';
     public string $favoriteSchoolSearch = '';
     public string $listSchoolSearch = '';
@@ -89,9 +90,13 @@ trait InteractsWithCoachDatabase
     public $templateInlineImageUpload = null;
     public string $composeGraphicUrl = '';
     public $composeGraphicUpload = null;
+    public array $composeAttachmentUploads = [];
+    public array $composeAttachments = [];
     public ?string $selectedTemplateId = null;
     public bool $templateIsNew = true;
     public bool $isSavingTemplate = false;
+    public bool $templateEditorOpen = false;
+    public string $templateSearch = '';
 
     public ?string $campaignTemplateId = null;
     public ?string $previewTemplateId = null;
@@ -108,6 +113,15 @@ trait InteractsWithCoachDatabase
     public array $campaignCoachIds = [];
     public string $campaignListKey = '';
     public string $campaignSchoolId = '';
+    public bool $campaignHeadCoachOnly = false;
+    public bool $composeShowCcBcc = false;
+    public string $campaignCc = '';
+    public string $campaignBcc = '';
+    public bool $showComposePreview = false;
+    public bool $composeTemplateMenuOpen = false;
+    public bool $composeChooseCoachesOpen = false;
+    public bool $composeSchoolPickerOpen = false;
+    public bool $composeTemplateAppliedRecently = false;
     public bool $isSendingCampaign = false;
     public ?string $messageLastId = null;
     public bool $hasMoreMessages = false;
@@ -1071,6 +1085,13 @@ trait InteractsWithCoachDatabase
         $this->messages = [];
     }
 
+
+    public function updatedConversationStatusFilter(): void
+    {
+        $this->selectedConversationId = null;
+        $this->messages = [];
+    }
+
     public function updatedCampaignTargetMode(): void
     {
         $this->campaignCoachIds = [];
@@ -1078,11 +1099,27 @@ trait InteractsWithCoachDatabase
         $this->campaignSchoolId = '';
         $this->campaignCoachSearch = '';
         $this->composeSchoolSearch = '';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = false;
     }
 
     public function updatedCampaignSchoolId(): void
     {
         $this->campaignCoachIds = [];
+        $this->campaignHeadCoachOnly = false;
+    }
+
+    public function updatedCampaignCoachIds(): void
+    {
+        if (! empty($this->campaignCoachIds)) {
+            $this->campaignTargetMode = 'coaches';
+            $this->campaignHeadCoachOnly = false;
+        }
+    }
+
+    public function updatedComposeSchoolSearch(): void
+    {
+        $this->composeSchoolPickerOpen = trim($this->composeSchoolSearch) !== '';
     }
 
     public function pollConversationUpdates(): void
@@ -1254,6 +1291,132 @@ trait InteractsWithCoachDatabase
     {
         $this->showNewConversationComposer = true;
         $this->composeToCoach($contactId);
+    }
+
+
+    protected function selectedConversationRow(): ?array
+    {
+        if (! $this->selectedConversationId) {
+            return null;
+        }
+
+        $conversation = collect($this->conversations ?? [])->firstWhere('id', $this->selectedConversationId);
+
+        return is_array($conversation) ? $conversation : null;
+    }
+
+    protected function selectedConversationCoachRow(): ?array
+    {
+        $conversation = $this->selectedConversationRow();
+        $contactId = trim((string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? ''));
+        $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+
+        if ($contactId !== '') {
+            $coach = collect($this->allCoaches())->firstWhere('id', $contactId);
+            if (is_array($coach)) {
+                return $coach;
+            }
+        }
+
+        if ($email !== '') {
+            $coach = collect($this->allCoaches())->first(function (array $row) use ($email): bool {
+                return strtolower(trim((string) ($row['email'] ?? ''))) === $email;
+            });
+
+            if (is_array($coach)) {
+                return $coach;
+            }
+        }
+
+        return null;
+    }
+
+    public function openSelectedConversationInComposer(): void
+    {
+        $conversation = $this->selectedConversationRow();
+        $coach = $this->selectedConversationCoachRow();
+        $contactId = trim((string) ($coach['id'] ?? $conversation['contact_id'] ?? $conversation['contactId'] ?? ''));
+
+        if ($contactId !== '') {
+            $this->selectedCoachId = $contactId;
+        }
+
+        $coachName = (string) ($coach['name'] ?? $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach');
+        $first = trim(explode(' ', $coachName)[0] ?? 'Coach') ?: 'Coach';
+        $this->emailSubject = $this->emailSubject ?: 'Re: ' . trim((string) ($conversation['subject'] ?? 'Coach conversation'));
+        $this->emailBody = '<p>Hi ' . e($first) . ',</p><p><br></p>';
+        $this->section = 'compose';
+        $this->activeSubpage = 'compose-email';
+    }
+
+    public function starSelectedConversation(): void
+    {
+        $coach = $this->selectedConversationCoachRow();
+        $contactId = trim((string) ($coach['id'] ?? ''));
+
+        if ($contactId === '') {
+            Notification::make()->title('Recruiting Center')->body('No matched coach contact found to star.')->warning()->send();
+            return;
+        }
+
+        $this->favoriteCoach($contactId);
+        Notification::make()->title('Recruiting Center')->body('Coach starred.')->success()->send();
+    }
+
+    public function scheduleSelectedConversation(): void
+    {
+        Notification::make()->title('Recruiting Center')->body('Schedule action is ready for calendar integration.')->success()->send();
+    }
+
+    public function moreSelectedConversation(): void
+    {
+        Notification::make()->title('Recruiting Center')->body('More conversation actions are available from the coach profile.')->success()->send();
+    }
+
+    public function viewSelectedConversationSchool(): void
+    {
+        $coach = $this->selectedConversationCoachRow();
+        $conversation = $this->selectedConversationRow();
+        $schoolId = trim((string) ($coach['school_id'] ?? $coach['business_id'] ?? $coach['ghl_business_id'] ?? $conversation['business_id'] ?? $conversation['company_id'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $conversation['school'] ?? $conversation['company_name'] ?? ''));
+
+        if ($schoolId === '' && $schoolName !== '') {
+            $school = collect($this->allSchools())->first(function (array $row) use ($schoolName): bool {
+                return strcasecmp(trim((string) ($row['name'] ?? '')), $schoolName) === 0;
+            });
+            $schoolId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? ''));
+        }
+
+        if ($schoolId === '') {
+            Notification::make()->title('Recruiting Center')->body('No matched school found for this conversation.')->warning()->send();
+            return;
+        }
+
+        $this->openSchoolDashboardModal($schoolId);
+    }
+
+    public function addSelectedConversationSchoolToList(): void
+    {
+        $coach = $this->selectedConversationCoachRow();
+        $conversation = $this->selectedConversationRow();
+        $schoolId = trim((string) ($coach['school_id'] ?? $coach['business_id'] ?? $coach['ghl_business_id'] ?? $conversation['business_id'] ?? $conversation['company_id'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $conversation['school'] ?? $conversation['company_name'] ?? ''));
+
+        if ($schoolId === '' && $schoolName !== '') {
+            $school = collect($this->allSchools())->first(function (array $row) use ($schoolName): bool {
+                return strcasecmp(trim((string) ($row['name'] ?? '')), $schoolName) === 0;
+            });
+            $schoolId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? ''));
+        }
+
+        if ($schoolId === '') {
+            Notification::make()->title('Recruiting Center')->body('No matched school found to add to a list.')->warning()->send();
+            return;
+        }
+
+        $defaultListKey = 'general_recruiting';
+        $this->addSchoolToListById($schoolId, $defaultListKey);
+        Notification::make()->title('Recruiting Center')->body('School added to General Recruiting.')->success()->send();
     }
 
 
@@ -1568,6 +1731,7 @@ trait InteractsWithCoachDatabase
 
     public function newTemplate(): void
     {
+        $this->templateEditorOpen = true;
         $this->selectedTemplateId = null;
         $this->previewTemplateId = null;
         $this->campaignTemplateId = null;
@@ -1597,6 +1761,7 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        $this->templateEditorOpen = true;
         $this->selectedTemplateId = $templateId;
         $this->previewTemplateId = $templateId;
         $this->campaignTemplateId = null;
@@ -1830,6 +1995,89 @@ HTML;
     }
 
 
+    public function closeTemplateEditor(): void
+    {
+        $this->templateEditorOpen = false;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->templateIsNew = false;
+    }
+
+
+    public function deleteTemplateById(string $templateId): void
+    {
+        $templateId = trim($templateId);
+        if ($templateId === '') {
+            return;
+        }
+
+        $this->selectedTemplateId = $templateId;
+        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
+        $this->deleteTemplate();
+        $this->templateEditorOpen = false;
+    }
+
+    public function duplicateTemplate(string $templateId): void
+    {
+        $templateId = trim($templateId);
+        if ($templateId === '') {
+            return;
+        }
+
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
+
+        if (! is_array($template)) {
+            Notification::make()->title('Templates')->body('Template could not be duplicated.')->danger()->send();
+            return;
+        }
+
+        $this->templateEditorOpen = true;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = true;
+        $this->templateName = trim((string) ($template['name'] ?? 'Email Template')) . ' Copy';
+        $this->templateSubject = $this->templateSubject($template);
+        $this->templatePreviewText = $this->templatePreviewText($template);
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+    }
+
+    public function templateQuickAction(string $action): void
+    {
+        $action = trim($action);
+        $body = trim((string) $this->templateBody);
+
+        if ($body === '') {
+            Notification::make()->title('Templates')->body('Add template copy first.')->warning()->send();
+            return;
+        }
+
+        if ($action === 'shorter') {
+            $body = preg_replace('/<p>\s*<\/p>/i', '', $body) ?: $body;
+            $body = str_replace(['I would love the opportunity to', 'I wanted to'], ['I would like to', 'I want to'], $body);
+        } elseif ($action === 'professional') {
+            $body = str_replace(['Hi ', 'Thanks,'], ['Hello ', 'Best regards,'], $body);
+        } elseif ($action === 'personalize') {
+            if (! str_contains($body, '{{SchoolName}}')) {
+                $body = '<p>Hello {{CoachFirstName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
+            }
+        } elseif ($action === 'improve') {
+            if (! str_contains($body, '{{ProfileLink}}')) {
+                $body .= '<p>You can view my profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p>';
+            }
+        }
+
+        $this->templateBody = $body;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+        Notification::make()->title('Templates')->body('Template updated. Review before saving.')->success()->send();
+    }
+
+
     /**
      * Backward-compatible alias for older Compose Email markup/cached Livewire payloads.
      */
@@ -1873,6 +2121,124 @@ HTML;
         if (trim($this->campaignBody) === '') {
             $this->campaignBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
         }
+
+        $this->composeTemplateAppliedRecently = true;
+        Notification::make()->title('Compose Email')->body('Template loaded.')->success()->send();
+    }
+
+
+    public function openComposePreview(): void
+    {
+        $this->showComposePreview = true;
+    }
+
+    public function closeComposePreview(): void
+    {
+        $this->showComposePreview = false;
+    }
+
+    public function clearComposeRecipients(): void
+    {
+        $this->campaignSchoolId = '';
+        $this->campaignListKey = '';
+        $this->campaignCoachIds = [];
+        $this->campaignHeadCoachOnly = false;
+        $this->composeSchoolSearch = '';
+        $this->campaignCoachSearch = '';
+        $this->composeChooseCoachesOpen = false;
+        $this->composeSchoolPickerOpen = false;
+        $this->campaignTargetMode = 'coaches';
+    }
+
+    public function setComposeSchoolHeadCoachOnly(): void
+    {
+        if ($this->campaignSchoolId === '') {
+            $this->campaignTargetMode = 'school';
+            return;
+        }
+
+        $this->campaignTargetMode = 'school';
+        $this->campaignHeadCoachOnly = true;
+        $this->campaignCoachIds = [];
+        $this->composeChooseCoachesOpen = false;
+    }
+
+    public function setComposeSchoolAllCoaches(): void
+    {
+        if ($this->campaignSchoolId === '') {
+            $this->campaignTargetMode = 'school';
+            return;
+        }
+
+        $this->campaignTargetMode = 'school';
+        $this->campaignHeadCoachOnly = false;
+        $this->campaignCoachIds = [];
+        $this->composeChooseCoachesOpen = false;
+    }
+
+    public function openComposeCoachChooser(): void
+    {
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+
+        if (! empty($this->campaignCoachIds)) {
+            return;
+        }
+
+        if ($this->campaignSchoolId !== '') {
+            $this->campaignCoachIds = collect($this->composeSchoolCoaches)
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id): string => (string) $id)
+                ->values()
+                ->all();
+        }
+    }
+
+    public function toggleCampaignCoach(string $coachId): void
+    {
+        $coachId = trim($coachId);
+        if ($coachId === '') {
+            return;
+        }
+
+        $ids = collect($this->campaignCoachIds)
+            ->map(fn ($id): string => (string) $id)
+            ->filter()
+            ->values();
+
+        if ($ids->contains($coachId)) {
+            $this->campaignCoachIds = $ids->reject(fn (string $id): bool => $id === $coachId)->values()->all();
+        } else {
+            $this->campaignCoachIds = $ids->push($coachId)->unique()->values()->all();
+        }
+
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+    }
+
+    public function selectAllComposeSchoolCoaches(): void
+    {
+        $this->campaignCoachIds = collect($this->composeSchoolCoaches)
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+    }
+
+    public function clearComposeCoachSelection(): void
+    {
+        $this->campaignCoachIds = [];
+        $this->campaignTargetMode = $this->campaignSchoolId !== '' ? 'school' : 'coaches';
+        $this->campaignHeadCoachOnly = false;
     }
 
     public function clearComposeTemplate(): void
@@ -1885,12 +2251,91 @@ HTML;
         $this->campaignBody = '';
         $this->composeGraphicUrl = '';
         $this->composeGraphicUpload = null;
+        $this->composeAttachmentUploads = [];
+        $this->composeAttachments = [];
     }
 
     public function removeComposeGraphic(): void
     {
         $this->composeGraphicUrl = '';
         $this->composeGraphicUpload = null;
+    }
+
+    public function updatedComposeAttachmentUploads(): void
+    {
+        $this->addComposeAttachments();
+    }
+
+    public function addComposeAttachments(): void
+    {
+        if (empty($this->composeAttachmentUploads)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            $this->composeAttachmentUploads = [];
+            return;
+        }
+
+        $files = collect($this->composeAttachmentUploads)
+            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
+            ->values();
+
+        if ($files->isEmpty()) {
+            $this->composeAttachmentUploads = [];
+            return;
+        }
+
+        try {
+            $this->validate([
+                'composeAttachmentUploads.*' => ['file', 'max:25600'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->composeAttachmentUploads = [];
+            Notification::make()->title('Attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
+            return;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
+
+                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                    Notification::make()
+                        ->title('Attachments')
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to GHL media.'))
+                        ->danger()
+                        ->send();
+                    continue;
+                }
+
+                $name = method_exists($file, 'getClientOriginalName')
+                    ? (string) $file->getClientOriginalName()
+                    : basename((string) ($result['url'] ?? 'attachment'));
+
+                $this->composeAttachments[] = [
+                    'name' => $name,
+                    'url' => trim((string) $result['url']),
+                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
+                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
+                ];
+            } catch (\Throwable $exception) {
+                Notification::make()->title('Attachments')->body('Unable to upload one attachment to GHL media.')->danger()->send();
+            }
+        }
+
+        $this->composeAttachmentUploads = [];
+    }
+
+    public function removeComposeAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->composeAttachments)) {
+            return;
+        }
+
+        unset($this->composeAttachments[$index]);
+        $this->composeAttachments = array_values($this->composeAttachments);
     }
 
     public function sendComposedEmail(): void
@@ -1976,8 +2421,11 @@ HTML;
                 'text' => trim(strip_tags($trackedBody)),
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
+                'cc' => trim($this->campaignCc),
+                'bcc' => trim($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
                 'skip_internal_sent_tracking' => true,
+                'attachments' => $this->composeAttachments,
             ];
 
             $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
@@ -3370,7 +3818,12 @@ HTML;
                     $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
                     return (string) ($coach['business_id'] ?? '') === $businessId
                         || trim((string) ($coach['school'] ?? '')) === trim((string) ($school['name'] ?? ''));
-                })->values(),
+                })
+                    ->when($this->campaignHeadCoachOnly, function (Collection $schoolCoaches): Collection {
+                        $headCoaches = $schoolCoaches->filter(fn (array $coach): bool => str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'));
+                        return $headCoaches->isNotEmpty() ? $headCoaches->take(1) : $schoolCoaches->take(1);
+                    })
+                    ->values(),
             default => $coaches->filter(fn (array $coach): bool => in_array((string) ($coach['id'] ?? ''), $this->campaignCoachIds, true))->values(),
         };
     }
@@ -4295,6 +4748,11 @@ HTML;
         return '';
     }
 
+    protected function enrichSchoolForDisplay(array $school): array
+    {
+        return $this->hydrateSchoolRowForDisplay($school);
+    }
+
     protected function hydrateSchoolRowForDisplay(array $school): array
     {
         $coaches = $this->coachesForSchoolSearch($school);
@@ -4690,7 +5148,22 @@ HTML;
 
         if ($graphic !== '') {
             $image = '<p style="margin:0 0 18px;text-align:center"><img src="' . e($graphic) . '" alt="Email graphic" style="max-width:100%;height:auto;border-radius:14px;display:inline-block"></p>';
-            return $image . $html;
+            $html = $image . $html;
+        }
+
+        if (! empty($this->composeAttachments)) {
+            $links = collect($this->composeAttachments)
+                ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
+                ->map(function (array $attachment): string {
+                    $name = e((string) ($attachment['name'] ?? 'Attachment'));
+                    $url = e((string) ($attachment['url'] ?? ''));
+                    return '<li style="margin:6px 0"><a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $name . '</a></li>';
+                })
+                ->implode('');
+
+            if ($links !== '') {
+                $html .= '<div style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $links . '</ul></div>';
+            }
         }
 
         return $html;
@@ -4777,6 +5250,15 @@ HTML;
         return $this->campaignRecipientCoaches()->count();
     }
 
+    public function getComposeRecipientNamesProperty(): string
+    {
+        return $this->campaignRecipientCoaches()
+            ->pluck('name')
+            ->filter()
+            ->take(8)
+            ->implode(', ');
+    }
+
     public function getCampaignCoachResultsProperty(): array
     {
         $query = strtolower(trim($this->campaignCoachSearch));
@@ -4824,6 +5306,85 @@ HTML;
         return $this->replaceCampaignTokens($this->buildComposeHtml($body), $this->composePreviewCoach);
     }
 
+
+    public function getComposeSelectedSchoolProperty(): ?array
+    {
+        if ($this->campaignSchoolId === '') {
+            return null;
+        }
+
+        return collect($this->allSchools())->firstWhere('id', $this->campaignSchoolId);
+    }
+
+    public function getComposeSchoolCoachesProperty(): array
+    {
+        $school = $this->composeSelectedSchool;
+        if (! is_array($school)) {
+            return [];
+        }
+
+        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+        $schoolName = trim((string) ($school['name'] ?? ''));
+
+        return collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null) && filled($coach['email'] ?? null))
+            ->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === $schoolName)
+            ->sortBy(function (array $coach): string {
+                $title = strtolower((string) ($coach['title'] ?? ''));
+                return (str_contains($title, 'head') ? '0' : '1') . '|' . strtolower((string) ($coach['name'] ?? ''));
+            })
+            ->values()
+            ->all();
+    }
+
+    public function getComposeTargetLabelProperty(): string
+    {
+        $count = $this->campaignRecipientCount;
+
+        if ($count <= 0) {
+            return 'Add a school';
+        }
+
+        return 'Send to ' . number_format($count) . ' coach' . ($count === 1 ? '' : 'es');
+    }
+
+    public function getComposeSendingDescriptionProperty(): string
+    {
+        $count = $this->campaignRecipientCount;
+        if ($count <= 0) {
+            return 'No school selected — search to add one below';
+        }
+
+        $prefix = match (true) {
+            $this->campaignTargetMode === 'school' && $this->campaignHeadCoachOnly => 'head coach only',
+            $this->campaignTargetMode === 'school' => 'all coaches',
+            $this->campaignTargetMode === 'all' => 'all coaches',
+            $this->campaignTargetMode === 'list' => 'selected list',
+            default => $count . ' coaches',
+        };
+
+        return 'Sending to ' . $prefix . ($this->composeRecipientNames !== '' ? ': ' . $this->composeRecipientNames : '');
+    }
+
+    public function getComposeTemplateOptionsProperty(): array
+    {
+        return collect($this->templates)
+            ->map(function (array $template): array {
+                $subject = trim((string) ($template['subject'] ?? $template['preview_text'] ?? ''));
+                $preview = trim((string) ($template['preview_text'] ?? $template['description'] ?? $template['body_preview'] ?? ''));
+                if ($preview === '') {
+                    $preview = trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')));
+                }
+
+                return array_merge($template, [
+                    'compose_subject_preview' => \Illuminate\Support\Str::limit($subject !== '' ? $subject : 'Recruiting email', 72),
+                    'compose_body_preview' => \Illuminate\Support\Str::limit($preview !== '' ? $preview : 'Personalized message preview', 96),
+                ]);
+            })
+            ->values()
+            ->all();
+    }
+
     public function getComposeSelectedListProperty(): ?array
     {
         if ($this->campaignListKey === '') {
@@ -4837,14 +5398,48 @@ HTML;
     {
         return collect($this->allSchools())
             ->filter(fn (array $school): bool => filled($school['id'] ?? null) && filled($school['name'] ?? null))
-            ->sortBy('name')
+            ->map(fn (array $school): array => $this->enrichSchoolForDisplay($school))
+            ->groupBy(function (array $school): string {
+                $businessId = trim((string) ($school['business_id'] ?? ''));
+                if ($businessId !== '') {
+                    return 'business:' . strtolower($businessId);
+                }
+
+                return 'name:' . strtolower(trim((string) ($school['name'] ?? '')));
+            })
+            ->map(function ($group): array {
+                $rows = collect($group)->values();
+                $primary = $rows->sortByDesc(function (array $school): int {
+                    return (filled($school['logo_url'] ?? null) ? 100 : 0)
+                        + (filled($school['business_id'] ?? null) ? 20 : 0)
+                        + (int) ($school['coach_count'] ?? 0);
+                })->first() ?: [];
+
+                $coachCount = max((int) ($primary['coach_count'] ?? 0), $rows->max(fn (array $school): int => (int) ($school['coach_count'] ?? 0)) ?: 0);
+                $primary['coach_count'] = $coachCount;
+
+                if (blank($primary['logo_url'] ?? null)) {
+                    $logo = $rows
+                        ->map(fn (array $school): string => $this->logoUrlForSchoolRow($school))
+                        ->first(fn (string $url): bool => $url !== '');
+
+                    if ($logo) {
+                        $primary['logo_url'] = $logo;
+                        $primary['school_logo_url'] = $primary['school_logo_url'] ?? $logo;
+                        $primary['business_logo_url'] = $primary['business_logo_url'] ?? $logo;
+                    }
+                }
+
+                return $primary;
+            })
+            ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
             ->values()
             ->all();
     }
 
     public function getComposeSchoolResultsProperty(): array
     {
-        $query = strtolower(trim($this->composeSchoolSearch));
+        $query = $this->normalizeSearchText($this->composeSchoolSearch);
 
         return collect($this->composeSchoolOptions)
             ->filter(function (array $school) use ($query): bool {
@@ -4852,17 +5447,19 @@ HTML;
                     return true;
                 }
 
-                $haystack = strtolower(implode(' ', [
+                $haystack = $this->normalizeSearchText([
                     $school['name'] ?? '',
                     $school['conference'] ?? '',
                     $school['division'] ?? '',
                     $school['state'] ?? '',
                     $school['city'] ?? '',
-                ]));
+                    $school['head_coach']['name'] ?? '',
+                    $school['head_coach']['email'] ?? '',
+                ]);
 
                 return str_contains($haystack, $query);
             })
-            ->take($query === '' ? 12 : 24)
+            ->take($query === '' ? 8 : 12)
             ->values()
             ->all();
     }
@@ -4878,12 +5475,17 @@ HTML;
 
         $this->campaignTargetMode = 'school';
         $this->campaignSchoolId = $schoolId;
+        $this->campaignHeadCoachOnly = true;
+        $this->campaignCoachIds = [];
+        $this->composeSchoolPickerOpen = false;
+        $this->composeChooseCoachesOpen = false;
 
         $school = collect($this->allSchools())->first(function (array $school) use ($schoolId): bool {
             return (string) ($school['id'] ?? '') === $schoolId;
         });
 
-        $this->composeSchoolSearch = is_array($school) ? (string) ($school['name'] ?? '') : $this->composeSchoolSearch;
+        // Clear the picker after selection so the suggestion dropdown does not remain open.
+        $this->composeSchoolSearch = '';
     }
 
     /** Backward-compatible alias for older school picker markup. */
@@ -4909,9 +5511,22 @@ HTML;
     public function getFilteredConversationsProperty(): array
     {
         $schoolFilter = trim($this->conversationSchoolFilter);
+        $statusFilter = strtolower(trim((string) ($this->conversationStatusFilter ?? 'all')));
+
+        $base = collect($this->conversations ?? []);
+
+        if ($statusFilter === 'unread') {
+            $base = $base->filter(fn (array $conversation): bool => (int) ($conversation['unread_count'] ?? 0) > 0);
+        } elseif ($statusFilter === 'starred') {
+            $base = $base->filter(function (array $conversation): bool {
+                $tags = collect($conversation['tags'] ?? [])->map(fn ($tag): string => strtolower(trim((string) $tag)));
+                return (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false)
+                    || $tags->contains(fn (string $tag): bool => str_contains($tag, 'favorite') || str_contains($tag, 'star'));
+            });
+        }
 
         if ($schoolFilter === '') {
-            return $this->conversations;
+            return $base->values()->all();
         }
 
         $coachesByEmail = collect($this->allCoaches())
@@ -4922,7 +5537,7 @@ HTML;
             ->filter(fn (array $coach): bool => filled($coach['id'] ?? null))
             ->keyBy(fn (array $coach): string => (string) ($coach['id'] ?? ''));
 
-        return collect($this->conversations)
+        return $base
             ->filter(function (array $conversation) use ($schoolFilter, $coachesByEmail, $coachesById): bool {
                 $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
                 $contactId = (string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '');

@@ -1707,6 +1707,84 @@
         .rc-search-slim { margin:.75rem 0 1rem; }
         .rc-school-modal-actions { display:flex; flex-wrap:wrap; gap:.55rem; margin:1rem 0; }
 
+
+
+        /* v56 Inbox redesign */
+        .rc-inbox-page-v56 { display:grid; gap:1rem; }
+        .rc-inbox-shell-v56 { display:grid; grid-template-columns: 23rem minmax(0,1fr) 22rem; min-height:42rem; border:1px solid var(--rc-border); border-radius:1.15rem; background:var(--rc-surface); box-shadow:0 16px 40px rgba(15,23,42,.07); overflow:hidden; }
+        .dark .rc-inbox-shell-v56 { box-shadow:0 20px 50px rgba(0,0,0,.26); }
+        .rc-inbox-left-v56 { border-right:1px solid var(--rc-border); background:var(--rc-surface); min-width:0; }
+        .rc-inbox-mid-v56 { min-width:0; display:flex; flex-direction:column; background:var(--rc-surface); }
+        .rc-inbox-right-v56 { border-left:1px solid var(--rc-border); background:var(--rc-soft); min-width:0; }
+        .rc-inbox-panel-head-v56 { padding:1.05rem 1.1rem .8rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+        .rc-inbox-panel-head-v56 h2 { margin:0; font-size:1.15rem; font-weight:760; letter-spacing:-.03em; color:var(--rc-text); }
+        .rc-inbox-head-actions-v56 { display:flex; align-items:center; gap:.4rem; }
+        .rc-inbox-icon-btn-v56 { width:2.05rem; height:2.05rem; display:grid; place-items:center; border:0; border-radius:.65rem; background:transparent; color:var(--rc-muted); cursor:pointer; }
+        .rc-inbox-icon-btn-v56:hover { background:var(--rc-soft); color:var(--rc-text); }
+        .rc-inbox-search-v56 { padding:0 1.1rem .75rem; }
+        .rc-inbox-search-v56 label { position:relative; display:block; }
+        .rc-inbox-search-v56 svg { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); width:1rem; height:1rem; color:#94a3b8; }
+        .rc-inbox-search-v56 input { width:100%; height:2.45rem; border:1px solid var(--rc-border); border-radius:.75rem; background:var(--rc-soft); color:var(--rc-text); padding:0 .8rem 0 2.05rem; font-size:.84rem; outline:none; }
+        .rc-inbox-tabs-v56 { display:flex; gap:1rem; align-items:center; padding:0 1.1rem .7rem; border-bottom:1px solid var(--rc-border); }
+        .rc-inbox-tab-v56 { border:0; background:transparent; color:var(--rc-muted); padding:.35rem 0; font-size:.82rem; font-weight:650; cursor:pointer; position:relative; }
+        .rc-inbox-tab-v56.is-active { color:#ff6338; }
+        .rc-inbox-tab-v56.is-active::after { content:""; position:absolute; left:0; right:0; bottom:-.72rem; height:2px; background:#ff6338; border-radius:999px; }
+        .rc-inbox-list-v56 { max-height:36rem; overflow:auto; }
+        .rc-thread-card-v56 { width:100%; border:0; border-left:3px solid transparent; background:transparent; color:var(--rc-text); text-align:left; padding:.95rem 1.1rem; display:grid; grid-template-columns:2.65rem minmax(0,1fr) auto; gap:.7rem; cursor:pointer; border-bottom:1px solid var(--rc-border); }
+        .rc-thread-card-v56:hover { background:rgba(255,99,56,.055); }
+        .rc-thread-card-v56.is-selected { background:rgba(255,99,56,.13); border-left-color:#ff6338; }
+        .rc-thread-logo-v56 { width:2.3rem; height:2.3rem; border-radius:999px; display:grid; place-items:center; overflow:hidden; border:1px solid var(--rc-border); background:#fff; color:#111827; font-size:.76rem; font-weight:760; }
+        .rc-thread-logo-v56 img { width:100%; height:100%; object-fit:contain; padding:.25rem; }
+        .rc-thread-name-v56 { display:block; font-size:.88rem; line-height:1.15; font-weight:760; color:var(--rc-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-thread-school-v56 { display:block; margin-top:.18rem; font-size:.78rem; color:var(--rc-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-thread-preview-v56 { display:block; margin-top:.45rem; font-size:.78rem; line-height:1.35; color:var(--rc-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-thread-date-v56 { font-size:.72rem; color:var(--rc-muted); white-space:nowrap; }
+        .rc-thread-status-v56 { display:inline-flex; align-items:center; justify-content:center; border-radius:.45rem; padding:.18rem .45rem; font-size:.68rem; font-weight:760; color:#059669; background:rgba(16,185,129,.12); margin-top:.5rem; }
+        .rc-thread-status-v56.is-opened { color:#f59e0b; background:rgba(245,158,11,.13); }
+        .rc-thread-unread-dot-v56 { width:.46rem; height:.46rem; border-radius:999px; background:#ff6338; margin-top:.45rem; justify-self:end; }
+        .rc-inbox-mid-head-v56 { min-height:5.3rem; border-bottom:1px solid var(--rc-border); padding:.9rem 1.2rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+        .rc-inbox-coach-title-v56 { display:grid; grid-template-columns:2.75rem minmax(0,1fr); gap:.7rem; align-items:center; }
+        .rc-inbox-school-logo-v56 { width:2.45rem; height:2.45rem; border-radius:999px; border:1px solid var(--rc-border); display:grid; place-items:center; overflow:hidden; background:#fff; color:#111827; font-size:.75rem; font-weight:760; }
+        .rc-inbox-school-logo-v56 img { width:100%; height:100%; object-fit:contain; padding:.28rem; }
+        .rc-inbox-coach-title-v56 h3 { margin:0; font-size:1rem; font-weight:760; color:var(--rc-text); }
+        .rc-inbox-coach-title-v56 p { margin:.15rem 0 0; color:var(--rc-muted); font-size:.78rem; }
+        .rc-inbox-mid-actions-v56 { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; justify-content:flex-end; }
+        .rc-inbox-open-composer-v56 { min-height:2.15rem; border:1px solid var(--rc-border); border-radius:.7rem; background:var(--rc-surface); color:var(--rc-text); padding:0 .75rem; display:inline-flex; gap:.4rem; align-items:center; font-size:.78rem; font-weight:700; cursor:pointer; }
+        .rc-inbox-open-composer-v56:hover { border-color:#ff6338; color:#ff6338; }
+        .rc-message-stream-v56 { overflow:auto; padding:1.2rem; display:grid; gap:1.15rem; flex:1; align-content:start; }
+        .rc-inbox-message-v56 { display:grid; grid-template-columns:2.4rem minmax(0,1fr); gap:.7rem; align-items:start; }
+        .rc-inbox-message-v56.is-out { grid-template-columns:2.4rem minmax(0,1fr); }
+        .rc-msg-avatar-v56 { width:2.25rem; height:2.25rem; border-radius:999px; background:#ff6338; color:#fff; display:grid; place-items:center; font-size:.74rem; font-weight:800; }
+        .rc-inbox-message-v56.is-out .rc-msg-avatar-v56 { background:#ff6338; }
+        .rc-msg-meta-v56 { display:flex; align-items:center; justify-content:space-between; gap:.75rem; color:var(--rc-muted); font-size:.74rem; margin:0 0 .5rem; }
+        .rc-msg-meta-v56 strong { color:var(--rc-text); font-size:.84rem; }
+        .rc-msg-bubble-v56 { width:min(100%,42rem); border-radius:.9rem; padding:1rem; background:#f2f4f8; color:#111827; line-height:1.58; font-size:.9rem; }
+        .dark .rc-msg-bubble-v56 { background:#111827; color:#e5e7eb; }
+        .rc-msg-bubble-v56 p { margin:.45rem 0; }
+        .rc-msg-bubble-v56 img { max-width:100%; height:auto; border-radius:.65rem; }
+        .rc-message-status-v56 { margin:.35rem 0 0 3.1rem; color:#059669; font-size:.75rem; display:flex; align-items:center; gap:.35rem; }
+        .rc-coach-profile-v56 { height:100%; overflow:auto; }
+        .rc-coach-cover-v56 { height:6.6rem; background:linear-gradient(135deg,#1f2937,#111827); display:grid; place-items:center; position:relative; }
+        .rc-coach-cover-v56 .rc-cover-logo-v56 { max-width:8rem; max-height:3.3rem; object-fit:contain; filter:drop-shadow(0 10px 20px rgba(0,0,0,.3)); }
+        .rc-profile-content-v56 { padding:0 1.15rem 1.15rem; }
+        .rc-profile-avatar-v56 { width:4.1rem; height:4.1rem; border-radius:999px; background:#ff6338; color:#fff; border:4px solid var(--rc-soft); display:grid; place-items:center; font-weight:850; margin-top:-2.1rem; position:relative; box-shadow:0 10px 24px rgba(15,23,42,.12); }
+        .rc-profile-name-v56 { display:flex; align-items:center; gap:.35rem; margin-top:1rem; }
+        .rc-profile-name-v56 h3 { margin:0; color:var(--rc-text); font-size:1rem; font-weight:780; }
+        .rc-verified-v56 { width:1rem; height:1rem; border-radius:999px; background:#3b82f6; color:#fff; display:grid; place-items:center; font-size:.65rem; }
+        .rc-profile-sub-v56 { color:var(--rc-muted); font-size:.82rem; margin:.22rem 0 0; line-height:1.35; }
+        .rc-contact-lines-v56 { display:grid; gap:.55rem; margin:1.05rem 0; }
+        .rc-contact-line-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.5rem; align-items:center; color:var(--rc-text); font-size:.78rem; }
+        .rc-contact-line-v56 svg { color:var(--rc-muted); width:1rem; height:1rem; }
+        .rc-profile-actions-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin:1rem 0; }
+        .rc-profile-action-v56 { min-height:3.55rem; border:1px solid var(--rc-border); border-radius:.8rem; background:var(--rc-surface); color:var(--rc-text); display:grid; place-items:center; gap:.25rem; font-size:.78rem; font-weight:700; cursor:pointer; }
+        .rc-profile-action-v56:hover { border-color:#ff6338; color:#ff6338; }
+        .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
+        .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
+        .rc-about-item-v56 strong { display:block; color:var(--rc-text); font-size:.86rem; margin-bottom:.12rem; }
+        .rc-inbox-empty-v56 { min-height:20rem; display:grid; place-items:center; color:var(--rc-muted); text-align:center; padding:2rem; }
+        @media (max-width: 1320px) { .rc-inbox-shell-v56 { grid-template-columns:20rem minmax(0,1fr); } .rc-inbox-right-v56 { display:none; } }
+        @media (max-width: 900px) { .rc-inbox-shell-v56 { grid-template-columns:1fr; } .rc-inbox-left-v56 { border-right:0; } .rc-inbox-mid-v56 { min-height:34rem; } }
+
         @media (max-width: 1100px) { .rc-compose-compact-grid,.rc-inbox-layout,.rc-school-filter-box { grid-template-columns:1fr; } .rc-recipient-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 
@@ -5200,7 +5278,7 @@
             <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
         @endif
 
-        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true) || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -5241,7 +5319,7 @@
                                 </div>
                             @endif
                 </div>
-                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
                     <button
                         type="button"
                         class="rc-home-refresh-v2"
@@ -5993,8 +6071,8 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                @keydown.escape.window="close()"
-                @click.self="close()">
+                x-on:keydown.escape.window="close()"
+                x-on:click.self="close()">
                 <aside class="rc-stats-drawer-panel"
                     role="dialog"
                     aria-modal="true"
@@ -6005,7 +6083,7 @@
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
                     x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -6132,8 +6210,8 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                @keydown.escape.window="close()"
-                @click.self="close()">
+                x-on:keydown.escape.window="close()"
+                x-on:click.self="close()">
                 <aside class="rc-stats-drawer-panel"
                     role="dialog"
                     aria-modal="true"
@@ -6144,7 +6222,7 @@
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
                     x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -6235,8 +6313,8 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                @keydown.escape.window="close()"
-                @click.self="close()">
+                x-on:keydown.escape.window="close()"
+                x-on:click.self="close()">
                 <aside class="rc-stats-drawer-panel"
                     role="dialog"
                     aria-modal="true"
@@ -6247,7 +6325,7 @@
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
                     x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" @click="close()" aria-label="Close details">×</button>
+                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7235,8 +7313,8 @@
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                 <span>Email</span>
                             </button>
-                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" @click.outside="open = false">
-                                <button type="button" @click="open = ! open">
+                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
+                                <button type="button" x-on:click="open = ! open">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                                     <span>Add to List</span>
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -7245,7 +7323,7 @@
                                     @forelse($this->lists as $list)
                                         @php $listKey = (string) ($list['key'] ?? ''); @endphp
                                         @if($listKey !== '')
-                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" @click="open = false">
+                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" x-on:click="open = false">
                                                 <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
                                                 <span>+</span>
                                             </button>
@@ -7663,278 +7741,439 @@
         @endif
 
         @if($section === 'conversations')
-            <div class="rc-page-heading">
-                <h1>Inbox</h1>
-                <div class="rc-subtle">Email threads from coaches. Filter by school when you need a focused view.</div>
-            </div>
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences...',
+                'showNewEmail' => false,
+            ])
 
-            <div class="rc-inbox-layout" wire:poll.12s.visible="pollConversationUpdates">
-                <div class="rc-card">
-                    <div class="rc-toolbar" style="margin-bottom:.75rem;display:grid;grid-template-columns:1fr;gap:.55rem">
-                        <input class="rc-input" style="width:100%" placeholder="Search inbox" wire:model.live.debounce.500ms="conversationSearch" />
-                        <select class="rc-select" style="width:100%" wire:model.live="conversationSchoolFilter">
-                            <option value="">All schools</option>
-                            @foreach($this->conversationSchoolOptions as $schoolName)
-                                <option value="{{ $schoolName }}">{{ $schoolName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+            @php
+                $inboxConversations = collect($this->filteredConversations ?? [])->values();
+                $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
+                if (! $selectedConversation && $inboxConversations->isNotEmpty()) {
+                    $selectedConversation = $inboxConversations->first();
+                }
+                $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
+                $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
+                $selectedCoach = null;
+                if ($selectedContactId !== '') {
+                    $selectedCoach = collect($this->allCoaches())->firstWhere('id', $selectedContactId);
+                }
+                if (! $selectedCoach && $selectedEmail !== '') {
+                    $selectedCoach = collect($this->allCoaches())->first(function ($coach) use ($selectedEmail) {
+                        return strtolower(trim((string) ($coach['email'] ?? ''))) === $selectedEmail;
+                    });
+                }
+                $selectedName = (string) ($selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? data_get($selectedCoach, 'name') ?? 'Coach');
+                $selectedSchool = (string) ($selectedConversation['school'] ?? $selectedConversation['company_name'] ?? data_get($selectedCoach, 'school') ?? data_get($selectedCoach, 'company_name') ?? 'School');
+                $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
+                $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
+                $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
+                $threadMessages = is_array($messages ?? null) ? $messages : [];
+                $filterStatus = $conversationStatusFilter ?? 'all';
+                $threadInitials = function (string $name): string {
+                    return strtoupper(collect(explode(' ', trim($name)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
+                };
+                $threadLogo = function (array $conversation) {
+                    $contactId = (string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '');
+                    $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+                    $coach = null;
+                    if ($contactId !== '') {
+                        $coach = collect($this->allCoaches())->firstWhere('id', $contactId);
+                    }
+                    if (! $coach && $email !== '') {
+                        $coach = collect($this->allCoaches())->first(fn($row) => strtolower(trim((string) ($row['email'] ?? ''))) === $email);
+                    }
+                    return trim((string) ($conversation['school_logo_url'] ?? $conversation['logo_url'] ?? data_get($coach, 'school_logo_url') ?? data_get($coach, 'business_logo_url') ?? data_get($coach, 'logo_url') ?? ''));
+                };
+                $formatInboxDate = function ($value): string {
+                    if (! $value) { return ''; }
+                    try {
+                        if (is_numeric($value)) {
+                            $date = \Illuminate\Support\Carbon::createFromTimestampMs((int) $value);
+                        } else {
+                            $date = \Illuminate\Support\Carbon::parse($value);
+                        }
+                        return $date->isCurrentYear() ? $date->format('M j') : $date->format('M j, Y');
+                    } catch (\Throwable $exception) {
+                        return is_scalar($value) ? (string) $value : '';
+                    }
+                };
+                $formatMessageDate = function ($value): string {
+                    if (! $value) { return ''; }
+                    try {
+                        if (is_numeric($value)) {
+                            $date = \Illuminate\Support\Carbon::createFromTimestampMs((int) $value);
+                        } else {
+                            $date = \Illuminate\Support\Carbon::parse($value);
+                        }
+                        return $date->format('M j, g:i A');
+                    } catch (\Throwable $exception) {
+                        return is_scalar($value) ? (string) $value : '';
+                    }
+                };
+            @endphp
 
-                    <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationSchoolFilter" class="rc-loading-inline" style="margin-bottom:.65rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+            <div class="rc-inbox-page-v56" wire:poll.12s.visible="pollConversationUpdates">
+                <div class="rc-inbox-shell-v56">
+                    <aside class="rc-inbox-left-v56">
+                        <div class="rc-inbox-panel-head-v56">
+                            <h2>Conversations</h2>
+                            <div class="rc-inbox-head-actions-v56">
+                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </button>
+                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="loadConversations" title="Refresh conversations" aria-label="Refresh conversations">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </button>
+                            </div>
+                        </div>
 
-                    <div class="rc-inbox-list">
-                        <?php $inboxConversations = collect($this->filteredConversations ?? [])->values()->all(); ?>
-                        <?php if (empty($inboxConversations)): ?>
-                            <div class="rc-empty"><strong>No email threads found.</strong><span>Try another search or school filter.</span></div>
-                        <?php else: ?>
-                            <?php foreach ($inboxConversations as $inboxConversation): ?>
-                                <?php
+                        <div class="rc-inbox-search-v56">
+                            <label>
+                                <svg viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                <input type="search" placeholder="Search conversations..." wire:model.live.debounce.450ms="conversationSearch">
+                            </label>
+                        </div>
+
+                        <div class="rc-inbox-tabs-v56">
+                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
+                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">Unread ({{ collect($this->conversations)->sum(fn($row) => (int) ($row['unread_count'] ?? 0)) }})</button>
+                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
+                        </div>
+
+                        <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+
+                        <div class="rc-inbox-list-v56">
+                            @forelse($inboxConversations as $inboxConversation)
+                                @php
                                     $inboxConversationId = (string) ($inboxConversation['id'] ?? '');
                                     $inboxContactName = (string) ($inboxConversation['contact_name'] ?? $inboxConversation['name'] ?? 'Coach');
-                                    $inboxInitials = collect(explode(' ', $inboxContactName))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                                    $inboxLastMessage = strip_tags((string) ($inboxConversation['last_message'] ?? $inboxConversation['snippet'] ?? 'No preview available.'));
                                     $inboxSchoolLine = (string) ($inboxConversation['school'] ?? $inboxConversation['company_name'] ?? $inboxConversation['email'] ?? 'School unavailable');
-                                    $inboxUpdatedAt = (string) ($inboxConversation['updated_at'] ?? $inboxConversation['last_message_at'] ?? '');
-                                ?>
-                                <button type="button" class="rc-thread-card <?php echo $selectedConversationId === $inboxConversationId ? 'is-selected' : ''; ?>" wire:click="selectConversation(<?php echo \Illuminate\Support\Js::from($inboxConversationId); ?>)" wire:loading.attr="disabled" wire:target="selectConversation(<?php echo \Illuminate\Support\Js::from($inboxConversationId); ?>)">
-                                    <span class="rc-avatar-mini"><?php echo e(strtoupper($inboxInitials ?: 'C')); ?></span>
-                                    <span style="min-width:0">
-                                        <span class="rc-thread-subject"><?php echo e($inboxContactName); ?></span>
-                                        <span class="rc-choice-sub"><?php echo e($inboxSchoolLine); ?></span>
-                                        <span class="rc-thread-preview"><?php echo e($inboxLastMessage); ?></span>
+                                    $inboxLastMessage = trim(strip_tags((string) ($inboxConversation['last_message'] ?? $inboxConversation['snippet'] ?? 'No preview available.')));
+                                    $inboxDate = $formatInboxDate($inboxConversation['last_message_at'] ?? $inboxConversation['updated_at'] ?? $inboxConversation['created_at'] ?? '');
+                                    $isSelectedThread = $selectedConversationId === $inboxConversationId;
+                                    $unreadCount = (int) ($inboxConversation['unread_count'] ?? 0);
+                                    $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
+                                    $logo = $threadLogo($inboxConversation);
+                                @endphp
+                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
+                                    <span class="rc-thread-logo-v56">
+                                        @if($logo !== '')
+                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                        @else
+                                            {{ $threadInitials($inboxContactName) }}
+                                        @endif
                                     </span>
-                                    <span style="display:grid;gap:.35rem;justify-items:end">
-                                        <span class="rc-subtle"><?php echo e($inboxUpdatedAt); ?></span>
-                                        <span class="rc-mail-dot">✉</span>
+                                    <span style="min-width:0">
+                                        <span class="rc-thread-name-v56">{{ $inboxContactName }}</span>
+                                        <span class="rc-thread-school-v56">{{ $inboxSchoolLine }}</span>
+                                        <span class="rc-thread-preview-v56">{{ $inboxLastMessage }}</span>
+                                        <span class="rc-thread-status-v56 {{ $statusLabel === 'Opened' ? 'is-opened' : '' }}">{{ $statusLabel }}</span>
+                                    </span>
+                                    <span style="display:grid;justify-items:end;align-content:start;gap:.3rem">
+                                        <span class="rc-thread-date-v56">{{ $inboxDate }}</span>
+                                        @if($unreadCount > 0)<span class="rc-thread-unread-dot-v56"></span>@endif
                                     </span>
                                 </button>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="rc-card rc-email-thread">
-                    <?php $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null; ?>
-                    <div class="rc-email-thread-head">
-                        <div>
-                            <div class="rc-title">{{ $selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? 'Email thread' }}</div>
-                            <div class="rc-subtle">{{ $selectedConversation['school'] ?? $selectedConversation['company_name'] ?? $selectedConversation['email'] ?? 'Select a thread to view emails' }}</div>
+                            @empty
+                                <div class="rc-inbox-empty-v56"><div><strong>No conversations found.</strong><br><span>Try another search or send a new coach email.</span></div></div>
+                            @endforelse
                         </div>
-                        @if($selectedConversationId)
-                            <button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Refresh</span><span wire:loading.flex wire:target="loadConversationMessages" class="rc-loading-inline"><span class="rc-spinner-mini"></span></span></button>
-                        @endif
-                    </div>
+                    </aside>
 
-                    <div class="rc-message-list">
-                        <?php $threadMessages = is_array($messages ?? null) ? $messages : []; ?>
-                        <?php if (empty($threadMessages)): ?>
-                            <div class="rc-empty"><strong>Select a thread.</strong><span>Email messages will appear here.</span></div>
-                        <?php else: ?>
-                            <?php foreach ($threadMessages as $message): ?>
-                                <?php
-                                    $message = is_array($message) ? $message : [];
-                                    $isOut = str_contains(strtolower((string) ($message['direction'] ?? '')), 'out');
-                                    $fromLabel = $isOut ? 'You' : ($message['from_name'] ?? $selectedConversation['contact_name'] ?? 'Coach');
-                                    $toLabel = $message['to'] ?? ($isOut ? ($selectedConversation['contact_name'] ?? 'Coach') : 'You');
-                                    if (is_array($toLabel)) {
-                                        $toLabel = collect($toLabel)->map(function ($item) {
-                                            if (is_array($item)) {
-                                                return $item['email'] ?? $item['name'] ?? $item['address'] ?? '';
-                                            }
-                                            return is_scalar($item) ? (string) $item : '';
-                                        })->filter()->implode(', ');
-                                    }
-                                    $messageBody = (string) ($message['body'] ?? '');
-                                    $messageAttachments = collect($message['attachments'] ?? [])->filter(fn ($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
-                                ?>
-                                <article class="rc-email-message <?php echo $isOut ? 'out' : ''; ?>">
-                                    <div class="rc-email-format-head">
-                                        <?php if (! empty($message['subject'])): ?>
-                                            <div class="rc-email-format-subject"><?php echo e((string) $message['subject']); ?></div>
-                                        <?php endif; ?>
-                                        <div class="rc-email-format-line"><strong>From</strong><span><?php echo e((string) ($fromLabel ?: ($isOut ? 'You' : 'Coach'))); ?></span></div>
-                                        <div class="rc-email-format-line"><strong>To</strong><span><?php echo e((string) ($toLabel ?: 'Recipient')); ?></span></div>
-                                        <?php if (! empty($message['created_at'])): ?>
-                                            <div class="rc-email-format-line"><strong>Date</strong><span><?php echo e((string) $message['created_at']); ?></span></div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="rc-message-body"><?php echo $messageBody !== '' ? $messageBody : '<p style="color:#64748b;margin:0">No message body.</p>'; ?></div>
-                                    <?php if ($messageAttachments->isNotEmpty()): ?>
-                                        <div class="rc-message-attachments">
-                                            <?php foreach ($messageAttachments as $attachment): ?>
-                                                <?php
-                                                    $attachmentUrl = (string) ($attachment['url'] ?? '');
-                                                    $attachmentName = (string) ($attachment['name'] ?? 'Attachment');
-                                                    $attachmentType = strtolower((string) ($attachment['mime_type'] ?? $attachment['type'] ?? ''));
-                                                    $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
-                                                ?>
-                                                <?php if ($isImageAttachment): ?>
-                                                    <img class="rc-message-attachment-image" src="<?php echo e($attachmentUrl); ?>" alt="<?php echo e($attachmentName); ?>">
-                                                <?php else: ?>
-                                                    <a class="rc-message-attachment-link" href="<?php echo e($attachmentUrl); ?>" target="_blank" rel="noopener">Open <?php echo e($attachmentName); ?></a>
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </article>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-
-                    @if($hasMoreMessages)
-                        <button class="rc-btn" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages"><span wire:loading.remove wire:target="loadConversationMessages">Load older emails</span><span wire:loading.flex wire:target="loadConversationMessages" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
-                    @endif
-
-                    @if($selectedConversationId || $selectedCoachId)
-                        <?php $composerCoach = $this->selectedCoach; ?>
-                        <div class="rc-native-email-composer" x-data="plyrNativeEditorBase('emailBody')" x-init="mount()" wire:key="native-email-composer-{{ $selectedCoachId ?: $selectedConversationId ?: 'new' }}">
-                            <div class="rc-card is-flat" style="display:grid;gap:.75rem;margin-top:.75rem">
-                                <div class="rc-top">
-                                    <div>
-                                        <div class="rc-row-title">Email {{ $composerCoach['name'] ?? ($selectedConversation['contact_name'] ?? 'coach') }}</div>
-                                        <div class="rc-subtle">Built-in PLYRCard editor. No external editor account required.</div>
-                                    </div>
-                                    <button class="rc-btn" type="button" wire:click="closeComposer">Close</button>
+                    <main class="rc-inbox-mid-v56">
+                        @if($selectedConversation)
+                            <div class="rc-inbox-mid-head-v56">
+                                <div class="rc-inbox-coach-title-v56">
+                                    <span class="rc-inbox-school-logo-v56">
+                                        @if($selectedSchoolLogo !== '')
+                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                        @else
+                                            {{ strtoupper(substr($selectedSchool, 0, 2)) }}
+                                        @endif
+                                    </span>
+                                    <span style="min-width:0">
+                                        <h3>{{ $selectedName }}</h3>
+                                        <p>{{ $selectedTitle }} • {{ $selectedSchool }}</p>
+                                    </span>
                                 </div>
-
-                                <label style="display:grid;gap:.35rem">
-                                    <span class="rc-section-title" style="margin:0">Subject</span>
-                                    <input class="rc-input" style="width:100%" type="text" wire:model.live.debounce.500ms="emailSubject" placeholder="Subject">
-                                </label>
-
-                                <div class="rc-rich-editor-shell rc-native-editor-shell">
-                                    <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Email message toolbar">
-                                        <button class="rc-rich-tool" type="button" @click="command('undo')">↶</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('redo')">↷</button>
-                                        <button class="rc-rich-tool" type="button" @click="block('p')">P</button>
-                                        <button class="rc-rich-tool" type="button" @click="block('h2')">H2</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('bold')"><strong>B</strong></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('italic')"><em>I</em></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('underline')"><u>U</u></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
-                                        <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
-                                        <button class="rc-rich-tool" type="button" @click="openImageUpload()">Image</button>
-                                        <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
-                                        <button class="rc-rich-tool" type="button" @click="addTable()">Table</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
-                                    </div>
-                                    <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
-                                                                                                                        <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
-                                    </div>
-                                    <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
-                                    
-                                    <div
-                                        x-cloak
-                                        x-show="activePanel"
-                                        x-transition.opacity
-                                        @keydown.escape.window="closeEditorPanel()"
-                                        @click.self="closeEditorPanel()"
-                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
-                                    >
-                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
-                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
-                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
-                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
-                                            </div>
-                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
-                                            </div>
-                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                    <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
-                                    <div
-                                        x-ref="editor"
-                                        class="rc-rich-editor rc-native-editor"
-                                        contenteditable="true"
-                                        data-placeholder="Write your message..."
-                                        data-initial-body="{{ base64_encode($emailBody ?? '') }}"
-                                        @input="queueSync()"
-                                        @blur="syncNow()"
-                                    ></div>
-                                </div>
-
-                                <div class="rc-toolbar" style="justify-content:flex-end">
-                                    <button class="rc-btn" type="button" wire:click="closeComposer">Cancel</button>
-                                    <button class="rc-btn rc-btn-primary" type="button" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
-                                        <span wire:loading.remove wire:target="sendEmail">Send email</span>
-                                        <span wire:loading.flex wire:target="sendEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                                <div class="rc-inbox-mid-actions-v56">
+                                    <button type="button" class="rc-inbox-open-composer-v56" wire:click="openSelectedConversationInComposer">
+                                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                        Open in Composer
                                     </button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+                                </div>
+                            </div>
+
+                            <div class="rc-message-stream-v56">
+                                @if(empty($threadMessages))
+                                    <div class="rc-inbox-empty-v56"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
+                                @else
+                                    @foreach($threadMessages as $message)
+                                        @php
+                                            $message = is_array($message) ? $message : [];
+                                            $isOut = str_contains(strtolower((string) ($message['direction'] ?? $message['type'] ?? '')), 'out');
+                                            $fromLabel = $isOut ? 'You' : ($message['from_name'] ?? $selectedName);
+                                            $toLabel = $message['to'] ?? ($isOut ? $selectedName : 'You');
+                                            if (is_array($toLabel)) {
+                                                $toLabel = collect($toLabel)->map(fn($item) => is_array($item) ? ($item['email'] ?? $item['name'] ?? $item['address'] ?? '') : (is_scalar($item) ? (string) $item : ''))->filter()->implode(', ');
+                                            }
+                                            $messageBody = (string) ($message['body'] ?? $message['html'] ?? $message['text'] ?? '');
+                                            $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
+                                            $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
+                                        @endphp
+                                        <article class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
+                                            <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
+                                            <div style="min-width:0">
+                                                <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
+                                                <div class="rc-msg-bubble-v56">{!! $messageBody !== '' ? $messageBody : '<p>No message body.</p>' !!}</div>
+                                                @if($messageAttachments->isNotEmpty())
+                                                    <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
+                                                        @foreach($messageAttachments as $attachment)
+                                                            @php
+                                                                $attachmentUrl = (string) ($attachment['url'] ?? '');
+                                                                $attachmentName = (string) ($attachment['name'] ?? 'Attachment');
+                                                                $attachmentType = strtolower((string) ($attachment['mime_type'] ?? $attachment['type'] ?? ''));
+                                                                $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
+                                                            @endphp
+                                                            @if($isImageAttachment)
+                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}">
+                                                            @else
+                                                                <a class="rc-message-attachment-link" href="{{ $attachmentUrl }}" target="_blank" rel="noopener">Open {{ $attachmentName }}</a>
+                                                            @endif
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                                @if($isOut)<div class="rc-message-status-v56"><span>⊙</span> Opened · just now</div>@endif
+                                            </div>
+                                        </article>
+                                    @endforeach
+                                @endif
+                                @if($hasMoreMessages)
+                                    <button class="rc-inbox-open-composer-v56" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages">Load older emails</button>
+                                @endif
+                            </div>
+                        @else
+                            <div class="rc-inbox-empty-v56"><div><strong>Select a conversation.</strong><br><span>Email messages will appear here.</span></div></div>
+                        @endif
+                    </main>
+
+                    <aside class="rc-inbox-right-v56">
+                        <div class="rc-coach-profile-v56">
+                            <div class="rc-coach-cover-v56">
+                                @if($selectedSchoolLogo !== '')
+                                    <img class="rc-cover-logo-v56" src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                @endif
+                            </div>
+                            <div class="rc-profile-content-v56">
+                                <div class="rc-profile-avatar-v56">{{ $selectedInitials }}</div>
+                                <div class="rc-profile-name-v56"><h3>{{ $selectedName }}</h3><span class="rc-verified-v56">✓</span></div>
+                                <div class="rc-profile-sub-v56">{{ $selectedTitle }}<br>{{ $selectedSchool }}</div>
+
+                                <div class="rc-contact-lines-v56">
+                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6Zm0 0 8 7 8-7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>{{ data_get($selectedCoach, 'email') ?? $selectedConversation['email'] ?? 'Email unavailable' }}</span></div>
+                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div>
+                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div>
+                                </div>
+
+                                <div class="rc-profile-actions-v56">
+                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
+                                </div>
+
+                                <div class="rc-section-title" style="margin:1rem 0 .75rem">About Coach</div>
+                                <div class="rc-about-grid-v56">
+                                    <div class="rc-about-item-v56"><span>🏅</span><span><strong>{{ data_get($selectedCoach, 'season') ?? '—' }}</strong>At {{ $selectedSchool }}</span></div>
+                                    <div class="rc-about-item-v56"><span>↗</span><span><strong>{{ data_get($selectedCoach, 'record') ?? '—' }}</strong>Career Record</span></div>
+                                    <div class="rc-about-item-v56"><span>👥</span><span><strong>{{ data_get($selectedCoach, 'conference') ?? data_get($selectedCoach, 'league') ?? '—' }}</strong>Conference</span></div>
+                                    <div class="rc-about-item-v56"><span>🏆</span><span><strong>{{ data_get($selectedCoach, 'division') ?? '—' }}</strong>Division</span></div>
                                 </div>
                             </div>
                         </div>
-                    @endif
+                    </aside>
                 </div>
             </div>
         @endif
 
-
         @if($section === 'compose')
-            <div class="rc-page-heading">
-                <h1>Compose email</h1>
-                <div class="rc-subtle">Choose recipients, start from a template, preview, then send.</div>
-            </div>
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'showNewEmail' => false,
+            ])
 
-            <div class="rc-compose-compact-grid">
-                <div class="rc-campaign-panel">
-                    <div class="rc-campaign-panel-header">
-                        <div>
-                            <div class="rc-section-title">Build email</div>
-                            <div class="rc-subtle">Recipient tools are tucked into compact dropdowns.</div>
-                        </div>
+            <style>
+                .rc-compose-page-v45 { display:grid; gap:1rem; }
+                .rc-compose-titlebar-v45 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
+                .rc-compose-titlebar-v45 h1 { margin:0; font-size:1.25rem; line-height:1.15; font-weight:700; letter-spacing:-.025em; }
+                .rc-compose-actions-v45 { display:flex; align-items:center; justify-content:flex-end; gap:.55rem; flex-wrap:wrap; }
+                .rc-compose-save-v45 { display:inline-flex; align-items:center; gap:.35rem; color:#059669; font-size:.76rem; font-weight:600; }
+                .rc-compose-layout-v45 { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; }
+                .rc-compose-card-v45 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; box-shadow:0 12px 28px rgba(15,23,42,.06); overflow:hidden; }
+                .rc-compose-inner-v45 { padding:1rem; display:grid; gap:1rem; }
+                .rc-compose-label-v45 { color:var(--rc-text); font-size:.73rem; font-weight:700; margin-bottom:.45rem; }
+                .rc-compose-recipient-bar-v45 { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+                .rc-compose-chip-v45 { display:inline-flex; align-items:center; gap:.45rem; border:1px solid rgba(255,99,56,.12); background:rgba(255,99,56,.10); color:#fb4f32; border-radius:.55rem; padding:.48rem .65rem; font-size:.78rem; font-weight:600; }
+                .rc-compose-chip-v45 button { border:0; background:transparent; color:inherit; cursor:pointer; padding:0; line-height:1; }
+                .rc-compose-tab-v45 { border:1px solid var(--rc-border); background:var(--rc-surface); color:var(--rc-text); border-radius:.58rem; padding:.48rem .72rem; min-height:2.25rem; font-size:.78rem; font-weight:600; }
+                .rc-compose-tab-v45.is-active { border-color:#ff6338; background:rgba(255,99,56,.08); color:#ff6338; }
+                .rc-compose-school-search-v45 { max-width:28rem; position:relative; }
+                .rc-compose-send-line-v45 { border-radius:.58rem; background:var(--rc-soft); color:var(--rc-muted); font-size:.76rem; padding:.58rem .75rem; }
+                .rc-compose-coach-grid-v45 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.42rem; margin-top:.65rem; }
+                .rc-compose-coach-pill-v45 { border:1px solid rgba(255,99,56,.55); background:rgba(255,99,56,.08); border-radius:.5rem; padding:.5rem .55rem; display:flex; align-items:center; justify-content:space-between; gap:.6rem; cursor:pointer; color:var(--rc-text); }
+                .rc-compose-coach-pill-v45:not(.is-selected) { border-color:var(--rc-border); background:var(--rc-surface); }
+                .rc-compose-coach-name-v45 { display:flex; align-items:center; gap:.42rem; min-width:0; font-size:.76rem; font-weight:650; }
+                .rc-compose-check-v45 { width:1rem; height:1rem; border-radius:.28rem; border:1px solid var(--rc-border); display:grid; place-items:center; flex:0 0 auto; font-size:.68rem; color:white; }
+                .rc-compose-coach-pill-v45.is-selected .rc-compose-check-v45 { background:#ff6338; border-color:#ff6338; }
+                .rc-compose-coach-title-v45 { color:var(--rc-muted); font-size:.68rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+                .rc-compose-field-row-v45 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.55rem; align-items:center; }
+                .rc-compose-template-wrap-v45 { position:relative; }
+                .rc-compose-template-menu-v45 { position:absolute; z-index:55; right:0; top:calc(100% + .45rem); width:min(23rem,88vw); border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); box-shadow:0 18px 45px rgba(15,23,42,.15); padding:.7rem; display:grid; gap:.25rem; }
+                .rc-compose-template-menu-v45 button { width:100%; border:0; background:transparent; color:var(--rc-text); border-radius:.55rem; padding:.65rem .7rem; text-align:left; cursor:pointer; }
+                .rc-compose-template-menu-v45 button:hover, .rc-compose-template-menu-v45 button.is-active { background:rgba(255,99,56,.12); }
+                .rc-compose-template-menu-v45 strong { display:block; font-size:.8rem; }
+                .rc-compose-template-menu-v45 span { display:block; color:var(--rc-muted); font-size:.72rem; margin-top:.12rem; }
+                .rc-compose-template-preview-v45 { color:var(--rc-muted); font-size:.7rem; margin-top:.2rem; line-height:1.35; }
+                .rc-compose-vars-v45 { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+                .rc-compose-var-v45 { border:0; border-radius:.45rem; background:var(--rc-soft); color:var(--rc-text); padding:.38rem .55rem; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.72rem; font-weight:650; }
+                .rc-merge-token-v48 { display:inline-block; border-radius:.42rem; background:rgba(255,99,56,.14); color:#ff6338; padding:.12rem .3rem; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.92em; font-weight:750; white-space:nowrap; }
+                .dark .rc-merge-token-v48 { background:rgba(255,99,56,.18); color:#ff8a72; }
+                .rc-compose-editor-shell-v45 { border:1px solid var(--rc-border); border-radius:.85rem; overflow:hidden; background:var(--rc-surface); }
+                .rc-compose-toolbar-v45 { display:flex; flex-wrap:wrap; gap:.32rem; align-items:center; padding:.48rem .55rem; border-bottom:1px solid var(--rc-border); background:var(--rc-soft); }
+                .rc-compose-toolbar-v45 .rc-rich-tool { background:transparent; color:var(--rc-text); border-color:transparent; height:1.9rem; min-width:1.9rem; }
+                .rc-compose-toolbar-v45 .rc-select { min-height:1.9rem; padding:.28rem .5rem; }
+                .rc-compose-editor-shell-v45 .rc-rich-editor { min-height:24rem; border:0; border-radius:0; box-shadow:none; background:var(--rc-surface); color:var(--rc-text); padding:1rem; }
+                .rc-compose-editor-foot-v45 { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.6rem .7rem; border-top:1px solid var(--rc-border); color:var(--rc-muted); font-size:.75rem; }
+                .rc-compose-icon-row-v45 { display:flex; gap:.65rem; align-items:center; }
+                .rc-compose-icon-row-v45 button, .rc-compose-icon-row-v45 label { border:0; background:transparent; padding:0; color:var(--rc-muted); cursor:pointer; display:inline-flex; align-items:center; }
+                .rc-attachments-v45 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; box-shadow:0 10px 24px rgba(15,23,42,.05); padding:1rem; display:grid; gap:.85rem; }
+                .rc-attachment-grid-v45 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+                .rc-attachment-card-v45 { border:1px solid var(--rc-border); border-radius:.8rem; padding:.85rem; display:flex; align-items:center; gap:.75rem; min-height:4.6rem; background:var(--rc-surface); }
+                .rc-attachment-icon-v45 { width:2.35rem; height:2.35rem; border-radius:.55rem; display:grid; place-items:center; background:#ef4444; color:white; font-size:.68rem; font-weight:800; flex:0 0 auto; }
+                .rc-attachment-icon-v45.is-file { background:#3b82f6; }
+                .rc-attachment-drop-v45 { border:1px dashed rgba(148,163,184,.55); border-radius:.8rem; display:grid; place-items:center; min-height:4.6rem; color:var(--rc-muted); text-align:center; cursor:pointer; background:var(--rc-soft); }
+                .rc-compose-modal-v45 { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(2,6,23,.62); backdrop-filter:blur(5px); }
+                @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
+            </style>
+
+            <div class="rc-compose-page-v45">
+                <div class="rc-compose-titlebar-v45">
+                    <div>
+                        <h1>Compose Email</h1>
+                        <div class="rc-subtle" style="margin-top:.35rem">Create a personalized email to coaches.</div>
+                    </div>
+                    <div class="rc-compose-actions-v45">
+                        <span class="rc-compose-save-v45">
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                            Saved just now
+                        </span>
+                        <button class="rc-btn" type="button" wire:click="openComposePreview">
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                            Preview
+                        </button>
+                        <button class="rc-btn" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
+                            <span wire:loading.remove wire:target="saveTemplate">Save as Template</span>
+                            <span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                        </button>
                         <button class="rc-btn rc-btn-primary" type="button" wire:click="sendComposedEmail" wire:loading.attr="disabled" wire:target="sendComposedEmail">
-                            <span wire:loading.remove wire:target="sendComposedEmail">Send</span>
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
+                            <span wire:loading.remove wire:target="sendComposedEmail">{{ $this->composeTargetLabel }}</span>
                             <span wire:loading.flex wire:target="sendComposedEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
                         </button>
                     </div>
+                </div>
 
-                    <div class="rc-campaign-compose">
-                        <div class="rc-recipient-tabs">
-                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'list' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','list')">
-                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg> List
-                            </button>
-                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'school' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','school')">
-                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 3 8l9 5 9-5-9-5Zm0 10v8m-7-4 7 4 7-4" /></svg> School
-                            </button>
-                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'coaches' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','coaches')">
-                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19a6 6 0 0 0-12 0m12 0a6 6 0 0 1 6-6m-12-4a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm9 2a3 3 0 1 0 0-6" /></svg> Coaches
-                            </button>
-                            <button type="button" class="rc-btn {{ $campaignTargetMode === 'all' ? 'rc-btn-primary' : '' }}" wire:click="$set('campaignTargetMode','all')">
-                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M5 7v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7" /></svg> All
-                            </button>
-                        </div>
+                <div class="rc-compose-layout-v45">
+                    <div class="rc-compose-card-v45">
+                        <div class="rc-compose-inner-v45">
+                            <div>
+                                <div class="rc-compose-label-v45">Recipients</div>
+                                <div class="rc-compose-recipient-bar-v45">
+                                    @if(is_array($this->composeSelectedSchool))
+                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients">×</button></span>
+                                    @elseif($campaignTargetMode === 'list' && $campaignListKey)
+                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedList['label'] ?? 'Selected List' }} ({{ number_format($this->campaignRecipientCount) }} coaches) <button type="button" wire:click="$set('campaignListKey','')">×</button></span>
+                                    @elseif($campaignTargetMode === 'coaches' && count($campaignCoachIds))
+                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection">×</button></span>
+                                    @else
+                                        <em class="rc-subtle">No school selected — search to add one below</em>
+                                    @endif
 
-                        <div class="rc-compose-summary">
-                            @if($campaignTargetMode === 'list')
-                                <details class="rc-details" open>
-                                    <summary><span>Saved list</span><span class="rc-pill">{{ $this->composeSelectedList['label'] ?? 'Choose' }}</span></summary>
-                                    <div class="rc-details-body">
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches">All Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser">Choose Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
+                                </div>
+
+                                <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
+                                    <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
+                                        <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
+                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.300ms="composeSchoolSearch" />
+                                        @if(trim($composeSchoolSearch) !== '')
+                                            <button type="button" class="rc-global-search-clear" wire:click="$set('composeSchoolSearch','')" aria-label="Clear school search">×</button>
+                                        @endif
+                                    </div>
+
+                                    @if(trim($composeSchoolSearch) !== '')
+                                        <div class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
+                                            @forelse($this->composeSchoolResults as $school)
+                                                <?php
+                                                    $sid = (string) ($school['id'] ?? '');
+                                                    $schoolName = (string) ($school['name'] ?? 'School');
+                                                    $schoolLogo = (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '');
+                                                    $coachCount = (int) ($school['coach_count'] ?? 0);
+                                                    $detail = trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • '));
+                                                ?>
+                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))">
+                                                    <span class="rc-global-suggestion-icon">
+                                                        @if($schoolLogo !== '')
+                                                            <img src="{{ $schoolLogo }}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($schoolName) }}';">
+                                                        @else
+                                                            {{ $globalSearchInitials($schoolName) }}
+                                                        @endif
+                                                    </span>
+                                                    <span class="rc-global-suggestion-copy">
+                                                        <strong>{{ $schoolName }}</strong>
+                                                        <small>{{ $detail !== '' ? $detail : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ $coachCount === 1 ? 'coach' : 'coaches' }}</small>
+                                                    </span>
+                                                    <span class="rc-global-suggestion-category">School</span>
+                                                </button>
+                                            @empty
+                                                <div class="rc-empty-state" style="padding:.8rem">No schools found for “{{ $composeSchoolSearch }}”.</div>
+                                            @endforelse
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if($composeShowCcBcc)
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.500ms="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.500ms="campaignBcc" />
+                                    </div>
+                                @endif
+
+                                @if($composeChooseCoachesOpen || ($campaignTargetMode === 'coaches' && is_array($this->composeSelectedSchool)))
+                                    <div class="rc-compose-coach-grid-v45">
+                                        @foreach($this->composeSchoolCoaches as $coach)
+                                            <?php $cid = (string) ($coach['id'] ?? ''); $selectedCoach = in_array($cid, $campaignCoachIds, true); ?>
+                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))">
+                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45">{{ $selectedCoach ? '✓' : '' }}</span><span>{{ $coach['name'] ?? 'Coach' }}</span>@if(str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'))<span style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>@endif</span>
+                                                <span class="rc-compose-coach-title-v45">{{ $coach['title'] ?? 'Coach' }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                    <div style="display:flex;gap:.45rem;margin-top:.55rem">
+                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches">Select all</button>
+                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection">Clear coaches</button>
+                                    </div>
+                                @elseif($campaignTargetMode === 'list')
+                                    <div style="margin-top:.65rem;max-width:28rem">
                                         <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
                                             <option value="">Select a list</option>
                                             @foreach($lists as $list)
@@ -7942,426 +8181,370 @@
                                             @endforeach
                                         </select>
                                     </div>
-                                </details>
-                            @endif
+                                @endif
 
-                            @if($campaignTargetMode === 'school')
-                                <details class="rc-details" open>
-                                    <summary><span>School</span><span class="rc-pill">{{ collect($this->composeSchoolOptions)->firstWhere('id', $campaignSchoolId)['name'] ?? 'Choose' }}</span></summary>
-                                    <div class="rc-details-body">
-                                        <input class="rc-input" style="width:100%;margin-bottom:.55rem" placeholder="Search schools" wire:model.live.debounce.300ms="composeSchoolSearch" />
-                                        <div wire:loading.flex wire:target="composeSchoolSearch,selectComposeSchool" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Loading schools</div>
-                                        <div class="rc-choice-list">
-                                            @forelse($this->composeSchoolResults as $school)
-                                                <?php $sid = (string) ($school['id'] ?? ''); ?>
-                                                <button type="button" class="rc-choice-row {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))" wire:loading.attr="disabled" wire:target="selectComposeSchool(@js($sid))">
-                                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 3 8l9 5 9-5-9-5Z" /></svg>
-                                                    <span style="min-width:0"><span class="rc-choice-title">{{ $school['name'] ?? 'School' }}</span><span class="rc-choice-sub">{{ $school['conference'] ?? 'Conference unavailable' }} · {{ number_format($school['coach_count'] ?? 0) }} coaches</span></span>
-                                                    @if($campaignSchoolId === $sid)<span class="rc-pill rc-pill-accent">Selected</span>@endif
+                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem">
+                                    {{ $this->composeSendingDescription }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="rc-compose-label-v45">Subject Line</div>
+                                <div class="rc-compose-field-row-v45">
+                                    <input class="rc-input" style="width:100%" placeholder="Subject line" wire:model.live.debounce.500ms="campaignSubject" />
+                                    <div class="rc-compose-template-wrap-v45" x-data="{open:false}">
+                                        <button class="rc-btn" type="button" x-on:click="open=!open">
+                                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
+                                            Templates
+                                        </button>
+                                        <div x-cloak x-show="open" x-on:click.outside="open=false" class="rc-compose-template-menu-v45">
+                                            <div class="rc-subtle" style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.25rem .4rem">Choose a template</div>
+                                            @forelse($this->composeTemplateOptions as $template)
+                                                <button type="button" class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}" wire:click="useTemplateForCompose(@js((string) ($template['id'] ?? '')))" x-on:click="open=false">
+                                                    <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
+                                                    <span>{{ $template['compose_subject_preview'] ?? 'Recruiting email' }}</span>
+                                                    <div class="rc-compose-template-preview-v45">{{ $template['compose_body_preview'] ?? 'Personalized message preview' }}</div>
                                                 </button>
                                             @empty
-                                                <div class="rc-subtle">No schools found.</div>
+                                                <div class="rc-subtle" style="padding:.5rem">No templates found.</div>
                                             @endforelse
                                         </div>
                                     </div>
-                                </details>
-                            @endif
-
-                            @if($campaignTargetMode === 'coaches')
-                                <details class="rc-details" open>
-                                    <summary><span>Coaches</span><span class="rc-pill">{{ count($campaignCoachIds) }} selected</span></summary>
-                                    <div class="rc-details-body">
-                                        <input class="rc-input" style="width:100%;margin-bottom:.55rem" placeholder="Search coaches" wire:model.live.debounce.300ms="campaignCoachSearch" />
-                                        <div wire:loading.flex wire:target="campaignCoachSearch" class="rc-loading-inline" style="margin-bottom:.5rem"><span class="rc-spinner-mini"></span> Searching</div>
-                                        <div class="rc-choice-list">
-                                            @forelse($this->campaignCoachResults as $coach)
-                                                <?php $coachId = (string) ($coach['id'] ?? ''); ?>
-                                                <label class="rc-choice-row {{ in_array($coachId, $campaignCoachIds, true) ? 'is-selected' : '' }}">
-                                                    <input type="checkbox" value="{{ $coachId }}" wire:model.live="campaignCoachIds" />
-                                                    <span style="min-width:0"><span class="rc-choice-title">{{ $coach['name'] ?? 'Coach' }}</span><span class="rc-choice-sub">{{ $coach['school'] ?? 'School' }} · {{ $coach['email'] ?? '' }}</span></span>
-                                                    <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75" /></svg>
-                                                </label>
-                                            @empty
-                                                <div class="rc-subtle">No coaches found.</div>
-                                            @endforelse
-                                        </div>
-                                    </div>
-                                </details>
-                            @endif
-
-                            @if($campaignTargetMode === 'all')
-                                <div class="rc-compact-panel"><strong>All loaded coaches</strong><div class="rc-subtle">Every loaded coach with an email will receive this message.</div></div>
-                            @endif
-                        </div>
-
-                        <div class="rc-compact-panel">
-                            <div class="rc-template-field-label">Start from template</div>
-                            <select class="rc-select" style="width:100%;margin-top:.45rem" wire:model.live="campaignTemplateId" wire:change="useTemplateForCompose($event.target.value)">
-                                <option value="">No template</option>
-                                @foreach($templates as $template)
-                                    <option value="{{ $template['id'] ?? '' }}">{{ $template['name'] ?? 'Template' }}</option>
-                                @endforeach
-                            </select>
-                            <div wire:loading.flex wire:target="useTemplateForCompose,campaignTemplateId" class="rc-loading-inline" style="margin-top:.5rem"><span class="rc-spinner-mini"></span> Loading template</div>
-                        </div>
-
-                        <div class="rc-compact-panel">
-                            <div class="rc-template-field-label">Email image</div>
-                            @if($composeGraphicUrl)
-                                <div style="display:flex;align-items:center;gap:.65rem;margin:.55rem 0">
-                                    <img src="{{ $composeGraphicUrl }}" alt="Email image" style="width:4.5rem;height:4.5rem;object-fit:cover;border-radius:.75rem;border:1px solid rgba(148,163,184,.25)">
-                                    <button class="rc-btn" type="button" wire:click="removeComposeGraphic">Remove</button>
                                 </div>
-                            @endif
-                            <input class="rc-input" style="width:100%;margin-bottom:.45rem" type="file" accept="image/*" wire:model="composeGraphicUpload" />
-                            <input class="rc-input" style="width:100%" placeholder="Paste image URL" wire:model.live.debounce.650ms="composeGraphicUrl" />
-                            <div wire:loading.flex wire:target="composeGraphicUpload,composeGraphicUrl" class="rc-loading-inline" style="margin-top:.5rem"><span class="rc-spinner-mini"></span> Updating image</div>
-                        </div>
-
-                        <div class="rc-compact-panel">
-                            <div class="rc-subtle"><strong>{{ number_format($this->campaignRecipientCount) }}</strong> coaches will receive this email.</div>
-                        </div>
-
-                        <label>
-                            <span class="rc-template-field-label">Subject</span>
-                            <input class="rc-input" style="width:100%" placeholder="Subject" wire:model.live.debounce.650ms="campaignSubject" />
-                        </label>
-
-                        <div>
-                            <div class="rc-template-field-label">Message</div>
-                            <div
-                                class="rc-rich-editor-shell rc-native-editor-shell"
-                                wire:ignore
-                                x-data="plyrCampaignBodyEditor()"
-                                x-init="mount()"
-                            >
-                                <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Campaign message toolbar">
-                                    <button class="rc-rich-tool" type="button" title="Undo" @click="command('undo')">↶</button>
-                                    <button class="rc-rich-tool" type="button" title="Redo" @click="command('redo')">↷</button>
-                                    <button class="rc-rich-tool" type="button" title="Paragraph" @click="block('p')">P</button>
-                                    <button class="rc-rich-tool" type="button" title="Heading" @click="block('h2')">H2</button>
-                                    <button class="rc-rich-tool" type="button" title="Bold" @click="command('bold')"><strong>B</strong></button>
-                                    <button class="rc-rich-tool" type="button" title="Italic" @click="command('italic')"><em>I</em></button>
-                                    <button class="rc-rich-tool" type="button" title="Underline" @click="command('underline')"><u>U</u></button>
-                                    <button class="rc-rich-tool" type="button" title="Bullet list" @click="command('insertUnorderedList')">• List</button>
-                                    <button class="rc-rich-tool" type="button" title="Numbered list" @click="command('insertOrderedList')">1. List</button>
-                                    <button class="rc-rich-tool" type="button" title="Add link" @click="addLink()">Link</button>
-                                    <button class="rc-rich-tool" type="button" title="Upload image" @click="openImageUpload()">Image</button>
-                                    <button class="rc-rich-tool" type="button" title="Add button" @click="addButton()">Button</button>
-                                    <button class="rc-rich-tool" type="button" title="Clear formatting" @click="command('removeFormat')">Clear</button>
-                                </div>
-                                <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Campaign merge values">
-                                    <span class="rc-subtle" style="align-self:center">Insert value:</span>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
-                                    <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
-                                                                                                            <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
-                                </div>
-                                <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
-                                    
-                                    <div
-                                        x-cloak
-                                        x-show="activePanel"
-                                        x-transition.opacity
-                                        @keydown.escape.window="closeEditorPanel()"
-                                        @click.self="closeEditorPanel()"
-                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
-                                    >
-                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
-                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
-                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
-                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
-                                            </div>
-                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
-                                            </div>
-                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
-                                <div
-                                    x-ref="editor"
-                                    class="rc-rich-editor rc-native-editor"
-                                    contenteditable="true"
-                                    data-plyr-native-editor="campaign-body"
-                                    data-placeholder="Write your message..."
-                                    data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
-                                    x-on:input="queueSync()"
-                                    x-on:blur="syncNow()"
-                                ></div>
                             </div>
-                            <input
-                                x-ref="campaignBodyHidden"
-                                type="hidden"
-                                data-plyr-native-editor-hidden="campaign-body"
-                                wire:model.live.debounce.800ms="campaignBody"
-                            />
-                        </div>
-                    </div>
-                </div>
 
-                <div class="rc-campaign-panel">
-                    <div class="rc-campaign-panel-header">
-                        <div>
-                            <div class="rc-section-title">Preview</div>
-                            <div class="rc-subtle">Personalized for a sample coach.</div>
+                            <div>
+                                <div class="rc-compose-label-v45">Insert Variable</div>
+                                <div class="rc-compose-vars-v45">
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachFirstName'})">@{{CoachFirstName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'SchoolName'})">@{{SchoolName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachTitle'})">@{{CoachTitle}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'AthleteName'})">@{{AthleteName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'ProfileLink'})">@{{ProfileLink}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'HighlightLink'})">@{{HighlightLink}}</button>
+                                </div>
+                            </div>
+
+                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="mount(); window.addEventListener('plyr-editor-insert-token', e => insertMerge(e.detail.token))" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
+                                <div class="rc-compose-editor-shell-v45">
+                                    <div class="rc-compose-toolbar-v45">
+                                        <select class="rc-select" x-on:change="formatBlock($event.target.value); $event.target.value='p'">
+                                            <option value="p">Paragraph</option>
+                                            <option value="h2">Heading</option>
+                                            <option value="h3">Subheading</option>
+                                        </select>
+                                        <button type="button" class="rc-rich-tool" x-on:click="format('bold')"><strong>B</strong></button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="format('italic')"><em>I</em></button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="format('underline')"><u>U</u></button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="format('insertUnorderedList')">☷</button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="format('insertOrderedList')">☑</button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="openLinkPanel()">🔗</button>
+                                        <button type="button" class="rc-rich-tool" x-on:click="$refs.imageUpload.click()">▧</button>
+                                    </div>
+                                    <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                    <div
+                                        x-ref="editor"
+                                        wire:ignore
+                                        class="rc-rich-editor rc-native-editor"
+                                        contenteditable="true"
+                                        data-plyr-native-editor="campaign-body"
+                                        data-placeholder="Write your message..."
+                                        data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
+                                        x-on:input="queueSync()"
+                                        x-on:blur="syncNow()"
+                                    ></div>
+                                    <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model.live.debounce.800ms="campaignBody" />
+                                    <div class="rc-compose-editor-foot-v45">
+                                        <div class="rc-compose-icon-row-v45">
+                                            <button type="button" title="Clear" wire:click="clearComposeTemplate">🗑</button>
+                                            <button type="button" title="Image" x-on:click="$refs.imageUpload.click()">▧</button>
+                                            <button type="button" title="Link" x-on:click="openLinkPanel()">🔗</button>
+                                            <label title="Attach files">
+                                                <input type="file" multiple style="display:none" wire:model="composeAttachmentUploads" />
+                                                📎
+                                            </label>
+                                            <button type="button" title="Email">✉</button>
+                                        </div>
+                                        <div style="display:flex;align-items:center;gap:.85rem">
+                                            <span>Words: {{ str_word_count(strip_tags($campaignBody)) }}</span>
+                                            <span style="color:#10b981;font-weight:650">Looks good!</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    x-cloak
+                                    x-show="activePanel"
+                                    class="rc-compose-modal-v45"
+                                    x-on:keydown.escape.window="closeEditorPanel()"
+                                    x-on:click.self="closeEditorPanel()"
+                                >
+                                    <div style="width:min(26rem,94vw);border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);overflow:hidden;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border)"><strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'"></strong><button type="button" class="rc-icon-button" x-on:click="closeEditorPanel()">×</button></div>
+                                        <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem">
+                                            <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
+                                            <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
+                                            <div class="rc-toolbar" style="justify-content:flex-end"><button type="button" class="rc-btn" x-on:click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="applyLinkPanel()">Insert link</button></div>
+                                        </div>
+                                        <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem">
+                                            <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
+                                            <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
+                                            <div class="rc-toolbar" style="justify-content:flex-end"><button type="button" class="rc-btn" x-on:click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="applyButtonPanel()">Insert button</button></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div wire:loading.flex wire:target="campaignSubject,campaignBody,campaignTemplateId,campaignListKey,campaignSchoolId,campaignCoachIds,campaignCoachSearch,composeSchoolSearch" class="rc-loading-inline" style="margin-bottom:.65rem"><span class="rc-spinner-mini"></span> Updating preview</div>
-                    <div class="rc-preview-card-soft" style="overflow:hidden">
-                        <div style="padding:1rem 1.15rem;border-bottom:1px solid #e5e7eb;background:#fff">
-                            <div style="font-size:.76rem;color:#64748b;margin-bottom:.45rem">To: {{ $this->composePreviewCoach['name'] ?? 'Coach' }} · {{ $this->composePreviewCoach['school'] ?? 'School' }}</div>
-                            <h3 style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:1.2rem;line-height:1.38;color:#111827;font-weight:800">{{ $this->composeRenderedSubject }}</h3>
+
+                    <div class="rc-attachments-v45">
+                        <div style="font-weight:700">Attachments ({{ count($composeAttachments) }})</div>
+                        <div class="rc-attachment-grid-v45">
+                            @foreach($composeAttachments as $index => $attachment)
+                                <?php $name = (string) ($attachment['name'] ?? 'Attachment'); $ext = strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE'); ?>
+                                <div class="rc-attachment-card-v45">
+                                    <div class="rc-attachment-icon-v45 {{ $ext === 'PDF' ? '' : 'is-file' }}">{{ \Illuminate\Support\Str::limit($ext, 4, '') }}</div>
+                                    <div style="min-width:0;flex:1">
+                                        <div style="font-size:.8rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $name }}</div>
+                                        <div class="rc-subtle">{{ $attachment['mime_type'] ?? 'File' }} @if(!empty($attachment['size'])) · {{ number_format(((int) $attachment['size']) / 1048576, 1) }} MB @endif</div>
+                                    </div>
+                                    <button type="button" class="rc-icon-button" wire:click="removeComposeAttachment({{ $index }})">×</button>
+                                </div>
+                            @endforeach
+                            <label class="rc-attachment-drop-v45">
+                                <input type="file" multiple style="display:none" wire:model="composeAttachmentUploads" />
+                                <span>
+                                    <svg class="rc-icon-sm" style="margin:0 auto .3rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 4v12m0-12 4 4m-4-4-4 4" /></svg>
+                                    <strong style="display:block;color:var(--rc-text);font-size:.82rem">Drag & drop files here</strong>
+                                    <span style="font-size:.72rem">or click to browse · Max 25MB per file</span>
+                                </span>
+                            </label>
                         </div>
-                        <div style="padding:1.35rem;font-family:Arial,Helvetica,sans-serif;font-size:.98rem;line-height:1.7;min-height:32rem;background:#fff;color:#111827">
-                            {!! $this->composeRenderedBody !!}
-                        </div>
+                        <div wire:loading.flex wire:target="composeAttachmentUploads,addComposeAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading attachment</div>
                     </div>
                 </div>
             </div>
+
+            @if($showComposePreview)
+                <div class="rc-compose-modal-v45" wire:click.self="closeComposePreview">
+                    <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
+                            <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
+                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview">×</button>
+                        </div>
+                        <div style="padding:1rem;background:var(--rc-soft)">
+                            <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
+                                {!! $this->composeRenderedBody !!}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
 
         @if($section === 'campaigns')
-            <div class="rc-campaign-shell">
-                <div class="rc-campaign-panel">
-                    <div class="rc-campaign-panel-header">
+            @include('filament.partials.coach-database-header')
+
+            @php
+                $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));
+                $templateRows = collect($templates ?? [])
+                    ->filter(fn ($template): bool => is_array($template))
+                    ->filter(function (array $template) use ($templateQuery): bool {
+                        if ($templateQuery === '') {
+                            return true;
+                        }
+
+                        return str_contains(strtolower((string) ($template['name'] ?? '')), $templateQuery)
+                            || str_contains(strtolower((string) ($template['subjectLine'] ?? $template['subject'] ?? '')), $templateQuery)
+                            || str_contains(strtolower((string) ($template['previewText'] ?? $template['description'] ?? '')), $templateQuery);
+                    })
+                    ->values();
+                $templateCount = $templateRows->count();
+            @endphp
+
+            <style>
+                .rc-templates-page-v50{display:grid;gap:1.1rem;margin-top:1.1rem}
+                .rc-templates-head-v50{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
+                .rc-templates-title-v50{display:flex;align-items:center;gap:.72rem;min-width:0}
+                .rc-templates-title-v50 h2{margin:0;color:var(--rc-text);font-size:1.42rem;line-height:1.15;font-weight:760;letter-spacing:-.025em}
+                .rc-templates-title-v50 p{margin:.2rem 0 0;color:var(--rc-muted);font-size:.88rem;line-height:1.35}
+                .rc-template-back-v50{width:2.35rem;height:2.35rem;border-radius:.72rem;border:1px solid var(--rc-border);background:var(--rc-surface);color:var(--rc-text);display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 24px rgba(15,23,42,.05)}
+                .rc-templates-actions-v50{display:flex;align-items:center;justify-content:flex-end;gap:.55rem;flex-wrap:wrap}
+                .rc-template-list-top-v50{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:.15rem}
+                .rc-template-search-v50{height:2.75rem;border:1px solid var(--rc-border);background:var(--rc-surface);border-radius:.9rem;padding:0 .95rem;display:flex;align-items:center;gap:.55rem;min-width:min(34rem,100%);box-shadow:0 10px 24px rgba(15,23,42,.045)}
+                .rc-template-search-v50 input{border:0;outline:0;background:transparent;width:100%;font-size:.9rem;color:var(--rc-text)}
+                .rc-template-grid-v50{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.05rem;margin-top:.55rem}
+                .rc-template-card-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 36px rgba(15,23,42,.065);padding:1.08rem;display:grid;gap:.9rem;min-height:15.4rem;transition:.16s ease;text-align:left}
+                .rc-template-card-v50:hover{transform:translateY(-1px);box-shadow:0 20px 45px rgba(15,23,42,.09)}
+                .rc-template-card-head-v50{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem}
+                .rc-template-icon-v50{width:2.85rem;height:2.85rem;border-radius:.85rem;background:#fff2ed;color:#ff6338;display:grid;place-items:center;font-weight:760;border:1px solid rgba(255,99,56,.15);flex:0 0 auto}
+                .dark .rc-template-icon-v50{background:rgba(255,99,56,.13);color:#ffb199}
+                .rc-template-card-main-v50{display:grid;gap:.3rem;min-width:0}
+                .rc-template-card-main-v50 h3{margin:0;color:var(--rc-text);font-size:1rem;line-height:1.2;font-weight:760;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+                .rc-template-card-main-v50 p{margin:0;color:var(--rc-muted);font-size:.8rem;line-height:1.3;display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+                .rc-template-subject-v50{border-radius:.58rem;background:rgba(148,163,184,.11);padding:.55rem .6rem;color:var(--rc-text);font-size:.73rem;line-height:1.32;min-height:2.35rem}.rc-template-subject-v50 strong{font-weight:720;color:var(--rc-text)}
+                .rc-template-card-actions-v50{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.45rem;align-items:center;margin-top:auto}.rc-template-delete-v52{width:1.75rem;height:1.75rem;border:0;background:transparent;color:var(--rc-muted);display:grid;place-items:center;border-radius:.5rem;cursor:pointer}.rc-template-delete-v52:hover{background:rgba(239,68,68,.08);color:#ef4444}.rc-template-body-v52{color:var(--rc-muted);font-size:.74rem;line-height:1.42;min-height:3.25rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.rc-template-use-v52{height:2.3rem;border:0;border-radius:.62rem;background:#ff5f3f;color:#fff;font-weight:720;font-size:.82rem;box-shadow:0 8px 18px rgba(255,95,63,.18);display:inline-flex;align-items:center;justify-content:center;gap:.36rem;cursor:pointer}.rc-template-edit-v52{height:2.3rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:var(--rc-text);font-weight:690;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:0 .7rem;cursor:pointer}
+                .rc-template-editor-layout-v50{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;align-items:start}
+                .rc-template-editor-card-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1.05rem;display:grid;gap:.95rem}
+                .rc-template-ai-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1rem;position:sticky;top:1rem;display:grid;gap:.8rem}
+                .rc-template-ai-head-v50{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+                .rc-template-ai-head-v50 strong{font-size:.95rem;color:var(--rc-text)}
+                .rc-template-ai-section-v50{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--rc-muted);font-weight:760;margin-top:.25rem}
+                .rc-template-ai-action-v50{width:100%;border:1px solid var(--rc-border);border-radius:.82rem;background:var(--rc-surface);color:var(--rc-text);display:grid;grid-template-columns:2rem minmax(0,1fr);gap:.65rem;align-items:center;text-align:left;padding:.72rem;cursor:pointer;transition:.16s ease}
+                .rc-template-ai-action-v50:hover{border-color:rgba(255,99,56,.42);background:rgba(255,99,56,.055)}
+                .rc-template-ai-action-v50 i{width:2rem;height:2rem;border-radius:.62rem;display:grid;place-items:center;background:#f1f5f9;color:#7c3aed;font-style:normal}
+                .rc-template-ai-action-v50 span{font-size:.84rem;font-weight:700;display:block}.rc-template-ai-action-v50 small{display:block;color:var(--rc-muted);font-size:.72rem;margin-top:.1rem}
+                .rc-email-score-v50{display:grid;grid-template-columns:3rem minmax(0,1fr);gap:.65rem;align-items:center}.rc-score-ring-v50{width:3rem;height:3rem;border-radius:999px;border:4px solid #22c55e;display:grid;place-items:center;color:#0f172a;background:#fff;font-weight:800}.dark .rc-score-ring-v50{color:#e5e7eb;background:rgba(15,23,42,.65)}
+                .rc-template-field-v50{display:grid;gap:.4rem}.rc-template-field-v50 label{font-size:.75rem;color:var(--rc-text);font-weight:760}.rc-template-field-v50 input{width:100%;height:2.65rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface);color:var(--rc-text);padding:0 .78rem;font-size:.88rem;outline:none}.rc-template-field-v50 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.12)}
+                .rc-template-editor-shell-v50{border:1px solid var(--rc-border);border-radius:.9rem;overflow:hidden;background:var(--rc-surface)}
+                .rc-template-editor-v50{min-height:19rem;padding:1rem;background:var(--rc-surface);color:var(--rc-text);outline:none;font-size:.9rem;line-height:1.65}.rc-template-editor-v50:empty:before{content:attr(data-placeholder);color:var(--rc-muted)}
+                .rc-template-attachments-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.06);padding:1rem;margin-top:1rem}.rc-template-drop-v50{border:1px dashed rgba(148,163,184,.42);border-radius:.95rem;min-height:4.6rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);font-size:.82rem;background:rgba(148,163,184,.035);cursor:pointer}
+                
+                /* Compact templates cards */
+                .rc-template-grid-v50{gap:.78rem!important;margin-top:.85rem!important}
+                .rc-template-card-v50{border-radius:.9rem!important;padding:.78rem!important;gap:.62rem!important;min-height:12.4rem!important;box-shadow:0 10px 26px rgba(15,23,42,.055)!important}
+                .rc-template-icon-v50{width:2.25rem!important;height:2.25rem!important;border-radius:.6rem!important;font-size:.82rem!important;font-weight:750!important}
+                .rc-template-card-main-v50 h3{font-size:.88rem!important;font-weight:720!important;line-height:1.22!important}
+                .rc-template-card-main-v50 p{font-size:.72rem!important;margin-top:.14rem!important}
+                .rc-template-subject-v50{font-size:.73rem!important;line-height:1.32!important;min-height:2.35rem!important;padding:.55rem .6rem!important;border-radius:.58rem!important}
+                .rc-template-subject-v50 strong{font-weight:720!important}
+                .rc-template-body-v52{font-size:.74rem!important;line-height:1.42!important;min-height:3.25rem!important}
+                .rc-template-use-v52,.rc-template-edit-v52{height:2.3rem!important;border-radius:.62rem!important;font-size:.82rem!important}
+                .rc-template-use-v52{font-weight:720!important;box-shadow:0 8px 18px rgba(255,95,63,.18)!important}
+                .rc-template-edit-v52{font-weight:690!important;padding:0 .7rem!important}
+                .rc-template-delete-v52{width:1.75rem!important;height:1.75rem!important}
+@media(max-width:1180px){.rc-template-grid-v50{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-template-editor-layout-v50{grid-template-columns:1fr}}
+                @media(max-width:720px){.rc-template-grid-v50{grid-template-columns:1fr}.rc-templates-head-v50,.rc-template-list-top-v50{align-items:stretch;flex-direction:column}.rc-template-search-v50{min-width:0}}
+            </style>
+
+            <div class="rc-templates-page-v50">
+                @if(! $templateEditorOpen)
+                    <div class="rc-templates-head-v50" style="margin-top:.25rem">
                         <div>
-                            <div class="rc-section-title">Email templates</div>
-                            <div class="rc-subtle">{{ count($templates) }} saved</div>
+                            <h2 style="margin:0;color:var(--rc-text);font-size:1.22rem;line-height:1.15;font-weight:760;letter-spacing:-.018em">Templates</h2>
+                            <p style="margin:.22rem 0 0;color:var(--rc-muted);font-size:.8rem">Reusable email templates for your coach outreach.</p>
                         </div>
-                        <div style="display:flex;gap:.5rem;align-items:center">
-                            <button class="rc-btn" type="button" wire:click="loadTemplates" wire:loading.attr="disabled" wire:target="loadTemplates">
-                                <span wire:loading.remove wire:target="loadTemplates">Refresh</span>
-                                <span wire:loading.flex wire:target="loadTemplates" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span></span>
-                            </button>
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate">New</button>
+                        <div class="rc-templates-actions-v50">
+                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate">+ New Template</button>
                         </div>
                     </div>
 
-                    <div class="rc-template-list" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate">
-                        @forelse($templates as $template)
-                            <?php $templateId = (string) ($template['id'] ?? ''); ?>
-                            <button type="button" class="rc-template-item {{ $selectedTemplateId === $templateId ? 'is-selected' : '' }}" wire:key="email-template-{{ $templateId }}" wire:click="selectTemplate(@js($templateId))" wire:loading.attr="disabled" wire:target="selectTemplate(@js($templateId))">
-                                <span class="rc-template-icon">
-                                    <span wire:loading.remove wire:target="selectTemplate(@js($templateId))">{{ strtoupper(substr((string) ($template['name'] ?? 'T'), 0, 1)) }}</span>
-                                    <span wire:loading.flex wire:target="selectTemplate(@js($templateId))" style="align-items:center"><span class="rc-spinner-mini"></span></span>
-                                </span>
-                                <span class="rc-template-main">
-                                    <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
-                                    <span>{{ $template['subjectLine'] ?? $template['subject'] ?? 'No subject yet' }}</span>
-                                </span>
-                            </button>
+                    <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate">
+                        @forelse($templateRows as $template)
+                            @php
+                                $templateId = (string) ($template['id'] ?? '');
+                                $templateNameDisplay = (string) ($template['name'] ?? 'Untitled Template');
+                                $templateSubjectRaw = trim((string) ($template['subjectLine'] ?? $template['subject'] ?? ''));
+                                $templateSubjectDisplay = $templateSubjectRaw !== '' ? $templateSubjectRaw : 'No subject yet';
+                                $templateBodyRaw = (string) ($template['body'] ?? $template['html'] ?? $template['content'] ?? $template['template'] ?? $template['message'] ?? '');
+                                $templateBodyPlain = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($templateBodyRaw), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+                                $templatePreviewRaw = trim((string) ($template['previewText'] ?? $template['preview_text'] ?? $template['description'] ?? ''));
+                                if ($templatePreviewRaw === '') {
+                                    $templatePreviewRaw = $templateBodyPlain;
+                                }
+                                $templatePreviewDisplay = $templatePreviewRaw !== '' ? \Illuminate\Support\Str::limit($templatePreviewRaw, 165) : 'No preview text yet. Open the template to add a short message preview.';
+                                $templateSource = (string) ($template['source_type'] ?? 'ghl');
+                            @endphp
+                            <article class="rc-template-card-v50" wire:key="template-card-v52-{{ $templateId }}">
+                                <div class="rc-template-card-head-v50">
+                                    <div style="display:flex;align-items:flex-start;gap:.75rem;min-width:0">
+                                        <span class="rc-template-icon-v50">{{ strtoupper(substr($templateNameDisplay ?: 'T', 0, 1)) }}</span>
+                                        <div class="rc-template-card-main-v50">
+                                            <h3>{{ $templateNameDisplay }}</h3>
+                                            <p>Coach outreach</p>
+                                        </div>
+                                    </div>
+                                    @if($templateSource !== 'built_in')
+                                        <button class="rc-template-delete-v52" type="button" wire:click="deleteTemplateById({{ \Illuminate\Support\Js::from($templateId) }})" wire:confirm="Delete this template?" aria-label="Delete {{ $templateNameDisplay }}">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                        </button>
+                                    @endif
+                                </div>
+                                <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
+                                <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
+                                <div class="rc-template-card-actions-v50">
+                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                        Use Template
+                                    </button>
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
+                                        Edit
+                                    </button>
+                                </div>
+                            </article>
                         @empty
-                            <div class="rc-empty"><strong>No templates yet.</strong><span>Create your first email template.</span></div>
+                            <div class="rc-empty" style="grid-column:1/-1"><strong>No templates found.</strong><span>Create your first reusable email template.</span></div>
                         @endforelse
                     </div>
-                </div>
-
-                <div class="rc-campaign-panel">
-                    <div class="rc-campaign-panel-header">
-                        <div>
-                            <div class="rc-section-title">Edit template</div>
-                            <div class="rc-subtle">Write the email body directly with formatting.</div>
+                @else
+                    <div class="rc-templates-head-v50">
+                        <div class="rc-templates-title-v50">
+                            <button type="button" class="rc-template-back-v50" wire:click="closeTemplateEditor" aria-label="Back to templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                            <div>
+                                <h2>{{ $templateIsNew ? 'New Template' : 'Edit Template' }}</h2>
+                                <p>Build a reusable email with formatting and merge variables.</p>
+                            </div>
                         </div>
-                        <div style="display:flex;gap:.5rem;align-items:center">
-                            @if($selectedTemplateId && ! $templateIsNew)
-                                <button class="rc-btn" type="button" wire:click="deleteTemplate" wire:loading.attr="disabled" wire:target="deleteTemplate"><span wire:loading.remove wire:target="deleteTemplate">Delete</span><span wire:loading.flex wire:target="deleteTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Deleting</span></button>
-                            @endif
-                            <button
-                                class="rc-btn"
-                                type="button"
-                                x-data
-                                x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"
-                            >
-                                Preview
-                            </button>
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
-                                <span wire:loading.remove wire:target="saveTemplate">Save</span>
-                                <span wire:loading.flex wire:target="saveTemplate" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Saving</span>
-                            </button>
+                        <div class="rc-templates-actions-v50">
+                            <button class="rc-btn" type="button" x-data x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
+                            <button class="rc-btn rc-btn-primary" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate"><span wire:loading.remove wire:target="saveTemplate">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
                         </div>
                     </div>
 
-                    <div
-                        class="rc-campaign-compose"
-                        wire:key="template-rich-editor-{{ $selectedTemplateId ?: ($templateIsNew ? 'new' : 'blank') }}"
-                        x-data="plyrTemplateEditor()"
-                        x-init="mount()"
-                        @keydown.escape.window="showPreview = false"
-                    >
-                        @if($templateIsNew)
-                            <span class="rc-template-pill">New template</span>
-                        @elseif($templateName !== '')
-                            <span class="rc-template-pill">Editing: {{ $templateName }}</span>
-                        @endif
+                    <div class="rc-template-editor-layout-v50" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
+                        <section class="rc-template-editor-card-v50">
+                            <div class="rc-template-field-v50"><label>Template Name</label><input placeholder="e.g. Spring Showcase Intro" wire:model.live.debounce.650ms="templateName"></div>
+                            <div class="rc-template-field-v50"><label>Subject Line</label><input x-ref="subject" placeholder="Subject (you can use @{{variables}})" wire:model.live.debounce.650ms="templateSubject"></div>
+                            <div class="rc-template-field-v50"><label>Preview Text</label><input x-ref="preview" placeholder="Short inbox preview text" wire:model.live.debounce.650ms="templatePreviewText"></div>
 
-                        <label>
-                            <span class="rc-template-field-label">Template name</span>
-                            <input class="rc-input" style="width:100%" placeholder="Intro Email" wire:model.live.debounce.650ms="templateName" />
-                        </label>
-
-                        <label>
-                            <span class="rc-template-field-label">Subject line</span>
-                            <div style="display:flex;gap:.45rem;align-items:center">
-                                <input x-ref="subject" class="rc-input" style="width:100%;min-width:0" placeholder="@{{GraduationYear}} @{{Position}} — Interested in @{{SchoolName}}" wire:model.live.debounce.650ms="templateSubject" />
-                                <select class="rc-select" style="width:10.5rem;flex:0 0 10.5rem" @change="insertFieldMerge('subject', $event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
+                            <div>
+                                <div class="rc-template-field-label">Insert Variable</div>
+                                <div class="rc-toolbar" style="gap:.45rem;flex-wrap:wrap;margin-top:.45rem">
+                                    @foreach(['CoachFirstName','SchoolName','CoachTitle','AthleteName','CoachLastName','ProfileLink','HighlightLink','InstagramLink','YoutubeLink','XLink'] as $token)
+                                        <button class="rc-token-chip" type="button" data-token="{{ $token }}" x-on:click="insertMerge($el.dataset.token)">{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</button>
+                                    @endforeach
+                                    <select class="rc-select" style="width:auto" x-on:change="insertMergeFromSelect($event)"><option value="">More</option><option value="GraduationYear">Graduation Year</option><option value="Position">Position</option><option value="ClubTeam">Club Team</option><option value="GPA">GPA</option><option value="AthleteEmail">Athlete Email</option><option value="AthletePhone">Athlete Phone</option><option value="__custom__">Custom value...</option></select>
+                                </div>
                             </div>
-                        </label>
 
-                        <label>
-                            <span class="rc-template-field-label">Preview text</span>
-                            <div style="display:flex;gap:.45rem;align-items:center">
-                                <input x-ref="preview" class="rc-input" style="width:100%;min-width:0" placeholder="Short inbox preview" wire:model.live.debounce.650ms="templatePreviewText" />
-                                <select class="rc-select" style="width:10.5rem;flex:0 0 10.5rem" @change="insertFieldMerge('preview', $event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
-                            </div>
-                        </label>
-
-                        <div>
-                            <div class="rc-template-field-label">Message</div>
-                            <div class="rc-rich-editor-shell rc-native-editor-shell" wire:ignore>
+                            <div class="rc-template-editor-shell-v50">
                                 <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Template editor toolbar">
-                                    <button class="rc-rich-tool" type="button" title="Undo" @click="command('undo')">↶</button>
-                                    <button class="rc-rich-tool" type="button" title="Redo" @click="command('redo')">↷</button>
-                                    <button class="rc-rich-tool" type="button" title="Paragraph" @click="block('p')">P</button>
-                                    <button class="rc-rich-tool" type="button" title="Heading" @click="block('h2')">H2</button>
-                                    <button class="rc-rich-tool" type="button" title="Bold" @click="command('bold')"><strong>B</strong></button>
-                                    <button class="rc-rich-tool" type="button" title="Italic" @click="command('italic')"><em>I</em></button>
-                                    <button class="rc-rich-tool" type="button" title="Underline" @click="command('underline')"><u>U</u></button>
-                                    <button class="rc-rich-tool" type="button" title="Bullet list" @click="command('insertUnorderedList')">• List</button>
-                                    <button class="rc-rich-tool" type="button" title="Numbered list" @click="command('insertOrderedList')">1. List</button>
-                                    <button class="rc-rich-tool" type="button" title="Add link" @click="addLink()">Link</button>
-                                    <button class="rc-rich-tool" type="button" title="Upload image" @click="openImageUpload()">Image</button>
-                                    <button class="rc-rich-tool" type="button" title="Add button" @click="addButton()">Button</button>
-                                    <button class="rc-rich-tool" type="button" title="Add simple table" @click="addTable()">Table</button>
-                                    <button class="rc-rich-tool" type="button" title="Clear formatting" @click="command('removeFormat')">Clear</button>
+                                    <select class="rc-select" style="width:auto;height:2rem" x-on:change="block($event.target.value); $event.target.value='p'"><option value="p">Paragraph</option><option value="h2">Heading</option><option value="blockquote">Quote</option></select>
+                                    <button class="rc-rich-tool" type="button" x-on:click="command('bold')"><strong>B</strong></button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="command('italic')"><em>I</em></button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="command('underline')"><u>U</u></button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="command('insertUnorderedList')">☷</button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="command('insertOrderedList')">☑</button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="addLink()">🔗</button>
+                                    <button class="rc-rich-tool" type="button" x-on:click="openImageUpload()">▧</button>
                                 </div>
-                                <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
-                                    <span class="rc-subtle" style="align-self:center">Insert value:</span>
-                                    <select class="rc-select" style="width:min(18rem,100%)" @change="insertMergeFromSelect($event)"><option value="">Insert value</option><option value="CoachFirstName">Coach first</option><option value="CoachLastName">Coach last</option><option value="CoachName">Coach full</option><option value="SchoolName">School</option><option value="CoachTitle">Coach title</option><option value="AthleteName">Athlete</option><option value="GraduationYear">Grad year</option><option value="Position">Position</option><option value="ClubTeam">Club team</option><option value="GPA">GPA</option><option value="ProfileLink">Profile link</option><option value="HighlightLink">Highlight link</option><option value="AthleteEmail">Email</option><option value="AthletePhone">Phone</option><option value="InstagramLink">Instagram</option><option value="TwitterLink">X</option><option value="YoutubeLink">YouTube</option><option value="__custom__">Custom value...</option></select>
-                                </div>
-                                <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
-                                    
-                                    <div
-                                        x-cloak
-                                        x-show="activePanel"
-                                        x-transition.opacity
-                                        @keydown.escape.window="closeEditorPanel()"
-                                        @click.self="closeEditorPanel()"
-                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
-                                    >
-                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
-                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
-                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
-                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
-                                            </div>
-                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
-                                            </div>
-                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
-                                <div
-                                    x-ref="editor"
-                                    class="rc-rich-editor rc-native-editor"
-                                    contenteditable="true"
-                                    data-placeholder="Write your email template here..."
-                                    data-initial-body="{{ base64_encode($templateBody ?? '') }}"
-                                    x-on:input="queueSync()"
-                                    x-on:blur="syncNow()"
-                                ></div>
+                                <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
+                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .75rem"><span class="rc-spinner-mini"></span> Uploading image</div>
+                                <div x-ref="editor" wire:ignore class="rc-template-editor-v50" contenteditable="true" data-placeholder="Write your reusable email template..." data-initial-body="{{ base64_encode($templateBody ?? '') }}" x-on:input="queueSync()" x-on:blur="syncNow()"></div>
+                                <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody">
                             </div>
-                            <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
-                                
-                                    <div
-                                        x-cloak
-                                        x-show="activePanel"
-                                        x-transition.opacity
-                                        @keydown.escape.window="closeEditorPanel()"
-                                        @click.self="closeEditorPanel()"
-                                        style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
-                                    >
-                                        <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
-                                            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
-                                                <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
-                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
-                                            </div>
-                                            <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
-                                            </div>
-                                            <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
-                                                <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
-                                                <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
-                                                <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div x-cloak x-show="editorNotice" class="rc-subtle" style="padding:.55rem .65rem;border-top:1px solid rgba(148,163,184,.14);color:#fed7aa" x-text="editorNotice"></div>
-                            <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody" />
-                            <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.65rem">
-                                <span class="rc-subtle" x-show="!uploadingImages">Built-in PLYRCard editor. No external editor account or API key required.</span>
-                                <span class="rc-subtle" x-show="uploadingImages" style="display:inline-flex;align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Uploading image…</span>
-                            </div>
-                        </div>
 
-                        <div class="rc-preview-modal-backdrop" x-cloak x-show="showPreview" x-transition.opacity>
-                            <div class="rc-preview-modal" @click.outside="showPreview = false">
-                                <div class="rc-preview-modal-head">
-                                    <div>
-                                        <div style="font-size:.78rem;color:#64748b;margin-bottom:.25rem">To: Stephens Salas • Abilene Christian University</div>
-                                        <h3 style="margin:0;font-size:1.2rem;line-height:1.35;font-weight:800" x-text="previewSubject()"></h3>
-                                    </div>
-                                    <button type="button" class="rc-btn" @click="showPreview = false">Close</button>
-                                </div>
-                                <div class="rc-preview-modal-body">
-                                    <template x-if="previewGraphic()">
-                                        <img :src="previewGraphic()" alt="Email graphic" style="max-width:100%;border-radius:1rem;margin-bottom:1rem">
-                                    </template>
-                                    <div x-html="previewHtml()"></div>
+                            <div class="rc-toolbar" style="justify-content:space-between">
+                                <div class="rc-subtle">Words: {{ str_word_count(strip_tags($templateBody ?? '')) }} &nbsp; <span style="color:#16a34a">Looks good!</span></div>
+                                @if($selectedTemplateId && ! $templateIsNew)
+                                    <button class="rc-btn" type="button" wire:click="deleteTemplate" wire:confirm="Delete this template?">Delete Template</button>
+                                @endif
+                            </div>
+
+                            <div class="rc-preview-modal-backdrop" x-cloak x-show="showPreview" x-transition.opacity>
+                                <div class="rc-preview-modal" x-on:click.outside="showPreview = false">
+                                    <div class="rc-preview-modal-head"><div><div style="font-size:.78rem;color:#64748b;margin-bottom:.25rem">Template preview</div><h3 style="margin:0;font-size:1.2rem;line-height:1.35;font-weight:800" x-text="previewSubject()"></h3></div><button type="button" class="rc-btn" x-on:click="showPreview = false">Close</button></div>
+                                    <div class="rc-preview-modal-body"><div x-html="previewHtml()"></div></div>
                                 </div>
                             </div>
-                        </div>
+                        </section>
+
                     </div>
-                </div>
+                @endif
             </div>
         @endif
+
 
         @if($selectedCoachId && $section !== 'conversations')
             <div class="rc-card">
@@ -8383,37 +8566,37 @@
 
                                 <div class="rc-rich-editor-shell rc-native-editor-shell">
                                     <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Email message toolbar">
-                                        <button class="rc-rich-tool" type="button" @click="command('undo')">↶</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('redo')">↷</button>
-                                        <button class="rc-rich-tool" type="button" @click="block('p')">P</button>
-                                        <button class="rc-rich-tool" type="button" @click="block('h2')">H2</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('bold')"><strong>B</strong></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('italic')"><em>I</em></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('underline')"><u>U</u></button>
-                                        <button class="rc-rich-tool" type="button" @click="command('insertUnorderedList')">• List</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('insertOrderedList')">1. List</button>
-                                        <button class="rc-rich-tool" type="button" @click="addLink()">Link</button>
-                                        <button class="rc-rich-tool" type="button" @click="openImageUpload()">Image</button>
-                                        <button class="rc-rich-tool" type="button" @click="addButton()">Button</button>
-                                        <button class="rc-rich-tool" type="button" @click="addTable()">Table</button>
-                                        <button class="rc-rich-tool" type="button" @click="command('removeFormat')">Clear</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('undo')">↶</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('redo')">↷</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="block('p')">P</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="block('h2')">H2</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('bold')"><strong>B</strong></button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('italic')"><em>I</em></button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('underline')"><u>U</u></button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('insertUnorderedList')">• List</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('insertOrderedList')">1. List</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="addLink()">Link</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="openImageUpload()">Image</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="addButton()">Button</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="addTable()">Table</button>
+                                        <button class="rc-rich-tool" type="button" x-on:click="command('removeFormat')">Clear</button>
                                     </div>
                                     <div class="rc-rich-editor-toolbar rc-merge-toolbar" aria-label="Merge values">
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachFirstName')">Coach first</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachLastName')">Coach last</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachName')">Coach full</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('SchoolName')">School</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('CoachTitle')">Coach title</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteName')">Athlete</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('GraduationYear')">Grad year</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('Position')">Position</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('HighlightLink')">Highlight link</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('ProfileLink')">Profile link</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthleteEmail')">Email</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('AthletePhone')">Phone</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('InstagramLink')">Instagram</button>
-                                        <button class="rc-token-chip" type="button" @click="insertMerge('TwitterLink')">X</button>
-                                                                                                                        <button class="rc-token-chip" type="button" @click="insertMerge('YoutubeLink')">YouTube</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('CoachFirstName')">Coach first</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('CoachLastName')">Coach last</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('CoachName')">Coach full</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('SchoolName')">School</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('CoachTitle')">Coach title</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('AthleteName')">Athlete</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('GraduationYear')">Grad year</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('Position')">Position</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('HighlightLink')">Highlight link</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('ProfileLink')">Profile link</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('AthleteEmail')">Email</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('AthletePhone')">Phone</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('InstagramLink')">Instagram</button>
+                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('TwitterLink')">X</button>
+                                                                                                                        <button class="rc-token-chip" type="button" x-on:click="insertMerge('YoutubeLink')">YouTube</button>
                                     </div>
                                     <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
                                     
@@ -8421,28 +8604,28 @@
                                         x-cloak
                                         x-show="activePanel"
                                         x-transition.opacity
-                                        @keydown.escape.window="closeEditorPanel()"
-                                        @click.self="closeEditorPanel()"
+                                        x-on:keydown.escape.window="closeEditorPanel()"
+                                        x-on:click.self="closeEditorPanel()"
                                         style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.62);backdrop-filter:blur(5px);"
                                     >
                                         <div style="width:min(26rem,94vw);border:1px solid rgba(148,163,184,.22);border-radius:1.1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.38);overflow:hidden;">
                                             <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--rc-border);">
                                                 <strong x-text="activePanel === 'button' ? 'Insert button' : 'Insert link'" style="font-size:.92rem"></strong>
-                                                <button type="button" class="rc-icon-button" @click="closeEditorPanel()" aria-label="Close">×</button>
+                                                <button type="button" class="rc-icon-button" x-on:click="closeEditorPanel()" aria-label="Close">×</button>
                                             </div>
                                             <div x-show="activePanel === 'link'" style="display:grid;gap:.65rem;padding:1rem;">
                                                 <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Link text</label>
                                                 <input class="rc-input" style="width:100%" placeholder="Link text" x-model="panelLinkLabel">
                                                 <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
                                                 <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelLinkUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyLinkPanel()">Insert link</button></div>
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" x-on:click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="applyLinkPanel()">Insert link</button></div>
                                             </div>
                                             <div x-show="activePanel === 'button'" style="display:grid;gap:.65rem;padding:1rem;">
                                                 <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">Button text</label>
                                                 <input class="rc-input" style="width:100%" placeholder="Button text" x-model="panelButtonLabel">
                                                 <label class="rc-subtle" style="font-weight:800;color:var(--rc-text)">URL or merge value</label>
                                                 <input class="rc-input" style="width:100%" placeholder="@{{ProfileLink}} or https://..." x-model="panelButtonUrl">
-                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" @click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" @click="applyButtonPanel()">Insert button</button></div>
+                                                <div class="rc-toolbar" style="justify-content:flex-end;margin-top:.25rem"><button type="button" class="rc-btn" x-on:click="closeEditorPanel()">Cancel</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="applyButtonPanel()">Insert button</button></div>
                                             </div>
                                         </div>
                                     </div>
@@ -8450,11 +8633,12 @@
                                     <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .65rem"><span class="rc-spinner-mini"></span> Uploading image</div>
                                     <div
                                         x-ref="editor"
+                                        wire:ignore
                                         class="rc-rich-editor rc-native-editor"
                                         contenteditable="true"
                                         data-placeholder="Write your message..."
                                         data-initial-body="{{ base64_encode($emailBody ?? '') }}"
-                                        @input="queueSync()"
+                                        x-on:input="queueSync()"
                                         @blur="syncNow()"
                                     ></div>
                                 </div>
@@ -8612,7 +8796,11 @@
                 bootEditor() {
                     if (!this.$refs.editor) return;
                     const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
-                    if (html && this.$refs.editor.innerHTML.trim() === '') this.$refs.editor.innerHTML = html;
+                    if (html && this.$refs.editor.innerHTML.trim() === '') {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
+                    } else {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
+                    }
                     this.syncNow();
                 },
                 decodeInitialBody(initial) {
@@ -8622,12 +8810,19 @@
                 },
                 queueSync() {
                     clearTimeout(this.syncTimer);
-                    this.syncTimer = setTimeout(() => this.syncNow(), 250);
+                    this.syncTimer = setTimeout(() => this.syncNow(), 700);
                 },
                 syncNow() {
                     if (!this.$refs.editor) return;
-                    const html = this.$refs.editor.innerHTML || '';
-                    if (modelName && this.$wire) this.$wire.set(modelName, html, true);
+                    const html = this.serializeEditorHtml();
+                    if (modelName && this.$wire) this.$wire.set(modelName, html, false);
+                },
+                serializeEditorHtml() {
+                    const clone = this.$refs.editor.cloneNode(true);
+                    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+                        node.replaceWith(document.createTextNode(node.textContent || ''));
+                    });
+                    return clone.innerHTML || '';
                 },
                 focusEditor() { this.$refs.editor?.focus(); },
                 command(name, value = null) {
@@ -8643,6 +8838,15 @@
                     return String(value || '')
                         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                         .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                },
+                highlightMergeTokens(html) {
+                    const source = String(html || '');
+                    if (!source) return '';
+                    if (source.includes('rc-merge-token-v48')) return source;
+                    return source.replace(/\{\{\s*([A-Za-z][A-Za-z0-9_ ]{0,60})\s*\}\}/g, (match) => {
+                        const clean = match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        return '<span class="rc-merge-token-v48" contenteditable="false">' + clean + '</span>';
+                    });
                 },
                 cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
                 showNotice(message) {
@@ -8683,7 +8887,10 @@
                     document.execCommand('insertHTML', false, html);
                     this.syncNow();
                 },
-                insertMerge(name) { this.insertHtml(this.escapeHtml(this.mergeToken(name))); },
+                insertMerge(name) {
+                    const token = this.mergeToken(name);
+                    this.insertHtml('<span class="rc-merge-token-v48" contenteditable="false">' + this.escapeHtml(token) + '</span>&nbsp;');
+                },
                 addLink() {
                     this.openLinkPanel();
                 },
