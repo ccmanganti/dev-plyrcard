@@ -2901,9 +2901,6 @@ class GoHighLevelService
             'emailFrom' => $fromEmail,
             'fromName' => $fromName,
             'senderName' => $fromName,
-            'attachments' => ! empty($attachments) ? $attachments : null,
-            'attachmentUrls' => ! empty($attachments) ? collect($attachments)->pluck('url')->values()->all() : null,
-            'files' => ! empty($attachments) ? $attachments : null,
         ], fn ($value) => filled($value));
 
         $payloads[] = array_merge($base, ['type' => 'Email']);
@@ -2928,9 +2925,6 @@ class GoHighLevelService
             'emailFrom' => $fromEmail,
             'fromName' => $fromName,
             'senderName' => $fromName,
-            'attachments' => ! empty($attachments) ? $attachments : null,
-            'attachmentUrls' => ! empty($attachments) ? collect($attachments)->pluck('url')->values()->all() : null,
-            'files' => ! empty($attachments) ? $attachments : null,
         ], fn ($value) => filled($value));
 
         $versions = array_values(array_unique(array_filter([
@@ -3746,12 +3740,13 @@ class GoHighLevelService
                         $url = $this->extractMediaUploadUrl($data);
 
                         if ($url === '') {
-                            $lastError = 'Image uploaded to GHL, but no URL was returned.';
+                            $lastError = 'File uploaded to GHL media, but no public URL was returned.';
                             continue;
                         }
 
                         return [
                             'success' => true,
+                            'id' => $this->extractMediaUploadId($data),
                             'url' => $url,
                             'raw' => $data,
                             'version' => $version,
@@ -3791,6 +3786,24 @@ class GoHighLevelService
         ];
     }
 
+    private function extractMediaUploadId(array $data): ?string
+    {
+        foreach ([
+            'id', '_id', 'mediaId', 'media_id', 'fileId', 'file_id',
+            'file.id', 'file._id', 'file.mediaId',
+            'data.id', 'data._id', 'data.mediaId', 'data.fileId',
+            'uploadedFiles.0.id', 'uploadedFiles.0._id', 'uploadedFiles.0.mediaId',
+            'files.0.id', 'files.0._id', 'files.0.mediaId',
+        ] as $key) {
+            $value = data_get($data, $key);
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return null;
+    }
+
     private function extractMediaUploadUrl(array $data): string
     {
         $candidates = [
@@ -3804,8 +3817,12 @@ class GoHighLevelService
             data_get($data, 'uploadedFiles.0.url'),
             data_get($data, 'uploadedFiles.0.fileUrl'),
             data_get($data, 'uploadedFiles.0.mediaUrl'),
+            data_get($data, 'uploadedFiles.0.downloadUrl'),
+            data_get($data, 'uploadedFiles.0.locationUrl'),
             data_get($data, 'files.0.url'),
             data_get($data, 'files.0.fileUrl'),
+            data_get($data, 'files.0.mediaUrl'),
+            data_get($data, 'files.0.downloadUrl'),
         ];
 
         foreach ($candidates as $candidate) {

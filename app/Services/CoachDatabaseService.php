@@ -583,6 +583,7 @@ class CoachDatabaseService
                     'description' => $config['description'] ?? null,
                     'tag' => $config['tag'] ?? null,
                     'custom' => (bool) ($config['custom'] ?? false),
+                    'color' => $config['color'] ?? '#ff6338',
                     'schools_count' => $items->count(),
                     'coaches_count' => $items->sum('coach_count'),
                     'schools' => $items
@@ -914,12 +915,12 @@ class CoachDatabaseService
             ->all();
 
         $defaults = [
-            'dream' => ['label' => 'Dream Schools', 'tag' => 'dream school', 'custom' => false],
-            'target' => ['label' => 'Target Schools', 'tag' => 'target school', 'custom' => false],
-            'safety' => ['label' => 'Safety Schools', 'tag' => 'safety school', 'custom' => false],
-            'camp_follow_up' => ['label' => 'Camp Follow-Up', 'tag' => 'camp follow-up', 'custom' => false],
-            'showcase_follow_up' => ['label' => 'Showcase Follow-Up', 'tag' => 'showcase follow-up', 'custom' => false],
-            'general_recruiting' => ['label' => 'General Recruiting', 'tag' => 'general recruiting', 'custom' => false],
+            'dream' => ['label' => 'Dream Schools', 'tag' => 'dream school', 'custom' => false, 'color' => '#ff6338'],
+            'target' => ['label' => 'Target Schools', 'tag' => 'target school', 'custom' => false, 'color' => '#3b82f6'],
+            'safety' => ['label' => 'Safety Schools', 'tag' => 'safety school', 'custom' => false, 'color' => '#22c55e'],
+            'camp_follow_up' => ['label' => 'Camp Follow-Up', 'tag' => 'camp follow-up', 'custom' => false, 'color' => '#f59e0b'],
+            'showcase_follow_up' => ['label' => 'Showcase Follow-Up', 'tag' => 'showcase follow-up', 'custom' => false, 'color' => '#8b5cf6'],
+            'general_recruiting' => ['label' => 'General Recruiting', 'tag' => 'general recruiting', 'custom' => false, 'color' => '#64748b'],
         ];
 
         $definitions = array_replace_recursive($defaults, $fromTags, $fromRoot);
@@ -933,22 +934,40 @@ class CoachDatabaseService
             ->values()
             ->all();
 
+        $customListMeta = collect($customListTags)
+            ->filter(fn ($row): bool => is_array($row))
+            ->mapWithKeys(function (array $row): array {
+                $tag = $this->stringTagFromMixed($row);
+
+                if ($tag === '') {
+                    return [];
+                }
+
+                return [strtolower($tag) => [
+                    'label' => $row['label'] ?? $row['name'] ?? null,
+                    'color' => $row['color'] ?? null,
+                ]];
+            });
+
         collect($customListTags)
             ->merge($tagsFromCoaches)
             ->map(fn ($tag): string => $this->stringTagFromMixed($tag))
             ->filter(fn (string $tag): bool => str_starts_with(strtolower($tag), strtolower($tagPrefix)))
             ->unique(fn (string $tag): string => strtolower($tag))
-            ->each(function (string $tag) use (&$definitions, $tagPrefix): void {
+            ->each(function (string $tag) use (&$definitions, $tagPrefix, $customListMeta): void {
                 $slug = Str::after(strtolower($tag), strtolower($tagPrefix));
 
                 if ($slug === '') {
                     return;
                 }
 
+                $meta = $customListMeta->get(strtolower($tag), []);
+
                 $definitions['custom:' . $slug] = [
-                    'label' => $this->labelFromCustomListTag($tag),
+                    'label' => $this->labelFromCustomListTag($tag, $meta['label'] ?? null),
                     'tag' => $tag,
                     'custom' => true,
+                    'color' => $meta['color'] ?? '#ff6338',
                 ];
             });
 
@@ -1006,6 +1025,7 @@ class CoachDatabaseService
             'description' => $config['description'] ?? null,
             'tag' => $config['tag'] ?? null,
             'custom' => (bool) ($config['custom'] ?? false),
+            'color' => $config['color'] ?? '#ff6338',
             'schools_count' => 0,
             'coaches_count' => 0,
             'schools' => [],
@@ -1103,11 +1123,20 @@ class CoachDatabaseService
         $schoolsByName = $this->buildSchools($coaches, $user, $customListTags)->keyBy(fn (array $school): string => strtolower(trim((string) ($school['name'] ?? ''))));
         $schoolsByBusiness = $coaches->groupBy(fn (array $coach): string => (string) ($coach['business_id'] ?? ''));
 
-        $mergedSchools = $schools->map(function (array $school) use ($schoolsByName, $schoolsByBusiness): array {
+        $mergedSchools = $schools->map(function (array $school) use ($schoolsByName, $schoolsByBusiness, $coaches): array {
             $nameKey = strtolower(trim((string) ($school['name'] ?? '')));
             $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
             $built = $schoolsByName->get($nameKey, []);
-            $businessCoachCount = $businessId !== '' ? $schoolsByBusiness->get($businessId, collect())->count() : 0;
+            $businessCoaches = $businessId !== '' ? $schoolsByBusiness->get($businessId, collect()) : collect();
+            $builtCoaches = collect($coaches)->filter(function (array $coach) use ($nameKey, $businessId): bool {
+                $coachBusinessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? ''));
+                $coachSchoolKey = strtolower(trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? '')));
+
+                return ($businessId !== '' && $coachBusinessId === $businessId)
+                    || ($nameKey !== '' && $coachSchoolKey === $nameKey);
+            });
+            $schoolCoaches = $businessCoaches->merge($builtCoaches)->unique('id')->values();
+            $businessCoachCount = $schoolCoaches->count();
             $coachCount = max((int) ($built['coach_count'] ?? 0), $businessCoachCount, (int) ($school['coach_count'] ?? 0));
             $wasLoaded = (bool) ($school['coaches_loaded'] ?? false);
 
@@ -1121,6 +1150,10 @@ class CoachDatabaseService
                 'conference' => $school['conference'] ?? ($built['conference'] ?? null),
                 'division' => $school['division'] ?? ($built['division'] ?? null),
                 'coach_count' => $coachCount,
+                'coaches' => $schoolCoaches->values()->all(),
+                'head_coach' => $school['head_coach'] ?? ($built['head_coach'] ?? ($schoolCoaches->first(function (array $coach): bool {
+                    return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
+                }) ?: $schoolCoaches->first() ?: null)),
                 'coaches_loaded' => $wasLoaded || $coachCount > 0,
             ]);
         })->values();

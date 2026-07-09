@@ -1700,6 +1700,9 @@
         .rc-school-actions .rc-btn { min-width:5rem; }
 
         /* v62 compose/template quick actions */
+        .rc-loading-spin { display:inline-block; width:1rem; height:1rem; border:2px solid currentColor; border-right-color:transparent; border-radius:999px; animation:rcSpin .7s linear infinite; vertical-align:-.16em; }
+        @keyframes rcSpin { to { transform:rotate(360deg); } }
+        .rc-btn-loading { pointer-events:none; opacity:.72; }
         .rc-mini-action { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .7rem; border-radius:.7rem; border:1px solid rgba(148,163,184,.18); background:rgba(255,255,255,.045); color:#fff; font-weight:800; font-size:.82rem; transition:all .14s ease; }
         .rc-mini-action:hover { border-color:rgba(255,99,56,.55); color:#ff7a5c; transform:translateY(-1px); }
         .rc-rich-toolbar { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.55rem; }
@@ -4935,6 +4938,403 @@
             color: var(--rc-accent) !important;
         }
 
+
+
+        /* v81: polished animated school drawer + list/favorite interactions */
+        .rc-school-modal-backdrop {
+            animation: rcBackdropInV81 .18s ease-out both !important;
+        }
+
+        @keyframes rcBackdropInV81 {
+            from { background: rgba(15, 23, 42, 0); backdrop-filter: blur(0); }
+            to { background: rgba(15, 23, 42, .38); backdrop-filter: blur(4px); }
+        }
+
+        .rc-school-modal-panel,
+        .rc-drawer-panel.rc-school-modal-panel {
+            width: min(640px, 100vw) !important;
+            padding: 1.25rem !important;
+            overflow-x: hidden !important;
+            animation: rcSchoolDrawerInV81 .24s cubic-bezier(.2,.8,.2,1) both !important;
+        }
+
+        @keyframes rcSchoolDrawerInV81 {
+            from { transform: translateX(42px); opacity: .15; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .rc-school-modal-close {
+            position: absolute !important;
+            top: .85rem !important;
+            right: .85rem !important;
+            width: 2.35rem !important;
+            height: 2.35rem !important;
+            border-radius: .8rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 8 !important;
+            font-size: 0 !important;
+        }
+
+        .rc-school-modal-close::before,
+        .rc-school-modal-close::after {
+            content: '' !important;
+            position: absolute !important;
+            width: 1rem !important;
+            height: 2px !important;
+            background: currentColor !important;
+            border-radius: 999px !important;
+        }
+
+        .rc-school-modal-close::before { transform: rotate(45deg); }
+        .rc-school-modal-close::after { transform: rotate(-45deg); }
+
+        .rc-school-modal-hero-v72 {
+            display: grid !important;
+            grid-template-columns: 4rem minmax(0, 1fr) 4.35rem !important;
+            gap: .85rem !important;
+            align-items: start !important;
+            padding: .45rem 3.15rem 0 0 !important;
+        }
+
+        .rc-school-logo-large-v72 {
+            width: 4rem !important;
+            height: 4rem !important;
+            border-radius: .9rem !important;
+            background: #f3f4f6 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+            padding: .45rem !important;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .06) !important;
+        }
+
+        .rc-school-logo-large-v72 img {
+            width: auto !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+        }
+
+        .rc-school-logo-large-v72 span {
+            color: #0f172a !important;
+            font-size: .85rem !important;
+            font-weight: 700 !important;
+        }
+
+        .dark .rc-school-logo-large-v72 { background: rgba(148, 163, 184, .12) !important; }
+        .dark .rc-school-logo-large-v72 span { color: #e5e7eb !important; }
+
+        .rc-school-modal-main {
+            min-width: 0 !important;
+            padding-top: .08rem !important;
+        }
+
+        .rc-school-modal-main h2 {
+            font-size: 1.28rem !important;
+            line-height: 1.08 !important;
+            letter-spacing: -.035em !important;
+            margin: .35rem 0 .28rem !important;
+            padding-right: .35rem !important;
+        }
+
+        .rc-school-modal-meta {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: .25rem !important;
+            font-size: .85rem !important;
+            line-height: 1.25 !important;
+        }
+
+        .rc-school-division-pill {
+            display: inline-flex !important;
+            align-items: center !important;
+            border-radius: .5rem !important;
+            padding: .28rem .6rem !important;
+            font-size: .72rem !important;
+            font-weight: 700 !important;
+        }
+
+        .rc-school-score-wrap {
+            align-self: start !important;
+            justify-self: end !important;
+            display: grid !important;
+            gap: .18rem !important;
+            justify-items: center !important;
+            padding-top: .05rem !important;
+        }
+
+        .rc-school-score-ring {
+            width: 3.8rem !important;
+            height: 3.8rem !important;
+            border-radius: 999px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            border: .42rem solid #ff6338 !important;
+            box-shadow: inset 0 0 0 4px var(--rc-surface), 0 8px 20px rgba(255, 99, 56, .14) !important;
+        }
+
+        .rc-school-score-label {
+            font-size: .72rem !important;
+            font-weight: 800 !important;
+        }
+
+        .rc-school-modal-actions-v72 {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: .55rem !important;
+            align-items: center !important;
+            margin-top: 1.25rem !important;
+        }
+
+        .rc-school-action {
+            height: 2.85rem !important;
+            border-radius: .8rem !important;
+            padding: 0 .9rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: .45rem !important;
+            font-size: .89rem !important;
+            font-weight: 750 !important;
+            border: 1px solid var(--rc-border) !important;
+            transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease !important;
+        }
+
+        .rc-school-action:hover { transform: translateY(-1px) !important; }
+        .rc-school-action svg { width: 1rem !important; height: 1rem !important; flex: 0 0 auto !important; }
+
+        .rc-school-action.is-in-list,
+        .rc-school-action.is-favorited {
+            background: var(--rc-accent) !important;
+            border-color: var(--rc-accent) !important;
+            color: #fff !important;
+            box-shadow: 0 12px 25px rgba(255, 99, 56, .22) !important;
+        }
+
+        .rc-school-action.is-loading {
+            opacity: .78 !important;
+            pointer-events: none !important;
+        }
+
+        .rc-action-spinner-v81 {
+            width: .95rem !important;
+            height: .95rem !important;
+            border: 2px solid rgba(255,255,255,.5) !important;
+            border-top-color: #fff !important;
+            border-radius: 999px !important;
+            animation: rcSpinV81 .7s linear infinite !important;
+        }
+
+        @keyframes rcSpinV81 { to { transform: rotate(360deg); } }
+
+        .rc-school-list-dropdown-v72 { position: relative !important; }
+
+        .rc-school-list-menu-v72 {
+            width: min(29rem, calc(100vw - 2rem)) !important;
+            max-height: 26rem !important;
+            overflow: auto !important;
+            border-radius: .95rem !important;
+            border: 1px solid var(--rc-border) !important;
+            box-shadow: 0 20px 45px rgba(15,23,42,.16) !important;
+            padding: .8rem !important;
+            animation: rcMenuInV81 .16s ease-out both !important;
+        }
+
+        @keyframes rcMenuInV81 {
+            from { transform: translateY(-6px) scale(.98); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .rc-school-list-menu-v72 h4 {
+            margin: 0 0 .55rem !important;
+            padding: 0 .3rem !important;
+            font-size: .72rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: .08em !important;
+            color: var(--rc-muted) !important;
+        }
+
+        .rc-school-list-menu-v72 button {
+            width: 100% !important;
+            min-height: 2.6rem !important;
+            display: grid !important;
+            grid-template-columns: 1.25rem minmax(13rem, 1fr) auto !important;
+            gap: .65rem !important;
+            align-items: center !important;
+            border-radius: .75rem !important;
+            padding: .45rem .5rem !important;
+            color: var(--rc-text) !important;
+            transition: background .15s ease, transform .15s ease !important;
+        }
+
+        .rc-school-list-menu-v72 button:hover {
+            background: var(--rc-soft) !important;
+            transform: translateX(2px) !important;
+        }
+
+        .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 13%, white) !important;
+        }
+
+        .dark .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 22%, transparent) !important;
+        }
+
+        .rc-list-check-v81 {
+            width: 1.05rem !important;
+            height: 1.05rem !important;
+            border-radius: .34rem !important;
+            border: 1.5px solid var(--rc-border) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: transparent !important;
+            background: var(--rc-surface) !important;
+        }
+
+        .rc-school-list-menu-v72 button.is-active .rc-list-check-v81 {
+            border-color: var(--list-color, #ff6338) !important;
+            background: var(--list-color, #ff6338) !important;
+            color: #fff !important;
+        }
+
+        .rc-list-check-v81 svg { width: .75rem !important; height: .75rem !important; }
+
+        .rc-school-list-dot-v72 {
+            width: .65rem !important;
+            height: .65rem !important;
+            background: var(--dot, #ff6338) !important;
+            border-radius: 999px !important;
+            display: inline-block !important;
+            margin-right: .45rem !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot, #ff6338) 16%, transparent) !important;
+        }
+
+        .rc-list-count-v81 {
+            min-width: 1.5rem !important;
+            height: 1.5rem !important;
+            border-radius: 999px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 .4rem !important;
+            background: var(--rc-soft) !important;
+            color: var(--rc-muted) !important;
+            font-size: .78rem !important;
+        }
+
+
+        /* v87: wider school drawer + readable colored list dropdown */
+        .rc-drawer-panel.rc-school-modal-panel {
+            width: min(660px, 100vw) !important;
+        }
+
+        .rc-school-list-dropdown-v72 {
+            position: relative !important;
+            flex: 0 0 auto !important;
+        }
+
+        .rc-school-list-menu-v72 {
+            width: min(30rem, calc(100vw - 2rem)) !important;
+            max-width: calc(100vw - 2rem) !important;
+            right: 0 !important;
+            left: auto !important;
+            z-index: 40 !important;
+        }
+
+        .rc-school-list-menu-v72 button {
+            grid-template-columns: 1.25rem minmax(15rem, 1fr) auto !important;
+            min-height: 3rem !important;
+            padding: .52rem .65rem !important;
+        }
+
+        .rc-school-list-label-v87 {
+            display: flex !important;
+            align-items: center !important;
+            gap: .55rem !important;
+            min-width: 0 !important;
+            color: var(--rc-text) !important;
+            font-size: .92rem !important;
+            font-weight: 700 !important;
+            line-height: 1.2 !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            word-break: break-word !important;
+        }
+
+        .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 18%, white) !important;
+            box-shadow: inset 3px 0 0 var(--list-color, #ff6338) !important;
+        }
+
+        .dark .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 24%, #111827) !important;
+        }
+
+        .rc-school-action.is-favorited[disabled],
+        .rc-school-action[disabled] {
+            opacity: .78 !important;
+            cursor: wait !important;
+        }
+
+        .rc-school-action .rc-action-spinner-v81 {
+            flex: 0 0 auto !important;
+        }
+
+        @media (min-width: 780px) {
+            .rc-school-modal-actions-v72 { flex-wrap: nowrap !important; }
+        }
+
+        .rc-school-tabbar-v72 {
+            border-radius: .9rem !important;
+            padding: .25rem !important;
+            background: var(--rc-soft) !important;
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: .2rem !important;
+        }
+
+        .rc-school-tab-v72 {
+            min-height: 2.75rem !important;
+            border-radius: .72rem !important;
+            font-size: .84rem !important;
+            font-weight: 700 !important;
+            color: var(--rc-muted) !important;
+            transition: background .15s ease, box-shadow .15s ease, color .15s ease !important;
+        }
+
+        .rc-school-tab-v72.is-active {
+            background: var(--rc-surface) !important;
+            color: var(--rc-text) !important;
+            box-shadow: 0 6px 16px rgba(15,23,42,.08) !important;
+        }
+
+        .rc-school-modal-coaches,
+        .rc-school-list-menu-v72 {
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(255,99,56,.48) transparent !important;
+        }
+
+        .rc-school-modal-coaches::-webkit-scrollbar,
+        .rc-school-list-menu-v72::-webkit-scrollbar { width: .45rem !important; }
+        .rc-school-modal-coaches::-webkit-scrollbar-thumb,
+        .rc-school-list-menu-v72::-webkit-scrollbar-thumb { background: rgba(255,99,56,.42) !important; border-radius: 999px !important; }
+        .rc-school-modal-coaches::-webkit-scrollbar-track,
+        .rc-school-list-menu-v72::-webkit-scrollbar-track { background: transparent !important; }
+
+        /* School drawer no longer uses a global wire:loading overlay.
+           The previous overlay could stay visible when any Livewire request was active,
+           blocking the entire dashboard. Keep school opening cache-only and let the drawer
+           animation handle the transition. */
+
+
         @media (max-width: 680px) {
             .rc-school-modal-panel,
             .rc-drawer-panel.rc-school-modal-panel {
@@ -5199,6 +5599,339 @@
             .rc-school-grid.rc-discover-school-grid { grid-template-columns: 1fr !important; }
         }
 
+
+
+        /* v72: school drawer tabs, stronger checkboxes, inbox scrollers, schedule/settings views */
+
+        /* v73: compact schedule/inbox/drawer refinements */
+        .rc-school-modal-panel { max-width: 30rem; }
+        .rc-school-modal-hero-v72 { gap:.75rem!important; padding-bottom:.85rem!important; }
+        .rc-school-logo-large-v72 { width:3.6rem!important;height:3.6rem!important;border-radius:.9rem!important; }
+        .rc-school-modal-main h2 { font-size:1.35rem!important; line-height:1.1!important; }
+        .rc-school-modal-actions-v72 { gap:.5rem!important; }
+        .rc-school-action { min-height:2.65rem!important; padding:.68rem .9rem!important; border-radius:.75rem!important; font-size:.84rem!important; }
+        .rc-school-tabbar-v72 { padding:.25rem!important; border-radius:.85rem!important; }
+        .rc-school-tab-v72 { padding:.72rem .8rem!important; font-size:.82rem!important; }
+        .rc-school-coach-list { max-height:18rem!important; }
+        .rc-school-coach-card { padding:.72rem!important; border-radius:.8rem!important; }
+        .rc-school-copy-btn { font-size:0!important; width:2.25rem!important; height:2.25rem!important; }
+        .rc-school-copy-btn svg { display:block; width:1.05rem; height:1.05rem; flex:0 0 auto; }
+        .rc-school-copy-btn::before { content:none!important; display:none!important; }
+        .rc-inbox-shell-v56 { height: min(41rem, calc(100vh - 10rem))!important; min-height:30rem!important; max-height:41rem!important; }
+        .rc-inbox-list-v56, .rc-inbox-messages-v56, .rc-coach-profile-v56 { scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.8) transparent; }
+        .rc-inbox-list-v56::-webkit-scrollbar, .rc-inbox-messages-v56::-webkit-scrollbar, .rc-coach-profile-v56::-webkit-scrollbar { width:.45rem; }
+        .rc-inbox-list-v56::-webkit-scrollbar-thumb, .rc-inbox-messages-v56::-webkit-scrollbar-thumb, .rc-coach-profile-v56::-webkit-scrollbar-thumb { background:rgba(148,163,184,.65); border-radius:999px; }
+        .rc-about-item-v56 span:first-child { display:grid; place-items:center; color:var(--rc-muted); }
+        .rc-schedule-page-v72 { gap:.9rem!important; }
+        .rc-schedule-titlebar-v72 h1 { font-size:1.25rem!important; }
+        .rc-schedule-form-v72 { padding:1rem!important; border-radius:1rem!important; }
+        .rc-schedule-grid-v72 { gap:.7rem!important; }
+        .rc-schedule-row-v72 { padding:.82rem .95rem!important; grid-template-columns:4.35rem minmax(0,1fr) auto!important; }
+        .rc-schedule-date-v72 strong { font-size:1.35rem!important; }
+        .rc-schedule-pill-v72 { font-size:.68rem!important; padding:.2rem .48rem!important; }
+        .rc-schedule-meta-v72 { font-size:.78rem!important; gap:.9rem!important; }
+        .rc-schedule-icon-v73 { width:.95rem; height:.95rem; display:inline-block; vertical-align:-.15rem; color:var(--rc-muted); margin-right:.25rem; }
+        .rc-icon-clean-v72 { width:2.2rem!important;height:2.2rem!important;display:grid!important;place-items:center!important;font-size:0!important; }
+        .rc-icon-clean-v72 svg { width:1rem;height:1rem; }
+        .rc-discover-card-check, .rc-discover-row-check { width:1.9rem!important;height:1.9rem!important;border:2.5px solid #94a3b8!important;background:#fff!important;box-shadow:0 2px 12px rgba(15,23,42,.14)!important; }
+        .rc-discover-card-check::after, .rc-discover-row-check::after { content:'✓'; font-size:1rem; font-weight:900; line-height:1; color:#fff; opacity:0; }
+        .rc-discover-card-check.is-selected::after, .rc-discover-row-check.is-selected::after { opacity:1; }
+        .rc-school-modal-panel { scrollbar-width: thin; scrollbar-color: rgba(255,99,56,.45) rgba(148,163,184,.16); }
+        .rc-school-modal-panel::-webkit-scrollbar,
+        .rc-school-modal-coaches::-webkit-scrollbar,
+        .rc-inbox-scroll-v72::-webkit-scrollbar,
+        .rc-inbox-list-v56::-webkit-scrollbar,
+        .rc-inbox-messages-v56::-webkit-scrollbar { width: .55rem; height:.55rem; }
+        .rc-school-modal-panel::-webkit-scrollbar-track,
+        .rc-school-modal-coaches::-webkit-scrollbar-track,
+        .rc-inbox-scroll-v72::-webkit-scrollbar-track,
+        .rc-inbox-list-v56::-webkit-scrollbar-track,
+        .rc-inbox-messages-v56::-webkit-scrollbar-track { background: rgba(148,163,184,.12); border-radius:999px; }
+        .rc-school-modal-panel::-webkit-scrollbar-thumb,
+        .rc-school-modal-coaches::-webkit-scrollbar-thumb,
+        .rc-inbox-scroll-v72::-webkit-scrollbar-thumb,
+        .rc-inbox-list-v56::-webkit-scrollbar-thumb,
+        .rc-inbox-messages-v56::-webkit-scrollbar-thumb { background: rgba(255,99,56,.55); border-radius:999px; }
+        .rc-school-logo-large-v72 { width:4.35rem;height:4.35rem;border-radius:1rem;background:#fff;border:1px solid var(--rc-border);display:grid;place-items:center;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.08); }
+        .rc-school-logo-large-v72 img { width:100%;height:100%;object-fit:contain;padding:.35rem; }
+        .rc-school-logo-large-v72 span { font-weight:800;color:#0f172a; }
+        .rc-school-modal-hero-v72 { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:1rem; align-items:start; animation: rcFadeUp .22s ease both; }
+        .rc-school-modal-actions-v72 { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:1.15rem; }
+        .rc-school-tabbar-v72 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; padding:.35rem; border-radius:1rem; background:var(--rc-soft); border:1px solid var(--rc-border); margin:1rem 0; }
+        .rc-school-tab-v72 { border:0;border-radius:.78rem;background:transparent;color:var(--rc-muted);font-weight:700;padding:.78rem .5rem;cursor:pointer;transition:.15s ease; }
+        .rc-school-tab-v72.is-active { background:var(--rc-surface);color:var(--rc-text);box-shadow:0 8px 18px rgba(15,23,42,.08); }
+        .rc-school-tab-panel-v72 { animation: rcFadeUp .2s ease both; }
+        .rc-school-list-dropdown-v72 { position:relative; }
+        .rc-school-list-menu-v72 { position:absolute;left:0;top:calc(100% + .45rem);width:min(21rem,86vw);z-index:15;background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:1rem;box-shadow:0 18px 44px rgba(15,23,42,.16);padding:.75rem;display:grid;gap:.35rem; }
+        .rc-school-list-menu-v72 h4 { margin:0 0 .35rem;font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;color:var(--rc-muted); }
+        .rc-school-list-menu-v72 button { width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.55rem;border:0;background:transparent;border-radius:.75rem;padding:.55rem;text-align:left;color:var(--rc-text);cursor:pointer; }
+        .rc-school-list-menu-v72 button:hover { background:var(--rc-soft); }
+        .rc-school-list-dot-v72 { width:.65rem;height:.65rem;border-radius:999px;background:var(--dot,#ff6338); }
+        .rc-coming-soon-v72 { min-height:13rem;border:1px dashed var(--rc-border);border-radius:1rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);background:var(--rc-soft); }
+        .rc-coming-soon-v72 strong { display:block;color:var(--rc-text);font-size:1.15rem;margin-bottom:.25rem; }
+        @keyframes rcFadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+        .rc-discover-card-check,
+        .rc-discover-row-check { width:1.65rem!important;height:1.65rem!important;border:2px solid #cbd5e1!important;background:#fff!important;color:#fff!important;border-radius:.5rem!important;display:inline-grid!important;place-items:center!important;box-shadow:0 2px 8px rgba(15,23,42,.10)!important;font-weight:900!important; }
+        .rc-discover-card-check:hover,
+        .rc-discover-row-check:hover { border-color:#ff6338!important; box-shadow:0 0 0 4px rgba(255,99,56,.12)!important; }
+        .rc-discover-card-check.is-selected,
+        .rc-discover-row-check.is-selected { background:#ff6338!important;border-color:#ff6338!important;color:#fff!important; }
+
+        .rc-inbox-page-v56 { max-height:calc(100vh - 11rem); min-height:35rem; overflow:hidden; }
+        .rc-inbox-shell-v56 { height:calc(100vh - 12rem); min-height:34rem; max-height:48rem; }
+        .rc-inbox-left-v56,
+        .rc-inbox-main-v56,
+        .rc-inbox-right-v56 { min-height:0; overflow:hidden; }
+        .rc-inbox-list-v56 { overflow:auto; max-height:calc(100% - 8.5rem); }
+        .rc-inbox-messages-v56 { overflow:auto; max-height:calc(100% - 6.25rem); padding-right:.25rem; }
+        .rc-inbox-right-v56 { overflow:auto; scrollbar-width:thin; }
+        .rc-about-grid-v56 { grid-template-columns:1fr!important; }
+
+        .rc-schedule-page-v72 { display:grid; gap:1.15rem; }
+        .rc-schedule-titlebar-v72 { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem; }
+        .rc-schedule-titlebar-v72 h1 { margin:0;font-size:1.35rem;letter-spacing:-.03em; }
+        .rc-schedule-sub-v72 { color:var(--rc-muted);margin:.25rem 0 0; }
+        .rc-schedule-live-v72 { color:#059669;font-weight:700;font-size:.85rem; }
+        .rc-schedule-form-v72 { border:1px solid var(--rc-border);border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.07);padding:1.15rem;display:grid;gap:1rem;animation:rcFadeUp .18s ease both; }
+        .rc-schedule-grid-v72 { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem; }
+        .rc-field-v72 label { display:block;font-size:.76rem;font-weight:700;color:var(--rc-text);margin-bottom:.4rem; }
+        .rc-field-v72 input,.rc-field-v72 select { width:100%;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface);color:var(--rc-text);padding:.75rem .85rem;outline:0; }
+        .rc-schedule-list-title-v72 { color:var(--rc-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800;margin-top:.5rem; }
+        .rc-schedule-list-v72 { border:1px solid var(--rc-border);border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.06);overflow:hidden; }
+        .rc-schedule-row-v72 { display:grid;grid-template-columns:5rem minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid var(--rc-border); }
+        .rc-schedule-row-v72:last-child { border-bottom:0; }
+        .rc-schedule-date-v72 { text-align:center;border-right:1px solid var(--rc-border);padding-right:.85rem; }
+        .rc-schedule-date-v72 small { display:block;color:#ff6338;font-weight:800;text-transform:uppercase;font-size:.7rem; }
+        .rc-schedule-date-v72 strong { display:block;font-size:1.55rem;line-height:1;color:var(--rc-text); }
+        .rc-schedule-date-v72 span { color:var(--rc-muted);font-size:.75rem; }
+        .rc-schedule-pill-v72 { display:inline-flex;border-radius:999px;padding:.25rem .55rem;background:rgba(99,102,241,.12);color:#6366f1;font-weight:800;font-size:.72rem;margin-right:.45rem; }
+        .rc-schedule-meta-v72 { display:flex;flex-wrap:wrap;gap:1rem;color:var(--rc-muted);font-size:.85rem;margin-top:.55rem; }
+        .rc-schedule-actions-v72 { display:flex;gap:.45rem; }
+        .rc-icon-clean-v72 { width:2rem;height:2rem;border:0;background:transparent;color:var(--rc-muted);border-radius:.55rem;cursor:pointer;display:grid;place-items:center; }
+        .rc-icon-clean-v72:hover { background:var(--rc-soft);color:#ff6338; }
+        .rc-settings-page-v72 { display:grid;gap:1rem; }
+        .rc-settings-card-v72 { border:1px solid var(--rc-border);border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.06);padding:1.25rem;max-width:56rem; }
+        .rc-settings-head-v72 { display:flex;gap:1rem;align-items:center;padding-bottom:1rem;border-bottom:1px solid var(--rc-border); }
+        .rc-settings-icon-v72 { width:3rem;height:3rem;border-radius:.85rem;background:#eff6ff;color:#2563eb;display:grid;place-items:center; }
+        .rc-setting-row-v72 { display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--rc-border); }
+        .rc-setting-row-v72:last-child { border-bottom:0; }
+        .rc-setting-row-v72 h3 { margin:0;font-size:.98rem; }
+        .rc-setting-row-v72 p { margin:.25rem 0 0;color:var(--rc-muted); }
+        .rc-toggle-v72 { width:3.25rem;height:1.8rem;border:0;border-radius:999px;background:#e5e7eb;padding:.2rem;display:flex;align-items:center;justify-content:flex-start;cursor:pointer;transition:.15s ease; }
+        .rc-toggle-v72 span { width:1.4rem;height:1.4rem;border-radius:999px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.18);transition:.15s ease; }
+        .rc-toggle-v72.is-on { background:#ff6338;justify-content:flex-end; }
+        @media (max-width:900px){ .rc-schedule-grid-v72{grid-template-columns:1fr}.rc-schedule-row-v72{grid-template-columns:1fr}.rc-schedule-date-v72{text-align:left;border-right:0;border-bottom:1px solid var(--rc-border);padding-bottom:.65rem} }
+
+
+
+        /* v87 final overrides: keep list dropdown readable after later compact rules */
+        .rc-drawer-panel.rc-school-modal-panel { width: min(680px, 100vw) !important; }
+        .rc-school-list-menu-v72 {
+            left: auto !important;
+            right: 0 !important;
+            width: min(31rem, calc(100vw - 2rem)) !important;
+            max-width: calc(100vw - 2rem) !important;
+            z-index: 50 !important;
+            gap: .42rem !important;
+        }
+        .rc-school-list-menu-v72 button {
+            grid-template-columns: 1.25rem minmax(16rem, 1fr) auto !important;
+            min-height: 3rem !important;
+            padding: .55rem .7rem !important;
+        }
+        .rc-school-list-label-v87 {
+            display:flex !important;
+            align-items:center !important;
+            gap:.55rem !important;
+            min-width:0 !important;
+            white-space:normal !important;
+            overflow:visible !important;
+            text-overflow:clip !important;
+            word-break:break-word !important;
+            font-size:.92rem !important;
+            font-weight:700 !important;
+            color:var(--rc-text) !important;
+        }
+        .rc-school-list-dot-v72 { flex: 0 0 auto !important; }
+        .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 20%, white) !important;
+            box-shadow: inset 3px 0 0 var(--list-color, #ff6338) !important;
+        }
+        .dark .rc-school-list-menu-v72 button.is-active {
+            background: color-mix(in srgb, var(--list-color, #ff6338) 24%, #111827) !important;
+        }
+
+
+
+        /* v90: keep the list menu under the In Lists button, shifted right so the left edge is never clipped. */
+        .rc-drawer-panel.rc-school-modal-panel {
+            width: min(760px, 100vw) !important;
+            max-width: 100vw !important;
+            overflow-x: visible !important;
+        }
+
+        .rc-school-modal-actions-v72 {
+            position: relative !important;
+            z-index: 40 !important;
+            overflow: visible !important;
+        }
+
+        .rc-school-list-dropdown-v72 {
+            position: relative !important;
+            display: inline-flex !important;
+            overflow: visible !important;
+            z-index: 90 !important;
+        }
+
+        .rc-school-list-menu-v72 {
+            position: absolute !important;
+            top: calc(100% + .55rem) !important;
+            right: -9rem !important;
+            left: auto !important;
+            width: min(27rem, calc(100vw - 2rem)) !important;
+            min-width: min(23rem, calc(100vw - 2rem)) !important;
+            max-width: calc(100vw - 2rem) !important;
+            z-index: 120 !important;
+            max-height: min(25rem, calc(100vh - 18rem)) !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            transform-origin: top center !important;
+        }
+
+        .rc-school-list-menu-v72 button {
+            grid-template-columns: 1.45rem minmax(0, 1fr) auto !important;
+            width: 100% !important;
+            overflow: visible !important;
+        }
+
+        @media (max-width: 900px) {
+            .rc-school-list-menu-v72 {
+                right: 0 !important;
+                width: min(23rem, calc(100vw - 2rem)) !important;
+                min-width: min(19rem, calc(100vw - 2rem)) !important;
+            }
+        }
+
+        .rc-school-list-label-v87 {
+            min-width: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            white-space: normal !important;
+            word-break: normal !important;
+            overflow-wrap: anywhere !important;
+        }
+
+        .rc-school-list-label-v87 > span:last-child {
+            display: block !important;
+            min-width: 0 !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }
+
+        .rc-school-list-menu-v72 h4 {
+            white-space: nowrap !important;
+            overflow: visible !important;
+        }
+
+        @media (max-width: 760px) {
+            .rc-school-list-menu-v72 {
+                right: auto !important;
+                left: 0 !important;
+                width: min(25rem, calc(100vw - 2rem)) !important;
+                min-width: min(21rem, calc(100vw - 2rem)) !important;
+                transform-origin: top left !important;
+            }
+        }
+
+
+        /* v93 Inbox scroll fix: use the actual inbox markup class names */
+        .rc-inbox-page-v56 {
+            height: calc(100vh - 9.75rem) !important;
+            min-height: 34rem !important;
+            overflow: hidden !important;
+        }
+        .rc-inbox-shell-v56 {
+            height: 100% !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: hidden !important;
+        }
+        .rc-inbox-left-v56,
+        .rc-inbox-mid-v56,
+        .rc-inbox-right-v56 {
+            min-height: 0 !important;
+            height: 100% !important;
+            overflow: hidden !important;
+        }
+        .rc-inbox-left-v56 {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .rc-inbox-list-v56 {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+        }
+        .rc-inbox-mid-v56 {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .rc-message-stream-v56 {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+        }
+        .rc-inbox-right-v56 {
+            overflow: hidden !important;
+        }
+        .rc-coach-profile-v56 {
+            height: 100% !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+        }
+        .rc-inbox-list-v56,
+        .rc-message-stream-v56,
+        .rc-coach-profile-v56 {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,99,56,.55) rgba(148,163,184,.12);
+        }
+        .rc-inbox-list-v56::-webkit-scrollbar,
+        .rc-message-stream-v56::-webkit-scrollbar,
+        .rc-coach-profile-v56::-webkit-scrollbar {
+            width: .55rem;
+        }
+        .rc-inbox-list-v56::-webkit-scrollbar-track,
+        .rc-message-stream-v56::-webkit-scrollbar-track,
+        .rc-coach-profile-v56::-webkit-scrollbar-track {
+            background: rgba(148,163,184,.12);
+            border-radius: 999px;
+        }
+        .rc-inbox-list-v56::-webkit-scrollbar-thumb,
+        .rc-message-stream-v56::-webkit-scrollbar-thumb,
+        .rc-coach-profile-v56::-webkit-scrollbar-thumb {
+            background: rgba(255,99,56,.55);
+            border-radius: 999px;
+        }
+        @media (max-width: 900px) {
+            .rc-inbox-page-v56 { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+            .rc-inbox-shell-v56 { height: auto !important; overflow: visible !important; }
+            .rc-inbox-left-v56,
+            .rc-inbox-mid-v56,
+            .rc-inbox-right-v56 { height: auto !important; overflow: visible !important; }
+            .rc-inbox-list-v56 { max-height: 24rem !important; }
+            .rc-message-stream-v56 { max-height: 36rem !important; }
+        }
+
 </style>
 
     @php
@@ -5278,7 +6011,7 @@
             <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
         @endif
 
-        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations'], true) || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -7821,10 +8554,10 @@
                             <h2>Conversations</h2>
                             <div class="rc-inbox-head-actions-v56">
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 </button>
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="loadConversations" title="Refresh conversations" aria-label="Refresh conversations">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -7903,9 +8636,9 @@
                                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
                                         Open in Composer
                                     </button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
                                 </div>
                             </div>
 
@@ -7981,22 +8714,100 @@
                                 </div>
 
                                 <div class="rc-profile-actions-v56">
-                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
                                 </div>
 
-                                <div class="rc-section-title" style="margin:1rem 0 .75rem">About Coach</div>
+                                <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
-                                    <div class="rc-about-item-v56"><span>🏅</span><span><strong>{{ data_get($selectedCoach, 'season') ?? '—' }}</strong>At {{ $selectedSchool }}</span></div>
-                                    <div class="rc-about-item-v56"><span>↗</span><span><strong>{{ data_get($selectedCoach, 'record') ?? '—' }}</strong>Career Record</span></div>
-                                    <div class="rc-about-item-v56"><span>👥</span><span><strong>{{ data_get($selectedCoach, 'conference') ?? data_get($selectedCoach, 'league') ?? '—' }}</strong>Conference</span></div>
-                                    <div class="rc-about-item-v56"><span>🏆</span><span><strong>{{ data_get($selectedCoach, 'division') ?? '—' }}</strong>Division</span></div>
+                                    <div class="rc-about-item-v56"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 21V9l8-5 8 5v12M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span><span><strong>{{ $selectedSchool }}</strong>School</span></div>
+                                    <div class="rc-about-item-v56"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 2a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 21a6 6 0 0 1 12 0M13 18a5 5 0 0 1 9 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>{{ data_get($selectedCoach, 'conference') ?? data_get($selectedCoach, 'league') ?? $selectedConversation['conference'] ?? '—' }}</strong>Conference</span></div>
+                                    <div class="rc-about-item-v56"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Zm10 2h3a3 3 0 0 1-3 3M7 6H4a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>{{ data_get($selectedCoach, 'division') ?? $selectedConversation['division'] ?? '—' }}</strong>Division</span></div>
                                 </div>
                             </div>
                         </div>
                     </aside>
+                </div>
+            </div>
+        @endif
+
+        @if($section === 'schedule')
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences...',
+                'showNewEmail' => false,
+            ])
+
+            @php
+                $scheduleEvents = collect($this->myScheduleEvents ?? [])->values();
+            @endphp
+
+            <div class="rc-schedule-page-v72">
+                <div class="rc-schedule-titlebar-v72">
+                    <div>
+                        <h1>My Schedule</h1>
+                        <p class="rc-schedule-sub-v72">Add your games and events. <span class="rc-schedule-live-v72">● Live on {{ parse_url(config('app.url', 'plyrcard.com'), PHP_URL_HOST) ?: 'plyrcard.com' }}</span></p>
+                    </div>
+                    <button type="button" class="rc-btn rc-btn-primary" wire:click="startAddScheduleEvent" wire:loading.attr="disabled" wire:target="startAddScheduleEvent">+ Add Event</button>
+                </div>
+
+                @if($showScheduleForm)
+                    <form class="rc-schedule-form-v72" wire:submit.prevent="saveScheduleEvent">
+                        <h2 style="margin:0;font-size:1rem;">{{ $editingScheduleId ? 'Edit Event' : 'Add Event' }}</h2>
+                        <div class="rc-schedule-grid-v72">
+                            <div class="rc-field-v72"><label>Event Type</label><select wire:model="scheduleEventType"><option>Game</option><option>Showcase</option><option>Tournament</option><option>ID Camp</option><option>Training</option><option>Other</option></select></div>
+                            <div class="rc-field-v72"><label>Date</label><input type="date" wire:model="scheduleDate"></div>
+                            <div class="rc-field-v72"><label>Time</label><input type="time" wire:model="scheduleTime"></div>
+                            <div class="rc-field-v72"><label>Opponent / Event Name</label><input type="text" placeholder="e.g. Bethesda SC" wire:model.defer="scheduleOpponent"></div>
+                            <div class="rc-field-v72"><label>Location</label><input type="text" placeholder="e.g. Seattle, WA" wire:model.defer="scheduleLocation"></div>
+                            <div class="rc-field-v72"><label>Field / Venue</label><input type="text" placeholder="e.g. Starfire Complex - Field 3" wire:model.defer="scheduleVenue"></div>
+                        </div>
+                        <div style="display:flex;justify-content:flex-end;gap:.65rem;"><button class="rc-btn" type="button" wire:click="cancelScheduleEvent">Cancel</button><button class="rc-btn rc-btn-primary" type="submit" wire:loading.attr="disabled" wire:target="saveScheduleEvent">{{ $editingScheduleId ? 'Save Changes' : 'Add Event' }}</button></div>
+                    </form>
+                @endif
+
+                <div class="rc-schedule-list-title-v72">Upcoming ({{ $scheduleEvents->count() }})</div>
+                <div class="rc-schedule-list-v72">
+                    @forelse($scheduleEvents as $event)
+                        <article class="rc-schedule-row-v72">
+                            <div class="rc-schedule-date-v72"><small>{{ strtoupper((string) ($event['day'] ?? '')) }}</small><strong>{{ $event['date_number'] ?? '—' }}</strong><span>{{ $event['time'] ?? '' }}</span></div>
+                            <div>
+                                <div><span class="rc-schedule-pill-v72">{{ $event['type'] ?? 'Game' }}</span><strong>vs {{ $event['opponent'] ?? $event['title'] ?? 'Event' }}</strong></div>
+                                <div class="rc-schedule-meta-v72"><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.7"/></svg>{{ $event['location'] ?: 'Location unavailable' }}</span><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Zm10 2h3a3 3 0 0 1-3 3M7 6H4a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ $event['venue'] ?: 'Venue unavailable' }}</span></div>
+                            </div>
+                            <div class="rc-schedule-actions-v72"><button type="button" class="rc-icon-clean-v72" wire:click="editScheduleEvent({{ (int) $event['id'] }})" aria-label="Edit event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.7"/></svg></button><button type="button" class="rc-icon-clean-v72" wire:click="deleteScheduleEvent({{ (int) $event['id'] }})" wire:confirm="Remove this event?" aria-label="Delete event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                        </article>
+                    @empty
+                        <div class="rc-empty" style="padding:1.25rem;">No scheduled games or events yet.</div>
+                    @endforelse
+                </div>
+            </div>
+        @endif
+
+        @if($section === 'settings')
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences...',
+                'showNewEmail' => false,
+            ])
+            <div class="rc-settings-page-v72">
+                <div class="rc-schedule-titlebar-v72"><div><h1>Settings</h1><p class="rc-schedule-sub-v72">Control your recruiting notifications and account shortcuts.</p></div></div>
+                <div class="rc-settings-card-v72">
+                    <div class="rc-settings-head-v72"><div class="rc-settings-icon-v72">🔔</div><div><h2 style="margin:0;">Notifications</h2><p style="margin:.2rem 0 0;color:var(--rc-muted);">Choose what you get notified about</p></div></div>
+                    @foreach([
+                        'profile_views' => ['Profile views', 'When a coach views your PLYR profile'],
+                        'email_opens' => ['Email opens', 'When a coach opens one of your emails'],
+                        'coach_replies' => ['Coach replies', 'When a coach replies to your outreach'],
+                        'weekly_digest' => ['Weekly digest', 'A Monday summary of your recruiting activity'],
+                        'product_news' => ['Product news', 'New PLYRCARD features and tips'],
+                    ] as $settingKey => $settingCopy)
+                        <div class="rc-setting-row-v72">
+                            <div><h3>{{ $settingCopy[0] }}</h3><p>{{ $settingCopy[1] }}</p></div>
+                            <button type="button" class="rc-toggle-v72 {{ ($notificationSettings[$settingKey] ?? false) ? 'is-on' : '' }}" wire:click="toggleNotificationSetting('{{ $settingKey }}')" aria-label="Toggle {{ $settingCopy[0] }}"><span></span></button>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         @endif
@@ -8200,7 +9011,7 @@
                                         <div x-cloak x-show="open" x-on:click.outside="open=false" class="rc-compose-template-menu-v45">
                                             <div class="rc-subtle" style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.25rem .4rem">Choose a template</div>
                                             @forelse($this->composeTemplateOptions as $template)
-                                                <button type="button" class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}" wire:click="useTemplateForCompose(@js((string) ($template['id'] ?? '')))" x-on:click="open=false">
+                                                <button type="button" class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}" wire:click="useTemplateForCompose(@js((string) ($template['id'] ?? '')))" wire:loading.attr="disabled" wire:target="useTemplateForCompose" x-on:click="open=false">
                                                     <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
                                                     <span>{{ $template['compose_subject_preview'] ?? 'Recruiting email' }}</span>
                                                     <div class="rc-compose-template-preview-v45">{{ $template['compose_body_preview'] ?? 'Personalized message preview' }}</div>
@@ -8320,7 +9131,7 @@
                                 </span>
                             </label>
                         </div>
-                        <div wire:loading.flex wire:target="composeAttachmentUploads,addComposeAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading attachment</div>
+                        <div wire:loading.flex wire:target="composeAttachmentUploads,addComposeAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading files</div>
                     </div>
                 </div>
             </div>
@@ -8425,11 +9236,11 @@
                             <p style="margin:.22rem 0 0;color:var(--rc-muted);font-size:.8rem">Reusable email templates for your coach outreach.</p>
                         </div>
                         <div class="rc-templates-actions-v50">
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate">+ New Template</button>
+                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate" wire:loading.attr="disabled" wire:target="newTemplate"><span wire:loading.remove wire:target="newTemplate">+ New Template</span><span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
                         </div>
                     </div>
 
-                    <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate">
+                    <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate,deleteTemplateById,useTemplateForCompose">
                         @forelse($templateRows as $template)
                             @php
                                 $templateId = (string) ($template['id'] ?? '');
@@ -8463,9 +9274,9 @@
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                        Use Template
+                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
+                                        <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                        Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
                                     <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
@@ -8492,7 +9303,7 @@
                         </div>
                     </div>
 
-                    <div class="rc-template-editor-layout-v50" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
+                    <div class="rc-template-editor-layout-v50" wire:key="template-editor-{{ $templateEditorRefreshKey }}" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
                         <section class="rc-template-editor-card-v50">
                             <div class="rc-template-field-v50"><label>Template Name</label><input placeholder="e.g. Spring Showcase Intro" wire:model.live.debounce.650ms="templateName"></div>
                             <div class="rc-template-field-v50"><label>Subject Line</label><input x-ref="subject" placeholder="Subject (you can use @{{variables}})" wire:model.live.debounce.650ms="templateSubject"></div>
@@ -8521,8 +9332,42 @@
                                 </div>
                                 <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
                                 <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .75rem"><span class="rc-spinner-mini"></span> Uploading image</div>
-                                <div x-ref="editor" wire:ignore class="rc-template-editor-v50" contenteditable="true" data-placeholder="Write your reusable email template..." data-initial-body="{{ base64_encode($templateBody ?? '') }}" x-on:input="queueSync()" x-on:blur="syncNow()"></div>
+                                <div x-ref="editor"
+                                     wire:ignore
+                                     class="rc-template-editor-v50"
+                                     contenteditable="true"
+                                     data-placeholder="Write your reusable email template..."
+                                     data-initial-body="{{ base64_encode($templateBody ?? '') }}"
+                                     data-refresh-key="{{ $templateEditorRefreshKey }}"
+                                     x-on:input="queueSync()"
+                                     x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
                                 <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody">
+                            </div>
+
+                            <div class="rc-attachments-v45" style="box-shadow:none;padding:.85rem">
+                                <div style="font-weight:700;font-size:.85rem">Attachments ({{ count($templateAttachments ?? []) }})</div>
+                                <div class="rc-attachment-grid-v45">
+                                    @foreach(($templateAttachments ?? []) as $index => $attachment)
+                                        <?php $name = (string) ($attachment['name'] ?? 'Attachment'); $ext = strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE'); ?>
+                                        <div class="rc-attachment-card-v45">
+                                            <div class="rc-attachment-icon-v45 {{ $ext === 'PDF' ? '' : 'is-file' }}">{{ \Illuminate\Support\Str::limit($ext, 4, '') }}</div>
+                                            <div style="min-width:0;flex:1">
+                                                <div style="font-size:.8rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $name }}</div>
+                                                <div class="rc-subtle">{{ $attachment['mime_type'] ?? 'File' }} @if(!empty($attachment['size'])) · {{ number_format(((int) $attachment['size']) / 1048576, 1) }} MB @endif</div>
+                                            </div>
+                                            <button type="button" class="rc-icon-button" wire:click="removeTemplateAttachment({{ $index }})">×</button>
+                                        </div>
+                                    @endforeach
+                                    <label class="rc-attachment-drop-v45">
+                                        <input type="file" multiple style="display:none" wire:model="templateAttachmentUploads" />
+                                        <span>
+                                            <svg class="rc-icon-sm" style="margin:0 auto .3rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 4v12m0-12 4 4m-4-4-4 4" /></svg>
+                                            <strong style="display:block;color:var(--rc-text);font-size:.82rem">Upload files</strong>
+                                            <span style="font-size:.72rem">or click to browse · Max 25MB per file</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div wire:loading.flex wire:target="templateAttachmentUploads,addTemplateAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading files</div>
                             </div>
 
                             <div class="rc-toolbar" style="justify-content:space-between">
@@ -8655,14 +9500,10 @@
             </div>
         @endif
 
-        <div class="rc-school-opening-overlay-v26" wire:loading.flex wire:target="openSchoolDashboardModal,openDashboardEngagedSchool,openSchoolFromCoach,selectSchoolById,selectGlobalSearchSuggestion">
-            <div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Opening school</div>
-        </div>
-
         @if($this->selectedSchool)
             @php
                 $slideSchool = $this->selectedSchool;
-                $slideSchoolId = (string) ($slideSchool['id'] ?? '');
+                $slideSchoolId = (string) ($slideSchool['id'] ?? $slideSchool['business_id'] ?? '');
                 $slideSchoolName = (string) ($slideSchool['name'] ?? 'School');
                 $slideDivision = (string) ($slideSchool['division'] ?? 'Division');
                 $slideConference = (string) ($slideSchool['conference'] ?? 'Conference unavailable');
@@ -8672,15 +9513,31 @@
                 $slideClicks = (int) ($slideSchool['link_clicks'] ?? $slideSchool['trigger_link_clicks'] ?? $slideSchool['trigger_clicks'] ?? 0);
                 $slideViews = (int) (($slideSchool['profile_views'] ?? 0) + ($slideSchool['highlight_views'] ?? 0));
                 $slideEmails = (int) ($slideSchool['emails_sent'] ?? $slideSchool['sent_emails'] ?? $slideSchool['email_count'] ?? 0);
-                $slideTexts = (int) ($slideSchool['texts_sent'] ?? $slideSchool['sms_count'] ?? 0);
                 $slideScore = (int) ($slideSchool['lead_score'] ?? $slideSchool['engagement_score'] ?? max(0, ($slideReplies * 20) + ($slideClicks * 6) + ($slideViews * 2)));
+                $slideLogo = trim((string) ($slideSchool['logo_url'] ?? $slideSchool['school_logo_url'] ?? $slideSchool['business_logo_url'] ?? data_get($slideSchool, 'business.logo') ?? data_get($slideSchool, 'contact.school_logo') ?? data_get($slideSchool, 'head_coach.school_logo_url') ?? data_get($slideSchool, 'head_coach.business_logo_url') ?? ''));
+                if ($slideLogo === '') {
+                    foreach ($slideCoaches as $coach) {
+                        $slideLogo = trim((string) (($coach['school_logo_url'] ?? '') ?: ($coach['business_logo_url'] ?? '') ?: ($coach['logo_url'] ?? '')));
+                        if ($slideLogo !== '') break;
+                    }
+                }
+                $slideInitials = strtoupper(collect(preg_split('/\s+/', trim($slideSchoolName)) ?: [])->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
+                $listRows = collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values();
+                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->values();
             @endphp
 
             <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel is-roster-free-v26" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                <div class="rc-drawer-panel rc-school-modal-panel" x-data="{ tab: 'coaches', listsOpen: false }" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
                     <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
 
-                    <div class="rc-school-modal-hero">
+                    <div class="rc-school-modal-hero-v72">
+                        <div class="rc-school-logo-large-v72">
+                            @if($slideLogo !== '')
+                                <img src="{{ $slideLogo }}" alt="{{ $slideSchoolName }} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();">
+                            @else
+                                <span>{{ $slideInitials }}</span>
+                            @endif
+                        </div>
                         <div class="rc-school-modal-main">
                             <span class="rc-school-division-pill">{{ $slideDivision }}</span>
                             <h2>{{ $slideSchoolName }}</h2>
@@ -8690,70 +9547,98 @@
                                     <span>· {{ $slideLocation }}</span>
                                 @endif
                             </div>
-
-                            <div class="rc-school-modal-actions">
-                                @if($slideSchool['is_favorite'] ?? false)
-                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
-                                        ♡ Favorited
-                                    </button>
-                                @else
-                                    <button class="rc-school-action rc-school-action-primary" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
-                                        ♡ Favorite
-                                    </button>
-                                @endif
-
-                                @if($slideSchool['is_saved'] ?? false)
-                                    <button class="rc-school-action" type="button" wire:click="unsaveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unsaveSchoolById">
-                                        ✓ Saved
-                                    </button>
-                                @else
-                                    <button class="rc-school-action" type="button" wire:click="saveSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="saveSchoolById">
-                                        + Add to list
-                                    </button>
-                                @endif
-
-                                <button class="rc-school-action" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})">
-                                    ✉ Email coaches
-                                </button>
-                            </div>
                         </div>
-
                         <div class="rc-school-score-wrap">
                             <div class="rc-school-score-ring">{{ max(0, min(100, $slideScore)) }}</div>
                             <div class="rc-school-score-label">{{ $slideScore >= 70 ? 'HOT' : ($slideScore >= 35 ? 'WARM' : 'NEW') }}</div>
                         </div>
                     </div>
 
-                    <div class="rc-school-modal-rule"></div>
+                    <div class="rc-school-modal-actions-v72">
+                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="composeEmailSchool">
+                            <span wire:loading.remove wire:target="composeEmailSchool">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </span>
+                            <span class="rc-action-spinner-v81" wire:loading wire:target="composeEmailSchool"></span>
+                            <span>Email Coaches</span>
+                        </button>
 
-                    <div class="rc-school-drawer-summary-v26">
-                        <div class="rc-school-stat-card"><span>👥</span><strong>{{ number_format($slideCoaches->count()) }}</strong><small>Coaches</small></div>
-                        <div class="rc-school-stat-card"><span>👁</span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
-                        <div class="rc-school-stat-card"><span>↗</span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
+                        @if($slideSchool['is_favorite'] ?? false)
+                            <button class="rc-school-action is-favorited" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
+                                <span wire:loading.remove wire:target="unfavoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+                                <span class="rc-action-spinner-v81" wire:loading wire:target="unfavoriteSchoolById"></span>
+                                <span wire:loading.remove wire:target="unfavoriteSchoolById">Favorited</span><span wire:loading wire:target="unfavoriteSchoolById">Updating</span>
+                            </button>
+                        @else
+                            <button class="rc-school-action" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
+                                <span wire:loading.remove wire:target="favoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+                                <span class="rc-action-spinner-v81" wire:loading wire:target="favoriteSchoolById"></span>
+                                <span wire:loading.remove wire:target="favoriteSchoolById">Favorite</span><span wire:loading wire:target="favoriteSchoolById">Updating</span>
+                            </button>
+                        @endif
+
+                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
+                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click="listsOpen=!listsOpen">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                                <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left>
+                                <h4>Add to a list</h4>
+                                @forelse($listRows as $listRow)
+                                    @php
+                                        $listKey = (string) ($listRow['key'] ?? '');
+                                        $listLabel = (string) ($listRow['label'] ?? $listRow['name'] ?? \Illuminate\Support\Str::headline($listKey));
+                                        $defaultListColors = [
+                                            'dream' => '#ff6338',
+                                            'target' => '#3b82f6',
+                                            'safety' => '#22c55e',
+                                            'camp_follow_up' => '#f59e0b',
+                                            'showcase_follow_up' => '#8b5cf6',
+                                            'general_recruiting' => '#64748b',
+                                        ];
+                                        $listColor = (string) ($listRow['color'] ?? $defaultListColors[$listKey] ?? '#ff6338');
+                                        $inList = $schoolListKeys->contains(strtolower($listKey));
+                                        $count = (int) ($listRow['schools_count'] ?? count($listRow['schools'] ?? []));
+                                    @endphp
+                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" wire:loading.attr="disabled" wire:target="addSchoolToListById,removeSchoolFromListById">
+                                        <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                        <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot: {{ $listColor }}"></span><span>{{ $listLabel }}</span></span>
+                                        <small class="rc-list-count-v81">{{ $count }}</small>
+                                    </button>
+                                @empty
+                                    <button type="button" wire:click="$set('showNewListComposer', true)">Create a list first</button>
+                                @endforelse
+                            </div>
+                        </div>
                     </div>
 
-                    <section class="rc-school-modal-section">
-                        <div class="rc-school-section-title">Coaching staff ({{ number_format($slideCoaches->count()) }})</div>
-                        <div class="rc-school-coach-list rc-school-modal-coaches">
+                    <div class="rc-school-modal-rule"></div>
+
+                    <div class="rc-school-tabbar-v72">
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'coaches' ? 'is-active' : ''" x-on:click="tab='coaches'">Coaching Staff</button>
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'roster' ? 'is-active' : ''" x-on:click="tab='roster'">Roster & Stats</button>
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
+                    </div>
+
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'" x-transition.opacity>
+                        <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
                             @forelse($slideCoaches as $coach)
                                 @php
                                     $coachName = (string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach');
                                     $coachTitle = (string) ($coach['title'] ?? $coach['position'] ?? 'Coach');
                                     $coachEmail = (string) ($coach['email'] ?? '');
                                     $coachInitials = collect(explode(' ', $coachName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
+                                    $isHead = str_contains(strtolower($coachTitle), 'head');
                                 @endphp
                                 <div class="rc-school-coach-card">
                                     <div class="rc-school-coach-avatar">{{ strtoupper($coachInitials ?: 'C') }}</div>
                                     <div class="rc-school-coach-info">
-                                        <strong>{{ $coachName }}</strong>
+                                        <strong>{{ $coachName }} @if($isHead)<span class="rc-head-coach-chip">Head Coach</span>@endif</strong>
                                         <span>{{ $coachTitle }}</span>
-                                        @if($coachEmail !== '')
-                                            <a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>
-                                        @endif
+                                        @if($coachEmail !== '')<a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>@endif
                                     </div>
-                                    @if($coachEmail !== '')
-                                        <button class="rc-school-copy-btn" type="button" x-on:click="navigator.clipboard?.writeText(@js($coachEmail))" title="Copy email">▣</button>
-                                    @endif
+                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
                                 </div>
                             @empty
                                 <div class="rc-empty">No coaches loaded for this school yet.</div>
@@ -8761,13 +9646,16 @@
                         </div>
                     </section>
 
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'" x-transition.opacity>
+                        <div class="rc-coming-soon-v72"><div><strong>Coming Soon</strong><span>Roster and advanced school stats will be available here soon.</span></div></div>
+                    </section>
 
-                    <section class="rc-school-modal-section">
-                        <div class="rc-school-section-title">Communications</div>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'" x-transition.opacity>
                         <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span>✉</span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
-                            <div class="rc-school-stat-card"><span>↗</span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
-                            <div class="rc-school-stat-card"><span>↩</span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
+                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
+                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
+                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 10 4 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 0 1-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
                         </div>
                     </section>
                 </div>
@@ -8777,6 +9665,36 @@
     </div>
 
     <script>
+
+        window.plyrRepairBrokenEditorLinkFragments = function (html) {
+            let source = String(html || '');
+            if (!source) return '';
+
+            const buttonStyle = 'display:block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;margin:0 0 10px;';
+            const repairs = [
+                { token: 'ProfileLink', label: 'View PLYRCard Profile', style: buttonStyle + 'background:#ff5b32;color:#ffffff;', className: 'rc-email-button' },
+                { token: 'HighlightLink', label: 'Watch Highlights', style: buttonStyle + 'background:#111827;color:#ffffff;', className: 'rc-email-button' },
+            ];
+
+            const escReg = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            repairs.forEach((item) => {
+                const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
+                const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
+                const classAttr = item.className ? ' class="' + item.className + '"' : '';
+                const iconReplacement = socialIcon(item);
+                const replacement = iconReplacement || ('<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>');
+                source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
+                if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
+                    source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
+                }
+            });
+
+            source = source.replace(/<span\b[^>]*style="[^"]*(?:background\s*:\s*#?000|background-color\s*:\s*#?000)[^"]*"[^>]*>\s*(?:<\/span>|&nbsp;)?/gi, '');
+            source = source.replace(/<span\b[^>]*class="[^"]*social[^"]*"[^>]*>\s*<\/span>/gi, '');
+            source = source.replace(/<\/a>\s*(?=<a\b)/gi, '');
+            return source;
+        };
+
         window.plyrNativeEditorBase = function (modelName, initialBody = '') {
             return {
                 syncTimer: null,
@@ -8791,7 +9709,18 @@
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
-                    this.$nextTick(() => this.bootEditor());
+                    this.$nextTick(() => {
+                        this.bootEditor();
+                        setTimeout(() => this.bootEditor(true), 80);
+                        setTimeout(() => this.bootEditor(true), 250);
+                    });
+                    window.addEventListener('rc-compose-editor-refresh', (event) => {
+                        if (modelName !== 'campaignBody' || !this.$refs.editor) return;
+                        const encoded = event.detail?.body || '';
+                        const html = this.decodeInitialBody(encoded);
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
+                        this.syncNow();
+                    });
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
@@ -8840,13 +9769,54 @@
                         .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
                 },
                 highlightMergeTokens(html) {
-                    const source = String(html || '');
+                    const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
                     if (!source) return '';
                     if (source.includes('rc-merge-token-v48')) return source;
-                    return source.replace(/\{\{\s*([A-Za-z][A-Za-z0-9_ ]{0,60})\s*\}\}/g, (match) => {
-                        const clean = match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        return '<span class="rc-merge-token-v48" contenteditable="false">' + clean + '</span>';
-                    });
+
+                    const template = document.createElement('template');
+                    template.innerHTML = source;
+                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_ .]{0,80})\s*\}\}/g;
+
+                    const walk = (node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const text = node.nodeValue || '';
+                            if (!pattern.test(text)) {
+                                pattern.lastIndex = 0;
+                                return;
+                            }
+
+                            pattern.lastIndex = 0;
+                            const fragment = document.createDocumentFragment();
+                            let lastIndex = 0;
+                            text.replace(pattern, (match, _name, offset) => {
+                                if (offset > lastIndex) {
+                                    fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+                                }
+                                const span = document.createElement('span');
+                                span.className = 'rc-merge-token-v48';
+                                span.contentEditable = 'false';
+                                span.textContent = match;
+                                fragment.appendChild(span);
+                                lastIndex = offset + match.length;
+                                return match;
+                            });
+                            if (lastIndex < text.length) {
+                                fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                            }
+                            node.parentNode?.replaceChild(fragment, node);
+                            return;
+                        }
+
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const tag = String(node.tagName || '').toLowerCase();
+                            if (['script', 'style', 'textarea', 'input', 'select', 'option'].includes(tag)) return;
+                        }
+
+                        Array.from(node.childNodes || []).forEach(walk);
+                    };
+
+                    Array.from(template.content.childNodes || []).forEach(walk);
+                    return template.innerHTML;
                 },
                 cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
                 showNotice(message) {
@@ -8984,18 +9954,24 @@
                     window.addEventListener('rc-template-editor-refresh', (event) => {
                         const encoded = event.detail?.body || '';
                         const html = this.decodeBodyValue(encoded);
-                        if (this.$refs.editor) {
-                            this.$refs.editor.innerHTML = html;
+                        if (this.$refs.editor && html.trim() !== '') {
+                            this.$refs.editor.dataset.initialBody = encoded;
+                            this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
                             this.syncNow();
                         }
                     });
                 },
-                bootEditor() {
+                bootEditor(force = false) {
                     if (!this.$refs.editor) return;
 
+                    const current = String(this.$refs.editor.innerHTML || '').trim();
+                    const currentLooksEmpty = current === '' || current === '<br>' || current.includes('Write your reusable email template...');
                     const html = this.decodeInitialBody();
-                    if (html && this.$refs.editor.innerHTML.trim() === '') {
-                        this.$refs.editor.innerHTML = html;
+
+                    if (html && (force || currentLooksEmpty)) {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
+                    } else if (current && !current.includes('rc-merge-token-v48')) {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(current);
                     }
 
                     this.syncNow();
@@ -9019,10 +9995,67 @@
                 syncNow() {
                     if (!this.$refs.hidden || !this.$refs.editor) return;
 
-                    const html = this.$refs.editor.innerHTML || '';
+                    const html = this.serializeEditorHtml();
                     this.$refs.hidden.value = html;
                     this.$refs.hidden.dispatchEvent(new Event('input', { bubbles: true }));
                     this.$refs.hidden.dispatchEvent(new Event('change', { bubbles: true }));
+                },
+                serializeEditorHtml() {
+                    const clone = this.$refs.editor.cloneNode(true);
+                    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+                        node.replaceWith(document.createTextNode(node.textContent || ''));
+                    });
+                    return clone.innerHTML || '';
+                },
+                highlightMergeTokens(html) {
+                    const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
+                    if (!source) return '';
+                    if (source.includes('rc-merge-token-v48')) return source;
+
+                    const template = document.createElement('template');
+                    template.innerHTML = source;
+                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_ .]{0,80})\s*\}\}/g;
+
+                    const walk = (node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const text = node.nodeValue || '';
+                            if (!pattern.test(text)) {
+                                pattern.lastIndex = 0;
+                                return;
+                            }
+
+                            pattern.lastIndex = 0;
+                            const fragment = document.createDocumentFragment();
+                            let lastIndex = 0;
+                            text.replace(pattern, (match, _name, offset) => {
+                                if (offset > lastIndex) {
+                                    fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+                                }
+                                const span = document.createElement('span');
+                                span.className = 'rc-merge-token-v48';
+                                span.contentEditable = 'false';
+                                span.textContent = match;
+                                fragment.appendChild(span);
+                                lastIndex = offset + match.length;
+                                return match;
+                            });
+                            if (lastIndex < text.length) {
+                                fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                            }
+                            node.parentNode?.replaceChild(fragment, node);
+                            return;
+                        }
+
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const tag = String(node.tagName || '').toLowerCase();
+                            if (['script', 'style', 'textarea', 'input', 'select', 'option'].includes(tag)) return;
+                        }
+
+                        Array.from(node.childNodes || []).forEach(walk);
+                    };
+
+                    Array.from(template.content.childNodes || []).forEach(walk);
+                    return template.innerHTML;
                 },
                 focusEditor() {
                     this.$refs.editor?.focus();
@@ -9047,7 +10080,7 @@
                 insertMerge(name) {
                     const token = this.mergeToken(name);
                     if (!token) return;
-                    this.insertHtml(this.escapeHtml(token));
+                    this.insertHtml('<span class="rc-merge-token-v48" contenteditable="false">' + this.escapeHtml(token) + '</span>&nbsp;');
                 },
                 mergeTokenFromSelect(event) {
                     const select = event?.target;

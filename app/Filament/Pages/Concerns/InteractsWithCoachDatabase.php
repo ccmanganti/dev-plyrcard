@@ -88,6 +88,8 @@ trait InteractsWithCoachDatabase
     public string $templateGraphicUrl = '';
     public $templateGraphicUpload = null;
     public $templateInlineImageUpload = null;
+    public array $templateAttachmentUploads = [];
+    public array $templateAttachments = [];
     public string $composeGraphicUrl = '';
     public $composeGraphicUpload = null;
     public array $composeAttachmentUploads = [];
@@ -97,6 +99,7 @@ trait InteractsWithCoachDatabase
     public bool $isSavingTemplate = false;
     public bool $templateEditorOpen = false;
     public string $templateSearch = '';
+    public int $templateEditorRefreshKey = 0;
 
     public ?string $campaignTemplateId = null;
     public ?string $previewTemplateId = null;
@@ -129,11 +132,28 @@ trait InteractsWithCoachDatabase
     public bool $isSyncingTags = false;
     public bool $showNewConversationComposer = false;
     public string $newConversationCoachSearch = '';
+    public bool $showScheduleForm = false;
+    public ?int $editingScheduleId = null;
+    public string $scheduleEventType = 'Game';
+    public string $scheduleDate = '';
+    public string $scheduleTime = '';
+    public string $scheduleOpponent = '';
+    public string $scheduleLocation = '';
+    public string $scheduleVenue = '';
+    public array $notificationSettings = [
+        'profile_views' => true,
+        'email_opens' => true,
+        'coach_replies' => true,
+        'weekly_digest' => false,
+        'product_news' => false,
+    ];
     public ?string $tagSyncedAt = null;
 
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
-        $this->section = $this->coachDatabaseSection();
+        $requestedSection = trim((string) request()->query('section', ''));
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','schedule','settings','profile'];
+        $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
 
@@ -179,10 +199,24 @@ trait InteractsWithCoachDatabase
 
         if ($this->section === 'compose') {
             $this->campaignTargetMode = $this->campaignTargetMode ?: 'list';
+
             $schoolId = trim((string) request()->query('school', ''));
             if ($schoolId !== '') {
                 $this->selectComposeSchool($schoolId);
             }
+
+            $coachId = trim((string) request()->query('coach', ''));
+            if ($coachId !== '') {
+                $this->selectComposeCoach($coachId);
+            }
+        }
+
+        if ($this->section === 'settings') {
+            $this->loadNotificationSettings();
+        }
+
+        if ($this->section === 'schedule') {
+            $this->showScheduleForm = false;
         }
     }
 
@@ -201,6 +235,8 @@ trait InteractsWithCoachDatabase
             'conversations' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
             'campaigns' => \App\Filament\Pages\CoachDatabaseCampaigns::getUrl(),
             'compose' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
+            'schedule' => class_exists(\App\Filament\Pages\CoachDatabaseSchedule::class) ? \App\Filament\Pages\CoachDatabaseSchedule::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'schedule']),
+            'settings' => class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'settings']),
             default => \App\Filament\Pages\CoachDatabase::getUrl(),
         };
     }
@@ -765,15 +801,24 @@ trait InteractsWithCoachDatabase
         if ((bool) config('ghl.coach_database.refresh_in_livewire', false)) {
             $this->startBackgroundLoad(true);
         } else {
-            Cache::forget($this->activeCacheKey());
-            $snapshot = $this->emptySnapshot();
+            // Do not wipe the current snapshot from Livewire. A full GHL reload can
+            // take longer than a browser request, so keep the last good cached
+            // schools/coaches visible and only mark the reload as queued. The
+            // background job can rebuild/refresh the cache without leaving the
+            // dashboard blank.
+            $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+            if (! is_array($snapshot)) {
+                $snapshot = $this->emptySnapshot();
+            }
+
             $snapshot['has_more_data'] = false;
             $snapshot['reload_queued_at'] = now()->toDateTimeString();
-            $snapshot['last_refresh_notice'] = 'Full reload was queued safely. Run php artisan recruiting:sync-stats --user=' . (int) Auth::id() . ' --force for stats, or enable ghl.coach_database.refresh_in_livewire only if GHL is responding quickly.';
+            $snapshot['last_refresh_notice'] = 'Full reload queued safely. Existing Coach Database rows were kept visible while background sync runs.';
             $this->storeSnapshot($snapshot);
             $this->hydrateFromSnapshot($snapshot);
             $this->isLoadingDataset = false;
             $this->hasMoreData = false;
+
             $user = Auth::user();
             if ($user) {
                 $this->startRecruitingStatsSyncInBackground($user);
@@ -902,8 +947,17 @@ trait InteractsWithCoachDatabase
 
     public function selectSchoolById(string $schoolId): void
     {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return;
+        }
+
+        // Keep the drawer open action instant. Do not call GHL or rebuild the
+        // whole snapshot inside the Livewire click request. The selectedSchool
+        // computed property hydrates coaches from the already cached dashboard /
+        // discover coach indexes, which is the same data source that already
+        // works on the dashboard school cards.
         $this->selectedSchoolId = $schoolId;
-        $this->loadSchoolCoachesById($schoolId);
     }
 
     public function openSchoolDashboardModal(string $schoolId): void
@@ -924,7 +978,6 @@ trait InteractsWithCoachDatabase
         if (is_array($school)) {
             $resolvedId = (string) ($school['id'] ?? $school['business_id'] ?? $schoolId);
             $this->selectedSchoolId = $resolvedId;
-            $this->loadSchoolCoachesById($resolvedId);
             return;
         }
 
@@ -963,21 +1016,14 @@ trait InteractsWithCoachDatabase
 
     public function loadSchoolCoachesById(string $schoolId): void
     {
-        $school = collect($this->allSchools())->firstWhere('id', $schoolId);
-        if (! $school || ! empty($school['coaches_loaded'])) {
-            return;
-        }
-
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $service = app(CoachDatabaseService::class);
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        $this->loadSchoolCoachesIntoSnapshot($school, $snapshot, $service, $user);
-        $this->rebuildAndStoreSnapshot($snapshot);
+        // Intentionally no-op for UI clicks. The old implementation called the
+        // slow GHL /contacts/business endpoint and rebuilt the snapshot during
+        // the Livewire request, which left the drawer stuck on the loading
+        // overlay. Coaches are resolved from the cached coach index in
+        // getSelectedSchoolProperty().
+        $this->selectedSchoolId = trim($schoolId) !== '' ? trim($schoolId) : $this->selectedSchoolId;
     }
+
 
     public function saveSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->savedSchoolTag(), 'add'); }
     public function unsaveSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->savedSchoolTag(), 'remove'); }
@@ -1641,7 +1687,7 @@ trait InteractsWithCoachDatabase
             ]);
         }
 
-        $trackedBody = $body;
+        $trackedBody = $this->ensurePlyrcardEmailSignature($body);
         try {
             $rewriter = app(TrackingLinkRewriter::class);
             $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
@@ -1854,8 +1900,11 @@ trait InteractsWithCoachDatabase
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = [];
         $this->templateBody = $this->starterTemplateHtml();
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
     }
 
     public function selectTemplate(string $templateId): void
@@ -1884,15 +1933,18 @@ trait InteractsWithCoachDatabase
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
-        $this->templateBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
     }
 
     protected function starterTemplateHtml(): string
     {
-        return <<<'HTML'
+        $body = <<<'HTML'
 <div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
-    <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px 18px 0 0;background:#ffffff;">
+    <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
         <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
         <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
         <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
@@ -1903,18 +1955,10 @@ trait InteractsWithCoachDatabase
         <p style="margin:0 0 16px;">Thank you for your time and consideration. I look forward to learning more about your program.</p>
         <p style="margin:0;">Best,<br><strong>{{AthleteName}}</strong></p>
     </div>
-    <div style="padding:18px 28px 22px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 18px 18px;background:#f9fafb;">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
-            <tr><td style="vertical-align:top;padding:0;"><div style="font-size:16px;font-weight:800;color:#111827;">{{AthleteName}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{GraduationYear}} • {{Position}} • {{ClubTeam}}</div><div style="font-size:13px;color:#4b5563;margin-top:3px;">{{AthleteEmail}} • {{AthletePhone}}</div></td></tr>
-            <tr><td style="padding-top:14px;">
-                <a href="{{InstagramLink}}" data-plyrcard-link="instagram" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="18" height="18" viewBox="0 0 24 24" role="img" aria-label="Instagram" style="display:block;"><path fill="#ffffff" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4c0 3.2-2.6 5.8-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8C2 4.6 4.6 2 7.8 2Zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6Zm9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg></span></a>
-                <a href="{{XLink}}" data-plyrcard-link="x" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="17" height="17" viewBox="0 0 24 24" role="img" aria-label="X" style="display:block;"><path fill="#ffffff" d="M18.9 2h3.1l-6.8 7.8L23.2 22h-6.3l-4.9-7.3L6.4 22H3.3l7.3-8.4L2.8 2h6.4l4.4 6.6L18.9 2Zm-1.1 17.9h1.7L8.3 4H6.5l11.3 15.9Z"/></svg></span></a>
-                <a href="{{YoutubeLink}}" data-plyrcard-link="youtube" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:#000000;vertical-align:middle;"><svg width="20" height="20" viewBox="0 0 24 24" role="img" aria-label="YouTube" style="display:block;"><path fill="#ffffff" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg></span></a>
-            </td></tr>
-        </table>
-    </div>
 </div>
 HTML;
+
+        return $this->canonicalizeTemplateEditorHtml($body);
     }
 
     public function createTemplate(): void
@@ -1940,7 +1984,10 @@ HTML;
 
         $this->isSavingTemplate = true;
         $this->resolveTemplateGraphicUpload();
-        $html = $this->normalizeTemplateLinksForCurrentTracking($this->buildTemplateHtml($bodyText));
+        $html = $this->appendAttachmentLinksToHtml(
+            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
+            $this->templateAttachments
+        );
 
         $shouldUpdateGhl = $this->selectedTemplateId
             && ! $this->templateIsNew
@@ -2155,8 +2202,11 @@ HTML;
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
-        $this->templateBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
     }
 
     public function templateQuickAction(string $action): void
@@ -2228,14 +2278,19 @@ HTML;
         $this->campaignSubject = $this->templateSubject($template);
         $this->campaignPreviewText = $this->templatePreviewText($template);
         $this->composeGraphicUrl = '';
-        $this->campaignBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateHtmlForNativeEditor($template));
+        $this->composeAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
 
         if (trim($this->campaignBody) === '') {
-            $this->campaignBody = $this->normalizeTemplateLinksForCurrentTracking($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
+            $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
         }
 
+        $this->section = 'compose';
+        $this->activeSubpage = 'compose-email';
         $this->composeTemplateAppliedRecently = true;
-        Notification::make()->title('Compose Email')->body('Template loaded.')->success()->send();
+        $this->composeTemplateMenuOpen = false;
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        Notification::make()->title('Compose Email')->body('Template loaded in Compose Email.')->success()->send();
     }
 
 
@@ -2427,6 +2482,7 @@ HTML;
                     : basename((string) ($result['url'] ?? 'attachment'));
 
                 $this->composeAttachments[] = [
+                    'id' => $result['id'] ?? null,
                     'name' => $name,
                     'url' => trim((string) $result['url']),
                     'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
@@ -2448,6 +2504,142 @@ HTML;
 
         unset($this->composeAttachments[$index]);
         $this->composeAttachments = array_values($this->composeAttachments);
+    }
+
+
+    public function updatedTemplateAttachmentUploads(): void
+    {
+        $this->addTemplateAttachments();
+    }
+
+    public function addTemplateAttachments(): void
+    {
+        if (empty($this->templateAttachmentUploads)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            $this->templateAttachmentUploads = [];
+            return;
+        }
+
+        $files = collect($this->templateAttachmentUploads)
+            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
+            ->values();
+
+        if ($files->isEmpty()) {
+            $this->templateAttachmentUploads = [];
+            return;
+        }
+
+        try {
+            $this->validate([
+                'templateAttachmentUploads.*' => ['file', 'max:25600'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->templateAttachmentUploads = [];
+            Notification::make()->title('Template attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
+            return;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
+
+                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                    Notification::make()
+                        ->title('Template attachments')
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to GHL media.'))
+                        ->danger()
+                        ->send();
+                    continue;
+                }
+
+                $name = method_exists($file, 'getClientOriginalName')
+                    ? (string) $file->getClientOriginalName()
+                    : basename((string) ($result['url'] ?? 'attachment'));
+
+                $this->templateAttachments[] = [
+                    'id' => $result['id'] ?? null,
+                    'name' => $name,
+                    'url' => trim((string) $result['url']),
+                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
+                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
+                ];
+            } catch (\Throwable $exception) {
+                Notification::make()->title('Template attachments')->body('Unable to upload one attachment to GHL media.')->danger()->send();
+            }
+        }
+
+        $this->templateAttachmentUploads = [];
+    }
+
+    public function removeTemplateAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->templateAttachments)) {
+            return;
+        }
+
+        unset($this->templateAttachments[$index]);
+        $this->templateAttachments = array_values($this->templateAttachments);
+    }
+
+    protected function appendAttachmentLinksToHtml(string $html, array $attachments): string
+    {
+        $attachments = collect($attachments)
+            ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
+            ->values();
+
+        if ($attachments->isEmpty() || str_contains($html, 'data-plyrcard-attachments="1"') || str_contains($html, 'data-plyrcard-attachments="template"')) {
+            return $html;
+        }
+
+        $links = $attachments->map(function (array $attachment): string {
+            $name = e((string) ($attachment['name'] ?? 'Attachment'));
+            $url = e((string) ($attachment['url'] ?? ''));
+            return '<li style="margin:6px 0"><a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $name . '</a></li>';
+        })->implode('');
+
+        if ($links === '') {
+            return $html;
+        }
+
+        return rtrim($html) . '<div data-plyrcard-attachments="1" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $links . '</ul></div>';
+    }
+
+    protected function extractPlyrcardAttachmentLinks(string $html): array
+    {
+        if (trim($html) === '') {
+            return [];
+        }
+
+        $document = $this->loadTemplateDom($html);
+        if (! $document) {
+            return [];
+        }
+
+        $attachments = [];
+        foreach ($document->getElementsByTagName('div') as $div) {
+            if ((string) $div->getAttribute('data-plyrcard-attachments') === '') {
+                continue;
+            }
+
+            foreach ($div->getElementsByTagName('a') as $a) {
+                $url = trim((string) $a->getAttribute('href'));
+                if ($url === '' || ! preg_match('/^https?:\/\//i', $url)) {
+                    continue;
+                }
+                $attachments[] = [
+                    'name' => trim((string) $a->textContent) ?: basename(parse_url($url, PHP_URL_PATH) ?: 'Attachment'),
+                    'url' => $url,
+                    'mime_type' => null,
+                    'size' => null,
+                ];
+            }
+        }
+
+        return collect($attachments)->unique('url')->values()->all();
     }
 
     public function sendComposedEmail(): void
@@ -2488,7 +2680,7 @@ HTML;
 
         $this->isSendingCampaign = true;
         $this->resolveComposeGraphicUpload();
-        $html = $this->normalizeTemplateLinksForCurrentTracking($this->buildComposeHtml($bodyText));
+        $html = $this->ensurePlyrcardEmailSignature($this->normalizeTemplateLinksForCurrentTracking($this->buildComposeHtml($bodyText)));
         $sent = 0;
         $failed = 0;
 
@@ -2806,13 +2998,37 @@ HTML;
      * Tracking URLs are generated at send time per coach/contact so old templates
      * automatically use the newest cross-domain tracking format without being recreated.
      */
+    /**
+     * Rebuilds template/compose HTML from scratch around one canonical signature.
+     * This is the actual signature pipeline: old footer blocks are removed first,
+     * then exactly one current footer is appended. No previous social logo/footer
+     * markup is trusted or kept.
+     */
+    protected function canonicalizeTemplateEditorHtml(string $html): string
+    {
+        $html = trim($html);
+
+        $html = $this->repairBrokenTemplateLinkFragments($html);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($html);
+        $html = $this->stripPlyrcardEmailSignatures($html);
+        $html = $this->stripLoosePlyrcardSocialFooter($html);
+        $html = $this->stripAllPlyrcardSocialAnchors($html);
+        $html = trim($html);
+
+        if ($html === '') {
+            return $this->dedupePlyrcardSocialIconAnchors($this->plyrcardEmailSignatureHtml());
+        }
+
+        return $this->dedupePlyrcardSocialIconAnchors($html . "\n" . $this->plyrcardEmailSignatureHtml());
+    }
+
     protected function normalizeTemplateLinksForCurrentTracking(string $html): string
     {
         if (trim($html) === '') {
             return $html;
         }
 
-        return preg_replace_callback('/<a\b(?=[^>]*\bhref\s*=)([^>]*)>(.*?)<\/a>/is', function (array $matches): string {
+        $normalized = preg_replace_callback('/<a\b(?=[^>]*\bhref\s*=)([^>]*)>(.*?)<\/a>/is', function (array $matches): string {
             $anchor = $matches[0];
             $attributes = $matches[1] ?? '';
             $innerHtml = $matches[2] ?? '';
@@ -2829,6 +3045,339 @@ HTML;
             }
 
             return preg_replace('/\bhref\s*=\s*(["\'])(.*?)\1/is', 'href="' . $token . '"', $anchor, 1) ?: $anchor;
+        }, $html) ?: $html;
+
+        return $this->ensureTemplateSocialLogoAnchors($normalized);
+    }
+
+
+    protected function socialIconUrl(string $platform): string
+    {
+        return match (strtolower(trim($platform))) {
+            'instagram' => 'https://img.icons8.com/color/48/instagram-new--v1.png',
+            'x', 'twitter' => 'https://img.icons8.com/ios-filled/50/twitterx--v1.png',
+            'youtube', 'yt' => 'https://img.icons8.com/color/48/youtube-play.png',
+            default => '',
+        };
+    }
+
+    protected function socialIconAnchor(string $token, string $label, string $platform): string
+    {
+        $icon = $this->socialIconUrl($platform);
+
+        if ($icon === '') {
+            return '<a href="{{' . $token . '}}" target="_blank" style="color:#ff5b32;text-decoration:none;font-weight:700;">' . e($label) . '</a>';
+        }
+
+        return '<a href="{{' . $token . '}}" data-plyrcard-link="' . e($platform) . '" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;vertical-align:middle;">'
+            . '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#ffffff;border:1px solid #e5e7eb;vertical-align:middle;">'
+            . '<img src="' . e($icon) . '" width="20" height="20" alt="' . e($label) . '" style="display:block;width:20px;height:20px;border:0;outline:none;text-decoration:none;" />'
+            . '</span></a>';
+    }
+
+    protected function plyrcardEmailSignatureHtml(): string
+    {
+        return <<<'HTML'
+<div class="plyrcard-email-signature" data-plyrcard-signature="1" style="margin-top:24px;padding:18px 20px;border:1px solid #e5e7eb;border-radius:16px;background:#f9fafb;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.5;">
+    <div style="font-size:16px;font-weight:800;color:#111827;margin-bottom:2px;">{{AthleteName}}</div>
+    <div style="font-size:13px;color:#4b5563;margin-bottom:2px;">{{GraduationYear}} • {{Position}} • {{ClubTeam}}</div>
+    <div style="font-size:13px;color:#4b5563;margin-bottom:12px;">{{AthleteEmail}} • {{AthletePhone}}</div>
+    <div data-plyrcard-social-row="1" style="font-size:0;line-height:0;">
+        <a href="{{InstagramLink}}" data-plyrcard-link="instagram" data-plyrcard-signature-social="instagram" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;vertical-align:middle;"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#ffffff;border:1px solid #e5e7eb;vertical-align:middle;"><img src="https://img.icons8.com/color/48/instagram-new--v1.png" width="20" height="20" alt="Instagram" style="display:block;width:20px;height:20px;border:0;outline:none;text-decoration:none;" /></span></a>
+        <a href="{{XLink}}" data-plyrcard-link="x" data-plyrcard-signature-social="x" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;vertical-align:middle;"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#ffffff;border:1px solid #e5e7eb;vertical-align:middle;"><img src="https://img.icons8.com/ios-filled/50/twitterx--v1.png" width="20" height="20" alt="X" style="display:block;width:20px;height:20px;border:0;outline:none;text-decoration:none;" /></span></a>
+        <a href="{{YoutubeLink}}" data-plyrcard-link="youtube" data-plyrcard-signature-social="youtube" target="_blank" style="display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;vertical-align:middle;"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#ffffff;border:1px solid #e5e7eb;vertical-align:middle;"><img src="https://img.icons8.com/color/48/youtube-play.png" width="22" height="22" alt="YouTube" style="display:block;width:22px;height:22px;border:0;outline:none;text-decoration:none;" /></span></a>
+    </div>
+</div>
+HTML;
+    }
+
+    protected function hasPlyrcardEmailSignature(string $html): bool
+    {
+        $lower = strtolower($html);
+
+        if (str_contains($lower, 'data-plyrcard-signature') || str_contains($lower, 'plyrcard-email-signature')) {
+            return true;
+        }
+
+        $hasContactLine = str_contains($lower, '{{athleteemail}}') || str_contains($lower, '{{athletephone}}') || str_contains($lower, 'athleteemail') || str_contains($lower, 'athletephone');
+        $hasSocials = str_contains($lower, '{{instagramlink}}') || str_contains($lower, '{{xlink}}') || str_contains($lower, '{{youtubelink}}') || str_contains($lower, 'data-plyrcard-link="instagram"') || str_contains($lower, "data-plyrcard-link='instagram'");
+
+        return $hasContactLine && $hasSocials;
+    }
+
+    protected function ensurePlyrcardEmailSignature(string $html): string
+    {
+        return $this->canonicalizeTemplateEditorHtml($html);
+    }
+
+    protected function stripPlyrcardEmailSignatures(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        // Remove older footer/signature blocks that were saved before the
+        // canonical data-plyrcard-signature marker existed. These older blocks
+        // are why social logos can duplicate after a template is loaded and
+        // the current footer is appended.
+        $html = $this->stripLegacyPlyrcardSignatureFooters($html);
+
+        $needles = [
+            'data-plyrcard-signature',
+            'plyrcard-email-signature',
+        ];
+
+        $offset = 0;
+        while ($offset < strlen($html)) {
+            $lower = strtolower($html);
+            $positions = [];
+
+            foreach ($needles as $needle) {
+                $pos = strpos($lower, $needle, $offset);
+                if ($pos !== false) {
+                    $positions[] = $pos;
+                }
+            }
+
+            if ($positions === []) {
+                break;
+            }
+
+            $marker = min($positions);
+            $start = strripos(substr($html, 0, $marker), '<div');
+
+            if ($start === false) {
+                $offset = $marker + 1;
+                continue;
+            }
+
+            $end = $this->findClosingDivOffset($html, $start);
+
+            if ($end === null || $end <= $start) {
+                $offset = $marker + 1;
+                continue;
+            }
+
+            $html = substr($html, 0, $start) . substr($html, $end);
+            $offset = max(0, $start - 1);
+        }
+
+        // Remove any leftover empty paragraphs created where duplicate
+        // signatures were stripped.
+        $html = preg_replace('/(?:<p[^>]*>\s*(?:&nbsp;)?\s*<\/p>\s*){2,}/i', '', $html) ?: $html;
+
+        return trim($html);
+    }
+
+    protected function stripLegacyPlyrcardSignatureFooters(string $html): string
+    {
+        $offset = 0;
+
+        while ($offset < strlen($html)) {
+            if (preg_match('/<div\b[^>]*>/i', $html, $match, PREG_OFFSET_CAPTURE, $offset) !== 1) {
+                break;
+            }
+
+            $start = $match[0][1];
+            $end = $this->findClosingDivOffset($html, $start);
+
+            if ($end === null || $end <= $start) {
+                $offset = $start + 4;
+                continue;
+            }
+
+            $block = substr($html, $start, $end - $start);
+            $lowerBlock = strtolower($block);
+
+            $looksLikePlyrcardFooter = (
+                (str_contains($lowerBlock, '{{athletename}}') || str_contains($lowerBlock, 'athleteemail') || str_contains($lowerBlock, 'athletephone'))
+                && (
+                    str_contains($lowerBlock, '{{instagramlink}}')
+                    || str_contains($lowerBlock, '{{xlink}}')
+                    || str_contains($lowerBlock, '{{twitterlink}}')
+                    || str_contains($lowerBlock, '{{youtubelink}}')
+                    || str_contains($lowerBlock, 'data-plyrcard-link="instagram"')
+                    || str_contains($lowerBlock, "data-plyrcard-link='instagram'")
+                )
+            );
+
+            if ($looksLikePlyrcardFooter) {
+                $html = substr($html, 0, $start) . substr($html, $end);
+                $offset = max(0, $start - 1);
+                continue;
+            }
+
+            $offset = $end;
+        }
+
+        return trim($html);
+    }
+
+    /**
+     * Remove legacy signature fragments that do not have data-plyrcard-signature.
+     * This specifically removes the old table/footer section from starter
+     * templates and any loose social icon clusters that were saved into GHL.
+     */
+    protected function stripLoosePlyrcardSocialFooter(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        $html = preg_replace('/<table\b[^>]*>.*?\{\{\s*AthleteEmail\s*\}\}.*?\{\{\s*AthletePhone\s*\}\}.*?\{\{\s*(?:InstagramLink|XLink|TwitterLink|YoutubeLink|YouTubeLink)\s*\}\}.*?<\/table>/is', '', $html) ?: $html;
+
+        $html = preg_replace('/<div\b[^>]*>\s*(?:<[^>]+>\s*)*\{\{\s*AthleteName\s*\}\}.*?\{\{\s*AthleteEmail\s*\}\}.*?\{\{\s*AthletePhone\s*\}\}.*?\{\{\s*(?:InstagramLink|XLink|TwitterLink|YoutubeLink|YouTubeLink)\s*\}\}.*?<\/div>\s*/is', '', $html) ?: $html;
+
+        $html = preg_replace('/(?:\s*<a\b[^>]*(?:data-plyrcard-link\s*=\s*["\'](?:instagram|x|twitter|youtube)["\']|href\s*=\s*["\']\s*\{\{\s*(?:InstagramLink|XLink|TwitterLink|YoutubeLink|YouTubeLink)\s*\}\}\s*["\'])[^>]*>.*?<\/a>\s*){2,}/is', '', $html) ?: $html;
+        $html = $this->stripAllPlyrcardSocialAnchors($html);
+
+        return trim($html);
+    }
+
+    /**
+     * The signature is the only allowed place for social logo anchors.
+     * Remove every Instagram/X/YouTube token/icon anchor already present in
+     * the body before appending the canonical footer. This prevents duplicates
+     * even when old GHL templates already saved social icons outside the marked
+     * signature block.
+     */
+    protected function stripAllPlyrcardSocialAnchors(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        // Remove social anchors by data attribute or merge-token href.
+        $html = preg_replace(
+            '/\s*<a\b[^>]*(?:data-plyrcard-link\s*=\s*(["\'])(?:instagram|x|twitter|youtube)\1|href\s*=\s*(["\'])\s*\{\{\s*(?:InstagramLink|XLink|TwitterLink|YoutubeLink|YouTubeLink)\s*\}\}\s*\2)[^>]*>.*?<\/a>\s*/is',
+            ' ',
+            $html
+        ) ?: $html;
+
+        // Remove anchors wrapping known social icon images even if attributes
+        // were stripped or rewritten by the editor/GHL.
+        $html = preg_replace(
+            '/\s*<a\b[^>]*>\s*(?:<span\b[^>]*>\s*)?<img\b[^>]*(?:instagram-new--v1|twitterx--v1|youtube-play|youtube)[^>]*>\s*(?:<\/span>\s*)?<\/a>\s*/is',
+            ' ',
+            $html
+        ) ?: $html;
+
+        // Remove loose social icon images/spans left behind after anchors are
+        // removed. This catches the black circles / duplicate image shells.
+        $html = preg_replace('/\s*<img\b[^>]*(?:instagram-new--v1|twitterx--v1|youtube-play|youtube)[^>]*>\s*/is', ' ', $html) ?: $html;
+        $html = preg_replace('/\s*<span\b[^>]*(?:border-radius\s*:\s*999px|background\s*:\s*#(?:000|ffffff)|background-color\s*:\s*#(?:000|ffffff))[^>]*>\s*<\/span>\s*/is', ' ', $html) ?: $html;
+
+        // Remove empty social/icon containers created by the removals.
+        $html = preg_replace('/<div\b[^>]*>\s*<\/div>/i', '', $html) ?: $html;
+        $html = preg_replace('/<p\b[^>]*>\s*(?:&nbsp;)?\s*<\/p>/i', '', $html) ?: $html;
+
+        return trim($html);
+    }
+
+    protected function dedupePlyrcardSocialIconAnchors(string $html): string
+    {
+        $seen = [];
+
+        return preg_replace_callback('/<a\b[^>]*(?:data-plyrcard-link\s*=\s*(["\'])(instagram|x|twitter|youtube)\1|href\s*=\s*(["\'])\s*\{\{\s*(InstagramLink|XLink|TwitterLink|YoutubeLink|YouTubeLink)\s*\}\}\s*\3)[^>]*>.*?<\/a>/is', function (array $matches) use (&$seen): string {
+            $platform = strtolower((string) ($matches[2] ?? ''));
+            $token = strtolower((string) ($matches[4] ?? ''));
+
+            if ($platform === '') {
+                $platform = match ($token) {
+                    'instagramlink' => 'instagram',
+                    'xlink', 'twitterlink' => 'x',
+                    'youtubelink', 'youtubelink' => 'youtube',
+                    default => '',
+                };
+            }
+
+            if ($platform === 'twitter') {
+                $platform = 'x';
+            }
+
+            if ($platform === '') {
+                return $matches[0];
+            }
+
+            if (isset($seen[$platform])) {
+                return '';
+            }
+
+            $seen[$platform] = true;
+            return $matches[0];
+        }, $html) ?: $html;
+    }
+
+    protected function findClosingDivOffset(string $html, int $start): ?int
+    {
+        $length = strlen($html);
+        $offset = $start;
+        $depth = 0;
+
+        while ($offset < $length) {
+            if (preg_match('/<\/?div\b[^>]*>/i', $html, $match, PREG_OFFSET_CAPTURE, $offset) !== 1) {
+                return null;
+            }
+
+            $tag = $match[0][0];
+            $pos = $match[0][1];
+            $offset = $pos + strlen($tag);
+
+            if (preg_match('/^<\/div/i', $tag) === 1) {
+                $depth--;
+
+                if ($depth <= 0) {
+                    return $offset;
+                }
+
+                continue;
+            }
+
+            if (str_ends_with(trim($tag), '/>')) {
+                continue;
+            }
+
+            $depth++;
+        }
+
+        return null;
+    }
+
+    protected function ensureTemplateSocialLogoAnchors(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        return preg_replace_callback('/<a\b(?=[^>]*\bhref\s*=)([^>]*)>(.*?)<\/a>/is', function (array $matches): string {
+            $anchor = $matches[0];
+            $attributes = (string) ($matches[1] ?? '');
+            $innerHtml = (string) ($matches[2] ?? '');
+            $haystack = strtolower(html_entity_decode($anchor . ' ' . strip_tags($innerHtml), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+            $token = null;
+            $platform = null;
+            $label = null;
+
+            if (str_contains($haystack, '{{instagramlink}}') || str_contains($haystack, 'data-plyrcard-link="instagram"') || str_contains($haystack, "data-plyrcard-link='instagram'")) {
+                $token = 'InstagramLink';
+                $platform = 'instagram';
+                $label = 'Instagram';
+            } elseif (str_contains($haystack, '{{xlink}}') || str_contains($haystack, '{{twitterlink}}') || str_contains($haystack, 'data-plyrcard-link="x"') || str_contains($haystack, "data-plyrcard-link='x'")) {
+                $token = 'XLink';
+                $platform = 'x';
+                $label = 'X';
+            } elseif (str_contains($haystack, '{{youtubelink}}') || str_contains($haystack, '{{youtubelink}}') || str_contains($haystack, 'data-plyrcard-link="youtube"') || str_contains($haystack, "data-plyrcard-link='youtube'")) {
+                $token = 'YoutubeLink';
+                $platform = 'youtube';
+                $label = 'YouTube';
+            }
+
+            if (! $token || ! $platform || ! $label) {
+                return $anchor;
+            }
+
+            return $this->socialIconAnchor($token, $label, $platform);
         }, $html) ?: $html;
     }
 
@@ -3160,19 +3709,211 @@ HTML;
             return '';
         }
 
-        // Some GHL/TyncMe responses return escaped HTML. Decode it before
-        // placing it into the native contenteditable editor so users see the
-        // rendered email, not raw <p> / <table> code.
-        $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        if ($decoded !== '') {
+        // GHL sometimes returns escaped or double-escaped HTML. Decode it a few
+        // times before inserting it into contenteditable so users see rendered
+        // content rather than literal <a>, <table>, or <div> code.
+        for ($i = 0; $i < 3; $i++) {
+            $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $html || trim($decoded) === '') {
+                break;
+            }
             $html = $decoded;
         }
 
-        if (preg_match('/<\s*(p|div|h1|h2|h3|h4|h5|h6|ul|ol|li|blockquote|img|a|table|tr|td|span|strong|em|br|body|html)\b/i', $html)) {
+        $html = $this->repairBrokenTemplateLinkFragments($html);
+
+        if (! preg_match('/<\s*(p|div|h1|h2|h3|h4|h5|h6|ul|ol|li|blockquote|img|a|table|tr|td|span|strong|em|br|body|html)\b/i', $html)) {
+            return $this->templateTextToHtml(trim(strip_tags($html)));
+        }
+
+        return $this->canonicalizeTemplateEditorHtml($this->simplifyEmailHtmlForEditor($html));
+    }
+
+    protected function repairBrokenTemplateLinkFragments(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        // GHL/editor round-trips can leave anchors as visible text fragments when
+        // a merge token inside href was converted into a chip. Repair those before
+        // DOM parsing so users see real links/buttons instead of raw HTML like:
+        // {{ProfileLink}}" target="_blank">View PLYRCard Profile
+        $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $buttonStyles = 'display:block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;margin:0 0 10px;';
+        $linkRepairs = [
+            'ProfileLink' => [
+                'label' => 'View PLYRCard Profile',
+                'style' => $buttonStyles . 'background:#ff5b32;color:#ffffff;',
+                'class' => 'rc-email-button',
+            ],
+            'HighlightLink' => [
+                'label' => 'Watch Highlights',
+                'style' => $buttonStyles . 'background:#111827;color:#ffffff;',
+                'class' => 'rc-email-button',
+            ],
+            'InstagramLink' => [
+                'label' => 'Instagram',
+                'style' => 'display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;color:#111827;font-weight:700;',
+                'class' => '',
+            ],
+            'XLink' => [
+                'label' => 'X',
+                'style' => 'display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;color:#111827;font-weight:700;',
+                'class' => '',
+            ],
+            'TwitterLink' => [
+                'label' => 'X',
+                'style' => 'display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;color:#111827;font-weight:700;',
+                'class' => '',
+            ],
+            'YoutubeLink' => [
+                'label' => 'YouTube',
+                'style' => 'display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;color:#111827;font-weight:700;',
+                'class' => '',
+            ],
+            'YouTubeLink' => [
+                'label' => 'YouTube',
+                'style' => 'display:inline-block;text-decoration:none;margin-right:8px;margin-bottom:6px;color:#111827;font-weight:700;',
+                'class' => '',
+            ],
+        ];
+
+        $socialIconReplacement = fn (string $token, string $label, string $platform): string => $this->socialIconAnchor($token, $label, $platform);
+
+        foreach ($linkRepairs as $token => $config) {
+            $tokenPattern = '\\{\\{\\s*' . preg_quote($token, '/') . '\\s*\\}\\}';
+            $label = (string) $config['label'];
+            $labelPattern = preg_quote($label, '/');
+            $class = trim((string) $config['class']);
+            $classAttribute = $class !== '' ? ' class="' . $class . '"' : '';
+            $style = (string) $config['style'];
+            $platform = in_array($token, ['InstagramLink'], true) ? 'instagram' : (in_array($token, ['XLink', 'TwitterLink'], true) ? 'x' : (in_array($token, ['YoutubeLink', 'YouTubeLink'], true) ? 'youtube' : ''));
+            $replacement = $platform !== ''
+                ? $socialIconReplacement($token, $label, $platform)
+                : '<a' . $classAttribute . ' href="{{' . $token . '}}" target="_blank" style="' . $style . '">' . $label . '</a>';
+
+            // Raw orphaned href token followed by the visible label.
+            $html = preg_replace(
+                '/' . $tokenPattern . '\s*(?:"|\'|&quot;|&#034;|&#39;)\s*(?:data-plyrcard-link\s*=\s*(?:"|\'|&quot;|&#034;|&#39;)[^"\' >]+(?:"|\'|&quot;|&#034;|&#39;)\s*)?(?:target\s*=\s*(?:"|\'|&quot;|&#034;|&#39;)?_blank(?:"|\'|&quot;|&#034;|&#39;)?\s*)?[^>\n\r]*>\s*' . $labelPattern . '/i',
+                $replacement,
+                $html
+            ) ?? $html;
+
+            // Broken social/icon anchors often have no readable label after the >.
+            if (in_array($token, ['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'], true)) {
+                $html = preg_replace(
+                    '/' . $tokenPattern . '\s*(?:"|\'|&quot;|&#034;|&#39;)\s*data-plyrcard-link\s*=\s*(?:"|\'|&quot;|&#034;|&#39;)[^"\' >]+(?:"|\'|&quot;|&#034;|&#39;)\s*[^>\n\r]*>\s*/i',
+                    $replacement . ' ',
+                    $html
+                ) ?? $html;
+            }
+        }
+
+        // Repair escaped/broken complete anchors that lost the opening <a href=.
+        $html = preg_replace('/(?:^|\s)href\s*=\s*("|\')({{[A-Za-z0-9_ .]+}})\1\s*target\s*=\s*("|\')_blank\3\s*>/i', ' <a href="$2" target="_blank">', $html) ?? $html;
+
+        // Remove icon shells left after SVG stripping. Keep the repaired text links.
+        $html = preg_replace('/<span\b[^>]*style="[^"]*(?:background\s*:\s*#?000|background-color\s*:\s*#?000)[^"]*"[^>]*>\s*(?:<\/span>|&nbsp;)?/i', '', $html) ?? $html;
+        $html = preg_replace('/<span\b[^>]*class="[^"]*social[^\"]*"[^>]*>\s*<\/span>/i', '', $html) ?? $html;
+
+        // Clean up orphan closing anchors from repaired fragments.
+        $html = preg_replace('/<\/a>\s*(?=<a\b)/i', '', $html) ?? $html;
+
+        return trim($html);
+    }
+
+    protected function simplifyEmailHtmlForEditor(string $html): string
+    {
+        $html = $this->sanitizeTemplateHtml($html);
+        $html = $this->repairBrokenTemplateLinkFragments($html);
+        // Do not create social-icon anchors here. The canonical signature is
+        // the only place where social logos are rendered, so templates cannot
+        // accumulate duplicated icon clusters while loading/saving.
+        $html = $this->stripAllPlyrcardSocialAnchors($html);
+        $html = preg_replace('/<\s*(style|script|head|title|meta|link|svg|noscript)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/<\s*svg\b[^>]*>.*?<\s*\/\s*svg\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/<\/?\s*(html|body)\b[^>]*>/i', '', $html) ?? $html;
+
+        $document = $this->loadTemplateDom($html);
+        if (! $document) {
             return $this->sanitizeTemplateHtml($html);
         }
 
-        return $this->templateTextToHtml(trim(strip_tags($html)));
+        foreach (['style', 'script', 'svg', 'head', 'title', 'meta', 'link', 'noscript'] as $tag) {
+            while (($nodes = $document->getElementsByTagName($tag))->length > 0) {
+                $node = $nodes->item(0);
+                $node?->parentNode?->removeChild($node);
+            }
+        }
+
+        $allowed = ['p','div','br','ul','ol','li','blockquote','strong','b','em','i','u','a','img','h1','h2','h3','h4','span'];
+        $walk = function ($node) use (&$walk, $allowed, $document): void {
+            if ($node instanceof \DOMElement) {
+                $tag = strtolower($node->tagName);
+                if (! in_array($tag, $allowed, true)) {
+                    $fragment = $document->createDocumentFragment();
+                    while ($node->firstChild) {
+                        $fragment->appendChild($node->firstChild);
+                    }
+                    $node->parentNode?->replaceChild($fragment, $node);
+                    return;
+                }
+
+                foreach (iterator_to_array($node->attributes ?? []) as $attribute) {
+                    $name = strtolower($attribute->name);
+                    if (str_starts_with($name, 'on') || in_array($name, ['class','id','width','height'], true)) {
+                        $node->removeAttribute($attribute->name);
+                    }
+                }
+
+                if ($tag === 'a') {
+                    $href = trim((string) $node->getAttribute('href'));
+                    $node->setAttribute('href', $href !== '' ? $href : '#');
+                    $node->setAttribute('target', '_blank');
+                    $node->removeAttribute('style');
+                    if (trim((string) $node->textContent) === '') {
+                        $node->nodeValue = 'Open link';
+                    }
+                }
+
+                if ($tag === 'img') {
+                    $src = trim((string) $node->getAttribute('src'));
+                    if ($src === '') {
+                        $node->parentNode?->removeChild($node);
+                        return;
+                    }
+                    $node->setAttribute('src', $src);
+                    $node->setAttribute('alt', $node->getAttribute('alt') ?: 'Image');
+                    $node->setAttribute('style', 'max-width:100%;height:auto;border-radius:12px;display:block;');
+                }
+            }
+
+            if ($node->hasChildNodes()) {
+                foreach (iterator_to_array($node->childNodes) as $child) {
+                    $walk($child);
+                }
+            }
+        };
+
+        $root = $document->getElementsByTagName('body')->item(0) ?: $document->documentElement;
+        if ($root) {
+            $walk($root);
+        }
+
+        $out = '';
+        $container = $document->getElementsByTagName('body')->item(0) ?: $document->documentElement;
+        if ($container) {
+            foreach ($container->childNodes as $child) {
+                $out .= $document->saveHTML($child);
+            }
+        }
+
+        $out = trim($out);
+        return $out !== '' ? $out : $this->templateTextToHtml(trim(strip_tags($html)));
     }
 
     protected function templateSubject(array $template): string
@@ -4867,16 +5608,54 @@ HTML;
 
     protected function hydrateSchoolRowForDisplay(array $school): array
     {
-        $coaches = $this->coachesForSchoolSearch($school);
-        if (! empty($coaches)) {
-            $school['coaches'] = $coaches;
+        $existingCoaches = collect($school['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach));
+
+        if ($existingCoaches->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
+            $existingCoaches = collect([$school['head_coach']]);
         }
 
+        $matchedCoaches = collect($this->coachesForSchoolSearch($school))
+            ->merge($this->dashboardCoachesForSchoolRow($school))
+            ->filter(fn ($coach): bool => is_array($coach));
+
+        $coaches = $existingCoaches
+            ->merge($matchedCoaches)
+            ->map(function (array $coach) use ($school): array {
+                $schoolName = (string) ($school['name'] ?? '');
+                $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+                $logoUrl = $school['school_logo_url'] ?? $school['business_logo_url'] ?? $school['logo_url'] ?? null;
+
+                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
+                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
+                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $logoUrl;
+                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $logoUrl;
+
+                return $coach;
+            })
+            ->unique(function (array $coach): string {
+                return strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach))));
+            })
+            ->values();
+
+        if ($coaches->isNotEmpty()) {
+            $school['coaches'] = $coaches->all();
+        }
+
+        $school['coach_count'] = max(
+            (int) ($school['coach_count'] ?? 0),
+            (int) ($school['coaches_count'] ?? 0),
+            $coaches->count()
+        );
+        $school['coaches_count'] = $school['coach_count'];
+
         $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
-        if (blank($headCoach['name'] ?? null) && ! empty($coaches)) {
-            $headCoach = collect($coaches)->first(function (array $coach): bool {
+        if (blank($headCoach['name'] ?? null) && $coaches->isNotEmpty()) {
+            $headCoach = $coaches->first(function (array $coach): bool {
                 return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
-            }) ?: ($coaches[0] ?? []);
+            }) ?: $coaches->first();
             if (is_array($headCoach)) {
                 $school['head_coach'] = $headCoach;
             }
@@ -5327,6 +6106,66 @@ HTML;
         $this->redirect($this->pageUrl('compose') . '?school=' . urlencode($schoolId), navigate: true);
     }
 
+    public function composeEmailCoach(string $coachId): void
+    {
+        $coachId = trim($coachId);
+        if ($coachId === '') {
+            return;
+        }
+
+        $this->redirect($this->pageUrl('compose') . '?coach=' . urlencode($coachId), navigate: true);
+    }
+
+    public function selectComposeCoach(string $coachId): void
+    {
+        $coachId = trim($coachId);
+        if ($coachId === '') {
+            return;
+        }
+
+        $coach = collect($this->allCoaches())->first(function (array $row) use ($coachId): bool {
+            return (string) ($row['id'] ?? '') === $coachId
+                || (string) ($row['contact_id'] ?? '') === $coachId
+                || (string) ($row['ghl_contact_id'] ?? '') === $coachId;
+        });
+
+        if (! is_array($coach)) {
+            $this->campaignTargetMode = 'coaches';
+            $this->campaignCoachIds = [$coachId];
+            $this->campaignHeadCoachOnly = false;
+            $this->composeChooseCoachesOpen = true;
+            return;
+        }
+
+        $resolvedCoachId = (string) ($coach['id'] ?? $coachId);
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignCoachIds = [$resolvedCoachId];
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+
+        $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $coach['school_name'] ?? ''));
+
+        $school = collect($this->allSchools())->first(function (array $row) use ($businessId, $schoolName): bool {
+            $rowBusinessId = trim((string) ($row['business_id'] ?? $row['company_id'] ?? $row['ghl_business_id'] ?? $row['id'] ?? ''));
+            $rowName = trim((string) ($row['name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
+
+            return ($businessId !== '' && $rowBusinessId === $businessId)
+                || ($schoolName !== '' && strcasecmp($rowName, $schoolName) === 0);
+        });
+
+        if (is_array($school) && filled($school['id'] ?? null)) {
+            $this->campaignSchoolId = (string) $school['id'];
+            $this->composeSchoolSearch = '';
+        }
+
+        $coachName = trim((string) ($coach['name'] ?? 'Coach'));
+        $first = trim(explode(' ', $coachName)[0] ?? 'Coach') ?: 'Coach';
+        if (trim((string) $this->campaignBody) === '') {
+            $this->campaignBody = '<p>Hi ' . e($first) . ',</p><p><br></p>';
+        }
+    }
+
     public function getCampaignRenderedPreviewProperty(): string
     {
         $body = trim($this->campaignBody) !== '' ? $this->campaignBody : $this->previewTemplateHtml;
@@ -5620,6 +6459,217 @@ HTML;
         return $schoolNames->take(250)->all();
     }
 
+
+    public function startAddScheduleEvent(): void
+    {
+        $this->resetScheduleForm();
+        $this->showScheduleForm = true;
+    }
+
+    public function cancelScheduleEvent(): void
+    {
+        $this->resetScheduleForm();
+        $this->showScheduleForm = false;
+    }
+
+    public function editScheduleEvent(int $scheduleId): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $schedule = \App\Models\Schedule::query()
+            ->where(function ($query) use ($user) {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->find($scheduleId);
+
+        if (! $schedule) {
+            Notification::make()->title('My Schedule')->body('Schedule event was not found.')->warning()->send();
+            return;
+        }
+
+        $this->editingScheduleId = $schedule->id;
+        $this->scheduleEventType = (string) ($schedule->status ?: 'Game');
+        $this->scheduleDate = optional($schedule->game_date)->format('Y-m-d') ?: '';
+        $this->scheduleTime = $schedule->game_time ? \Illuminate\Support\Carbon::parse($schedule->game_time)->format('H:i') : '';
+        $this->scheduleOpponent = (string) ($schedule->opponent ?: $schedule->title);
+        $this->scheduleLocation = (string) $schedule->location;
+        $this->scheduleVenue = (string) $schedule->venue;
+        $this->showScheduleForm = true;
+    }
+
+    public function saveScheduleEvent(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        if (blank($this->scheduleDate) || blank($this->scheduleOpponent)) {
+            Notification::make()->title('My Schedule')->body('Add a date and opponent/event name.')->danger()->send();
+            return;
+        }
+
+        $payload = [
+            'created_by_user_id' => $user->id,
+            'title' => trim($this->scheduleOpponent),
+            'opponent' => trim($this->scheduleOpponent),
+            'game_date' => $this->scheduleDate,
+            'game_time' => $this->scheduleTime ?: null,
+            'location' => trim($this->scheduleLocation),
+            'venue' => trim($this->scheduleVenue),
+            'status' => trim($this->scheduleEventType) ?: 'Game',
+        ];
+
+        if ($this->editingScheduleId) {
+            $schedule = \App\Models\Schedule::query()
+                ->where(function ($query) use ($user) {
+                    $query->where('created_by_user_id', $user->id)
+                        ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+                })
+                ->find($this->editingScheduleId);
+
+            if (! $schedule) {
+                Notification::make()->title('My Schedule')->body('Schedule event was not found.')->warning()->send();
+                return;
+            }
+
+            $schedule->fill($payload)->save();
+        } else {
+            $schedule = \App\Models\Schedule::query()->create($payload);
+            $schedule->users()->syncWithoutDetaching([$user->id]);
+        }
+
+        $this->resetScheduleForm();
+        $this->showScheduleForm = false;
+        Notification::make()->title('My Schedule')->body('Schedule event saved.')->success()->send();
+    }
+
+    public function deleteScheduleEvent(int $scheduleId): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $schedule = \App\Models\Schedule::query()
+            ->where(function ($query) use ($user) {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->find($scheduleId);
+
+        if (! $schedule) {
+            Notification::make()->title('My Schedule')->body('Schedule event was not found.')->warning()->send();
+            return;
+        }
+
+        $schedule->delete();
+        Notification::make()->title('My Schedule')->body('Schedule event removed.')->success()->send();
+    }
+
+    protected function resetScheduleForm(): void
+    {
+        $this->editingScheduleId = null;
+        $this->scheduleEventType = 'Game';
+        $this->scheduleDate = '';
+        $this->scheduleTime = '';
+        $this->scheduleOpponent = '';
+        $this->scheduleLocation = '';
+        $this->scheduleVenue = '';
+    }
+
+    public function getMyScheduleEventsProperty(): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+
+        return \App\Models\Schedule::query()
+            ->where(function ($query) use ($user) {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->orderBy('game_date')
+            ->orderBy('game_time')
+            ->limit(50)
+            ->get()
+            ->map(function ($schedule): array {
+                return [
+                    'id' => $schedule->id,
+                    'type' => $schedule->status ?: 'Game',
+                    'title' => $schedule->title ?: $schedule->opponent,
+                    'opponent' => $schedule->opponent ?: $schedule->title,
+                    'date' => optional($schedule->game_date)->format('Y-m-d'),
+                    'day' => optional($schedule->game_date)->format('D'),
+                    'date_number' => optional($schedule->game_date)->format('j'),
+                    'time' => $schedule->game_time ? \Illuminate\Support\Carbon::parse($schedule->game_time)->format('g:i A') : '',
+                    'location' => $schedule->location,
+                    'venue' => $schedule->venue,
+                ];
+            })
+            ->all();
+    }
+
+    public function loadNotificationSettings(): void
+    {
+        $userId = Auth::id();
+        if (! $userId) {
+            return;
+        }
+
+        $stored = Cache::get('coach-database:notification-settings:' . $userId, []);
+        if (is_array($stored)) {
+            $this->notificationSettings = array_merge($this->notificationSettings, $stored);
+        }
+    }
+
+    public function toggleNotificationSetting(string $key): void
+    {
+        if (! array_key_exists($key, $this->notificationSettings)) {
+            return;
+        }
+
+        $this->notificationSettings[$key] = ! (bool) $this->notificationSettings[$key];
+        if (Auth::id()) {
+            Cache::put('coach-database:notification-settings:' . Auth::id(), $this->notificationSettings, now()->addYear());
+        }
+    }
+
+    public function openProfileEditor(): mixed
+    {
+        if (! Auth::user()) {
+            return null;
+        }
+
+        // Prefer the athlete/profile page when the app has one, instead of exposing the raw UsersResource edit link.
+        foreach ([
+            '\\App\\Filament\\Pages\\AthleteProfile',
+            '\\App\\Filament\\Pages\\Profile',
+            '\\App\\Filament\\Pages\\MyProfile',
+        ] as $profilePage) {
+            if (class_exists($profilePage) && method_exists($profilePage, 'getUrl')) {
+                return redirect()->to($profilePage::getUrl());
+            }
+        }
+
+        return redirect()->to('/admin/athlete-profile');
+    }
+
+    public function openNotificationSettings(): mixed
+    {
+        return redirect()->to($this->pageUrl('settings'));
+    }
+
+    public function openMySchedule(): mixed
+    {
+        return redirect()->to($this->pageUrl('schedule'));
+    }
+
     public function getFilteredConversationsProperty(): array
     {
         $schoolFilter = trim($this->conversationSchoolFilter);
@@ -5685,7 +6735,15 @@ HTML;
         }
 
         $selectedId = (string) $this->selectedSchoolId;
-        $school = collect($this->allSchools())->firstWhere('id', $selectedId);
+        $normalizedSelectedId = strtolower(trim($selectedId));
+
+        $school = collect($this->allSchools())->first(function (array $item) use ($selectedId, $normalizedSelectedId): bool {
+            $name = strtolower(trim((string) ($item['name'] ?? '')));
+            return (string) ($item['id'] ?? '') === $selectedId
+                || (string) ($item['business_id'] ?? '') === $selectedId
+                || md5($name) === $selectedId
+                || $name === $normalizedSelectedId;
+        });
 
         if (! $school) {
             $dashboardTopSchools = $this->dashboardTopEngagedSchools ?? [];
@@ -5694,15 +6752,16 @@ HTML;
             }
 
             $school = collect(is_array($dashboardTopSchools) ? $dashboardTopSchools : [])
-                ->first(function ($item) use ($selectedId): bool {
+                ->first(function ($item) use ($selectedId, $normalizedSelectedId): bool {
                     if (! is_array($item)) {
                         return false;
                     }
 
+                    $name = strtolower(trim((string) ($item['name'] ?? '')));
                     return (string) ($item['id'] ?? '') === $selectedId
                         || (string) ($item['business_id'] ?? '') === $selectedId
-                        || md5(strtolower(trim((string) ($item['name'] ?? '')))) === $selectedId
-                        || strcasecmp(trim((string) ($item['name'] ?? '')), $selectedId) === 0;
+                        || md5($name) === $selectedId
+                        || $name === $normalizedSelectedId;
                 });
         }
 
@@ -5710,12 +6769,55 @@ HTML;
             return null;
         }
 
-        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
         $schoolName = trim((string) ($school['name'] ?? ''));
-        $school['coaches'] = collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === $schoolName)
-            ->values()
-            ->all();
+        $normalizedSchoolName = strtolower($schoolName);
+        $existingCoaches = collect($school['coaches'] ?? [])->filter(fn ($coach): bool => is_array($coach));
+        $matchedCoaches = collect($this->allCoaches())
+            ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
+                $coachBusinessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['school_id'] ?? ''));
+                $coachSchool = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+
+                return ($businessId !== '' && $coachBusinessId === $businessId)
+                    || ($schoolName !== '' && strtolower($coachSchool) === $normalizedSchoolName);
+            });
+
+        $coaches = $existingCoaches
+            ->merge($matchedCoaches)
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(function (array $coach) use ($school, $businessId, $schoolName): array {
+                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
+                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
+                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $school['school_logo_url'] ?? $school['logo_url'] ?? null;
+                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $school['business_logo_url'] ?? $school['logo_url'] ?? null;
+
+                return $coach;
+            })
+            ->unique(function (array $coach): string {
+                return strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach))));
+            })
+            ->values();
+
+        if ($coaches->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
+            $headCoach = $school['head_coach'];
+            $headCoach['school'] = $headCoach['school'] ?? $schoolName;
+            $headCoach['school_name'] = $headCoach['school_name'] ?? $schoolName;
+            $headCoach['company_name'] = $headCoach['company_name'] ?? $schoolName;
+            $headCoach['business_id'] = $headCoach['business_id'] ?? $businessId;
+            $headCoach['school_logo_url'] = $headCoach['school_logo_url'] ?? $school['school_logo_url'] ?? $school['logo_url'] ?? null;
+            $coaches = collect([$headCoach]);
+        }
+
+        $school['coaches'] = $coaches->values()->all();
+        $school['coach_count'] = max((int) ($school['coach_count'] ?? 0), $coaches->count());
+
+        if (blank(data_get($school, 'head_coach.name')) && $coaches->isNotEmpty()) {
+            $school['head_coach'] = $coaches->first(function (array $coach): bool {
+                return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
+            }) ?: $coaches->first();
+        }
 
         return $school;
     }
@@ -6048,25 +7150,83 @@ HTML;
             }
 
             $keys = [];
-            $businessId = trim((string) ($coach['business_id'] ?? ''));
-            $schoolName = strtolower(trim((string) ($coach['school'] ?? '')));
+            $businessIds = collect([
+                $coach['business_id'] ?? null,
+                $coach['company_id'] ?? null,
+                $coach['ghl_business_id'] ?? null,
+                $coach['school_id'] ?? null,
+                data_get($coach, 'company.id'),
+                data_get($coach, 'business.id'),
+            ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
 
-            if ($businessId !== '') {
+            foreach ($businessIds as $businessId) {
                 $keys[] = 'business:' . $businessId;
             }
 
-            if ($schoolName !== '') {
-                $keys[] = 'school:' . $schoolName;
+            $schoolNames = collect([
+                $coach['school'] ?? null,
+                $coach['school_name'] ?? null,
+                $coach['company_name'] ?? null,
+                $coach['school_or_company'] ?? null,
+                data_get($coach, 'company.name'),
+                data_get($coach, 'business.name'),
+            ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
+
+            foreach ($schoolNames as $schoolName) {
+                $keys[] = 'school:' . strtolower($schoolName);
+                $normalized = $this->normalizeSchoolMatchKey($schoolName);
+                if ($normalized !== '') {
+                    $keys[] = 'school_key:' . $normalized;
+                }
             }
 
             foreach (array_unique($keys) as $key) {
                 $index[$key] ??= [];
-                $coachId = (string) ($coach['id'] ?? md5(json_encode($coach)));
+                $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? md5(json_encode($coach)));
                 $index[$key][$coachId] = $coach;
             }
         }
 
         return $this->schoolCoachIndexMemo = $index;
+    }
+
+    protected function coachCountForSchoolSearch(array $school): int
+    {
+        $keys = [];
+        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
+        $schoolName = trim((string) ($school['name'] ?? ''));
+        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
+
+        if ($businessId !== '') {
+            $keys[] = 'business:' . $businessId;
+        }
+
+        if ($schoolName !== '') {
+            $keys[] = 'school:' . strtolower($schoolName);
+        }
+
+        if ($normalizedSchoolName !== '') {
+            $keys[] = 'school_key:' . $normalizedSchoolName;
+        }
+
+        $index = $this->schoolCoachSearchIndex();
+        $ids = [];
+
+        foreach (array_unique($keys) as $key) {
+            foreach (array_keys($index[$key] ?? []) as $coachId) {
+                $ids[$coachId] = true;
+            }
+        }
+
+        foreach ($this->dashboardCoachesForSchoolRow($school) as $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+            $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach)));
+            $ids[$coachId] = true;
+        }
+
+        return count($ids);
     }
 
     protected function coachesForSchoolSearch(array $school): array
@@ -6082,6 +7242,10 @@ HTML;
 
         if ($schoolName !== '') {
             $keys[] = 'school:' . strtolower($schoolName);
+        }
+
+        if ($normalizedSchoolName !== '') {
+            $keys[] = 'school_key:' . $normalizedSchoolName;
         }
 
         $index = $this->schoolCoachSearchIndex();
@@ -6113,6 +7277,63 @@ HTML;
             }
         }
 
+        return array_values($coaches);
+    }
+
+
+    protected function dashboardCoachesForSchoolRow(array $school): array
+    {
+        $schoolKey = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+        $businessId = strtolower(trim((string) ($school['business_id'] ?? $school['id'] ?? '')));
+
+        if ($schoolKey === '' && $businessId === '') {
+            return [];
+        }
+
+        $sources = collect()
+            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
+            ->merge(is_array($this->dashboardTopEngagedSchools ?? null) ? $this->dashboardTopEngagedSchools : [])
+            ->merge(is_array($this->onTheRadarSchools ?? null) ? $this->onTheRadarSchools : [])
+            ->merge(is_array($this->schoolsMostInterested ?? null) ? $this->schoolsMostInterested : [])
+            ->merge(is_array($this->topEngagedSchools ?? null) ? $this->topEngagedSchools : [])
+            ->merge(is_array($this->schoolRecommendations ?? null) ? $this->schoolRecommendations : [])
+            ->filter(fn ($row): bool => is_array($row));
+
+        $coaches = [];
+
+        foreach ($sources as $row) {
+            $rowName = (string) ($row['name'] ?? $row['school'] ?? $row['school_name'] ?? $row['company_name'] ?? '');
+            $rowKey = $this->normalizeSchoolMatchKey($rowName);
+            $rowBusinessId = strtolower(trim((string) ($row['business_id'] ?? $row['id'] ?? $row['company_id'] ?? $row['ghl_business_id'] ?? '')));
+
+            $isMatch = false;
+            if ($businessId !== '' && $rowBusinessId !== '' && $businessId === $rowBusinessId) {
+                $isMatch = true;
+            }
+            if (! $isMatch && $schoolKey !== '' && $rowKey !== '' && $schoolKey === $rowKey) {
+                $isMatch = true;
+            }
+            if (! $isMatch) {
+                continue;
+            }
+
+            foreach (['coaches', 'staff', 'coaching_staff', 'contacts'] as $field) {
+                if (is_array($row[$field] ?? null)) {
+                    foreach ($row[$field] as $coach) {
+                        if (is_array($coach)) {
+                            $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach)));
+                            $coaches[$coachId] = $coach;
+                        }
+                    }
+                }
+            }
+
+            if (is_array($row['head_coach'] ?? null) && filled($row['head_coach']['name'] ?? null)) {
+                $coach = $row['head_coach'];
+                $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach)));
+                $coaches[$coachId] = $coach;
+            }
+        }
         return array_values($coaches);
     }
 
@@ -6300,13 +7521,231 @@ HTML;
     protected function allSchools(): array
     {
         $snapshot = $this->activeSnapshotRows();
-        return is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [];
+
+        $snapshotSchools = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
+            ->filter(fn ($school): bool => is_array($school));
+
+        $topSchoolRows = collect(is_array($snapshot['top_schools'] ?? null) ? $snapshot['top_schools'] : [])
+            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
+            ->merge(is_array($this->dashboardTopEngagedSchools ?? null) ? $this->dashboardTopEngagedSchools : [])
+            ->filter(fn ($school): bool => is_array($school));
+
+        /**
+         * Discover Schools cannot depend only on the paged business/school cache.
+         * On large GHL accounts that cache may contain only the first page, while
+         * the contacts/coaches cache already contains schools from every coach.
+         * Build lightweight school rows from coaches so Discover can show every
+         * school and still paginate with the existing Load More button.
+         */
+        $coachRows = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [])
+            ->filter(fn ($coach): bool => is_array($coach));
+
+        $coachDerivedSchools = $coachRows
+            ->map(function (array $coach): array {
+                $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? ''));
+                $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $coach['businessId'] ?? ''));
+
+                if ($schoolName === '' && $businessId === '') {
+                    return [];
+                }
+
+                $logo = $coach['school_logo_url']
+                    ?? $coach['business_logo_url']
+                    ?? $coach['logo_url']
+                    ?? $coach['logo']
+                    ?? data_get($coach, 'business.logo')
+                    ?? data_get($coach, 'contact.school_logo')
+                    ?? null;
+
+                return [
+                    'id' => $businessId !== '' ? $businessId : 'school-' . md5(strtolower($schoolName)),
+                    'business_id' => $businessId,
+                    'name' => $schoolName !== '' ? $schoolName : (string) ($coach['company_name'] ?? 'School'),
+                    'conference' => $coach['conference'] ?? $coach['school_conference'] ?? '',
+                    'division' => $coach['division'] ?? $coach['school_division'] ?? '',
+                    'city' => $coach['city'] ?? $coach['school_city'] ?? '',
+                    'state' => $coach['state'] ?? $coach['school_state'] ?? '',
+                    'logo_url' => $logo,
+                    'school_logo_url' => $logo,
+                    'business_logo_url' => $logo,
+                    'coach_count' => 1,
+                    'coaches_count' => 1,
+                    'head_coach' => $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? '')) ? $coach : null,
+                ];
+            })
+            ->filter(fn (array $school): bool => filled($school['name'] ?? null));
+
+        $allRows = $snapshotSchools
+            ->merge($coachDerivedSchools)
+            ->merge($topSchoolRows)
+            ->filter(fn ($school): bool => is_array($school) && filled($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? null));
+
+        $coachCountsByKey = [];
+        $headCoachesByKey = [];
+
+        foreach ($coachRows as $coach) {
+            $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? ''));
+            $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $coach['businessId'] ?? ''));
+            $keys = [];
+
+            if ($businessId !== '') {
+                $keys[] = 'business:' . strtolower($businessId);
+            }
+
+            $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
+            if ($schoolKey !== '') {
+                $keys[] = 'school:' . $schoolKey;
+            }
+
+            foreach (array_unique($keys) as $key) {
+                $coachCountsByKey[$key] = ($coachCountsByKey[$key] ?? 0) + 1;
+
+                if (! isset($headCoachesByKey[$key]) && $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''))) {
+                    $headCoachesByKey[$key] = $coach;
+                }
+            }
+        }
+
+        return $allRows
+            ->groupBy(function (array $school): string {
+                $schoolKey = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+                if ($schoolKey !== '') {
+                    return 'school:' . $schoolKey;
+                }
+
+                $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
+                return 'business:' . strtolower($businessId);
+            })
+            ->map(function ($rows, string $groupKey) use ($coachCountsByKey, $headCoachesByKey): array {
+                $rows = collect($rows)->filter(fn ($school): bool => is_array($school))->values();
+                $primary = $rows->sortByDesc(function (array $school): int {
+                    $nestedCoachCount = is_array($school['coaches'] ?? null)
+                        ? count(array_filter($school['coaches'], fn ($coach): bool => is_array($coach)))
+                        : 0;
+
+                    return (filled($school['business_id'] ?? null) ? 100 : 0)
+                        + (filled($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null) ? 50 : 0)
+                        + max((int) ($school['coach_count'] ?? 0), (int) ($school['coaches_count'] ?? 0), $nestedCoachCount);
+                })->first() ?: [];
+
+                foreach ($rows as $row) {
+                    foreach (['id', 'business_id', 'logo_url', 'school_logo_url', 'business_logo_url', 'conference', 'division', 'city', 'state'] as $field) {
+                        if (blank($primary[$field] ?? null) && filled($row[$field] ?? null)) {
+                            $primary[$field] = $row[$field];
+                        }
+                    }
+
+                    if (blank(data_get($primary, 'head_coach.name')) && filled(data_get($row, 'head_coach.name'))) {
+                        $primary['head_coach'] = $row['head_coach'];
+                    }
+                }
+
+                $schoolKey = $this->normalizeSchoolMatchKey((string) ($primary['name'] ?? $primary['school'] ?? $primary['school_name'] ?? $primary['company_name'] ?? ''));
+                $businessKey = trim((string) ($primary['business_id'] ?? $primary['id'] ?? ''));
+                $lookupKeys = array_values(array_filter([
+                    $schoolKey !== '' ? 'school:' . $schoolKey : null,
+                    $businessKey !== '' ? 'business:' . strtolower($businessKey) : null,
+                    $groupKey,
+                ]));
+
+                $nestedCoachCount = 0;
+                foreach ($rows as $row) {
+                    $nestedCoachCount = max(
+                        $nestedCoachCount,
+                        (int) ($row['coach_count'] ?? 0),
+                        (int) ($row['coaches_count'] ?? 0),
+                        is_array($row['coaches'] ?? null)
+                            ? count(array_filter($row['coaches'], fn ($coach): bool => is_array($coach)))
+                            : 0
+                    );
+                }
+
+                $indexedCoachCount = 0;
+                foreach ($lookupKeys as $key) {
+                    $indexedCoachCount = max($indexedCoachCount, (int) ($coachCountsByKey[$key] ?? 0));
+
+                    if (blank(data_get($primary, 'head_coach.name')) && isset($headCoachesByKey[$key])) {
+                        $primary['head_coach'] = $headCoachesByKey[$key];
+                    }
+                }
+
+                $primary['coach_count'] = max(
+                    (int) ($primary['coach_count'] ?? 0),
+                    (int) ($primary['coaches_count'] ?? 0),
+                    $nestedCoachCount,
+                    $indexedCoachCount,
+                    (is_array($primary['head_coach'] ?? null) && filled($primary['head_coach']['name'] ?? null)) ? 1 : 0
+                );
+                $primary['coaches_count'] = $primary['coach_count'];
+
+                unset($primary['coaches']);
+
+                return $primary;
+            })
+            ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
+            ->values()
+            ->all();
     }
 
     protected function allCoaches(): array
     {
         $snapshot = $this->activeSnapshotRows();
-        return is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [];
+        $baseCoaches = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : []);
+
+        $schoolRows = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
+            ->merge(is_array($snapshot['top_schools'] ?? null) ? $snapshot['top_schools'] : [])
+            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
+            ->merge(is_array($this->dashboardTopEngagedSchools ?? null) ? $this->dashboardTopEngagedSchools : [])
+            ->filter(fn ($school): bool => is_array($school));
+
+        $nestedCoaches = $schoolRows->flatMap(function (array $school): array {
+            $schoolName = (string) ($school['name'] ?? '');
+            $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
+            $schoolLogo = $school['school_logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? null;
+
+            $rows = collect($school['coaches'] ?? [])
+                ->filter(fn ($coach): bool => is_array($coach))
+                ->values();
+
+            if ($rows->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
+                $rows = collect([$school['head_coach']]);
+            }
+
+            return $rows->map(function (array $coach) use ($schoolName, $businessId, $schoolLogo): array {
+                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
+                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
+                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
+                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $schoolLogo;
+                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $schoolLogo;
+
+                return $coach;
+            })->all();
+        });
+
+        return $baseCoaches
+            ->merge($nestedCoaches)
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->unique(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach)))))
+            ->values()
+            ->all();
+    }
+
+    protected function isHeadCoachTitle(string $title): bool
+    {
+        $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $title)));
+
+        if ($normalized === '') {
+            return false;
+        }
+
+        // Treat common GHL/NCAA title variants as the primary/head coach.
+        // Avoid matching assistant/associate/volunteer titles that merely contain "coach".
+        if (preg_match('/\b(assistant|associate|volunteer|graduate|goalkeeper|keeper|operations|recruiting|director|staff)\b/', $normalized)) {
+            return false;
+        }
+
+        return (bool) preg_match('/\b(head coach|college head coach|head women\'?s coach|head womens coach|women\'?s head coach|womens head coach|head soccer coach|head)\b/', $normalized);
     }
 
     protected function hydrateFromSnapshot(array $snapshot): void
