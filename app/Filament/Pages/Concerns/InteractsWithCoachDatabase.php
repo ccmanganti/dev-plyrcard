@@ -253,17 +253,39 @@ trait InteractsWithCoachDatabase
         }
 
         if ((bool) ($snapshot['businesses_have_more'] ?? true)) {
-            $result = $service->getSchoolBusinessesPageForUser(
-                user: $user,
-                skip: (int) ($snapshot['next_business_skip'] ?? 0),
-                limit: (int) config('ghl.coach_database.business_page_limit', 100),
-            );
+            try {
+                $result = $service->getSchoolBusinessesPageForUser(
+                    user: $user,
+                    skip: (int) ($snapshot['next_business_skip'] ?? 0),
+                    limit: min((int) config('ghl.coach_database.business_page_limit', 50), 50),
+                );
+            } catch (\Throwable $exception) {
+                \Log::warning('Coach Database Livewire school page load failed safely.', [
+                    'user_id' => $user->id ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $result = [
+                    'success' => false,
+                    'schools' => [],
+                    'has_more' => true,
+                    'next_skip' => (int) ($snapshot['next_business_skip'] ?? 0),
+                    'temporary_failure' => true,
+                    'error' => 'GHL schools timed out. Existing cache was kept.',
+                ];
+            }
 
             if (! ($result['success'] ?? false)) {
-                $this->error = $result['error'] ?? 'Unable to load schools.';
-                $this->isLoadingDataset = false;
-                return;
-            }
+                // GHL occasionally times out on large locations. Keep the existing cached
+                // snapshot and let the user retry instead of failing the Livewire request.
+                $snapshot['last_schools_error'] = $result['error'] ?? 'Unable to load schools.';
+
+                if (! ($result['temporary_failure'] ?? false)) {
+                    $this->error = $snapshot['last_schools_error'];
+                    $this->isLoadingDataset = false;
+                    return;
+                }
+            } else {
 
             $snapshot['schools'] = collect($snapshot['schools'] ?? [])
                 ->merge($result['schools'] ?? [])
@@ -274,15 +296,35 @@ trait InteractsWithCoachDatabase
             $snapshot['next_business_skip'] = $result['next_skip'] ?? null;
             $snapshot['businesses_have_more'] = (bool) ($result['has_more'] ?? false);
             $snapshot['remote_total_schools'] = $result['total'] ?? ($snapshot['remote_total_schools'] ?? null);
+            }
         }
 
         if ((bool) ($snapshot['contacts_have_more'] ?? true)) {
-            $contactsResult = $service->getCoachContactsPageForUser(
-                user: $user,
-                startAfter: $snapshot['next_contacts_start_after'] ?? null,
-                startAfterId: $snapshot['next_contacts_start_after_id'] ?? null,
-                limit: (int) config('ghl.coach_database.contact_page_limit', 100),
-            );
+            try {
+                $contactsResult = $service->getCoachContactsPageForUser(
+                    user: $user,
+                    startAfter: $snapshot['next_contacts_start_after'] ?? null,
+                    startAfterId: $snapshot['next_contacts_start_after_id'] ?? null,
+                    limit: min((int) config('ghl.coach_database.contact_page_limit', 50), 50),
+                );
+            } catch (\Throwable $exception) {
+                \Log::warning('Coach Database Livewire contact page load failed safely.', [
+                    'user_id' => $user->id ?? null,
+                    'start_after' => $snapshot['next_contacts_start_after'] ?? null,
+                    'start_after_id' => $snapshot['next_contacts_start_after_id'] ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $contactsResult = [
+                    'success' => false,
+                    'contacts' => [],
+                    'has_more' => true,
+                    'next_start_after' => $snapshot['next_contacts_start_after'] ?? null,
+                    'next_start_after_id' => $snapshot['next_contacts_start_after_id'] ?? null,
+                    'temporary_failure' => true,
+                    'error' => 'GHL contacts timed out. Existing cache was kept.',
+                ];
+            }
 
             if ($contactsResult['success'] ?? false) {
                 $this->mergeContactsIntoSnapshot($snapshot, $contactsResult['contacts'] ?? []);
@@ -291,7 +333,13 @@ trait InteractsWithCoachDatabase
                 $snapshot['contacts_have_more'] = (bool) ($contactsResult['has_more'] ?? false);
                 $snapshot['remote_total_contacts'] = $contactsResult['total'] ?? ($snapshot['remote_total_contacts'] ?? null);
             } else {
-                $snapshot['contacts_have_more'] = false;
+                // Do not crash or discard progress when GHL times out. Keep the current
+                // cursor so the next manual/background refresh can retry the same page.
+                if (! ($contactsResult['temporary_failure'] ?? false)) {
+                    $snapshot['contacts_have_more'] = false;
+                }
+
+                $snapshot['last_contacts_error'] = $contactsResult['error'] ?? null;
             }
         }
 
@@ -714,7 +762,23 @@ trait InteractsWithCoachDatabase
         $this->isLoadingDataset = true;
         $this->hasMoreData = true;
 
-        $this->startBackgroundLoad(true);
+        if ((bool) config('ghl.coach_database.refresh_in_livewire', false)) {
+            $this->startBackgroundLoad(true);
+        } else {
+            Cache::forget($this->activeCacheKey());
+            $snapshot = $this->emptySnapshot();
+            $snapshot['has_more_data'] = false;
+            $snapshot['reload_queued_at'] = now()->toDateTimeString();
+            $snapshot['last_refresh_notice'] = 'Full reload was queued safely. Run php artisan recruiting:sync-stats --user=' . (int) Auth::id() . ' --force for stats, or enable ghl.coach_database.refresh_in_livewire only if GHL is responding quickly.';
+            $this->storeSnapshot($snapshot);
+            $this->hydrateFromSnapshot($snapshot);
+            $this->isLoadingDataset = false;
+            $this->hasMoreData = false;
+            $user = Auth::user();
+            if ($user) {
+                $this->startRecruitingStatsSyncInBackground($user);
+            }
+        }
 
         if ($notify) {
             Notification::make()

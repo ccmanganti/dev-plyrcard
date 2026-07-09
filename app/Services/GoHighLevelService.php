@@ -281,7 +281,7 @@ class GoHighLevelService
     ): array {
         $locationId = $locationId ?: config('ghl.location_id');
         $token = $this->tokenForLocation($locationId, $tokenOverride);
-        $limit = min(max($limit, 1), 100);
+        $limit = min(max($limit, 1), (int) config('ghl.coach_database.contact_page_limit_max', 50));
 
         if (! $locationId || ! $token) {
             return [
@@ -307,13 +307,39 @@ class GoHighLevelService
             $query['startAfterId'] = $startAfterId;
         }
 
-        $response = Http::withHeaders([
-                'Version' => config('ghl.contacts_search_version', 'v3'),
-            ])
-            ->timeout((int) config('ghl.timeout', 20))
-            ->withToken($token)
-            ->acceptJson()
-            ->get("{$this->baseUrl}/contacts/", $query);
+        try {
+            $response = Http::withHeaders([
+                    'Version' => config('ghl.contacts_search_version', 'v3'),
+                ])
+                ->connectTimeout((int) config('ghl.coach_database.http_connect_timeout', 5))
+                ->timeout((int) config('ghl.coach_database.http_timeout', 12))
+                ->retry(
+                    (int) config('ghl.coach_database.http_retries', 1),
+                    (int) config('ghl.coach_database.http_retry_sleep_ms', 350),
+                    throw: false,
+                )
+                ->withToken($token)
+                ->acceptJson()
+                ->get("{$this->baseUrl}/contacts/", $query);
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting contacts page request timed out or failed before response.', [
+                'location_id' => $locationId,
+                'query' => $query,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'contacts' => [],
+                'count' => 0,
+                'total' => null,
+                'next_start_after' => $startAfter,
+                'next_start_after_id' => $startAfterId,
+                'has_more' => true,
+                'temporary_failure' => true,
+                'error' => 'GHL contacts timed out. Kept existing cached data; try again shortly.',
+            ];
+        }
 
         $data = $response->json() ?? [];
 
@@ -2466,15 +2492,42 @@ class GoHighLevelService
             return ['success' => false, 'businesses' => [], 'schools' => [], 'has_more' => false, 'next_skip' => null, 'error' => 'Missing recruiting data connection.'];
         }
 
-        $response = Http::withHeaders(['Version' => config('ghl.businesses_version', 'v3')])
-            ->timeout((int) config('ghl.timeout', 20))
-            ->withToken($token)
-            ->acceptJson()
-            ->get("{$this->baseUrl}/businesses/", [
-                'locationId' => $locationId,
-                'limit' => $limit,
+        try {
+            $response = Http::withHeaders(['Version' => config('ghl.businesses_version', 'v3')])
+                ->connectTimeout((int) config('ghl.coach_database.http_connect_timeout', 5))
+                ->timeout((int) config('ghl.coach_database.http_timeout', 12))
+                ->retry(
+                    (int) config('ghl.coach_database.http_retries', 1),
+                    (int) config('ghl.coach_database.http_retry_sleep_ms', 350),
+                    throw: false,
+                )
+                ->withToken($token)
+                ->acceptJson()
+                ->get("{$this->baseUrl}/businesses/", [
+                    'locationId' => $locationId,
+                    'limit' => $limit,
+                    'skip' => $skip,
+                ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting school/company request timed out or failed before response.', [
+                'location_id' => $locationId,
                 'skip' => $skip,
+                'limit' => $limit,
+                'error' => $exception->getMessage(),
             ]);
+
+            return [
+                'success' => false,
+                'businesses' => [],
+                'schools' => [],
+                'count' => 0,
+                'total' => null,
+                'has_more' => true,
+                'next_skip' => $skip,
+                'temporary_failure' => true,
+                'error' => 'GHL schools timed out. Kept existing cached data; try again shortly.',
+            ];
+        }
 
         $data = $response->json() ?? [];
 
