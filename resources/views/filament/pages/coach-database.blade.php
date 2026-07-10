@@ -5922,6 +5922,17 @@
             background: rgba(255,99,56,.55);
             border-radius: 999px;
         }
+
+        /* v94: keep dashboard first visit pinned to the top and avoid stale loading panels covering content. */
+        .rc-wrap { min-height: 0 !important; }
+        .rc-livewire-root [data-stale-school-loader],
+        .rc-livewire-root .rc-school-loader-backdrop,
+        .rc-livewire-root .rc-school-loading-backdrop,
+        .rc-livewire-root .rc-opening-school-backdrop {
+            display: none !important;
+            pointer-events: none !important;
+        }
+
         @media (max-width: 900px) {
             .rc-inbox-page-v56 { height: auto !important; min-height: 0 !important; overflow: visible !important; }
             .rc-inbox-shell-v56 { height: auto !important; overflow: visible !important; }
@@ -5995,10 +6006,97 @@
         $firstName = $athleteName !== '' ? $athleteName : 'Player';
     @endphp
 
+    <script>
+        (function () {
+            const isCoachDashboardRoot = function () {
+                const path = window.location.pathname.replace(/\/$/, '');
+                return path === '/admin/coach-database';
+            };
+
+            const resetOne = function (el) {
+                if (! el) return;
+                try { el.scrollTop = 0; } catch (error) {}
+                try { el.scrollLeft = 0; } catch (error) {}
+            };
+
+            window.resetCoachDatabaseDashboardScroll = function () {
+                if (! isCoachDashboardRoot()) return;
+
+                try {
+                    if ('scrollRestoration' in window.history) {
+                        window.history.scrollRestoration = 'manual';
+                    }
+                } catch (error) {}
+
+                try { window.scrollTo(0, 0); } catch (error) {}
+                resetOne(document.documentElement);
+                resetOne(document.body);
+
+                document.querySelectorAll('main, .fi-main, .fi-page, .fi-main-ctn, .fi-layout, .fi-body, [data-filament-main], [data-slot="main"], .fi-panel-page').forEach(resetOne);
+
+                document.querySelectorAll('*').forEach(function (el) {
+                    try {
+                        if (el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== 'visible') {
+                            el.scrollTop = 0;
+                        }
+                    } catch (error) {}
+                });
+            };
+
+            window.runCoachDatabaseScrollResetLoop = function () {
+                if (! isCoachDashboardRoot()) return;
+
+                let count = 0;
+                const run = function () {
+                    window.resetCoachDatabaseDashboardScroll();
+                    count += 1;
+                    if (count < 18) {
+                        window.setTimeout(run, count < 6 ? 50 : 150);
+                    }
+                };
+
+                run();
+                window.requestAnimationFrame(function () {
+                    window.resetCoachDatabaseDashboardScroll();
+                });
+            };
+
+            window.addEventListener('pageshow', window.runCoachDatabaseScrollResetLoop);
+            window.addEventListener('load', window.runCoachDatabaseScrollResetLoop);
+            document.addEventListener('DOMContentLoaded', window.runCoachDatabaseScrollResetLoop);
+            document.addEventListener('livewire:navigated', window.runCoachDatabaseScrollResetLoop);
+        })();
+
+        window.initCoachDatabasePage = function (wire) {
+            window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
+
+            window.setTimeout(function () {
+                window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
+            }, 250);
+
+            window.setTimeout(function () {
+                if (wire && typeof wire.startBackgroundLoad === 'function') {
+                    wire.startBackgroundLoad();
+                }
+            }, 900);
+
+            if (! window.__plyrCoachDatabaseLoadNextInstalled) {
+                window.__plyrCoachDatabaseLoadNextInstalled = true;
+                window.addEventListener('coach-database-load-next', function () {
+                    window.setTimeout(function () {
+                        if (wire && typeof wire.loadNextBatch === 'function') {
+                            wire.loadNextBatch();
+                        }
+                    }, 75);
+                });
+            }
+        };
+    </script>
+
     <div
         class="rc-wrap"
         x-data
-        x-init="setTimeout(() => $wire.startBackgroundLoad(), 50); window.addEventListener('coach-database-load-next', () => setTimeout(() => $wire.loadNextBatch(), 75));"
+        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
     >
         @if($isLoadingDataset)
             <div class="rc-card is-flat">
@@ -6007,8 +6105,8 @@
             </div>
         @endif
 
-        @if($reason || $error)
-            <div class="rc-card"><strong>{{ $reason ?: $error }}</strong></div>
+        @if($error)
+            <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
 
         @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
@@ -9664,6 +9762,39 @@
     </div>
     </div>
 
+    <style>
+        /* v100: keep logo fallback initials from ever becoming a full-page overlay.
+           This is intentionally non-invasive: it does not touch data loading, school loading,
+           logo URL handling, or pagination. */
+        .rc-wrap .rc-logo-fallback-text {
+            position: relative !important;
+            inset: auto !important;
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            max-width: 4.5rem !important;
+            max-height: 4.5rem !important;
+            box-sizing: border-box !important;
+            z-index: 0 !important;
+        }
+
+        .rc-wrap .rc-school-card-logo-box,
+        .rc-wrap .rc-school-list-logo-box,
+        .rc-wrap .rc-radar-logo-v2,
+        .rc-wrap .rc-interested-logo-v2,
+        .rc-wrap .rc-favorite-logo-v37,
+        .rc-wrap .rc-fav-list-logo-v40,
+        .rc-wrap .rc-drawer-school-logo,
+        .rc-wrap .rc-school-drawer-logo,
+        .rc-wrap .rc-inbox-school-logo,
+        .rc-wrap .rc-school-logo-placeholder,
+        .rc-wrap .rc-logo-initials {
+            position: relative !important;
+            overflow: hidden !important;
+        }
+    </style>
+
     <script>
 
         window.plyrRepairBrokenEditorLinkFragments = function (html) {
@@ -10247,4 +10378,5 @@
             };
         };
     </script>
+
 </x-filament-panels::page>
