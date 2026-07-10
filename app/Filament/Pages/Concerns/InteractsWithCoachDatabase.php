@@ -6,6 +6,7 @@ use App\Services\CoachDatabaseService;
 use App\Services\CoachDatabaseActionQueueService;
 use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
+use App\Services\CoachDatabaseWebFallbackSyncService;
 use App\Services\GoHighLevelService;
 use App\Support\TrackingLinkRewriter;
 use Filament\Notifications\Notification;
@@ -598,9 +599,32 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Polling is cache-only. The detached CLI process performs every Recruiting Center page
-        // request and the expensive school/coach reconciliation.
+        // Most environments only read cached progress here. When auto mode has selected the
+        // browser-assisted compatibility runner, this passive poll performs one bounded API page
+        // (maximum a few seconds) and persists its checkpoint. A cache lock prevents duplicate
+        // work from multiple tabs. The expensive final read-model swap still happens atomically.
         $this->refreshRecruitingSyncStatus();
+
+        $user = Auth::user();
+        if ($user && $this->recruitingSyncMode === 'full_database_reload') {
+            $rawStatus = Cache::get($this->recruitingStatsSyncStatusKey($user), []);
+            $rawStatus = is_array($rawStatus) ? $rawStatus : [];
+            $launchDriver = strtolower((string) ($rawStatus['launch_driver'] ?? ''));
+            $syncState = strtolower((string) ($rawStatus['status'] ?? ''));
+
+            if ($launchDriver === 'web_tick' && in_array($syncState, ['running', 'queued', 'starting', 'waiting_for_worker', 'stalled'], true)) {
+                try {
+                    app(CoachDatabaseWebFallbackSyncService::class)->tick($user);
+                } catch (\Throwable $exception) {
+                    Log::warning('Coach Database compatibility-mode poll tick failed safely.', [
+                        'user_id' => $user->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+                $this->refreshRecruitingSyncStatus();
+            }
+        }
+
         $this->refreshContactTagSyncStatus();
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
 
@@ -1165,6 +1189,7 @@ trait InteractsWithCoachDatabase
             'queue' => 'Queue worker',
             'scheduler' => 'Scheduled worker',
             'detached_shell' => 'Background process',
+            'web_tick' => 'Compatibility worker',
             default => $launchDriver !== '' ? str_replace('_', ' ', ucfirst($launchDriver)) : 'Automatic',
         };
 
@@ -1173,7 +1198,8 @@ trait InteractsWithCoachDatabase
             $workerHint = match ($launchDriver) {
                 'queue' => 'No queue worker heartbeat has been received yet. The server queue worker must be running for progress to begin.',
                 'scheduler' => 'The scheduled worker has not picked up the request yet. Check the server cron or scheduler entry.',
-                'detached_shell' => 'The detached PHP process did not check in. Use the queue or scheduled-worker mode on this server.',
+                'detached_shell' => 'The detached PHP process did not check in. Automatic mode will use compatibility processing instead.',
+                'web_tick' => 'Small pages are being processed by passive page refreshes. Keep any Recruiting Center tab open until the reload completes.',
                 default => 'The server has not started a worker yet. Run the sync doctor to confirm the production worker configuration.',
             };
         } elseif ($rawStatus === 'stalled') {
@@ -1230,6 +1256,14 @@ trait InteractsWithCoachDatabase
         }
 
         Cache::forget($this->recruitingStatsSyncLockKey($user));
+        try {
+            app(CoachDatabaseWebFallbackSyncService::class)->cancel($user);
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to remove compatibility-mode checkpoint during status clear.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
         $status = [
             'status' => 'cleared',
             'mode' => $this->recruitingSyncMode ?: 'manual_clear',
@@ -1396,7 +1430,9 @@ trait InteractsWithCoachDatabase
             $launchStatus = strtolower((string) ($status['status'] ?? 'queued'));
             $launchDriver = strtolower((string) ($status['launch_driver'] ?? ''));
             $body = match ($launchStatus) {
-                'running', 'already_running' => 'The background worker is running. Live progress will appear at the top of the page.',
+                'running', 'already_running' => $launchDriver === 'web_tick'
+                    ? 'Compatibility processing started. Keep a Recruiting Center tab open while small pages load safely.'
+                    : 'The background worker is running. Live progress will appear at the top of the page.',
                 'starting' => 'The server is starting the background worker. The progress monitor will confirm when its first heartbeat arrives.',
                 'waiting_for_worker' => $launchDriver === 'scheduler'
                     ? 'The reload is queued for the scheduled server worker. The progress monitor will show when it is picked up.'

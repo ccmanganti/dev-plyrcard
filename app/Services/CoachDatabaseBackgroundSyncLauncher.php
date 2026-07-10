@@ -15,6 +15,7 @@ class CoachDatabaseBackgroundSyncLauncher
     public function __construct(
         protected CoachDatabaseSyncCoordinator $coordinator,
         protected CoachDatabaseSyncRuntime $runtime,
+        protected CoachDatabaseWebFallbackSyncService $webFallback,
     ) {}
 
     /** @param array<string, mixed> $baseStatus */
@@ -31,18 +32,22 @@ class CoachDatabaseBackgroundSyncLauncher
                 : $requestedDriver,
         ]);
 
-        $strategies = $this->strategiesFor($requestedDriver);
-
-        foreach ($strategies as $strategy) {
+        foreach ($this->strategiesFor($requestedDriver) as $strategy) {
             $status = match ($strategy) {
                 'queue' => $this->tryQueue($user, $baseStatus),
                 'shell' => $this->tryDetachedShell($user, $baseStatus),
+                'scheduler' => $this->waitingForScheduledWorker($user, $baseStatus),
+                'web_tick' => $this->startWebFallback($user, $baseStatus),
                 default => null,
             };
 
             if ($status !== null) {
                 return $status;
             }
+        }
+
+        if ($this->runtime->webFallbackEnabled()) {
+            return $this->startWebFallback($user, $baseStatus);
         }
 
         return $this->waitingForScheduledWorker($user, $baseStatus);
@@ -55,31 +60,26 @@ class CoachDatabaseBackgroundSyncLauncher
             return $this->runtime->autoStrategies();
         }
 
-        // Explicit modes still fail over safely unless fallback is disabled.
         $fallback = (bool) config('coach-database-sync.background.allow_fallback', true);
 
         return match ($requestedDriver) {
-            'queue' => $fallback ? ['queue', 'shell'] : ['queue'],
-            'shell' => $fallback ? ['shell', 'queue'] : ['shell'],
-            'scheduler' => [],
-            default => ['queue', 'shell'],
+            'queue' => $fallback ? ['queue', 'scheduler', 'web_tick'] : ['queue'],
+            'shell' => $fallback ? ['shell', 'scheduler', 'web_tick'] : ['shell'],
+            'scheduler' => $fallback ? ['scheduler', 'web_tick'] : ['scheduler'],
+            'web_tick' => ['web_tick'],
+            default => ['queue', 'scheduler', 'web_tick'],
         };
     }
 
     /** @param array<string, mixed> $baseStatus */
     protected function tryQueue(User $user, array $baseStatus): ?array
     {
-        if (! (bool) config('coach-database-sync.background.queue_enabled', true)) {
-            return null;
-        }
-
-        if (! $this->runtime->queueIsAsynchronous()) {
+        if (! (bool) config('coach-database-sync.background.queue_enabled', true) || ! $this->runtime->queueIsAsynchronous()) {
             return null;
         }
 
         $connection = $this->runtime->queueConnection();
         $queue = (string) config('coach-database-sync.background.queue_name', 'recruiting');
-
         $status = array_merge($baseStatus, [
             'status' => 'queued',
             'launch_driver' => 'queue',
@@ -120,14 +120,14 @@ class CoachDatabaseBackgroundSyncLauncher
         $artisan = base_path('artisan');
         $userId = (int) $user->id;
         $logPath = storage_path("logs/recruiting-dataset-sync-{$userId}.log");
-        $arguments = ' --user=' . $userId
-            . ' --force --release-lock --launch-driver=detached_shell';
+        $arguments = ' --user=' . $userId . ' --force --release-lock --launch-driver=detached_shell';
+        $launchAt = now()->toDateTimeString();
 
         $status = array_merge($baseStatus, [
             'status' => 'starting',
             'launch_driver' => 'detached_shell',
             'resolved_driver' => 'shell',
-            'launch_attempted_at' => now()->toDateTimeString(),
+            'launch_attempted_at' => $launchAt,
             'launcher_host' => gethostname() ?: php_uname('n'),
             'launcher_pid' => getmypid(),
             'worker_log' => $logPath,
@@ -143,10 +143,8 @@ class CoachDatabaseBackgroundSyncLauncher
                     . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
                     . ' recruiting:sync-dataset' . $arguments
                     . ' > ' . escapeshellarg($logPath) . ' 2>&1';
-
                 $process = Process::fromShellCommandline($command, base_path());
                 $process->setTimeout(10)->run();
-
                 if (! $process->isSuccessful()) {
                     throw new \RuntimeException(trim($process->getErrorOutput()) ?: 'Windows detached process could not be started.');
                 }
@@ -154,32 +152,46 @@ class CoachDatabaseBackgroundSyncLauncher
                 $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
                     . ' recruiting:sync-dataset' . $arguments
                     . ' > ' . escapeshellarg($logPath) . ' 2>&1 < /dev/null & echo $!';
-
                 $process = Process::fromShellCommandline($command, base_path());
                 $process->setTimeout(10)->run();
-
                 if (! $process->isSuccessful()) {
                     throw new \RuntimeException(trim($process->getErrorOutput()) ?: 'Detached process could not be started.');
                 }
-
                 $pidValue = trim($process->getOutput());
                 $pid = ctype_digit($pidValue) ? (int) $pidValue : null;
             }
 
-            $current = Cache::get($this->coordinator->statusKey($userId), []);
-            $current = is_array($current) ? $current : [];
+            $waitMs = max(0, (int) config('coach-database-sync.background.shell_heartbeat_wait_ms', 1600));
+            $deadline = microtime(true) + ($waitMs / 1000);
 
-            // Do not overwrite a fast child process that has already reported `running`.
-            if (in_array((string) ($current['status'] ?? ''), ['running', 'completed', 'failed'], true)) {
-                return $current;
-            }
+            do {
+                $current = Cache::get($this->coordinator->statusKey($userId), []);
+                $current = is_array($current) ? $current : [];
+                $heartbeat = $current['worker_heartbeat_at'] ?? null;
+                $currentStatus = strtolower((string) ($current['status'] ?? ''));
 
-            $status['detached_pid'] = $pid;
-            Cache::put($this->coordinator->statusKey($userId), $status, now()->addHours(6));
+                if ($heartbeat && in_array($currentStatus, ['running', 'completed', 'failed'], true)) {
+                    return $current;
+                }
 
-            return $status;
+                if ($waitMs <= 0) {
+                    break;
+                }
+                usleep(100000);
+            } while (microtime(true) < $deadline);
+
+            // A detached command returning successfully only proves the shell accepted it.
+            // If the child never checks in, do not leave production stuck forever. The auto
+            // launcher continues to the browser-assisted fallback instead.
+            Log::warning('Detached Coach Database process did not report a heartbeat during launch grace; trying fallback.', [
+                'user_id' => $userId,
+                'pid' => $pid,
+                'log' => $logPath,
+            ]);
+
+            return null;
         } catch (Throwable $exception) {
-            Log::warning('Detached Coach Database process could not be started; scheduled fallback remains pending.', [
+            Log::warning('Detached Coach Database process could not be started; trying another launcher.', [
                 'user_id' => $user->id,
                 'os_family' => PHP_OS_FAMILY,
                 'php_binary' => $php,
@@ -191,11 +203,27 @@ class CoachDatabaseBackgroundSyncLauncher
     }
 
     /** @param array<string, mixed> $baseStatus */
-    protected function waitingForScheduledWorker(User $user, array $baseStatus): array
+    protected function startWebFallback(User $user, array $baseStatus): ?array
     {
+        if (! $this->runtime->webFallbackEnabled()) {
+            return null;
+        }
+
+        return $this->webFallback->start($user, array_merge($baseStatus, [
+            'launch_driver' => 'web_tick',
+            'resolved_driver' => 'web_tick',
+        ]), true);
+    }
+
+    /** @param array<string, mixed> $baseStatus */
+    protected function waitingForScheduledWorker(User $user, array $baseStatus): ?array
+    {
+        if ($this->runtime->configuredDriver() === 'auto' && ! $this->runtime->schedulerIsHealthy()) {
+            return null;
+        }
+
         $heartbeat = $this->coordinator->schedulerHeartbeat();
         $lastSeen = $heartbeat['at'] ?? null;
-
         $message = $lastSeen
             ? 'Coach Database reload is waiting for the scheduled worker. The scheduler was last seen at ' . $lastSeen . '.'
             : 'Coach Database reload is waiting for the scheduled worker. Existing rows remain available.';

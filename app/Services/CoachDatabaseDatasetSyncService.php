@@ -51,6 +51,9 @@ class CoachDatabaseDatasetSyncService
         $startedAt = now()->toDateTimeString();
         $lastSchoolError = null;
         $lastContactError = null;
+        $businessFailures = 0;
+        $contactFailures = 0;
+        $warnings = [];
 
         $this->writeStatus($user, [
             'status' => 'running',
@@ -84,8 +87,18 @@ class CoachDatabaseDatasetSyncService
 
                     if (! ($result['success'] ?? false)) {
                         $lastSchoolError = (string) ($result['error'] ?? 'Unable to load a school page.');
-                        throw new RuntimeException($lastSchoolError);
-                    }
+                        $businessFailures++;
+                        $failureLimit = max(1, (int) config('coach-database-sync.business_failure_limit', 2));
+
+                        if ($businessFailures >= $failureLimit) {
+                            // Business/company records are an enrichment source, not the only
+                            // source of schools. Preserve the imported school directory and use
+                            // each contact's Business/Company/School Name instead of failing the
+                            // complete reload when this endpoint is temporarily slow.
+                            $businessHasMore = false;
+                            $warnings[] = 'The school/company endpoint was unavailable, so existing schools and contact Business Name values were preserved.';
+                        }
+                    } else {
 
                     foreach (($result['schools'] ?? $result['businesses'] ?? []) as $school) {
                         if (! is_array($school)) {
@@ -114,6 +127,7 @@ class CoachDatabaseDatasetSyncService
                     if ($businessHasMore && $businessSkip <= $previousSkip) {
                         throw new RuntimeException('School pagination did not advance. The previous cache was kept.');
                     }
+                    }
                 }
 
                 if ($contactsHaveMore) {
@@ -135,8 +149,19 @@ class CoachDatabaseDatasetSyncService
 
                     if (! ($result['success'] ?? false)) {
                         $lastContactError = (string) ($result['error'] ?? 'Unable to load a coach page.');
-                        throw new RuntimeException($lastContactError);
-                    }
+                        $contactFailures++;
+                        $failureLimit = max(1, (int) config('coach-database-sync.contact_failure_limit', 3));
+
+                        if ($contactFailures >= $failureLimit) {
+                            $existingCoachesForFallback = is_array($existing['coaches'] ?? null) ? $existing['coaches'] : [];
+                            if ($existingCoachesForFallback !== []) {
+                                $contactsHaveMore = false;
+                                $warnings[] = 'The contacts endpoint was temporarily unavailable, so the previous cached coach rows were preserved.';
+                            } else {
+                                throw new RuntimeException($lastContactError);
+                            }
+                        }
+                    } else {
 
                     foreach (($result['contacts'] ?? []) as $coach) {
                         if (! is_array($coach)) {
@@ -167,6 +192,7 @@ class CoachDatabaseDatasetSyncService
                         && (string) $contactsStartAfterId === (string) $previousAfterId
                     ) {
                         throw new RuntimeException('Coach pagination did not advance. The previous cache was kept.');
+                    }
                     }
                 }
 
@@ -274,6 +300,7 @@ class CoachDatabaseDatasetSyncService
                 'has_more_data' => false,
                 'last_schools_error' => $lastSchoolError,
                 'last_contacts_error' => $lastContactError,
+                'dataset_sync_warnings' => array_values(array_unique($warnings)),
                 'last_refresh_notice' => 'Full Coach Database background reload completed. Schools and coaches were cross-referenced by association ID and Business/Company/School Name.',
                 'cached_at' => $finishedAt,
             ]);
@@ -304,7 +331,10 @@ class CoachDatabaseDatasetSyncService
                 'remote_total_contacts' => $remoteContacts,
                 'started_at' => $startedAt,
                 'finished_at' => $finishedAt,
-                'message' => 'Full Coach Database reload completed. The base directory was preserved and refreshed contact/business data was merged into it.',
+                'warnings' => array_values(array_unique($warnings)),
+                'message' => $warnings === []
+                    ? 'Full Coach Database reload completed. The base directory was preserved and refreshed contact/business data was merged into it.'
+                    : 'Coach Database reload completed with safe fallback data for an unavailable source: ' . implode(' ', array_values(array_unique($warnings))),
             ];
             $this->writeStatus($user, $status);
 
@@ -452,6 +482,11 @@ class CoachDatabaseDatasetSyncService
         if ($memory !== '') {
             @ini_set('memory_limit', $memory);
         }
+
+        config([
+            'ghl.coach_database.http_connect_timeout' => max(1, (int) config('coach-database-sync.http.connect_timeout', 5)),
+            'ghl.coach_database.http_timeout' => max(5, (int) config('coach-database-sync.http.request_timeout', 20)),
+        ]);
     }
 
     protected function writeStatus(User $user, array $status): void
