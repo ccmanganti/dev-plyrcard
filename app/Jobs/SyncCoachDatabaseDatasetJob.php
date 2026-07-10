@@ -32,8 +32,6 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
         CoachDatabaseDatasetSyncService $syncService,
         CoachDatabaseSyncCoordinator $coordinator,
     ): void {
-        // A scheduled fallback may have already completed this queued request before
-        // the queue worker came online. In that case the stale queued job must no-op.
         if (
             ! in_array($this->userId, $coordinator->pendingUsers(), true)
             && ! Cache::has($coordinator->sharedLockKey($this->userId))
@@ -42,7 +40,6 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
         }
 
         if (! $coordinator->claimExecution($this->userId)) {
-            // Another queue worker, scheduler, or manual command already owns this reload.
             return;
         }
 
@@ -60,7 +57,8 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
                 'mode' => 'full_database_reload',
                 'worker_started_at' => now()->toDateTimeString(),
                 'launch_driver' => 'queue',
-                'message' => 'Background worker started. Loading school and coach records in small pages.',
+                'resolved_driver' => 'queue',
+                'message' => 'Queue worker started. Loading school and coach records in small pages.',
             ]);
 
             $result = $syncService->sync($user, true);

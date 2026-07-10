@@ -10,6 +10,7 @@ use Throwable;
 class CoachDatabaseSyncCoordinator
 {
     public const PENDING_USERS_KEY = 'recruiting:dataset-sync-pending-users';
+    public const SCHEDULER_HEARTBEAT_KEY = 'recruiting:dataset-sync-scheduler-heartbeat';
 
     public function sharedLockKey(int $userId): string
     {
@@ -30,6 +31,7 @@ class CoachDatabaseSyncCoordinator
     {
         $this->mutatePendingUsers(function (array $ids) use ($userId): array {
             $ids[] = $userId;
+
             return array_values(array_unique(array_map('intval', $ids)));
         });
     }
@@ -74,6 +76,23 @@ class CoachDatabaseSyncCoordinator
     public function releaseExecution(int $userId): void
     {
         Cache::forget($this->executionLockKey($userId));
+    }
+
+    public function recordSchedulerHeartbeat(): void
+    {
+        Cache::put(self::SCHEDULER_HEARTBEAT_KEY, [
+            'at' => now()->toDateTimeString(),
+            'host' => gethostname() ?: php_uname('n'),
+            'pid' => getmypid(),
+        ], now()->addMinutes(10));
+    }
+
+    /** @return array<string, mixed> */
+    public function schedulerHeartbeat(): array
+    {
+        $heartbeat = Cache::get(self::SCHEDULER_HEARTBEAT_KEY, []);
+
+        return is_array($heartbeat) ? $heartbeat : [];
     }
 
     public function heartbeat(User|int $user, array $extra = []): array
@@ -129,6 +148,24 @@ class CoachDatabaseSyncCoordinator
         return $status;
     }
 
+    public function cleanTerminalPendingEntries(): int
+    {
+        $removed = 0;
+
+        foreach ($this->pendingUsers() as $userId) {
+            $status = Cache::get($this->statusKey($userId), []);
+            $status = is_array($status) ? $status : [];
+            $terminal = in_array((string) ($status['status'] ?? ''), ['completed', 'failed', 'cleared'], true);
+
+            if ($terminal && ! Cache::has($this->sharedLockKey($userId)) && ! Cache::has($this->executionLockKey($userId))) {
+                $this->removePending($userId);
+                $removed++;
+            }
+        }
+
+        return $removed;
+    }
+
     protected function mutatePendingUsers(callable $callback): void
     {
         try {
@@ -138,7 +175,6 @@ class CoachDatabaseSyncCoordinator
                 Cache::put(self::PENDING_USERS_KEY, $callback($ids), now()->addDays(2));
             });
         } catch (Throwable $exception) {
-            // Last-resort fallback for cache drivers that do not support atomic locks.
             $ids = Cache::get(self::PENDING_USERS_KEY, []);
             $ids = is_array($ids) ? $ids : [];
             Cache::put(self::PENDING_USERS_KEY, $callback($ids), now()->addDays(2));

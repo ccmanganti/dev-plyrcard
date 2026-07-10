@@ -14,12 +14,15 @@ class RunPendingCoachDatabaseDatasetSyncs extends Command
     protected $signature = 'recruiting:run-pending-dataset-syncs
         {--limit=1 : Maximum pending users to process during this invocation}';
 
-    protected $description = 'Process pending Coach Database reloads for servers that cannot spawn detached PHP processes.';
+    protected $description = 'Process pending Coach Database reloads when queue or detached processes are unavailable.';
 
     public function handle(
         CoachDatabaseDatasetSyncService $syncService,
         CoachDatabaseSyncCoordinator $coordinator,
     ): int {
+        $coordinator->recordSchedulerHeartbeat();
+        $coordinator->cleanTerminalPendingEntries();
+
         $limit = max(1, min(20, (int) $this->option('limit')));
         $pending = array_slice($coordinator->pendingUsers(), 0, $limit);
 
@@ -49,6 +52,7 @@ class RunPendingCoachDatabaseDatasetSyncs extends Command
                     'mode' => 'full_database_reload',
                     'worker_started_at' => now()->toDateTimeString(),
                     'launch_driver' => 'scheduled_command',
+                    'resolved_driver' => 'scheduler',
                     'message' => 'Scheduled background worker started. Loading school and coach records in small pages.',
                 ]);
 

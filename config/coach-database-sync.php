@@ -1,20 +1,6 @@
 <?php
 
 return [
-
-    'background' => [
-        // auto: async Laravel queue first, detached shell second, scheduled command fallback last.
-        // queue: queue only, shell: detached shell only, scheduler: scheduled command only.
-        'driver' => env('COACH_DATABASE_SYNC_DRIVER', 'auto'),
-        'queue_enabled' => (bool) env('COACH_DATABASE_QUEUE_ENABLED', true),
-        'queue_connection' => env('COACH_DATABASE_QUEUE_CONNECTION', env('QUEUE_CONNECTION')),
-        'queue_name' => env('COACH_DATABASE_QUEUE_NAME', 'recruiting'),
-        'shell_enabled' => (bool) env('COACH_DATABASE_SHELL_ENABLED', true),
-        'worker_start_grace_seconds' => (int) env('COACH_DATABASE_WORKER_START_GRACE_SECONDS', 45),
-        'worker_stale_seconds' => (int) env('COACH_DATABASE_WORKER_STALE_SECONDS', 180),
-    ],
-
-    // Small API pages prevent a single upstream request from monopolizing a worker.
     'pages' => [
         'businesses' => (int) env('COACH_DATABASE_BUSINESS_PAGE_SIZE', 25),
         'contacts' => (int) env('COACH_DATABASE_CONTACT_PAGE_SIZE', 50),
@@ -29,8 +15,33 @@ return [
     'retry_sleep_ms' => (int) env('COACH_DATABASE_RETRY_SLEEP_MS', 800),
     'cli_memory_limit' => env('COACH_DATABASE_CLI_MEMORY_LIMIT', '512M'),
 
-    // Existing Blade Load more controls remain compatible, but Livewire is never
-    // allowed to serialize an unlimited number of cards in one response.
+    'http' => [
+        'connect_timeout' => (int) env('COACH_DATABASE_HTTP_CONNECT_TIMEOUT', 5),
+        'request_timeout' => (int) env('COACH_DATABASE_HTTP_REQUEST_TIMEOUT', 15),
+    ],
+
+    'background' => [
+        // Keep this identical in local, staging, and production.
+        // Auto resolves the best available runner at runtime.
+        'driver' => env('COACH_DATABASE_SYNC_DRIVER', 'auto'),
+
+        'queue_enabled' => (bool) env('COACH_DATABASE_QUEUE_ENABLED', true),
+        'queue_connection' => env('COACH_DATABASE_QUEUE_CONNECTION'),
+        'queue_name' => env('COACH_DATABASE_QUEUE_NAME', 'recruiting'),
+
+        'shell_enabled' => (bool) env('COACH_DATABASE_SHELL_ENABLED', true),
+        'allow_fallback' => (bool) env('COACH_DATABASE_ALLOW_FALLBACK', true),
+
+        // Local machines often have a database queue configured without a running worker.
+        // Prefer a detached process locally, while production prefers a real async queue.
+        'prefer_shell_locally' => (bool) env('COACH_DATABASE_PREFER_SHELL_LOCALLY', true),
+    ],
+
+    'tags' => [
+        'sync_minutes' => (int) env('COACH_DATABASE_TAG_SYNC_MINUTES', 5),
+        'max_pages_per_tag' => (int) env('COACH_DATABASE_TAG_MAX_PAGES', 20),
+    ],
+
     'ui' => [
         'school_row_cap' => (int) env('COACH_DATABASE_UI_SCHOOL_ROW_CAP', 96),
         'coach_row_cap' => (int) env('COACH_DATABASE_UI_COACH_ROW_CAP', 120),

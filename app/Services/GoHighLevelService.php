@@ -2223,6 +2223,7 @@ class GoHighLevelService
 
         $fieldValue = function (array $field): mixed {
             return $field['value']
+                ?? $field['fieldValue']
                 ?? $field['field_value']
                 ?? $field['valueString']
                 ?? $field['value_string']
@@ -5329,7 +5330,7 @@ class GoHighLevelService
             return '';
         }
 
-        foreach (['value', 'field_value', 'valueString', 'value_string', 'stringValue', 'valueText', 'text', 'url', 'link', 'mediaUrl', 'fileUrl', 'downloadUrl', 'thumbnailUrl', 'src'] as $key) {
+        foreach (['value', 'fieldValue', 'field_value', 'valueString', 'value_string', 'stringValue', 'valueText', 'text', 'url', 'link', 'mediaUrl', 'fileUrl', 'downloadUrl', 'thumbnailUrl', 'src'] as $key) {
             $candidate = $value[$key] ?? null;
 
             if (is_scalar($candidate) && trim((string) $candidate) !== '') {
@@ -5392,7 +5393,7 @@ class GoHighLevelService
                 }
 
                 if (is_array($fieldValue)) {
-                    $value = $fieldValue['value'] ?? $fieldValue['field_value'] ?? $fieldValue['valueString'] ?? $fieldValue['stringValue'] ?? $fieldValue['text'] ?? null;
+                    $value = $fieldValue['value'] ?? $fieldValue['fieldValue'] ?? $fieldValue['field_value'] ?? $fieldValue['valueString'] ?? $fieldValue['stringValue'] ?? $fieldValue['text'] ?? null;
                     if (is_scalar($value)) {
                         return trim((string) $value);
                     }
@@ -5418,7 +5419,7 @@ class GoHighLevelService
                 continue;
             }
 
-            $value = $field['value'] ?? $field['field_value'] ?? $field['valueString'] ?? $field['stringValue'] ?? $field['text'] ?? null;
+            $value = $field['value'] ?? $field['fieldValue'] ?? $field['field_value'] ?? $field['valueString'] ?? $field['stringValue'] ?? $field['text'] ?? null;
             if (is_scalar($value)) {
                 return trim((string) $value);
             }

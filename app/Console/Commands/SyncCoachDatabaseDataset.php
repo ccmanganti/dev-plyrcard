@@ -14,9 +14,10 @@ class SyncCoachDatabaseDataset extends Command
     protected $signature = 'recruiting:sync-dataset
         {--user= : User ID whose Coach Database should be rebuilt}
         {--force : Run even when the command is started manually}
-        {--release-lock : Release the shared Recruiting Center lock when finished}';
+        {--release-lock : Release the shared Recruiting Center lock when finished}
+        {--launch-driver=artisan_command : Driver name recorded in progress status}';
 
-    protected $description = 'Rebuild the complete school/coach read model in a timeout-safe CLI worker.';
+    protected $description = 'Rebuild the complete school/coach read model in a timeout-safe background CLI process.';
 
     public function handle(
         CoachDatabaseDatasetSyncService $syncService,
@@ -30,34 +31,38 @@ class SyncCoachDatabaseDataset extends Command
             return self::FAILURE;
         }
 
-        $sharedLockKey = $coordinator->sharedLockKey($userId);
-        $ownsSharedLock = false;
+        $lockKey = $coordinator->sharedLockKey((int) $user->id);
+        $statusKey = $coordinator->statusKey((int) $user->id);
+        $ownsLock = false;
+        $ownsExecution = false;
 
-        if (! Cache::has($sharedLockKey)) {
-            $ownsSharedLock = Cache::add($sharedLockKey, now()->toDateTimeString(), now()->addHours(3));
+        if (! Cache::has($lockKey)) {
+            $ownsLock = Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(90));
         }
 
-        if (! Cache::has($sharedLockKey) && ! $this->option('force')) {
+        if (! Cache::has($lockKey) && ! $this->option('force')) {
             $this->error('Unable to acquire the Recruiting Center sync lock.');
             return self::FAILURE;
         }
 
-        if (! $coordinator->claimExecution($userId)) {
-            $this->warn('Another worker is already processing this Coach Database reload.');
-            return self::SUCCESS;
+        $ownsExecution = $coordinator->claimExecution((int) $user->id);
+        if (! $ownsExecution) {
+            $this->error('Another Coach Database worker already owns this reload.');
+            return self::FAILURE;
         }
 
-        $coordinator->registerPending($userId);
+        $launchDriver = trim((string) $this->option('launch-driver')) ?: 'artisan_command';
+
+        $coordinator->heartbeat($user, [
+            'status' => 'running',
+            'mode' => 'full_database_reload',
+            'worker_started_at' => now()->toDateTimeString(),
+            'launch_driver' => $launchDriver,
+            'resolved_driver' => $launchDriver === 'detached_shell' ? 'shell' : $launchDriver,
+            'message' => 'Background command started. Loading and reconciling Coach Database records.',
+        ]);
 
         try {
-            $coordinator->heartbeat($user, [
-                'status' => 'running',
-                'mode' => 'full_database_reload',
-                'worker_started_at' => now()->toDateTimeString(),
-                'launch_driver' => 'artisan_command',
-                'message' => 'Background worker started. Loading school and coach records in small pages.',
-            ]);
-
             $this->info("Starting timeout-safe Coach Database sync for user {$user->id}...");
             $result = $syncService->sync($user, (bool) $this->option('force'));
 
@@ -69,25 +74,30 @@ class SyncCoachDatabaseDataset extends Command
             $this->info((string) ($result['message'] ?? 'Coach Database sync completed.'));
             $this->line('Schools: ' . (int) ($result['loaded_schools'] ?? 0));
             $this->line('Coaches: ' . (int) ($result['loaded_contacts'] ?? 0));
+
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            Cache::put($coordinator->statusKey($userId), [
+            Cache::put($statusKey, [
                 'status' => 'failed',
                 'mode' => 'full_database_reload',
-                'user_id' => $userId,
+                'user_id' => $user->id,
                 'failed_at' => now()->toDateTimeString(),
                 'error' => $exception->getMessage(),
-                'message' => 'Background Coach Database reload failed. The previous cached data was preserved.',
-            ], now()->addHours(6));
+                'message' => 'Background Coach Database reload failed. The previous cache was preserved: ' . $exception->getMessage(),
+            ], now()->addMinutes(120));
 
             $this->error($exception->getMessage());
             return self::FAILURE;
         } finally {
-            $coordinator->removePending($userId);
-            $coordinator->releaseExecution($userId);
+            $coordinator->removePending((int) $user->id);
+            $coordinator->releaseSharedLock((int) $user->id);
 
-            if ($ownsSharedLock || $this->option('release-lock')) {
-                $coordinator->releaseSharedLock($userId);
+            if ($ownsExecution) {
+                $coordinator->releaseExecution((int) $user->id);
+            }
+
+            if ($ownsLock || $this->option('release-lock')) {
+                Cache::forget($lockKey);
             }
         }
     }

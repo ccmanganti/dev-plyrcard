@@ -209,18 +209,49 @@ class CoachDatabaseDatasetSyncService
                 'loaded_schools' => count($schoolsByKey),
                 'loaded_contacts' => count($coachesByKey),
                 'loaded_pages' => $businessPages + $contactPages,
+                'fetched_remote_schools' => count($schoolsByKey),
+                'fetched_remote_contacts' => count($coachesByKey),
                 'remote_total_schools' => $remoteSchools,
                 'remote_total_contacts' => $remoteContacts,
                 'started_at' => $startedAt,
                 'message' => 'All school and coach pages are loaded. Building the final cross-referenced indexes.',
             ]);
 
+            // The cached Coach Database may contain the imported/base school directory
+            // in addition to records currently represented in the connected CRM. A CRM
+            // refresh must enrich that directory, never replace it with only the two or
+            // three Business records returned by the location API.
+            $existingSchools = is_array($existing['schools'] ?? null) ? $existing['schools'] : [];
+            $existingCoaches = is_array($existing['coaches'] ?? null) ? $existing['coaches'] : [];
+
             $rebuilt = $this->coachDatabaseService->rebuildFromSchoolCompanySnapshot(
-                schools: array_values($schoolsByKey),
-                coaches: array_values($coachesByKey),
+                schools: array_merge($existingSchools, array_values($schoolsByKey)),
+                coaches: array_merge($existingCoaches, array_values($coachesByKey)),
                 user: $user,
                 customListTags: is_array($existing['custom_list_tags'] ?? null) ? $existing['custom_list_tags'] : [],
             );
+
+            $previousSchoolCount = count($existingSchools);
+            $previousCoachCount = count($existingCoaches);
+            $rebuiltSchoolCount = count($rebuilt['schools'] ?? []);
+            $rebuiltCoachCount = count($rebuilt['coaches'] ?? []);
+
+            // Never atomically replace a healthy production snapshot with a clearly
+            // incomplete result. This protects against partial API payloads, missing
+            // custom-field mappings, and accidental source changes.
+            $schoolFloor = $previousSchoolCount >= 20 ? (int) floor($previousSchoolCount * 0.50) : 0;
+            $coachFloor = $previousCoachCount >= 20 ? (int) floor($previousCoachCount * 0.50) : 0;
+
+            if (
+                ($schoolFloor > 0 && $rebuiltSchoolCount < $schoolFloor)
+                || ($coachFloor > 0 && $rebuiltCoachCount < $coachFloor)
+            ) {
+                throw new RuntimeException(
+                    'The refreshed dataset was unexpectedly incomplete '
+                    . "({$rebuiltSchoolCount} schools / {$rebuiltCoachCount} coaches; previous "
+                    . "{$previousSchoolCount} / {$previousCoachCount}). The previous cache was preserved."
+                );
+            }
 
             $finishedAt = now()->toDateTimeString();
             $final = array_merge($existing, $rebuilt, [
@@ -230,6 +261,8 @@ class CoachDatabaseDatasetSyncService
                 'dataset_sync_finished_at' => $finishedAt,
                 'loaded_schools_count' => count($rebuilt['schools'] ?? []),
                 'loaded_contacts_count' => count($rebuilt['coaches'] ?? []),
+                'fetched_remote_schools_count' => count($schoolsByKey),
+                'fetched_remote_contacts_count' => count($coachesByKey),
                 'remote_total_schools' => $remoteSchools,
                 'remote_total_contacts' => $remoteContacts,
                 'loaded_pages' => $businessPages + $contactPages,
@@ -245,6 +278,13 @@ class CoachDatabaseDatasetSyncService
                 'cached_at' => $finishedAt,
             ]);
 
+            // Keep one rollback snapshot before the atomic swap. This does not
+            // affect the active cache and gives production a recovery point if a future
+            // API/schema change produces an unexpected read model.
+            if ($existing !== []) {
+                Cache::put($cacheKey . ':previous', $existing, now()->addDays(7));
+            }
+
             Cache::put(
                 $cacheKey,
                 $final,
@@ -258,11 +298,13 @@ class CoachDatabaseDatasetSyncService
                 'loaded_schools' => (int) $final['loaded_schools_count'],
                 'loaded_contacts' => (int) $final['loaded_contacts_count'],
                 'loaded_pages' => $businessPages + $contactPages,
+                'fetched_remote_schools' => count($schoolsByKey),
+                'fetched_remote_contacts' => count($coachesByKey),
                 'remote_total_schools' => $remoteSchools,
                 'remote_total_contacts' => $remoteContacts,
                 'started_at' => $startedAt,
                 'finished_at' => $finishedAt,
-                'message' => 'Full Coach Database reload completed. The cached read model is ready.',
+                'message' => 'Full Coach Database reload completed. The base directory was preserved and refreshed contact/business data was merged into it.',
             ];
             $this->writeStatus($user, $status);
 
