@@ -11,7 +11,7 @@
     $displayName = $displayName !== '' ? $displayName : 'Player';
 @endphp
 
-<div class="rc-home-header-v2" wire:poll.5s="pollRealtime">
+<div class="rc-home-header-v2" wire:poll.12s.visible="pollRealtime">
     <div class="rc-home-welcome-copy-v2">
         <h1>Welcome back, {{ $displayName }} <span aria-hidden="true">👋</span></h1>
         <p>{{ $subtitle }}</p>
@@ -77,7 +77,7 @@
             <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
                 <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
                     <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                    <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                    <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from the latest cached tracking fields.</small></span>
                 </button>
                 <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
                     <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>

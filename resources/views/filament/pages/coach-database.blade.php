@@ -485,6 +485,215 @@
             transition: width .35s ease;
         }
 
+
+        .rc-sync-monitor {
+            --rc-sync-tone: #2563eb;
+            --rc-sync-soft: rgba(37, 99, 235, .10);
+            position: relative;
+            display: grid;
+            gap: .8rem;
+            margin-bottom: 1rem;
+            padding: 1rem 1.05rem;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--rc-sync-tone) 24%, var(--rc-border));
+            border-radius: 1rem;
+            background: color-mix(in srgb, var(--rc-sync-soft) 42%, var(--rc-card));
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+        }
+
+        .rc-sync-monitor--success { --rc-sync-tone: #059669; --rc-sync-soft: rgba(5, 150, 105, .10); }
+        .rc-sync-monitor--warning { --rc-sync-tone: #d97706; --rc-sync-soft: rgba(217, 119, 6, .10); }
+        .rc-sync-monitor--danger { --rc-sync-tone: #dc2626; --rc-sync-soft: rgba(220, 38, 38, .10); }
+        .rc-sync-monitor--neutral { --rc-sync-tone: #64748b; --rc-sync-soft: rgba(100, 116, 139, .10); }
+
+        .rc-sync-monitor__head {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: .8rem;
+            align-items: start;
+        }
+
+        .rc-sync-monitor__signal {
+            position: relative;
+            width: 2.35rem;
+            height: 2.35rem;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            border-radius: .75rem;
+            color: var(--rc-sync-tone);
+            background: var(--rc-sync-soft);
+        }
+
+        .rc-sync-monitor__signal::before {
+            content: '';
+            width: .65rem;
+            height: .65rem;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 28%, transparent);
+            animation: rcSyncHeartbeat 1.65s ease-out infinite;
+        }
+
+        .rc-sync-monitor--danger .rc-sync-monitor__signal::before {
+            animation: none;
+        }
+
+        .rc-sync-monitor__title-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .55rem;
+            margin-bottom: .2rem;
+        }
+
+        .rc-sync-monitor__title {
+            color: var(--rc-text);
+            font-size: .92rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .rc-sync-monitor__badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.45rem;
+            padding: .2rem .5rem;
+            border-radius: 999px;
+            background: var(--rc-sync-soft);
+            color: var(--rc-sync-tone);
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .01em;
+        }
+
+        .rc-sync-monitor__stage {
+            color: var(--rc-text);
+            font-size: .8rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__message {
+            margin-top: .15rem;
+            color: var(--rc-muted);
+            font-size: .75rem;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__percent {
+            min-width: 3.25rem;
+            color: var(--rc-sync-tone);
+            font-size: 1rem;
+            font-weight: 850;
+            text-align: right;
+        }
+
+        .rc-sync-monitor__bar {
+            position: relative;
+            height: .55rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--rc-sync-tone) 10%, var(--rc-soft));
+        }
+
+        .rc-sync-monitor__bar > span {
+            position: relative;
+            display: block;
+            height: 100%;
+            min-width: .5rem;
+            border-radius: inherit;
+            background: var(--rc-sync-tone);
+            transition: width .3s ease;
+        }
+
+        .rc-sync-monitor__bar.is-indeterminate > span {
+            width: 38% !important;
+            min-width: 6rem;
+            animation: rcSyncIndeterminate 1.2s ease-in-out infinite;
+        }
+
+        .rc-sync-monitor__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+        }
+
+        .rc-sync-monitor__meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            min-height: 1.75rem;
+            padding: .28rem .55rem;
+            border: 1px solid color-mix(in srgb, var(--rc-border) 85%, transparent);
+            border-radius: .55rem;
+            background: color-mix(in srgb, var(--rc-card) 80%, transparent);
+            color: var(--rc-muted);
+            font-size: .7rem;
+            font-weight: 650;
+        }
+
+        .rc-sync-monitor__meta-item strong {
+            color: var(--rc-text);
+            font-weight: 800;
+        }
+
+        .rc-sync-monitor__hint {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .65rem .75rem;
+            border-radius: .7rem;
+            background: var(--rc-sync-soft);
+            color: color-mix(in srgb, var(--rc-sync-tone) 82%, var(--rc-text));
+            font-size: .73rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__action {
+            flex: 0 0 auto;
+            border: 1px solid currentColor;
+            border-radius: .5rem;
+            background: transparent;
+            padding: .32rem .55rem;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        @keyframes rcSyncHeartbeat {
+            0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 30%, transparent); }
+            70%, 100% { box-shadow: 0 0 0 .65rem transparent; }
+        }
+
+        @keyframes rcSyncIndeterminate {
+            0% { transform: translateX(-115%); }
+            55% { transform: translateX(110%); }
+            100% { transform: translateX(285%); }
+        }
+
+        @media (max-width: 700px) {
+            .rc-sync-monitor__head {
+                grid-template-columns: auto minmax(0, 1fr);
+            }
+            .rc-sync-monitor__percent {
+                grid-column: 2;
+                text-align: left;
+            }
+            .rc-sync-monitor__hint {
+                flex-direction: column;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-sync-monitor__signal::before,
+            .rc-sync-monitor__bar.is-indeterminate > span {
+                animation: none;
+            }
+        }
+
         .rc-pulse {
             animation: rcFade .35s ease-in;
         }
@@ -6148,12 +6357,7 @@
         x-data
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
     >
-        @if($isLoadingDataset)
-            <div class="rc-card is-flat">
-                <div class="rc-subtle" style="margin-bottom:.5rem">Loading schools and coaches in the background. You can keep using the page.</div>
-                <div class="rc-progress"><span style="width:{{ $remoteTotalSchools ? min(100, round(($loadedSchoolsCount / max(1,$remoteTotalSchools))*100)) : min(96, $loadedPages * 8) }}%"></span></div>
-            </div>
-        @endif
+        @include('filament.partials.coach-database-sync-status')
 
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>

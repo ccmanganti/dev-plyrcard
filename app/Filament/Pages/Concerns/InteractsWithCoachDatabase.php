@@ -1069,36 +1069,158 @@ trait InteractsWithCoachDatabase
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
         $snapshot = is_array($snapshot) ? $snapshot : [];
 
+        $rawStatus = strtolower((string) ($status['status'] ?? $this->recruitingSyncStatus ?? ''));
         $loadedSchools = (int) ($status['loaded_schools'] ?? $snapshot['loaded_schools_count'] ?? $this->loadedSchoolsCount ?? 0);
         $loadedContacts = (int) ($status['loaded_contacts'] ?? $snapshot['loaded_contacts_count'] ?? $this->loadedContactsCount ?? 0);
+        $loadedPages = (int) ($status['loaded_pages'] ?? $snapshot['loaded_pages'] ?? $this->loadedPages ?? 0);
         $remoteSchools = (int) ($status['remote_total_schools'] ?? $snapshot['remote_total_schools'] ?? $this->remoteTotalSchools ?? 0);
         $remoteContacts = (int) ($status['remote_total_contacts'] ?? $snapshot['remote_total_contacts'] ?? 0);
         $progress = (int) ($status['progress'] ?? 0);
 
-        if ($progress <= 0) {
-            $remoteTotal = max(1, $remoteSchools + $remoteContacts);
-            $progress = min(99, (int) round((($loadedSchools + $loadedContacts) / $remoteTotal) * 100));
+        if ($progress <= 0 && ($loadedSchools > 0 || $loadedContacts > 0)) {
+            $remoteTotal = $remoteSchools + $remoteContacts;
+            if ($remoteTotal > 0) {
+                $progress = min(99, (int) round((($loadedSchools + $loadedContacts) / max(1, $remoteTotal)) * 100));
+            } elseif ($loadedPages > 0) {
+                $progress = min(94, max(2, 2 + ($loadedPages * 2)));
+            }
         }
 
-        if (! $this->isRecruitingSyncRunning && in_array($this->recruitingSyncStatus, ['completed', 'cleared'], true)) {
+        if (! $this->isRecruitingSyncRunning && in_array($rawStatus, ['completed', 'cleared'], true)) {
             $progress = 100;
         }
 
+        $heartbeatAt = $status['worker_heartbeat_at'] ?? null;
+        $startedAt = $status['started_at'] ?? $status['queued_at'] ?? $status['launch_attempted_at'] ?? $this->recruitingSyncStartedAt;
+        $finishedAt = $status['finished_at'] ?? $status['failed_at'] ?? $this->recruitingSyncFinishedAt;
+        $heartbeatTimestamp = $heartbeatAt ? strtotime((string) $heartbeatAt) : false;
+        $startedTimestamp = $startedAt ? strtotime((string) $startedAt) : false;
+        $heartbeatAge = $heartbeatTimestamp ? max(0, time() - $heartbeatTimestamp) : null;
+        $elapsedSeconds = $startedTimestamp ? max(0, time() - $startedTimestamp) : null;
+
+        $formatAge = static function (?int $seconds): ?string {
+            if ($seconds === null) {
+                return null;
+            }
+            if ($seconds < 5) {
+                return 'just now';
+            }
+            if ($seconds < 60) {
+                return $seconds . 's ago';
+            }
+            if ($seconds < 3600) {
+                return intdiv($seconds, 60) . 'm ago';
+            }
+            return intdiv($seconds, 3600) . 'h ago';
+        };
+
+        $formatDuration = static function (?int $seconds): ?string {
+            if ($seconds === null) {
+                return null;
+            }
+            if ($seconds < 60) {
+                return $seconds . 's';
+            }
+            if ($seconds < 3600) {
+                return intdiv($seconds, 60) . 'm ' . ($seconds % 60) . 's';
+            }
+            return intdiv($seconds, 3600) . 'h ' . intdiv($seconds % 3600, 60) . 'm';
+        };
+
+        $statusLabel = match ($rawStatus) {
+            'queued' => 'Queued',
+            'starting' => 'Starting worker',
+            'waiting_for_worker' => 'Waiting for worker',
+            'running', 'already_running' => 'Syncing now',
+            'stalled' => 'Worker stalled',
+            'failed', 'failed_to_start' => 'Sync failed',
+            'completed' => 'Completed',
+            'cleared' => 'Status cleared',
+            default => 'Checking status',
+        };
+
+        $stage = match ($rawStatus) {
+            'queued' => 'The reload request has been accepted.',
+            'starting' => 'The server is starting the background worker.',
+            'waiting_for_worker' => 'The request is waiting for the configured queue worker or scheduled task.',
+            'running', 'already_running' => $loadedPages > 0
+                ? "Processing API page {$loadedPages}."
+                : 'The background worker has checked in and is preparing the first page.',
+            'stalled' => 'The worker started but its heartbeat is no longer current.',
+            'failed', 'failed_to_start' => 'The previous cached database remains available.',
+            'completed' => 'The refreshed database is ready.',
+            default => 'Reading the latest background status.',
+        };
+
+        $tone = match ($rawStatus) {
+            'running', 'already_running', 'completed' => 'success',
+            'queued', 'starting' => 'info',
+            'waiting_for_worker' => 'warning',
+            'stalled', 'failed', 'failed_to_start' => 'danger',
+            default => 'neutral',
+        };
+
+        $launchDriver = strtolower((string) ($status['launch_driver'] ?? ''));
+        $launchDriverLabel = match ($launchDriver) {
+            'queue' => 'Queue worker',
+            'scheduler' => 'Scheduled worker',
+            'detached_shell' => 'Background process',
+            default => $launchDriver !== '' ? str_replace('_', ' ', ucfirst($launchDriver)) : 'Automatic',
+        };
+
+        $workerHint = null;
+        if ($rawStatus === 'waiting_for_worker') {
+            $workerHint = match ($launchDriver) {
+                'queue' => 'No queue worker heartbeat has been received yet. The server queue worker must be running for progress to begin.',
+                'scheduler' => 'The scheduled worker has not picked up the request yet. Check the server cron or scheduler entry.',
+                'detached_shell' => 'The detached PHP process did not check in. Use the queue or scheduled-worker mode on this server.',
+                default => 'The server has not started a worker yet. Run the sync doctor to confirm the production worker configuration.',
+            };
+        } elseif ($rawStatus === 'stalled') {
+            $workerHint = 'The worker stopped reporting progress. Check its process/log before starting another reload.';
+        } elseif (in_array($rawStatus, ['failed', 'failed_to_start'], true)) {
+            $workerHint = (string) ($status['error'] ?? $status['launch_error'] ?? 'Check the application log for the background-sync error.');
+        }
+
+        $activeStatuses = ['queued', 'starting', 'waiting_for_worker', 'running', 'already_running', 'stalled'];
+        $problemStatuses = ['failed', 'failed_to_start'];
+        $visible = in_array($rawStatus, array_merge($activeStatuses, $problemStatuses), true);
+        $workerConfirmed = filled($heartbeatAt);
+        $indeterminate = in_array($rawStatus, ['queued', 'starting', 'waiting_for_worker'], true)
+            && $loadedPages === 0
+            && ! $workerConfirmed;
+
         return [
-            'active' => $this->isRecruitingSyncRunning,
-            'status' => $this->recruitingSyncStatus,
+            'visible' => $visible,
+            'active' => in_array($rawStatus, $activeStatuses, true),
+            'status' => $rawStatus !== '' ? $rawStatus : null,
+            'status_label' => $statusLabel,
+            'tone' => $tone,
+            'stage' => $stage,
             'mode' => $this->recruitingSyncMode,
             'title' => $this->recruitingSyncModeLabel($this->recruitingSyncMode),
             'message' => $this->recruitingSyncMessage ?: ($snapshot['last_refresh_notice'] ?? 'Coach Database is syncing in the background.'),
-            'percent' => max(1, min(100, $progress)),
+            'percent' => max(1, min(100, $progress > 0 ? $progress : 1)),
+            'indeterminate' => $indeterminate,
             'loaded_schools' => $loadedSchools,
             'loaded_contacts' => $loadedContacts,
-            'loaded_pages' => (int) ($status['loaded_pages'] ?? $snapshot['loaded_pages'] ?? $this->loadedPages ?? 0),
-            'started_at' => $this->recruitingSyncStartedAt,
-            'finished_at' => $this->recruitingSyncFinishedAt,
+            'loaded_pages' => $loadedPages,
+            'remote_total_schools' => $remoteSchools,
+            'remote_total_contacts' => $remoteContacts,
+            'started_at' => $startedAt,
+            'finished_at' => $finishedAt,
+            'elapsed_label' => $formatDuration($elapsedSeconds),
+            'heartbeat_at' => $heartbeatAt,
+            'heartbeat_age_seconds' => $heartbeatAge,
+            'heartbeat_label' => $workerConfirmed ? $formatAge($heartbeatAge) : 'No heartbeat yet',
+            'worker_confirmed' => $workerConfirmed,
+            'worker_host' => $status['worker_host'] ?? null,
+            'launch_driver' => $launchDriver,
+            'launch_driver_label' => $launchDriverLabel,
+            'worker_hint' => $workerHint,
+            'can_clear' => in_array($rawStatus, ['stalled', 'failed', 'failed_to_start'], true),
         ];
     }
-
 
     public function clearStuckRecruitingSync(): void
     {
@@ -1268,14 +1390,34 @@ trait InteractsWithCoachDatabase
 
         $status = $this->startRecruitingStatsSyncInBackground($user, 'full_database_reload');
         $this->refreshRecruitingSyncStatus($status);
-        $this->isLoadingDataset = in_array(strtolower((string) ($status['status'] ?? '')), ['running', 'already_running'], true);
+        $this->isLoadingDataset = in_array(strtolower((string) ($status['status'] ?? '')), ['queued', 'starting', 'waiting_for_worker', 'running', 'already_running', 'stalled'], true);
 
         if ($notify) {
-            Notification::make()
-                ->title('Recruiting Center')
-                ->body('The full Coach Database reload has been queued for background processing. You can keep using the page; schools and coaches will refresh from cache as progress is completed.')
-                ->success()
-                ->send();
+            $launchStatus = strtolower((string) ($status['status'] ?? 'queued'));
+            $launchDriver = strtolower((string) ($status['launch_driver'] ?? ''));
+            $body = match ($launchStatus) {
+                'running', 'already_running' => 'The background worker is running. Live progress will appear at the top of the page.',
+                'starting' => 'The server is starting the background worker. The progress monitor will confirm when its first heartbeat arrives.',
+                'waiting_for_worker' => $launchDriver === 'scheduler'
+                    ? 'The reload is queued for the scheduled server worker. The progress monitor will show when it is picked up.'
+                    : 'The reload is waiting for the configured server worker. The progress monitor will identify whether a worker heartbeat is received.',
+                'failed', 'failed_to_start' => 'The reload could not be started. The existing cached database was preserved.',
+                default => 'The reload request is queued. Live worker status, page counts, and heartbeat details will appear at the top of the page.',
+            };
+
+            $notification = Notification::make()
+                ->title('Coach Database reload')
+                ->body($body);
+
+            if (in_array($launchStatus, ['failed', 'failed_to_start'], true)) {
+                $notification->danger();
+            } elseif ($launchStatus === 'waiting_for_worker') {
+                $notification->warning();
+            } else {
+                $notification->info();
+            }
+
+            $notification->send();
         }
     }
 
