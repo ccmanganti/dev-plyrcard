@@ -3,6 +3,8 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
+use App\Services\CoachDatabaseActionQueueService;
+use App\Services\CoachDatabaseUiSyncService;
 use App\Services\GoHighLevelService;
 use App\Support\TrackingLinkRewriter;
 use Filament\Notifications\Notification;
@@ -38,6 +40,9 @@ trait InteractsWithCoachDatabase
     protected ?array $coachDatabaseSnapshotMemo = null;
     protected ?array $coachSearchIndexMemo = null;
     protected ?array $schoolCoachIndexMemo = null;
+    protected ?array $allSchoolsMemo = null;
+    protected ?array $allCoachesMemo = null;
+    protected ?array $trackingCoachesMemo = null;
 
     public bool $allowed = false;
     public bool $locked = false;
@@ -130,6 +135,12 @@ trait InteractsWithCoachDatabase
     public bool $hasMoreMessages = false;
     public bool $isSendingEmail = false;
     public bool $isSyncingTags = false;
+    public bool $isRecruitingSyncRunning = false;
+    public ?string $recruitingSyncMode = null;
+    public ?string $recruitingSyncStatus = null;
+    public ?string $recruitingSyncStartedAt = null;
+    public ?string $recruitingSyncFinishedAt = null;
+    public ?string $recruitingSyncMessage = null;
     public bool $showNewConversationComposer = false;
     public string $newConversationCoachSearch = '';
     public bool $showScheduleForm = false;
@@ -148,6 +159,20 @@ trait InteractsWithCoachDatabase
         'product_news' => false,
     ];
     public ?string $tagSyncedAt = null;
+
+    /**
+     * UI-only async state. Remote reads are deferred until after the page is
+     * visible so Livewire never blocks the first paint of a tab or modal.
+     */
+    public bool $isBootingRemoteSection = false;
+    public bool $isLoadingConversations = false;
+    public bool $isLoadingConversationMessages = false;
+    public bool $isLoadingTemplates = false;
+    public bool $isLoadingTemplateDetail = false;
+    public bool $isRefreshingRemoteData = false;
+    public ?string $activeUiOperation = null;
+    public ?string $pendingTemplateAction = null;
+    public ?string $pendingTemplateActionId = null;
 
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
@@ -175,14 +200,17 @@ trait InteractsWithCoachDatabase
             $this->hydrateFromSnapshot(Cache::get($this->activeCacheKey(), []));
         }
 
-        if (in_array($this->section, ['favorites', 'lists'], true) && $this->allowed && ! $this->locked) {
-            $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        // Hydrate the last successful remote UI payload first. The page paints
+        // immediately with stale-while-revalidate data, then wire:init refreshes
+        // only the active section in a second request.
+        $this->hydrateDeferredUiCache();
+        $this->refreshRecruitingSyncStatus();
 
-            if (blank($snapshot['tag_synced_at'] ?? null) || ! $this->snapshotHasSavedFavoriteOrListData($snapshot)) {
-                $this->syncLatestContactTags(false);
-            } else {
-                $this->syncTagsIfStale(false);
-            }
+        if (in_array($this->section, ['favorites', 'lists'], true) && $this->allowed && ! $this->locked) {
+            // Favorites and Lists must be cache-only during the HTTP request. A slow
+            // contacts/search call here previously caused the entire page to fail with
+            // cURL error 28. Refresh tag data in a detached CLI process instead.
+            $this->syncTagsIfStale(false);
         }
 
         if ($this->section === 'dashboard') {
@@ -190,11 +218,16 @@ trait InteractsWithCoachDatabase
         }
 
         if ($this->section === 'conversations') {
-            $this->loadConversations();
+            // Do not call the remote conversations endpoint during mount.
+            // The cached rows are already visible and bootDeferredUiData()
+            // refreshes them after first paint.
+            $this->isLoadingConversations = empty($this->conversations);
         }
 
         if (in_array($this->section, ['campaigns', 'compose'], true)) {
-            $this->loadTemplates();
+            // Template retrieval is also deferred. Built-ins/cached templates
+            // remain usable while the latest remote list loads.
+            $this->isLoadingTemplates = empty($this->templates);
         }
 
         if ($this->section === 'compose') {
@@ -241,193 +274,321 @@ trait InteractsWithCoachDatabase
         };
     }
 
+    /**
+     * Called once by wire:init after the HTML is already on screen. Only the
+     * active section is refreshed, which keeps navigation and modal opening
+     * responsive even when the upstream service is slow.
+     */
+    public function bootDeferredUiData(): void
+    {
+        if ($this->isBootingRemoteSection || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        $this->isBootingRemoteSection = true;
+
+        try {
+            if ($this->section === 'conversations') {
+                $this->loadConversations();
+            }
+
+            if (in_array($this->section, ['campaigns', 'compose'], true)) {
+                $this->loadTemplates();
+            }
+        } finally {
+            $this->isBootingRemoteSection = false;
+        }
+    }
+
+    public function pollDeferredUiData(): void
+    {
+        $user = Auth::user();
+        if (! $user || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        if (! $this->isRefreshingRemoteData
+            && ! $this->isLoadingConversations
+            && ! $this->isLoadingConversationMessages
+            && ! $this->isLoadingTemplates
+            && ! $this->isLoadingTemplateDetail) {
+            return;
+        }
+
+        $this->hydrateDeferredUiCache();
+
+        $conversationStatus = Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'conversations'), []);
+        $templateStatus = Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'templates'), []);
+        $messageStatus = $this->selectedConversationId
+            ? Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'messages', $this->selectedConversationId), [])
+            : [];
+        $templateDetailStatus = $this->selectedTemplateId
+            ? Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'template-detail', $this->selectedTemplateId), [])
+            : [];
+
+        $this->isLoadingConversations = $this->deferredUiStatusIsRunning($conversationStatus, $user, 'conversations');
+        $this->isLoadingTemplates = $this->deferredUiStatusIsRunning($templateStatus, $user, 'templates');
+        $this->isLoadingConversationMessages = $this->selectedConversationId
+            ? $this->deferredUiStatusIsRunning($messageStatus, $user, 'messages', $this->selectedConversationId)
+            : false;
+        $this->isLoadingTemplateDetail = $this->selectedTemplateId
+            ? $this->deferredUiStatusIsRunning($templateDetailStatus, $user, 'template-detail', $this->selectedTemplateId)
+            : false;
+
+        if ($this->selectedConversationId) {
+            $cached = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
+            if (is_array($cached['rows'] ?? null)) {
+                $this->messages = collect($cached['rows'])->filter(fn ($row): bool => is_array($row))->values()->all();
+                $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
+                $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
+            }
+        }
+
+        if ($this->pendingTemplateAction && $this->pendingTemplateActionId
+            && isset($this->templateDetails[$this->pendingTemplateActionId])
+            && ! $this->isLoadingTemplateDetail) {
+            $action = $this->pendingTemplateAction;
+            $templateId = $this->pendingTemplateActionId;
+            $this->pendingTemplateAction = null;
+            $this->pendingTemplateActionId = null;
+
+            if ($action === 'duplicate') {
+                $this->duplicateTemplate($templateId);
+            } elseif ($action === 'use-compose') {
+                $this->useTemplateForCompose($templateId);
+            }
+        }
+
+        if ($this->selectedTemplateId && isset($this->templateDetails[$this->selectedTemplateId]) && ! $this->isLoadingTemplateDetail) {
+            $template = $this->templateDetails[$this->selectedTemplateId];
+            if (is_array($template)) {
+                $this->templateName = trim((string) ($template['name'] ?? $this->templateName)) ?: 'Untitled Template';
+                $this->templateSubject = $this->templateSubject($template);
+                $this->templatePreviewText = $this->templatePreviewText($template);
+                $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+                $newBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+                if ($newBody !== '' && $newBody !== $this->templateBody) {
+                    $this->templateBody = $newBody;
+                    $this->templateEditorRefreshKey++;
+                    $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+                }
+            }
+        }
+
+        $this->isRefreshingRemoteData = $this->isLoadingConversations
+            || $this->isLoadingTemplates
+            || $this->isLoadingConversationMessages
+            || $this->isLoadingTemplateDetail;
+
+        if (! $this->isRefreshingRemoteData) {
+            $this->activeUiOperation = null;
+        }
+    }
+
+    protected function deferredUiStatusIsRunning(array $status, $user, string $type, ?string $reference = null): bool
+    {
+        if (Cache::has(CoachDatabaseUiSyncService::lockKey($user, $type, $reference))) {
+            return true;
+        }
+
+        $state = strtolower((string) ($status['status'] ?? ''));
+        if (! in_array($state, ['queued', 'running', 'already_running'], true)) {
+            return false;
+        }
+
+        $startedAt = $status['started_at'] ?? $status['queued_at'] ?? null;
+        if ($startedAt) {
+            try {
+                return \Illuminate\Support\Carbon::parse($startedAt)->greaterThan(now()->subMinutes(2));
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    protected function startDeferredUiSync(string $type, ?string $reference = null, bool $force = false): void
+    {
+        $user = Auth::user();
+        if (! $user || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        $type = trim(strtolower($type));
+        $reference = filled($reference) ? trim((string) $reference) : null;
+        $lockKey = CoachDatabaseUiSyncService::lockKey($user, $type, $reference);
+        $statusKey = CoachDatabaseUiSyncService::statusKey($user, $type, $reference);
+        $launchKey = CoachDatabaseUiSyncService::launchKey($user, $type, $reference);
+
+        if (! $force && (Cache::has($lockKey) || ! Cache::add($launchKey, true, now()->addSeconds(30)))) {
+            return;
+        }
+
+        Cache::put($statusKey, [
+            'status' => 'queued',
+            'type' => $type,
+            'reference' => $reference,
+            'user_id' => $user->id,
+            'queued_at' => now()->toIso8601String(),
+            'message' => 'Refresh queued.',
+        ], now()->addHours(2));
+
+        $this->isRefreshingRemoteData = true;
+        $this->activeUiOperation = match ($type) {
+            'conversations' => 'Loading conversations',
+            'messages' => 'Loading messages',
+            'templates' => 'Loading templates',
+            'template-detail' => 'Loading template',
+            default => 'Loading data',
+        };
+
+        try {
+            $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
+            $artisan = base_path('artisan');
+            $arguments = ' --user=' . escapeshellarg((string) $user->id)
+                . ' --type=' . escapeshellarg($type);
+
+            if ($reference !== null) {
+                $arguments .= ' --reference=' . escapeshellarg($reference);
+            }
+            if ($force) {
+                $arguments .= ' --force --release-lock';
+            }
+
+            $logPath = storage_path('logs/recruiting-ui-sync-' . $user->id . '-' . preg_replace('/[^a-z0-9_-]+/i', '-', $type) . '.log');
+
+            if (PHP_OS_FAMILY === 'Windows') {
+                $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                    . ' recruiting:sync-ui' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1';
+                Process::fromShellCommandline($command, base_path())->run();
+                return;
+            }
+
+            $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                . ' recruiting:sync-ui' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1 &';
+            Process::fromShellCommandline($command, base_path())->run();
+        } catch (\Throwable $exception) {
+            Cache::forget($launchKey);
+            Cache::put($statusKey, [
+                'status' => 'failed_to_start',
+                'type' => $type,
+                'reference' => $reference,
+                'user_id' => $user->id,
+                'failed_at' => now()->toIso8601String(),
+                'message' => 'Unable to start the refresh. Cached data was kept.',
+                'error' => $exception->getMessage(),
+            ], now()->addHours(2));
+            Log::warning('Unable to start Recruiting Center deferred UI sync.', [
+                'user_id' => $user->id,
+                'type' => $type,
+                'reference' => $reference,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function deferredUiCachePrefix(): string
+    {
+        $user = Auth::user();
+        return $user ? CoachDatabaseUiSyncService::cachePrefix($user) : 'coach-database:ui:guest';
+    }
+
+    protected function deferredUiCacheKey(string $type, ?string $suffix = null): string
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return $this->deferredUiCachePrefix() . ':' . trim($type);
+        }
+
+        return CoachDatabaseUiSyncService::cacheKey($user, $type, $suffix);
+    }
+
+    protected function hydrateDeferredUiCache(): void
+    {
+        $conversationCache = Cache::get($this->deferredUiCacheKey('conversations'), []);
+        if (is_array($conversationCache) && ! empty($conversationCache['rows'])) {
+            $this->conversations = collect($conversationCache['rows'])
+                ->filter(fn ($row): bool => is_array($row))
+                ->take((int) config('coach-database-sync.ui.conversation_row_cap', 25))
+                ->values()
+                ->all();
+        }
+
+        $templateCache = Cache::get($this->deferredUiCacheKey('templates'), []);
+        if (is_array($templateCache)) {
+            $rows = $templateCache['rows'] ?? [];
+            if (is_array($rows)) {
+                $this->templates = collect($rows)
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->merge($this->hardcodedEmailTemplates())
+                    ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row))))
+                    ->take((int) config('coach-database-sync.ui.template_row_cap', 100))
+                    ->values()
+                    ->all();
+            }
+
+            if (is_array($templateCache['details'] ?? null)) {
+                $this->templateDetails = $templateCache['details'];
+            }
+
+            $this->templateSourceSummary = (string) ($templateCache['summary'] ?? $this->templateSourceSummary);
+            $this->templateSourceDebug = is_array($templateCache['debug'] ?? null) ? $templateCache['debug'] : $this->templateSourceDebug;
+            $this->templateConnectionKey = $templateCache['connection_key'] ?? $this->templateConnectionKey;
+        }
+
+        if (empty($this->templates) && in_array($this->section, ['campaigns', 'compose'], true)) {
+            $this->templates = $this->hardcodedEmailTemplates();
+        }
+    }
+
     public function startBackgroundLoad(bool $force = false): void
     {
         if (! $this->allowed || $this->locked) {
             return;
         }
 
+        // Compatibility entry point. Large Recruiting Center datasets must never be fetched from
+        // a Livewire request. A forced load starts the detached Artisan sync; a
+        // normal call only refreshes the cache/status already produced by it.
         if ($force) {
-            Cache::forget($this->activeCacheKey());
-            $this->storeSnapshot($this->emptySnapshot());
+            $this->refreshCoachDatabase(false);
+            return;
         }
 
+        $this->refreshRecruitingSyncStatus();
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $this->hydrateFromSnapshot($snapshot);
-        $this->isLoadingDataset = (bool) ($snapshot['has_more_data'] ?? true);
-        $this->hasMoreData = $this->isLoadingDataset;
+        $snapshot = is_array($snapshot) ? $snapshot : $this->emptySnapshot();
 
-        if ($this->isLoadingDataset) {
-            $this->dispatch('coach-database-load-next');
+        if (($snapshot['cached_at'] ?? null) !== $this->cachedAt) {
+            $this->hydrateFromSnapshot($snapshot);
+        }
+
+        $needsInitialDataset = empty($snapshot['schools'] ?? [])
+            || empty($snapshot['coaches'] ?? [])
+            || (bool) ($snapshot['has_more_data'] ?? false)
+            || ! (bool) ($snapshot['dataset_reconciled'] ?? false);
+
+        if ($needsInitialDataset && ! $this->isRecruitingSyncRunning) {
+            $this->refreshCoachDatabase(false);
         }
     }
 
     public function loadNextBatch(): void
     {
-        if (! $this->allowed || $this->locked) {
-            $this->isLoadingDataset = false;
-            return;
-        }
-
-        $service = app(CoachDatabaseService::class);
-        $user = Auth::user();
-        if (! $user) {
-            $this->isLoadingDataset = false;
-            return;
-        }
+        // Kept for older Blade/JavaScript listeners. No Recruiting Center API work is allowed in
+        // this Livewire method because two sequential network calls plus a full
+        // snapshot rebuild can exceed PHP's 30-second web request limit.
+        $this->refreshRecruitingSyncStatus();
 
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $maxPages = (int) config('ghl.coach_database.max_pages', 500);
-        $loadedPages = (int) ($snapshot['loaded_pages'] ?? 0);
-
-        if ($loadedPages >= $maxPages) {
-            $snapshot['has_more_data'] = false;
-            $this->storeSnapshot($snapshot);
+        if (is_array($snapshot) && ($snapshot['cached_at'] ?? null) !== $this->cachedAt) {
             $this->hydrateFromSnapshot($snapshot);
-            $this->isLoadingDataset = false;
-            return;
         }
 
-        if ((bool) ($snapshot['businesses_have_more'] ?? true)) {
-            try {
-                $result = $service->getSchoolBusinessesPageForUser(
-                    user: $user,
-                    skip: (int) ($snapshot['next_business_skip'] ?? 0),
-                    limit: min((int) config('ghl.coach_database.business_page_limit', 50), 50),
-                );
-            } catch (\Throwable $exception) {
-                \Log::warning('Coach Database Livewire school page load failed safely.', [
-                    'user_id' => $user->id ?? null,
-                    'error' => $exception->getMessage(),
-                ]);
-
-                $result = [
-                    'success' => false,
-                    'schools' => [],
-                    'has_more' => true,
-                    'next_skip' => (int) ($snapshot['next_business_skip'] ?? 0),
-                    'temporary_failure' => true,
-                    'error' => 'GHL schools timed out. Existing cache was kept.',
-                ];
-            }
-
-            if (! ($result['success'] ?? false)) {
-                // GHL occasionally times out on large locations. Keep the existing cached
-                // snapshot and let the user retry instead of failing the Livewire request.
-                $snapshot['last_schools_error'] = $result['error'] ?? 'Unable to load schools.';
-
-                if (! ($result['temporary_failure'] ?? false)) {
-                    $this->error = $snapshot['last_schools_error'];
-                    $this->isLoadingDataset = false;
-                    return;
-                }
-            } else {
-
-            $snapshot['schools'] = collect($snapshot['schools'] ?? [])
-                ->merge($result['schools'] ?? [])
-                ->filter(fn ($school): bool => is_array($school) && filled($school['id'] ?? null))
-                ->unique('id')
-                ->values()
-                ->all();
-            $snapshot['next_business_skip'] = $result['next_skip'] ?? null;
-            $snapshot['businesses_have_more'] = (bool) ($result['has_more'] ?? false);
-            $snapshot['remote_total_schools'] = $result['total'] ?? ($snapshot['remote_total_schools'] ?? null);
-            }
-        }
-
-        if ((bool) ($snapshot['contacts_have_more'] ?? true)) {
-            try {
-                $contactsResult = $service->getCoachContactsPageForUser(
-                    user: $user,
-                    startAfter: $snapshot['next_contacts_start_after'] ?? null,
-                    startAfterId: $snapshot['next_contacts_start_after_id'] ?? null,
-                    limit: min((int) config('ghl.coach_database.contact_page_limit', 50), 50),
-                );
-            } catch (\Throwable $exception) {
-                \Log::warning('Coach Database Livewire contact page load failed safely.', [
-                    'user_id' => $user->id ?? null,
-                    'start_after' => $snapshot['next_contacts_start_after'] ?? null,
-                    'start_after_id' => $snapshot['next_contacts_start_after_id'] ?? null,
-                    'error' => $exception->getMessage(),
-                ]);
-
-                $contactsResult = [
-                    'success' => false,
-                    'contacts' => [],
-                    'has_more' => true,
-                    'next_start_after' => $snapshot['next_contacts_start_after'] ?? null,
-                    'next_start_after_id' => $snapshot['next_contacts_start_after_id'] ?? null,
-                    'temporary_failure' => true,
-                    'error' => 'GHL contacts timed out. Existing cache was kept.',
-                ];
-            }
-
-            if ($contactsResult['success'] ?? false) {
-                $this->mergeContactsIntoSnapshot($snapshot, $contactsResult['contacts'] ?? []);
-                $snapshot['next_contacts_start_after'] = $contactsResult['next_start_after'] ?? null;
-                $snapshot['next_contacts_start_after_id'] = $contactsResult['next_start_after_id'] ?? null;
-                $snapshot['contacts_have_more'] = (bool) ($contactsResult['has_more'] ?? false);
-                $snapshot['remote_total_contacts'] = $contactsResult['total'] ?? ($snapshot['remote_total_contacts'] ?? null);
-            } else {
-                // Do not crash or discard progress when GHL times out. Keep the current
-                // cursor so the next manual/background refresh can retry the same page.
-                if (! ($contactsResult['temporary_failure'] ?? false)) {
-                    $snapshot['contacts_have_more'] = false;
-                }
-
-                $snapshot['last_contacts_error'] = $contactsResult['error'] ?? null;
-            }
-        }
-
-        /**
-         * Do not hydrate every school's coaches through /contacts/business during a normal
-         * Livewire refresh. That endpoint can timeout on larger GHL locations and it runs
-         * inside the browser request. We already load coaches through the paged Contacts
-         * endpoint above, then merge/group them into schools. If a specific school needs
-         * fresh coach rows later, load it on demand from the drawer/detail action.
-         *
-         * Set GHL_COACH_DATABASE_HYDRATE_SCHOOL_COACHES_ON_REFRESH=true only for small
-         * accounts where the per-business endpoint is fast enough.
-         */
-        $hydrateBusinessCoaches = (bool) config('ghl.coach_database.hydrate_school_coaches_on_refresh', false);
-
-        if ($hydrateBusinessCoaches) {
-            $schoolsToHydrate = collect($snapshot['schools'] ?? [])
-                ->filter(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null))
-                ->take((int) config('ghl.coach_database.businesses_per_batch', 2))
-                ->values();
-
-            foreach ($schoolsToHydrate as $school) {
-                $school = $this->loadSchoolCoachesIntoSnapshot($school, $snapshot, $service, $user);
-            }
-        } else {
-            $snapshot['schools'] = collect($snapshot['schools'] ?? [])
-                ->filter(fn ($school): bool => is_array($school))
-                ->map(function (array $school): array {
-                    $school['coaches_loaded'] = true;
-                    $school['coaches_loaded_from'] = $school['coaches_loaded_from'] ?? 'contacts_page';
-                    return $school;
-                })
-                ->values()
-                ->all();
-        }
-
-        $loadedPages++;
-        $snapshot['loaded_pages'] = $loadedPages;
-        $hasUnhydratedSchools = $hydrateBusinessCoaches
-            && collect($snapshot['schools'] ?? [])->contains(fn (array $school): bool => empty($school['coaches_loaded']) && filled($school['business_id'] ?? null));
-        $snapshot['has_more_data'] = (bool) ($snapshot['businesses_have_more'] ?? false)
-            || (bool) ($snapshot['contacts_have_more'] ?? false)
-            || $hasUnhydratedSchools;
-        $snapshot['cached_at'] = now()->toDateTimeString();
-
-        $this->rebuildAndStoreSnapshot($snapshot);
-        $this->isLoadingDataset = (bool) ($snapshot['has_more_data'] ?? false) && $loadedPages < $maxPages;
-        $this->hasMoreData = $this->isLoadingDataset;
-
-        if ($this->isLoadingDataset) {
-            $this->dispatch('coach-database-load-next');
-        }
+        $this->isLoadingDataset = $this->isRecruitingSyncRunning
+            && $this->recruitingSyncMode === 'full_database_reload';
+        $this->hasMoreData = false;
     }
 
     public function pollRealtime(): void
@@ -436,16 +597,20 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        if ($this->hasMoreData || $this->isLoadingDataset) {
-            $this->loadNextBatch();
-            return;
+        // Polling is cache-only. The detached CLI process performs every Recruiting Center page
+        // request and the expensive school/coach reconciliation.
+        $this->refreshRecruitingSyncStatus();
+        $this->refreshContactTagSyncStatus();
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+
+        if (is_array($snapshot) && ($snapshot['cached_at'] ?? null) !== $this->cachedAt) {
+            $this->hydrateFromSnapshot($snapshot);
         }
 
-        $this->hydrateFromSnapshot(Cache::get($this->activeCacheKey(), $this->emptySnapshot()));
+        $this->isLoadingDataset = $this->isRecruitingSyncRunning
+            && $this->recruitingSyncMode === 'full_database_reload';
+        $this->hasMoreData = false;
 
-        if ($this->section === 'conversations') {
-            $this->refreshConversationsRealtime();
-        }
     }
 
     public function refreshConversationsRealtime(): void
@@ -616,62 +781,147 @@ trait InteractsWithCoachDatabase
 
     protected function loadSchoolCoachesIntoSnapshot(array $school, array &$snapshot, CoachDatabaseService $service, $user): array
     {
-        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-        if ($businessId === '') {
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['id'] ?? ''));
+        $schoolName = trim((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
+
+        if ($businessId === '' && $normalizedSchoolName === '') {
             return $school;
         }
 
-        try {
-            $result = $service->getContactsForBusinessForUser(
-                $user,
-                $businessId,
-                0,
-                (int) config('ghl.coach_database.business_contacts_page_limit', 50),
-                $school,
-            );
-        } catch (\Throwable $exception) {
-            Log::warning('Recruiting school coach hydration skipped after exception.', [
-                'user_id' => $user?->id,
-                'business_id' => $businessId,
-                'error' => $exception->getMessage(),
-            ]);
+        $result = [
+            'success' => true,
+            'coaches' => [],
+            'count' => 0,
+            'total' => 0,
+        ];
 
-            $school['coaches_loaded'] = true;
-            $school['coaches_load_failed'] = true;
-            $school['coaches_load_error'] = 'GHL timed out while loading this school coaches.';
-            return $school;
+        // Use the authoritative business roster when a Recruiting Center Business ID exists.
+        if ($businessId !== '') {
+            try {
+                $result = $service->getContactsForBusinessForUser(
+                    $user,
+                    $businessId,
+                    0,
+                    (int) config('ghl.coach_database.business_contacts_page_limit', 50),
+                    $school,
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('Recruiting school coach hydration skipped after exception.', [
+                    'user_id' => $user?->id,
+                    'business_id' => $businessId,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $result = [
+                    'success' => false,
+                    'coaches' => [],
+                    'count' => 0,
+                    'total' => 0,
+                    'error' => 'Recruiting Center timed out while loading this school coaches.',
+                ];
+            }
         }
 
-        if (! ($result['success'] ?? false)) {
-            $school['coaches_loaded'] = true;
-            $school['coaches_load_failed'] = true;
-            $school['coaches_load_error'] = $result['error'] ?? 'Unable to load coaches for this school.';
-            return $school;
-        }
+        // Cross-reference the already-loaded generic contacts by Business / Company /
+        // School Name. These rows recover contacts whose Recruiting Center business association is
+        // missing even though their Business Name field is correct.
+        $nameMatchedCoaches = collect($snapshot['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->filter(fn (array $coach): bool => $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName))
+            ->values()
+            ->all();
 
-        $coaches = $this->mergeCoachRowsById($snapshot['coaches'] ?? [], $result['coaches'] ?? []);
+        $businessCoaches = collect($result['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->values()
+            ->all();
 
-        $snapshot['coaches'] = $coaches;
-        $snapshot['schools'] = collect($snapshot['schools'] ?? [])->map(function (array $existing) use ($school, $result): array {
-            if ((string) ($existing['id'] ?? '') !== (string) ($school['id'] ?? '')) {
+        $resolvedSchoolCoaches = $this->mergeCoachRowsById($businessCoaches, $nameMatchedCoaches);
+        $snapshot['coaches'] = $this->mergeCoachRowsById($snapshot['coaches'] ?? [], $resolvedSchoolCoaches);
+
+        $normalizedBusinessId = strtolower($businessId);
+        $nameOnlyCount = collect($nameMatchedCoaches)
+            ->filter(function (array $coach) use ($normalizedBusinessId): bool {
+                if ($normalizedBusinessId === '') {
+                    return true;
+                }
+
+                return ! in_array($normalizedBusinessId, $this->coachBusinessIdCandidates($coach), true);
+            })
+            ->map(fn (array $coach): string => $this->coachTrackingIdentity($coach))
+            ->unique()
+            ->count();
+
+        $associatedCount = max(
+            count($businessCoaches),
+            (int) ($result['count'] ?? 0),
+            (int) ($result['total'] ?? 0),
+        );
+        $crossReferencedCount = max($associatedCount + $nameOnlyCount, count($resolvedSchoolCoaches));
+
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])->map(function (array $existing) use (
+            $school,
+            $schoolName,
+            $normalizedSchoolName,
+            $businessId,
+            $result,
+            $resolvedSchoolCoaches,
+            $associatedCount,
+            $nameOnlyCount,
+            $crossReferencedCount
+        ): array {
+            $targetIds = collect([$school['id'] ?? null, $school['business_id'] ?? null, $businessId])
+                ->map(fn ($value): string => strtolower(trim((string) $value)))
+                ->filter()
+                ->values();
+            $existingIds = collect([$existing['id'] ?? null, $existing['business_id'] ?? null, $existing['company_id'] ?? null])
+                ->map(fn ($value): string => strtolower(trim((string) $value)))
+                ->filter()
+                ->values();
+
+            $existingNameKey = $this->normalizeSchoolMatchKey((string) ($existing['name'] ?? $existing['school_name'] ?? $existing['company_name'] ?? ''));
+            $matchesById = $targetIds->intersect($existingIds)->isNotEmpty();
+            $matchesByName = $normalizedSchoolName !== '' && $existingNameKey === $normalizedSchoolName;
+
+            if (! $matchesById && ! $matchesByName) {
                 return $existing;
             }
 
-            $logoUrl = collect($result['coaches'] ?? [])
-                ->filter(fn ($coach): bool => is_array($coach))
+            $logoUrl = collect($resolvedSchoolCoaches)
                 ->map(fn (array $coach): ?string => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null)
                 ->filter(fn (?string $url): bool => filled($url))
                 ->first();
 
-            $firstCoach = collect($result['coaches'] ?? [])->first(fn ($coach): bool => is_array($coach)) ?: [];
+            $firstCoach = collect($resolvedSchoolCoaches)->first(fn ($coach): bool => is_array($coach)) ?: [];
 
             $existing['coaches_loaded'] = true;
-            $existing['coach_count'] = count($result['coaches'] ?? []);
+            $existing['coaches_loaded_from_business'] = $businessId !== '' && (bool) ($result['success'] ?? false);
+            $existing['coaches_loaded_from'] = $nameOnlyCount > 0
+                ? 'ghl_business_contacts+company_name_cross_reference'
+                : ($businessId !== '' ? 'ghl_business_contacts' : 'company_name_cross_reference');
+            $existing['coach_count_loaded'] = true;
+            $existing['coach_count_associated'] = $associatedCount;
+            $existing['coach_count_name_only'] = $nameOnlyCount;
+            $existing['coach_count_cross_referenced'] = $crossReferencedCount;
+            $existing['coach_count_source'] = $nameOnlyCount > 0
+                ? 'ghl_business_plus_company_name_cross_reference'
+                : ($businessId !== '' ? 'ghl_business_contacts' : 'company_name_cross_reference');
+            $existing['coach_count'] = max((int) ($existing['coach_count'] ?? 0), $crossReferencedCount);
+            $existing['coaches_count'] = $existing['coach_count'];
             $existing['logo_url'] = $existing['logo_url'] ?? $logoUrl;
             $existing['school_logo_url'] = $existing['school_logo_url'] ?? $logoUrl;
             $existing['business_logo_url'] = $existing['business_logo_url'] ?? $logoUrl;
             $existing['conference'] = $existing['conference'] ?? ($firstCoach['conference'] ?? null);
             $existing['division'] = $existing['division'] ?? ($firstCoach['division'] ?? null);
+
+            if (! ($result['success'] ?? true) && empty($resolvedSchoolCoaches)) {
+                $existing['coaches_load_failed'] = true;
+                $existing['coaches_load_error'] = $result['error'] ?? 'Unable to load coaches for this school.';
+            } else {
+                unset($existing['coaches_load_failed'], $existing['coaches_load_error']);
+            }
+
             return $existing;
         })->values()->all();
 
@@ -682,18 +932,18 @@ trait InteractsWithCoachDatabase
      * Backward-compatible default refresh action.
      *
      * The header reload button now exposes two actions:
-     * - refreshStatsOnly(): lightweight one-pass GHL stats sync
+     * - refreshStatsOnly(): lightweight one-pass Recruiting Center stats sync
      * - refreshCoachDatabase(): full Coach Database dataset reload
      *
      * Keep refreshData() as the default/stats action so older buttons, keyboard
      * shortcuts, or links still perform the safer lightweight refresh.
      */
-    public function refreshData(bool $notify = true, string $message = 'Syncing recruiting stats from GHL.'): void
+    public function refreshData(bool $notify = true, string $message = 'Syncing recruiting stats from Recruiting Center.'): void
     {
         $this->refreshStatsOnly($notify, $message);
     }
 
-    public function refreshStatsOnly(bool $notify = true, string $message = 'Syncing recruiting stats from GHL.'): void
+    public function refreshStatsOnly(bool $notify = true, string $message = 'Syncing recruiting stats from Recruiting Center.'): void
     {
         $user = Auth::user();
 
@@ -702,7 +952,8 @@ trait InteractsWithCoachDatabase
         }
 
         $this->error = null;
-        $this->startRecruitingStatsSyncInBackground($user);
+        $syncStatus = $this->startRecruitingStatsSyncInBackground($user, 'stats_sync');
+        $this->refreshRecruitingSyncStatus($syncStatus);
 
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
         if (is_array($snapshot)) {
@@ -715,67 +966,241 @@ trait InteractsWithCoachDatabase
         if ($notify) {
             Notification::make()
                 ->title('Recruiting Center')
-                ->body('Stats sync started in the background. The dashboard will use the latest cached stats now; refresh again in a moment to see the newly exported GHL values.')
+                ->body('Stats sync started in the background. The dashboard will use the latest cached stats now; refresh again in a moment to see the newly exported Recruiting Center values.')
                 ->success()
                 ->send();
         }
     }
 
-    protected function startRecruitingStatsSyncInBackground($user): void
+    protected function recruitingStatsSyncLockKey($user): string
     {
-        $lockKey = 'recruiting:stats-sync-running:' . $user->id;
-        $statusKey = 'recruiting:stats-sync-status:' . $user->id;
+        return 'recruiting:stats-sync-running:' . ($user?->id ?? 'guest');
+    }
 
-        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(20))) {
-            Cache::put($statusKey, [
-                'status' => 'already_running',
-                'started_at' => Cache::get($lockKey),
-                'user_id' => $user->id,
-            ], now()->addMinutes(30));
+    protected function recruitingStatsSyncStatusKey($user): string
+    {
+        return 'recruiting:stats-sync-status:' . ($user?->id ?? 'guest');
+    }
+
+    protected function recruitingSyncModeLabel(?string $mode): string
+    {
+        return match ($mode) {
+            'full_database_reload' => 'Full Coach Database reload',
+            'livewire_dataset_load' => 'Coach Database dataset load',
+            'stats_sync' => 'Recruiting stats sync',
+            default => 'Recruiting Center sync',
+        };
+    }
+
+    public function refreshRecruitingSyncStatus(?array $statusOverride = null): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            $this->isRecruitingSyncRunning = false;
+            $this->recruitingSyncStatus = null;
+            $this->recruitingSyncMode = null;
+            $this->recruitingSyncStartedAt = null;
+            $this->recruitingSyncFinishedAt = null;
+            $this->recruitingSyncMessage = null;
             return;
         }
 
-        Cache::put($statusKey, [
+        $statusKey = $this->recruitingStatsSyncStatusKey($user);
+        $lockKey = $this->recruitingStatsSyncLockKey($user);
+        $status = is_array($statusOverride) && ! empty($statusOverride)
+            ? $statusOverride
+            : Cache::get($statusKey, []);
+        $status = is_array($status) ? $status : [];
+        $lockStartedAt = Cache::get($lockKey);
+        $rawStatus = strtolower((string) ($status['status'] ?? ''));
+
+        if (in_array($rawStatus, ['running', 'already_running'], true) && ! $lockStartedAt) {
+            // The background command releases the lock when it finishes. If the status
+            // row still says "running" but the lock is gone, mark it complete so the
+            // visible loader does not get stuck after the service finishes safely.
+            $status['status'] = 'completed';
+            $status['finished_at'] = $status['finished_at'] ?? now()->toDateTimeString();
+            $status['message'] = $status['message'] ?? 'Recruiting sync completed. Latest cached rows are still available.';
+            Cache::put($statusKey, $status, now()->addMinutes(30));
+            $rawStatus = 'completed';
+        }
+
+        $this->isRecruitingSyncRunning = (bool) $lockStartedAt && in_array($rawStatus, ['running', 'already_running'], true);
+        $this->recruitingSyncStatus = $rawStatus !== '' ? $rawStatus : null;
+        $this->recruitingSyncMode = $status['mode'] ?? null;
+        $this->recruitingSyncStartedAt = $status['started_at'] ?? (is_string($lockStartedAt) ? $lockStartedAt : null);
+        $this->recruitingSyncFinishedAt = $status['finished_at'] ?? null;
+        $this->recruitingSyncMessage = $status['message']
+            ?? ($this->isRecruitingSyncRunning
+                ? $this->recruitingSyncModeLabel($this->recruitingSyncMode) . ' is running. Existing schools/coaches stay visible while the background service works.'
+                : null);
+    }
+
+    public function getRecruitingReloadStatusProperty(): array
+    {
+        $this->refreshRecruitingSyncStatus();
+
+        $user = Auth::user();
+        $status = $user ? Cache::get($this->recruitingStatsSyncStatusKey($user), []) : [];
+        $status = is_array($status) ? $status : [];
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $snapshot = is_array($snapshot) ? $snapshot : [];
+
+        $loadedSchools = (int) ($status['loaded_schools'] ?? $snapshot['loaded_schools_count'] ?? $this->loadedSchoolsCount ?? 0);
+        $loadedContacts = (int) ($status['loaded_contacts'] ?? $snapshot['loaded_contacts_count'] ?? $this->loadedContactsCount ?? 0);
+        $remoteSchools = (int) ($status['remote_total_schools'] ?? $snapshot['remote_total_schools'] ?? $this->remoteTotalSchools ?? 0);
+        $remoteContacts = (int) ($status['remote_total_contacts'] ?? $snapshot['remote_total_contacts'] ?? 0);
+        $progress = (int) ($status['progress'] ?? 0);
+
+        if ($progress <= 0) {
+            $remoteTotal = max(1, $remoteSchools + $remoteContacts);
+            $progress = min(99, (int) round((($loadedSchools + $loadedContacts) / $remoteTotal) * 100));
+        }
+
+        if (! $this->isRecruitingSyncRunning && in_array($this->recruitingSyncStatus, ['completed', 'cleared'], true)) {
+            $progress = 100;
+        }
+
+        return [
+            'active' => $this->isRecruitingSyncRunning,
+            'status' => $this->recruitingSyncStatus,
+            'mode' => $this->recruitingSyncMode,
+            'title' => $this->recruitingSyncModeLabel($this->recruitingSyncMode),
+            'message' => $this->recruitingSyncMessage ?: ($snapshot['last_refresh_notice'] ?? 'Recruiting Center is syncing with Recruiting Center in the background.'),
+            'percent' => max(1, min(100, $progress)),
+            'loaded_schools' => $loadedSchools,
+            'loaded_contacts' => $loadedContacts,
+            'loaded_pages' => (int) ($status['loaded_pages'] ?? $snapshot['loaded_pages'] ?? $this->loadedPages ?? 0),
+            'started_at' => $this->recruitingSyncStartedAt,
+            'finished_at' => $this->recruitingSyncFinishedAt,
+        ];
+    }
+
+
+    public function clearStuckRecruitingSync(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        Cache::forget($this->recruitingStatsSyncLockKey($user));
+        $status = [
+            'status' => 'cleared',
+            'mode' => $this->recruitingSyncMode ?: 'manual_clear',
+            'user_id' => $user->id,
+            'progress' => 100,
+            'finished_at' => now()->toDateTimeString(),
+            'message' => 'The stale background-sync lock was cleared. Existing cached data was not deleted.',
+        ];
+        Cache::put($this->recruitingStatsSyncStatusKey($user), $status, now()->addMinutes(120));
+        $this->refreshRecruitingSyncStatus($status);
+        $this->isLoadingDataset = false;
+        $this->hasMoreData = false;
+
+        Notification::make()
+            ->title('Recruiting Center')
+            ->body('Stale sync status cleared. You can start the full background reload again.')
+            ->success()
+            ->send();
+    }
+
+    protected function startRecruitingStatsSyncInBackground($user, string $mode = 'stats_sync'): array
+    {
+        $lockKey = $this->recruitingStatsSyncLockKey($user);
+        $statusKey = $this->recruitingStatsSyncStatusKey($user);
+        $modeLabel = $this->recruitingSyncModeLabel($mode);
+
+        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(90))) {
+            $existing = Cache::get($statusKey, []);
+            $status = array_merge(is_array($existing) ? $existing : [], [
+                'status' => 'already_running',
+                'mode' => $existing['mode'] ?? $mode,
+                'started_at' => $existing['started_at'] ?? Cache::get($lockKey),
+                'user_id' => $user->id,
+                'message' => $existing['message'] ?? ($modeLabel . ' is already running. Existing cached rows remain available.'),
+            ]);
+            Cache::put($statusKey, $status, now()->addMinutes(120));
+            return $status;
+        }
+
+        $status = [
             'status' => 'running',
+            'mode' => $mode,
+            'progress' => 1,
+            'loaded_schools' => 0,
+            'loaded_contacts' => 0,
+            'loaded_pages' => 0,
             'started_at' => now()->toDateTimeString(),
             'user_id' => $user->id,
-        ], now()->addMinutes(30));
+            'message' => $modeLabel . ' started in a detached process. Existing Coach Database rows remain visible.',
+        ];
+        Cache::put($statusKey, $status, now()->addMinutes(120));
 
         $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
         $artisan = base_path('artisan');
-        $logPath = storage_path('logs/recruiting-stats-sync-' . $user->id . '.log');
+        $artisanCommand = $mode === 'full_database_reload'
+            ? 'recruiting:sync-dataset'
+            : 'recruiting:sync-stats';
+        $logName = $mode === 'full_database_reload'
+            ? 'recruiting-dataset-sync-'
+            : 'recruiting-stats-sync-';
+        $logPath = storage_path('logs/' . $logName . $user->id . '.log');
+        $arguments = ' --user=' . (int) $user->id . ' --force --release-lock';
 
         try {
             if (PHP_OS_FAMILY === 'Windows') {
                 $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
-                    . ' recruiting:sync-stats --user=' . (int) $user->id . ' --force --release-lock > ' . escapeshellarg($logPath) . ' 2>&1';
+                    . ' ' . $artisanCommand . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1';
                 pclose(popen($command, 'r'));
-                return;
+                return $status;
             }
 
             $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
-                . ' recruiting:sync-stats --user=' . (int) $user->id . ' --force --release-lock > ' . escapeshellarg($logPath) . ' 2>&1 &';
-
+                . ' ' . $artisanCommand . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1 &';
             Process::fromShellCommandline($command, base_path())->run();
         } catch (\Throwable $exception) {
             Cache::forget($lockKey);
-            Cache::put($statusKey, [
+            $status = [
                 'status' => 'failed_to_start',
+                'mode' => $mode,
                 'error' => $exception->getMessage(),
                 'user_id' => $user->id,
                 'failed_at' => now()->toDateTimeString(),
-            ], now()->addMinutes(30));
+                'message' => 'Unable to start ' . strtolower($modeLabel) . ': ' . $exception->getMessage(),
+            ];
+            Cache::put($statusKey, $status, now()->addMinutes(120));
 
-            Log::warning('Unable to start recruiting stats sync in background.', [
+            Log::warning('Unable to start Recruiting Center background sync.', [
                 'user_id' => $user->id,
+                'mode' => $mode,
                 'error' => $exception->getMessage(),
             ]);
         }
+
+        return $status;
     }
 
     public function refreshCoachDatabase(bool $notify = true): void
     {
         if (! $this->allowed || $this->locked) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $this->refreshRecruitingSyncStatus();
+        if ($this->isRecruitingSyncRunning) {
+            if ($notify) {
+                Notification::make()
+                    ->title('Recruiting Center')
+                    ->body($this->recruitingSyncMessage ?: 'A Recruiting Center sync is already running. Existing cached data remains available.')
+                    ->warning()
+                    ->send();
+            }
             return;
         }
 
@@ -794,41 +1219,16 @@ trait InteractsWithCoachDatabase
         $this->divisionFilter = '';
         $this->conferenceFilter = '';
         $this->error = null;
+        $this->hasMoreData = false;
 
-        $this->isLoadingDataset = true;
-        $this->hasMoreData = true;
-
-        if ((bool) config('ghl.coach_database.refresh_in_livewire', false)) {
-            $this->startBackgroundLoad(true);
-        } else {
-            // Do not wipe the current snapshot from Livewire. A full GHL reload can
-            // take longer than a browser request, so keep the last good cached
-            // schools/coaches visible and only mark the reload as queued. The
-            // background job can rebuild/refresh the cache without leaving the
-            // dashboard blank.
-            $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-            if (! is_array($snapshot)) {
-                $snapshot = $this->emptySnapshot();
-            }
-
-            $snapshot['has_more_data'] = false;
-            $snapshot['reload_queued_at'] = now()->toDateTimeString();
-            $snapshot['last_refresh_notice'] = 'Full reload queued safely. Existing Coach Database rows were kept visible while background sync runs.';
-            $this->storeSnapshot($snapshot);
-            $this->hydrateFromSnapshot($snapshot);
-            $this->isLoadingDataset = false;
-            $this->hasMoreData = false;
-
-            $user = Auth::user();
-            if ($user) {
-                $this->startRecruitingStatsSyncInBackground($user);
-            }
-        }
+        $status = $this->startRecruitingStatsSyncInBackground($user, 'full_database_reload');
+        $this->refreshRecruitingSyncStatus($status);
+        $this->isLoadingDataset = in_array(strtolower((string) ($status['status'] ?? '')), ['running', 'already_running'], true);
 
         if ($notify) {
             Notification::make()
                 ->title('Recruiting Center')
-                ->body('Reloading the full Coach Database from GHL. This can take a moment for large datasets.')
+                ->body('The full Coach Database reload is running outside Livewire. You can keep using the page; schools and coaches will refresh from cache when the background sync finishes.')
                 ->success()
                 ->send();
         }
@@ -836,12 +1236,14 @@ trait InteractsWithCoachDatabase
 
     public function loadMoreSchools(): void
     {
-        $this->schoolDisplayLimit += 24;
+        $cap = max(24, (int) config('coach-database-sync.ui.school_row_cap', 96));
+        $this->schoolDisplayLimit = min($cap, $this->schoolDisplayLimit + 24);
     }
 
     public function loadMoreCoaches(): void
     {
-        $this->coachDisplayLimit += 40;
+        $cap = max(40, (int) config('coach-database-sync.ui.coach_row_cap', 120));
+        $this->coachDisplayLimit = min($cap, $this->coachDisplayLimit + 40);
     }
 
     public function createCustomList(): void
@@ -940,7 +1342,7 @@ trait InteractsWithCoachDatabase
 
         Notification::make()
             ->title('My Lists')
-            ->body('List removed. Existing GHL contact tags are left untouched.')
+            ->body('List removed. Existing Recruiting Center contact tags are left untouched.')
             ->success()
             ->send();
     }
@@ -952,7 +1354,7 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Keep the drawer open action instant. Do not call GHL or rebuild the
+        // Keep the drawer open action instant. Do not call Recruiting Center or rebuild the
         // whole snapshot inside the Livewire click request. The selectedSchool
         // computed property hydrates coaches from the already cached dashboard /
         // discover coach indexes, which is the same data source that already
@@ -967,6 +1369,9 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        // Drawer opens are cache-only. The complete roster is reconciled during the
+        // detached dataset sync, so a click never calls Recruiting Center or rebuilds the full
+        // snapshot inside a Livewire request.
         $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
             $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
             return (string) ($item['id'] ?? '') === $schoolId
@@ -975,13 +1380,9 @@ trait InteractsWithCoachDatabase
                 || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
         });
 
-        if (is_array($school)) {
-            $resolvedId = (string) ($school['id'] ?? $school['business_id'] ?? $schoolId);
-            $this->selectedSchoolId = $resolvedId;
-            return;
-        }
-
-        $this->selectedSchoolId = $schoolId;
+        $this->selectedSchoolId = is_array($school)
+            ? (string) ($school['id'] ?? $school['business_id'] ?? $schoolId)
+            : $schoolId;
     }
 
     public function openDashboardEngagedSchool(int $index): void
@@ -1014,10 +1415,24 @@ trait InteractsWithCoachDatabase
         $this->selectedSchoolId = null;
     }
 
+    /**
+     * Close only the school that initiated the close request. This prevents an
+     * older delayed close response from dismissing a different school that the
+     * user opened while background favorite/list work was still finishing.
+     */
+    public function closeSchoolIfSelected(string $schoolId): void
+    {
+        $schoolId = trim($schoolId);
+
+        if ($schoolId === '' || (string) $this->selectedSchoolId === $schoolId) {
+            $this->selectedSchoolId = null;
+        }
+    }
+
     public function loadSchoolCoachesById(string $schoolId): void
     {
         // Intentionally no-op for UI clicks. The old implementation called the
-        // slow GHL /contacts/business endpoint and rebuilt the snapshot during
+        // slow Recruiting Center /contacts/business endpoint and rebuilt the snapshot during
         // the Livewire request, which left the drawer stuck on the loading
         // overlay. Coaches are resolved from the cached coach index in
         // getSelectedSchoolProperty().
@@ -1029,6 +1444,132 @@ trait InteractsWithCoachDatabase
     public function unsaveSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->savedSchoolTag(), 'remove'); }
     public function favoriteSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->favoriteSchoolTag(), 'add'); }
     public function unfavoriteSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->favoriteSchoolTag(), 'remove'); }
+
+    /**
+     * Queue a favorite change without morphing the active Livewire component.
+     * This prevents an older favorite response from replacing a newer school
+     * drawer that the user opened while the background action was finishing.
+     */
+    public function queueSchoolFavoriteState(string $schoolId, bool $favorite): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        $schoolId = trim($schoolId);
+
+        if (! $user || $schoolId === '' || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
+        $contactIds = $this->contactIdsForSchool($schoolId);
+        if (empty($contactIds)) {
+            return ['success' => false, 'error' => 'No coaches were found for this school.'];
+        }
+
+        $tag = app(CoachDatabaseService::class)->favoriteSchoolTag();
+        $type = $favorite ? 'add' : 'remove';
+
+        $this->applyTagToCachedContacts($contactIds, $tag, $type, false);
+
+        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, [[
+            'school_id' => $schoolId,
+            'contact_ids' => $contactIds,
+            'tag' => $tag,
+            'type' => $type,
+        ]]);
+
+        if (! ($queued['success'] ?? false)) {
+            // Revert the optimistic cache mutation when the queue itself failed.
+            $this->applyTagToCachedContacts($contactIds, $tag, $favorite ? 'remove' : 'add', false);
+            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue the favorite change.'];
+        }
+
+        $this->startCoachDatabaseActionWorker($user);
+
+        return [
+            'success' => true,
+            'favorite' => $favorite,
+            'queued' => (int) ($queued['queued'] ?? 1),
+        ];
+    }
+
+    public function pollCoachDatabaseActionStatus(): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return ['status' => 'idle'];
+        }
+
+        $status = Cache::get(CoachDatabaseActionQueueService::statusKey($user), []);
+        $status = is_array($status) ? $status : ['status' => 'idle'];
+        $state = strtolower(trim((string) ($status['status'] ?? 'idle')));
+
+        if (in_array($state, ['completed', 'completed_with_errors'], true)) {
+            $completedAt = trim((string) ($status['completed_at'] ?? $status['updated_at'] ?? ''));
+            $notificationToken = sha1(implode('|', [
+                (string) $user->id,
+                $state,
+                $completedAt,
+                (string) ($status['processed'] ?? 0),
+                (string) ($status['failed'] ?? 0),
+            ]));
+
+            $notificationKey = CoachDatabaseActionQueueService::statusKey($user) . ':filament-notification:' . $notificationToken;
+            if (Cache::add($notificationKey, true, now()->addDay())) {
+                $processed = (int) ($status['processed'] ?? 0);
+                $failed = (int) ($status['failed'] ?? 0);
+
+                $notification = Notification::make()
+                    ->title($state === 'completed_with_errors' ? 'Update finished with issues' : 'Update complete')
+                    ->body($state === 'completed_with_errors'
+                        ? number_format($processed) . ' background update(s) completed and ' . number_format($failed) . ' failed.'
+                        : number_format($processed) . ' background update(s) completed successfully.');
+
+                if ($state === 'completed_with_errors') {
+                    $notification->warning();
+                } else {
+                    $notification->success();
+                }
+
+                $notification->send();
+            }
+        }
+
+        return $status;
+    }
+
+    public function notifyRecruitingUi(string $message, string $type = 'success', ?string $title = null): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $message = trim($message);
+        if ($message === '') {
+            return ['success' => false];
+        }
+
+        $notification = Notification::make()
+            ->title(trim((string) $title) !== '' ? trim((string) $title) : 'Recruiting Center')
+            ->body($message);
+
+        match (strtolower(trim($type))) {
+            'danger', 'error' => $notification->danger(),
+            'warning', 'warn' => $notification->warning(),
+            'info' => $notification->info(),
+            default => $notification->success(),
+        };
+
+        $notification->send();
+
+        return ['success' => true];
+    }
     public function saveCoach(string $contactId): void { $this->runContactTagAction([$contactId], app(CoachDatabaseService::class)->savedCoachTag(), 'add'); }
     public function unsaveCoach(string $contactId): void { $this->runContactTagAction([$contactId], app(CoachDatabaseService::class)->savedCoachTag(), 'remove'); }
     public function favoriteCoach(string $contactId): void { $this->runContactTagAction([$contactId], app(CoachDatabaseService::class)->favoriteCoachTag(), 'add'); }
@@ -1044,6 +1585,80 @@ trait InteractsWithCoachDatabase
     {
         $tag = app(CoachDatabaseService::class)->listTagForKey($listKey, Auth::user());
         if ($tag) $this->runSchoolContactTagAction($schoolId, $tag, 'remove');
+    }
+
+    /**
+     * Optimistically apply several list checkbox changes in one lightweight
+     * Livewire request, then send the remote contact updates in a detached
+     * worker. This keeps the drawer interactive during stress/rapid clicking.
+     */
+    public function queueSchoolListMemberships(string $schoolId, array $memberships): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        $schoolId = trim($schoolId);
+
+        if (! $user || $schoolId === '' || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
+        $desired = collect($memberships)
+            ->mapWithKeys(function ($value, $key): array {
+                $listKey = trim((string) $key);
+                return $listKey === '' ? [] : [$listKey => filter_var($value, FILTER_VALIDATE_BOOL)];
+            })
+            ->all();
+
+        if (empty($desired)) {
+            return ['success' => true, 'queued' => 0, 'states' => []];
+        }
+
+        $contactIds = $this->contactIdsForSchool($schoolId);
+        if (empty($contactIds)) {
+            return ['success' => false, 'error' => 'No coaches were found for this school.'];
+        }
+
+        $actions = [];
+        $resolvedStates = [];
+        $service = app(CoachDatabaseService::class);
+
+        foreach ($desired as $listKey => $inList) {
+            $tag = $service->listTagForKey($listKey, $user);
+            if (! $tag) {
+                continue;
+            }
+
+            $resolvedStates[$listKey] = (bool) $inList;
+            $actions[] = [
+                'school_id' => $schoolId,
+                'list_key' => $listKey,
+                'contact_ids' => $contactIds,
+                'tag' => $tag,
+                'type' => $inList ? 'add' : 'remove',
+            ];
+        }
+
+        if (empty($actions)) {
+            return ['success' => false, 'error' => 'No valid list changes were found.'];
+        }
+
+        $this->applySchoolListMembershipsToCache($schoolId, $contactIds, $actions, false);
+        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, $actions);
+
+        if (! ($queued['success'] ?? false)) {
+            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue list changes.'];
+        }
+
+        $this->startCoachDatabaseActionWorker($user);
+
+        return [
+            'success' => true,
+            'queued' => (int) ($queued['queued'] ?? count($actions)),
+            'states' => $resolvedStates,
+        ];
     }
 
     public function addCoachToList(string $contactId, string $listKey): void
@@ -1063,6 +1678,165 @@ trait InteractsWithCoachDatabase
         $this->loadSchoolCoachesById($schoolId);
         $ids = $this->contactIdsForSchool($schoolId);
         $this->runContactTagAction($ids, $tag, $type);
+    }
+
+
+    protected function applySchoolListMembershipsToCache(string $schoolId, array $contactIds, array $actions, bool $hydrateComponent = true): void
+    {
+        $selectedSchoolId = $this->selectedSchoolId;
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $contactLookup = array_flip(collect($contactIds)->map(fn ($id): string => trim((string) $id))->filter()->unique()->all());
+
+        $changes = collect($actions)
+            ->filter(fn ($action): bool => is_array($action) && filled($action['tag'] ?? null) && filled($action['list_key'] ?? null))
+            ->mapWithKeys(function (array $action): array {
+                $listKey = trim((string) $action['list_key']);
+                return [$listKey => [
+                    'tag' => trim((string) $action['tag']),
+                    'in_list' => strtolower((string) ($action['type'] ?? 'add')) !== 'remove',
+                ]];
+            });
+
+        $snapshot['coaches'] = collect($snapshot['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(function (array $coach) use ($contactLookup, $changes): array {
+                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''));
+                if ($coachId === '' || ! isset($contactLookup[$coachId])) {
+                    return $coach;
+                }
+
+                $tags = collect($coach['tags'] ?? [])
+                    ->map(fn ($tag): string => trim((string) $tag))
+                    ->filter()
+                    ->unique(fn (string $tag): string => strtolower($tag))
+                    ->values();
+
+                foreach ($changes as $change) {
+                    $tag = (string) ($change['tag'] ?? '');
+                    $lowerTag = strtolower($tag);
+                    if ((bool) ($change['in_list'] ?? false)) {
+                        if (! $tags->contains(fn (string $existing): bool => strtolower($existing) === $lowerTag)) {
+                            $tags->push($tag);
+                        }
+                    } else {
+                        $tags = $tags->reject(fn (string $existing): bool => strtolower($existing) === $lowerTag)->values();
+                    }
+                }
+
+                $coach['tags'] = $tags->values()->all();
+                return $coach;
+            })
+            ->values()
+            ->all();
+
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])
+            ->filter(fn ($school): bool => is_array($school))
+            ->map(function (array $school) use ($schoolId, $changes): array {
+                $id = trim((string) ($school['id'] ?? ''));
+                $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
+                if ($id !== $schoolId && $businessId !== $schoolId) {
+                    return $school;
+                }
+
+                $listKeys = collect($school['list_keys'] ?? [])
+                    ->merge($school['lists'] ?? [])
+                    ->map(fn ($key): string => trim((string) $key))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                foreach ($changes as $listKey => $change) {
+                    if ((bool) ($change['in_list'] ?? false)) {
+                        if (! $listKeys->contains($listKey)) {
+                            $listKeys->push($listKey);
+                        }
+                    } else {
+                        $listKeys = $listKeys->reject(fn (string $key): bool => $key === $listKey)->values();
+                    }
+                }
+
+                $school['list_keys'] = $listKeys->values()->all();
+                $school['lists'] = $school['list_keys'];
+                return $school;
+            })
+            ->values()
+            ->all();
+
+        $schools = collect($snapshot['schools'] ?? []);
+        $snapshot['lists'] = collect($snapshot['lists'] ?? [])
+            ->map(function ($row) use ($schools, $changes) {
+                if (! is_array($row)) {
+                    return $row;
+                }
+
+                $rowKey = trim((string) ($row['key'] ?? ''));
+                if (! $changes->has($rowKey)) {
+                    return $row;
+                }
+
+                $items = $schools
+                    ->filter(fn (array $school): bool => in_array($rowKey, $school['list_keys'] ?? [], true))
+                    ->values();
+
+                $row['schools_count'] = $items->count();
+                $row['coaches_count'] = $items->sum(fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0));
+                $row['schools'] = $items
+                    ->map(fn (array $school): array => [
+                        'id' => $school['id'] ?? $school['business_id'] ?? null,
+                        'name' => $school['name'] ?? null,
+                        'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null,
+                        'conference' => $school['conference'] ?? null,
+                        'division' => $school['division'] ?? null,
+                        'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                    ])
+                    ->all();
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        $snapshot['tag_synced_at'] = now()->toDateTimeString();
+        $this->storeSnapshot($snapshot);
+
+        if ($hydrateComponent) {
+            $this->hydrateFromSnapshot($snapshot);
+            $this->selectedSchoolId = $selectedSchoolId ?: $schoolId;
+            $this->dispatch('rc-school-list-cache-updated', schoolId: $schoolId);
+        }
+    }
+
+    protected function startCoachDatabaseActionWorker($user): void
+    {
+        $launchKey = CoachDatabaseActionQueueService::launchKey($user);
+        if (! Cache::add($launchKey, true, now()->addMinutes(10))) {
+            return;
+        }
+
+        $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
+        $artisan = base_path('artisan');
+        $logPath = storage_path('logs/recruiting-actions-' . $user->id . '.log');
+
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                    . ' recruiting:process-actions --user=' . (int) $user->id
+                    . ' > ' . escapeshellarg($logPath) . ' 2>&1';
+                pclose(popen($command, 'r'));
+                return;
+            }
+
+            $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                . ' recruiting:process-actions --user=' . (int) $user->id
+                . ' > ' . escapeshellarg($logPath) . ' 2>&1 &';
+            Process::fromShellCommandline($command, base_path())->run();
+        } catch (\Throwable $exception) {
+            Cache::forget($launchKey);
+            Log::warning('Unable to start Recruiting Center action worker.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     protected function runContactTagAction(array $contactIds, string $tag, string $type): void
@@ -1115,19 +1889,36 @@ trait InteractsWithCoachDatabase
     {
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
         $lastSyncedAt = $snapshot['tag_synced_at'] ?? null;
-        $syncEveryMinutes = (int) config('ghl.coach_database.tag_sync_minutes', 5);
+        $syncEveryMinutes = max(1, (int) config('coach-database-sync.tags.sync_minutes', config('ghl.coach_database.tag_sync_minutes', 5)));
 
-        if (! $force && $lastSyncedAt && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($lastSyncedAt)) < $syncEveryMinutes) {
-            $this->hydrateFromSnapshot($snapshot);
+        if (! $force && $lastSyncedAt) {
+            try {
+                if (now()->diffInMinutes(\Illuminate\Support\Carbon::parse($lastSyncedAt)) < $syncEveryMinutes) {
+                    $this->hydrateFromSnapshot($snapshot);
+                    $this->refreshContactTagSyncStatus();
+                    return;
+                }
+            } catch (\Throwable) {
+                // Invalid legacy timestamps are treated as stale and refreshed below.
+            }
+        }
+
+        $user = Auth::user();
+        if (! $user) {
             return;
         }
 
-        $this->syncLatestContactTags($force);
+        $this->startContactTagSyncInBackground($user, $force);
+        $this->hydrateFromSnapshot($snapshot);
+        $this->refreshContactTagSyncStatus();
     }
 
+    /**
+     * Start a tag-only refresh outside Livewire. This method never calls Recruiting Center directly.
+     */
     public function syncLatestContactTags(bool $force = true): void
     {
-        if (! $this->allowed || $this->locked || $this->isSyncingTags) {
+        if (! $this->allowed || $this->locked) {
             return;
         }
 
@@ -1136,105 +1927,120 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        $this->isSyncingTags = true;
-        $service = app(CoachDatabaseService::class);
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-
-        $customListTags = collect($snapshot['custom_list_tags'] ?? [])
-            ->map(function ($item): ?string {
-                if (is_array($item)) {
-                    $value = $item['tag'] ?? $item['name'] ?? $item['value'] ?? null;
-                    return is_scalar($value) ? trim((string) $value) : null;
-                }
-
-                return is_scalar($item) ? trim((string) $item) : null;
-            })
-            ->filter(fn (?string $tag): bool => filled($tag))
-            ->values()
-            ->all();
-
-        $tags = $service->actionTags($user, $customListTags);
-
-        if (empty($tags)) {
-            $this->isSyncingTags = false;
-            $this->hydrateFromSnapshot($snapshot);
-            return;
-        }
-
-        $result = $service->getContactsByTagsForUser($user, $tags);
-        $contacts = $result['contacts'] ?? [];
-
-        if (! ($result['success'] ?? false) && empty($contacts)) {
-            $this->isSyncingTags = false;
-            $this->hydrateFromSnapshot($snapshot);
-
-            if ($force) {
-                Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to sync saved, favorite, and list tags.')->danger()->send();
-            }
-
-            return;
-        }
-
-        $this->mergeContactsIntoSnapshot($snapshot, $contacts);
-
-        $snapshot['tag_synced_at'] = now()->toDateTimeString();
-        $snapshot['cached_at'] = now()->toDateTimeString();
-        $snapshot['tag_sync_mode'] = 'by_tag';
-        $snapshot['last_tag_sync_count'] = count($contacts);
-        $snapshot['last_tag_sync_debug'] = $result['by_tag'] ?? $result['debug'] ?? [];
-
-        $this->rebuildAndStoreSnapshot($snapshot);
-        $this->isSyncingTags = false;
+        $status = $this->startContactTagSyncInBackground($user, $force);
+        $this->refreshContactTagSyncStatus($status);
 
         if ($force) {
-            $byTag = collect($result['by_tag'] ?? [])
-                ->map(function ($value, $tag): string {
-                    $count = is_array($value)
-                        ? ($value['count'] ?? $value['total'] ?? count($value['contacts'] ?? []))
-                        : $value;
+            $state = strtolower((string) ($status['status'] ?? ''));
+            $message = in_array($state, ['running', 'already_running'], true)
+                ? 'Favorites and list tags are refreshing in the background. Cached results remain available while it runs.'
+                : (string) ($status['message'] ?? 'Unable to start the background tag refresh.');
 
-                    if (is_array($count)) {
-                        $count = count($count);
-                    }
+            $notification = Notification::make()
+                ->title('Recruiting Center')
+                ->body($message);
 
-                    return (string) $tag . ': ' . (string) $count;
-                })
-                ->values()
-                ->implode(', ');
+            if (in_array($state, ['running', 'already_running'], true)) {
+                $notification->success();
+            } else {
+                $notification->danger();
+            }
 
-            $message = count($contacts) > 0
-                ? count($contacts) . ' saved, favorite, and list coaches synced' . ($byTag !== '' ? ' (' . $byTag . ').' : '.')
-                : 'No tagged coaches found yet.';
-
-            Notification::make()->title('Recruiting Center')->body($message)->success()->send();
+            $notification->send();
         }
+    }
+
+    protected function startContactTagSyncInBackground($user, bool $force = false): array
+    {
+        $lockKey = $this->contactTagSyncLockKey($user);
+        $statusKey = $this->contactTagSyncStatusKey($user);
+
+        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(30))) {
+            $existing = Cache::get($statusKey, []);
+            return array_merge(is_array($existing) ? $existing : [], [
+                'status' => 'already_running',
+                'user_id' => $user->id,
+                'message' => $existing['message'] ?? 'Favorites and list tags are already refreshing in the background.',
+            ]);
+        }
+
+        $status = [
+            'status' => 'running',
+            'mode' => 'contact_tag_sync',
+            'user_id' => $user->id,
+            'started_at' => now()->toDateTimeString(),
+            'message' => 'Refreshing Favorites, Saved items, and custom lists in a detached process.',
+        ];
+        Cache::put($statusKey, $status, now()->addMinutes(60));
+
+        $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
+        $artisan = base_path('artisan');
+        $logPath = storage_path('logs/recruiting-tag-sync-' . $user->id . '.log');
+        $arguments = ' --user=' . (int) $user->id . ($force ? ' --force' : '') . ' --release-lock';
+
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                    . ' recruiting:sync-tags' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1';
+                pclose(popen($command, 'r'));
+                return $status;
+            }
+
+            $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                . ' recruiting:sync-tags' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1 &';
+            Process::fromShellCommandline($command, base_path())->run();
+        } catch (\Throwable $exception) {
+            Cache::forget($lockKey);
+            $status = [
+                'status' => 'failed_to_start',
+                'mode' => 'contact_tag_sync',
+                'user_id' => $user->id,
+                'failed_at' => now()->toDateTimeString(),
+                'error' => $exception->getMessage(),
+                'message' => 'Unable to start the background Favorites/List refresh: ' . $exception->getMessage(),
+            ];
+            Cache::put($statusKey, $status, now()->addMinutes(60));
+            Log::warning('Unable to start Recruiting Center tag sync.', $status);
+        }
+
+        return $status;
+    }
+
+    protected function refreshContactTagSyncStatus(?array $status = null): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            $this->isSyncingTags = false;
+            return;
+        }
+
+        $status ??= Cache::get($this->contactTagSyncStatusKey($user), []);
+        $running = Cache::has($this->contactTagSyncLockKey($user));
+        $state = strtolower((string) (is_array($status) ? ($status['status'] ?? '') : ''));
+        $this->isSyncingTags = $running || in_array($state, ['running', 'already_running'], true);
+    }
+
+    protected function contactTagSyncLockKey($user): string
+    {
+        return 'recruiting:tag-sync-running:' . $user->id;
+    }
+
+    protected function contactTagSyncStatusKey($user): string
+    {
+        return 'recruiting:tag-sync-status:' . $user->id;
     }
 
     public function loadConversations(): void
     {
-        $result = app(CoachDatabaseService::class)->getConversationsForUser(Auth::user(), [
-            'search' => $this->conversationSearch,
-            'limit' => 50,
-            'status' => 'all',
-        ]);
-
-        $this->conversations = $result['conversations'] ?? [];
-
-        if (! ($result['success'] ?? false)) {
-            $this->error = $result['error'] ?? 'Unable to load conversations.';
-            return;
-        }
-
-        $this->error = null;
-
-        if (! $this->selectedConversationId && count($this->conversations) === 1) {
-            $this->selectConversation((string) ($this->conversations[0]['id'] ?? ''));
-        }
+        $this->isLoadingConversations = true;
+        $this->startDeferredUiSync('conversations');
     }
 
     public function updatedConversationSearch(): void
     {
-        $this->loadConversations();
+        // Search the already loaded/cached conversation rows. Remote searching
+        // on every keystroke made the whole component wait behind the upstream
+        // request and delayed unrelated clicks.
     }
 
     public function updatedConversationSchoolFilter(): void
@@ -1286,12 +2092,60 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        $this->loadConversations();
+        // Poll only local cache. When data becomes stale, launch a detached CLI
+        // refresh and return immediately so no network request can hold the UI.
+        $conversationCache = Cache::get($this->deferredUiCacheKey('conversations'), []);
+        if (is_array($conversationCache['rows'] ?? null)) {
+            $this->conversations = collect($conversationCache['rows'])
+                ->filter(fn ($row): bool => is_array($row))
+                ->take((int) config('coach-database-sync.ui.conversation_row_cap', 25))
+                ->values()
+                ->all();
+        }
+
+        $conversationCachedAt = is_array($conversationCache) ? ($conversationCache['cached_at'] ?? null) : null;
+        $conversationIsStale = ! $conversationCachedAt;
+        if ($conversationCachedAt) {
+            try {
+                $conversationIsStale = \Illuminate\Support\Carbon::parse($conversationCachedAt)->lessThan(now()->subSeconds(60));
+            } catch (\Throwable) {
+                $conversationIsStale = true;
+            }
+        }
+
+        $user = Auth::user();
+        if ($conversationIsStale && $user
+            && ! Cache::has(CoachDatabaseUiSyncService::lockKey($user, 'conversations'))) {
+            $this->startDeferredUiSync('conversations');
+            $this->isLoadingConversations = true;
+        }
 
         if ($this->selectedConversationId) {
-            $this->messages = [];
-            $this->messageLastId = null;
-            $this->loadConversationMessages();
+            $messageCache = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
+            if (is_array($messageCache['rows'] ?? null)) {
+                $this->messages = collect($messageCache['rows'])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values()
+                    ->all();
+                $this->messageLastId = $messageCache['last_message_id'] ?? $this->messageLastId;
+                $this->hasMoreMessages = (bool) ($messageCache['has_more'] ?? $this->hasMoreMessages);
+            }
+
+            $messageCachedAt = is_array($messageCache) ? ($messageCache['cached_at'] ?? null) : null;
+            $messageIsStale = ! $messageCachedAt;
+            if ($messageCachedAt) {
+                try {
+                    $messageIsStale = \Illuminate\Support\Carbon::parse($messageCachedAt)->lessThan(now()->subSeconds(30));
+                } catch (\Throwable) {
+                    $messageIsStale = true;
+                }
+            }
+
+            if ($messageIsStale && $user
+                && ! Cache::has(CoachDatabaseUiSyncService::lockKey($user, 'messages', $this->selectedConversationId))) {
+                $this->startDeferredUiSync('messages', $this->selectedConversationId);
+                $this->isLoadingConversationMessages = true;
+            }
         }
     }
 
@@ -1299,6 +2153,97 @@ trait InteractsWithCoachDatabase
     protected function recruitingDashboardActivityCacheKey($user): string
     {
         return 'coach-database:dashboard-activity:' . ($user?->id ?? 'guest') . ':' . md5((string) ($user?->ghl_location_id ?? '') . '|' . substr((string) ($user?->ghl_api_key ?? ''), -12));
+    }
+
+    protected function recruitingDashboardActivityHistoryCacheKey($user): string
+    {
+        return 'coach-database:dashboard-activity-history:' . ($user?->id ?? 'guest') . ':' . md5((string) ($user?->ghl_location_id ?? ''));
+    }
+
+    protected function normalizeDashboardActivityRow(array $item): ?array
+    {
+        $title = trim((string) ($item['title'] ?? ''));
+        $copy = trim(preg_replace('/\s+/', ' ', strip_tags((string) ($item['copy'] ?? $item['snippet'] ?? ''))) ?? '');
+
+        if ($title === '' && $copy === '') {
+            return null;
+        }
+
+        $time = $item['time'] ?? $item['last_message_at'] ?? $item['updated_at'] ?? null;
+        $timestamp = 0;
+
+        if ($time) {
+            try {
+                $timestamp = \Carbon\Carbon::parse($time)->getTimestamp();
+            } catch (\Throwable $exception) {
+                $timestamp = 0;
+            }
+        }
+
+        return array_merge($item, [
+            'type' => trim((string) ($item['type'] ?? 'activity')) ?: 'activity',
+            'title' => $title !== '' ? $title : 'Recruiting activity',
+            'copy' => $copy !== '' ? $copy : 'Recruiting activity recorded.',
+            'time' => $time,
+            '_timestamp' => $timestamp,
+            'url' => $item['url'] ?? \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+        ]);
+    }
+
+    protected function dashboardActivityIdentity(array $item): string
+    {
+        $contact = strtolower(trim((string) ($item['coach_id'] ?? $item['contact_id'] ?? $item['conversation_id'] ?? '')));
+        $platform = strtolower(trim((string) ($item['platform_key'] ?? $item['platform'] ?? '')));
+        $time = trim((string) ($item['time'] ?? ''));
+
+        return md5(
+            strtolower(trim((string) ($item['type'] ?? 'activity'))) . '|' .
+            $contact . '|' . $platform . '|' .
+            strtolower(trim((string) ($item['title'] ?? ''))) . '|' .
+            strtolower(trim((string) ($item['copy'] ?? ''))) . '|' . $time
+        );
+    }
+
+    protected function cachedDashboardActivityRows($user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $rows = Cache::get($this->recruitingDashboardActivityHistoryCacheKey($user), []);
+
+        return collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): ?array => $this->normalizeDashboardActivityRow($row))
+            ->filter()
+            ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
+            ->values()
+            ->all();
+    }
+
+    protected function persistDashboardActivityRows($user, array $rows): void
+    {
+        if (! $user) {
+            return;
+        }
+
+        $existing = $this->cachedDashboardActivityRows($user);
+        $merged = collect($rows)
+            ->merge($existing)
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): ?array => $this->normalizeDashboardActivityRow($row))
+            ->filter()
+            ->unique(fn (array $row): string => $this->dashboardActivityIdentity($row))
+            ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
+            ->take(200)
+            ->map(function (array $row): array {
+                unset($row['_timestamp']);
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        Cache::forever($this->recruitingDashboardActivityHistoryCacheKey($user), $merged);
     }
 
     protected function persistDashboardStatsAfterTracking($user): void
@@ -1317,46 +2262,57 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Always fetch current tracking values for the dashboard.
-        // The tracking counters are stored remotely and can change immediately after a send/click,
-        // so a cached dashboard summary causes the UI to flash the right value and then fall back.
-        try {
-            Cache::forget($this->recruitingDashboardActivityCacheKey($user));
-            $summary = app(GoHighLevelService::class)->getRecruitingDashboardActivityForUser($user);
-        } catch (\Throwable $exception) {
-            \Log::warning('Recruiting dashboard activity refresh failed.', [
-                'user_id' => $user->id ?? null,
-                'error' => $exception->getMessage(),
-            ]);
-            $summary = [];
-        }
-
-        if (! is_array($summary) || empty($summary)) {
-            return;
-        }
+        // Page rendering is cache-only. Remote activity refreshes are performed by
+        // the detached background sync so opening the dashboard cannot time out.
+        $summary = Cache::get($this->recruitingDashboardActivityCacheKey($user), []);
+        $summary = is_array($summary) ? $summary : [];
 
         $remoteStats = $summary['stats'] ?? [];
         if (is_array($remoteStats)) {
             $this->stats = $this->mergeDashboardTrackingStats($this->stats ?? [], $remoteStats);
         }
 
-        $recent = $summary['recent_activity'] ?? [];
-        $this->dashboardRecentActivity = is_array($recent) ? array_values($recent) : [];
-        $this->dashboardActivitySummary = $summary;
+        $recent = collect(is_array($summary['recent_activity'] ?? null) ? $summary['recent_activity'] : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values()
+            ->all();
 
         if (empty($this->conversations) && ! empty($summary['conversations']) && is_array($summary['conversations'])) {
-            $this->conversations = array_values($summary['conversations']);
+            $this->conversations = collect($summary['conversations'])
+                ->filter(fn ($row): bool => is_array($row))
+                ->take((int) config('coach-database-sync.ui.conversation_row_cap', 25))
+                ->values()
+                ->all();
         }
+
+        $activityRows = collect($recent)
+            ->merge($this->dashboardRecentActivity ?? [])
+            ->merge($this->localCoachDashboardActivityRows())
+            ->merge($this->conversationDashboardActivityRows())
+            ->filter(fn ($row): bool => is_array($row))
+            ->values()
+            ->all();
+
+        $this->persistDashboardActivityRows($user, $activityRows);
+        $this->dashboardRecentActivity = collect($this->cachedDashboardActivityRows($user))
+            ->take(30)
+            ->values()
+            ->all();
+        $this->dashboardActivitySummary = $summary;
 
         $this->persistDashboardStatsAndActivity($user);
     }
 
     protected function mergeDashboardTrackingStats(array $baseStats, array $remoteStats): array
     {
+        $numeric = function ($value): int {
+            return is_scalar($value) && is_numeric($value) ? (int) $value : 0;
+        };
+
         $merged = array_merge($baseStats, array_filter($remoteStats, fn ($value) => $value !== null));
 
         foreach ($this->dashboardTrackingStatKeys() as $key) {
-            $merged[$key] = max((int) ($baseStats[$key] ?? 0), (int) ($remoteStats[$key] ?? 0), (int) ($merged[$key] ?? 0));
+            $merged[$key] = max($numeric($baseStats[$key] ?? 0), $numeric($remoteStats[$key] ?? 0), $numeric($merged[$key] ?? 0));
         }
 
         $profileBreakdown = (int) ($merged['view_profile_website'] ?? 0)
@@ -1367,6 +2323,9 @@ trait InteractsWithCoachDatabase
 
         $merged['view_profile_total'] = max((int) ($merged['view_profile_total'] ?? 0), $profileBreakdown);
         $merged['profile_views'] = max((int) ($merged['profile_views'] ?? 0), (int) ($merged['view_profile_total'] ?? 0));
+        $merged['profile_view_school_click_count'] = max((int) ($merged['profile_view_school_click_count'] ?? 0), (int) ($merged['school_profile_view_count'] ?? 0), (int) ($merged['view_profile_total'] ?? 0));
+        $merged['profile_view_unique_contact_count'] = max((int) ($merged['profile_view_unique_contact_count'] ?? 0), (int) ($merged['unique_profile_view_contacts'] ?? 0), (int) ($merged['unique_profile_view_count'] ?? 0), (int) ($merged['profile_views'] ?? 0) > 0 ? 1 : 0);
+        $merged['profile_view_unique_school_count'] = max((int) ($merged['profile_view_unique_school_count'] ?? 0), (int) ($merged['schools_with_profile_views'] ?? 0));
         $merged['emails_sent'] = max((int) ($merged['emails_sent'] ?? 0), (int) ($merged['email_sent_count'] ?? 0));
         $merged['email_sent_count'] = max((int) ($merged['email_sent_count'] ?? 0), (int) ($merged['emails_sent'] ?? 0));
         $merged['email_opens'] = max((int) ($merged['email_opens'] ?? 0), (int) ($merged['email_open_count'] ?? 0));
@@ -1376,6 +2335,12 @@ trait InteractsWithCoachDatabase
             + (int) ($merged['x_click_count'] ?? 0);
         $merged['link_clicks'] = max((int) ($merged['link_clicks'] ?? 0), (int) ($merged['email_click_count'] ?? 0) + $socialClicks);
         $merged['trigger_link_clicks'] = max((int) ($merged['trigger_link_clicks'] ?? 0), (int) ($merged['link_clicks'] ?? 0));
+        $merged['unique_profile_views'] = max((int) ($merged['unique_profile_views'] ?? 0), (int) ($merged['unique_profile_view_contacts'] ?? 0), (int) ($merged['unique_profile_view_count'] ?? 0));
+        $merged['unique_link_click_contacts'] = max((int) ($merged['unique_link_click_contacts'] ?? 0), (int) ($merged['unique_link_click_count'] ?? 0));
+        $merged['unique_clicks'] = max((int) ($merged['unique_clicks'] ?? 0), (int) ($merged['unique_contact_clicks'] ?? 0), (int) ($merged['unique_link_click_contacts'] ?? 0), (int) ($merged['unique_profile_views'] ?? 0));
+        $merged['contact_link_clicks'] = max((int) ($merged['contact_link_clicks'] ?? 0), (int) ($merged['ghl_contact_clicks'] ?? 0), (int) ($merged['contact_clicks'] ?? 0));
+        $merged['school_clicks_total'] = max((int) ($merged['school_clicks_total'] ?? 0), (int) ($merged['overall_school_clicks'] ?? 0), (int) ($merged['school_click_count'] ?? 0));
+        $merged['school_link_clicks'] = max((int) ($merged['school_link_clicks'] ?? 0), (int) ($merged['school_link_click_count'] ?? 0));
 
         return $merged;
     }
@@ -1400,15 +2365,47 @@ trait InteractsWithCoachDatabase
             'email_opens',
             'link_clicks',
             'trigger_link_clicks',
+            'unique_contact_clicks',
+            'unique_profile_view_contacts',
+            'unique_profile_views',
+            'unique_link_click_contacts',
+            'unique_clicks',
+            'contact_link_clicks',
+            'ghl_contact_clicks',
+            'overall_school_clicks',
+            'school_clicks_total',
+            'school_link_clicks',
+            'schools_with_clicks',
+            'school_profile_views',
             'coach_replies',
         ];
     }
 
     protected function persistDashboardStatsAndActivity($user = null): void
     {
+        $user ??= Auth::user();
+        $history = $this->cachedDashboardActivityRows($user);
+        $mergedActivity = collect($this->dashboardRecentActivity ?? [])
+            ->merge($history)
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): ?array => $this->normalizeDashboardActivityRow($row))
+            ->filter()
+            ->unique(fn (array $row): string => $this->dashboardActivityIdentity($row))
+            ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
+            ->take(30)
+            ->map(function (array $row): array {
+                unset($row['_timestamp']);
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        $this->dashboardRecentActivity = $mergedActivity;
+        $this->persistDashboardActivityRows($user, $mergedActivity);
+
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
         $snapshot['stats'] = $this->mergeDashboardTrackingStats($snapshot['stats'] ?? [], $this->stats ?? []);
-        $snapshot['dashboard_recent_activity'] = $this->dashboardRecentActivity ?? [];
+        $snapshot['dashboard_recent_activity'] = $mergedActivity;
         $snapshot['dashboard_activity_summary'] = $this->dashboardActivitySummary ?? [];
         $snapshot['cached_at'] = now()->toDateTimeString();
         $this->storeSnapshot($snapshot);
@@ -1580,39 +2577,37 @@ trait InteractsWithCoachDatabase
 
     public function selectConversation(string $conversationId): void
     {
+        $conversationId = trim($conversationId);
+        if ($conversationId === '') {
+            return;
+        }
+
         $this->selectedConversationId = $conversationId;
         $this->messageLastId = null;
-        $this->messages = [];
-        $this->loadConversationMessages();
+        $this->hasMoreMessages = false;
+
+        $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
+        $this->messages = is_array($cached['rows'] ?? null)
+            ? collect($cached['rows'])->filter(fn ($row): bool => is_array($row))->values()->all()
+            : [];
+        $this->messageLastId = $cached['last_message_id'] ?? null;
+        $this->hasMoreMessages = (bool) ($cached['has_more'] ?? false);
+        $this->isLoadingConversationMessages = true;
+
+        // The conversation pane is now rendered immediately. JavaScript starts
+        // the slower message request after the DOM morph completes.
+        $this->dispatch('rc-load-conversation-messages');
     }
 
     public function loadConversationMessages(): void
     {
         if (! $this->selectedConversationId) {
+            $this->isLoadingConversationMessages = false;
             return;
         }
 
-        $result = app(CoachDatabaseService::class)->getConversationMessagesForUser(
-            Auth::user(),
-            $this->selectedConversationId,
-            $this->messageLastId
-        );
-
-        if (! ($result['success'] ?? false)) {
-            $this->error = $result['error'] ?? 'Unable to load messages.';
-            return;
-        }
-
-        $new = $result['messages'] ?? [];
-        $this->messages = collect($this->messages)
-            ->merge($new)
-            ->unique('id')
-            ->sortBy('created_at')
-            ->values()
-            ->all();
-        $this->messageLastId = $result['last_message_id'] ?? $this->messageLastId;
-        $this->hasMoreMessages = (bool) ($result['has_more'] ?? false);
-        $this->error = null;
+        $this->isLoadingConversationMessages = true;
+        $this->startDeferredUiSync('messages', $this->selectedConversationId);
     }
 
     public function composeToCoach(string $contactId): void
@@ -1663,6 +2658,17 @@ trait InteractsWithCoachDatabase
         }
 
         $contactId = trim((string) $contactId);
+        $coachForTokens = is_array($coach) ? $coach : array_filter([
+            'id' => $contactId,
+            'email' => $to,
+            'name' => $conversation['contact_name'] ?? $conversation['name'] ?? null,
+            'school' => $conversation['school'] ?? $conversation['company_name'] ?? null,
+            'business_id' => $conversation['business_id'] ?? $conversation['ghl_business_id'] ?? null,
+        ], fn ($value): bool => ! is_null($value) && $value !== '');
+        $subject = $this->replaceCampaignTokens($subject, $coachForTokens);
+        $body = $this->replaceCampaignTokens($body, $coachForTokens);
+        $plainBody = trim(strip_tags($body));
+
         $trackingContext = [
             'athlete_id' => $user->id,
             'contact_id' => $contactId,
@@ -1688,6 +2694,16 @@ trait InteractsWithCoachDatabase
         }
 
         $trackedBody = $this->ensurePlyrcardEmailSignature($body);
+        $conversationForTokens = is_array($conversation ?? null) ? $conversation : [];
+        $tokenCoach = is_array($coach) ? $coach : [
+            'id' => $contactId,
+            'name' => $conversationForTokens['contact_name'] ?? $conversationForTokens['name'] ?? 'Coach',
+            'email' => $to,
+            'school' => $conversationForTokens['school'] ?? $conversationForTokens['company_name'] ?? null,
+            'business_id' => $conversationForTokens['business_id'] ?? $conversationForTokens['ghl_business_id'] ?? null,
+        ];
+        $trackedBody = $this->replaceCampaignTokens($trackedBody, $tokenCoach);
+
         try {
             $rewriter = app(TrackingLinkRewriter::class);
             $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
@@ -1739,6 +2755,14 @@ trait InteractsWithCoachDatabase
 
             $this->stats['email_sent_count'] = (int) ($this->stats['email_sent_count'] ?? 0) + 1;
             $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
+            $this->prependDashboardActivity([
+                'type' => 'email_sent',
+                'title' => 'Email sent to ' . (string) ($coachForTokens['name'] ?? $to ?? 'coach'),
+                'copy' => trim(($coachForTokens['school'] ?? '') . (($coachForTokens['school'] ?? '') !== '' ? ' • ' : '') . $subject),
+                'time' => now()->toIso8601String(),
+                'school_id' => $this->trackingSchoolIdForCoach(is_array($coachForTokens) ? $coachForTokens : []),
+                'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+            ]);
             $this->persistDashboardStatsAfterTracking($user);
         } catch (\Throwable $exception) {
             \Log::warning('Recruiting email sent tracking failed.', [
@@ -1754,7 +2778,8 @@ trait InteractsWithCoachDatabase
         if ($this->selectedConversationId) {
             $this->messages = [];
             $this->messageLastId = null;
-            $this->loadConversationMessages();
+            $this->isLoadingConversationMessages = true;
+            $this->dispatch('rc-load-conversation-messages');
         }
 
         $this->loadDashboardActivity();
@@ -1764,82 +2789,8 @@ trait InteractsWithCoachDatabase
 
     public function loadTemplates(): void
     {
-        $builtIn = $this->hardcodedEmailTemplates();
-        $user = Auth::user();
-        $currentConnectionKey = $this->templateConnectionKeyForUser($user);
-
-        if ($this->templateConnectionKey !== $currentConnectionKey) {
-            $this->templateConnectionKey = $currentConnectionKey;
-            $this->templateDetails = [];
-            $this->templates = [];
-            $this->selectedTemplateId = null;
-            $this->previewTemplateId = null;
-            $this->campaignTemplateId = null;
-            $this->templateIsNew = true;
-        }
-
-        $this->templateDetails = collect($this->templateDetails)
-            ->filter(fn ($template): bool => is_array($template))
-            ->filter(fn (array $template): bool => (string) ($template['connection_key'] ?? $currentConnectionKey) === $currentConnectionKey)
-            ->all();
-
-        $result = $user
-            ? app(CoachDatabaseService::class)->getEmailTemplatesForUser($user)
-            : ['success' => false, 'templates' => [], 'error' => 'No authenticated user.'];
-
-        $ghlTemplates = collect($result['templates'] ?? [])
-            ->filter(fn ($template): bool => is_array($template))
-            ->map(function (array $template) use ($currentConnectionKey): array {
-                $id = (string) ($template['id'] ?? $template['_id'] ?? $template['templateId'] ?? '');
-
-                return array_merge($template, [
-                    'id' => $id,
-                    'source_type' => 'ghl',
-                    'connection_key' => $currentConnectionKey,
-                ]);
-            })
-            ->filter(fn (array $template): bool => trim((string) ($template['id'] ?? '')) !== '')
-            ->unique(fn (array $template): string => (string) ($template['id'] ?? ''))
-            ->values();
-
-        $this->templates = $ghlTemplates
-            ->merge($builtIn)
-            ->unique(fn (array $template): string => (string) ($template['id'] ?? ''))
-            ->values()
-            ->all();
-
-        $this->templateSourceSummary = $ghlTemplates->isNotEmpty()
-            ? 'GHL email templates loaded for this API key/location. Built-in PLYRCard templates are included as fallbacks.'
-            : 'No GHL templates found for this API key/location. Showing built-in PLYRCard templates.';
-        $this->templateSourceDebug = $result['debug'] ?? [];
-        $this->error = null;
-
-        if (! ($result['success'] ?? false) && $ghlTemplates->isEmpty() && filled($result['error'] ?? null)) {
-            $this->templateSourceDebug = array_merge($this->templateSourceDebug, [[
-                'stage' => 'ghl_template_load_failed',
-                'error' => $result['error'],
-            ]]);
-        }
-
-        if ($this->campaignTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->campaignTemplateId)) {
-            return;
-        }
-
-        if ($this->selectedTemplateId && collect($this->templates)->contains(fn (array $template): bool => (string) ($template['id'] ?? '') === $this->selectedTemplateId)) {
-            $this->selectTemplate($this->selectedTemplateId);
-            return;
-        }
-
-        if ($this->templateIsNew && trim(strip_tags((string) $this->templateBody)) === '') {
-            $this->templateName = $this->templateName ?: 'New Recruiting Email';
-            $this->templateSubject = $this->templateSubject ?: '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
-            $this->templatePreviewText = $this->templatePreviewText ?: 'Quick intro, profile, and highlight link from {{AthleteName}}.';
-            $this->templateBody = $this->starterTemplateHtml();
-        }
-
-        if (! empty($this->templates[0]['id']) && ! $this->templateIsNew) {
-            $this->selectTemplate((string) $this->templates[0]['id']);
-        }
+        $this->isLoadingTemplates = true;
+        $this->startDeferredUiSync('templates');
     }
 
     protected function templateConnectionKeyForUser($user): string
@@ -1915,8 +2866,13 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        $template = $this->loadTemplateDetail($templateId)
-            ?: collect($this->templates)->firstWhere('id', $templateId);
+        // Open immediately from the local summary/built-in record. Remote HTML
+        // is fetched in a second request after the editor is visible.
+        $template = $this->templateDetails[$templateId] ?? null;
+        if (! is_array($template)) {
+            $template = collect($this->templates)->firstWhere('id', $templateId)
+                ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
+        }
 
         if (! is_array($template)) {
             return;
@@ -1938,6 +2894,26 @@ trait InteractsWithCoachDatabase
         $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
         $this->templateEditorRefreshKey++;
         $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+
+        $isRemoteSummary = ! $this->templateIsNew && (($template['source_type'] ?? null) !== 'built_in');
+        $hasFullBody = isset($this->templateDetails[$templateId]);
+        $this->isLoadingTemplateDetail = $isRemoteSummary && ! $hasFullBody;
+
+        if ($this->isLoadingTemplateDetail) {
+            $this->dispatch('rc-load-template-detail');
+        }
+    }
+
+    public function loadSelectedTemplateDetail(): void
+    {
+        $templateId = trim((string) $this->selectedTemplateId);
+        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
+            $this->isLoadingTemplateDetail = false;
+            return;
+        }
+
+        $this->isLoadingTemplateDetail = true;
+        $this->startDeferredUiSync('template-detail', $templateId);
     }
 
     protected function starterTemplateHtml(): string
@@ -2014,9 +2990,9 @@ HTML;
             }
 
             if (! ($result['success'] ?? false) && $this->templateSaveFailedBecauseNotFound($result, $updateFailures)) {
-                // Some GHL HTML-builder templates expose one id for loading and a different/internal
+                // Some Recruiting Center HTML-builder templates expose one id for loading and a different/internal
                 // id for editing. If none of the known ids can be updated, save the edited version as
-                // a new GHL template instead of failing with "Template not found" and losing the work.
+                // a new Recruiting Center template instead of failing with "Template not found" and losing the work.
                 $copyName = Str::endsWith($name, ' (Edited Copy)') ? $name : $name . ' (Edited Copy)';
                 $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $copyName, $subject, $html, $this->templatePreviewText);
                 if ($result['success'] ?? false) {
@@ -2059,7 +3035,7 @@ HTML;
         $this->loadTemplates();
 
         $message = ! empty($updateFailures) && blank($updatedTemplateId)
-            ? 'Template saved as a new edited copy because GHL would not update the original template id.'
+            ? 'Template saved as a new edited copy because Recruiting Center would not update the original template id.'
             : 'Template saved.';
 
         Notification::make()->title('Templates')->body($message)->success()->send();
@@ -2183,6 +3159,7 @@ HTML;
             return;
         }
 
+        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
         $template = $this->loadTemplateDetail($templateId)
             ?: collect($this->templates)->firstWhere('id', $templateId);
 
@@ -2192,7 +3169,7 @@ HTML;
         }
 
         $this->templateEditorOpen = true;
-        $this->selectedTemplateId = null;
+        $this->selectedTemplateId = $hasFullDetail ? null : $templateId;
         $this->previewTemplateId = null;
         $this->campaignTemplateId = null;
         $this->templateIsNew = true;
@@ -2207,6 +3184,13 @@ HTML;
         $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
         $this->templateEditorRefreshKey++;
         $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+
+        if (! $hasFullDetail) {
+            $this->pendingTemplateAction = 'duplicate';
+            $this->pendingTemplateActionId = $templateId;
+            $this->isLoadingTemplateDetail = true;
+            $this->dispatch('rc-load-template-detail');
+        }
     }
 
     public function templateQuickAction(string $action): void
@@ -2264,6 +3248,7 @@ HTML;
             return;
         }
 
+        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
         $template = $this->loadTemplateDetail($templateId)
             ?: collect($this->templates)->firstWhere('id', $templateId);
 
@@ -2273,6 +3258,7 @@ HTML;
         }
 
         $this->campaignTemplateId = $templateId;
+        $this->selectedTemplateId = $templateId;
         $this->previewTemplateId = $templateId;
         $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
         $this->campaignSubject = $this->templateSubject($template);
@@ -2290,7 +3276,14 @@ HTML;
         $this->composeTemplateAppliedRecently = true;
         $this->composeTemplateMenuOpen = false;
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
-        Notification::make()->title('Compose Email')->body('Template loaded in Compose Email.')->success()->send();
+        if (! $hasFullDetail) {
+            $this->pendingTemplateAction = 'use-compose';
+            $this->pendingTemplateActionId = $templateId;
+            $this->isLoadingTemplateDetail = true;
+            $this->dispatch('rc-load-template-detail');
+        }
+
+        Notification::make()->title('Compose Email')->body($hasFullDetail ? 'Template loaded in Compose Email.' : 'Template opened. The latest content is loading.')->success()->send();
     }
 
 
@@ -2471,7 +3464,7 @@ HTML;
                 if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
                     Notification::make()
                         ->title('Attachments')
-                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to GHL media.'))
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
                         ->danger()
                         ->send();
                     continue;
@@ -2489,7 +3482,7 @@ HTML;
                     'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
                 ];
             } catch (\Throwable $exception) {
-                Notification::make()->title('Attachments')->body('Unable to upload one attachment to GHL media.')->danger()->send();
+                Notification::make()->title('Attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
             }
         }
 
@@ -2550,7 +3543,7 @@ HTML;
                 if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
                     Notification::make()
                         ->title('Template attachments')
-                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to GHL media.'))
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
                         ->danger()
                         ->send();
                     continue;
@@ -2568,7 +3561,7 @@ HTML;
                     'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
                 ];
             } catch (\Throwable $exception) {
-                Notification::make()->title('Template attachments')->body('Unable to upload one attachment to GHL media.')->danger()->send();
+                Notification::make()->title('Template attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
             }
         }
 
@@ -2743,6 +3736,13 @@ HTML;
                         'to' => (string) ($coach['email'] ?? ''),
                         'host' => request()?->getHost(),
                     ]);
+                    $this->prependDashboardActivity([
+                        'type' => 'email_sent',
+                        'title' => 'Campaign email sent to ' . (string) ($coach['name'] ?? $coach['email'] ?? 'coach'),
+                        'copy' => trim((string) ($coach['school'] ?? $coach['company_name'] ?? '') . (filled($coach['school'] ?? $coach['company_name'] ?? null) ? ' • ' : '') . $personalizedSubject),
+                        'time' => now()->toIso8601String(),
+                        'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+                    ]);
                 } catch (\Throwable $exception) {
                     \Log::warning('Recruiting campaign sent tracking failed.', [
                         'contact_id' => $contactId,
@@ -2776,43 +3776,14 @@ HTML;
             return null;
         }
 
-        if (isset($this->templateDetails[$templateId])) {
-            $cached = $this->templateDetails[$templateId];
-            if (! is_array($cached) || (string) ($cached['connection_key'] ?? $this->templateConnectionKey) === (string) $this->templateConnectionKey) {
-                return $cached;
-            }
-            unset($this->templateDetails[$templateId]);
+        if (isset($this->templateDetails[$templateId]) && is_array($this->templateDetails[$templateId])) {
+            return $this->templateDetails[$templateId];
         }
 
         $summary = collect($this->templates)->firstWhere('id', $templateId)
             ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
 
-        if (is_array($summary) && ($this->isBuiltInTemplateId($templateId) || ($summary['source_type'] ?? null) === 'built_in')) {
-            $this->templateDetails[$templateId] = $summary;
-            return $summary;
-        }
-
-        if (Auth::user()) {
-            $result = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
-
-            if (($result['success'] ?? false) && is_array($result['template'] ?? null)) {
-                $detail = $this->mergeTemplateRecord(is_array($summary) ? $summary : [], array_merge($result['template'], [
-                    'id' => $templateId,
-                    'source_type' => 'ghl',
-                    'connection_key' => $this->templateConnectionKey,
-                ]));
-
-                $this->templateDetails[$templateId] = $detail;
-                return $detail;
-            }
-        }
-
-        if (is_array($summary)) {
-            $this->templateDetails[$templateId] = $summary;
-            return $summary;
-        }
-
-        return null;
+        return is_array($summary) ? $summary : null;
     }
 
     public function insertTemplateVariable(string $token, string $field = 'body'): void
@@ -3216,7 +4187,7 @@ HTML;
     /**
      * Remove legacy signature fragments that do not have data-plyrcard-signature.
      * This specifically removes the old table/footer section from starter
-     * templates and any loose social icon clusters that were saved into GHL.
+     * templates and any loose social icon clusters that were saved into Recruiting Center.
      */
     protected function stripLoosePlyrcardSocialFooter(string $html): string
     {
@@ -3238,7 +4209,7 @@ HTML;
      * The signature is the only allowed place for social logo anchors.
      * Remove every Instagram/X/YouTube token/icon anchor already present in
      * the body before appending the canonical footer. This prevents duplicates
-     * even when old GHL templates already saved social icons outside the marked
+     * even when old Recruiting Center templates already saved social icons outside the marked
      * signature block.
      */
     protected function stripAllPlyrcardSocialAnchors(string $html): string
@@ -3255,7 +4226,7 @@ HTML;
         ) ?: $html;
 
         // Remove anchors wrapping known social icon images even if attributes
-        // were stripped or rewritten by the editor/GHL.
+        // were stripped or rewritten by the editor/Recruiting Center.
         $html = preg_replace(
             '/\s*<a\b[^>]*>\s*(?:<span\b[^>]*>\s*)?<img\b[^>]*(?:instagram-new--v1|twitterx--v1|youtube-play|youtube)[^>]*>\s*(?:<\/span>\s*)?<\/a>\s*/is',
             ' ',
@@ -3398,9 +4369,9 @@ HTML;
         $trackedPlatform = strtolower((string) ($tracked['platform'] ?? ''));
         $trackedEvent = strtolower((string) ($tracked['event_type'] ?? ''));
 
-        // If a saved GHL template already contains an old /track/... URL, decode the
+        // If a saved Recruiting Center template already contains an old /track/... URL, decode the
         // compact payload and convert it back to the stable merge token. This is the
-        // important self-healing step for social icon templates: even if GHL stripped
+        // important self-healing step for social icon templates: even if Recruiting Center stripped
         // aria-labels/classes from the SVG, the token payload still tells us the real
         // platform and destination.
         if ($trackedPlatform === 'instagram' || str_contains($trackedDestination, 'instagram.com')) {
@@ -3512,7 +4483,7 @@ HTML;
         }
 
         // Quill stores the message as HTML. Keep that HTML intact so images,
-        // links, buttons, lists, colors, and headings remain compatible with GHL.
+        // links, buttons, lists, colors, and headings remain compatible with Recruiting Center.
         if (preg_match('/<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i', $text)) {
             return $this->sanitizeTemplateHtml($text);
         }
@@ -3558,7 +4529,7 @@ HTML;
             if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
                 Notification::make()
                     ->title('Templates')
-                    ->body($this->templateErrorMessage($result, 'Unable to upload graphic to GHL media.'))
+                    ->body($this->templateErrorMessage($result, 'Unable to upload graphic to Recruiting Center media.'))
                     ->danger()
                     ->send();
                 return;
@@ -3567,7 +4538,7 @@ HTML;
             $this->templateGraphicUrl = trim((string) $result['url']);
         } catch (\Throwable $e) {
             $this->templateGraphicUpload = null;
-            Notification::make()->title('Templates')->body('Unable to upload graphic to GHL media.')->danger()->send();
+            Notification::make()->title('Templates')->body('Unable to upload graphic to Recruiting Center media.')->danger()->send();
         }
     }
 
@@ -3709,7 +4680,7 @@ HTML;
             return '';
         }
 
-        // GHL sometimes returns escaped or double-escaped HTML. Decode it a few
+        // Recruiting Center sometimes returns escaped or double-escaped HTML. Decode it a few
         // times before inserting it into contenteditable so users see rendered
         // content rather than literal <a>, <table>, or <div> code.
         for ($i = 0; $i < 3; $i++) {
@@ -3737,7 +4708,7 @@ HTML;
             return '';
         }
 
-        // GHL/editor round-trips can leave anchors as visible text fragments when
+        // Recruiting Center/editor round-trips can leave anchors as visible text fragments when
         // a merge token inside href was converted into a chip. Repair those before
         // DOM parsing so users see real links/buttons instead of raw HTML like:
         // {{ProfileLink}}" target="_blank">View PLYRCard Profile
@@ -4382,13 +5353,13 @@ HTML;
             'GPA' => $this->userTokenText('gpa', '[GPA]'),
             'AthleteEmail' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], '[Email]'),
             'AthletePhone' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '[Phone]'),
-            'HighlightLink' => $this->userHighlightUrl('[Highlight Link]'),
-            'ProfileLink' => $this->userProfileUrl('[Profile Link]'),
-            'InstagramLink' => $this->userSocialUrl('instagram', '#'),
-            'TwitterLink' => $this->userSocialUrl('x', '#'),
-            'XLink' => $this->userSocialUrl('x', '#'),
-            'YoutubeLink' => $this->userSocialUrl('youtube', '#'),
-            'YouTubeLink' => $this->userSocialUrl('youtube', '#'),
+            'HighlightLink' => $this->userHighlightUrlForCoach($coach, '[Highlight Link]'),
+            'ProfileLink' => $this->userProfileUrlForCoach($coach, '[Profile Link]'),
+            'InstagramLink' => $this->userSocialUrlForCoach('instagram', $coach, '#'),
+            'TwitterLink' => $this->userSocialUrlForCoach('x', $coach, '#'),
+            'XLink' => $this->userSocialUrlForCoach('x', $coach, '#'),
+            'YoutubeLink' => $this->userSocialUrlForCoach('youtube', $coach, '#'),
+            'YouTubeLink' => $this->userSocialUrlForCoach('youtube', $coach, '#'),
         ];
 
         $aliases = [
@@ -4549,6 +5520,103 @@ HTML;
         return str_contains($value, '.') ? 'https://' . $value : '';
     }
 
+    protected function userProfileUrlForCoach(array $coach, string $fallback = ''): string
+    {
+        return $this->appendRecruitingTrackingQuery(
+            $this->userProfileUrl($fallback),
+            'website',
+            'profile_view',
+            $coach,
+            'profile'
+        );
+    }
+
+    protected function userHighlightUrlForCoach(array $coach, string $fallback = ''): string
+    {
+        return $this->appendRecruitingTrackingQuery(
+            $this->userHighlightUrl($fallback),
+            'youtube',
+            'profile_view',
+            $coach,
+            'highlights'
+        );
+    }
+
+    protected function userSocialUrlForCoach(string $platform, array $coach, string $fallback = ''): string
+    {
+        $platform = strtolower(trim($platform));
+        $platform = $platform === 'twitter' ? 'x' : $platform;
+
+        return $this->appendRecruitingTrackingQuery(
+            $this->userSocialUrl($platform, $fallback),
+            $platform,
+            'profile_view',
+            $coach,
+            $platform
+        );
+    }
+
+    protected function appendRecruitingTrackingQuery(string $url, string $platform, string $eventType, array $coach = [], string $content = 'profile'): string
+    {
+        $url = trim($url);
+        if ($url === '' || $url === '#' || str_starts_with($url, '[')) {
+            return $url;
+        }
+
+        $user = Auth::user();
+        $platform = strtolower(trim($platform));
+        $platform = $platform === 'twitter' ? 'x' : $platform;
+        $eventType = strtolower(trim($eventType)) ?: 'profile_view';
+
+        $fragment = '';
+        $fragmentPosition = strpos($url, '#');
+        if ($fragmentPosition !== false) {
+            $fragment = substr($url, $fragmentPosition);
+            $url = substr($url, 0, $fragmentPosition);
+        }
+
+        $contactId = $coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? null;
+        $businessId = $coach['business_id'] ?? $coach['ghl_business_id'] ?? null;
+        $schoolName = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? null;
+        $trackingPayload = array_filter([
+            'u' => $user?->id,
+            'c' => $contactId,
+            'b' => $businessId,
+            'school' => $schoolName,
+            'p' => $platform,
+            'e' => $eventType,
+            's' => 'coach_database_email',
+            'd' => $url,
+            'ts' => now()->timestamp,
+        ], fn ($value): bool => ! is_null($value) && trim((string) $value) !== '');
+        $trackingContext = rtrim(strtr(base64_encode(json_encode($trackingPayload, JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+        $trackingSignature = substr(hash_hmac('sha256', $trackingContext, (string) config('app.key', 'plyrcard')), 0, 24);
+
+        $params = [
+            'utm_source' => 'plyrcard_recruiting',
+            'utm_medium' => 'email',
+            'utm_campaign' => 'coach_database',
+            'utm_content' => $content,
+            'rc_event' => $eventType,
+            'rc_platform' => $platform,
+            'rc_ctx' => $trackingContext,
+            'rc_sig' => $trackingSignature,
+            'rc_athlete_id' => $user?->id,
+            'rc_contact_id' => $contactId,
+            'rc_ghl_contact_id' => $contactId,
+            'rc_business_id' => $businessId,
+            'rc_school' => $schoolName,
+        ];
+
+        $params = array_filter($params, fn ($value): bool => ! is_null($value) && trim((string) $value) !== '');
+        if (empty($params)) {
+            return $url . $fragment;
+        }
+
+        $separator = str_contains($url, '?') ? '&' : '?';
+        return $url . $separator . http_build_query($params, '', '&', PHP_QUERY_RFC3986) . $fragment;
+    }
+
     protected function isUsableTemplateUrl(string $value): bool
     {
         $value = trim($value);
@@ -4681,11 +5749,16 @@ HTML;
         };
     }
 
-    protected function applyTagToCachedContacts(array $contactIds, string $tag, string $type): void
+    protected function applyTagToCachedContacts(array $contactIds, string $tag, string $type, bool $hydrateComponent = true): void
     {
+        $selectedSchoolId = $this->selectedSchoolId;
         $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        if (str_starts_with(strtolower(trim($tag)), 'plyrcard:list:')) {
-            $key = Str::after(strtolower(trim($tag)), 'plyrcard:list:');
+        $tag = trim($tag);
+        $lowerTag = strtolower($tag);
+        $type = strtolower(trim($type)) === 'remove' ? 'remove' : 'add';
+
+        if (str_starts_with($lowerTag, 'plyrcard:list:')) {
+            $key = Str::after($lowerTag, 'plyrcard:list:');
             if ($key !== '') {
                 $snapshot['custom_list_tags'][$key] = [
                     'key' => $key,
@@ -4695,33 +5768,175 @@ HTML;
                 ];
             }
         }
+
+        $contactIds = collect($contactIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         $ids = array_flip($contactIds);
-        $lower = strtolower(trim($tag));
-        $snapshot['coaches'] = collect($snapshot['coaches'] ?? [])->map(function (array $coach) use ($ids, $tag, $lower, $type): array {
-            if (! isset($ids[(string) ($coach['id'] ?? '')])) return $coach;
-            $tags = collect($coach['tags'] ?? [])->map(fn ($tag) => trim((string) $tag))->filter()->values();
-            if ($type === 'add') {
-                if (! $tags->contains(fn ($existing) => strtolower($existing) === $lower)) $tags->push($tag);
-            } else {
-                $tags = $tags->reject(fn ($existing) => strtolower($existing) === $lower)->values();
-            }
 
-            $coach['tags'] = $tags->values()->all();
-            $has = $type === 'add';
+        $service = app(CoachDatabaseService::class);
+        $favoriteTag = strtolower($service->favoriteSchoolTag());
+        $savedTag = strtolower($service->savedSchoolTag());
 
-            if ($lower === strtolower(app(CoachDatabaseService::class)->savedSchoolTag())) {
-                $coach['is_saved_school'] = $has;
-            } elseif ($lower === strtolower(app(CoachDatabaseService::class)->favoriteSchoolTag())) {
-                $coach['is_favorite_school'] = $has;
-            } elseif ($lower === strtolower(app(CoachDatabaseService::class)->savedCoachTag())) {
-                $coach['is_saved_coach'] = $has;
-            } elseif ($lower === strtolower(app(CoachDatabaseService::class)->favoriteCoachTag())) {
-                $coach['is_favorite_coach'] = $has;
-            }
+        $snapshot['coaches'] = collect($snapshot['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(function (array $coach) use ($ids, $tag, $lowerTag, $type, $favoriteTag, $savedTag): array {
+                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''));
+                if ($coachId === '' || ! isset($ids[$coachId])) {
+                    return $coach;
+                }
 
-            return $coach;
-        })->values()->all();
-        $this->rebuildAndStoreSnapshot($snapshot);
+                $tags = collect($coach['tags'] ?? [])
+                    ->map(fn ($value): string => trim((string) $value))
+                    ->filter()
+                    ->values();
+
+                if ($type === 'add') {
+                    if (! $tags->contains(fn (string $existing): bool => strtolower($existing) === $lowerTag)) {
+                        $tags->push($tag);
+                    }
+                } else {
+                    $tags = $tags
+                        ->reject(fn (string $existing): bool => strtolower($existing) === $lowerTag)
+                        ->values();
+                }
+
+                $coach['tags'] = $tags->all();
+                $hasTag = $type === 'add';
+
+                if ($lowerTag === $savedTag) {
+                    $coach['is_saved_school'] = $hasTag;
+                } elseif ($lowerTag === $favoriteTag) {
+                    $coach['is_favorite_school'] = $hasTag;
+                }
+
+                return $coach;
+            })
+            ->values()
+            ->all();
+
+        $coachById = collect($snapshot['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach) && filled($coach['id'] ?? $coach['contact_id'] ?? null))
+            ->keyBy(fn (array $coach): string => trim((string) ($coach['id'] ?? $coach['contact_id'] ?? '')));
+
+        $listRow = collect($snapshot['lists'] ?? [])->first(function ($row) use ($lowerTag): bool {
+            return is_array($row) && strtolower(trim((string) ($row['tag'] ?? ''))) === $lowerTag;
+        });
+        $listKey = is_array($listRow) ? trim((string) ($listRow['key'] ?? '')) : '';
+        if ($listKey === '' && str_starts_with($lowerTag, 'plyrcard:list:')) {
+            $listKey = Str::after($lowerTag, 'plyrcard:list:');
+        }
+
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])
+            ->filter(fn ($school): bool => is_array($school))
+            ->map(function (array $school) use ($coachById, $ids, $lowerTag, $favoriteTag, $savedTag, $listKey): array {
+                $schoolCoachIds = collect($school['coach_ids'] ?? [])
+                    ->map(fn ($id): string => trim((string) $id))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($schoolCoachIds->isEmpty() || ! $schoolCoachIds->contains(fn (string $id): bool => isset($ids[$id]))) {
+                    return $school;
+                }
+
+                $schoolCoaches = $schoolCoachIds
+                    ->map(fn (string $id) => $coachById->get($id))
+                    ->filter(fn ($coach): bool => is_array($coach))
+                    ->values();
+
+                $schoolHasTag = fn (string $needle): bool => $schoolCoaches->contains(function (array $coach) use ($needle): bool {
+                    return collect($coach['tags'] ?? [])->contains(
+                        fn ($existing): bool => strtolower(trim((string) $existing)) === $needle
+                    );
+                });
+
+                if ($lowerTag === $favoriteTag) {
+                    $school['is_favorite'] = $schoolHasTag($favoriteTag);
+                }
+
+                if ($lowerTag === $savedTag) {
+                    $school['is_saved'] = $schoolHasTag($savedTag);
+                }
+
+                if ($listKey !== '') {
+                    $listKeys = collect($school['list_keys'] ?? [])
+                        ->map(fn ($key): string => trim((string) $key))
+                        ->filter()
+                        ->unique()
+                        ->values();
+
+                    if ($schoolHasTag($lowerTag)) {
+                        if (! $listKeys->contains($listKey)) {
+                            $listKeys->push($listKey);
+                        }
+                    } else {
+                        $listKeys = $listKeys->reject(fn (string $key): bool => $key === $listKey)->values();
+                    }
+
+                    $school['list_keys'] = $listKeys->all();
+                }
+
+                return $school;
+            })
+            ->values()
+            ->all();
+
+        if ($listKey !== '') {
+            $schools = collect($snapshot['schools'] ?? []);
+            $snapshot['lists'] = collect($snapshot['lists'] ?? [])
+                ->map(function ($row) use ($schools, $listKey, $lowerTag) {
+                    if (! is_array($row)) {
+                        return $row;
+                    }
+
+                    $rowKey = trim((string) ($row['key'] ?? ''));
+                    $rowTag = strtolower(trim((string) ($row['tag'] ?? '')));
+                    if ($rowKey !== $listKey && $rowTag !== $lowerTag) {
+                        return $row;
+                    }
+
+                    $items = $schools
+                        ->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))
+                        ->values();
+
+                    $row['schools_count'] = $items->count();
+                    $row['coaches_count'] = $items->sum(fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0));
+                    $row['schools'] = $items
+                        ->map(fn (array $school): array => [
+                            'id' => $school['id'] ?? $school['business_id'] ?? null,
+                            'name' => $school['name'] ?? null,
+                            'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null,
+                            'conference' => $school['conference'] ?? null,
+                            'division' => $school['division'] ?? null,
+                            'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                        ])
+                        ->all();
+
+                    return $row;
+                })
+                ->values()
+                ->all();
+        }
+
+        $schools = collect($snapshot['schools'] ?? []);
+        $snapshot['stats']['saved_schools'] = $schools->filter(fn (array $school): bool => (bool) ($school['is_saved'] ?? false))->count();
+        $snapshot['stats']['favorite_schools'] = $schools->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))->count();
+        $snapshot['tag_synced_at'] = now()->toDateTimeString();
+
+        // Tag actions do not need a complete school/contact reconciliation. The
+        // previous implementation rebuilt every school, list and dashboard stat
+        // inside the click request, which caused drawer flicker and long waits.
+        $this->storeSnapshot($snapshot);
+
+        if ($hydrateComponent) {
+            $this->hydrateFromSnapshot($snapshot);
+            $this->selectedSchoolId = $selectedSchoolId;
+            $this->dispatch('rc-school-action-complete', schoolId: $selectedSchoolId);
+        }
     }
 
     protected function removeContactsFromCache(array $contactIds): void
@@ -4754,61 +5969,323 @@ HTML;
 
     protected function contactIdsForSchool(string $schoolId): array
     {
-        $school = collect($this->allSchools())->firstWhere('id', $schoolId);
-        if (! $school) return [];
-        $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-        return collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => (string) ($coach['business_id'] ?? '') === $businessId || trim((string) ($coach['school'] ?? '')) === trim((string) ($school['name'] ?? '')))
-            ->pluck('id')->filter()->unique()->values()->all();
+        $school = collect($this->allSchools())->first(function (array $row) use ($schoolId): bool {
+            return (string) ($row['id'] ?? '') === $schoolId
+                || (string) ($row['business_id'] ?? '') === $schoolId;
+        });
+
+        if (! is_array($school)) {
+            return [];
+        }
+
+        return collect($this->coachesForSchoolSearch($school))
+            ->pluck('id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
+
+    protected function coachTrackedLinkClickTotal(array $coach): int
+    {
+        $platformTotal = (int) ($coach['email_click_count'] ?? 0)
+            + (int) ($coach['website_click_count'] ?? 0)
+            + (int) ($coach['instagram_click_count'] ?? 0)
+            + (int) ($coach['youtube_click_count'] ?? 0)
+            + (int) ($coach['x_click_count'] ?? 0);
+
+        if ($platformTotal > 0) {
+            return $platformTotal;
+        }
+
+        return max(
+            (int) ($coach['trigger_link_click_count'] ?? 0),
+            (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0,
+        );
+    }
+
+    protected function coachTrackedClickTotal(array $coach): int
+    {
+        return $this->coachTrackedProfileViewTotal($coach) + $this->coachTrackedLinkClickTotal($coach);
+    }
+
+    protected function coachTrackedProfileViewTotal(array $coach): int
+    {
+        $platformTotal = (int) ($coach['view_profile_website'] ?? 0)
+            + (int) ($coach['view_profile_instagram'] ?? 0)
+            + (int) ($coach['view_profile_youtube'] ?? 0)
+            + (int) ($coach['view_profile_x'] ?? 0)
+            + (int) ($coach['view_profile_email_link'] ?? 0)
+            + (int) ($coach['view_profile_qr'] ?? 0);
+
+        return max(
+            (int) ($coach['view_profile_total'] ?? 0),
+            (int) ($coach['profile_view_count'] ?? 0),
+            $platformTotal,
+            (bool) ($coach['viewed_profile'] ?? false) ? 1 : 0,
+        );
+    }
+
+    protected function coachTrackingIdentity(array $coach): string
+    {
+        // Email is the strongest cross-source key because the same contact can arrive
+        // once as a business association and once as a general contact row with
+        // differently named id fields.
+        $email = strtolower(trim((string) ($coach['email'] ?? '')));
+        if ($email !== '') {
+            return 'email:' . $email;
+        }
+
+        $contactId = strtolower(trim((string) ($coach['contact_id'] ?? $coach['id'] ?? $coach['ghl_contact_id'] ?? '')));
+        if ($contactId !== '') {
+            return 'contact:' . $contactId;
+        }
+
+        return 'fallback:' . md5(strtolower(trim((string) ($coach['name'] ?? ''))) . '|' . strtolower(trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''))));
+    }
+
+    /**
+     * Return one canonical tracking row per coach/contact. The dataset can contain
+     * the same contact from both the school association feed and the full contacts
+     * feed. We merge counters by MAX per field instead of summing duplicate source
+     * rows, preventing inflated dashboard totals while preserving complementary
+     * platform counters.
+     */
+    protected function trackingCoaches(): array
+    {
+        if (is_array($this->trackingCoachesMemo)) {
+            return $this->trackingCoachesMemo;
+        }
+
+        $numericFields = [
+            'view_profile_total', 'profile_view_count',
+            'view_profile_website', 'view_profile_instagram', 'view_profile_youtube',
+            'view_profile_x', 'view_profile_email_link', 'view_profile_qr',
+            'website_click_count', 'instagram_click_count', 'youtube_click_count',
+            'x_click_count', 'email_click_count', 'trigger_link_click_count',
+            'coach_reply_count', 'email_sent_count', 'email_open_count',
+        ];
+        $booleanFields = ['viewed_profile', 'trigger_link_clicked', 'replied'];
+        $fillFields = [
+            'id', 'contact_id', 'ghl_contact_id', 'email', 'phone', 'name',
+            'first_name', 'last_name', 'title', 'school', 'school_name',
+            'company_name', 'business_name', 'business_id', 'company_id', 'school_id',
+            'conference', 'division', 'school_logo_url', 'business_logo_url', 'logo_url',
+            'last_clicked_platform', 'last_clicked_url',
+        ];
+        $dateFields = ['last_profile_view_at', 'last_clicked_at', 'last_reply_at', 'date_updated', 'updated_at'];
+
+        $this->trackingCoachesMemo = collect($this->allCoaches())
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->groupBy(fn (array $coach): string => $this->coachTrackingIdentity($coach))
+            ->map(function (Collection $rows) use ($numericFields, $booleanFields, $fillFields, $dateFields): array {
+                $rows = $rows->values();
+                $base = (array) ($rows->first() ?? []);
+
+                foreach ($fillFields as $field) {
+                    $value = $rows->pluck($field)
+                        ->first(fn ($candidate): bool => ! is_null($candidate) && trim((string) $candidate) !== '');
+                    if (! is_null($value) && trim((string) $value) !== '') {
+                        $base[$field] = $value;
+                    }
+                }
+
+                foreach ($numericFields as $field) {
+                    $base[$field] = (int) $rows->max(fn (array $row): int => max(0, (int) ($row[$field] ?? 0)));
+                }
+
+                foreach ($booleanFields as $field) {
+                    $base[$field] = $rows->contains(fn (array $row): bool => (bool) ($row[$field] ?? false));
+                }
+
+                foreach ($dateFields as $field) {
+                    $latestValue = null;
+                    $latestTimestamp = 0;
+                    foreach ($rows as $row) {
+                        $candidate = $row[$field] ?? null;
+                        if (! $candidate) {
+                            continue;
+                        }
+                        try {
+                            $timestamp = \Carbon\Carbon::parse($candidate)->getTimestamp();
+                        } catch (\Throwable $exception) {
+                            $timestamp = 0;
+                        }
+                        if ($timestamp >= $latestTimestamp) {
+                            $latestTimestamp = $timestamp;
+                            $latestValue = $candidate;
+                        }
+                    }
+                    if ($latestValue) {
+                        $base[$field] = $latestValue;
+                    }
+                }
+
+                return $base;
+            })
+            ->values()
+            ->all();
+
+        return $this->trackingCoachesMemo;
+    }
+
+    protected function coachTrackingSchoolKey(array $coach): string
+    {
+        $businessId = strtolower(trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['school_id'] ?? '')));
+        if ($businessId !== '') {
+            return 'business:' . $businessId;
+        }
+
+        $school = $this->normalizeSchoolMatchKey((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+        return $school !== '' ? 'school:' . $school : '';
+    }
+
+    protected function trackingSchoolIdForCoach(array $coach): string
+    {
+        $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['school_id'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? ''));
+        $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
+
+        $school = collect($this->allSchools())->first(function (array $row) use ($businessId, $schoolKey): bool {
+            $rowBusinessId = trim((string) ($row['business_id'] ?? $row['company_id'] ?? $row['id'] ?? ''));
+            if ($businessId !== '' && $rowBusinessId !== '' && strcasecmp($businessId, $rowBusinessId) === 0) {
+                return true;
+            }
+
+            return $schoolKey !== '' && $this->normalizeSchoolMatchKey((string) ($row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? '')) === $schoolKey;
+        });
+
+        if (is_array($school)) {
+            $resolved = trim((string) ($school['id'] ?? $school['business_id'] ?? ''));
+            if ($resolved !== '') {
+                return $resolved;
+            }
+        }
+
+        if ($businessId !== '') {
+            return $businessId;
+        }
+
+        return $schoolName !== '' ? md5(strtolower($schoolName)) : '';
+    }
+
+    public function getProfileViewRowsProperty(): array
+    {
+        return collect($this->trackingCoaches())
+            ->map(function (array $coach): ?array {
+                $views = $this->coachTrackedProfileViewTotal($coach);
+                if ($views <= 0) {
+                    return null;
+                }
+
+                $name = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Known coach contact';
+                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+                $initials = strtoupper(collect(preg_split('/\s+/', $name) ?: [])->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'PV');
+
+                $platforms = collect([
+                    'Website' => (int) ($coach['view_profile_website'] ?? 0),
+                    'Instagram' => (int) ($coach['view_profile_instagram'] ?? 0),
+                    'YouTube' => (int) ($coach['view_profile_youtube'] ?? 0),
+                    'X' => (int) ($coach['view_profile_x'] ?? 0),
+                    'Email Link' => (int) ($coach['view_profile_email_link'] ?? 0),
+                    'QR' => (int) ($coach['view_profile_qr'] ?? 0),
+                ])->filter(fn (int $count): bool => $count > 0);
+
+                $primaryPlatform = (string) ($platforms->sortDesc()->keys()->first() ?? 'Profile');
+                $breakdown = $platforms->map(fn (int $count, string $label): string => $label . ' ' . number_format($count))->values()->implode(' • ');
+                $copy = collect([$school, $breakdown !== '' ? $breakdown : number_format($views) . ' tracked profile ' . Str::plural('view', $views)])
+                    ->filter()
+                    ->implode(' • ');
+                $time = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
+
+                try {
+                    $timeLabel = $time ? \Carbon\Carbon::parse($time)->diffForHumans() : 'Synced';
+                } catch (\Throwable $exception) {
+                    $timeLabel = 'Synced';
+                }
+
+                return [
+                    'coach_id' => $this->coachTrackingIdentity($coach),
+                    'school_key' => $this->coachTrackingSchoolKey($coach),
+                    'school_id' => $this->trackingSchoolIdForCoach($coach),
+                    'school' => $school,
+                    'title' => $name,
+                    'copy' => $copy !== '' ? $copy : 'Tracked profile view from a known coach contact',
+                    'views' => $views,
+                    'type' => $primaryPlatform,
+                    'logo' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
+                    'initials' => $initials,
+                    'time' => $time,
+                    'time_label' => $timeLabel,
+                ];
+            })
+            ->filter()
+            ->unique('coach_id')
+            ->sortByDesc(fn (array $row): int => (int) ($row['views'] ?? 0))
+            ->values()
+            ->map(fn (array $row, int $index): array => array_merge($row, ['rank' => $index + 1]))
+            ->all();
+    }
 
     public function getDashboardMetricsProperty(): array
     {
         $stats = $this->stats ?? [];
         $schools = collect($this->allSchools());
 
-        $savedSchoolsFromRows = $schools->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school))->count();
-        $favoriteSchoolsFromRows = $schools->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school))->count();
-        $savedSchoolsFromLists = $this->schoolCountFromListLabels(['saved', 'saved schools']);
-        $favoriteSchoolsFromLists = $this->schoolCountFromListLabels(['favorite', 'favorites', 'favorite schools']);
-
         $savedSchools = max(
-            (int) (($stats['saved_schools'] ?? 0) ?: 0),
-            $savedSchoolsFromRows,
-            $savedSchoolsFromLists,
+            (int) ($stats['saved_schools'] ?? 0),
+            $schools->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school))->count(),
+            $this->schoolCountFromListLabels(['saved', 'saved schools']),
         );
-
         $favoriteSchools = max(
-            (int) (($stats['favorite_schools'] ?? 0) ?: 0),
-            $favoriteSchoolsFromRows,
-            $favoriteSchoolsFromLists,
+            (int) ($stats['favorite_schools'] ?? 0),
+            $schools->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school))->count(),
+            $this->schoolCountFromListLabels(['favorite', 'favorites', 'favorite schools']),
         );
 
-        $trackedWebsiteViews = (int) ($stats['view_profile_website'] ?? $stats['website_clicks'] ?? 0);
-        $trackedInstagramViews = (int) ($stats['view_profile_instagram'] ?? $stats['instagram_clicks'] ?? 0);
-        $trackedYoutubeViews = (int) ($stats['view_profile_youtube'] ?? $stats['youtube_clicks'] ?? 0);
-        $trackedXViews = (int) ($stats['view_profile_x'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0);
-        $trackedEmailProfileLinks = (int) ($stats['view_profile_email_link'] ?? 0);
+        $profileRows = collect($this->profileViewRows);
+        $engagementRows = collect($this->coachEngagementRows);
 
-        $trackedProfileTotal = (int) ($stats['view_profile_total'] ?? 0);
+        $trackedProfileTotal = $profileRows->sum('views');
         if ($trackedProfileTotal === 0) {
-            $trackedProfileTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailProfileLinks;
+            $trackedProfileTotal = (int) ($stats['view_profile_total'] ?? $stats['profile_views'] ?? 0);
         }
 
-        $emailSentCount = max((int) ($stats['email_sent_count'] ?? 0), (int) ($stats['emails_sent'] ?? 0), (int) (($stats['campaigns_sent'] ?? 0) ?: 0) + (int) (($stats['personal_emails_sent'] ?? 0) ?: 0));
+        $trackedWebsiteViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_website'] ?? 0));
+        $trackedInstagramViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_instagram'] ?? 0));
+        $trackedYoutubeViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_youtube'] ?? 0));
+        $trackedXViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_x'] ?? 0));
+        $trackedEmailProfileLinks = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_email_link'] ?? 0));
 
+        $websiteClicks = $engagementRows->where('platform_key', 'website')->sum('clicks');
+        $instagramClicks = $engagementRows->where('platform_key', 'instagram')->sum('clicks');
+        $youtubeClicks = $engagementRows->where('platform_key', 'youtube')->sum('clicks');
+        $xClicks = $engagementRows->where('platform_key', 'x')->sum('clicks');
+        $emailClicks = $engagementRows->where('platform_key', 'email')->sum('clicks');
+        $linkClicks = $engagementRows->sum('clicks');
+
+        $profileContactIds = $profileRows->pluck('coach_id')->filter()->unique();
+        $linkContactIds = $engagementRows->pluck('coach_id')->filter()->unique();
+        $uniqueProfileViewContacts = $profileContactIds->count();
+        $uniqueLinkClickContacts = $linkContactIds->count();
+        $uniqueContactClicks = $profileContactIds->merge($linkContactIds)->unique()->count();
+        $profileViewUniqueSchools = $profileRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
+        $profileViewSchoolClicks = $profileRows->where('school_key', '!=', '')->sum('views');
+        $overallSchoolClicks = $engagementRows->where('school_key', '!=', '')->sum('clicks');
+        $schoolsWithClicks = $engagementRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
+        $ghlContactClicks = $trackedProfileTotal + $linkClicks;
+
+        $emailSentCount = max((int) ($stats['email_sent_count'] ?? 0), (int) ($stats['emails_sent'] ?? 0), (int) ($stats['campaigns_sent'] ?? 0) + (int) ($stats['personal_emails_sent'] ?? 0));
         $emailOpenCount = (int) ($stats['email_open_count'] ?? $stats['email_opens'] ?? 0);
-        $emailClickCount = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
-        $socialClickCount = (int) ($stats['website_click_count'] ?? $stats['website_clicks'] ?? 0) + (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0) + (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0) + (int) ($stats['x_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0);
-        $linkClicks = max((int) ($stats['link_clicks'] ?? $stats['trigger_link_clicks'] ?? $stats['trigger_clicks'] ?? 0), $emailClickCount + $socialClickCount);
+        $coachReplies = (int) ($stats['coach_replies'] ?? $stats['replies'] ?? 0);
 
-        $engagedSchools = (int) (($stats['engaged_schools'] ?? $schools->filter(function (array $school): bool {
+        $engagedSchools = $schools->filter(function (array $school): bool {
             return ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) > 0)
                 || ((int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0) > 0)
                 || ((int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0) > 0)
                 || ((int) ($school['engagement_score'] ?? 0) > 0);
-        })->count()) ?: 0);
+        })->count();
 
         return [
             'saved_schools' => $savedSchools,
@@ -4817,11 +6294,11 @@ HTML;
             'emails_sent' => $emailSentCount,
             'email_sent_count' => $emailSentCount,
             'email_open_count' => $emailOpenCount,
-            'email_click_count' => $emailClickCount,
-            'website_click_count' => (int) ($stats['website_click_count'] ?? $stats['website_clicks'] ?? 0),
-            'instagram_click_count' => (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
-            'youtube_click_count' => (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
-            'x_click_count' => (int) ($stats['x_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
+            'email_click_count' => $emailClicks,
+            'website_click_count' => $websiteClicks,
+            'instagram_click_count' => $instagramClicks,
+            'youtube_click_count' => $youtubeClicks,
+            'x_click_count' => $xClicks,
             'profile_views' => $trackedProfileTotal,
             'view_profile_total' => $trackedProfileTotal,
             'view_profile_website' => $trackedWebsiteViews,
@@ -4829,34 +6306,55 @@ HTML;
             'view_profile_youtube' => $trackedYoutubeViews,
             'view_profile_x' => $trackedXViews,
             'view_profile_email_link' => $trackedEmailProfileLinks,
+            'profile_view_unique_contact_count' => $uniqueProfileViewContacts,
+            'profile_view_unique_school_count' => $profileViewUniqueSchools,
+            'profile_view_school_click_count' => $profileViewSchoolClicks,
             'link_clicks' => $linkClicks,
             'trigger_link_clicks' => $linkClicks,
-            'email_open_rate' => (int) (($stats['email_open_rate'] ?? 0) ?: 0),
-            'coach_replies' => (int) (($stats['coach_replies'] ?? $stats['replies'] ?? 0) ?: 0),
+            'unique_contact_clicks' => $uniqueContactClicks,
+            'unique_profile_view_contacts' => $uniqueProfileViewContacts,
+            'unique_profile_views' => $uniqueProfileViewContacts,
+            'unique_link_click_contacts' => $uniqueLinkClickContacts,
+            'unique_clicks' => $uniqueContactClicks,
+            'contact_link_clicks' => $ghlContactClicks,
+            'ghl_contact_clicks' => $ghlContactClicks,
+            'overall_school_clicks' => $overallSchoolClicks,
+            'school_clicks_total' => $overallSchoolClicks,
+            'schools_with_clicks' => $schoolsWithClicks,
+            'school_profile_views' => $profileViewSchoolClicks,
+            'email_open_rate' => (int) ($stats['email_open_rate'] ?? 0),
+            'coach_replies' => $coachReplies,
             'sparks' => $this->dashboardActivitySummary['sparks'] ?? $this->fallbackDashboardSparks($stats),
         ];
     }
 
-
     public function getCoachEngagementRowsProperty(): array
     {
         $platforms = [
-            'website' => ['label' => 'Website', 'key' => 'website_click_count', 'class' => 'is-blue', 'icon' => '⌁'],
-            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count', 'class' => 'is-pink', 'icon' => '◎'],
-            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count', 'class' => 'is-red', 'icon' => '▶'],
-            'x' => ['label' => 'X', 'key' => 'x_click_count', 'class' => 'is-neutral', 'icon' => '𝕏'],
-            'email' => ['label' => 'Email link', 'key' => 'email_click_count', 'class' => 'is-coral', 'icon' => '↗'],
+            'website' => ['label' => 'Website', 'key' => 'website_click_count', 'class' => 'is-blue', 'icon_file' => 'website.png'],
+            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count', 'class' => 'is-pink', 'icon_file' => 'instagram.png'],
+            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count', 'class' => 'is-red', 'icon_file' => 'youtube.png'],
+            'x' => ['label' => 'X', 'key' => 'x_click_count', 'class' => 'is-neutral', 'icon_file' => 'x.png'],
+            'email' => ['label' => 'Email link', 'key' => 'email_click_count', 'class' => 'is-coral', 'icon_file' => 'email.png'],
         ];
 
-        return collect($this->allCoaches())
-            ->filter(fn ($coach): bool => is_array($coach) && filled($coach['id'] ?? null))
+        return collect($this->trackingCoaches())
             ->flatMap(function (array $coach) use ($platforms): array {
                 $rows = [];
-                $coachName = trim((string) ($coach['name'] ?? 'Coach contact')) ?: 'Coach contact';
-                $school = trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''));
+                $coachId = $this->coachTrackingIdentity($coach);
+                $schoolKey = $this->coachTrackingSchoolKey($coach);
+                $schoolId = $this->trackingSchoolIdForCoach($coach);
+                $coachName = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Known coach contact';
+                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
                 $lastPlatform = strtolower(trim((string) ($coach['last_clicked_platform'] ?? '')));
+                $lastPlatform = match ($lastPlatform) {
+                    'twitter' => 'x',
+                    'ig' => 'instagram',
+                    'email_link' => 'email',
+                    default => $lastPlatform,
+                };
                 $lastUrl = trim((string) ($coach['last_clicked_url'] ?? ''));
-                $lastTime = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
+                $lastTime = $coach['last_clicked_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? $coach['last_profile_view_at'] ?? null;
 
                 foreach ($platforms as $platform => $config) {
                     $count = (int) ($coach[$config['key']] ?? 0);
@@ -4864,29 +6362,70 @@ HTML;
                         continue;
                     }
 
+                    try {
+                        $timeLabel = $lastTime ? \Carbon\Carbon::parse($lastTime)->diffForHumans() : 'Synced';
+                    } catch (\Throwable $exception) {
+                        $timeLabel = 'Synced';
+                    }
+
                     $rows[] = [
-                        'coach_id' => (string) ($coach['id'] ?? ''),
+                        'coach_id' => $coachId,
+                        'school_key' => $schoolKey,
+                        'school_id' => $schoolId,
                         'coach_name' => $coachName,
                         'school' => $school,
                         'title' => $coachName,
-                        'copy' => $school !== ''
-                            ? $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count) . ' • ' . $school
-                            : $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count),
+                        'copy' => collect([
+                            $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . Str::plural('time', $count),
+                            $school,
+                        ])->filter()->implode(' • '),
                         'platform' => $config['label'],
                         'platform_key' => $platform,
                         'platform_class' => $config['class'],
-                        'platform_icon' => $config['icon'],
+                        'platform_icon_file' => $config['icon_file'],
                         'clicks' => $count,
                         'url' => $lastPlatform === $platform ? $lastUrl : '',
                         'time' => $lastTime,
-                        'time_label' => $lastTime ? \Carbon\Carbon::parse($lastTime)->diffForHumans() : 'Synced',
+                        'time_label' => $timeLabel,
                     ];
+                }
+
+                if (empty($rows)) {
+                    $fallback = max((int) ($coach['trigger_link_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0);
+                    if ($fallback > 0) {
+                        $rows[] = [
+                            'coach_id' => $coachId,
+                            'school_key' => $schoolKey,
+                            'school_id' => $schoolId,
+                            'coach_name' => $coachName,
+                            'school' => $school,
+                            'title' => $coachName,
+                            'copy' => collect([$coachName . ' clicked a tracked recruiting link ' . number_format($fallback) . ' ' . Str::plural('time', $fallback), $school])->filter()->implode(' • '),
+                            'platform' => 'Tracked link',
+                            'platform_key' => 'tracked',
+                            'platform_class' => 'is-blue',
+                            'platform_icon_file' => 'link.png',
+                            'clicks' => $fallback,
+                            'url' => $lastUrl,
+                            'time' => $lastTime,
+                            'time_label' => 'Synced',
+                        ];
+                    }
                 }
 
                 return $rows;
             })
-            ->sortByDesc(fn (array $row): int => (int) ($row['clicks'] ?? 0))
-            ->take(30)
+            ->sortByDesc(function (array $row): int {
+                $timestamp = 0;
+                try {
+                    $timestamp = filled($row['time'] ?? null) ? \Carbon\Carbon::parse($row['time'])->getTimestamp() : 0;
+                } catch (\Throwable $exception) {
+                    $timestamp = 0;
+                }
+
+                return ($timestamp * 1000000) + min(999999, max(0, (int) ($row['clicks'] ?? 0)));
+            })
+            ->take(100)
             ->values()
             ->all();
     }
@@ -4987,6 +6526,120 @@ HTML;
         return array_slice($steps, 0, 3);
     }
 
+    public function getDashboardMostInterestedSchoolsProperty(): array
+    {
+        $schools = collect($this->allSchools())
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+
+        $byBusinessId = $schools
+            ->flatMap(function (array $school): array {
+                $ids = collect([
+                    $school['id'] ?? null,
+                    $school['business_id'] ?? null,
+                    $school['company_id'] ?? null,
+                    $school['school_id'] ?? null,
+                ])->map(fn ($id): string => strtolower(trim((string) $id)))->filter()->unique();
+
+                return $ids->mapWithKeys(fn (string $id): array => [$id => $school])->all();
+            });
+
+        $byName = $schools
+            ->filter(fn (array $school): bool => $this->normalizeSchoolMatchKey((string) ($school['name'] ?? $school['school_name'] ?? '')) !== '')
+            ->keyBy(fn (array $school): string => $this->normalizeSchoolMatchKey((string) ($school['name'] ?? $school['school_name'] ?? '')));
+
+        $interest = [];
+
+        $resolve = function (array $row) use ($byBusinessId, $byName): ?array {
+            $schoolId = strtolower(trim((string) ($row['school_id'] ?? $row['business_id'] ?? $row['company_id'] ?? '')));
+            $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? $row['company_name'] ?? $row['business_name'] ?? ''));
+            $schoolKey = $this->normalizeSchoolMatchKey($schoolName !== '' ? $schoolName : (string) ($row['school_key'] ?? ''));
+
+            $school = ($schoolId !== '' ? $byBusinessId->get($schoolId) : null)
+                ?? ($schoolKey !== '' ? $byName->get($schoolKey) : null);
+
+            if (! is_array($school) && $schoolName === '' && $schoolId === '') {
+                return null;
+            }
+
+            if (! is_array($school)) {
+                $school = [
+                    'id' => $schoolId !== '' ? $schoolId : md5(strtolower($schoolName)),
+                    'business_id' => $schoolId,
+                    'name' => $schoolName !== '' ? $schoolName : 'School',
+                    'conference' => '',
+                    'division' => '',
+                    'logo_url' => $row['logo'] ?? $row['logo_url'] ?? null,
+                ];
+            }
+
+            $canonicalId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? ''));
+            if ($canonicalId === '') {
+                $canonicalId = md5(strtolower(trim((string) ($school['name'] ?? $schoolName))));
+            }
+
+            return ['key' => $canonicalId, 'school' => $school];
+        };
+
+        foreach (collect($this->profileViewRows)->filter(fn ($row): bool => is_array($row)) as $row) {
+            $resolved = $resolve($row);
+            if (! $resolved) {
+                continue;
+            }
+
+            $key = (string) $resolved['key'];
+            $interest[$key] ??= [
+                'school' => $resolved['school'],
+                'profile_views' => 0,
+                'engagement_clicks' => 0,
+            ];
+            $interest[$key]['profile_views'] += max(0, (int) ($row['views'] ?? 0));
+        }
+
+        foreach (collect($this->coachEngagementRows)->filter(fn ($row): bool => is_array($row)) as $row) {
+            $resolved = $resolve($row);
+            if (! $resolved) {
+                continue;
+            }
+
+            $key = (string) $resolved['key'];
+            $interest[$key] ??= [
+                'school' => $resolved['school'],
+                'profile_views' => 0,
+                'engagement_clicks' => 0,
+            ];
+            $interest[$key]['engagement_clicks'] += max(0, (int) ($row['clicks'] ?? 0));
+        }
+
+        return collect($interest)
+            ->map(function (array $row): array {
+                $school = is_array($row['school'] ?? null) ? $row['school'] : [];
+                $views = max(0, (int) ($row['profile_views'] ?? 0));
+                $clicks = max(0, (int) ($row['engagement_clicks'] ?? 0));
+
+                $school['profile_views'] = $views;
+                $school['interest_clicks'] = $clicks;
+                // Ranking can use click activity as a secondary signal, while
+                // the number rendered on the dashboard remains profile views.
+                $school['interest_rank_score'] = ($views * 1000000) + $clicks;
+                $school['lead_score'] = $school['interest_rank_score'];
+
+                return $school;
+            })
+            ->filter(fn (array $school): bool => (int) ($school['profile_views'] ?? 0) > 0 || (int) ($school['interest_clicks'] ?? 0) > 0)
+            ->sort(function (array $a, array $b): int {
+                $views = (int) ($b['profile_views'] ?? 0) <=> (int) ($a['profile_views'] ?? 0);
+                if ($views !== 0) {
+                    return $views;
+                }
+
+                return (int) ($b['interest_clicks'] ?? 0) <=> (int) ($a['interest_clicks'] ?? 0);
+            })
+            ->take(5)
+            ->values()
+            ->all();
+    }
+
     public function getDashboardTopEngagedSchoolsProperty(): array
     {
         $schools = collect($this->topSchools ?: $this->allSchools())
@@ -5014,33 +6667,191 @@ HTML;
         return $schools ?: collect($this->allSchools())->take(5)->values()->all();
     }
 
+    protected function prependDashboardActivity(array $activity): void
+    {
+        $activity['time'] = $activity['time'] ?? now()->toIso8601String();
+        $this->dashboardRecentActivity = collect([$activity])
+            ->merge($this->dashboardRecentActivity ?? [])
+            ->filter(fn ($item): bool => is_array($item))
+            ->map(fn (array $item): ?array => $this->normalizeDashboardActivityRow($item))
+            ->filter()
+            ->unique(fn (array $item): string => $this->dashboardActivityIdentity($item))
+            ->sortByDesc(fn (array $item): int => (int) ($item['_timestamp'] ?? 0))
+            ->take(30)
+            ->map(function (array $item): array {
+                unset($item['_timestamp']);
+                return $item;
+            })
+            ->values()
+            ->all();
+
+        $this->persistDashboardActivityRows(Auth::user(), $this->dashboardRecentActivity);
+    }
+
+    protected function conversationDashboardActivityRows(): array
+    {
+        return collect($this->conversations ?? [])
+            ->filter(fn ($conversation): bool => is_array($conversation))
+            ->map(function (array $conversation): array {
+                $name = trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? 'Coach contact')) ?: 'Coach contact';
+                $direction = strtolower(trim((string) (
+                    $conversation['last_message_direction']
+                    ?? $conversation['lastMessageDirection']
+                    ?? $conversation['direction']
+                    ?? $conversation['message_direction']
+                    ?? $conversation['last_message_type']
+                    ?? ''
+                )));
+                $outbound = in_array($direction, ['outbound', 'sent', 'outgoing', 'out'], true);
+                $inbound = in_array($direction, ['inbound', 'received', 'incoming', 'in'], true);
+                $title = $outbound
+                    ? 'Email sent to ' . $name
+                    : ($inbound ? 'Email received from ' . $name : 'Email activity with ' . $name);
+
+                return [
+                    'type' => $outbound ? 'email_outbound' : ($inbound ? 'email_inbound' : 'conversation'),
+                    'title' => $title,
+                    'copy' => $conversation['last_message'] ?? $conversation['snippet'] ?? 'Recruiting email activity',
+                    'time' => $conversation['last_message_at'] ?? $conversation['updated_at'] ?? null,
+                    'conversation_id' => (string) ($conversation['id'] ?? ''),
+                    'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    protected function localCoachDashboardActivityRows(): array
+    {
+        $platforms = [
+            'website' => ['label' => 'Website', 'key' => 'website_click_count'],
+            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count'],
+            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count'],
+            'x' => ['label' => 'X', 'key' => 'x_click_count'],
+            'email' => ['label' => 'Email link', 'key' => 'email_click_count'],
+        ];
+
+        return collect($this->trackingCoaches())
+            ->flatMap(function (array $coach) use ($platforms): array {
+                $rows = [];
+                $name = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Coach contact';
+                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+                $coachId = $this->coachTrackingIdentity($coach);
+                $schoolId = $this->trackingSchoolIdForCoach($coach);
+                $clickTime = $coach['last_clicked_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
+                $viewTime = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
+
+                if ((bool) ($coach['replied'] ?? false) || (int) ($coach['coach_reply_count'] ?? 0) > 0) {
+                    $rows[] = [
+                        'type' => 'coach_reply',
+                        'title' => $name . ' replied',
+                        'copy' => collect([$school, 'Inbound coach reply'])->filter()->implode(' • '),
+                        'time' => $coach['last_reply_at'] ?? $clickTime,
+                        'coach_id' => $coachId,
+                        'school_id' => $schoolId,
+                        'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+                    ];
+                }
+
+                $clickCounts = collect($platforms)->mapWithKeys(fn (array $config, string $key): array => [$key => (int) ($coach[$config['key']] ?? 0)]);
+                $lastPlatform = strtolower(trim((string) ($coach['last_clicked_platform'] ?? '')));
+                $lastPlatform = match ($lastPlatform) {
+                    'twitter' => 'x',
+                    'ig' => 'instagram',
+                    'email_link' => 'email',
+                    default => $lastPlatform,
+                };
+                if (! isset($platforms[$lastPlatform]) || (int) $clickCounts->get($lastPlatform, 0) <= 0) {
+                    $lastPlatform = (string) ($clickCounts->sortDesc()->keys()->first() ?? '');
+                }
+
+                if ($lastPlatform !== '' && (int) $clickCounts->get($lastPlatform, 0) > 0) {
+                    $count = (int) $clickCounts->get($lastPlatform);
+                    $label = $platforms[$lastPlatform]['label'];
+                    $rows[] = [
+                        'type' => $lastPlatform === 'email' ? 'email_click' : 'social_click_' . $lastPlatform,
+                        'title' => $name . ' clicked ' . $label,
+                        'copy' => collect([$school, number_format($count) . ' total ' . $label . ' ' . Str::plural('click', $count)])->filter()->implode(' • '),
+                        'time' => $clickTime,
+                        'coach_id' => $coachId,
+                        'school_id' => $schoolId,
+                        'platform_key' => $lastPlatform,
+                        'url' => $schoolId !== '' ? '#' : \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
+                    ];
+                }
+
+                $views = $this->coachTrackedProfileViewTotal($coach);
+                if ($views > 0) {
+                    $rows[] = [
+                        'type' => 'profile_view',
+                        'title' => $name . ' viewed your profile',
+                        'copy' => collect([$school, number_format($views) . ' total profile ' . Str::plural('view', $views)])->filter()->implode(' • '),
+                        'time' => $viewTime,
+                        'coach_id' => $coachId,
+                        'school_id' => $schoolId,
+                        'url' => $schoolId !== '' ? '#' : \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
+                    ];
+                }
+
+                return $rows;
+            })
+            ->filter(fn ($row): bool => is_array($row))
+            ->sortByDesc(function (array $item): int {
+                try {
+                    return filled($item['time'] ?? null) ? \Carbon\Carbon::parse($item['time'])->getTimestamp() : 0;
+                } catch (\Throwable $exception) {
+                    return 0;
+                }
+            })
+            ->take(50)
+            ->values()
+            ->all();
+    }
+
     public function getDashboardRecentActivityProperty(): array
     {
-        $format = function (array $item): array {
-            $copy = trim(strip_tags((string) ($item['copy'] ?? '')));
-            $copy = preg_replace('/\s+/', ' ', $copy) ?: 'Recent recruiting activity';
-            return [
-                'type' => $item['type'] ?? 'activity',
-                'title' => $item['title'] ?? 'Activity',
-                'copy' => Str::limit($copy, 220),
-                'time' => $item['time'] ?? null,
-                'url' => $item['url'] ?? \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
-            ];
-        };
+        $user = Auth::user();
+        $baseRows = collect($this->dashboardRecentActivity ?? [])
+            ->merge($this->cachedDashboardActivityRows($user))
+            ->merge($this->localCoachDashboardActivityRows())
+            ->merge($this->conversationDashboardActivityRows())
+            ->filter(fn ($item): bool => is_array($item));
 
-        if (! empty($this->dashboardRecentActivity)) {
-            return collect($this->dashboardRecentActivity)->take(8)->map($format)->values()->all();
+        $metrics = $this->dashboardMetrics;
+        $hasSpecificEmailActivity = $baseRows->contains(fn (array $item): bool => str_contains(strtolower((string) ($item['type'] ?? '')), 'email'));
+        $hasSpecificProfileActivity = $baseRows->contains(fn (array $item): bool => str_contains(strtolower((string) ($item['type'] ?? '')), 'profile'));
+
+        if (! $hasSpecificEmailActivity && (int) ($metrics['emails_sent'] ?? 0) > 0) {
+            $baseRows->push([
+                'type' => 'email_outbound',
+                'title' => 'Recruiting emails sent',
+                'copy' => number_format((int) ($metrics['emails_sent'] ?? 0)) . ' outbound email ' . Str::plural('message', (int) ($metrics['emails_sent'] ?? 0)) . ' recorded.',
+                'time' => $this->cachedAt,
+                'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+            ]);
         }
 
-        return collect($this->conversations ?? [])
+        if (! $hasSpecificProfileActivity && (int) ($metrics['profile_views'] ?? 0) > 0) {
+            $baseRows->push([
+                'type' => 'profile_view',
+                'title' => 'Profile views recorded',
+                'copy' => number_format((int) ($metrics['profile_views'] ?? 0)) . ' player website/profile views from ' . number_format((int) ($metrics['unique_contact_clicks'] ?? 0)) . ' unique coach contacts.',
+                'time' => $this->cachedAt,
+                'url' => \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
+            ]);
+        }
+
+        return $baseRows
+            ->map(fn (array $item): ?array => $this->normalizeDashboardActivityRow($item))
+            ->filter()
+            ->unique(fn (array $item): string => $this->dashboardActivityIdentity($item))
+            ->sortByDesc(fn (array $item): int => (int) ($item['_timestamp'] ?? 0))
             ->take(8)
-            ->map(fn (array $conversation): array => $format([
-                'type' => 'conversation',
-                'title' => $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach conversation',
-                'copy' => $conversation['last_message'] ?? $conversation['snippet'] ?? 'New recruiting email activity',
-                'time' => $conversation['last_message_at'] ?? $conversation['updated_at'] ?? null,
-                'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
-            ]))
+            ->map(function (array $item): array {
+                unset($item['_timestamp']);
+                $item['copy'] = Str::limit((string) ($item['copy'] ?? ''), 220);
+                return $item;
+            })
             ->values()
             ->all();
     }
@@ -5608,81 +7419,45 @@ HTML;
 
     protected function hydrateSchoolRowForDisplay(array $school): array
     {
-        $existingCoaches = collect($school['coaches'] ?? [])
-            ->filter(fn ($coach): bool => is_array($coach));
-
-        if ($existingCoaches->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
-            $existingCoaches = collect([$school['head_coach']]);
-        }
-
-        $matchedCoaches = collect($this->coachesForSchoolSearch($school))
-            ->merge($this->dashboardCoachesForSchoolRow($school))
-            ->filter(fn ($coach): bool => is_array($coach));
-
-        $coaches = $existingCoaches
-            ->merge($matchedCoaches)
-            ->map(function (array $coach) use ($school): array {
-                $schoolName = (string) ($school['name'] ?? '');
-                $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-                $logoUrl = $school['school_logo_url'] ?? $school['business_logo_url'] ?? $school['logo_url'] ?? null;
-
-                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
-                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
-                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $logoUrl;
-                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $logoUrl;
-
-                return $coach;
-            })
-            ->unique(function (array $coach): string {
-                return strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach))));
-            })
-            ->values();
-
-        if ($coaches->isNotEmpty()) {
-            $school['coaches'] = $coaches->all();
-        }
-
-        $school['coach_count'] = max(
+        // Lightweight display hydration only. Do not attach the full coach roster
+        // to every school card/list option because Livewire serializes the result.
+        $count = max(
             (int) ($school['coach_count'] ?? 0),
             (int) ($school['coaches_count'] ?? 0),
-            $coaches->count()
+            $this->coachCountForSchoolSearch($school)
         );
-        $school['coaches_count'] = $school['coach_count'];
 
-        $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
-        if (blank($headCoach['name'] ?? null) && $coaches->isNotEmpty()) {
-            $headCoach = $coaches->first(function (array $coach): bool {
-                return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
-            }) ?: $coaches->first();
-            if (is_array($headCoach)) {
-                $school['head_coach'] = $headCoach;
+        $school['coach_count'] = $count;
+        $school['coaches_count'] = $count;
+
+        if (blank(data_get($school, 'head_coach.name'))) {
+            foreach ($this->coachesForSchoolSearch($school) as $coach) {
+                if (! is_array($coach)) {
+                    continue;
+                }
+
+                if ($this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''))) {
+                    $school['head_coach'] = $coach;
+                    break;
+                }
+
+                $school['head_coach'] ??= $coach;
             }
         }
 
-        $logoUrl = $this->logoUrlForSchoolRow($school);
-
-        if ($logoUrl === '') {
-            $logoUrl = $this->logoUrlFromDashboardSchoolReference($school);
-        }
-
-        if ($logoUrl !== '') {
-            $school['logo_url'] = $logoUrl;
-            $school['school_logo_url'] = $school['school_logo_url'] ?? $logoUrl;
-            $school['business_logo_url'] = $school['business_logo_url'] ?? $logoUrl;
-        }
+        unset($school['coaches'], $school['staff'], $school['coaching_staff'], $school['contacts']);
 
         return $school;
     }
 
-    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all(); }
+
+    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->take((int) config('coach-database-sync.ui.school_row_cap', 96))->values()->all(); }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
     public function getSavedSchoolsProperty(): array
     {
-        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->values()->all();
+        return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->take((int) config('coach-database-sync.ui.school_row_cap', 96))->values()->all();
     }
 
     public function getSavedCoachesProperty(): array
@@ -5811,6 +7586,7 @@ HTML;
 
         return $this->filterSchoolsForSearch(collect($this->allSchools())
             ->filter(fn (array $school): bool => in_array((string) ($list['key'] ?? ''), $school['list_keys'] ?? [], true)), $this->listSchoolSearch !== '' ? $this->listSchoolSearch : $this->search)
+            ->take((int) config('coach-database-sync.ui.school_row_cap', 96))
             ->values()
             ->all();
     }
@@ -5833,6 +7609,7 @@ HTML;
 
                 return $inList && ($query === '' || str_contains($this->coachSearchHaystack($coach), $query));
             })
+            ->take((int) config('coach-database-sync.ui.coach_row_cap', 120))
             ->values()
             ->all();
     }
@@ -6083,7 +7860,7 @@ HTML;
             if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
                 Notification::make()
                     ->title('Compose Email')
-                    ->body($this->templateErrorMessage($result, 'Unable to upload image to GHL media.'))
+                    ->body($this->templateErrorMessage($result, 'Unable to upload image to Recruiting Center media.'))
                     ->danger()
                     ->send();
                 return;
@@ -6092,7 +7869,7 @@ HTML;
             $this->composeGraphicUrl = trim((string) $result['url']);
         } catch (\Throwable $exception) {
             $this->composeGraphicUpload = null;
-            Notification::make()->title('Compose Email')->body('Unable to upload image to GHL media.')->danger()->send();
+            Notification::make()->title('Compose Email')->body('Unable to upload image to Recruiting Center media.')->danger()->send();
         }
     }
 
@@ -6771,19 +8548,9 @@ HTML;
 
         $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
         $schoolName = trim((string) ($school['name'] ?? ''));
-        $normalizedSchoolName = strtolower($schoolName);
-        $existingCoaches = collect($school['coaches'] ?? [])->filter(fn ($coach): bool => is_array($coach));
-        $matchedCoaches = collect($this->allCoaches())
-            ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
-                $coachBusinessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['school_id'] ?? ''));
-                $coachSchool = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+        $matchedCoaches = collect($this->coachesForSchoolSearch($school));
 
-                return ($businessId !== '' && $coachBusinessId === $businessId)
-                    || ($schoolName !== '' && strtolower($coachSchool) === $normalizedSchoolName);
-            });
-
-        $coaches = $existingCoaches
-            ->merge($matchedCoaches)
+        $coaches = $matchedCoaches
             ->filter(fn ($coach): bool => is_array($coach))
             ->map(function (array $coach) use ($school, $businessId, $schoolName): array {
                 $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
@@ -6811,7 +8578,9 @@ HTML;
         }
 
         $school['coaches'] = $coaches->values()->all();
-        $school['coach_count'] = max((int) ($school['coach_count'] ?? 0), $coaches->count());
+        $school['coach_count'] = $coaches->count();
+        $school['coaches_count'] = $coaches->count();
+        $school['coach_count_cross_referenced'] = $coaches->count();
 
         if (blank(data_get($school, 'head_coach.name')) && $coaches->isNotEmpty()) {
             $school['head_coach'] = $coaches->first(function (array $coach): bool {
@@ -6876,6 +8645,23 @@ HTML;
         }
 
         $this->selectedSchoolIds = $ids->push($schoolId)->unique()->values()->all();
+    }
+
+    public function setSelectedSchoolIds(array $schoolIds): array
+    {
+        $this->selectedSchoolIds = collect($schoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->take(500)
+            ->values()
+            ->all();
+
+        return [
+            'success' => true,
+            'selected' => $this->selectedSchoolIds,
+            'count' => count($this->selectedSchoolIds),
+        ];
     }
 
     public function clearSelectedSchools(): void
@@ -6969,18 +8755,165 @@ HTML;
         Notification::make()->title('Recruiting Center')->body('Selected schools were added to Compose Email.')->success()->send();
     }
 
+    public function queueSelectedSchoolsToList(string $listKey): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        $listKey = trim($listKey);
+        $schoolIds = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->take(500)
+            ->values()
+            ->all();
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
+        if ($listKey === '') {
+            return ['success' => false, 'error' => 'Choose a list first.'];
+        }
+
+        if (empty($schoolIds)) {
+            return ['success' => false, 'error' => 'Select at least one school first.'];
+        }
+
+        $service = app(CoachDatabaseService::class);
+        $tag = $service->listTagForKey($listKey, $user);
+        if (blank($tag)) {
+            return ['success' => false, 'error' => 'That list could not be found.'];
+        }
+
+        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, [[
+            'kind' => 'school_list_bulk',
+            'school_ids' => $schoolIds,
+            'list_key' => $listKey,
+            'tag' => $tag,
+            'type' => 'add',
+        ]]);
+
+        if (! ($queued['success'] ?? false)) {
+            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue the selected schools.'];
+        }
+
+        $this->applyBulkSchoolListMembershipToCache($schoolIds, $listKey, true);
+        $this->startCoachDatabaseActionWorker($user);
+
+        $listLabel = collect($this->lists)
+            ->first(fn ($list): bool => is_array($list) && (string) ($list['key'] ?? '') === $listKey)['label']
+            ?? \Illuminate\Support\Str::headline($listKey);
+
+        return [
+            'success' => true,
+            'queued' => (int) ($queued['queued'] ?? 1),
+            'school_count' => count($schoolIds),
+            'list_key' => $listKey,
+            'list_label' => (string) $listLabel,
+        ];
+    }
+
+    /**
+     * Compatibility alias for older Blade files. The actual work is queued and
+     * processed outside Livewire so this method returns immediately.
+     */
     public function addSelectedSchoolsToList(string $listKey): void
     {
-        $listKey = trim($listKey);
-        if ($listKey === '') {
+        $result = $this->queueSelectedSchoolsToList($listKey);
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()
+                ->title('Recruiting Center')
+                ->body($result['error'] ?? 'Unable to queue the selected schools.')
+                ->danger()
+                ->send();
+        }
+    }
+
+    protected function applyBulkSchoolListMembershipToCache(array $schoolIds, string $listKey, bool $inList): void
+    {
+        $schoolLookup = array_fill_keys(
+            collect($schoolIds)->map(fn ($id): string => trim((string) $id))->filter()->unique()->all(),
+            true,
+        );
+
+        if (empty($schoolLookup) || trim($listKey) === '') {
             return;
         }
 
-        foreach (collect($this->selectedSchoolIds)->filter()->unique()->values() as $schoolId) {
-            $this->addSchoolToListById((string) $schoolId, $listKey);
-        }
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])
+            ->filter(fn ($school): bool => is_array($school))
+            ->map(function (array $school) use ($schoolLookup, $listKey, $inList): array {
+                $name = strtolower(trim((string) ($school['name'] ?? '')));
+                $candidates = array_filter([
+                    trim((string) ($school['id'] ?? '')),
+                    trim((string) ($school['business_id'] ?? $school['company_id'] ?? '')),
+                    $name !== '' ? md5($name) : '',
+                ]);
 
-        Notification::make()->title('Recruiting Center')->body('Selected schools were added to the list.')->success()->send();
+                $selected = collect($candidates)->contains(fn (string $candidate): bool => isset($schoolLookup[$candidate]));
+                if (! $selected) {
+                    return $school;
+                }
+
+                $keys = collect($school['list_keys'] ?? $school['lists'] ?? [])
+                    ->map(fn ($key): string => trim((string) $key))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($inList) {
+                    if (! $keys->contains($listKey)) {
+                        $keys->push($listKey);
+                    }
+                } else {
+                    $keys = $keys->reject(fn (string $key): bool => $key === $listKey)->values();
+                }
+
+                $school['list_keys'] = $keys->values()->all();
+                $school['lists'] = $school['list_keys'];
+
+                return $school;
+            })
+            ->values()
+            ->all();
+
+        $schools = collect($snapshot['schools'] ?? []);
+        $snapshot['lists'] = collect($snapshot['lists'] ?? [])
+            ->map(function ($row) use ($schools, $listKey) {
+                if (! is_array($row) || trim((string) ($row['key'] ?? '')) !== $listKey) {
+                    return $row;
+                }
+
+                $items = $schools
+                    ->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))
+                    ->values();
+
+                $row['schools_count'] = $items->count();
+                $row['coaches_count'] = $items->sum(fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0));
+                $row['schools'] = $items
+                    ->map(fn (array $school): array => [
+                        'id' => $school['id'] ?? $school['business_id'] ?? null,
+                        'name' => $school['name'] ?? null,
+                        'logo_url' => $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null,
+                        'conference' => $school['conference'] ?? null,
+                        'division' => $school['division'] ?? null,
+                        'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                    ])
+                    ->all();
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        $snapshot['tag_synced_at'] = now()->toDateTimeString();
+        $this->storeSnapshot($snapshot);
     }
 
     public function setDivisionFilter(string $division): void
@@ -7136,6 +9069,62 @@ HTML;
         return str_contains($this->normalizeSearchText($this->conferenceSearchTokens($conference)), $needle);
     }
 
+    protected function lightweightCoachForSchoolIndex(array $coach, array $school = []): array
+    {
+        $schoolName = trim((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['id'] ?? ''));
+        $logo = $school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null;
+
+        if ($schoolName !== '') {
+            $coach['school'] = $schoolName;
+            $coach['school_name'] = $schoolName;
+            $coach['company_name'] = $schoolName;
+        }
+        if ($businessId !== '') {
+            $coach['business_id'] = $businessId;
+            $coach['company_id'] = $businessId;
+            $coach['school_id'] = $businessId;
+        }
+
+        $coach['conference'] = $coach['conference'] ?? $school['conference'] ?? null;
+        $coach['division'] = $coach['division'] ?? $school['division'] ?? null;
+        $coach['school_logo_url'] = $coach['school_logo_url'] ?? $logo;
+        $coach['business_logo_url'] = $coach['business_logo_url'] ?? $logo;
+        $coach['logo_url'] = $coach['logo_url'] ?? $logo;
+
+        foreach (['raw_contact', 'raw_business', 'custom_fields_json', 'customFields', 'custom_fields', 'customFieldValues', 'contact', 'business', 'company'] as $heavyKey) {
+            unset($coach[$heavyKey]);
+        }
+
+        return $coach;
+    }
+
+    protected function rawSnapshotSchoolCoachRows(): array
+    {
+        $snapshot = $this->activeSnapshotRows();
+        $schoolRows = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
+            ->merge(is_array($snapshot['top_schools'] ?? null) ? $snapshot['top_schools'] : [])
+            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
+            ->filter(fn ($school): bool => is_array($school));
+
+        return $schoolRows->flatMap(function (array $school): array {
+            $rows = [];
+            foreach (['coaches', 'staff', 'coaching_staff', 'contacts', 'coaches_preview'] as $field) {
+                foreach (is_array($school[$field] ?? null) ? $school[$field] : [] as $coach) {
+                    if (is_array($coach)) {
+                        $rows[] = $this->lightweightCoachForSchoolIndex($coach, $school);
+                    }
+                }
+            }
+
+            if (is_array($school['head_coach'] ?? null)) {
+                $rows[] = $this->lightweightCoachForSchoolIndex($school['head_coach'], $school);
+            }
+
+            return $rows;
+        })->values()->all();
+    }
+
     protected function schoolCoachSearchIndex(): array
     {
         if (is_array($this->schoolCoachIndexMemo)) {
@@ -7143,12 +9132,13 @@ HTML;
         }
 
         $index = [];
+        $coachRows = collect($this->allCoaches())
+            ->merge($this->rawSnapshotSchoolCoachRows())
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->unique(fn (array $coach): string => $this->coachTrackingIdentity($coach))
+            ->values();
 
-        foreach ($this->allCoaches() as $coach) {
-            if (! is_array($coach)) {
-                continue;
-            }
-
+        foreach ($coachRows as $coach) {
             $keys = [];
             $businessIds = collect([
                 $coach['business_id'] ?? null,
@@ -7157,10 +9147,10 @@ HTML;
                 $coach['school_id'] ?? null,
                 data_get($coach, 'company.id'),
                 data_get($coach, 'business.id'),
-            ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
+            ])->merge($this->coachBusinessIdCandidates($coach))->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
 
             foreach ($businessIds as $businessId) {
-                $keys[] = 'business:' . $businessId;
+                $keys[] = 'business:' . strtolower(trim((string) $businessId));
             }
 
             $schoolNames = collect([
@@ -7170,7 +9160,12 @@ HTML;
                 $coach['school_or_company'] ?? null,
                 data_get($coach, 'company.name'),
                 data_get($coach, 'business.name'),
-            ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
+            ])->merge(is_array($coach['school_aliases'] ?? null) ? $coach['school_aliases'] : [])
+                ->merge($this->coachSchoolNameCandidates($coach))
+                ->map(fn ($value): string => trim((string) $value))
+                ->filter()
+                ->unique()
+                ->values();
 
             foreach ($schoolNames as $schoolName) {
                 $keys[] = 'school:' . strtolower($schoolName);
@@ -7182,8 +9177,7 @@ HTML;
 
             foreach (array_unique($keys) as $key) {
                 $index[$key] ??= [];
-                $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? md5(json_encode($coach)));
-                $index[$key][$coachId] = $coach;
+                $index[$key][$this->coachTrackingIdentity($coach)] = $coach;
             }
         }
 
@@ -7192,29 +9186,58 @@ HTML;
 
     protected function coachCountForSchoolSearch(array $school): int
     {
-        $keys = [];
+        return count($this->coachesForSchoolSearch($school));
+    }
+
+    protected function coachesForSchoolSearch(array $school): array
+    {
         $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-        $schoolName = trim((string) ($school['name'] ?? ''));
+        $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? $school['business_name'] ?? ''));
         $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
 
-        if ($businessId !== '') {
-            $keys[] = 'business:' . $businessId;
+        $allCoaches = collect($this->allCoaches())
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->values();
+        $coachesById = $allCoaches
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null))
+            ->keyBy(fn (array $coach): string => trim((string) ($coach['id'] ?? $coach['contact_id'] ?? '')));
+        $coachesByEmail = $allCoaches
+            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
+
+        $coaches = [];
+
+        // First use the exact reconciled contact references saved on the school row.
+        foreach (collect($school['coach_ids'] ?? [])->map(fn ($id): string => trim((string) $id))->filter()->unique() as $coachId) {
+            $coach = $coachesById->get($coachId);
+            if (is_array($coach)) {
+                $coaches[$this->coachTrackingIdentity($coach)] = $coach;
+            }
+        }
+        foreach (collect($school['coach_emails'] ?? [])->map(fn ($email): string => strtolower(trim((string) $email)))->filter()->unique() as $email) {
+            $coach = $coachesByEmail->get($email);
+            if (is_array($coach)) {
+                $coaches[$this->coachTrackingIdentity($coach)] = $coach;
+            }
         }
 
+        // Then union the live index matches from official Business IDs and contact-side
+        // Business Name / Company Name / School Name values.
+        $keys = [];
+        if ($businessId !== '') {
+            $keys[] = 'business:' . strtolower($businessId);
+        }
         if ($schoolName !== '') {
             $keys[] = 'school:' . strtolower($schoolName);
         }
-
         if ($normalizedSchoolName !== '') {
             $keys[] = 'school_key:' . $normalizedSchoolName;
         }
 
         $index = $this->schoolCoachSearchIndex();
-        $ids = [];
-
         foreach (array_unique($keys) as $key) {
-            foreach (array_keys($index[$key] ?? []) as $coachId) {
-                $ids[$coachId] = true;
+            foreach (($index[$key] ?? []) as $coachId => $coach) {
+                $coaches[$coachId] = $coach;
             }
         }
 
@@ -7222,64 +9245,88 @@ HTML;
             if (! is_array($coach)) {
                 continue;
             }
-            $coachId = (string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach)));
-            $ids[$coachId] = true;
-        }
-
-        return count($ids);
-    }
-
-    protected function coachesForSchoolSearch(array $school): array
-    {
-        $keys = [];
-        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-        $schoolName = trim((string) ($school['name'] ?? ''));
-        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
-
-        if ($businessId !== '') {
-            $keys[] = 'business:' . $businessId;
-        }
-
-        if ($schoolName !== '') {
-            $keys[] = 'school:' . strtolower($schoolName);
-        }
-
-        if ($normalizedSchoolName !== '') {
-            $keys[] = 'school_key:' . $normalizedSchoolName;
-        }
-
-        $index = $this->schoolCoachSearchIndex();
-        $coaches = [];
-
-        foreach (array_unique($keys) as $key) {
-            foreach (($index[$key] ?? []) as $coachId => $coach) {
-                $coaches[$coachId] = $coach;
-            }
-        }
-
-        // Fallback: GHL business names and contact company names are not always
-        // identical, so exact indexing can miss the coaches that contain the
-        // contact.school_logo URL. Match by a normalized school name too.
-        if (empty($coaches) && $normalizedSchoolName !== '') {
-            foreach ($this->allCoaches() as $coach) {
-                if (! is_array($coach)) {
-                    continue;
-                }
-
-                $coachSchoolKey = $this->normalizeSchoolMatchKey((string) ($coach['school'] ?? $coach['company_name'] ?? $coach['school_or_company'] ?? ''));
-
-                if ($coachSchoolKey === '' || $coachSchoolKey !== $normalizedSchoolName) {
-                    continue;
-                }
-
-                $coachId = (string) ($coach['id'] ?? md5(json_encode($coach)));
-                $coaches[$coachId] = $coach;
-            }
+            $coaches[$this->coachTrackingIdentity($coach)] = $coach;
         }
 
         return array_values($coaches);
     }
 
+    protected function coachSchoolNameCandidates(array $coach): array
+    {
+        return collect(is_array($coach['school_aliases'] ?? null) ? $coach['school_aliases'] : [])->merge([
+            $coach['school'] ?? null,
+            $coach['school_name'] ?? null,
+            $coach['company_name'] ?? null,
+            $coach['business_name'] ?? null,
+            $coach['school_or_company'] ?? null,
+            $coach['organization'] ?? null,
+            data_get($coach, 'company.name'),
+            data_get($coach, 'business.name'),
+            data_get($coach, 'raw_contact.companyName'),
+            data_get($coach, 'raw_contact.businessName'),
+        ])->map(fn ($value): string => trim((string) $value))->filter()->unique(fn (string $value): string => strtolower($value))->values()->all();
+    }
+
+    protected function coachBusinessIdCandidates(array $coach): array
+    {
+        return collect([
+            $coach['business_id'] ?? null,
+            $coach['company_id'] ?? null,
+            $coach['ghl_business_id'] ?? null,
+            $coach['school_id'] ?? null,
+            $coach['businessId'] ?? null,
+            $coach['companyId'] ?? null,
+            data_get($coach, 'company.id'),
+            data_get($coach, 'business.id'),
+            data_get($coach, 'raw_contact.businessId'),
+            data_get($coach, 'raw_contact.companyId'),
+        ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique()->values()->all();
+    }
+
+    protected function firstCoachSchoolName(array $coach): string
+    {
+        return (string) (collect($this->coachSchoolNameCandidates($coach))->first() ?? '');
+    }
+
+    protected function firstCoachBusinessId(array $coach): string
+    {
+        return (string) (collect($this->coachBusinessIdCandidates($coach))->first() ?? '');
+    }
+
+    protected function coachBelongsToSchool(array $coach, string $businessId, string $schoolName, string $normalizedSchoolName = ''): bool
+    {
+        $businessId = strtolower(trim($businessId));
+        $normalizedSchoolName = $normalizedSchoolName !== '' ? $normalizedSchoolName : $this->normalizeSchoolMatchKey($schoolName);
+
+        if ($businessId !== '' && in_array($businessId, $this->coachBusinessIdCandidates($coach), true)) {
+            return true;
+        }
+
+        if ($normalizedSchoolName === '') {
+            return false;
+        }
+
+        foreach ($this->coachSchoolNameCandidates($coach) as $candidate) {
+            $coachSchoolKey = $this->normalizeSchoolMatchKey($candidate);
+            if ($coachSchoolKey === '') {
+                continue;
+            }
+
+            if ($coachSchoolKey === $normalizedSchoolName) {
+                return true;
+            }
+
+            // Conservative loose match for common Recruiting Center mismatch cases, e.g.
+            // business row includes "University" but contact row uses the shorter
+            // school/company name. Require one side to be reasonably specific.
+            if ((strlen($coachSchoolKey) >= 8 || strlen($normalizedSchoolName) >= 8)
+                && (str_contains($coachSchoolKey, $normalizedSchoolName) || str_contains($normalizedSchoolName, $coachSchoolKey))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     protected function dashboardCoachesForSchoolRow(array $school): array
     {
@@ -7341,7 +9388,7 @@ HTML;
     {
         $value = strtolower(trim($value));
         $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $value = preg_replace('/\b(the|university|college|school|of|at)\b/i', ' ', $value) ?: $value;
+        $value = preg_replace('/\b(the|university|college|school|athletics|athletic|department|dept|of|at)\b/i', ' ', $value) ?: $value;
         $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?: $value;
         $value = preg_replace('/\s+/', ' ', $value) ?: $value;
 
@@ -7419,24 +9466,18 @@ HTML;
 
     protected function schoolSearchHaystack(array $school): string
     {
-        $coaches = collect($this->coachesForSchoolSearch($school))
-            ->flatMap(function (array $coach): array {
-                return [
-                    $coach['name'] ?? '',
-                    $coach['first_name'] ?? '',
-                    $coach['last_name'] ?? '',
-                    $coach['email'] ?? '',
-                    $coach['title'] ?? '',
-                    $coach['position'] ?? '',
-                    $coach['school'] ?? '',
-                    $coach['division'] ?? '',
-                    $coach['conference'] ?? '',
-                    $this->conferenceSearchTokens($coach['conference'] ?? ''),
-                    $coach['city'] ?? '',
-                    $coach['state'] ?? '',
-                ];
-            })
-            ->all();
+        // Keep school search lightweight. Coach names are searchable in the Coaches
+        // index/suggestions; running a full school-coach lookup for every school card
+        // causes timeout/memory issues on large datasets.
+        $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
+        $coachTokens = [
+            $headCoach['name'] ?? '',
+            $headCoach['first_name'] ?? '',
+            $headCoach['last_name'] ?? '',
+            $headCoach['email'] ?? '',
+            $headCoach['title'] ?? '',
+            $headCoach['position'] ?? '',
+        ];
 
         return $this->normalizeSearchText(array_merge([
             $school['name'] ?? '',
@@ -7445,10 +9486,8 @@ HTML;
             $school['division'] ?? '',
             $school['city'] ?? '',
             $school['state'] ?? '',
-            $school['head_coach']['name'] ?? '',
-            $school['head_coach']['title'] ?? '',
             $this->listTokensForSchool($school),
-        ], $coaches));
+        ], $coachTokens));
     }
 
     protected function filteredSchoolsQuery(): Collection
@@ -7516,11 +9555,25 @@ HTML;
         $this->coachDatabaseSnapshotMemo = null;
         $this->coachSearchIndexMemo = null;
         $this->schoolCoachIndexMemo = null;
+        $this->allSchoolsMemo = null;
+        $this->allCoachesMemo = null;
+        $this->trackingCoachesMemo = null;
     }
 
     protected function allSchools(): array
     {
+        if (is_array($this->allSchoolsMemo)) {
+            return $this->allSchoolsMemo;
+        }
+
         $snapshot = $this->activeSnapshotRows();
+
+        if ((bool) ($snapshot['dataset_reconciled'] ?? false) && is_array($snapshot['schools'] ?? null)) {
+            return $this->allSchoolsMemo = collect($snapshot['schools'])
+                ->filter(fn ($school): bool => is_array($school))
+                ->values()
+                ->all();
+        }
 
         $snapshotSchools = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
             ->filter(fn ($school): bool => is_array($school));
@@ -7532,7 +9585,7 @@ HTML;
 
         /**
          * Discover Schools cannot depend only on the paged business/school cache.
-         * On large GHL accounts that cache may contain only the first page, while
+         * On large Recruiting Center accounts that cache may contain only the first page, while
          * the contacts/coaches cache already contains schools from every coach.
          * Build lightweight school rows from coaches so Discover can show every
          * school and still paginate with the existing Load More button.
@@ -7542,8 +9595,8 @@ HTML;
 
         $coachDerivedSchools = $coachRows
             ->map(function (array $coach): array {
-                $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? ''));
-                $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $coach['businessId'] ?? ''));
+                $schoolName = trim($this->firstCoachSchoolName($coach));
+                $businessId = trim($this->firstCoachBusinessId($coach));
 
                 if ($schoolName === '' && $businessId === '') {
                     return [];
@@ -7580,31 +9633,42 @@ HTML;
             ->merge($topSchoolRows)
             ->filter(fn ($school): bool => is_array($school) && filled($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? null));
 
-        $coachCountsByKey = [];
+        $coachIdsByKey = [];
         $headCoachesByKey = [];
 
         foreach ($coachRows as $coach) {
-            $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? ''));
-            $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $coach['businessId'] ?? ''));
             $keys = [];
 
-            if ($businessId !== '') {
-                $keys[] = 'business:' . strtolower($businessId);
+            // Exact association keys.
+            foreach ($this->coachBusinessIdCandidates($coach) as $businessId) {
+                $keys[] = 'business:' . strtolower(trim((string) $businessId));
             }
 
-            $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
-            if ($schoolKey !== '') {
-                $keys[] = 'school:' . $schoolKey;
+            // Cross-reference keys. Include every known School / Company / Business
+            // name because Recruiting Center sometimes leaves businessId empty even though the
+            // contact's Business Name field is populated correctly.
+            foreach ($this->coachSchoolNameCandidates($coach) as $schoolName) {
+                $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
+                if ($schoolKey !== '') {
+                    $keys[] = 'school:' . $schoolKey;
+                }
             }
 
-            foreach (array_unique($keys) as $key) {
-                $coachCountsByKey[$key] = ($coachCountsByKey[$key] ?? 0) + 1;
+            $identity = $this->coachTrackingIdentity($coach);
+
+            foreach (array_unique(array_filter($keys)) as $key) {
+                $coachIdsByKey[$key] ??= [];
+                $coachIdsByKey[$key][$identity] = true;
 
                 if (! isset($headCoachesByKey[$key]) && $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''))) {
                     $headCoachesByKey[$key] = $coach;
                 }
             }
         }
+
+        $coachCountsByKey = collect($coachIdsByKey)
+            ->map(fn (array $identities): int => count($identities))
+            ->all();
 
         return $allRows
             ->groupBy(function (array $school): string {
@@ -7653,10 +9717,7 @@ HTML;
                     $nestedCoachCount = max(
                         $nestedCoachCount,
                         (int) ($row['coach_count'] ?? 0),
-                        (int) ($row['coaches_count'] ?? 0),
-                        is_array($row['coaches'] ?? null)
-                            ? count(array_filter($row['coaches'], fn ($coach): bool => is_array($coach)))
-                            : 0
+                        (int) ($row['coaches_count'] ?? 0)
                     );
                 }
 
@@ -7678,7 +9739,13 @@ HTML;
                 );
                 $primary['coaches_count'] = $primary['coach_count'];
 
-                unset($primary['coaches']);
+                $indexedCount = $this->coachCountForSchoolSearch($primary);
+                if ($indexedCount > 0) {
+                    $primary['coach_count'] = max((int) ($primary['coach_count'] ?? 0), $indexedCount);
+                    $primary['coaches_count'] = $primary['coach_count'];
+                }
+
+                unset($primary['coaches'], $primary['staff'], $primary['coaching_staff'], $primary['contacts']);
 
                 return $primary;
             })
@@ -7689,44 +9756,18 @@ HTML;
 
     protected function allCoaches(): array
     {
+        if (is_array($this->allCoachesMemo)) {
+            return $this->allCoachesMemo;
+        }
+
         $snapshot = $this->activeSnapshotRows();
-        $baseCoaches = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : []);
 
-        $schoolRows = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
-            ->merge(is_array($snapshot['top_schools'] ?? null) ? $snapshot['top_schools'] : [])
-            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
-            ->merge(is_array($this->dashboardTopEngagedSchools ?? null) ? $this->dashboardTopEngagedSchools : [])
-            ->filter(fn ($school): bool => is_array($school));
-
-        $nestedCoaches = $schoolRows->flatMap(function (array $school): array {
-            $schoolName = (string) ($school['name'] ?? '');
-            $businessId = (string) ($school['business_id'] ?? $school['id'] ?? '');
-            $schoolLogo = $school['school_logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? null;
-
-            $rows = collect($school['coaches'] ?? [])
-                ->filter(fn ($coach): bool => is_array($coach))
-                ->values();
-
-            if ($rows->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
-                $rows = collect([$school['head_coach']]);
-            }
-
-            return $rows->map(function (array $coach) use ($schoolName, $businessId, $schoolLogo): array {
-                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
-                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
-                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $schoolLogo;
-                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $schoolLogo;
-
-                return $coach;
-            })->all();
-        });
-
-        return $baseCoaches
-            ->merge($nestedCoaches)
+        // Use the canonical contact list as the source of truth. Do not re-read
+        // nested school coach arrays here. Old cached snapshots may contain a full
+        // duplicated roster under every school, which causes timeout/memory errors.
+        return $this->allCoachesMemo = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [])
             ->filter(fn ($coach): bool => is_array($coach))
-            ->unique(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach)))))
+            ->unique(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach))))))
             ->values()
             ->all();
     }
@@ -7739,7 +9780,7 @@ HTML;
             return false;
         }
 
-        // Treat common GHL/NCAA title variants as the primary/head coach.
+        // Treat common Recruiting Center/NCAA title variants as the primary/head coach.
         // Avoid matching assistant/associate/volunteer titles that merely contain "coach".
         if (preg_match('/\b(assistant|associate|volunteer|graduate|goalkeeper|keeper|operations|recruiting|director|staff)\b/', $normalized)) {
             return false;
@@ -7753,6 +9794,8 @@ HTML;
         $this->coachDatabaseSnapshotMemo = is_array($snapshot) ? $snapshot : [];
         $this->coachSearchIndexMemo = null;
         $this->schoolCoachIndexMemo = null;
+        $this->allSchoolsMemo = null;
+        $this->allCoachesMemo = null;
 
         $this->lists = $snapshot['lists'] ?? [];
         $this->stats = $snapshot['stats'] ?? [];

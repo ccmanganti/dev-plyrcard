@@ -1,0 +1,428 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
+
+class CoachDatabaseDatasetSyncService
+{
+    public function __construct(
+        protected CoachDatabaseService $coachDatabaseService,
+    ) {}
+
+    /**
+     * Build the complete Recruiting Center read model outside an HTTP/Livewire request.
+     *
+     * The current snapshot is never cleared while this runs. Schools and contacts are
+     * accumulated in CLI memory, reconciled once, and atomically swapped into cache only
+     * after the complete build succeeds.
+     */
+    public function sync(User $user, bool $force = false): array
+    {
+        $this->prepareCliRuntime();
+
+        $cacheKey = $this->coachDatabaseService->recruitingSnapshotCacheKey($user);
+        $statusKey = $this->statusKey($user);
+        $lockKey = $this->lockKey($user);
+        $existing = Cache::get($cacheKey, []);
+        $existing = is_array($existing) ? $existing : [];
+
+        $businessLimit = max(5, min(50, (int) config('coach-database-sync.pages.businesses', 25)));
+        $contactLimit = max(10, min(100, (int) config('coach-database-sync.pages.contacts', 50)));
+        $maxBusinessPages = max(1, (int) config('coach-database-sync.max_pages.businesses', 500));
+        $maxContactPages = max(1, (int) config('coach-database-sync.max_pages.contacts', 500));
+
+        $schoolsByKey = [];
+        $coachesByKey = [];
+        $businessSkip = 0;
+        $contactsStartAfter = null;
+        $contactsStartAfterId = null;
+        $businessHasMore = true;
+        $contactsHaveMore = true;
+        $businessPages = 0;
+        $contactPages = 0;
+        $remoteSchools = null;
+        $remoteContacts = null;
+        $startedAt = now()->toDateTimeString();
+        $lastSchoolError = null;
+        $lastContactError = null;
+
+        $this->writeStatus($user, [
+            'status' => 'running',
+            'mode' => 'full_database_reload',
+            'progress' => 1,
+            'loaded_schools' => 0,
+            'loaded_contacts' => 0,
+            'loaded_pages' => 0,
+            'started_at' => $startedAt,
+            'message' => 'Loading GHL schools and contacts in background pages. Existing cached data remains visible.',
+        ]);
+
+        try {
+            while ($businessHasMore || $contactsHaveMore) {
+                if ($businessHasMore) {
+                    if ($businessPages >= $maxBusinessPages) {
+                        throw new RuntimeException("School pagination exceeded {$maxBusinessPages} pages. The previous cache was kept.");
+                    }
+
+                    $previousSkip = $businessSkip;
+                    $result = $this->attemptPage(
+                        fn (): array => $this->coachDatabaseService->getSchoolBusinessesPageForUser(
+                            user: $user,
+                            skip: $businessSkip,
+                            limit: $businessLimit,
+                        ),
+                        'schools',
+                    );
+
+                    if (! ($result['success'] ?? false)) {
+                        $lastSchoolError = (string) ($result['error'] ?? 'Unable to load a GHL school page.');
+                        throw new RuntimeException($lastSchoolError);
+                    }
+
+                    foreach (($result['schools'] ?? $result['businesses'] ?? []) as $school) {
+                        if (! is_array($school)) {
+                            continue;
+                        }
+
+                        $key = $this->schoolIdentity($school);
+                        if ($key === '') {
+                            continue;
+                        }
+
+                        $schoolsByKey[$key] = isset($schoolsByKey[$key])
+                            ? $this->mergePreferFilled($schoolsByKey[$key], $school)
+                            : $school;
+                    }
+
+                    $remoteSchools = is_numeric($result['total'] ?? null)
+                        ? (int) $result['total']
+                        : $remoteSchools;
+                    $businessSkip = is_numeric($result['next_skip'] ?? null)
+                        ? (int) $result['next_skip']
+                        : ($businessSkip + $businessLimit);
+                    $businessHasMore = (bool) ($result['has_more'] ?? false);
+                    $businessPages++;
+
+                    if ($businessHasMore && $businessSkip <= $previousSkip) {
+                        throw new RuntimeException('GHL school pagination did not advance. The previous cache was kept.');
+                    }
+                }
+
+                if ($contactsHaveMore) {
+                    if ($contactPages >= $maxContactPages) {
+                        throw new RuntimeException("Contact pagination exceeded {$maxContactPages} pages. The previous cache was kept.");
+                    }
+
+                    $previousAfter = $contactsStartAfter;
+                    $previousAfterId = $contactsStartAfterId;
+                    $result = $this->attemptPage(
+                        fn (): array => $this->coachDatabaseService->getCoachContactsPageForUser(
+                            user: $user,
+                            startAfter: is_numeric($contactsStartAfter) ? (int) $contactsStartAfter : null,
+                            startAfterId: filled($contactsStartAfterId) ? (string) $contactsStartAfterId : null,
+                            limit: $contactLimit,
+                        ),
+                        'contacts',
+                    );
+
+                    if (! ($result['success'] ?? false)) {
+                        $lastContactError = (string) ($result['error'] ?? 'Unable to load a GHL contact page.');
+                        throw new RuntimeException($lastContactError);
+                    }
+
+                    foreach (($result['contacts'] ?? []) as $coach) {
+                        if (! is_array($coach)) {
+                            continue;
+                        }
+
+                        $key = $this->coachIdentity($coach);
+                        if ($key === '') {
+                            continue;
+                        }
+
+                        $coachesByKey[$key] = isset($coachesByKey[$key])
+                            ? $this->mergePreferFilled($coachesByKey[$key], $coach)
+                            : $coach;
+                    }
+
+                    $remoteContacts = is_numeric($result['total'] ?? null)
+                        ? (int) $result['total']
+                        : $remoteContacts;
+                    $contactsStartAfter = $result['next_start_after'] ?? null;
+                    $contactsStartAfterId = $result['next_start_after_id'] ?? null;
+                    $contactsHaveMore = (bool) ($result['has_more'] ?? false);
+                    $contactPages++;
+
+                    if (
+                        $contactsHaveMore
+                        && (string) $contactsStartAfter === (string) $previousAfter
+                        && (string) $contactsStartAfterId === (string) $previousAfterId
+                    ) {
+                        throw new RuntimeException('GHL contact pagination did not advance. The previous cache was kept.');
+                    }
+                }
+
+                $loadedSchools = count($schoolsByKey);
+                $loadedContacts = count($coachesByKey);
+                $progress = $this->calculateProgress(
+                    loadedSchools: $loadedSchools,
+                    loadedContacts: $loadedContacts,
+                    remoteSchools: $remoteSchools,
+                    remoteContacts: $remoteContacts,
+                    businessDone: ! $businessHasMore,
+                    contactsDone: ! $contactsHaveMore,
+                    pages: $businessPages + $contactPages,
+                );
+
+                // Refresh the lock TTL and expose only lightweight progress to Livewire.
+                Cache::put($lockKey, $startedAt, now()->addMinutes(90));
+                $this->writeStatus($user, [
+                    'status' => 'running',
+                    'mode' => 'full_database_reload',
+                    'progress' => $progress,
+                    'loaded_schools' => $loadedSchools,
+                    'loaded_contacts' => $loadedContacts,
+                    'loaded_pages' => $businessPages + $contactPages,
+                    'remote_total_schools' => $remoteSchools,
+                    'remote_total_contacts' => $remoteContacts,
+                    'started_at' => $startedAt,
+                    'message' => "Loaded {$loadedSchools} schools and {$loadedContacts} coaches. Reconciling Business IDs and Business Name fields in background pages.",
+                ]);
+
+                if ((($businessPages + $contactPages) % 5) === 0) {
+                    gc_collect_cycles();
+                }
+            }
+
+            $this->writeStatus($user, [
+                'status' => 'running',
+                'mode' => 'full_database_reload',
+                'progress' => 96,
+                'loaded_schools' => count($schoolsByKey),
+                'loaded_contacts' => count($coachesByKey),
+                'loaded_pages' => $businessPages + $contactPages,
+                'remote_total_schools' => $remoteSchools,
+                'remote_total_contacts' => $remoteContacts,
+                'started_at' => $startedAt,
+                'message' => 'All GHL pages are loaded. Building the final cross-referenced school and coach indexes.',
+            ]);
+
+            $rebuilt = $this->coachDatabaseService->rebuildFromSchoolCompanySnapshot(
+                schools: array_values($schoolsByKey),
+                coaches: array_values($coachesByKey),
+                user: $user,
+                customListTags: is_array($existing['custom_list_tags'] ?? null) ? $existing['custom_list_tags'] : [],
+            );
+
+            $finishedAt = now()->toDateTimeString();
+            $final = array_merge($existing, $rebuilt, [
+                'dataset_reconciled' => true,
+                'dataset_sync_version' => (string) Str::uuid(),
+                'dataset_sync_started_at' => $startedAt,
+                'dataset_sync_finished_at' => $finishedAt,
+                'loaded_schools_count' => count($rebuilt['schools'] ?? []),
+                'loaded_contacts_count' => count($rebuilt['coaches'] ?? []),
+                'remote_total_schools' => $remoteSchools,
+                'remote_total_contacts' => $remoteContacts,
+                'loaded_pages' => $businessPages + $contactPages,
+                'next_business_skip' => $businessSkip,
+                'businesses_have_more' => false,
+                'next_contacts_start_after' => $contactsStartAfter,
+                'next_contacts_start_after_id' => $contactsStartAfterId,
+                'contacts_have_more' => false,
+                'has_more_data' => false,
+                'last_schools_error' => $lastSchoolError,
+                'last_contacts_error' => $lastContactError,
+                'last_refresh_notice' => 'Full Coach Database background reload completed. Schools and coaches were cross-referenced by Business ID and Business/Company/School Name.',
+                'cached_at' => $finishedAt,
+            ]);
+
+            Cache::put(
+                $cacheKey,
+                $final,
+                now()->addHours((int) config('ghl.coach_database.cache_hours', 12)),
+            );
+
+            $status = [
+                'status' => 'completed',
+                'mode' => 'full_database_reload',
+                'progress' => 100,
+                'loaded_schools' => (int) $final['loaded_schools_count'],
+                'loaded_contacts' => (int) $final['loaded_contacts_count'],
+                'loaded_pages' => $businessPages + $contactPages,
+                'remote_total_schools' => $remoteSchools,
+                'remote_total_contacts' => $remoteContacts,
+                'started_at' => $startedAt,
+                'finished_at' => $finishedAt,
+                'message' => 'Full Coach Database reload completed. The cached read model is ready.',
+            ];
+            $this->writeStatus($user, $status);
+
+            return array_merge(['success' => true], $status);
+        } catch (Throwable $exception) {
+            Log::error('Coach Database background dataset sync failed safely.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+                'loaded_schools' => count($schoolsByKey),
+                'loaded_contacts' => count($coachesByKey),
+                'business_pages' => $businessPages,
+                'contact_pages' => $contactPages,
+            ]);
+
+            $status = [
+                'status' => 'failed',
+                'mode' => 'full_database_reload',
+                'progress' => 0,
+                'loaded_schools' => count($schoolsByKey),
+                'loaded_contacts' => count($coachesByKey),
+                'loaded_pages' => $businessPages + $contactPages,
+                'started_at' => $startedAt,
+                'failed_at' => now()->toDateTimeString(),
+                'error' => $exception->getMessage(),
+                'message' => 'Background reload failed, but the previous cached Coach Database was preserved: ' . $exception->getMessage(),
+            ];
+            $this->writeStatus($user, $status);
+
+            return array_merge(['success' => false], $status);
+        }
+    }
+
+    protected function attemptPage(callable $callback, string $label): array
+    {
+        $attempts = max(1, (int) config('coach-database-sync.page_attempts', 3));
+        $sleepMs = max(0, (int) config('coach-database-sync.retry_sleep_ms', 800));
+        $last = [];
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                $last = $callback();
+                if (($last['success'] ?? false) === true) {
+                    return $last;
+                }
+            } catch (Throwable $exception) {
+                $last = ['success' => false, 'error' => $exception->getMessage()];
+            }
+
+            if ($attempt < $attempts && $sleepMs > 0) {
+                usleep($sleepMs * 1000);
+            }
+        }
+
+        Log::warning("Coach Database {$label} page exhausted retries.", [
+            'attempts' => $attempts,
+            'error' => $last['error'] ?? null,
+        ]);
+
+        return $last ?: ['success' => false, 'error' => "Unable to load {$label} page."];
+    }
+
+    protected function calculateProgress(
+        int $loadedSchools,
+        int $loadedContacts,
+        ?int $remoteSchools,
+        ?int $remoteContacts,
+        bool $businessDone,
+        bool $contactsDone,
+        int $pages,
+    ): int {
+        if (($remoteSchools ?? 0) > 0 || ($remoteContacts ?? 0) > 0) {
+            $total = max(1, (int) ($remoteSchools ?? $loadedSchools) + (int) ($remoteContacts ?? $loadedContacts));
+            $loaded = min($total, $loadedSchools + $loadedContacts);
+            return max(2, min(94, (int) round(($loaded / $total) * 94)));
+        }
+
+        if ($businessDone && $contactsDone) {
+            return 94;
+        }
+
+        return max(2, min(90, 2 + ($pages * 2)));
+    }
+
+    protected function schoolIdentity(array $school): string
+    {
+        $businessId = strtolower(trim((string) ($school['business_id'] ?? $school['id'] ?? '')));
+        if ($businessId !== '') {
+            return 'business:' . $businessId;
+        }
+
+        $name = $this->normalizeName((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+        return $name !== '' ? 'school:' . $name : '';
+    }
+
+    protected function coachIdentity(array $coach): string
+    {
+        foreach (['id', 'contact_id', 'contactId'] as $field) {
+            $value = strtolower(trim((string) ($coach[$field] ?? '')));
+            if ($value !== '') {
+                return 'id:' . $value;
+            }
+        }
+
+        $email = strtolower(trim((string) ($coach['email'] ?? '')));
+        if ($email !== '') {
+            return 'email:' . $email;
+        }
+
+        $name = $this->normalizeName((string) ($coach['name'] ?? ''));
+        $school = $this->normalizeName((string) ($coach['school'] ?? $coach['business_name'] ?? $coach['company_name'] ?? ''));
+        return ($name !== '' || $school !== '') ? 'fallback:' . sha1($name . '|' . $school) : '';
+    }
+
+    protected function normalizeName(string $value): string
+    {
+        $value = Str::ascii(mb_strtolower(trim($value)));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?: '';
+        return trim(preg_replace('/\s+/', ' ', $value) ?: '');
+    }
+
+    protected function mergePreferFilled(array $existing, array $incoming): array
+    {
+        foreach ($incoming as $key => $value) {
+            if (! array_key_exists($key, $existing) || blank($existing[$key])) {
+                $existing[$key] = $value;
+                continue;
+            }
+
+            if (is_array($existing[$key]) && is_array($value)) {
+                $existing[$key] = array_replace_recursive($existing[$key], $value);
+            }
+        }
+
+        return $existing;
+    }
+
+    protected function prepareCliRuntime(): void
+    {
+        if (PHP_SAPI !== 'cli') {
+            throw new RuntimeException('Full Coach Database dataset sync must run from CLI/background processing.');
+        }
+
+        @set_time_limit(0);
+        $memory = trim((string) config('coach-database-sync.cli_memory_limit', '512M'));
+        if ($memory !== '') {
+            @ini_set('memory_limit', $memory);
+        }
+    }
+
+    protected function writeStatus(User $user, array $status): void
+    {
+        $status['user_id'] = $user->id;
+        Cache::put($this->statusKey($user), $status, now()->addMinutes(120));
+    }
+
+    protected function statusKey(User $user): string
+    {
+        return 'recruiting:stats-sync-status:' . $user->id;
+    }
+
+    protected function lockKey(User $user): string
+    {
+        return 'recruiting:stats-sync-running:' . $user->id;
+    }
+}

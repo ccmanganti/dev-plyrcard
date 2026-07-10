@@ -11,7 +11,7 @@
     $displayName = $displayName !== '' ? $displayName : 'Player';
 @endphp
 
-<div class="rc-home-header-v2">
+<div class="rc-home-header-v2" wire:poll.5s="pollRealtime">
     <div class="rc-home-welcome-copy-v2">
         <h1>Welcome back, {{ $displayName }} <span aria-hidden="true">👋</span></h1>
         <p>{{ $subtitle }}</p>
@@ -81,7 +81,7 @@
                 </button>
                 <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
                     <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                    <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Clear cache and reload schools, coaches, logos, tags, filters, and stats from GHL.</small></span>
+                    <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Reload schools, coaches, logos, tags, filters, and stats safely in a background process.</small></span>
                 </button>
             </div>
         </div>

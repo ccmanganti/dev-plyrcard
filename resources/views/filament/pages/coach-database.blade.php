@@ -1,5 +1,6 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root">
+    <div class="rc-livewire-root" wire:init="bootDeferredUiData">
+        @include('filament.partials.coach-database-ui-shell')
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -3284,10 +3285,17 @@
         }
 
         .rc-home-activity-v2 {
+            width: 100%;
             display: grid;
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
             gap: .6rem;
             align-items: center;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
             text-decoration: none;
             color: inherit;
         }
@@ -5926,6 +5934,30 @@
         /* v94: keep dashboard first visit pinned to the top and avoid stale loading panels covering content. */
         .rc-wrap { min-height: 0 !important; }
         .rc-livewire-root [data-stale-school-loader],
+
+        .rc-brand-icon-img {
+            width: 1.2rem;
+            height: 1.2rem;
+            display: block;
+            object-fit: contain;
+        }
+
+        .rc-detail-platform-icon-v2 .rc-brand-icon-img {
+            width: 1.35rem;
+            height: 1.35rem;
+        }
+
+        @media (min-width: 981px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: 1fr !important;
+            }
+        }
         .rc-livewire-root .rc-school-loader-backdrop,
         .rc-livewire-root .rc-school-loading-backdrop,
         .rc-livewire-root .rc-opening-school-backdrop {
@@ -5960,6 +5992,24 @@
 
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
         $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
+
+
+        // Public PNG icons from Icons8's CDN. These replace missing local files
+        // under /images/recruiting-center/icons and avoid SVG-only brand marks.
+        $publicIconUrls = [
+            'cap' => 'https://img.icons8.com/fluency/48/graduation-cap.png',
+            'eye' => 'https://img.icons8.com/fluency/48/visible.png',
+            'star' => 'https://img.icons8.com/fluency/48/star.png',
+            'mail' => 'https://img.icons8.com/fluency/48/secured-letter.png',
+            'chart' => 'https://img.icons8.com/fluency/48/sent.png',
+            'profile' => 'https://img.icons8.com/fluency/48/user-male-circle.png',
+            'website' => 'https://img.icons8.com/fluency/48/domain.png',
+            'email' => 'https://img.icons8.com/fluency/48/new-post.png',
+            'instagram' => 'https://img.icons8.com/fluency/48/instagram-new.png',
+            'youtube' => 'https://img.icons8.com/color/48/youtube-play.png',
+            'x' => 'https://img.icons8.com/ios-filled/50/x.png',
+            'link' => 'https://img.icons8.com/fluency/48/link.png',
+        ];
 
         $formatActivityTimeLabel = function ($time): string {
             if (! $time) {
@@ -6165,11 +6215,11 @@
                     <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
                         <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Refresh email activity, profile views, and social clicks.</small></span>
                         </button>
                         <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Clear cache and reload schools, coaches, logos, tags, filters, and stats from GHL.</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Reload schools, coaches, logos, tags, filters, and dashboard stats.</small></span>
                         </button>
                     </div>
                 </div>
@@ -6184,6 +6234,7 @@
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(5)->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
@@ -6469,7 +6520,7 @@
                         'sub' => 'Schools saved',
                         'icon' => 'star',
                         'tone' => 'gold',
-                        'target' => 'favorites',
+                        'url' => $this->pageUrl('favorites'),
                     ],
                     [
                         'label' => 'Coach Engagement',
@@ -6567,6 +6618,7 @@
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
                         'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
                         'url' => $activity['url'] ?? '#',
+                        'school_id' => (string) ($activity['school_id'] ?? ''),
                         'tone' => $tone,
                         'icon' => $icon,
                         'time_label' => $timeLabel,
@@ -6624,29 +6676,22 @@
                     ]);
                 }
 
-                $interestedSchoolRows = collect($dashboardTopSchools)->take(4)->values()->map(function ($school, $rank) {
+                $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
-                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
-                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                    $views = max(0, (int) ($school['profile_views'] ?? 0));
+                    $engagementClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
 
                     return [
                         'rank' => $rank + 1,
+                        'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($schoolName)))),
                         'name' => $schoolName,
-                        'score' => $score,
+                        'score' => $views,
+                        'engagement_clicks' => $engagementClicks,
                         'initials' => strtoupper($initials ?: 'S'),
                         'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
                     ];
-                })->values();
-
-                if ($interestedSchoolRows->isEmpty()) {
-                    $interestedSchoolRows = collect([
-                        ['rank' => 1, 'name' => 'Virginia Commonwealth', 'score' => 14, 'initials' => 'VCU'],
-                        ['rank' => 2, 'name' => 'University of Maryland', 'score' => 9, 'initials' => 'M'],
-                        ['rank' => 3, 'name' => 'Florida State', 'score' => 7, 'initials' => 'FS'],
-                        ['rank' => 4, 'name' => 'Indiana University', 'score' => 6, 'initials' => 'IU'],
-                    ]);
-                }
+                })->filter(fn (array $row): bool => (int) ($row['score'] ?? 0) > 0 || (int) ($row['engagement_clicks'] ?? 0) > 0)->values();
             @endphp
 
             <div class="rc-home-dashboard-v2">
@@ -6662,44 +6707,29 @@
                             <button
                                 type="button"
                                 class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
-                                wire:click="$set('section', @js($stat['target']))"
+                                x-on:click="$dispatch('rc-open-{{ $stat['target'] }}')"
+                                data-rc-stat-open="{{ $stat['target'] }}"
+                                data-rc-no-pending
+                            >
+                        @elseif(! empty($stat['url']))
+                            <a
+                                class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
+                                href="{{ $stat['url'] }}"
+                                wire:navigate
                             >
                         @else
-                            <button
-                                type="button"
-                                class="rc-home-stat-v2 is-{{ $stat['tone'] }}"
-                            >
+                            <div class="rc-home-stat-v2 is-{{ $stat['tone'] }}">
                         @endif
                             <div class="rc-home-stat-icon-v2">
-                                @switch($stat['icon'])
-                                    @case('cap')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="M7 11v4.2c0 1.6 2.2 3 5 3s5-1.4 5-3V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                        </svg>
-                                        @break
-                                    @case('eye')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/>
-                                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
-                                        </svg>
-                                        @break
-                                    @case('star')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="m12 3 2.7 5.5 6 .9-4.35 4.2 1.05 6-5.4-2.85-5.4 2.85 1.05-6L3.3 9.4l6-.9L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @case('mail')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @default
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                @endswitch
+                                <img
+                                    class="rc-public-png-icon"
+                                    src="{{ $publicIconUrls[$stat['icon']] ?? $publicIconUrls['link'] }}"
+                                    alt=""
+                                    width="48"
+                                    height="48"
+                                    loading="eager"
+                                    referrerpolicy="no-referrer"
+                                >
                             </div>
 
                             <div class="rc-home-stat-copy-v2">
@@ -6714,7 +6744,13 @@
                             @endif
 
                             <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
-                        </button>
+                        @if(! empty($stat['target']))
+                            </button>
+                        @elseif(! empty($stat['url']))
+                            </a>
+                        @else
+                            </div>
+                        @endif
                     @endforeach
                 </div>
 
@@ -6766,7 +6802,11 @@
 
                         <div class="rc-home-activity-list-v2">
                             @foreach($dashboardActivityRows as $activityRow)
-                                <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                                @if(! empty($activityRow['school_id']))
+                                    <button type="button" class="rc-home-activity-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $activityRow['school_id']) }})">
+                                @else
+                                    <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                                @endif
                                     <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
 
                                     <span class="rc-home-activity-copy-v2">
@@ -6775,7 +6815,11 @@
                                     </span>
 
                                     <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
-                                </a>
+                                @if(! empty($activityRow['school_id']))
+                                    </button>
+                                @else
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     </section>
@@ -6817,12 +6861,12 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Schools Most Interested</h2>
-                            <span>Last 30 days</span>
+                            <span>Total tracked profile views</span>
                         </div>
 
                         <div class="rc-interested-list-v2">
-                            @foreach($interestedSchoolRows as $interestedSchool)
-                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
+                            @forelse($interestedSchoolRows as $interestedSchool)
+                                <button type="button" class="rc-interested-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $interestedSchool['id']) }})">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
                                     <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($interestedSchool['logo_url']))
@@ -6832,89 +6876,55 @@
                                     </span>
                                     <span>
                                         <strong>{{ $interestedSchool['name'] }}</strong>
-                                        <small>Profile views</small>
+                                        <small>Profile views from this school</small>
                                     </span>
-                                    <b>{{ $interestedSchool['score'] }}</b>
+                                    <b>{{ number_format((int) $interestedSchool['score']) }}</b>
                                 </button>
-                            @endforeach
+                            @empty
+                                <div class="rc-home-empty-v2">School interest will appear after identified coach contacts view your profile or interact with your recruiting links.</div>
+                            @endforelse
                         </div>
 
-                        <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
+                        <button
+                            type="button"
+                            class="rc-home-outline-btn-v2"
+                            x-on:click="$dispatch('rc-open-coach-engagement')"
+                            data-rc-stat-open="coach-engagement"
+                            data-rc-no-pending
+                        >View Full Analytics</button>
                     </section>
                 </div>
             </div>
         @endif
 
-        @if($section === 'profile-views')
+        @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
-
-                $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
-                $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
-                $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-                $xViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
-                $emailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $profileViewsTotal = $websiteViews + $instagramViews + $youtubeViews + $xViews + $emailLinkViews;
-                $profilePrograms = max(0, (int) ($dashboardMetrics['engaged_schools'] ?? $dashboardTopSchools->count()));
-
-                $profileBreakdownRows = collect([
-                    ['title' => 'Website profile link', 'copy' => 'Website profile clicks', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Updated'],
-                    ['title' => 'Instagram profile link', 'copy' => 'Instagram profile clicks', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Updated'],
-                    ['title' => 'YouTube highlight link', 'copy' => 'YouTube profile clicks', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Updated'],
-                    ['title' => 'X profile link', 'copy' => 'X profile clicks', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Updated'],
-                    ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
-                ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
-
-                $activityProfileRows = $dashboardRecentActivity
-                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
-                    ->take(8)
-                    ->values()
-                    ->map(function ($activity, $index) use ($formatActivityTimeLabel) {
-                        $title = (string) ($activity['title'] ?? 'Coach viewed profile');
-                        $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                        $time = $activity['time'] ?? null;
-
-                        return [
-                            'title' => $title,
-                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity',
-                            'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
-                            'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
-                            'logo' => $activity['logo'] ?? null,
-                            'initials' => strtoupper($initials ?: 'PV'),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    });
-
-                $profileViewRows = $activityProfileRows->merge($profileBreakdownRows)->values()->map(function ($row, $index) {
-                    return array_merge($row, ['rank' => $index + 1]);
-                });
+                $profileViewRows = collect($this->profileViewRows ?? [])->values();
+                $profileViewsTotal = max(
+                    (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0),
+                    (int) $profileViewRows->sum('views'),
+                );
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-profile-views"
+                data-rc-modal="stats"
+                data-rc-modal-id="profile-views"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('profile-views', @js($section === 'profile-views'), @js($section !== 'dashboard')) : { open: @js($section === 'profile-views'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-profile-views.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -6959,17 +6969,16 @@
                     </form>
                 </div>
 
-                <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>↑ {{ number_format(max(0, $profileViewsTotal)) }} tracked views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Coaches</small><strong>{{ number_format(max(0, $profileViewRows->count())) }}</strong><em>Viewed your profile</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Programs</small><strong>{{ number_format($profilePrograms) }}</strong><em>Showing interest</em></div></div>
+                <div class="rc-detail-stats-v2 is-two">
+                    <div class="rc-detail-stat-v2 is-blue"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['profile'] }}" alt=""></span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>{{ number_format(max(0, $profileViewsTotal)) }} tracked views</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['website'] }}" alt=""></span><div><small>Coach Contacts</small><strong>{{ number_format(max(0, $profileViewRows->count())) }}</strong><em>Viewed your profile</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
                     <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
-                            <button type="button" class="rc-detail-row-v2">
+                            <button type="button" class="rc-detail-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($profileRow['school_id'] ?? '')) }})">
                                 <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
                                 <span class="rc-detail-avatar-v2">
                                     @if(! empty($profileRow['logo']))
@@ -6994,7 +7003,7 @@
             </div>
         @endif
 
-        @if($section === 'coach-engagement')
+        @if(in_array($section, ['dashboard', 'coach-engagement'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
@@ -7015,15 +7024,16 @@
                         $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
                         $platformLower = strtolower($platform);
                         $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : (str_contains($platformLower, 'website') ? 'is-blue' : 'is-neutral'));
-                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : (str_contains($platformLower, 'website') ? '⌁' : '𝕏'));
+                        $platformIconKey = str_contains($platformLower, 'you') ? 'youtube' : (str_contains($platformLower, 'instagram') ? 'instagram' : (str_contains($platformLower, 'website') ? 'website' : (str_contains($platformLower, 'email') ? 'email' : 'x')));
                         $time = $row['time'] ?? null;
 
                         return [
                             'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
                             'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked activity'))) ?: 'Tracked activity',
+                            'school_id' => (string) ($row['school_id'] ?? ''),
                             'platform' => $platform,
                             'platform_class' => $platformClass,
-                            'platform_icon' => $platformIcon,
+                            'platform_icon_key' => $platformIconKey,
                             'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
                             'time_label' => $formatActivityTimeLabel($time),
                         ];
@@ -7031,29 +7041,24 @@
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-coach-engagement"
+                data-rc-modal="stats"
+                data-rc-modal-id="coach-engagement"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('coach-engagement', @js($section === 'coach-engagement'), @js($section !== 'dashboard')) : { open: @js($section === 'coach-engagement'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-coach-engagement.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7067,22 +7072,26 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-neutral"><span>𝕏</span><div><small>X (Twitter)</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-pink"><span>◎</span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-neutral"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['x'] }}" alt="X"></span><div><small>X</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-pink"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['instagram'] }}" alt="Instagram"></span><div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div></div>
+                    <div class="rc-detail-stat-v2 is-red"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['youtube'] }}" alt="YouTube"></span><div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
                     <header><h2>Who's Clicking</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
-                            <button type="button" class="rc-detail-row-v2 is-engagement">
-                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
+                            <button type="button" class="rc-detail-row-v2 is-engagement" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($engagementRow['school_id'] ?? '')) }})">
+                                @php
+                                    $engagementIconKey = (string) ($engagementRow['platform_icon_key'] ?? pathinfo((string) ($engagementRow['platform_icon_file'] ?? 'link'), PATHINFO_FILENAME));
+                                    $engagementIconKey = array_key_exists($engagementIconKey, $publicIconUrls) ? $engagementIconKey : 'link';
+                                @endphp
+                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}"><img class="rc-brand-icon-img" src="{{ $publicIconUrls[$engagementIconKey] }}" alt="{{ $engagementRow['platform'] }}" referrerpolicy="no-referrer"></span>
                                 <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
                                 <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
-                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $engagementRow['clicks']) }}</small></span>
+                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('click', $engagementRow['clicks']) }}</small></span>
                                 <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] }}</span>
-                                <span class="rc-detail-chevron-v2">›</span>
+                                <span class="rc-detail-chevron-v2" aria-hidden="true">›</span>
                             </button>
                         @empty
                             <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked links or open emails.</div>
@@ -7134,29 +7143,23 @@
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-emails-sent"
+                data-rc-modal="stats"
+                data-rc-modal-id="emails-sent"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('emails-sent', true, true) : { open: true, openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -8087,6 +8090,28 @@
                     box-shadow:0 8px 18px rgba(255,99,56,.18);
                 }
 
+                .rc-discover-bulk-status-v92 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.5rem;
+                    min-height:2rem;
+                    padding:.42rem .68rem;
+                    border-radius:.72rem;
+                    border:1px solid rgba(255,99,56,.2);
+                    background:rgba(255,99,56,.08);
+                    color:var(--rc-text);
+                    font-size:.76rem;
+                    font-weight:750;
+                    line-height:1.25;
+                }
+                .rc-discover-bulk-option-v36 .rc-spinner-mini,
+                .rc-discover-bulk-list-v36 > button .rc-spinner-mini {
+                    width:.88rem;
+                    height:.88rem;
+                    border-width:2px;
+                    flex:0 0 auto;
+                }
+
                 @media (max-width: 1100px) {
                     .rc-discover-top-v29 { grid-template-columns: 1fr !important; }
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
@@ -8137,32 +8162,49 @@
                 </div>
 
                 @if($this->selectedSchoolCount > 0)
-                    <div class="rc-discover-bulk-v36" wire:key="discover-bulk-selection-bar">
+                    <div
+                        class="rc-discover-bulk-v36"
+                        wire:key="discover-bulk-selection-bar"
+                        x-data="window.rcBulkSchoolList ? window.rcBulkSchoolList() : { open: false, pendingLists: {}, statusText: '', queue() {}, isPending() { return false }, pendingCount() { return 0 } }"
+                    >
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36">{{ number_format($this->selectedSchoolCount) }} {{ \Illuminate\Support\Str::plural('selected', $this->selectedSchoolCount) }}</span>
                             <button type="button" class="rc-discover-bulk-email-v36" wire:click="emailSelectedSchools" wire:loading.attr="disabled" wire:target="emailSelectedSchools">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                 <span>Email</span>
                             </button>
-                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
-                                <button type="button" x-on:click="open = ! open">
+                            <div class="rc-discover-bulk-list-v36" x-on:click.outside="open = false">
+                                <button type="button" x-on:click.stop="open = ! open">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                                     <span>Add to List</span>
+                                    <span x-show="pendingCount() > 0" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                                 </button>
                                 <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
                                     @forelse($this->lists as $list)
-                                        @php $listKey = (string) ($list['key'] ?? ''); @endphp
+                                        @php
+                                            $listKey = (string) ($list['key'] ?? '');
+                                            $listLabel = (string) ($list['label'] ?? \Illuminate\Support\Str::headline($listKey));
+                                        @endphp
                                         @if($listKey !== '')
-                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" x-on:click="open = false">
-                                                <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
-                                                <span>+</span>
+                                            <button
+                                                type="button"
+                                                class="rc-discover-bulk-option-v36"
+                                                x-on:click.stop="queue({{ \Illuminate\Support\Js::from($listKey) }}, {{ \Illuminate\Support\Js::from($listLabel) }}, {{ (int) $this->selectedSchoolCount }})"
+                                            >
+                                                <span>{{ $listLabel }}</span>
+                                                <span x-show="!isPending({{ \Illuminate\Support\Js::from($listKey) }})">+</span>
+                                                <span x-show="isPending({{ \Illuminate\Support\Js::from($listKey) }})" x-cloak class="rc-spinner-mini" aria-label="Adding in background"></span>
                                             </button>
                                         @endif
                                     @empty
                                         <div class="rc-school-list-empty">No lists yet.</div>
                                     @endforelse
                                 </div>
+                            </div>
+                            <div class="rc-discover-bulk-status-v92" x-show="pendingCount() > 0" x-cloak role="status" aria-live="polite">
+                                <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                <span x-text="statusText || 'Updating selected schools in the background...'"></span>
                             </div>
                         </div>
                         <button type="button" class="rc-discover-bulk-clear-v36" wire:click="clearSelectedSchools">Clear</button>
@@ -8462,7 +8504,7 @@
                         <h2>My Lists</h2>
                         <p>Organize schools into your own lists — Dream Schools, On the Radar, by conference, however you want.</p>
                     </div>
-                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)">
+                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)" data-rc-local-action>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                         New List
                     </button>
@@ -8578,6 +8620,10 @@
                 'showNewEmail' => false,
             ])
 
+            <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
+                Refreshing conversations while the current inbox stays available.
+            </div>
+
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
@@ -8645,7 +8691,7 @@
                 };
             @endphp
 
-            <div class="rc-inbox-page-v56" wire:poll.12s.visible="pollConversationUpdates">
+            <div class="rc-inbox-page-v56" wire:poll.30s.visible="pollConversationUpdates">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
@@ -8688,7 +8734,7 @@
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" data-rc-open="conversation" data-rc-title="{{ $inboxContactName }}" data-rc-copy="Opening the conversation now. Messages will load inside the thread." wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -8741,8 +8787,13 @@
                             </div>
 
                             <div class="rc-message-stream-v56">
+                                <div class="rc-thread-loading-skeleton {{ $isLoadingConversationMessages ? 'is-visible' : '' }}">
+                                    <span class="rc-skeleton"></span>
+                                    <span class="rc-skeleton"></span>
+                                    <span class="rc-skeleton"></span>
+                                </div>
                                 @if(empty($threadMessages))
-                                    <div class="rc-inbox-empty-v56"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
+                                    <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
                                     @foreach($threadMessages as $message)
                                         @php
@@ -8915,6 +8966,10 @@
                 'firstName' => $firstName,
                 'showNewEmail' => false,
             ])
+
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Preparing templates and recipient data. You can keep editing while it refreshes.
+            </div>
 
             <style>
                 .rc-compose-page-v45 { display:grid; gap:1rem; }
@@ -9254,6 +9309,10 @@
         @if($section === 'campaigns')
             @include('filament.partials.coach-database-header')
 
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Refreshing templates. Cached and built-in templates remain available.
+            </div>
+
             @php
                 $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));
                 $templateRows = collect($templates ?? [])
@@ -9376,7 +9435,7 @@
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -9621,12 +9680,16 @@
                 }
                 $slideInitials = strtoupper(collect(preg_split('/\s+/', trim($slideSchoolName)) ?: [])->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
                 $listRows = collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values();
-                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->values();
+                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->filter()->unique()->values();
+                $initialListMemberships = $listRows->mapWithKeys(function ($listRow) use ($schoolListKeys) {
+                    $key = (string) ($listRow['key'] ?? '');
+                    return $key === '' ? [] : [$key => $schoolListKeys->contains(strtolower($key))];
+                })->all();
             @endphp
 
-            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel" x-data="{ tab: 'coaches', listsOpen: false }" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
-                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
+            <div class="rc-drawer rc-school-modal-backdrop rc-ui-stable-modal" wire:key="school-drawer-{{ $slideSchoolId }}" x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcRequestSchoolClose($el); }" data-rc-modal="school" data-rc-modal-id="school-{{ $slideSchoolId }}" data-rc-school-id="{{ $slideSchoolId }}" data-rc-drawer-backdrop>
+                <div class="rc-drawer-panel rc-school-modal-panel rc-ui-stable-panel" wire:ignore.self x-data="window.rcSchoolDrawer ? window.rcSchoolDrawer({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($initialListMemberships) }}, @js((bool) ($slideSchool['is_favorite'] ?? false))) : { tab: 'coaches', listsOpen: false, isInList(key, value) { return value }, isListPending() { return false }, toggleList() {} }" x-init="init && init()" x-on:click.stop x-on:pointerdown.stop x-on:mousedown.stop x-on:touchstart.stop data-rc-interaction-boundary role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                    <button class="rc-school-modal-close" type="button" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcRequestSchoolClose($el)" x-on:click.prevent.stop aria-label="Close school details">×</button>
 
                     <div class="rc-school-modal-hero-v72">
                         <div class="rc-school-logo-large-v72">
@@ -9653,7 +9716,7 @@
                     </div>
 
                     <div class="rc-school-modal-actions-v72">
-                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="composeEmailSchool">
+                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailSchool">
                             <span wire:loading.remove wire:target="composeEmailSchool">
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </span>
@@ -9661,27 +9724,27 @@
                             <span>Email Coaches</span>
                         </button>
 
-                        @if($slideSchool['is_favorite'] ?? false)
-                            <button class="rc-school-action is-favorited" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="unfavoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById">Favorited</span><span wire:loading wire:target="unfavoriteSchoolById">Updating</span>
-                            </button>
-                        @else
-                            <button class="rc-school-action" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
-                                <span wire:loading.remove wire:target="favoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="favoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="favoriteSchoolById">Favorite</span><span wire:loading wire:target="favoriteSchoolById">Updating</span>
-                            </button>
-                        @endif
+                        <button
+                            class="rc-school-action"
+                            type="button"
+                            data-rc-local-action
+                            data-rc-drawer-action
+                            x-on:click.stop="toggleFavorite()"
+                            x-bind:class="{ 'is-favorited': favorite }"
+                            x-bind:aria-pressed="favorite ? 'true' : 'false'"
+                        >
+                            <span x-show="!favoritePending"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+                            <span class="rc-action-spinner-v81" x-cloak x-show="favoritePending"></span>
+                            <span x-text="favorite ? 'Favorited' : 'Favorite'"></span>
+                        </button>
 
-                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
-                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click="listsOpen=!listsOpen">
+                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false" x-on:click.stop data-rc-dropdown-boundary>
+                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click.stop="listsOpen=!listsOpen" x-bind:aria-expanded="listsOpen ? 'true' : 'false'" aria-haspopup="menu">
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
                                 <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
-                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left>
+                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-on:click.stop role="menu">
                                 <h4>Add to a list</h4>
                                 @forelse($listRows as $listRow)
                                     @php
@@ -9699,13 +9762,13 @@
                                         $inList = $schoolListKeys->contains(strtolower($listKey));
                                         $count = (int) ($listRow['schools_count'] ?? count($listRow['schools'] ?? []));
                                     @endphp
-                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" wire:loading.attr="disabled" wire:target="addSchoolToListById,removeSchoolFromListById">
+                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" data-rc-local-action data-rc-drawer-action x-on:click.stop="toggleList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)); listsOpen = true" x-bind:class="{ 'is-active': isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)), 'is-saving': isListPending({{ \Illuminate\Support\Js::from($listKey) }}) }" x-bind:data-list-pending="isListPending({{ \Illuminate\Support\Js::from($listKey) }}) ? 'true' : 'false'" wire:key="school-drawer-list-{{ $slideSchoolId }}-{{ $listKey }}" role="menuitemcheckbox" x-bind:aria-checked="isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)) ? 'true' : 'false'">
                                         <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                         <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot: {{ $listColor }}"></span><span>{{ $listLabel }}</span></span>
                                         <small class="rc-list-count-v81">{{ $count }}</small>
                                     </button>
                                 @empty
-                                    <button type="button" wire:click="$set('showNewListComposer', true)">Create a list first</button>
+                                    <button type="button" wire:click="$set('showNewListComposer', true)" data-rc-local-action data-rc-drawer-action x-on:click.stop="listsOpen = true">Create a list first</button>
                                 @endforelse
                             </div>
                         </div>
@@ -9719,7 +9782,7 @@
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
                     </div>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'">
                         <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
                             @forelse($slideCoaches as $coach)
                                 @php
@@ -9736,7 +9799,7 @@
                                         <span>{{ $coachTitle }}</span>
                                         @if($coachEmail !== '')<a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>@endif
                                     </div>
-                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
+                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
                                 </div>
                             @empty
                                 <div class="rc-empty">No coaches loaded for this school yet.</div>
@@ -9744,11 +9807,11 @@
                         </div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'">
                         <div class="rc-coming-soon-v72"><div><strong>Coming Soon</strong><span>Roster and advanced school stats will be available here soon.</span></div></div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'">
                         <div class="rc-school-stat-grid">
                             <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
                             <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>

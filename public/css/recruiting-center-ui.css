@@ -1,0 +1,593 @@
+/* Recruiting Center responsive async UI layer */
+:root {
+    --rc-ui-accent: #ff6338;
+    --rc-ui-surface: rgba(255, 255, 255, .98);
+    --rc-ui-border: rgba(148, 163, 184, .24);
+    --rc-ui-text: #111827;
+    --rc-ui-muted: #64748b;
+}
+.dark {
+    --rc-ui-surface: rgba(24, 24, 27, .985);
+    --rc-ui-border: rgba(148, 163, 184, .22);
+    --rc-ui-text: #f8fafc;
+    --rc-ui-muted: #a1a1aa;
+}
+
+.rc-ui-poll-anchor {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#rc-ui-progress {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 99999;
+    height: 3px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .12s ease, transform .12s ease;
+}
+#rc-ui-progress::before {
+    content: "";
+    display: block;
+    width: 36%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, var(--rc-ui-accent), #fb923c, transparent);
+    animation: rcUiProgress 1.05s cubic-bezier(.4,0,.2,1) infinite;
+}
+#rc-ui-progress.is-active { opacity: 1; transform: translateY(0); }
+@keyframes rcUiProgress { from { transform: translateX(-120%); } to { transform: translateX(390%); } }
+
+.rc-action-pending {
+    position: relative !important;
+    pointer-events: none !important;
+    opacity: .76 !important;
+    transform: translateY(0) scale(.985) !important;
+}
+.rc-action-pending::after {
+    content: "";
+    position: absolute;
+    top: .52rem;
+    right: .52rem;
+    width: .9rem;
+    height: .9rem;
+    display: block;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: rcUiSpin .65s linear infinite;
+}
+@keyframes rcUiSpin { to { transform: rotate(360deg); } }
+
+.rc-livewire-root button,
+.rc-livewire-root a,
+.rc-livewire-root [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+.rc-livewire-root button:active,
+.rc-livewire-root [role="button"]:active {
+    transform: scale(.985);
+}
+
+#rc-ui-instant-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 99970;
+    display: none;
+    align-items: stretch;
+    justify-content: flex-end;
+    background: rgba(2, 6, 23, .48);
+    backdrop-filter: blur(7px);
+    opacity: 0;
+    transition: opacity .14s ease;
+}
+#rc-ui-instant-shell.is-open { display: flex; opacity: 1; }
+#rc-ui-instant-shell.is-closing { opacity: 0; }
+#rc-ui-instant-shell[data-kind="template"],
+#rc-ui-instant-shell[data-kind="compose"] { align-items: center; justify-content: center; }
+
+.rc-ui-shell-panel {
+    position: relative;
+    width: min(760px, 94vw);
+    height: 100%;
+    overflow: hidden;
+    border-left: 1px solid var(--rc-ui-border);
+    background: var(--rc-ui-surface);
+    color: var(--rc-ui-text);
+    box-shadow: -24px 0 80px rgba(2, 6, 23, .3);
+    transform: translateX(22px);
+    opacity: .82;
+    animation: rcUiShellIn .18s cubic-bezier(.2,.8,.2,1) forwards;
+}
+#rc-ui-instant-shell[data-kind="template"] .rc-ui-shell-panel,
+#rc-ui-instant-shell[data-kind="compose"] .rc-ui-shell-panel {
+    width: min(860px, 94vw);
+    height: min(84vh, 760px);
+    border: 1px solid var(--rc-ui-border);
+    border-radius: 1.2rem;
+    box-shadow: 0 30px 100px rgba(2, 6, 23, .36);
+    transform: translateY(12px) scale(.985);
+    animation-name: rcUiModalIn;
+}
+@keyframes rcUiShellIn { to { transform: translateX(0); opacity: 1; } }
+@keyframes rcUiModalIn { to { transform: translateY(0) scale(1); opacity: 1; } }
+
+.rc-ui-shell-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.2rem;
+    border-bottom: 1px solid var(--rc-ui-border);
+}
+.rc-ui-shell-head strong { font-size: 1.05rem; letter-spacing: -.02em; }
+.rc-ui-shell-head span { display: block; margin-top: .18rem; color: var(--rc-ui-muted); font-size: .78rem; }
+.rc-ui-shell-close {
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 1px solid var(--rc-ui-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--rc-ui-text);
+    font-size: 1.3rem;
+    cursor: pointer;
+}
+.rc-ui-shell-body { padding: 1.2rem; display: grid; gap: 1rem; }
+.rc-ui-shell-hero { display: grid; grid-template-columns: 3.4rem minmax(0,1fr); gap: .85rem; align-items: center; }
+.rc-ui-shell-block,
+.rc-ui-shell-line,
+.rc-ui-shell-circle {
+    position: relative;
+    overflow: hidden;
+    background: rgba(148, 163, 184, .15);
+}
+.rc-ui-shell-block::after,
+.rc-ui-shell-line::after,
+.rc-ui-shell-circle::after,
+.rc-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+    animation: rcUiShimmer 1.15s ease-in-out infinite;
+}
+.dark .rc-ui-shell-block::after,
+.dark .rc-ui-shell-line::after,
+.dark .rc-ui-shell-circle::after,
+.dark .rc-skeleton::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent); }
+@keyframes rcUiShimmer { to { transform: translateX(100%); } }
+.rc-ui-shell-circle { width: 3.4rem; height: 3.4rem; border-radius: .9rem; }
+.rc-ui-shell-line { height: .78rem; border-radius: 999px; }
+.rc-ui-shell-line.is-title { width: 56%; height: 1.05rem; }
+.rc-ui-shell-line.is-short { width: 35%; }
+.rc-ui-shell-block { height: 5.6rem; border-radius: .9rem; border: 1px solid var(--rc-ui-border); }
+.rc-ui-shell-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .8rem; }
+
+.rc-ui-deferred-toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 99940;
+    align-items: center;
+    gap: .55rem;
+    min-height: 2.65rem;
+    padding: .65rem .85rem;
+    border: 1px solid var(--rc-ui-border);
+    border-radius: .8rem;
+    background: var(--rc-ui-surface);
+    color: var(--rc-ui-text);
+    box-shadow: 0 16px 45px rgba(15,23,42,.16);
+    font-size: .8rem;
+    font-weight: 650;
+}
+.rc-ui-deferred-toast::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--rc-ui-accent);
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: rcUiSpin .65s linear infinite;
+}
+
+.rc-section-async-banner {
+    display: none;
+    align-items: center;
+    gap: .65rem;
+    min-height: 3rem;
+    margin: .65rem 0;
+    padding: .7rem .85rem;
+    border: 1px solid var(--rc-ui-border);
+    border-radius: .85rem;
+    background: color-mix(in srgb, var(--rc-ui-surface) 92%, var(--rc-ui-accent) 8%);
+    color: var(--rc-ui-muted);
+    font-size: .8rem;
+}
+.rc-section-async-banner::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 2px solid var(--rc-ui-accent);
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: rcUiSpin .65s linear infinite;
+}
+
+.rc-thread-loading-skeleton {
+    display: none;
+    gap: .65rem;
+    padding: .9rem;
+}
+.rc-thread-loading-skeleton .rc-skeleton {
+    position: relative;
+    overflow: hidden;
+    width: min(72%, 34rem);
+    height: 4.2rem;
+    border-radius: .9rem;
+    background: rgba(148,163,184,.14);
+}
+.rc-thread-loading-skeleton .rc-skeleton:nth-child(even) { margin-left: auto; width: min(62%, 28rem); }
+
+.rc-ui-deferred-toast.is-visible { display: flex; }
+.rc-section-async-banner.is-visible { display: flex; }
+.rc-thread-loading-skeleton.is-visible { display: grid; }
+.rc-ui-hidden { display: none !important; }
+
+.rc-ui-leaving {
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transform: translateX(18px) scale(.99) !important;
+    transition: opacity .12s ease, transform .12s ease !important;
+}
+.rc-stats-drawer-backdrop.rc-ui-leaving,
+.rc-school-modal-backdrop.rc-ui-leaving,
+.rc-preview-modal-backdrop.rc-ui-leaving {
+    transform: none !important;
+}
+
+.rc-livewire-root .rc-card,
+.rc-livewire-root .rc-home-panel-v2,
+.rc-livewire-root .rc-school-card,
+.rc-livewire-root .rc-favorite-card-v37,
+.rc-livewire-root .rc-template-card-v50,
+.rc-livewire-root .rc-detail-row-v2 {
+    animation: rcUiContentIn .18s ease both;
+}
+@keyframes rcUiContentIn { from { opacity: .72; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 700px) {
+    .rc-ui-shell-panel { width: 100vw; }
+    #rc-ui-instant-shell[data-kind="template"] .rc-ui-shell-panel,
+    #rc-ui-instant-shell[data-kind="compose"] .rc-ui-shell-panel { width: calc(100vw - 1rem); height: calc(100vh - 1rem); border-radius: 1rem; }
+    .rc-ui-shell-grid { grid-template-columns: 1fr; }
+    .rc-ui-deferred-toast { right: .6rem; left: .6rem; bottom: .6rem; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* v20260710 icon/stat navigation patch */
+.rc-public-png-icon,
+.rc-brand-icon-img {
+    width: 1.45rem;
+    height: 1.45rem;
+    display: block;
+    object-fit: contain;
+}
+a.rc-home-stat-v2 {
+    text-decoration: none;
+    color: inherit;
+}
+.rc-home-stat-v2[data-rc-stat-open] {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* v20260710 visual-stability patch
+   Keep real drawers mounted and visually fixed while Livewire updates their data. */
+.rc-school-modal-backdrop.rc-ui-stable-modal,
+.rc-school-modal-backdrop.rc-ui-stable-modal.rc-drawer {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+}
+
+.rc-school-modal-backdrop.rc-ui-stable-modal .rc-school-modal-panel,
+.rc-school-modal-backdrop.rc-ui-stable-modal .rc-drawer-panel.rc-school-modal-panel,
+.rc-school-modal-panel.rc-ui-stable-panel {
+    animation: none !important;
+    transition-property: box-shadow, background-color, border-color !important;
+    transition-duration: .14s !important;
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    scrollbar-gutter: stable;
+    overflow-anchor: none;
+}
+
+.rc-school-modal-backdrop .rc-action-pending,
+.rc-school-modal-backdrop [data-rc-local-action].rc-action-pending {
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+.rc-school-modal-backdrop [data-rc-local-action].rc-action-pending::after,
+.rc-school-modal-backdrop .rc-action-pending::after {
+    display: none !important;
+}
+
+.rc-school-list-menu-v72 button.is-saving {
+    pointer-events: none !important;
+    opacity: .78 !important;
+    transform: none !important;
+}
+
+.rc-school-list-menu-v72 button.is-saving .rc-list-count-v81 {
+    color: transparent !important;
+    position: relative !important;
+}
+
+.rc-school-list-menu-v72 button.is-saving .rc-list-count-v81::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: .75rem;
+    height: .75rem;
+    margin: -.375rem 0 0 -.375rem;
+    border: 2px solid var(--list-color, var(--rc-ui-accent));
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: rcUiSpin .65s linear infinite;
+}
+
+.rc-school-list-menu-v72,
+.rc-school-tab-panel-v72,
+.rc-school-modal-actions-v72,
+.rc-school-modal-coaches {
+    overflow-anchor: none;
+}
+
+/* Scroll locking is controlled only by the live visible-overlay stack.
+   Do not use :has() here: a locally hidden drawer can remain in the DOM while
+   a background request finishes, and :has() would keep the page frozen. */
+
+/* Background poll requests should never create a page-wide loading veil. */
+.rc-ui-deferred-toast.is-suppressed,
+.rc-school-modal-backdrop ~ .rc-ui-deferred-toast {
+    display: none !important;
+}
+
+/* v20260710 drawer interaction-isolation patch
+   The open drawer is a true interaction layer: clicks cannot fall through to
+   cards, tabs, or actions behind it, and Livewire morphs do not replay drawer
+   or dropdown transitions. */
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] {
+    z-index: 100020 !important;
+    pointer-events: auto !important;
+    isolation: isolate;
+    overscroll-behavior: contain;
+    touch-action: none;
+}
+
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-modal-panel[data-rc-interaction-boundary] {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto !important;
+    touch-action: pan-y;
+    contain: layout style;
+    isolation: isolate;
+    animation: none !important;
+    transition: none !important;
+}
+
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-modal-panel[data-rc-interaction-boundary] *,
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-modal-panel[data-rc-interaction-boundary] *::before,
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-modal-panel[data-rc-interaction-boundary] *::after {
+    animation-fill-mode: both;
+}
+
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-tab-panel-v72,
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-list-menu-v72 {
+    animation: none !important;
+    transition: none !important;
+}
+
+.rc-school-list-dropdown-v72[data-rc-dropdown-boundary] {
+    position: relative;
+    z-index: 30;
+    pointer-events: auto;
+}
+
+.rc-school-list-dropdown-v72[data-rc-dropdown-boundary] .rc-school-list-menu-v72 {
+    z-index: 100 !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    opacity: 1 !important;
+    will-change: auto !important;
+}
+
+.rc-school-list-dropdown-v72[data-rc-dropdown-boundary] button {
+    pointer-events: auto !important;
+}
+
+.rc-school-list-dropdown-v72[data-rc-dropdown-boundary] button.is-saving {
+    opacity: .76 !important;
+    cursor: wait !important;
+}
+
+
+/* Content entrance animations are useful on page navigation but look like a
+   flash during an in-drawer tag update, so disable them only inside the drawer. */
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-card,
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-coach-card,
+.rc-school-modal-backdrop[data-rc-drawer-backdrop] .rc-school-stat-card {
+    animation: none !important;
+}
+
+/* v20260710 modal-stack + stress-test patch
+   Keep every open drawer mounted, visible and ordered. Only the top layer can
+   receive input; lower layers never replay an entrance/exit animation. */
+.rc-stack-layer {
+    z-index: var(--rc-stack-z, 9000) !important;
+}
+
+.rc-stack-underlay {
+    pointer-events: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+.rc-stack-underlay::before,
+.rc-stack-underlay::after {
+    animation: none !important;
+    transition: none !important;
+}
+
+.rc-stack-underlay .rc-school-modal-panel,
+.rc-stack-underlay .rc-stats-drawer-panel,
+.rc-stack-underlay .fi-modal-window {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+.rc-stack-top {
+    pointer-events: auto !important;
+}
+
+html.rc-has-overlay-stack,
+html.rc-has-overlay-stack body {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+}
+
+/* Stats drawers are Alpine/local views. They should not animate again when a
+   school selection causes Livewire to morph the dashboard behind them. */
+.rc-stats-drawer-backdrop.rc-ui-stable-modal,
+.rc-stats-drawer-backdrop.rc-ui-stable-modal .rc-stats-drawer-panel,
+.rc-stats-drawer-panel.rc-ui-stable-panel {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+.rc-stats-drawer-backdrop.rc-stack-underlay {
+    display: flex !important;
+}
+
+/* Make the temporary school layer match the real right drawer. The replacement
+   happens in one frame instead of shell -> blank page -> real drawer. */
+#rc-ui-instant-shell[data-kind="school"] {
+    align-items: stretch;
+    justify-content: flex-end;
+}
+
+#rc-ui-instant-shell[data-kind="school"] .rc-ui-shell-panel {
+    width: min(760px, 100vw);
+    height: 100dvh;
+    border-radius: 1.35rem 0 0 1.35rem;
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+/* Rapid list changes remain clickable. Each row shows its own small progress
+   state while other checkboxes can still be toggled. */
+.rc-school-list-menu-v72 button.is-saving,
+.rc-school-list-menu-v72 button[data-list-pending="true"] {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+}
+
+.rc-school-list-menu-v72 button.is-saving .rc-list-count-v81 {
+    color: transparent !important;
+    position: relative;
+    min-width: 1rem;
+}
+
+.rc-school-list-menu-v72 button.is-saving .rc-list-count-v81::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: .8rem;
+    height: .8rem;
+    margin: -.4rem 0 0 -.4rem;
+    border: 2px solid var(--list-color, #ff6338);
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: rcUiSpin .65s linear infinite;
+}
+
+.rc-school-list-menu-v72 button.is-active .rc-list-check-v81 {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+}
+
+.rc-school-list-menu-v72 button:not(.is-active) .rc-list-check-v81 {
+    opacity: .22 !important;
+}
+
+/* Never animate the whole dashboard/cards because a nested action completed. */
+.rc-has-overlay-stack .rc-livewire-root .rc-card,
+.rc-has-overlay-stack .rc-livewire-root .rc-home-panel-v2,
+.rc-has-overlay-stack .rc-livewire-root .rc-school-card,
+.rc-has-overlay-stack .rc-livewire-root .rc-detail-row-v2 {
+    animation: none !important;
+}
+
+/* The original inline drawer stylesheet uses a high fixed z-index. This more
+   specific stack rule lets the runtime stack order win without changing the
+   appearance or geometry of either drawer. */
+.rc-school-modal-backdrop[data-rc-drawer-backdrop].rc-stack-layer,
+.rc-stats-drawer-backdrop[data-rc-modal="stats"].rc-stack-layer,
+#rc-ui-instant-shell.rc-stack-layer {
+    z-index: var(--rc-stack-z, 100000) !important;
+}
+
+
+/* v20260710 instant-close patch */
+.rc-school-modal-backdrop.rc-ui-closed-now,
+.rc-stats-drawer-backdrop.rc-ui-closed-now,
+.rc-preview-modal-backdrop.rc-ui-closed-now {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+button.rc-home-outline-btn-v2 {
+    width: 100%;
+    cursor: pointer;
+    font: inherit;
+}
+
+/* v20260710 background-safe overlay close
+   Hidden/suppressed overlays must never participate in layout, hit testing, or
+   scroll locking while their older background requests complete. */
+.rc-school-modal-backdrop.rc-ui-closed-now,
+.rc-stats-drawer-backdrop.rc-ui-closed-now,
+.rc-preview-modal-backdrop.rc-ui-closed-now,
+[data-rc-closed-locally="1"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+}
+
+html:not(.rc-has-overlay-stack),
+html:not(.rc-has-overlay-stack) body {
+    overscroll-behavior: auto;
+}

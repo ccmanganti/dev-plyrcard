@@ -11,10 +11,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\RecruitingProfileViewTrackingController;
+
 
 Route::get('/track/click/{token}', [TrackingController::class, 'click'])->where('token', '[^/]+')->name('tracking.click');
 Route::get('/track/profile/{token}', [TrackingController::class, 'profile'])->where('token', '[^/]+')->name('tracking.profile');
 Route::get('/track/open/{token}.gif', [TrackingController::class, 'open'])->where('token', '[^/]+')->name('tracking.open');
+
+Route::get('/recruiting/profile-view', RecruitingProfileViewTrackingController::class)->name('recruiting.profile-view');
+
 
 require __DIR__ . '/club_referrals.php';
 /*
@@ -58,6 +63,7 @@ $reservedWebsiteSlugs = implode('|', [
     'locker-room',
     'clubs',
     'teams',
+    'recruiting',
 ]);
 
 /*

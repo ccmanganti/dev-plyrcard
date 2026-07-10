@@ -190,9 +190,11 @@
             return $headCoach;
         }
 
-        foreach (($school['coaches'] ?? []) as $coach) {
-            if (is_array($coach) && trim((string) ($coach['name'] ?? '')) !== '') {
-                return $coach;
+        foreach (['coaches_preview', 'coaches'] as $field) {
+            foreach (($school[$field] ?? []) as $coach) {
+                if (is_array($coach) && trim((string) ($coach['name'] ?? '')) !== '') {
+                    return $coach;
+                }
             }
         }
 
@@ -216,6 +218,8 @@
         return trim((string) ($headCoach['email'] ?? ''));
     };
 @endphp
+
+<div x-data="window.rcDiscoverSelection ? window.rcDiscoverSelection({{ \Illuminate\Support\Js::from($selectedSchoolIds) }}) : { isSelected(id) { return @js($selectedSchoolIds).includes(String(id)) }, toggle() {} }" x-init="init && init()" data-rc-discover-selection style="display:contents">
 
 @if($schools->isEmpty())
     <div class="rc-empty rc-discover-empty">
@@ -247,7 +251,7 @@
                 $headCoachEmail = $coachEmailFor($school);
             @endphp
 
-            <div class="rc-school-list-row rc-discover-school-list-row {{ $isSelected ? 'is-selected' : '' }}">
+            <div class="rc-school-list-row rc-discover-school-list-row {{ $isSelected ? 'is-selected' : '' }}" x-bind:class="{ 'is-selected': isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) }">
                 <button class="rc-school-list-name rc-discover-school-list-school" type="button" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
                     <span class="rc-school-list-logo-box rc-school-logo-placeholder {{ $schoolLogoUrl === '' ? 'is-missing-logo' : '' }}">
                         @if($schoolLogoUrl !== '')
@@ -274,8 +278,8 @@
                 </span>
                 <span class="rc-discover-list-division">{{ $shortDivision !== '' ? $shortDivision : '—' }}</span>
                 <div class="rc-school-list-actions rc-discover-list-actions">
-                    <button class="rc-discover-row-check {{ $isSelected ? 'is-selected' : '' }}" type="button" wire:click.stop="toggleSchoolSelection({{ \Illuminate\Support\Js::from($schoolId) }})" aria-label="Select {{ $schoolName }}">
-                        {{ $isSelected ? '✓' : '' }}
+                    <button class="rc-discover-row-check {{ $isSelected ? 'is-selected' : '' }}" type="button" x-on:click.stop="toggle({{ \Illuminate\Support\Js::from($schoolId) }})" x-bind:class="{ 'is-selected': isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) }" x-bind:aria-pressed="isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) ? 'true' : 'false'" aria-label="Select {{ $schoolName }}">
+                        <span x-text="isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) ? '✓' : ''">{{ $isSelected ? '✓' : '' }}</span>
                     </button>
                 </div>
             </div>
@@ -292,10 +296,23 @@
                 $schoolInitials = $schoolInitialsFor($schoolName);
                 $conference = trim((string) ($school['conference'] ?? ''));
                 $division = trim((string) ($school['division'] ?? ''));
-                $coachCount = (int) ($school['coach_count'] ?? 0);
+                $resolvedCoachReferences = is_array($school['coach_keys'] ?? null)
+                    ? count(array_unique(array_filter($school['coach_keys'])))
+                    : max(
+                        is_array($school['coach_ids'] ?? null) ? count(array_unique(array_filter($school['coach_ids']))) : 0,
+                        is_array($school['coach_emails'] ?? null) ? count(array_unique(array_filter($school['coach_emails']))) : 0
+                    );
+                $coachCount = max(
+                    $resolvedCoachReferences,
+                    (int) ($school['coach_count'] ?? 0),
+                    (int) ($school['coaches_count'] ?? 0),
+                    (int) ($school['coach_count_cross_referenced'] ?? 0),
+                    is_array($school['coaches'] ?? null) ? count(array_filter($school['coaches'], fn ($coach) => is_array($coach))) : 0,
+                    is_array($school['coaches_preview'] ?? null) ? count(array_filter($school['coaches_preview'], fn ($coach) => is_array($coach))) : 0
+                );
             @endphp
 
-            <article class="rc-school-card rc-discover-school-card {{ $isSelected ? 'is-selected' : '' }}">
+            <article class="rc-school-card rc-discover-school-card {{ $isSelected ? 'is-selected' : '' }}" x-bind:class="{ 'is-selected': isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) }">
                 <div class="rc-discover-card-main">
                     <button class="rc-school-list-name rc-discover-card-title rc-discover-card-title-with-list-logo" type="button" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
                         {{-- Use the exact same logo render path as the working list view. --}}
@@ -311,8 +328,8 @@
                         </span>
                     </button>
 
-                    <button class="rc-discover-card-check {{ $isSelected ? 'is-selected' : '' }}" type="button" wire:click.stop="toggleSchoolSelection({{ \Illuminate\Support\Js::from($schoolId) }})" aria-label="Select {{ $schoolName }}">
-                        {{ $isSelected ? '✓' : '' }}
+                    <button class="rc-discover-card-check {{ $isSelected ? 'is-selected' : '' }}" type="button" x-on:click.stop="toggle({{ \Illuminate\Support\Js::from($schoolId) }})" x-bind:class="{ 'is-selected': isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) }" x-bind:aria-pressed="isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) ? 'true' : 'false'" aria-label="Select {{ $schoolName }}">
+                        <span x-text="isSelected({{ \Illuminate\Support\Js::from($schoolId) }}) ? '✓' : ''">{{ $isSelected ? '✓' : '' }}</span>
                     </button>
                 </div>
 
@@ -326,3 +343,4 @@
         @endforeach
     </div>
 @endif
+</div>
