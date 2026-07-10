@@ -1669,6 +1669,7 @@
             $submittedPlanSlug = $submitted['plan'] ?? match ($submittedPlan) {
                 'Plyr Plus' => 'plyr-plus',
                 'My Journey' => 'my-journey',
+                'Amplify' => 'amplify',
                 default => 'free',
             };
 
@@ -2678,16 +2679,52 @@ window.plyrIntakeData = {
 
     function clearDraft(){ try{ localStorage.removeItem(draftKey); } catch(e){} }
 
+    function normalizeSubmittedPlan(value){
+        const normalized = safe(value).toLowerCase().replace(/[_\s]+/g, '-');
+        if (['myjourney', 'my-journey', 'journey'].includes(normalized)) return 'my-journey';
+        if (['amplify', 'power-4', 'power4'].includes(normalized)) return 'amplify';
+        return 'free';
+    }
+
+    function requestedIntakePlan(){
+        const planField = document.querySelector('#playerIntakeForm [name="utm_plan"]');
+        return normalizeSubmittedPlan(planField?.value || data.selectedPlan || 'free');
+    }
+
+    function paymentUrlForPlan(plan){
+        if (plan === 'my-journey') return 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true';
+        if (plan === 'amplify') return 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true';
+        return null;
+    }
+
+    function normalizeSubmissionForCurrentPlan(submission){
+        const response = submission || {};
+        const requestedPlan = requestedIntakePlan();
+        const responsePlan = normalizeSubmittedPlan(response.plan || response.selected_plan || 'free');
+        const plan = ['my-journey', 'amplify'].includes(requestedPlan) ? requestedPlan : responsePlan;
+
+        return {
+            ...response,
+            plan: plan,
+            selected_plan: plan === 'amplify' ? 'Amplify' : (plan === 'my-journey' ? 'My Journey' : 'Free'),
+            payment_url: response.payment_url || paymentUrlForPlan(plan),
+            app_url: response.app_url || '/admin/profile',
+            payload: response.payload || {}
+        };
+    }
+
     function postSubmittedMessage(submission){
         if (!submission || !window.parent || window.parent === window) return;
 
+        const normalizedSubmission = normalizeSubmissionForCurrentPlan(submission);
+
         window.parent.postMessage({
             type: 'plyrcard-intake-submitted',
-            plan: submission.plan || 'free',
-            selected_plan: submission.selected_plan || 'Free',
-            payment_url: submission.payment_url || null,
-            app_url: submission.app_url || null,
-            payload: submission.payload || {}
+            plan: normalizedSubmission.plan,
+            selected_plan: normalizedSubmission.selected_plan,
+            payment_url: normalizedSubmission.payment_url,
+            app_url: normalizedSubmission.app_url,
+            payload: normalizedSubmission.payload
         }, '*');
     }
 
@@ -3036,18 +3073,22 @@ window.plyrIntakeData = {
                     const contentType = response.headers.get('content-type') || '';
 
                     if (response.ok && contentType.indexOf('application/json') !== -1) {
-                        const submission = await response.json();
+                        const rawSubmission = await response.json();
+                        const submission = normalizeSubmissionForCurrentPlan(rawSubmission);
                         postSubmittedMessage(submission);
 
-                        if (submission.payment_url) {
+                        // Paid plans must stay inside the registration flow until the GHL
+                        // enrollment/payment form is completed. Never redirect them directly
+                        // to /admin/profile after the intake step.
+                        if (submission.plan === 'my-journey' || submission.plan === 'amplify') {
                             hideAllScreens();
                             const formScreen = $('#formScreen');
                             if (formScreen) formScreen.style.display = 'none';
-                            document.body.innerHTML = '<div class="page"><div class="app"><section class="screen hero-screen" id="thanksScreen"><div class="hero-copy"><h1 class="hero-title">Almost Done</h1><p class="hero-text">Your intake has been submitted. Opening the next step now.</p></div></section></div></div>';
+                            document.body.innerHTML = '<div class="page"><div class="app"><section class="screen hero-screen" id="thanksScreen"><div class="hero-copy"><h1 class="hero-title">Almost Done</h1><p class="hero-text">Your intake has been submitted. Opening the secure enrollment form now.</p></div></section></div></div>';
                             return;
                         }
 
-                        if (submission.app_url) {
+                        if (submission.plan === 'free' && submission.app_url) {
                             window.top.location.href = submission.app_url;
                             return;
                         }

@@ -1,7 +1,7 @@
 @php
 $activePage = 'registration';
 
-$allowedPlans = ['free', 'plyr-plus', 'my-journey'];
+$allowedPlans = ['free', 'my-journey', 'amplify'];
 
 $normalizeRegistrationPlan = function ($value) {
   $value = strtolower(trim((string) $value));
@@ -9,7 +9,7 @@ $normalizeRegistrationPlan = function ($value) {
   $value = preg_replace('/-+/', '-', $value);
 
   return match ($value) {
-    'plyr', 'plyrplus', 'plyr-plus', 'player-plus', 'playerplus' => 'plyr-plus',
+    'amplify', 'power-4', 'power4' => 'amplify',
     'myjourney', 'my-journey', 'journey' => 'my-journey',
     'free' => 'free',
     default => 'free',
@@ -23,7 +23,7 @@ $utmPlan = in_array($utmPlan, $allowedPlans, true) ? $utmPlan : 'free';
 
 $formEmbedUrls = [
   'free' => url('/player-intake-app?utm_plan=free'),
-  'plyr-plus' => url('/player-intake-app?utm_plan=plyr-plus'),
+  'amplify' => url('/player-intake-app?utm_plan=amplify'),
   'my-journey' => url('/player-intake-app?utm_plan=my-journey'),
 ];
 
@@ -41,18 +41,18 @@ $pageCopy = [
     ],
     'form_label' => 'Free Registration Form',
   ],
-  'plyr-plus' => [
-    'meta_description' => 'Join Plyr Plus with PLYRCARD — Build your athlete profile and unlock premium visibility tools.',
-    'title' => 'Plyr Plus Registration — PLYRCARD',
-    'eyebrow' => 'Plyr Plus',
-    'heading_lines' => ['Upgrade Your', 'PLYRCARD', 'Plyr Plus.'],
-    'lead' => 'Start your Plyr Plus registration and build a stronger athlete profile with premium media, recruiting details, and upgraded profile features.',
+  'amplify' => [
+    'meta_description' => 'Join Amplify with PLYRCARD — Get monthly done-for-you recruiting content, outreach, and support.',
+    'title' => 'Amplify Registration — PLYRCARD',
+    'eyebrow' => 'Amplify',
+    'heading_lines' => ['Amplify Your', 'Recruiting', 'Reach.'],
+    'lead' => 'Enroll in Amplify for monthly done-for-you highlight reels, custom graphics, managed coach outreach, and hands-on support.',
     'steps' => [
-      ['Create Your Plyr Plus Account', 'Enter your athlete details so we can prepare your upgraded PLYRCARD experience.'],
-      ['Submit Your Athlete Assets', 'Add your sport, position, images, highlights, and contact information for a stronger profile build.'],
-      ['Continue To Payment', 'After the intake form, this page will switch to the Plyr Plus payment form so you can complete enrollment.'],
+      ['Create Your Amplify Profile', 'Complete the athlete intake so our team has your recruiting details, media, and contact information.'],
+      ['Continue To Enrollment', 'After the intake form, this page will switch to the Amplify enrollment form.'],
+      ['Launch Your Outreach', 'Once enrollment is complete, we begin your monthly content and managed coach outreach.'],
     ],
-    'form_label' => 'Plyr Plus Registration Form',
+    'form_label' => 'Amplify Enrollment Form',
   ],
   'my-journey' => [
     'meta_description' => 'Join My Journey with PLYRCARD — Register for the guided athlete profile and recruiting support experience.',
@@ -702,6 +702,67 @@ $copy = $pageCopy[$utmPlan];
     display: none !important;
   }
 
+
+  /* Revision 14: GHL enrollment/payment iframe must scroll independently. */
+  body.registration-ui-updated.payment-embed-active .registration-page {
+    overflow: visible !important;
+  }
+
+  body.registration-ui-updated.payment-embed-active .registration-page .calendar-card.form-card {
+    overflow: visible !important;
+  }
+
+  body.registration-ui-updated.payment-embed-active .registration-form-embed {
+    width: min(520px, 100%) !important;
+    max-width: 520px !important;
+    height: min(860px, calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px) - 40px)) !important;
+    min-height: 620px !important;
+    max-height: 860px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: auto !important;
+  }
+
+  body.registration-ui-updated.payment-embed-active .registration-form-embed iframe {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    overflow: auto !important;
+    scrollbar-width: auto !important;
+  }
+
+  body.registration-ui-updated.payment-embed-active .registration-form-embed::-webkit-scrollbar,
+  body.registration-ui-updated.payment-embed-active .registration-form-embed iframe::-webkit-scrollbar {
+    display: initial !important;
+  }
+
+  @media (max-width: 767px) {
+    body.registration-ui-updated.payment-embed-active .registration-page,
+    body.registration-ui-updated.payment-embed-active .registration-page .demo-shell,
+    body.registration-ui-updated.payment-embed-active .registration-page .calendar-card.form-card {
+      min-height: 0 !important;
+      height: auto !important;
+    }
+
+    body.registration-ui-updated.payment-embed-active .registration-form-embed {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: calc(100svh - var(--header-h, 60px) - var(--safe-top, 0px) - 44px) !important;
+      min-height: 520px !important;
+      max-height: none !important;
+      border-radius: 0 !important;
+      overflow-y: auto !important;
+    }
+
+    body.registration-ui-updated.payment-embed-active .registration-form-embed iframe {
+      width: 100vw !important;
+      height: 100% !important;
+      min-height: 100% !important;
+    }
+  }
+
 </style>
 
 <main>
@@ -763,10 +824,12 @@ $copy = $pageCopy[$utmPlan];
   'use strict';
 
   const registrationIframe = document.getElementById('registrationEmbedFrame');
+  const registrationPlan = @json($utmPlan);
+  let pendingAppUrl = null;
 
   const paymentEmbeds = {
-    'plyr-plus': 'https://systems.plyrcard.com/widget/survey/rY9lpkKJxgH844GoXuYf?notrack=true',
-    'my-journey': 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true'
+    'my-journey': 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
+    'amplify': 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true'
   };
 
   function appendParamsToUrl(baseUrl, values) {
@@ -782,10 +845,29 @@ $copy = $pageCopy[$utmPlan];
     }
   }
 
-  function setRegistrationFrameSrc(url) {
+  function setRegistrationFrameSrc(url, options = {}) {
     if (!registrationIframe || !url) return;
+
+    const isPayment = options.mode === 'payment';
+    const holder = registrationIframe.closest('.registration-form-embed');
+
+    document.body.classList.toggle('payment-embed-active', isPayment);
+    registrationIframe.setAttribute('scrolling', isPayment ? 'yes' : 'no');
+
+    if (isPayment) {
+      registrationIframe.style.overflow = 'auto';
+      registrationIframe.style.height = '100%';
+      registrationIframe.style.minHeight = '100%';
+
+      if (holder) {
+        holder.style.overflowY = 'auto';
+        holder.style.overflowX = 'hidden';
+        holder.scrollTop = 0;
+      }
+    }
+
     registrationIframe.src = url;
-    registrationIframe.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    registrationIframe.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   window.addEventListener('message', function (event) {
@@ -797,9 +879,18 @@ $copy = $pageCopy[$utmPlan];
 
     if (data.type !== 'plyrcard-intake-submitted') return;
 
-    const plan = String(data.plan || '').toLowerCase();
+    const messagePlan = String(data.plan || '').toLowerCase().trim();
+    const normalizedMessagePlan = ['power-4', 'power4'].includes(messagePlan) ? 'amplify' : messagePlan;
 
-    if (plan === 'plyr-plus' || plan === 'my-journey') {
+    // The registration URL is the source of truth. This prevents a stale controller
+    // response from treating Amplify as Free and sending the athlete to /admin/profile.
+    const plan = ['my-journey', 'amplify'].includes(registrationPlan)
+      ? registrationPlan
+      : normalizedMessagePlan;
+
+    pendingAppUrl = data.app_url || pendingAppUrl || '/admin/profile';
+
+    if (plan === 'my-journey' || plan === 'amplify') {
       const fallbackUrl = paymentEmbeds[plan];
       const paymentUrl = data.payment_url || appendParamsToUrl(fallbackUrl, {
         utm_plan: plan,
@@ -809,15 +900,16 @@ $copy = $pageCopy[$utmPlan];
         email: data.payload?.email || '',
         phone: data.payload?.phone || '',
         user_id: data.payload?.user_id || '',
-        contact_id: data.payload?.contact_id || ''
+        contact_id: data.payload?.contact_id || '',
+        app_url: pendingAppUrl
       });
 
-      setRegistrationFrameSrc(paymentUrl);
+      setRegistrationFrameSrc(paymentUrl, { mode: 'payment' });
       return;
     }
 
     if (plan === 'free') {
-      const appUrl = data.app_url || 'https://plyrcard.com/admin/profile';
+      const appUrl = data.app_url || '/admin/profile';
       window.top.location.href = appUrl;
     }
   });
@@ -1001,42 +1093,6 @@ $copy = $pageCopy[$utmPlan];
     });
   });
 
-  const billingToggle = document.getElementById('billing-toggle');
-  const labelMonthly = document.getElementById('label-monthly');
-  const labelAnnual = document.getElementById('label-annual');
-
-  if (billingToggle && labelMonthly && labelAnnual) {
-    let isAnnual = false;
-
-    const setBilling = annual => {
-      isAnnual = annual;
-      billingToggle.classList.toggle('annual', annual);
-      billingToggle.setAttribute('aria-checked', annual ? 'true' : 'false');
-      labelMonthly.classList.toggle('active', !annual);
-      labelAnnual.classList.toggle('active', annual);
-      document.body.classList.toggle('annual', annual);
-
-      document.querySelectorAll('.monthly-price').forEach(el => {
-        el.style.display = annual ? 'none' : (el.tagName === 'DIV' ? 'flex' : 'inline');
-      });
-
-      document.querySelectorAll('.annual-price').forEach(el => {
-        el.style.display = annual ? (el.tagName === 'DIV' ? 'flex' : 'inline') : 'none';
-      });
-    };
-
-    billingToggle.addEventListener('click', () => setBilling(!isAnnual));
-    billingToggle.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        setBilling(!isAnnual);
-      }
-    });
-
-    labelMonthly.addEventListener('click', () => setBilling(false));
-    labelAnnual.addEventListener('click', () => setBilling(true));
-  }
-
   if ('IntersectionObserver' in window) {
     const revealObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -1098,6 +1154,8 @@ $copy = $pageCopy[$utmPlan];
     const intakeFrame = document.getElementById('registrationEmbedFrame');
 
     function setIntakeEmbedHeight(height) {
+      if (document.body.classList.contains('payment-embed-active')) return;
+
       const safeHeight = Math.max(Number(height || 0), 520);
       const drawerSpace = 0;
       const maxReasonableHeight = window.matchMedia('(max-width: 767px)').matches ? 920 : 1100;

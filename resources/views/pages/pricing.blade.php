@@ -10,7 +10,7 @@
 	<!-- <script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6941fea74ca18223c7de491d"></script> -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="PLYRCARD Pricing — Choose the plan that fits your recruiting journey. Start free or go all in." />
+  <meta name="description" content="PLYRCARD Pricing — Choose Free, My Journey, or Amplify. Monthly plans built to strengthen your recruiting presence." />
   <title>Pricing — PLYRCARD</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -920,15 +920,6 @@
   <p class="page-hero-sub reveal" style="transition-delay:0.08s">
     Start free and upgrade when you're ready. Every plan includes a recruiting card built to get you noticed.
   </p>
-
-  <!-- Billing toggle -->
-  <!-- <div class="billing-toggle reveal" style="transition-delay:0.14s">
-    <span class="toggle-label active" id="label-monthly" aria-label="Switch to monthly billing">Monthly</span>
-    <div class="toggle-switch" id="billing-toggle" role="switch" aria-checked="false" tabindex="0" aria-label="Toggle annual billing"></div>
-    <span class="toggle-label" id="label-annual" aria-label="Switch to annual billing">
-      Annual <span class="save-badge">Save 20%</span>
-    </span>
-  </div> -->
 </section>
 
 
@@ -940,247 +931,81 @@
   <!-- Sticky strip -->
   <div class="plan-strip" role="list" aria-label="Plan names">
     <div class="plan-strip-item" role="listitem">Free</div>
-    <div class="plan-strip-item active" role="listitem">Plyr Plus</div>
-    <div class="plan-strip-item" role="listitem">My Journey</div>
+    <div class="plan-strip-item active" role="listitem">My Journey</div>
+    <div class="plan-strip-item" role="listitem">Amplify</div>
   </div>
 
   <div class="pricing-stack">
 
-    <!-- ── PLAN 1: FREE ────────────────────────────────── -->
     <article class="plan-card reveal" aria-label="Free plan">
       <div class="plan-header">
         <div class="plan-name">Free</div>
-        <div class="plan-tagline">Get started with the basics. Build your card and start sharing.</div>
+        <div class="plan-tagline">A simple PLYRSite with your quick info. Get started in minutes.</div>
       </div>
-
-      <!-- Monthly price -->
-      <div class="plan-price-wrap monthly-price" aria-label="Free">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">0</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
+      <div class="plan-price-wrap" aria-label="Free">
+        <span class="plan-price-currency">$</span><span class="plan-price">0</span>
+        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
       </div>
-      <!-- Annual price (same — free is free) -->
-      <div class="plan-price-wrap annual-price" aria-label="Free">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">0</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
-      </div>
-      <p class="plan-setup">No set-up fee &nbsp;· No credit card required</p>
-
-      <div class="plan-cta-wrap">
-        <a href="/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a>
-      </div>
-
+      <p class="plan-setup">No credit card required</p>
+      <div class="plan-cta-wrap"><a href="/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a></div>
       <div class="plan-divider"></div>
-
-      <ul class="plan-features" aria-label="Rookie plan features">
-        <li class="feature-group-label">Card Basics</li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          PLYRCARD recruiting card
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Athlete profile link
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Stats, schedule &amp; highlights
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Bio &amp; academic info
-        </li>
-        <li class="feature-group-label" style="margin-top:8px">Outreach</li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Share via email &amp; social
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Email open tracking
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Coach engagement analytics
-        </li>
+      <ul class="plan-features" aria-label="Free plan features">
+        <li class="feature-group-label">The Basics</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Simple PLYRSite page</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Quick athlete info</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Bio &amp; basic stats</li>
         <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Email support
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Priority support
-        </li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Email support</li>
       </ul>
     </article>
 
-
-    <!-- ── PLAN 2: ROOKIE PLUS (FEATURED) ───────────────── -->
-    <article class="plan-card featured reveal" style="transition-delay:0.08s" aria-label="Rookie Plus plan — most popular">
+    <article class="plan-card featured reveal" style="transition-delay:0.08s" aria-label="My Journey plan — most popular">
       <div class="plan-header">
         <div class="popular-badge">Most Popular</div>
-        <div class="plan-name">Plyr Plus</div>
-        <div class="plan-tagline">The full PLYRCARD experience with tracking and analytics.</div>
+        <div class="plan-name">My Journey</div>
+        <div class="plan-tagline">Your own recruiting HQ — domain, email, tracking, templates, and the coach database.</div>
       </div>
-
-      <div class="plan-price-wrap monthly-price" aria-label="$20.99 per month">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">10</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.99</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
+      <div class="plan-price-wrap" aria-label="$49 per month">
+        <span class="plan-price-currency">$</span><span class="plan-price">49</span>
+        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
       </div>
-      <div class="plan-price-wrap annual-price" aria-label="$16.79 per month billed annually">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">8</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.80</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
-      </div>
-      <p class="plan-setup">
-        <strong class="monthly-price" style="display:inline;">$50 set-up fee</strong>
-        <strong class="annual-price" style="display:none;">$50 set-up fee</strong>
-        &nbsp;· Limited time
-      </p>
-
-      <div class="plan-cta-wrap">
-        <a href="/registration?utm_plan=plyr-plus" class="plan-cta solid">Get PLYR PLUS</a>
-      </div>
-
+      <p class="plan-setup">Monthly subscription &nbsp;· Cancel anytime</p>
+      <div class="plan-cta-wrap"><a href="/registration?utm_plan=my-journey" class="plan-cta solid">Get My Journey</a></div>
       <div class="plan-divider"></div>
-
-      <ul class="plan-features" aria-label="Rookie Plus plan features">
+      <ul class="plan-features" aria-label="My Journey plan features">
         <li class="feature-group-label">Everything in Free, plus:</li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          PLYR recruiting card
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Custom branded graphics
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Email open tracking
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Click &amp; profile view tracking
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Coach engagement dashboard
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Multiple email sends/month
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Schedule &amp; highlights page
-        </li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own personalized domain</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own email — sends from you, not a third party</li>
+        <li class="feature-group-label" style="margin-top:8px">Tools</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach engagement tracking tool</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Outreach templates</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach database access — weekly verifications</li>
         <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Priority email support
-        </li>
-        <li class="feature-item dimmed">
-          <span class="feature-check muted"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          1-on-1 onboarding call
-        </li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>1-on-1 onboarding</li>
       </ul>
     </article>
 
-
-    <!-- ── PLAN 3: MY JOURNEY ───────────────────────────── -->
-    <article class="plan-card reveal" style="transition-delay:0.16s" aria-label="My Journey plan">
+    <article class="plan-card reveal" style="transition-delay:0.16s;border-color:rgba(245,196,81,.55)" aria-label="Amplify plan">
       <div class="plan-header">
-        <div class="plan-name">My Journey</div>
-        <div class="plan-tagline">Full-service recruiting presence. The complete athlete brand package.</div>
+        <div class="popular-badge" style="background:#f5c451;color:#241701;">Done For You</div>
+        <div class="plan-name">Amplify</div>
+        <div class="plan-tagline">Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.</div>
       </div>
-
-      <div class="plan-price-wrap monthly-price" aria-label="$49 per month">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">49</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
+      <div class="plan-price-wrap" aria-label="$49 per month plus a one-time $500 setup fee">
+        <span class="plan-price-currency">$</span><span class="plan-price">49</span>
+        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
       </div>
-      <div class="plan-price-wrap annual-price" aria-label="$49 per month">
-        <span class="plan-price-currency">$</span>
-        <span class="plan-price">49</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;">
-          <span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span>
-          <span class="plan-price-period">/mo</span>
-        </span>
-      </div>
-      <p class="plan-setup">
-        <strong class="monthly-price" style="display:inline;">$200 set-up fee</strong>
-        <strong class="annual-price" style="display:inline;">$200 set-up fee</strong>
-        &nbsp;· Limited time
-      </p>
-
-      <div class="plan-cta-wrap">
-        <a href="/registration?utm_plan=my-journey" class="plan-cta outline">Get My Journey</a>
-        <!-- My Journey: fixed $49/mo — no annual discount -->
-      </div>
-
+      <p class="plan-setup"><strong>$500 one-time setup fee</strong> &nbsp;· Covers graphics, production, and done-for-you setup</p>
+      <div class="plan-cta-wrap"><a href="/registration?utm_plan=amplify" class="plan-cta outline">Amplify My Recruiting</a></div>
       <div class="plan-divider"></div>
-
-      <ul class="plan-features" aria-label="My Journey plan features">
-        <li class="feature-group-label">Everything in Rookie Plus, plus:</li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Full brand identity package
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Custom graphics &amp; design
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Unlimited email outreach
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Advanced coach analytics
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          1-on-1 onboarding call
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Recruiting strategy session
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Video highlight integration
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Monthly card refresh
-        </li>
+      <ul class="plan-features" aria-label="Amplify plan features">
+        <li class="feature-group-label">Everything in My Journey, plus:</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Highlight Reels</strong></li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Custom Graphics</strong></li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Managed Coach Outreach sends</strong></li>
         <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Dedicated account support
-        </li>
-        <li class="feature-item">
-          <span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>
-          Priority response time
-        </li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>8 Hours of Support</strong></li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Full onboarding</li>
       </ul>
     </article>
 
@@ -1194,100 +1019,27 @@
 <section id="compare-section" aria-labelledby="compare">
   <p class="section-eyebrow reveal">Side by Side</p>
   <h2 class="section-title reveal" id="compare">Compare<br>Plans</h2>
-
   <div style="overflow-x:auto;" role="region" aria-label="Plan comparison table" tabindex="0">
-    <table class="compare-table" aria-label="Feature comparison across Rookie, Rookie Plus, and My Journey plans">
-      <thead>
-        <tr>
-          <th scope="col">Feature</th>
-          <th scope="col">Free</th>
-          <th scope="col" class="accent-col">PLYR Plus</th>
-          <th scope="col">My Journey</th>
-        </tr>
-      </thead>
+    <table class="compare-table" aria-label="Feature comparison across Free, My Journey, and Amplify plans">
+      <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col" class="accent-col">My Journey</th><th scope="col" style="color:#f5c451">Amplify</th></tr></thead>
       <tbody>
-        <tr class="section-row"><td colspan="4">Card</td></tr>
-        <tr><td>Recruiting card</td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Custom link</td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Custom branded graphics</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Full brand package</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-
-        <tr class="section-row"><td colspan="4">Analytics</td></tr>
-        <tr><td>Email open tracking</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Click tracking</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Coach engagement dashboard</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Advanced analytics</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-
-        <tr class="section-row"><td colspan="4">Outreach</td></tr>
-        <tr><td>Share via email &amp; social</td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Multiple monthly sends</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Unlimited outreach</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-
+        <tr class="section-row"><td colspan="4">Your Presence</td></tr>
+        <tr><td>Simple PLYRSite page</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Quick athlete info &amp; bio</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Personalized domain</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr><td>Personal email</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr class="section-row"><td colspan="4">Recruiting Tools</td></tr>
+        <tr><td>Coach engagement tracking</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr><td>Outreach templates</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr><td>Coach database</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr class="section-row"><td colspan="4">Done-For-You Production</td></tr>
+        <tr><td>Highlight reels included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4</td></tr>
+        <tr><td>Custom graphics included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4</td></tr>
+        <tr><td>Managed coach outreach included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4 sends</td></tr>
         <tr class="section-row"><td colspan="4">Support</td></tr>
-        <tr><td>Email support</td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Priority support</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>1-on-1 onboarding</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
-        <tr><td>Dedicated account support</td>
-          <td><span class="dash">—</span></td>
-          <td><span class="dash">—</span></td>
-          <td><span class="check-icon"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span></td>
-        </tr>
+        <tr><td>Email support</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>1-on-1 onboarding</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
+        <tr><td>Dedicated support</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>8 hrs</td></tr>
       </tbody>
     </table>
   </div>
@@ -1305,11 +1057,11 @@
 
     <div class="faq-item reveal" role="listitem">
       <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        What is the set-up fee for?
+        What is the Amplify setup fee for?
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">The set-up fee covers our team building and configuring your custom PLYRCARD — including graphics, profile setup, and initial card design. It's a one-time fee and is currently discounted for new accounts.</p>
+        <p class="faq-answer-inner">Amplify is $49 per month with a one-time $500 setup fee. The setup fee covers the initial graphics, highlight reels, coach outreach assets, onboarding, and done-for-you production work needed to launch the athlete's recruiting package.</p>
       </div>
     </div>
 
@@ -1319,7 +1071,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Yes. Monthly plans can be cancelled at any time with no penalties. Annual plans can be cancelled before the next renewal date. We don't believe in locking athletes in.</p>
+        <p class="faq-answer-inner">Yes. My Journey and Amplify are monthly subscriptions and can be cancelled before the next billing cycle.</p>
       </div>
     </div>
 
@@ -1329,7 +1081,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Absolutely. You can upgrade from Free to Rookie Plus or My Journey at any time. Your card stays intact — we just unlock more features and enhance your setup.</p>
+        <p class="faq-answer-inner">Absolutely. You can upgrade from Free to My Journey or Amplify at any time. Your profile stays intact while the new features and support are added.</p>
       </div>
     </div>
 
@@ -1570,41 +1322,6 @@
     });
   });
 
-  const billingToggle = document.getElementById('billing-toggle');
-  const labelMonthly = document.getElementById('label-monthly');
-  const labelAnnual = document.getElementById('label-annual');
-
-  if (billingToggle && labelMonthly && labelAnnual) {
-    let isAnnual = false;
-
-    const setBilling = annual => {
-      isAnnual = annual;
-      billingToggle.classList.toggle('annual', annual);
-      billingToggle.setAttribute('aria-checked', annual ? 'true' : 'false');
-      labelMonthly.classList.toggle('active', !annual);
-      labelAnnual.classList.toggle('active', annual);
-      document.body.classList.toggle('annual', annual);
-
-      document.querySelectorAll('.monthly-price').forEach(el => {
-        el.style.display = annual ? 'none' : (el.tagName === 'DIV' ? 'flex' : 'inline');
-      });
-
-      document.querySelectorAll('.annual-price').forEach(el => {
-        el.style.display = annual ? (el.tagName === 'DIV' ? 'flex' : 'inline') : 'none';
-      });
-    };
-
-    billingToggle.addEventListener('click', () => setBilling(!isAnnual));
-    billingToggle.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        setBilling(!isAnnual);
-      }
-    });
-
-    labelMonthly.addEventListener('click', () => setBilling(false));
-    labelAnnual.addEventListener('click', () => setBilling(true));
-  }
 
   if ('IntersectionObserver' in window) {
     const revealObserver = new IntersectionObserver(entries => {
