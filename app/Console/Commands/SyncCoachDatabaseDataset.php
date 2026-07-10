@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\CoachDatabaseDatasetSyncService;
+use App\Services\CoachDatabaseSyncCoordinator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -11,14 +12,16 @@ use Throwable;
 class SyncCoachDatabaseDataset extends Command
 {
     protected $signature = 'recruiting:sync-dataset
-        {--user= : User ID whose GHL Coach Database should be rebuilt}
+        {--user= : User ID whose Coach Database should be rebuilt}
         {--force : Run even when the command is started manually}
         {--release-lock : Release the shared Recruiting Center lock when finished}';
 
-    protected $description = 'Rebuild the complete GHL school/coach read model in a timeout-safe background CLI process.';
+    protected $description = 'Rebuild the complete school/coach read model in a timeout-safe CLI worker.';
 
-    public function handle(CoachDatabaseDatasetSyncService $syncService): int
-    {
+    public function handle(
+        CoachDatabaseDatasetSyncService $syncService,
+        CoachDatabaseSyncCoordinator $coordinator,
+    ): int {
         $userId = (int) $this->option('user');
         $user = $userId > 0 ? User::query()->find($userId) : null;
 
@@ -27,20 +30,34 @@ class SyncCoachDatabaseDataset extends Command
             return self::FAILURE;
         }
 
-        $lockKey = 'recruiting:stats-sync-running:' . $user->id;
-        $statusKey = 'recruiting:stats-sync-status:' . $user->id;
-        $ownsLock = false;
+        $sharedLockKey = $coordinator->sharedLockKey($userId);
+        $ownsSharedLock = false;
 
-        if (! Cache::has($lockKey)) {
-            $ownsLock = Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(90));
+        if (! Cache::has($sharedLockKey)) {
+            $ownsSharedLock = Cache::add($sharedLockKey, now()->toDateTimeString(), now()->addHours(3));
         }
 
-        if (! Cache::has($lockKey) && ! $this->option('force')) {
+        if (! Cache::has($sharedLockKey) && ! $this->option('force')) {
             $this->error('Unable to acquire the Recruiting Center sync lock.');
             return self::FAILURE;
         }
 
+        if (! $coordinator->claimExecution($userId)) {
+            $this->warn('Another worker is already processing this Coach Database reload.');
+            return self::SUCCESS;
+        }
+
+        $coordinator->registerPending($userId);
+
         try {
+            $coordinator->heartbeat($user, [
+                'status' => 'running',
+                'mode' => 'full_database_reload',
+                'worker_started_at' => now()->toDateTimeString(),
+                'launch_driver' => 'artisan_command',
+                'message' => 'Background worker started. Loading school and coach records in small pages.',
+            ]);
+
             $this->info("Starting timeout-safe Coach Database sync for user {$user->id}...");
             $result = $syncService->sync($user, (bool) $this->option('force'));
 
@@ -54,20 +71,23 @@ class SyncCoachDatabaseDataset extends Command
             $this->line('Coaches: ' . (int) ($result['loaded_contacts'] ?? 0));
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            Cache::put($statusKey, [
+            Cache::put($coordinator->statusKey($userId), [
                 'status' => 'failed',
                 'mode' => 'full_database_reload',
-                'user_id' => $user->id,
+                'user_id' => $userId,
                 'failed_at' => now()->toDateTimeString(),
                 'error' => $exception->getMessage(),
-                'message' => 'Background Coach Database reload failed. The previous cache was preserved: ' . $exception->getMessage(),
-            ], now()->addMinutes(120));
+                'message' => 'Background Coach Database reload failed. The previous cached data was preserved.',
+            ], now()->addHours(6));
 
             $this->error($exception->getMessage());
             return self::FAILURE;
         } finally {
-            if ($ownsLock || $this->option('release-lock')) {
-                Cache::forget($lockKey);
+            $coordinator->removePending($userId);
+            $coordinator->releaseExecution($userId);
+
+            if ($ownsSharedLock || $this->option('release-lock')) {
+                $coordinator->releaseSharedLock($userId);
             }
         }
     }

@@ -60,7 +60,9 @@ class CoachDatabaseDatasetSyncService
             'loaded_contacts' => 0,
             'loaded_pages' => 0,
             'started_at' => $startedAt,
-            'message' => 'Loading GHL schools and contacts in background pages. Existing cached data remains visible.',
+            'worker_started_at' => $startedAt,
+            'worker_heartbeat_at' => $startedAt,
+            'message' => 'Loading school and coach records in background pages. Existing cached data remains visible.',
         ]);
 
         try {
@@ -81,7 +83,7 @@ class CoachDatabaseDatasetSyncService
                     );
 
                     if (! ($result['success'] ?? false)) {
-                        $lastSchoolError = (string) ($result['error'] ?? 'Unable to load a GHL school page.');
+                        $lastSchoolError = (string) ($result['error'] ?? 'Unable to load a school page.');
                         throw new RuntimeException($lastSchoolError);
                     }
 
@@ -110,7 +112,7 @@ class CoachDatabaseDatasetSyncService
                     $businessPages++;
 
                     if ($businessHasMore && $businessSkip <= $previousSkip) {
-                        throw new RuntimeException('GHL school pagination did not advance. The previous cache was kept.');
+                        throw new RuntimeException('School pagination did not advance. The previous cache was kept.');
                     }
                 }
 
@@ -132,7 +134,7 @@ class CoachDatabaseDatasetSyncService
                     );
 
                     if (! ($result['success'] ?? false)) {
-                        $lastContactError = (string) ($result['error'] ?? 'Unable to load a GHL contact page.');
+                        $lastContactError = (string) ($result['error'] ?? 'Unable to load a coach page.');
                         throw new RuntimeException($lastContactError);
                     }
 
@@ -164,7 +166,7 @@ class CoachDatabaseDatasetSyncService
                         && (string) $contactsStartAfter === (string) $previousAfter
                         && (string) $contactsStartAfterId === (string) $previousAfterId
                     ) {
-                        throw new RuntimeException('GHL contact pagination did not advance. The previous cache was kept.');
+                        throw new RuntimeException('Coach pagination did not advance. The previous cache was kept.');
                     }
                 }
 
@@ -192,7 +194,7 @@ class CoachDatabaseDatasetSyncService
                     'remote_total_schools' => $remoteSchools,
                     'remote_total_contacts' => $remoteContacts,
                     'started_at' => $startedAt,
-                    'message' => "Loaded {$loadedSchools} schools and {$loadedContacts} coaches. Reconciling Business IDs and Business Name fields in background pages.",
+                    'message' => "Loaded {$loadedSchools} schools and {$loadedContacts} coaches. Reconciling school associations and Business Name fields in background pages.",
                 ]);
 
                 if ((($businessPages + $contactPages) % 5) === 0) {
@@ -210,7 +212,7 @@ class CoachDatabaseDatasetSyncService
                 'remote_total_schools' => $remoteSchools,
                 'remote_total_contacts' => $remoteContacts,
                 'started_at' => $startedAt,
-                'message' => 'All GHL pages are loaded. Building the final cross-referenced school and coach indexes.',
+                'message' => 'All school and coach pages are loaded. Building the final cross-referenced indexes.',
             ]);
 
             $rebuilt = $this->coachDatabaseService->rebuildFromSchoolCompanySnapshot(
@@ -239,7 +241,7 @@ class CoachDatabaseDatasetSyncService
                 'has_more_data' => false,
                 'last_schools_error' => $lastSchoolError,
                 'last_contacts_error' => $lastContactError,
-                'last_refresh_notice' => 'Full Coach Database background reload completed. Schools and coaches were cross-referenced by Business ID and Business/Company/School Name.',
+                'last_refresh_notice' => 'Full Coach Database background reload completed. Schools and coaches were cross-referenced by association ID and Business/Company/School Name.',
                 'cached_at' => $finishedAt,
             ]);
 
@@ -412,8 +414,18 @@ class CoachDatabaseDatasetSyncService
 
     protected function writeStatus(User $user, array $status): void
     {
-        $status['user_id'] = $user->id;
-        Cache::put($this->statusKey($user), $status, now()->addMinutes(120));
+        $existing = Cache::get($this->statusKey($user), []);
+        $existing = is_array($existing) ? $existing : [];
+
+        $status = array_merge($existing, $status, [
+            'user_id' => $user->id,
+            'worker_heartbeat_at' => now()->toDateTimeString(),
+            'worker_host' => gethostname() ?: php_uname('n'),
+            'worker_pid' => getmypid(),
+        ]);
+
+        Cache::put($this->statusKey($user), $status, now()->addHours(6));
+        Cache::put($this->lockKey($user), $status['started_at'] ?? now()->toDateTimeString(), now()->addHours(3));
     }
 
     protected function statusKey(User $user): string

@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
 use App\Services\CoachDatabaseActionQueueService;
+use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
 use App\Services\GoHighLevelService;
 use App\Support\TrackingLinkRewriter;
@@ -1014,18 +1015,40 @@ trait InteractsWithCoachDatabase
         $lockStartedAt = Cache::get($lockKey);
         $rawStatus = strtolower((string) ($status['status'] ?? ''));
 
+        $activeStatuses = ['queued', 'starting', 'waiting_for_worker', 'running', 'already_running', 'stalled'];
+
         if (in_array($rawStatus, ['running', 'already_running'], true) && ! $lockStartedAt) {
-            // The background command releases the lock when it finishes. If the status
-            // row still says "running" but the lock is gone, mark it complete so the
-            // visible loader does not get stuck after the service finishes safely.
+            // The background worker releases the lock after finishing. If the status still
+            // says running but the lock is gone, stop the visible loader instead of leaving
+            // the page permanently busy.
             $status['status'] = 'completed';
             $status['finished_at'] = $status['finished_at'] ?? now()->toDateTimeString();
-            $status['message'] = $status['message'] ?? 'Recruiting sync completed. Latest cached rows are still available.';
-            Cache::put($statusKey, $status, now()->addMinutes(30));
+            $status['message'] = $status['message'] ?? 'Recruiting sync completed. Latest cached rows are available.';
+            Cache::put($statusKey, $status, now()->addHours(1));
             $rawStatus = 'completed';
         }
 
-        $this->isRecruitingSyncRunning = (bool) $lockStartedAt && in_array($rawStatus, ['running', 'already_running'], true);
+        $heartbeatAt = $status['worker_heartbeat_at'] ?? null;
+        $startedAt = $status['launch_attempted_at'] ?? $status['queued_at'] ?? $status['started_at'] ?? null;
+        $startGrace = max(15, (int) config('coach-database-sync.background.worker_start_grace_seconds', 45));
+        $staleAfter = max(60, (int) config('coach-database-sync.background.worker_stale_seconds', 180));
+        $startedAge = $startedAt ? max(0, time() - (strtotime((string) $startedAt) ?: time())) : 0;
+        $heartbeatAge = $heartbeatAt ? max(0, time() - (strtotime((string) $heartbeatAt) ?: time())) : null;
+
+        if (in_array($rawStatus, ['queued', 'starting'], true) && ! $heartbeatAt && $startedAge >= $startGrace) {
+            $rawStatus = 'waiting_for_worker';
+            $status['status'] = $rawStatus;
+            $status['waiting_since'] = $status['waiting_since'] ?? now()->toDateTimeString();
+            $status['message'] = 'The reload is queued and waiting for the server background worker. Existing Coach Database rows remain available.';
+            Cache::put($statusKey, $status, now()->addHours(6));
+        } elseif ($rawStatus === 'running' && $heartbeatAge !== null && $heartbeatAge >= $staleAfter) {
+            $rawStatus = 'stalled';
+            $status['status'] = $rawStatus;
+            $status['message'] = 'The background worker stopped reporting progress. Existing Coach Database rows remain available while the server worker is checked.';
+            Cache::put($statusKey, $status, now()->addHours(6));
+        }
+
+        $this->isRecruitingSyncRunning = (bool) $lockStartedAt && in_array($rawStatus, $activeStatuses, true);
         $this->recruitingSyncStatus = $rawStatus !== '' ? $rawStatus : null;
         $this->recruitingSyncMode = $status['mode'] ?? null;
         $this->recruitingSyncStartedAt = $status['started_at'] ?? (is_string($lockStartedAt) ? $lockStartedAt : null);
@@ -1066,7 +1089,7 @@ trait InteractsWithCoachDatabase
             'status' => $this->recruitingSyncStatus,
             'mode' => $this->recruitingSyncMode,
             'title' => $this->recruitingSyncModeLabel($this->recruitingSyncMode),
-            'message' => $this->recruitingSyncMessage ?: ($snapshot['last_refresh_notice'] ?? 'Recruiting Center is syncing with Recruiting Center in the background.'),
+            'message' => $this->recruitingSyncMessage ?: ($snapshot['last_refresh_notice'] ?? 'Coach Database is syncing in the background.'),
             'percent' => max(1, min(100, $progress)),
             'loaded_schools' => $loadedSchools,
             'loaded_contacts' => $loadedContacts,
@@ -1111,21 +1134,21 @@ trait InteractsWithCoachDatabase
         $statusKey = $this->recruitingStatsSyncStatusKey($user);
         $modeLabel = $this->recruitingSyncModeLabel($mode);
 
-        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addMinutes(90))) {
+        if (! Cache::add($lockKey, now()->toDateTimeString(), now()->addHours(3))) {
             $existing = Cache::get($statusKey, []);
             $status = array_merge(is_array($existing) ? $existing : [], [
-                'status' => 'already_running',
+                'status' => $existing['status'] ?? 'already_running',
                 'mode' => $existing['mode'] ?? $mode,
                 'started_at' => $existing['started_at'] ?? Cache::get($lockKey),
                 'user_id' => $user->id,
                 'message' => $existing['message'] ?? ($modeLabel . ' is already running. Existing cached rows remain available.'),
             ]);
-            Cache::put($statusKey, $status, now()->addMinutes(120));
+            Cache::put($statusKey, $status, now()->addHours(6));
             return $status;
         }
 
         $status = [
-            'status' => 'running',
+            'status' => 'queued',
             'mode' => $mode,
             'progress' => 1,
             'loaded_schools' => 0,
@@ -1133,32 +1156,55 @@ trait InteractsWithCoachDatabase
             'loaded_pages' => 0,
             'started_at' => now()->toDateTimeString(),
             'user_id' => $user->id,
-            'message' => $modeLabel . ' started in a detached process. Existing Coach Database rows remain visible.',
+            'message' => $modeLabel . ' is queued for background processing. Existing Coach Database rows remain visible.',
         ];
-        Cache::put($statusKey, $status, now()->addMinutes(120));
+        Cache::put($statusKey, $status, now()->addHours(6));
 
+        if ($mode === 'full_database_reload') {
+            try {
+                return app(CoachDatabaseBackgroundSyncLauncher::class)->launchDataset($user, $status);
+            } catch (\Throwable $exception) {
+                Cache::forget($lockKey);
+                $status = [
+                    'status' => 'failed_to_start',
+                    'mode' => $mode,
+                    'error' => $exception->getMessage(),
+                    'user_id' => $user->id,
+                    'failed_at' => now()->toDateTimeString(),
+                    'message' => 'Unable to queue the full Coach Database reload: ' . $exception->getMessage(),
+                ];
+                Cache::put($statusKey, $status, now()->addHours(6));
+                Log::warning('Unable to queue Coach Database background reload.', [
+                    'user_id' => $user->id,
+                    'error' => $exception->getMessage(),
+                ]);
+                return $status;
+            }
+        }
+
+        // Keep the existing lightweight stats command compatible. The full database reload
+        // above uses the production-safe queue/scheduler launcher instead of trusting nohup.
         $php = (new PhpExecutableFinder())->find(false) ?: PHP_BINARY;
         $artisan = base_path('artisan');
-        $artisanCommand = $mode === 'full_database_reload'
-            ? 'recruiting:sync-dataset'
-            : 'recruiting:sync-stats';
-        $logName = $mode === 'full_database_reload'
-            ? 'recruiting-dataset-sync-'
-            : 'recruiting-stats-sync-';
-        $logPath = storage_path('logs/' . $logName . $user->id . '.log');
+        $logPath = storage_path('logs/recruiting-stats-sync-' . $user->id . '.log');
         $arguments = ' --user=' . (int) $user->id . ' --force --release-lock';
 
         try {
             if (PHP_OS_FAMILY === 'Windows') {
                 $command = 'start /B "" ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
-                    . ' ' . $artisanCommand . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1';
+                    . ' recruiting:sync-stats' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1';
                 pclose(popen($command, 'r'));
-                return $status;
+            } else {
+                $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
+                    . ' recruiting:sync-stats' . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1 < /dev/null &';
+                Process::fromShellCommandline($command, base_path())->setTimeout(10)->run();
             }
 
-            $command = 'nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($artisan)
-                . ' ' . $artisanCommand . $arguments . ' > ' . escapeshellarg($logPath) . ' 2>&1 &';
-            Process::fromShellCommandline($command, base_path())->run();
+            $status['status'] = 'starting';
+            $status['launch_driver'] = 'detached_shell';
+            $status['launch_attempted_at'] = now()->toDateTimeString();
+            $status['worker_log'] = $logPath;
+            Cache::put($statusKey, $status, now()->addHours(6));
         } catch (\Throwable $exception) {
             Cache::forget($lockKey);
             $status = [
@@ -1169,11 +1215,10 @@ trait InteractsWithCoachDatabase
                 'failed_at' => now()->toDateTimeString(),
                 'message' => 'Unable to start ' . strtolower($modeLabel) . ': ' . $exception->getMessage(),
             ];
-            Cache::put($statusKey, $status, now()->addMinutes(120));
+            Cache::put($statusKey, $status, now()->addHours(6));
 
-            Log::warning('Unable to start Recruiting Center background sync.', [
+            Log::warning('Unable to start Recruiting Center background stats sync.', [
                 'user_id' => $user->id,
-                'mode' => $mode,
                 'error' => $exception->getMessage(),
             ]);
         }
@@ -1228,7 +1273,7 @@ trait InteractsWithCoachDatabase
         if ($notify) {
             Notification::make()
                 ->title('Recruiting Center')
-                ->body('The full Coach Database reload is running outside Livewire. You can keep using the page; schools and coaches will refresh from cache when the background sync finishes.')
+                ->body('The full Coach Database reload has been queued for background processing. You can keep using the page; schools and coaches will refresh from cache as progress is completed.')
                 ->success()
                 ->send();
         }

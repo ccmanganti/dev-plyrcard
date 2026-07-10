@@ -1,6 +1,19 @@
 <?php
 
 return [
+
+    'background' => [
+        // auto: async Laravel queue first, detached shell second, scheduled command fallback last.
+        // queue: queue only, shell: detached shell only, scheduler: scheduled command only.
+        'driver' => env('COACH_DATABASE_SYNC_DRIVER', 'auto'),
+        'queue_enabled' => (bool) env('COACH_DATABASE_QUEUE_ENABLED', true),
+        'queue_connection' => env('COACH_DATABASE_QUEUE_CONNECTION', env('QUEUE_CONNECTION')),
+        'queue_name' => env('COACH_DATABASE_QUEUE_NAME', 'recruiting'),
+        'shell_enabled' => (bool) env('COACH_DATABASE_SHELL_ENABLED', true),
+        'worker_start_grace_seconds' => (int) env('COACH_DATABASE_WORKER_START_GRACE_SECONDS', 45),
+        'worker_stale_seconds' => (int) env('COACH_DATABASE_WORKER_STALE_SECONDS', 180),
+    ],
+
     // Small API pages prevent a single upstream request from monopolizing a worker.
     'pages' => [
         'businesses' => (int) env('COACH_DATABASE_BUSINESS_PAGE_SIZE', 25),
@@ -15,16 +28,6 @@ return [
     'page_attempts' => (int) env('COACH_DATABASE_PAGE_ATTEMPTS', 3),
     'retry_sleep_ms' => (int) env('COACH_DATABASE_RETRY_SLEEP_MS', 800),
     'cli_memory_limit' => env('COACH_DATABASE_CLI_MEMORY_LIMIT', '512M'),
-
-    'http' => [
-        'connect_timeout' => (int) env('COACH_DATABASE_HTTP_CONNECT_TIMEOUT', 5),
-        'request_timeout' => (int) env('COACH_DATABASE_HTTP_REQUEST_TIMEOUT', 15),
-    ],
-
-    'tags' => [
-        'sync_minutes' => (int) env('COACH_DATABASE_TAG_SYNC_MINUTES', 5),
-        'max_pages_per_tag' => (int) env('COACH_DATABASE_TAG_MAX_PAGES', 20),
-    ],
 
     // Existing Blade Load more controls remain compatible, but Livewire is never
     // allowed to serialize an unlimited number of cards in one response.
