@@ -1,7 +1,7 @@
 (() => {
     if (window.__recruitingCenterUiLoaded) return;
     window.__recruitingCenterUiLoaded = true;
-    window.__recruitingCenterUiVersion = '2026-07-13.2';
+    window.__recruitingCenterUiVersion = '2026-07-13.3';
 
     const state = {
         pending: new Set(),
@@ -319,33 +319,6 @@
                 this.$cleanup?.(() => window.removeEventListener('rc-discover-selection-refresh', refresh));
             },
 
-            async waitForSelectionIdle() {
-                clearTimeout(store.timer);
-
-                if (store.pendingPromise) {
-                    try {
-                        await store.pendingPromise;
-                    } catch (_) {
-                        // The next deterministic action still proceeds.
-                    }
-                }
-
-                while (store.inFlight) {
-                    await new Promise((resolve) => setTimeout(resolve, 25));
-                }
-            },
-
-            markFilterChanged() {
-                store.allFilteredSelected = false;
-                store.version = Number(store.version || 0) + 1;
-                this.revision = store.version;
-                this.allFilteredSelected = false;
-                broadcastDiscoverSelection(store);
-                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
-                    detail: { version: store.version },
-                }));
-            },
-
             count() {
                 this.revision;
                 return store.selected.size;
@@ -407,7 +380,19 @@
             },
 
             async toggleAllFiltered() {
-                await this.waitForSelectionIdle();
+                clearTimeout(store.timer);
+
+                if (store.pendingPromise) {
+                    try {
+                        await store.pendingPromise;
+                    } catch (_) {
+                        // Continue with the deterministic Select All action.
+                    }
+                }
+
+                while (store.inFlight) {
+                    await new Promise((resolve) => setTimeout(resolve, 25));
+                }
 
                 const shouldSelect = !Boolean(store.allFilteredSelected);
                 const token = ++store.operationToken;
@@ -422,7 +407,10 @@
                     if (token !== store.operationToken) return;
 
                     if (!result || result.success === false) {
-                        showToast(result?.error || 'Unable to update the filtered schools.', 'error');
+                        showToast(
+                            result?.error || 'Unable to update the filtered schools.',
+                            'error'
+                        );
                         return;
                     }
 
@@ -430,7 +418,6 @@
                         result.selected || [],
                         Boolean(result.all_filtered_selected)
                     );
-
                     store.dirty = false;
                     store.needsFlush = false;
                 } catch (error) {
@@ -457,17 +444,147 @@
             },
 
             async clearAll() {
-            const store = getDiscoverSelectionStore();
-
-            if (store?.pendingPromise) {
-                try {
-                    await store.pendingPromise;
-                } catch (_) {}
-            }
-
-            if (store) {
                 clearTimeout(store.timer);
-                store.operationToken = Number(store.operationToken || 0) + 1;
+
+                if (store.pendingPromise) {
+                    try {
+                        await store.pendingPromise;
+                    } catch (_) {
+                        // Continue and clear deterministically.
+                    }
+                }
+
+                while (store.inFlight) {
+                    await new Promise((resolve) => setTimeout(resolve, 25));
+                }
+
+                const token = ++store.operationToken;
+                store.inFlight = true;
+
+                // Update the browser immediately and invalidate older responses.
+                this.updateLocal([], false);
+                store.dirty = false;
+                store.needsFlush = false;
+
+                try {
+                    const result = await this.$wire.call('clearSelectedSchools');
+
+                    if (token !== store.operationToken) return;
+
+                    if (!result || result.success === false) {
+                        showToast(
+                            result?.error || 'Unable to clear the selected schools.',
+                            'error'
+                        );
+                    }
+                } catch (error) {
+                    console.error(error);
+                    showToast('Unable to clear the selected schools.', 'error');
+                } finally {
+                    if (token === store.operationToken) {
+                        store.inFlight = false;
+                    }
+                }
+            },
+
+            async flush() {
+                if (store.inFlight) {
+                    store.needsFlush = true;
+
+                    if (store.pendingPromise) {
+                        try {
+                            await store.pendingPromise;
+                        } catch (_) {}
+                    }
+
+                    return;
+                }
+
+                clearTimeout(store.timer);
+                store.inFlight = true;
+                store.needsFlush = false;
+
+                const snapshot = Array.from(store.selected);
+                const token = store.operationToken;
+
+                store.pendingPromise = this.$wire.call(
+                    'setSelectedSchoolIds',
+                    snapshot
+                );
+
+                try {
+                    const result = await store.pendingPromise;
+
+                    if (token !== store.operationToken) return;
+
+                    if (!result || result.success === false) {
+                        showToast(
+                            result?.error || 'Unable to update selected schools.',
+                            'error'
+                        );
+                    } else {
+                        store.dirty = false;
+                    }
+                } catch (error) {
+                    console.error(error);
+
+                    if (token === store.operationToken) {
+                        showToast('Unable to update selected schools.', 'error');
+                    }
+                } finally {
+                    store.pendingPromise = null;
+                    store.inFlight = false;
+
+                    if (store.needsFlush && token === store.operationToken) {
+                        clearTimeout(store.timer);
+                        store.timer = setTimeout(() => this.flush(), 40);
+                    }
+                }
+            },
+        };
+    };
+
+    window.rcBulkSchoolList = (initialLists = []) => ({
+        open: false,
+        creating: false,
+        newListName: '',
+        newListColor: '#ff6338',
+        lists: Array.isArray(initialLists) ? [...initialLists] : [],
+        pendingLists: {},
+        pendingAdds: {},
+        statusText: '',
+        watchTimer: null,
+        watching: false,
+        selectedCount: getDiscoverSelectionStore()?.selected?.size || 0,
+        selectionListener: null,
+
+        init() {
+            const store = getDiscoverSelectionStore();
+            this.selectedCount = store?.selected?.size || 0;
+
+            this.selectionListener = (event) => {
+                this.selectedCount = Number(
+                    event?.detail?.count
+                    ?? getDiscoverSelectionStore()?.selected?.size
+                    ?? 0
+                );
+            };
+
+            window.addEventListener('rc-discover-selection-changed', this.selectionListener);
+            this.$cleanup?.(() => {
+                if (this.selectionListener) {
+                    window.removeEventListener('rc-discover-selection-changed', this.selectionListener);
+                }
+            });
+        },
+
+        count() {
+            return Number(this.selectedCount || 0);
+        },
+
+        async clearAll() {
+            const store = getDiscoverSelectionStore();
+            if (store) {
                 store.selected.clear();
                 store.allFilteredSelected = false;
                 store.dirty = false;
