@@ -1,6 +1,7 @@
 (() => {
     if (window.__recruitingCenterUiLoaded) return;
     window.__recruitingCenterUiLoaded = true;
+    window.__recruitingCenterUiVersion = '2026-07-13.2';
 
     const state = {
         pending: new Set(),
@@ -288,6 +289,8 @@
                 inFlight: false,
                 needsFlush: false,
                 timer: null,
+                pendingPromise: null,
+                operationToken: 0,
                 version: 0,
                 initialized: true,
             };
@@ -314,6 +317,33 @@
 
                 window.addEventListener('rc-discover-selection-refresh', refresh);
                 this.$cleanup?.(() => window.removeEventListener('rc-discover-selection-refresh', refresh));
+            },
+
+            async waitForSelectionIdle() {
+                clearTimeout(store.timer);
+
+                if (store.pendingPromise) {
+                    try {
+                        await store.pendingPromise;
+                    } catch (_) {
+                        // The next deterministic action still proceeds.
+                    }
+                }
+
+                while (store.inFlight) {
+                    await new Promise((resolve) => setTimeout(resolve, 25));
+                }
+            },
+
+            markFilterChanged() {
+                store.allFilteredSelected = false;
+                store.version = Number(store.version || 0) + 1;
+                this.revision = store.version;
+                this.allFilteredSelected = false;
+                broadcastDiscoverSelection(store);
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: store.version },
+                }));
             },
 
             count() {
@@ -377,23 +407,39 @@
             },
 
             async toggleAllFiltered() {
-                if (store.inFlight) return;
+                await this.waitForSelectionIdle();
+
+                const shouldSelect = !Boolean(store.allFilteredSelected);
+                const token = ++store.operationToken;
                 store.inFlight = true;
 
                 try {
-                    const result = await this.$wire.call('toggleVisibleSchoolsSelection');
+                    const result = await this.$wire.call(
+                        'setFilteredSchoolsSelection',
+                        shouldSelect
+                    );
+
+                    if (token !== store.operationToken) return;
+
                     if (!result || result.success === false) {
-                        showToast(result?.error || 'Unable to select the filtered schools.', 'error');
+                        showToast(result?.error || 'Unable to update the filtered schools.', 'error');
                         return;
                     }
-                    this.updateLocal(result.selected || [], result.all_filtered_selected);
+
+                    this.updateLocal(
+                        result.selected || [],
+                        Boolean(result.all_filtered_selected)
+                    );
+
                     store.dirty = false;
                     store.needsFlush = false;
                 } catch (error) {
                     console.error(error);
-                    showToast('Unable to select the filtered schools.', 'error');
+                    showToast('Unable to update the filtered schools.', 'error');
                 } finally {
-                    store.inFlight = false;
+                    if (token === store.operationToken) {
+                        store.inFlight = false;
+                    }
                 }
             },
 
@@ -411,100 +457,17 @@
             },
 
             async clearAll() {
-                if (store.inFlight) return;
-                store.inFlight = true;
-
-                try {
-                    const result = await this.$wire.call('clearSelectedSchools');
-                    if (!result || result.success === false) {
-                        showToast(result?.error || 'Unable to clear the selected schools.', 'error');
-                        return;
-                    }
-                    this.updateLocal([], false);
-                    store.dirty = false;
-                    store.needsFlush = false;
-                } catch (error) {
-                    console.error(error);
-                    showToast('Unable to clear the selected schools.', 'error');
-                } finally {
-                    store.inFlight = false;
-                }
-            },
-
-            async flush() {
-                if (store.inFlight) {
-                    store.needsFlush = true;
-                    return;
-                }
-
-                store.inFlight = true;
-                store.needsFlush = false;
-                const snapshot = Array.from(store.selected);
-
-                try {
-                    const result = await this.$wire.call('setSelectedSchoolIds', snapshot);
-                    if (!result || result.success === false) {
-                        showToast(result?.error || 'Unable to update selected schools.', 'error');
-                    } else {
-                        // Keep the optimistic browser state authoritative. The
-                        // server call uses skipRender(), so no card grid morphs.
-                        store.dirty = false;
-                    }
-                } catch (error) {
-                    console.error(error);
-                    showToast('Unable to update selected schools.', 'error');
-                } finally {
-                    store.inFlight = false;
-                    if (store.needsFlush) {
-                        clearTimeout(store.timer);
-                        store.timer = setTimeout(() => this.flush(), 40);
-                    }
-                }
-            },
-        };
-    };
-
-    window.rcBulkSchoolList = (initialLists = []) => ({
-        open: false,
-        creating: false,
-        newListName: '',
-        newListColor: '#ff6338',
-        lists: Array.isArray(initialLists) ? [...initialLists] : [],
-        pendingLists: {},
-        pendingAdds: {},
-        statusText: '',
-        watchTimer: null,
-        watching: false,
-        selectedCount: getDiscoverSelectionStore()?.selected?.size || 0,
-        selectionListener: null,
-
-        init() {
             const store = getDiscoverSelectionStore();
-            this.selectedCount = store?.selected?.size || 0;
 
-            this.selectionListener = (event) => {
-                this.selectedCount = Number(
-                    event?.detail?.count
-                    ?? getDiscoverSelectionStore()?.selected?.size
-                    ?? 0
-                );
-            };
+            if (store?.pendingPromise) {
+                try {
+                    await store.pendingPromise;
+                } catch (_) {}
+            }
 
-            window.addEventListener('rc-discover-selection-changed', this.selectionListener);
-            this.$cleanup?.(() => {
-                if (this.selectionListener) {
-                    window.removeEventListener('rc-discover-selection-changed', this.selectionListener);
-                }
-            });
-        },
-
-        count() {
-            return Number(this.selectedCount || 0);
-        },
-
-        async clearAll() {
-            const store = getDiscoverSelectionStore();
             if (store) {
+                clearTimeout(store.timer);
+                store.operationToken = Number(store.operationToken || 0) + 1;
                 store.selected.clear();
                 store.allFilteredSelected = false;
                 store.dirty = false;
@@ -1268,6 +1231,48 @@
         }, 20);
     };
 
+    const bindDiscoverFilterReset = () => {
+        const reset = (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (!target) return;
+
+            const model = String(
+                target.getAttribute('wire:model.live')
+                || target.getAttribute('wire:model.live.debounce.350ms')
+                || target.getAttribute('wire:model.live.debounce.300ms')
+                || ''
+            );
+
+            const action = String(
+                target.getAttribute('wire:click')
+                || target.closest('[wire\\:click]')?.getAttribute('wire:click')
+                || ''
+            );
+
+            const changesFilter = ['search', 'conferenceFilter', 'divisionFilter', 'sort']
+                .includes(model)
+                || /setDivisionFilter|clearSchoolFilters/.test(action);
+
+            if (!changesFilter) return;
+
+            const store = getDiscoverSelectionStore();
+            if (!store) return;
+
+            store.allFilteredSelected = false;
+            store.operationToken = Number(store.operationToken || 0) + 1;
+            store.version = Number(store.version || 0) + 1;
+
+            broadcastDiscoverSelection(store);
+            window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                detail: { version: store.version },
+            }));
+        };
+
+        document.addEventListener('input', reset, true);
+        document.addEventListener('change', reset, true);
+        document.addEventListener('click', reset, true);
+    };
+
     const bindDeferredEvents = () => {
         const messageLoader = () => callComponent('loadConversationMessages');
         const templateLoader = () => callComponent('loadSelectedTemplateDetail');
@@ -1399,6 +1404,7 @@
     });
 
     bindDeferredEvents();
+    bindDiscoverFilterReset();
     document.addEventListener('livewire:init', hookLivewire);
     document.addEventListener('livewire:initialized', hookLivewire);
     document.addEventListener('livewire:navigated', () => {

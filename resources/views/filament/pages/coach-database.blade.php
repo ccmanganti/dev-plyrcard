@@ -1,6 +1,535 @@
 <x-filament-panels::page>
     <div class="rc-livewire-root" wire:init="bootDeferredUiData">
         @include('filament.partials.coach-database-ui-shell')
+
+    <script>
+        /*
+         * Discover Schools Alpine bootstrap.
+         *
+         * This runs before Alpine parses the school markup, so production asset
+         * timing, CDN caching, or deferred JavaScript can never leave x-data with
+         * an incomplete fallback object.
+         */
+        (() => {
+            const stores = window.__rcDiscoverSelectionStores || new Map();
+            window.__rcDiscoverSelectionStores = stores;
+
+            const key = () => window.location.pathname;
+            const getStore = () => stores.get(key()) || null;
+
+            const announce = (store) => {
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-changed', {
+                    detail: {
+                        selected: Array.from(store?.selected || []),
+                        count: store?.selected?.size || 0,
+                        allFilteredSelected: Boolean(store?.allFilteredSelected),
+                        version: Number(store?.version || 0),
+                    },
+                }));
+
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: Number(store?.version || 0) },
+                }));
+            };
+
+            const toast = (message, type = 'error') => {
+                const text = String(message || '').trim();
+                if (!text) return;
+
+                const root = document.querySelector('.rc-livewire-root');
+                const owner = root?.closest('[wire\\:id]');
+                const id = owner?.getAttribute('wire:id');
+                const instance = id && window.Livewire?.find ? window.Livewire.find(id) : null;
+
+                if (instance?.call) {
+                    instance.call(
+                        'notifyRecruitingUi',
+                        text,
+                        type === 'error' ? 'danger' : type
+                    ).catch(() => {});
+                } else {
+                    console[type === 'error' ? 'error' : 'log'](text);
+                }
+            };
+
+            if (typeof window.rcDiscoverSelection !== 'function') {
+                window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false) => {
+                    let store = stores.get(key());
+
+                    if (!store) {
+                        store = {
+                            selected: new Set((initialIds || []).map((id) => String(id))),
+                            allFilteredSelected: Boolean(initialAllFilteredSelected),
+                            dirty: false,
+                            inFlight: false,
+                            needsFlush: false,
+                            timer: null,
+                            version: 0,
+                        };
+                        stores.set(key(), store);
+                    }
+
+                    return {
+                        revision: Number(store.version || 0),
+                        allFilteredSelected: Boolean(store.allFilteredSelected),
+                        selectionListener: null,
+
+                        init() {
+                            this.revision = Number(store.version || 0);
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+
+                            this.selectionListener = (event) => {
+                                this.revision = Number(
+                                    event?.detail?.version
+                                    ?? store.version
+                                    ?? (this.revision + 1)
+                                );
+                                this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            };
+
+                            window.addEventListener(
+                                'rc-discover-selection-refresh',
+                                this.selectionListener
+                            );
+
+                            this.$cleanup?.(() => {
+                                window.removeEventListener(
+                                    'rc-discover-selection-refresh',
+                                    this.selectionListener
+                                );
+                            });
+                        },
+
+                        count() {
+                            this.revision;
+                            return store.selected.size;
+                        },
+
+                        selectedIds() {
+                            this.revision;
+                            return Array.from(store.selected);
+                        },
+
+                        isSelected(id) {
+                            this.revision;
+                            return store.selected.has(String(id));
+                        },
+
+                        updateLocal(ids, allSelected = null) {
+                            store.selected = new Set((ids || []).map((id) => String(id)));
+
+                            if (allSelected !== null) {
+                                store.allFilteredSelected = Boolean(allSelected);
+                            }
+
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            announce(store);
+                        },
+
+                        toggle(id) {
+                            const normalized = String(id || '');
+                            if (!normalized) return;
+
+                            if (store.selected.has(normalized)) {
+                                store.selected.delete(normalized);
+                            } else {
+                                store.selected.add(normalized);
+                            }
+
+                            store.allFilteredSelected = false;
+                            store.dirty = true;
+                            store.needsFlush = true;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = false;
+                            announce(store);
+
+                            clearTimeout(store.timer);
+                            store.timer = setTimeout(() => this.flush(), 220);
+                        },
+
+                        async flush() {
+                            if (store.inFlight) {
+                                store.needsFlush = true;
+                                return;
+                            }
+
+                            store.inFlight = true;
+                            store.needsFlush = false;
+
+                            try {
+                                const result = await this.$wire.call(
+                                    'setSelectedSchoolIds',
+                                    Array.from(store.selected)
+                                );
+
+                                if (!result || result.success === false) {
+                                    toast(result?.error || 'Unable to update selected schools.');
+                                } else {
+                                    store.dirty = false;
+                                }
+                            } catch (error) {
+                                console.error(error);
+                                toast('Unable to update selected schools.');
+                            } finally {
+                                store.inFlight = false;
+
+                                if (store.needsFlush) {
+                                    clearTimeout(store.timer);
+                                    store.timer = setTimeout(() => this.flush(), 40);
+                                }
+                            }
+                        },
+
+                        async toggleAllFiltered() {
+                            if (store.inFlight) return;
+                            store.inFlight = true;
+
+                            try {
+                                const result = await this.$wire.call(
+                                    'toggleVisibleSchoolsSelection'
+                                );
+
+                                if (!result || result.success === false) {
+                                    toast(
+                                        result?.error
+                                        || 'Unable to select the filtered schools.'
+                                    );
+                                    return;
+                                }
+
+                                this.updateLocal(
+                                    result.selected || [],
+                                    result.all_filtered_selected
+                                );
+                                store.dirty = false;
+                                store.needsFlush = false;
+                            } catch (error) {
+                                console.error(error);
+                                toast('Unable to select the filtered schools.');
+                            } finally {
+                                store.inFlight = false;
+                            }
+                        },
+
+                        async clearAll() {
+                            if (store.inFlight) return;
+                            store.inFlight = true;
+
+                            try {
+                                const result = await this.$wire.call(
+                                    'clearSelectedSchools'
+                                );
+
+                                if (!result || result.success === false) {
+                                    toast(
+                                        result?.error
+                                        || 'Unable to clear selected schools.'
+                                    );
+                                    return;
+                                }
+
+                                this.updateLocal([], false);
+                                store.dirty = false;
+                                store.needsFlush = false;
+                            } catch (error) {
+                                console.error(error);
+                                toast('Unable to clear selected schools.');
+                            } finally {
+                                store.inFlight = false;
+                            }
+                        },
+
+                        async emailSelected() {
+                            await this.flush();
+
+                            try {
+                                await this.$wire.call('emailSelectedSchools');
+                            } catch (error) {
+                                console.error(error);
+                                toast(
+                                    'Unable to open Compose Email for the selected schools.'
+                                );
+                            }
+                        },
+                    };
+                };
+            }
+
+            if (typeof window.rcBulkSchoolList !== 'function') {
+                window.rcBulkSchoolList = (initialLists = []) => ({
+                    open: false,
+                    creating: false,
+                    newListName: '',
+                    newListColor: '#ff6338',
+                    lists: Array.isArray(initialLists) ? [...initialLists] : [],
+                    pendingLists: {},
+                    pendingAdds: {},
+                    statusText: '',
+                    watchTimer: null,
+                    watching: false,
+                    selectedCount: getStore()?.selected?.size || 0,
+                    selectionListener: null,
+
+                    init() {
+                        this.selectedCount = getStore()?.selected?.size || 0;
+
+                        this.selectionListener = (event) => {
+                            this.selectedCount = Number(
+                                event?.detail?.count
+                                ?? getStore()?.selected?.size
+                                ?? 0
+                            );
+                        };
+
+                        window.addEventListener(
+                            'rc-discover-selection-changed',
+                            this.selectionListener
+                        );
+
+                        this.$cleanup?.(() => {
+                            window.removeEventListener(
+                                'rc-discover-selection-changed',
+                                this.selectionListener
+                            );
+                        });
+                    },
+
+                    count() {
+                        return Number(this.selectedCount || 0);
+                    },
+
+                    isPending(listKey) {
+                        return Boolean(this.pendingLists[String(listKey || '')]);
+                    },
+
+                    pendingCount() {
+                        return Object.keys(this.pendingLists).length;
+                    },
+
+                    async syncSelection() {
+                        const store = getStore();
+                        if (!store) return true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'setSelectedSchoolIds',
+                                Array.from(store.selected)
+                            );
+                            return Boolean(result?.success !== false);
+                        } catch (error) {
+                            console.error(error);
+                            return false;
+                        }
+                    },
+
+                    async clearAll() {
+                        const store = getStore();
+
+                        if (store) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
+
+                        this.selectedCount = 0;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'clearSelectedSchools'
+                            );
+
+                            if (!result || result.success === false) {
+                                toast(
+                                    result?.error
+                                    || 'Unable to clear selected schools.'
+                                );
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to clear selected schools.');
+                        }
+                    },
+
+                    async createQuickList() {
+                        const name = String(this.newListName || '').trim();
+                        if (!name || this.creating) return;
+
+                        this.creating = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'createCustomListQuick',
+                                name,
+                                this.newListColor
+                            );
+
+                            if (!result || result.success === false || !result.list) {
+                                toast(result?.error || 'Unable to create the list.');
+                                return;
+                            }
+
+                            const created = {
+                                ...result.list,
+                                count: Number(
+                                    result.list?.count
+                                    ?? result.list?.schools_count
+                                    ?? 0
+                                ),
+                            };
+
+                            if (!this.lists.some(
+                                (list) => String(list?.key || '')
+                                    === String(created.key || '')
+                            )) {
+                                this.lists.push(created);
+                            }
+
+                            this.newListName = '';
+                            this.newListColor = '#ff6338';
+                            toast(result.message || 'List created.', 'success');
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to create the list.');
+                        } finally {
+                            this.creating = false;
+                        }
+                    },
+
+                    async queue(listKey, listLabel, selectedCount) {
+                        const listKeyValue = String(listKey || '').trim();
+                        if (!listKeyValue) return;
+
+                        const synced = await this.syncSelection();
+
+                        if (!synced) {
+                            toast('Unable to synchronize the current school selection.');
+                            return;
+                        }
+
+                        const actualCount = getStore()?.selected?.size
+                            || Number(selectedCount || 0);
+                        const label = String(listLabel || listKeyValue);
+
+                        this.pendingLists = {
+                            ...this.pendingLists,
+                            [listKeyValue]: label,
+                        };
+                        this.pendingAdds = {
+                            ...this.pendingAdds,
+                            [listKeyValue]: Number(actualCount || 0),
+                        };
+                        this.statusText = `Saving ${Number(actualCount).toLocaleString()} selected school(s) to ${label}...`;
+                        this.open = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'queueSelectedSchoolsToList',
+                                listKeyValue
+                            );
+
+                            if (!result || result.success === false) {
+                                const nextPending = { ...this.pendingLists };
+                                const nextAdds = { ...this.pendingAdds };
+                                delete nextPending[listKeyValue];
+                                delete nextAdds[listKeyValue];
+                                this.pendingLists = nextPending;
+                                this.pendingAdds = nextAdds;
+                                this.statusText = this.pendingCount()
+                                    ? this.statusText
+                                    : '';
+                                toast(
+                                    result?.error
+                                    || 'Unable to queue the selected schools.'
+                                );
+                                return;
+                            }
+
+                            const queuedCount = Number(
+                                result.school_count || actualCount || 0
+                            );
+                            this.statusText = `Adding ${queuedCount.toLocaleString()} selected school(s) to ${result.list_label || label} in the background...`;
+                            this.watchUntilComplete();
+                        } catch (error) {
+                            console.error(error);
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+                            toast('Unable to queue the selected schools.');
+                        }
+                    },
+
+                    watchUntilComplete() {
+                        if (this.watching) return;
+                        this.watching = true;
+                        clearTimeout(this.watchTimer);
+
+                        const check = async () => {
+                            try {
+                                const status = await this.$wire.call(
+                                    'pollCoachDatabaseActionStatus'
+                                );
+                                const current = String(status?.status || 'idle');
+
+                                if (
+                                    current === 'completed'
+                                    || current === 'completed_with_errors'
+                                ) {
+                                    if (current === 'completed') {
+                                        this.lists = this.lists.map((list) => {
+                                            const listKeyValue = String(
+                                                list?.key || ''
+                                            );
+                                            const added = Number(
+                                                this.pendingAdds?.[listKeyValue] || 0
+                                            );
+
+                                            return added > 0
+                                                ? {
+                                                    ...list,
+                                                    count: Number(list.count || 0)
+                                                        + added,
+                                                }
+                                                : list;
+                                        });
+                                    }
+
+                                    this.pendingLists = {};
+                                    this.pendingAdds = {};
+                                    this.statusText = '';
+                                    this.watching = false;
+                                    return;
+                                }
+
+                                if (this.pendingCount() > 0) {
+                                    this.watchTimer = setTimeout(
+                                        check,
+                                        current === 'running' ? 850 : 500
+                                    );
+                                    return;
+                                }
+
+                                this.watching = false;
+                            } catch (error) {
+                                console.error(error);
+                                this.watchTimer = setTimeout(check, 1200);
+                            }
+                        };
+
+                        this.watchTimer = setTimeout(check, 450);
+                    },
+                });
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -8595,7 +9124,7 @@
 
 </style>
 
-            <div class="rc-discover-v29" x-data="window.rcDiscoverSelection ? window.rcDiscoverSelection(@js($selectedSchoolIds), @js($this->visibleSchoolsSelected)) : {}">
+            <div class="rc-discover-v29" x-data="window.rcDiscoverSelection(@js($selectedSchoolIds), @js($this->visibleSchoolsSelected))">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -8645,7 +9174,7 @@
                         x-show="count() > 0"
                         x-cloak
                         wire:key="discover-bulk-selection-bar"
-                        x-data="window.rcBulkSchoolList ? window.rcBulkSchoolList(@js(collect($this->lists)->map(fn ($list) => ['key' => (string) ($list['key'] ?? ''), 'label' => (string) ($list['label'] ?? ''), 'color' => (string) ($list['color'] ?? '#ff6338'), 'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? []))])->filter(fn ($list) => $list['key'] !== '')->values()->all())) : { open: false, lists: [], pendingLists: {}, statusText: '', queue() {}, isPending() { return false }, pendingCount() { return 0 } }"
+                        x-data="window.rcBulkSchoolList(@js(collect($this->lists)->map(fn ($list) => ['key' => (string) ($list['key'] ?? ''), 'label' => (string) ($list['label'] ?? ''), 'color' => (string) ($list['color'] ?? '#ff6338'), 'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? []))])->filter(fn ($list) => $list['key'] !== '')->values()->all()))"
                     >
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36"><span x-text="count().toLocaleString()"></span> selected</span>
