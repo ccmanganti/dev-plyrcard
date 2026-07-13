@@ -26,12 +26,21 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
     public int $timeout = 0;
     public bool $failOnTimeout = true;
 
-    public function __construct(public int $userId) {}
+    public function __construct(public int $userId, public string $runToken = '') {}
 
     public function handle(
         CoachDatabaseDatasetSyncService $syncService,
         CoachDatabaseSyncCoordinator $coordinator,
     ): void {
+        $status = Cache::get($coordinator->statusKey($this->userId), []);
+        $status = is_array($status) ? $status : [];
+
+        // If auto mode already fell back to shell/web processing, this queued job is
+        // stale and must never compete with the active worker.
+        if ($this->runToken !== '' && ! hash_equals($this->runToken, (string) ($status['launch_token'] ?? ''))) {
+            return;
+        }
+
         if (
             ! in_array($this->userId, $coordinator->pendingUsers(), true)
             && ! Cache::has($coordinator->sharedLockKey($this->userId))
@@ -58,7 +67,8 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
                 'worker_started_at' => now()->toDateTimeString(),
                 'launch_driver' => 'queue',
                 'resolved_driver' => 'queue',
-                'message' => 'Queue worker started. Loading school and coach records in small pages.',
+                'launch_token' => $this->runToken,
+                'message' => 'Queue worker checked in. Loading school and coach records in small pages.',
             ]);
 
             $result = $syncService->sync($user, true);
@@ -78,6 +88,11 @@ class SyncCoachDatabaseDatasetJob implements ShouldQueue
         $statusKey = $coordinator->statusKey($this->userId);
         $status = Cache::get($statusKey, []);
         $status = is_array($status) ? $status : [];
+
+        // Do not overwrite a newer fallback run with an old queued-job failure.
+        if ($this->runToken !== '' && ! hash_equals($this->runToken, (string) ($status['launch_token'] ?? ''))) {
+            return;
+        }
 
         Cache::put($statusKey, array_merge($status, [
             'status' => 'failed',

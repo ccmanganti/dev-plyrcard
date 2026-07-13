@@ -33,15 +33,15 @@ class CoachDatabaseWebFallbackSyncService
         $status = array_merge($baseStatus, [
             'status' => 'running',
             'mode' => 'full_database_reload',
-            'launch_driver' => 'web_tick',
-            'resolved_driver' => 'web_tick',
+            'launch_driver' => 'incremental_livewire',
+            'resolved_driver' => 'incremental_livewire',
             'progress' => max(1, (int) ($checkpoint['progress'] ?? 1)),
             'loaded_schools' => count($checkpoint['schools'] ?? []),
             'loaded_contacts' => count($checkpoint['coaches'] ?? []),
             'loaded_pages' => (int) ($checkpoint['business_pages'] ?? 0) + (int) ($checkpoint['contact_pages'] ?? 0),
             'worker_started_at' => $checkpoint['started_at'] ?? now()->toDateTimeString(),
             'worker_heartbeat_at' => now()->toDateTimeString(),
-            'message' => 'Reload started in compatibility mode. Small pages will be processed safely while this Recruiting Center page remains open.',
+            'message' => 'Background reload started. Small checkpointed pages will be processed while this Recruiting Center page remains open.',
         ]);
 
         Cache::put($this->coordinator->statusKey($userId), $status, now()->addHours(6));
@@ -69,7 +69,7 @@ class CoachDatabaseWebFallbackSyncService
     public function tick(User $user): array
     {
         $userId = (int) $user->id;
-        $lock = Cache::lock($this->tickLockKey($userId), max(10, (int) config('coach-database-sync.web_fallback.tick_lock_seconds', 20)));
+        $lock = Cache::lock($this->tickLockKey($userId), max(10, (int) config('coach-database-sync.incremental.tick_lock_seconds', 30)));
 
         if (! $lock->get()) {
             return $this->currentStatus($userId);
@@ -80,6 +80,14 @@ class CoachDatabaseWebFallbackSyncService
             if ($checkpoint === []) {
                 $this->start($user, [], true);
                 $checkpoint = $this->readCheckpoint($userId);
+            }
+
+            $retryNotBefore = $checkpoint['retry_not_before'] ?? null;
+            if ($retryNotBefore && strtotime((string) $retryNotBefore) > time()) {
+                $checkpoint['progress'] = $this->calculateProgress($checkpoint);
+                $checkpoint['updated_at'] = now()->toDateTimeString();
+                $this->writeCheckpoint($userId, $checkpoint);
+                return $this->writeRunningStatus($user, $checkpoint);
             }
 
             $phase = (string) ($checkpoint['phase'] ?? 'fetch');
@@ -94,26 +102,52 @@ class CoachDatabaseWebFallbackSyncService
 
             $this->applyBoundedHttpTimeouts();
 
-            $source = $this->nextSource($checkpoint);
-            if ($source === 'businesses') {
-                $checkpoint = $this->processBusinessPage($user, $checkpoint);
-            } elseif ($source === 'contacts') {
-                $checkpoint = $this->processContactPage($user, $checkpoint);
-            } else {
-                $checkpoint['phase'] = 'finalize';
+            // The incremental browser worker
+            // processes a bounded burst while staying below the web request timeout.
+            $maxPages = max(1, min(5, (int) config('coach-database-sync.incremental.pages_per_tick', 2)));
+            $timeBudget = max(4, min(20, (int) config('coach-database-sync.incremental.time_budget_seconds', 12)));
+            $finalizeReserve = max(1, min(5, (int) config('coach-database-sync.incremental.finalize_reserve_seconds', 2)));
+            $started = microtime(true);
+            $processedThisTick = 0;
+
+            while ($processedThisTick < $maxPages) {
+                $phase = (string) ($checkpoint['phase'] ?? 'fetch');
+                if ($phase === 'finalize') {
+                    if ((microtime(true) - $started) <= max(1, $timeBudget - $finalizeReserve)) {
+                        return $this->finalize($user, $checkpoint);
+                    }
+                    break;
+                }
+
+                $source = $this->nextSource($checkpoint);
+                if ($source === 'businesses') {
+                    $checkpoint = $this->processBusinessPage($user, $checkpoint);
+                } elseif ($source === 'contacts') {
+                    $checkpoint = $this->processContactPage($user, $checkpoint);
+                } else {
+                    $checkpoint['phase'] = 'finalize';
+                    continue;
+                }
+
+                $processedThisTick++;
+
+                if (! ($checkpoint['business_has_more'] ?? false) && ! ($checkpoint['contacts_have_more'] ?? false)) {
+                    $checkpoint['phase'] = 'finalize';
+                }
+
+                if ((microtime(true) - $started) >= $timeBudget) {
+                    break;
+                }
             }
 
-            if (! ($checkpoint['business_has_more'] ?? false) && ! ($checkpoint['contacts_have_more'] ?? false)) {
-                $checkpoint['phase'] = 'finalize';
-            }
-
+            $checkpoint['pages_processed_last_tick'] = $processedThisTick;
             $checkpoint['progress'] = $this->calculateProgress($checkpoint);
             $checkpoint['updated_at'] = now()->toDateTimeString();
             $this->writeCheckpoint($userId, $checkpoint);
 
             return $this->writeRunningStatus($user, $checkpoint);
         } catch (Throwable $exception) {
-            Log::error('Coach Database compatibility-mode tick failed safely.', [
+            Log::error('Coach Database incremental background tick failed safely.', [
                 'user_id' => $userId,
                 'error' => $exception->getMessage(),
             ]);
@@ -125,7 +159,7 @@ class CoachDatabaseWebFallbackSyncService
                 'progress' => max(1, (int) ($status['progress'] ?? 1)),
                 'failed_at' => now()->toDateTimeString(),
                 'error' => $exception->getMessage(),
-                'message' => 'The compatibility-mode reload stopped safely. The previous cached Coach Database remains available: ' . $exception->getMessage(),
+                'message' => 'The incremental background reload stopped safely. The previous cached Coach Database remains available: ' . $exception->getMessage(),
             ]);
             Cache::put($this->coordinator->statusKey($userId), $status, now()->addHours(6));
             $this->coordinator->removePending($userId);
@@ -140,14 +174,14 @@ class CoachDatabaseWebFallbackSyncService
 
     protected function processBusinessPage(User $user, array $checkpoint): array
     {
-        $limit = max(5, min(25, (int) config('coach-database-sync.web_fallback.business_page_size', 10)));
+        $limit = max(5, min(25, (int) config('coach-database-sync.incremental.business_page_size', 10)));
         $skip = max(0, (int) ($checkpoint['business_skip'] ?? 0));
         $result = $this->coachDatabaseService->getSchoolBusinessesPageForUser($user, $skip, $limit);
 
         if (! ($result['success'] ?? false)) {
             $checkpoint['business_failures'] = (int) ($checkpoint['business_failures'] ?? 0) + 1;
             $checkpoint['last_school_error'] = (string) ($result['error'] ?? 'Unable to load a school page.');
-            $failureLimit = max(1, (int) config('coach-database-sync.web_fallback.business_failure_limit', 2));
+            $failureLimit = max(1, (int) config('coach-database-sync.incremental.business_failure_limit', 3));
 
             if ($checkpoint['business_failures'] >= $failureLimit) {
                 // The imported/base school directory and contact Business Name values are
@@ -192,36 +226,61 @@ class CoachDatabaseWebFallbackSyncService
 
     protected function processContactPage(User $user, array $checkpoint): array
     {
-        $limit = max(10, min(50, (int) config('coach-database-sync.web_fallback.contact_page_size', 25)));
+        $configuredLimit = max(10, min(50, (int) config('coach-database-sync.incremental.contact_page_size', 25)));
+        $limit = max(10, min($configuredLimit, (int) ($checkpoint['contact_page_size'] ?? $configuredLimit)));
         $startAfter = $checkpoint['contacts_start_after'] ?? null;
         $startAfterId = $checkpoint['contacts_start_after_id'] ?? null;
 
-        $result = $this->coachDatabaseService->getCoachContactsPageForUser(
-            user: $user,
-            startAfter: is_numeric($startAfter) ? (int) $startAfter : null,
-            startAfterId: filled($startAfterId) ? (string) $startAfterId : null,
-            limit: $limit,
-        );
+        try {
+            $result = $this->coachDatabaseService->getCoachContactsPageForUser(
+                user: $user,
+                startAfter: is_numeric($startAfter) ? (int) $startAfter : null,
+                startAfterId: filled($startAfterId) ? (string) $startAfterId : null,
+                limit: $limit,
+            );
+        } catch (Throwable $exception) {
+            $result = [
+                'success' => false,
+                'contacts' => [],
+                'has_more' => true,
+                'temporary_failure' => true,
+                'error' => $exception->getMessage(),
+            ];
+        }
 
         if (! ($result['success'] ?? false)) {
-            $checkpoint['contact_failures'] = (int) ($checkpoint['contact_failures'] ?? 0) + 1;
+            $failures = (int) ($checkpoint['contact_failures'] ?? 0) + 1;
+            $checkpoint['contact_failures'] = $failures;
             $checkpoint['last_contact_error'] = (string) ($result['error'] ?? 'Unable to load a coach page.');
-            $failureLimit = max(1, (int) config('coach-database-sync.web_fallback.contact_failure_limit', 3));
+            $checkpoint['contact_page_size'] = max(10, (int) floor($limit / 2));
+            $checkpoint['retry_not_before'] = now()->addSeconds(min(20, 2 + ($failures * 2)))->toDateTimeString();
+            $checkpoint['warnings'][] = 'A contacts page timed out and will be retried automatically with a smaller page size.';
 
-            if ($checkpoint['contact_failures'] >= $failureLimit) {
+            $failureLimit = max(2, (int) config('coach-database-sync.incremental.contact_failure_limit', 6));
+            if ($failures >= $failureLimit) {
                 $existing = $this->coachDatabaseService->cachedRecruitingSnapshotForUser($user) ?? [];
                 if (! empty($existing['coaches'] ?? [])) {
                     $checkpoint['contacts_have_more'] = false;
                     $checkpoint['contact_source_degraded'] = true;
-                    $checkpoint['warnings'][] = 'The contacts endpoint was temporarily unavailable, so the previous cached coach rows were preserved.';
+                    $checkpoint['warnings'][] = 'The contacts endpoint stayed unavailable, so the previous cached coach rows were preserved.';
+                    $checkpoint['retry_not_before'] = null;
                 } else {
-                    throw new RuntimeException($checkpoint['last_contact_error']);
+                    // No old cache exists yet. Keep the checkpoint alive instead of marking
+                    // the whole sync as failed; the next passive poll retries the same cursor.
+                    $checkpoint['contact_failures'] = max(1, $failureLimit - 1);
                 }
             }
 
-            $checkpoint['next_source'] = 'businesses';
+            $checkpoint['next_source'] = (bool) ($checkpoint['business_has_more'] ?? false) ? 'businesses' : 'contacts';
             return $checkpoint;
         }
+
+        $checkpoint['contact_failures'] = 0;
+        $checkpoint['retry_not_before'] = null;
+        $checkpoint['contact_page_size'] = min(
+            max(10, (int) config('coach-database-sync.incremental.contact_page_size', 25)),
+            max(10, $limit + 5),
+        );
 
         foreach (($result['contacts'] ?? []) as $coach) {
             if (! is_array($coach)) {
@@ -316,8 +375,8 @@ class CoachDatabaseWebFallbackSyncService
         $status = [
             'status' => 'completed',
             'mode' => 'full_database_reload',
-            'launch_driver' => 'web_tick',
-            'resolved_driver' => 'web_tick',
+            'launch_driver' => 'incremental_livewire',
+            'resolved_driver' => 'incremental_livewire',
             'progress' => 100,
             'loaded_schools' => $rebuiltSchoolCount,
             'loaded_contacts' => $rebuiltCoachCount,
@@ -348,15 +407,16 @@ class CoachDatabaseWebFallbackSyncService
         $loadedContacts = count($checkpoint['coaches'] ?? []);
         $pages = (int) ($checkpoint['business_pages'] ?? 0) + (int) ($checkpoint['contact_pages'] ?? 0);
         $phase = (string) ($checkpoint['phase'] ?? 'fetch');
+        $lastBurst = max(0, (int) ($checkpoint['pages_processed_last_tick'] ?? 0));
         $message = $phase === 'finalize'
             ? 'All available pages are loaded. Building the final school and coach indexes.'
-            : "Compatibility mode processed {$pages} pages ({$loadedSchools} schools, {$loadedContacts} coaches). Existing cached rows remain usable.";
+            : "Background worker processed {$lastBurst} page(s) in the latest pass and {$pages} total ({$loadedSchools} schools, {$loadedContacts} coaches). Existing cached rows remain usable.";
 
         $status = array_merge($this->currentStatus($userId), [
             'status' => 'running',
             'mode' => 'full_database_reload',
-            'launch_driver' => 'web_tick',
-            'resolved_driver' => 'web_tick',
+            'launch_driver' => 'incremental_livewire',
+            'resolved_driver' => 'incremental_livewire',
             'progress' => max(1, min(96, (int) ($checkpoint['progress'] ?? 1))),
             'loaded_schools' => $loadedSchools,
             'loaded_contacts' => $loadedContacts,
@@ -382,7 +442,7 @@ class CoachDatabaseWebFallbackSyncService
             'version' => 1,
             'user_id' => (int) $user->id,
             'phase' => 'fetch',
-            'next_source' => 'businesses',
+            'next_source' => 'contacts',
             'started_at' => now()->toDateTimeString(),
             'updated_at' => now()->toDateTimeString(),
             'progress' => 1,
@@ -395,6 +455,8 @@ class CoachDatabaseWebFallbackSyncService
             'contacts_have_more' => true,
             'contact_pages' => 0,
             'contact_failures' => 0,
+            'contact_page_size' => max(10, min(50, (int) config('coach-database-sync.incremental.contact_page_size', 25))),
+            'retry_not_before' => null,
             'remote_total_schools' => null,
             'remote_total_contacts' => null,
             'schools' => [],
@@ -445,8 +507,8 @@ class CoachDatabaseWebFallbackSyncService
     protected function applyBoundedHttpTimeouts(): void
     {
         config([
-            'ghl.coach_database.http_connect_timeout' => max(1, (int) config('coach-database-sync.web_fallback.connect_timeout', 2)),
-            'ghl.coach_database.http_timeout' => max(3, (int) config('coach-database-sync.web_fallback.request_timeout', 6)),
+            'ghl.coach_database.http_connect_timeout' => max(1, (int) config('coach-database-sync.incremental.connect_timeout', 3)),
+            'ghl.coach_database.http_timeout' => max(3, (int) config('coach-database-sync.incremental.request_timeout', 8)),
             'ghl.coach_database.http_retries' => 0,
             'ghl.coach_database.http_retry_sleep_ms' => 0,
         ]);

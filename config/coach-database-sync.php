@@ -23,32 +23,49 @@ return [
     ],
 
     'background' => [
-        'driver' => env('COACH_DATABASE_SYNC_DRIVER', 'auto'),
-        'queue_enabled' => (bool) env('COACH_DATABASE_QUEUE_ENABLED', true),
+        'driver' => env('COACH_DATABASE_SYNC_DRIVER', 'incremental_livewire'),
+        'queue_enabled' => false,
         'queue_connection' => env('COACH_DATABASE_QUEUE_CONNECTION'),
         'queue_name' => env('COACH_DATABASE_QUEUE_NAME', 'recruiting'),
-        'shell_enabled' => (bool) env('COACH_DATABASE_SHELL_ENABLED', true),
+        'queue_heartbeat_wait_ms' => (int) env('COACH_DATABASE_QUEUE_HEARTBEAT_WAIT_MS', 2200),
+        'shell_enabled' => false,
         'allow_shell_in_production' => (bool) env('COACH_DATABASE_ALLOW_SHELL_IN_PRODUCTION', false),
         'allow_fallback' => (bool) env('COACH_DATABASE_ALLOW_FALLBACK', true),
         'prefer_shell_locally' => (bool) env('COACH_DATABASE_PREFER_SHELL_LOCALLY', true),
-        'shell_heartbeat_wait_ms' => (int) env('COACH_DATABASE_SHELL_HEARTBEAT_WAIT_MS', 1600),
+        'shell_heartbeat_wait_ms' => (int) env('COACH_DATABASE_SHELL_HEARTBEAT_WAIT_MS', 2800),
         'scheduler_healthy_seconds' => (int) env('COACH_DATABASE_SCHEDULER_HEALTHY_SECONDS', 180),
         'worker_start_grace_seconds' => (int) env('COACH_DATABASE_WORKER_START_GRACE_SECONDS', 45),
         'worker_stale_seconds' => (int) env('COACH_DATABASE_WORKER_STALE_SECONDS', 180),
     ],
 
-    // Last-resort compatibility runner. It processes one small remote page on each
-    // passive Livewire poll. This means the same code works on local machines and shared
-    // hosting even when no queue worker, cron task, or durable detached process exists.
+    // One consistent full-dataset runner for local and production.
+    // It processes small checkpointed pages through passive Livewire polling, so
+    // no queue worker, detached process, Supervisor, or cron is required.
+    'incremental' => [
+        'business_page_size' => (int) env('COACH_DATABASE_INCREMENTAL_BUSINESS_PAGE_SIZE', 10),
+        'contact_page_size' => (int) env('COACH_DATABASE_INCREMENTAL_CONTACT_PAGE_SIZE', 25),
+        'connect_timeout' => (int) env('COACH_DATABASE_INCREMENTAL_CONNECT_TIMEOUT', 3),
+        'request_timeout' => (int) env('COACH_DATABASE_INCREMENTAL_REQUEST_TIMEOUT', 8),
+        'business_failure_limit' => (int) env('COACH_DATABASE_INCREMENTAL_BUSINESS_FAILURE_LIMIT', 3),
+        'contact_failure_limit' => (int) env('COACH_DATABASE_INCREMENTAL_CONTACT_FAILURE_LIMIT', 6),
+        'tick_lock_seconds' => (int) env('COACH_DATABASE_INCREMENTAL_TICK_LOCK_SECONDS', 30),
+        'pages_per_tick' => (int) env('COACH_DATABASE_INCREMENTAL_PAGES_PER_TICK', 2),
+        'time_budget_seconds' => (int) env('COACH_DATABASE_INCREMENTAL_TIME_BUDGET_SECONDS', 12),
+        'finalize_reserve_seconds' => (int) env('COACH_DATABASE_INCREMENTAL_FINALIZE_RESERVE_SECONDS', 2),
+    ],
+
     'web_fallback' => [
         'enabled' => (bool) env('COACH_DATABASE_WEB_FALLBACK_ENABLED', true),
-        'business_page_size' => (int) env('COACH_DATABASE_WEB_BUSINESS_PAGE_SIZE', 10),
-        'contact_page_size' => (int) env('COACH_DATABASE_WEB_CONTACT_PAGE_SIZE', 25),
+        'business_page_size' => (int) env('COACH_DATABASE_WEB_BUSINESS_PAGE_SIZE', 20),
+        'contact_page_size' => (int) env('COACH_DATABASE_WEB_CONTACT_PAGE_SIZE', 50),
         'connect_timeout' => (int) env('COACH_DATABASE_WEB_CONNECT_TIMEOUT', 2),
-        'request_timeout' => (int) env('COACH_DATABASE_WEB_REQUEST_TIMEOUT', 6),
+        'request_timeout' => (int) env('COACH_DATABASE_WEB_REQUEST_TIMEOUT', 5),
         'business_failure_limit' => (int) env('COACH_DATABASE_WEB_BUSINESS_FAILURE_LIMIT', 2),
         'contact_failure_limit' => (int) env('COACH_DATABASE_WEB_CONTACT_FAILURE_LIMIT', 3),
-        'tick_lock_seconds' => (int) env('COACH_DATABASE_WEB_TICK_LOCK_SECONDS', 20),
+        'tick_lock_seconds' => (int) env('COACH_DATABASE_WEB_TICK_LOCK_SECONDS', 25),
+        'pages_per_tick' => (int) env('COACH_DATABASE_WEB_PAGES_PER_TICK', 2),
+        'time_budget_seconds' => (int) env('COACH_DATABASE_WEB_TIME_BUDGET_SECONDS', 11),
+        'finalize_reserve_seconds' => (int) env('COACH_DATABASE_WEB_FINALIZE_RESERVE_SECONDS', 2),
     ],
 
     'tags' => [

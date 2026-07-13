@@ -37,11 +37,14 @@ class CoachDatabaseSyncDoctor extends Command
 
         $this->table(['Check', 'Value'], [
             ['App environment', (string) ($diagnostics['app_environment'] ?? app()->environment())],
+            ['App URL', (string) ($diagnostics['app_url'] ?? config('app.url'))],
+            ['Local runtime detected', ($diagnostics['local_runtime_detected'] ?? false) ? 'yes' : 'no'],
             ['Configured sync driver', (string) ($diagnostics['configured_driver'] ?? 'auto')],
             ['Resolved sync driver', (string) ($diagnostics['resolved_driver'] ?? 'scheduler')],
             ['Queue connection', (string) ($diagnostics['queue_connection'] ?? 'sync')],
             ['Queue driver', (string) ($diagnostics['queue_driver'] ?? 'unknown')],
             ['Queue is asynchronous', ($diagnostics['queue_is_asynchronous'] ?? false) ? 'yes' : 'no'],
+            ['Queue requires check-in', ($diagnostics['queue_requires_worker_checkin'] ?? true) ? 'yes' : 'no'],
             ['Detached shell enabled', ($diagnostics['shell_enabled'] ?? false) ? 'yes' : 'no'],
             ['Shell allowed here', ($diagnostics['shell_allowed_here'] ?? false) ? 'yes' : 'no'],
             ['proc_open available', ($diagnostics['proc_open_available'] ?? false) ? 'yes' : 'no'],
@@ -104,7 +107,7 @@ class CoachDatabaseSyncDoctor extends Command
         }
 
         if (($diagnostics['resolved_driver'] ?? null) === 'queue') {
-            $this->line('Auto mode will use the asynchronous queue first. Keep the recruiting queue worker running.');
+            $this->line('Auto mode will try the asynchronous queue first, but it must report a real worker heartbeat. Otherwise the launcher falls back automatically.');
         }
 
         if (($diagnostics['resolved_driver'] ?? null) === 'shell') {

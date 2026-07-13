@@ -53,6 +53,42 @@ class CoachDatabaseSyncRuntime
         return (bool) config('coach-database-sync.web_fallback.enabled', true);
     }
 
+    /**
+     * APP_ENV is occasionally copied from production into a local checkout. Detect the
+     * actual runtime as well, so 127.0.0.1/localhost never accidentally selects an
+     * unattended queue merely because QUEUE_CONNECTION=database or redis is configured.
+     */
+    public function isLocalRuntime(): bool
+    {
+        if (app()->environment(['local', 'testing']) || app()->runningUnitTests()) {
+            return true;
+        }
+
+        $hosts = [];
+        $appHost = parse_url((string) config('app.url', ''), PHP_URL_HOST);
+        if (is_string($appHost) && $appHost !== '') {
+            $hosts[] = strtolower($appHost);
+        }
+
+        if (! app()->runningInConsole()) {
+            try {
+                $hosts[] = strtolower((string) request()->getHost());
+            } catch (\Throwable) {
+                // Request is not available in every execution context.
+            }
+        }
+
+        foreach (array_unique($hosts) as $host) {
+            if (in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+                || str_ends_with($host, '.test')
+                || str_ends_with($host, '.local')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function functionAvailable(string $function): bool
     {
         if (! function_exists($function)) {
@@ -73,7 +109,7 @@ class CoachDatabaseSyncRuntime
             return false;
         }
 
-        if (app()->environment(['local', 'testing'])) {
+        if ($this->isLocalRuntime()) {
             return true;
         }
 
@@ -106,21 +142,21 @@ class CoachDatabaseSyncRuntime
         $shellAvailable = $this->canSpawnDetachedProcess();
         $schedulerAvailable = $this->schedulerIsHealthy();
         $webAvailable = $this->webFallbackEnabled();
-        $local = app()->environment(['local', 'testing']);
-        $preferShellLocally = (bool) config('coach-database-sync.background.prefer_shell_locally', true) && $local;
 
-        if ($preferShellLocally) {
+        if ($this->isLocalRuntime()) {
+            // A local database/redis queue connection does not prove that queue:work is
+            // running. Prefer a verified detached CLI process, then the self-driving web
+            // fallback. Queue remains available when explicitly selected in .env.
             return array_values(array_filter([
                 $shellAvailable ? 'shell' : null,
-                $queueAvailable ? 'queue' : null,
-                $schedulerAvailable ? 'scheduler' : null,
                 $webAvailable ? 'web_tick' : null,
+                $schedulerAvailable ? 'scheduler' : null,
             ]));
         }
 
-        // Production auto mode only chooses runners that have evidence they can actually
-        // continue after the HTTP request. A merely available proc_open is not enough on
-        // shared hosting, where detached children are commonly killed by PHP-FPM.
+        // Queue launch is verified by a real worker heartbeat in the launcher. If no
+        // worker checks in within the grace window, auto mode immediately continues to
+        // scheduler/shell/web compatibility mode instead of remaining stuck or failing.
         return array_values(array_filter([
             $queueAvailable ? 'queue' : null,
             $schedulerAvailable ? 'scheduler' : null,
@@ -131,7 +167,7 @@ class CoachDatabaseSyncRuntime
 
     public function resolvedAutoDriver(): string
     {
-        return $this->autoStrategies()[0] ?? 'scheduler';
+        return $this->autoStrategies()[0] ?? 'web_tick';
     }
 
     /** @return array<string, mixed> */
@@ -143,9 +179,11 @@ class CoachDatabaseSyncRuntime
                 ? $this->resolvedAutoDriver()
                 : $this->configuredDriver(),
             'auto_strategies' => $this->autoStrategies(),
+            'local_runtime_detected' => $this->isLocalRuntime(),
             'queue_connection' => $this->queueConnection(),
             'queue_driver' => $this->queueDriver(),
             'queue_is_asynchronous' => $this->queueIsAsynchronous(),
+            'queue_requires_worker_checkin' => true,
             'shell_enabled' => $this->shellEnabled(),
             'shell_allowed_here' => $this->canSpawnDetachedProcess(),
             'allow_shell_in_production' => $this->allowShellInProduction(),
@@ -155,6 +193,7 @@ class CoachDatabaseSyncRuntime
             'os_family' => PHP_OS_FAMILY,
             'php_binary' => PHP_BINARY,
             'app_environment' => app()->environment(),
+            'app_url' => (string) config('app.url', ''),
         ];
     }
 }
