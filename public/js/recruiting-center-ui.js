@@ -1,7 +1,13 @@
 (() => {
-    if (window.__recruitingCenterUiLoaded) return;
+    const RC_UI_VERSION = '2026-07-13.5';
+
+    // A stale production asset may have set __recruitingCenterUiLoaded first.
+    // Only skip when this exact revision is already active. A newer revision
+    // must be allowed to replace global factories and compatibility handlers.
+    if (window.__recruitingCenterUiVersion === RC_UI_VERSION) return;
+
     window.__recruitingCenterUiLoaded = true;
-    window.__recruitingCenterUiVersion = '2026-07-13.4';
+    window.__recruitingCenterUiVersion = RC_UI_VERSION;
 
     const state = {
         pending: new Set(),
@@ -99,6 +105,38 @@
             }));
         }
     };
+
+
+    // Compatibility for older cached Blade markup that still calls clearAll().
+    // Alpine can resolve this global even when its currently mounted x-data
+    // object came from an older rcBulkSchoolList factory.
+    window.clearAll = () => window.rcClearDiscoverSelection();
+
+    // Capture the Clear button before Alpine's stale x-on handler executes.
+    // This prevents "clearAll is not defined" even during rolling deployments
+    // where old HTML and new JavaScript briefly coexist.
+    if (!window.__rcDiscoverClearCaptureBound) {
+        window.__rcDiscoverClearCaptureBound = true;
+
+        document.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const button = target?.closest?.('.rc-discover-bulk-clear-v36');
+
+            if (!button) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            button.setAttribute('aria-busy', 'true');
+            button.disabled = true;
+
+            Promise.resolve(window.rcClearDiscoverSelection())
+                .finally(() => {
+                    button.removeAttribute('aria-busy');
+                    button.disabled = false;
+                });
+        }, true);
+    }
 
     // A locally closed overlay must stay closed while older background Livewire
     // requests finish. Otherwise an optimistic favorite/list update can morph the
