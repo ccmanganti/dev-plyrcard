@@ -9277,7 +9277,7 @@
                         <button
                             type="button"
                             class="rc-discover-bulk-clear-v36"
-                            x-on:click.stop="window.rcClearDiscoverSelection($wire)"
+                            data-rc-clear-discover-selection="1"
                             x-bind:disabled="Boolean(window.__rcDiscoverClearRunning)"
                         >
                             <span x-show="!window.__rcDiscoverClearRunning">Clear</span>

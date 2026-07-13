@@ -1,5 +1,5 @@
 (() => {
-    const RC_UI_VERSION = '2026-07-13.5';
+    const RC_UI_VERSION = '2026-07-13.6';
 
     // A stale production asset may have set __recruitingCenterUiLoaded first.
     // Only skip when this exact revision is already active. A newer revision
@@ -120,7 +120,9 @@
 
         document.addEventListener('click', (event) => {
             const target = event.target instanceof Element ? event.target : null;
-            const button = target?.closest?.('.rc-discover-bulk-clear-v36');
+            const button = target?.closest?.(
+                '[data-rc-clear-discover-selection], .rc-discover-bulk-clear-v36'
+            );
 
             if (!button) return;
 
