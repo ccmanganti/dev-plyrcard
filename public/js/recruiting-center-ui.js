@@ -263,40 +263,174 @@
     const discoverSelectionStores = window.__rcDiscoverSelectionStores || new Map();
     window.__rcDiscoverSelectionStores = discoverSelectionStores;
 
-    window.rcDiscoverSelection = (initialIds = []) => {
-        const key = window.location.pathname;
+    const discoverSelectionKey = () => window.location.pathname;
+    const getDiscoverSelectionStore = () => discoverSelectionStores.get(discoverSelectionKey()) || null;
+
+    const broadcastDiscoverSelection = (store) => {
+        window.dispatchEvent(new CustomEvent('rc-discover-selection-changed', {
+            detail: {
+                selected: Array.from(store?.selected || []),
+                count: store?.selected?.size || 0,
+                allFilteredSelected: Boolean(store?.allFilteredSelected),
+            },
+        }));
+    };
+
+    window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false) => {
+        const key = discoverSelectionKey();
         let store = discoverSelectionStores.get(key);
+
         if (!store) {
             store = {
                 selected: new Set((initialIds || []).map((id) => String(id))),
+                allFilteredSelected: Boolean(initialAllFilteredSelected),
                 dirty: false,
                 inFlight: false,
                 needsFlush: false,
                 timer: null,
+                version: 0,
+                initialized: true,
             };
             discoverSelectionStores.set(key, store);
-        } else if (!store.dirty && !store.inFlight) {
-            store.selected = new Set((initialIds || []).map((id) => String(id)));
         }
 
+        // Do not replace the shared browser selection from nested school-grid
+        // Alpine instances. Those instances are created with the server-rendered
+        // IDs, which may lag behind an optimistic manual click or Select All.
+        // The shared store remains authoritative until navigation/reset.
+
         return {
-            revision: 0,
-            init() { this.revision += 1; },
+            revision: store.version || 0,
+            allFilteredSelected: Boolean(store.allFilteredSelected),
+
+            init() {
+                this.revision = store.version || 0;
+                this.allFilteredSelected = Boolean(store.allFilteredSelected);
+
+                const refresh = (event) => {
+                    this.revision = Number(event?.detail?.version ?? store.version ?? (this.revision + 1));
+                    this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                };
+
+                window.addEventListener('rc-discover-selection-refresh', refresh);
+                this.$cleanup?.(() => window.removeEventListener('rc-discover-selection-refresh', refresh));
+            },
+
+            count() {
+                this.revision;
+                return store.selected.size;
+            },
+
+            selectedIds() {
+                this.revision;
+                return Array.from(store.selected);
+            },
+
             isSelected(id) {
                 this.revision;
                 return store.selected.has(String(id));
             },
+
+            updateLocal(selected, allFilteredSelected = null) {
+                store.selected = new Set((selected || []).map((id) => String(id)));
+                if (allFilteredSelected !== null) {
+                    store.allFilteredSelected = Boolean(allFilteredSelected);
+                }
+                store.version = Number(store.version || 0) + 1;
+                this.revision = store.version;
+                this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                broadcastDiscoverSelection(store);
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: store.version },
+                }));
+
+                // Alpine may have multiple nested school-grid scopes. Repeat the
+                // refresh on the next frame so every visible checkbox/card binds
+                // to the newly selected full-filter result immediately.
+                requestAnimationFrame(() => {
+                    window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                        detail: { version: store.version },
+                    }));
+                });
+            },
+
             toggle(id) {
                 const normalized = String(id || '');
                 if (!normalized) return;
+
                 if (store.selected.has(normalized)) store.selected.delete(normalized);
                 else store.selected.add(normalized);
+
+                store.allFilteredSelected = false;
                 store.dirty = true;
                 store.needsFlush = true;
-                this.revision += 1;
+                store.version = Number(store.version || 0) + 1;
+                this.revision = store.version;
+                this.allFilteredSelected = false;
+                broadcastDiscoverSelection(store);
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: store.version },
+                }));
+
                 clearTimeout(store.timer);
-                store.timer = setTimeout(() => this.flush(), 45);
+                store.timer = setTimeout(() => this.flush(), 220);
             },
+
+            async toggleAllFiltered() {
+                if (store.inFlight) return;
+                store.inFlight = true;
+
+                try {
+                    const result = await this.$wire.call('toggleVisibleSchoolsSelection');
+                    if (!result || result.success === false) {
+                        showToast(result?.error || 'Unable to select the filtered schools.', 'error');
+                        return;
+                    }
+                    this.updateLocal(result.selected || [], result.all_filtered_selected);
+                    store.dirty = false;
+                    store.needsFlush = false;
+                } catch (error) {
+                    console.error(error);
+                    showToast('Unable to select the filtered schools.', 'error');
+                } finally {
+                    store.inFlight = false;
+                }
+            },
+
+            async emailSelected() {
+                if (store.inFlight) return;
+
+                await this.flush();
+
+                try {
+                    await this.$wire.call('emailSelectedSchools');
+                } catch (error) {
+                    console.error(error);
+                    showToast('Unable to open Compose Email for the selected schools.', 'error');
+                }
+            },
+
+            async clearAll() {
+                if (store.inFlight) return;
+                store.inFlight = true;
+
+                try {
+                    const result = await this.$wire.call('clearSelectedSchools');
+                    if (!result || result.success === false) {
+                        showToast(result?.error || 'Unable to clear the selected schools.', 'error');
+                        return;
+                    }
+                    this.updateLocal([], false);
+                    store.dirty = false;
+                    store.needsFlush = false;
+                } catch (error) {
+                    console.error(error);
+                    showToast('Unable to clear the selected schools.', 'error');
+                } finally {
+                    store.inFlight = false;
+                }
+            },
+
             async flush() {
                 if (store.inFlight) {
                     store.needsFlush = true;
@@ -311,28 +445,89 @@
                     const result = await this.$wire.call('setSelectedSchoolIds', snapshot);
                     if (!result || result.success === false) {
                         showToast(result?.error || 'Unable to update selected schools.', 'error');
+                    } else {
+                        // Keep the optimistic browser state authoritative. The
+                        // server call uses skipRender(), so no card grid morphs.
+                        store.dirty = false;
                     }
                 } catch (error) {
                     console.error(error);
                     showToast('Unable to update selected schools.', 'error');
                 } finally {
                     store.inFlight = false;
-                    store.dirty = store.needsFlush;
                     if (store.needsFlush) {
                         clearTimeout(store.timer);
-                        store.timer = setTimeout(() => this.flush(), 20);
+                        store.timer = setTimeout(() => this.flush(), 40);
                     }
                 }
             },
         };
     };
 
-    window.rcBulkSchoolList = () => ({
+    window.rcBulkSchoolList = (initialLists = []) => ({
         open: false,
+        creating: false,
+        newListName: '',
+        newListColor: '#ff6338',
+        lists: Array.isArray(initialLists) ? [...initialLists] : [],
         pendingLists: {},
+        pendingAdds: {},
         statusText: '',
         watchTimer: null,
         watching: false,
+        selectedCount: getDiscoverSelectionStore()?.selected?.size || 0,
+        selectionListener: null,
+
+        init() {
+            const store = getDiscoverSelectionStore();
+            this.selectedCount = store?.selected?.size || 0;
+
+            this.selectionListener = (event) => {
+                this.selectedCount = Number(
+                    event?.detail?.count
+                    ?? getDiscoverSelectionStore()?.selected?.size
+                    ?? 0
+                );
+            };
+
+            window.addEventListener('rc-discover-selection-changed', this.selectionListener);
+            this.$cleanup?.(() => {
+                if (this.selectionListener) {
+                    window.removeEventListener('rc-discover-selection-changed', this.selectionListener);
+                }
+            });
+        },
+
+        count() {
+            return Number(this.selectedCount || 0);
+        },
+
+        async clearAll() {
+            const store = getDiscoverSelectionStore();
+            if (store) {
+                store.selected.clear();
+                store.allFilteredSelected = false;
+                store.dirty = false;
+                store.needsFlush = false;
+                store.version = Number(store.version || 0) + 1;
+                broadcastDiscoverSelection(store);
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: store.version },
+                }));
+            }
+
+            this.selectedCount = 0;
+
+            try {
+                const result = await this.$wire.call('clearSelectedSchools');
+                if (!result || result.success === false) {
+                    showToast(result?.error || 'Unable to clear the selected schools.', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('Unable to clear the selected schools.', 'error');
+            }
+        },
 
         isPending(listKey) {
             return Boolean(this.pendingLists[String(listKey || '')]);
@@ -342,35 +537,94 @@
             return Object.keys(this.pendingLists).length;
         },
 
+        async syncSelection() {
+            const store = getDiscoverSelectionStore();
+            if (!store) return true;
+
+            const instance = component();
+            if (!instance?.call) return false;
+
+            const result = await instance.call('setSelectedSchoolIds', Array.from(store.selected));
+            return Boolean(result?.success !== false);
+        },
+
+        async createQuickList() {
+            const name = String(this.newListName || '').trim();
+            if (!name || this.creating) return;
+
+            this.creating = true;
+            try {
+                const result = await this.$wire.call('createCustomListQuick', name, this.newListColor);
+                if (!result || result.success === false || !result.list) {
+                    showToast(result?.error || 'Unable to create the list.', 'error');
+                    return;
+                }
+
+                const created = {
+                    ...result.list,
+                    count: Number(result.list?.count ?? result.list?.schools_count ?? 0),
+                };
+                if (!this.lists.some((list) => String(list?.key || '') === String(created.key || ''))) {
+                    this.lists.push(created);
+                }
+
+                this.newListName = '';
+                this.newListColor = '#ff6338';
+                showToast(result.message || 'List created.', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('Unable to create the list.', 'error');
+            } finally {
+                this.creating = false;
+            }
+        },
+
         async queue(listKey, listLabel, selectedCount) {
             const key = String(listKey || '').trim();
             if (!key) return;
 
+            const synced = await this.syncSelection();
+            if (!synced) {
+                showToast('Unable to synchronize the current school selection.', 'error');
+                return;
+            }
+
+            const store = getDiscoverSelectionStore();
+            const actualCount = store?.selected?.size || Number(selectedCount || 0);
             const label = String(listLabel || key);
             this.pendingLists = { ...this.pendingLists, [key]: label };
-            this.statusText = `Adding ${Number(selectedCount || 0).toLocaleString()} selected school(s) to ${label} in the background...`;
-            this.open = false;
+            this.pendingAdds = { ...this.pendingAdds, [key]: Number(actualCount || 0) };
+            this.statusText = `Saving ${Number(actualCount).toLocaleString()} selected school(s) to ${label}...`;
+            // Keep the dropdown visible so the user can see the row-level
+            // spinner and saving progress animation.
+            this.open = true;
 
             try {
                 const result = await this.$wire.call('queueSelectedSchoolsToList', key);
                 if (!result || result.success === false) {
                     const next = { ...this.pendingLists };
+                    const nextAdds = { ...this.pendingAdds };
                     delete next[key];
+                    delete nextAdds[key];
                     this.pendingLists = next;
+                    this.pendingAdds = nextAdds;
                     this.statusText = this.pendingCount() ? this.statusText : '';
                     showToast(result?.error || 'Unable to queue the selected schools.', 'error');
                     return;
                 }
 
-                const count = Number(result.school_count || selectedCount || 0);
+                const count = Number(result.school_count || actualCount || 0);
                 const resolvedLabel = String(result.list_label || label);
                 this.statusText = `Adding ${count.toLocaleString()} selected school(s) to ${resolvedLabel} in the background...`;
                 beginActionStatusWatch();
                 this.watchUntilComplete();
             } catch (error) {
                 const next = { ...this.pendingLists };
+                const nextAdds = { ...this.pendingAdds };
                 delete next[key];
+                delete nextAdds[key];
                 this.pendingLists = next;
+                this.pendingAdds = nextAdds;
                 this.statusText = this.pendingCount() ? this.statusText : '';
                 console.error(error);
                 showToast('Unable to queue the selected schools.', 'error');
@@ -388,7 +642,19 @@
                     const current = String(status?.status || 'idle');
 
                     if (current === 'completed' || current === 'completed_with_errors') {
+                        if (current === 'completed') {
+                            this.lists = this.lists.map((list) => {
+                                const key = String(list?.key || '');
+                                const added = Number(this.pendingAdds?.[key] || 0);
+
+                                return added > 0
+                                    ? { ...list, count: Number(list.count || 0) + added }
+                                    : list;
+                            });
+                        }
+
                         this.pendingLists = {};
+                        this.pendingAdds = {};
                         this.statusText = '';
                         this.watching = false;
                         return;
@@ -715,7 +981,13 @@
         if (/selectConversation/.test(action)) {
             return { kind: 'conversation', title: text, copy: 'Opening the conversation now. Messages will appear as they load.' };
         }
-        if (/selectTemplate|newTemplate|createTemplate|previewTemplate|duplicateTemplate/.test(action)) {
+        // Creating a blank template only changes local editor state. Do not
+        // open the large global loading shell for this action.
+        if (/newTemplate/.test(action)) {
+            return null;
+        }
+
+        if (/selectTemplate|createTemplate|previewTemplate|duplicateTemplate/.test(action)) {
             return { kind: 'template', title: text, copy: 'Opening the template editor. The latest template content is loading.' };
         }
         if (/composeEmailSchool|composeEmailCoach|composeToCoach|startNewConversation|useTemplateForCompose|useCampaignTemplate/.test(action)) {
@@ -923,6 +1195,19 @@
             || element.getAttribute('wire:click.prevent')
             || element.getAttribute('wire:click.self')
             || '';
+
+        // Never allow the global skeleton/loading shell to flash when opening
+        // the blank New Template editor. The button's normal inline Livewire
+        // loading indicator remains available.
+        if (/^\s*newTemplate(?:\s*\(|\s*$)/.test(wireAction)) {
+            closeShell(true);
+
+            if (!element.hasAttribute('wire:confirm')) {
+                markPending(element);
+            }
+
+            return;
+        }
 
         if (shouldInstantClose(element, wireAction)) {
             hideModalImmediately(element);

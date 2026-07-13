@@ -599,43 +599,124 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Most environments only read cached progress here. When auto mode has selected the
-        // browser-assisted compatibility runner, this passive poll performs one bounded API page
-        // (maximum a few seconds) and persists its checkpoint. A cache lock prevents duplicate
-        // work from multiple tabs. The expensive final read-model swap still happens atomically.
         $this->refreshRecruitingSyncStatus();
 
         $user = Auth::user();
-        if ($user && $this->recruitingSyncMode === 'full_database_reload') {
-            $rawStatus = Cache::get($this->recruitingStatsSyncStatusKey($user), []);
-            $rawStatus = is_array($rawStatus) ? $rawStatus : [];
-            $launchDriver = strtolower((string) ($rawStatus['launch_driver'] ?? ''));
-            $syncState = strtolower((string) ($rawStatus['status'] ?? ''));
+        $status = $user
+            ? Cache::get($this->recruitingStatsSyncStatusKey($user), [])
+            : [];
+        $status = is_array($status) ? $status : [];
 
-            if (in_array($launchDriver, ['web_tick', 'incremental_livewire'], true) && in_array($syncState, ['running', 'queued', 'starting', 'waiting_for_worker', 'stalled'], true)) {
-                try {
-                    app(CoachDatabaseWebFallbackSyncService::class)->tick($user);
-                } catch (\Throwable $exception) {
-                    Log::warning('Coach Database incremental background poll tick failed safely.', [
-                        'user_id' => $user->id,
-                        'error' => $exception->getMessage(),
-                    ]);
-                }
-                $this->refreshRecruitingSyncStatus();
+        $launchDriver = strtolower((string) ($status['launch_driver'] ?? ''));
+        $syncState = strtolower((string) ($status['status'] ?? ''));
+        $activeStates = ['running', 'queued', 'starting', 'waiting_for_worker', 'stalled'];
+
+        // The currently installed launcher intentionally uses incremental
+        // Livewire polling as its worker. Keep processing one checkpointed page
+        // per poll, but provide enough headroom for the final snapshot swap.
+        if ($user
+            && $this->recruitingSyncMode === 'full_database_reload'
+            && in_array($launchDriver, ['web_tick', 'incremental_livewire'], true)
+            && in_array($syncState, $activeStates, true)) {
+            $this->raiseRecruitingPollMemoryLimit();
+
+            // Release request-local indexes before the sync service reads and
+            // serializes the checkpoint/final snapshot.
+            $this->coachDatabaseSnapshotMemo = null;
+            $this->coachSearchIndexMemo = null;
+            $this->schoolCoachIndexMemo = null;
+            $this->allSchoolsMemo = null;
+            $this->allCoachesMemo = null;
+            $this->trackingCoachesMemo = null;
+
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
             }
+
+            try {
+                app(CoachDatabaseWebFallbackSyncService::class)->tick($user);
+            } catch (\Throwable $exception) {
+                Log::warning('Coach Database incremental polling tick failed safely.', [
+                    'user_id' => $user->id,
+                    'memory_limit' => ini_get('memory_limit'),
+                    'memory_usage' => memory_get_usage(true),
+                    'memory_peak' => memory_get_peak_usage(true),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
+            $this->refreshRecruitingSyncStatus();
+
+            $status = Cache::get($this->recruitingStatsSyncStatusKey($user), []);
+            $status = is_array($status) ? $status : [];
+            $syncState = strtolower((string) ($status['status'] ?? $this->recruitingSyncStatus ?? ''));
         }
 
         $this->refreshContactTagSyncStatus();
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
 
-        if (is_array($snapshot) && ($snapshot['cached_at'] ?? null) !== $this->cachedAt) {
-            $this->hydrateFromSnapshot($snapshot);
+        $this->isLoadingDataset = $this->recruitingSyncMode === 'full_database_reload'
+            && in_array($syncState, $activeStates, true);
+
+        // Do not hydrate the multi-megabyte active snapshot while the
+        // incremental worker is still building the replacement.
+        if ($this->isLoadingDataset) {
+            $this->hasMoreData = false;
+            return;
         }
 
-        $this->isLoadingDataset = $this->isRecruitingSyncRunning
-            && $this->recruitingSyncMode === 'full_database_reload';
-        $this->hasMoreData = false;
+        // Once the worker completes, hydrate the newly swapped snapshot.
+        if (in_array($syncState, ['completed', 'completed_with_errors'], true)) {
+            $snapshot = Cache::get($this->activeCacheKey());
 
+            if (is_array($snapshot)
+                && ($snapshot['cached_at'] ?? null)
+                && ($snapshot['cached_at'] ?? null) !== $this->cachedAt) {
+                $this->hydrateFromSnapshot($snapshot);
+            }
+        }
+
+        $this->hasMoreData = false;
+    }
+
+    protected function raiseRecruitingPollMemoryLimit(): void
+    {
+        $target = trim((string) config(
+            'coach-database-sync.incremental.memory_limit',
+            config('coach-database-sync.web_fallback.memory_limit', '512M')
+        ));
+
+        if ($target === '' || $target === '-1') {
+            return;
+        }
+
+        $current = trim((string) ini_get('memory_limit'));
+
+        if ($current === '-1') {
+            return;
+        }
+
+        if ($this->recruitingMemoryBytes($target) > $this->recruitingMemoryBytes($current)) {
+            @ini_set('memory_limit', $target);
+        }
+    }
+
+    protected function recruitingMemoryBytes(string $value): int
+    {
+        $value = trim($value);
+
+        if ($value === '' || $value === '-1') {
+            return PHP_INT_MAX;
+        }
+
+        $unit = strtolower(substr($value, -1));
+        $number = (float) $value;
+
+        return match ($unit) {
+            'g' => (int) ($number * 1024 * 1024 * 1024),
+            'm' => (int) ($number * 1024 * 1024),
+            'k' => (int) ($number * 1024),
+            default => (int) $number,
+        };
     }
 
     public function refreshConversationsRealtime(): void
@@ -1471,32 +1552,139 @@ trait InteractsWithCoachDatabase
 
     public function createCustomList(): void
     {
-        $name = trim($this->newListName);
-        if ($name === '') {
-            Notification::make()->title('Recruiting Center')->body('Enter a list name.')->danger()->send();
+        $result = $this->createCustomListQuick($this->newListName, $this->newListColor);
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()
+                ->title('Recruiting Center')
+                ->body($result['error'] ?? 'Unable to create the list.')
+                ->danger()
+                ->send();
             return;
         }
 
-        $key = Str::slug($name);
-        $tag = 'plyrcard:list:' . $key;
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $color = $this->normalizeListColor($this->newListColor);
-
-        $custom = collect($snapshot['custom_list_tags'] ?? []);
-        $custom->put($key, [
-            'key' => $key,
-            'label' => Str::headline($name),
-            'tag' => $tag,
-            'custom' => true,
-            'color' => $color,
-        ]);
-        $snapshot['custom_list_tags'] = $custom->all();
-        $this->selectedListKey = 'custom:' . $key;
-        $this->rebuildAndStoreSnapshot($snapshot);
+        $this->selectedListKey = (string) ($result['list']['key'] ?? '');
         $this->newListName = '';
         $this->newListColor = '#ff6338';
         $this->showNewListComposer = false;
-        Notification::make()->title('Recruiting Center')->body('List created. Add a school or coach to save it to recruiting contacts.')->success()->send();
+
+        Notification::make()
+            ->title('Recruiting Center')
+            ->body('List created. Add a school or coach to save it to recruiting contacts.')
+            ->success()
+            ->send();
+    }
+
+    public function createCustomListQuick(string $name, string $color = '#ff6338'): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        $name = trim($name);
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
+        if ($name === '') {
+            return ['success' => false, 'error' => 'Enter a list name.'];
+        }
+
+        $key = Str::slug($name);
+        if ($key === '') {
+            return ['success' => false, 'error' => 'Enter a valid list name.'];
+        }
+
+        $normalizedColor = $this->normalizeListColor($color);
+        $tag = 'plyrcard:list:' . $key;
+        $listKey = 'custom:' . $key;
+
+        // Custom-list definitions are tiny metadata. Store them separately from
+        // the multi-megabyte Coach Database snapshot so this Livewire action
+        // never serializes or rewrites all schools and coaches.
+        $definitions = $this->customListDefinitions();
+        $definitions[$key] = [
+            'key' => $key,
+            'label' => trim($name),
+            'tag' => $tag,
+            'custom' => true,
+            'color' => $normalizedColor,
+        ];
+
+        Cache::put(
+            $this->customListDefinitionsCacheKey(),
+            $definitions,
+            now()->addMonths(12)
+        );
+
+        $list = [
+            'key' => $listKey,
+            'label' => trim($name),
+            'tag' => $tag,
+            'custom' => true,
+            'color' => $normalizedColor,
+            'schools_count' => 0,
+            'coaches_count' => 0,
+            'schools' => [],
+        ];
+
+        // Update only the small Livewire list collection. skipRender() prevents
+        // the complete schools grid from morphing during this request.
+        $this->lists = collect($this->lists)
+            ->reject(fn ($existing): bool => is_array($existing)
+                && in_array((string) ($existing['key'] ?? ''), [$key, $listKey], true))
+            ->push($list)
+            ->values()
+            ->all();
+
+        return [
+            'success' => true,
+            'list' => $list,
+            'message' => 'List created.',
+        ];
+    }
+
+    protected function customListDefinitionsCacheKey(): string
+    {
+        return $this->activeCacheKey() . ':custom-list-definitions';
+    }
+
+    protected function customListDefinitions(): array
+    {
+        $definitions = Cache::get($this->customListDefinitionsCacheKey(), []);
+
+        return is_array($definitions)
+            ? collect($definitions)
+                ->filter(fn ($definition): bool => is_array($definition))
+                ->all()
+            : [];
+    }
+
+    protected function customListRows(): array
+    {
+        return collect($this->customListDefinitions())
+            ->map(function (array $definition, string $fallbackKey): array {
+                $key = trim((string) ($definition['key'] ?? $fallbackKey));
+                $label = trim((string) ($definition['label'] ?? Str::headline($key)));
+                $tag = trim((string) ($definition['tag'] ?? ('plyrcard:list:' . $key)));
+
+                return [
+                    'key' => 'custom:' . $key,
+                    'label' => $label,
+                    'tag' => $tag,
+                    'custom' => true,
+                    'color' => $this->normalizeListColor($definition['color'] ?? '#ff6338'),
+                    'schools_count' => (int) ($definition['schools_count'] ?? 0),
+                    'coaches_count' => (int) ($definition['coaches_count'] ?? 0),
+                    'schools' => is_array($definition['schools'] ?? null)
+                        ? $definition['schools']
+                        : [],
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function normalizeListColor(?string $color): string
@@ -1548,20 +1736,28 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-        $custom = collect($snapshot['custom_list_tags'] ?? []);
-        $normalizedKey = str_starts_with($listKey, 'custom:') ? substr($listKey, 7) : $listKey;
+        $normalizedKey = str_starts_with($listKey, 'custom:')
+            ? substr($listKey, 7)
+            : $listKey;
 
-        $custom->forget($listKey);
-        $custom->forget($normalizedKey);
+        $definitions = $this->customListDefinitions();
+        unset($definitions[$listKey], $definitions[$normalizedKey]);
 
-        $snapshot['custom_list_tags'] = $custom->all();
+        Cache::put(
+            $this->customListDefinitionsCacheKey(),
+            $definitions,
+            now()->addMonths(12)
+        );
 
-        if ($this->selectedListKey === $listKey || $this->selectedListKey === $normalizedKey) {
+        $this->lists = collect($this->lists)
+            ->reject(fn ($list): bool => is_array($list)
+                && in_array((string) ($list['key'] ?? ''), [$listKey, $normalizedKey, 'custom:' . $normalizedKey], true))
+            ->values()
+            ->all();
+
+        if (in_array($this->selectedListKey, [$listKey, $normalizedKey, 'custom:' . $normalizedKey], true)) {
             $this->selectedListKey = '';
         }
-
-        $this->rebuildAndStoreSnapshot($snapshot);
 
         Notification::make()
             ->title('My Lists')
@@ -3012,62 +3208,8 @@ trait InteractsWithCoachDatabase
 
     public function loadTemplates(): void
     {
-        $user = Auth::user();
-
-        if (! $user || ! $this->allowed || $this->locked) {
-            $this->isLoadingTemplates = false;
-            return;
-        }
-
         $this->isLoadingTemplates = true;
-        $this->error = null;
-
-        try {
-            $result = app(CoachDatabaseService::class)->getEmailTemplatesForUser($user);
-            $remoteTemplates = collect($result['templates'] ?? [])
-                ->filter(fn ($template): bool => is_array($template))
-                ->map(function (array $template): array {
-                    $id = trim((string) ($template['id'] ?? $template['_id'] ?? $template['templateId'] ?? ''));
-                    if ($id !== '') {
-                        $template['id'] = $id;
-                    }
-
-                    $template['source_type'] = $template['source_type'] ?? 'ghl';
-                    return $template;
-                })
-                ->filter(fn (array $template): bool => filled($template['id'] ?? null))
-                ->values();
-
-            $this->templates = $remoteTemplates
-                ->merge($this->hardcodedEmailTemplates())
-                ->unique(fn (array $template): string => (string) ($template['id'] ?? md5(json_encode($template))))
-                ->values()
-                ->all();
-
-            $this->templateSourceSummary = (string) ($result['source'] ?? 'GoHighLevel');
-            $this->templateSourceDebug = is_array($result['debug'] ?? null) ? $result['debug'] : [];
-
-            if (! ($result['success'] ?? false) && $remoteTemplates->isEmpty()) {
-                $this->error = $result['error'] ?? 'Unable to load GoHighLevel templates.';
-            }
-        } catch (\Throwable $exception) {
-            Log::error('Unable to load GoHighLevel email templates.', [
-                'user_id' => $user->id,
-                'error' => $exception->getMessage(),
-            ]);
-
-            $this->templates = collect($this->templates)
-                ->merge($this->hardcodedEmailTemplates())
-                ->unique(fn (array $template): string => (string) ($template['id'] ?? md5(json_encode($template))))
-                ->values()
-                ->all();
-
-            $this->error = 'Unable to load GoHighLevel templates.';
-        } finally {
-            $this->isLoadingTemplates = false;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = null;
-        }
+        $this->startDeferredUiSync('templates');
     }
 
     protected function templateConnectionKeyForUser($user): string
@@ -3168,10 +3310,7 @@ trait InteractsWithCoachDatabase
         $this->templateInlineImageUpload = null;
         $this->templateAttachmentUploads = [];
         $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->templateBody = $this->templateHtml($template);
-        if ($this->templateBody === '') {
-            $this->templateBody = $this->coerceTemplateHtml($template);
-        }
+        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
         $this->templateEditorRefreshKey++;
         $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
 
@@ -3186,65 +3325,14 @@ trait InteractsWithCoachDatabase
 
     public function loadSelectedTemplateDetail(): void
     {
-        $user = Auth::user();
         $templateId = trim((string) $this->selectedTemplateId);
-
-        if (! $user || $templateId === '' || $this->isBuiltInTemplateId($templateId)) {
+        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
             $this->isLoadingTemplateDetail = false;
             return;
         }
 
         $this->isLoadingTemplateDetail = true;
-
-        try {
-            $result = app(CoachDatabaseService::class)->getEmailTemplateForUser($user, $templateId);
-
-            if (! ($result['success'] ?? false) || ! is_array($result['template'] ?? null)) {
-                Notification::make()
-                    ->title('Templates')
-                    ->body($this->templateErrorMessage($result, 'Unable to load template content.'))
-                    ->danger()
-                    ->send();
-                return;
-            }
-
-            $template = $result['template'];
-            $template['id'] = $templateId;
-            $this->templateDetails[$templateId] = $template;
-
-            $this->templateName = trim((string) ($template['name'] ?? $template['title'] ?? 'Untitled Template')) ?: 'Untitled Template';
-            $this->templateSubject = $this->templateSubject($template);
-            $this->templatePreviewText = $this->templatePreviewText($template);
-
-            $html = $this->templateHtml($template);
-            if ($html === '') {
-                $html = $this->coerceTemplateHtml($template);
-            }
-
-            $this->templateBody = $html;
-            $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($html);
-            $this->templateEditorRefreshKey++;
-
-            $this->dispatch(
-                'rc-template-editor-refresh',
-                body: base64_encode($this->templateBody),
-                key: $this->templateEditorRefreshKey
-            );
-        } catch (\Throwable $exception) {
-            Log::error('Unable to load GoHighLevel template detail.', [
-                'user_id' => $user->id,
-                'template_id' => $templateId,
-                'error' => $exception->getMessage(),
-            ]);
-
-            Notification::make()
-                ->title('Templates')
-                ->body('Unable to load template content.')
-                ->danger()
-                ->send();
-        } finally {
-            $this->isLoadingTemplateDetail = false;
-        }
+        $this->startDeferredUiSync('template-detail', $templateId);
     }
 
     protected function starterTemplateHtml(): string
@@ -3291,10 +3379,8 @@ HTML;
 
         $this->isSavingTemplate = true;
         $this->resolveTemplateGraphicUpload();
-        // Preserve the original GoHighLevel HTML, inline CSS, style tags,
-        // tables, and document structure returned by the visual editor.
         $html = $this->appendAttachmentLinksToHtml(
-            trim($bodyText),
+            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
             $this->templateAttachments
         );
 
@@ -3493,20 +3579,8 @@ HTML;
         }
 
         $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
-        $template = $this->loadTemplateDetail($templateId);
-
-        if (! $hasFullDetail && ! $this->isBuiltInTemplateId($templateId) && Auth::user()) {
-            $detailResult = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
-
-            if (($detailResult['success'] ?? false) && is_array($detailResult['template'] ?? null)) {
-                $template = $detailResult['template'];
-                $template['id'] = $templateId;
-                $this->templateDetails[$templateId] = $template;
-                $hasFullDetail = true;
-            }
-        }
-
-        $template = $template ?: collect($this->templates)->firstWhere('id', $templateId);
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
 
         if (! is_array($template)) {
             Notification::make()->title('Templates')->body('Template could not be duplicated.')->danger()->send();
@@ -3610,10 +3684,7 @@ HTML;
         $this->campaignPreviewText = $this->templatePreviewText($template);
         $this->composeGraphicUrl = '';
         $this->composeAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->campaignBody = $this->templateHtml($template);
-        if ($this->campaignBody === '') {
-            $this->campaignBody = $this->coerceTemplateHtml($template);
-        }
+        $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
 
         if (trim($this->campaignBody) === '') {
             $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
@@ -8975,79 +9046,122 @@ HTML;
     }
 
 
-    public function toggleSchoolSelection(string $schoolId): void
+    public function toggleSchoolSelection(string $schoolId): array
     {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
         $schoolId = trim($schoolId);
         if ($schoolId === '') {
-            return;
+            return $this->schoolSelectionResponse();
         }
 
         $ids = collect($this->selectedSchoolIds)
-            ->map(fn ($id): string => (string) $id)
+            ->map(fn ($id): string => trim((string) $id))
             ->filter()
+            ->unique()
             ->values();
 
-        if ($ids->contains($schoolId)) {
-            $this->selectedSchoolIds = $ids->reject(fn (string $id): bool => $id === $schoolId)->values()->all();
-            return;
-        }
+        $this->selectedSchoolIds = $ids->contains($schoolId)
+            ? $ids->reject(fn (string $id): bool => $id === $schoolId)->values()->all()
+            : $ids->push($schoolId)->unique()->values()->all();
 
-        $this->selectedSchoolIds = $ids->push($schoolId)->unique()->values()->all();
+        return $this->schoolSelectionResponse();
     }
 
     public function setSelectedSchoolIds(array $schoolIds): array
     {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
         $this->selectedSchoolIds = collect($schoolIds)
             ->map(fn ($id): string => trim((string) $id))
             ->filter()
             ->unique()
-            ->take(500)
             ->values()
             ->all();
 
-        return [
-            'success' => true,
-            'selected' => $this->selectedSchoolIds,
-            'count' => count($this->selectedSchoolIds),
-        ];
+        return $this->schoolSelectionResponse();
     }
 
-    public function clearSelectedSchools(): void
+    public function clearSelectedSchools(): array
     {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
         $this->selectedSchoolIds = [];
+
+        return $this->schoolSelectionResponse(false);
     }
 
-    public function toggleVisibleSchoolsSelection(): void
+    public function toggleVisibleSchoolsSelection(): array
     {
-        $visibleIds = collect($this->filteredSchools)
-            ->map(fn (array $school): string => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))))
-            ->filter()
-            ->values();
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
 
-        if ($visibleIds->isEmpty()) {
-            return;
+        // This is intentionally the complete filtered query, not the 24-row
+        // display slice returned by the filteredSchools computed property.
+        $filteredIds = $this->filteredSchoolIds();
+
+        if ($filteredIds->isEmpty()) {
+            return $this->schoolSelectionResponse(false, 0);
         }
 
         $current = collect($this->selectedSchoolIds)
-            ->map(fn ($id): string => (string) $id)
+            ->map(fn ($id): string => trim((string) $id))
             ->filter()
+            ->unique()
             ->values();
 
-        $allVisibleSelected = $visibleIds->every(fn (string $id): bool => $current->contains($id));
+        $allFilteredSelected = $filteredIds
+            ->every(fn (string $id): bool => $current->contains($id));
 
-        if ($allVisibleSelected) {
-            $this->selectedSchoolIds = $current
-                ->reject(fn (string $id): bool => $visibleIds->contains($id))
-                ->values()
-                ->all();
-            return;
+        $this->selectedSchoolIds = $allFilteredSelected
+            ? $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all()
+            : $current->merge($filteredIds)->unique()->values()->all();
+
+        return $this->schoolSelectionResponse(! $allFilteredSelected, $filteredIds->count());
+    }
+
+    protected function filteredSchoolIds(): Collection
+    {
+        return $this->filteredSchoolsQuery()
+            ->map(fn (array $school): string => (string) (
+                $school['id']
+                ?? $school['business_id']
+                ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))
+            ))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    protected function schoolSelectionResponse(?bool $allFilteredSelected = null, ?int $filteredCount = null): array
+    {
+        $selected = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($allFilteredSelected === null) {
+            $filteredIds = $this->filteredSchoolIds();
+            $filteredCount = $filteredIds->count();
+            $allFilteredSelected = $filteredIds->isNotEmpty()
+                && $filteredIds->every(fn (string $id): bool => $selected->contains($id));
         }
 
-        $this->selectedSchoolIds = $current
-            ->merge($visibleIds)
-            ->unique()
-            ->values()
-            ->all();
+        return [
+            'success' => true,
+            'selected' => $selected->all(),
+            'count' => $selected->count(),
+            'filtered_count' => (int) ($filteredCount ?? 0),
+            'all_filtered_selected' => (bool) $allFilteredSelected,
+        ];
     }
 
     public function getSelectedSchoolCountProperty(): int
@@ -9057,20 +9171,18 @@ HTML;
 
     public function getVisibleSchoolsSelectedProperty(): bool
     {
-        $visibleIds = collect($this->filteredSchools)
-            ->map(fn (array $school): string => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))))
-            ->filter()
-            ->values();
+        $filteredIds = $this->filteredSchoolIds();
 
-        if ($visibleIds->isEmpty()) {
+        if ($filteredIds->isEmpty()) {
             return false;
         }
 
         $current = collect($this->selectedSchoolIds)
-            ->map(fn ($id): string => (string) $id)
-            ->filter();
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique();
 
-        return $visibleIds->every(fn (string $id): bool => $current->contains($id));
+        return $filteredIds->every(fn (string $id): bool => $current->contains($id));
     }
 
     public function emailSelectedSchools(): void
@@ -9111,11 +9223,11 @@ HTML;
 
         $user = Auth::user();
         $listKey = trim($listKey);
+
         $schoolIds = collect($this->selectedSchoolIds)
             ->map(fn ($id): string => trim((string) $id))
             ->filter()
             ->unique()
-            ->take(500)
             ->values()
             ->all();
 
@@ -9131,8 +9243,18 @@ HTML;
             return ['success' => false, 'error' => 'Select at least one school first.'];
         }
 
+        $maximumSchools = max(50, (int) config('ghl.coach_database.bulk_list_max_schools', 2000));
+        if (count($schoolIds) > $maximumSchools) {
+            return [
+                'success' => false,
+                'error' => 'This batch contains ' . number_format(count($schoolIds))
+                    . ' schools. The configured maximum is ' . number_format($maximumSchools) . '.',
+            ];
+        }
+
         $service = app(CoachDatabaseService::class);
         $tag = $service->listTagForKey($listKey, $user);
+
         if (blank($tag)) {
             return ['success' => false, 'error' => 'That list could not be found.'];
         }
@@ -9143,25 +9265,46 @@ HTML;
             'list_key' => $listKey,
             'tag' => $tag,
             'type' => 'add',
+            'contact_batch_size' => max(1, min(
+                50,
+                (int) config('ghl.coach_database.bulk_list_contacts_per_second', 50)
+            )),
         ]]);
 
         if (! ($queued['success'] ?? false)) {
-            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue the selected schools.'];
+            return [
+                'success' => false,
+                'error' => $queued['error'] ?? 'Unable to queue the selected schools.',
+            ];
         }
 
-        $this->applyBulkSchoolListMembershipToCache($schoolIds, $listKey, true);
+        // Do not call applyBulkSchoolListMembershipToCache() here. That method
+        // reads and rewrites the entire Coach Database snapshot inside the
+        // Livewire request and is what makes 200+ school batches run out of
+        // memory before the background worker can start.
         $this->startCoachDatabaseActionWorker($user);
 
-        $listLabel = collect($this->lists)
-            ->first(fn ($list): bool => is_array($list) && (string) ($list['key'] ?? '') === $listKey)['label']
-            ?? \Illuminate\Support\Str::headline($listKey);
+        $list = collect($this->lists)->first(
+            fn ($item): bool => is_array($item)
+                && (string) ($item['key'] ?? '') === $listKey
+        );
+
+        $listLabel = is_array($list)
+            ? (string) ($list['label'] ?? Str::headline($listKey))
+            : Str::headline($listKey);
 
         return [
             'success' => true,
             'queued' => (int) ($queued['queued'] ?? 1),
             'school_count' => count($schoolIds),
             'list_key' => $listKey,
-            'list_label' => (string) $listLabel,
+            'list_label' => $listLabel,
+            'contacts_per_second' => max(1, min(
+                50,
+                (int) config('ghl.coach_database.bulk_list_contacts_per_second', 50)
+            )),
+            'message' => number_format(count($schoolIds))
+                . ' schools were queued. Coach contacts will be processed in controlled background batches.',
         ];
     }
 
@@ -10145,7 +10288,11 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
 
-        $this->lists = $snapshot['lists'] ?? [];
+        $this->lists = collect($snapshot['lists'] ?? [])
+            ->merge($this->customListRows())
+            ->unique(fn (array $list): string => (string) ($list['key'] ?? $list['tag'] ?? md5(json_encode($list))))
+            ->values()
+            ->all();
         $this->stats = $snapshot['stats'] ?? [];
         $this->topSchools = $snapshot['top_schools'] ?? [];
         if (isset($snapshot['dashboard_recent_activity']) && is_array($snapshot['dashboard_recent_activity'])) {

@@ -8321,9 +8321,281 @@
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
+
+                .rc-discover-quick-list-v97 {
+                    display:grid;
+                    gap:.5rem;
+                    padding:.65rem;
+                    margin-top:.35rem;
+                    border-top:1px solid var(--rc-border);
+                    background:var(--rc-soft);
+                }
+                .rc-discover-quick-list-title-v97 {
+                    font-size:.72rem;
+                    font-weight:800;
+                    color:var(--rc-muted);
+                    text-transform:uppercase;
+                    letter-spacing:.05em;
+                }
+                .rc-discover-quick-list-v97 .rc-input { width:100%; }
+                .rc-discover-quick-list-actions-v97 {
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.5rem;
+                }
+                .rc-discover-quick-list-actions-v97 input[type="color"] {
+                    width:2.4rem;
+                    height:2.1rem;
+                    padding:.15rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.55rem;
+                    background:var(--rc-surface);
+                }
+
+                /* Add-to-list dropdown — compact reference layout */
+                .rc-list-popover-v105 {
+                    left:auto !important;
+                    right:0 !important;
+                    top:calc(100% + .55rem) !important;
+                    width:21.75rem !important;
+                    min-width:21.75rem !important;
+                    max-width:min(21.75rem, calc(100vw - 2rem)) !important;
+                    max-height:none !important;
+                    overflow:visible !important;
+                    padding:0 !important;
+                    border:1px solid #e5e7eb !important;
+                    border-radius:1rem !important;
+                    background:#fff !important;
+                    color:#111827 !important;
+                    box-shadow:0 24px 60px rgba(15,23,42,.22) !important;
+                }
+
+                .rc-list-popover-title-v105 {
+                    padding:1rem 1.15rem .72rem;
+                    color:#8791a4;
+                    font-size:.72rem;
+                    font-weight:850;
+                    line-height:1.2;
+                    letter-spacing:.075em;
+                    text-transform:uppercase;
+                }
+
+                .rc-list-popover-options-v105 {
+                    display:grid;
+                    gap:.12rem;
+                    padding:0 .72rem .65rem;
+                    max-height:15.5rem;
+                    overflow:auto;
+                }
+
+                .rc-list-popover-row-v105 {
+                    min-height:2.75rem;
+                    padding:.58rem .58rem !important;
+                    border-radius:.65rem !important;
+                    font-size:.85rem !important;
+                    font-weight:700 !important;
+                }
+
+                .rc-list-popover-row-v105:hover {
+                    background:#f8fafc !important;
+                    color:#111827 !important;
+                }
+
+                .rc-list-popover-row-v105:disabled {
+                    cursor:wait;
+                    opacity:.78;
+                }
+
+                .rc-list-popover-row-main-v105,
+                .rc-list-popover-row-side-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.68rem;
+                    min-width:0;
+                }
+
+                .rc-list-popover-dot-v105 {
+                    width:.72rem;
+                    height:.72rem;
+                    flex:0 0 auto;
+                    border-radius:999px;
+                    box-shadow:0 0 0 3px rgba(15,23,42,.025);
+                }
+
+                .rc-list-popover-label-v105 {
+                    overflow:hidden;
+                    color:#111827;
+                    text-overflow:ellipsis;
+                    white-space:nowrap;
+                }
+
+                .rc-list-popover-count-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    min-width:1.75rem;
+                    height:1.75rem;
+                    padding:0 .48rem;
+                    border-radius:999px;
+                    background:#f2f4f7;
+                    color:#9aa3b2;
+                    font-size:.75rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.38rem;
+                    color:#ff6338;
+                    font-size:.72rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 .rc-spinner-mini {
+                    width:.82rem;
+                    height:.82rem;
+                    border-width:2px;
+                }
+
+                .rc-list-quick-create-v105 {
+                    display:grid !important;
+                    grid-template-columns:minmax(0,1fr) 3rem;
+                    gap:.55rem !important;
+                    padding:.8rem .9rem .9rem !important;
+                    margin:0 !important;
+                    border-top:1px solid #edf0f4 !important;
+                    background:#fff !important;
+                }
+
+                .rc-list-new-input-v105 {
+                    width:100%;
+                    min-width:0;
+                    height:2.8rem;
+                    padding:0 .9rem;
+                    border:1px solid #dfe4ea;
+                    border-radius:.72rem;
+                    background:#fff;
+                    color:#111827;
+                    font-size:.86rem;
+                    outline:none;
+                    transition:border-color .15s ease, box-shadow .15s ease;
+                }
+
+                .rc-list-new-input-v105::placeholder {
+                    color:#98a2b3;
+                }
+
+                .rc-list-new-input-v105:focus {
+                    border-color:#ff8f73;
+                    box-shadow:0 0 0 3px rgba(255,99,56,.12);
+                }
+
+                .rc-list-new-button-v105 {
+                    width:3rem;
+                    height:2.8rem;
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    border:0;
+                    border-radius:.72rem;
+                    background:#ff9a84;
+                    color:#fff;
+                    cursor:pointer;
+                    transition:background .15s ease, transform .15s ease, opacity .15s ease;
+                }
+
+                .rc-list-new-button-v105:hover:not(:disabled) {
+                    background:#ff6338;
+                    transform:translateY(-1px);
+                }
+
+                .rc-list-new-button-v105:disabled {
+                    cursor:not-allowed;
+                    opacity:.58;
+                }
+
+                .rc-list-new-button-v105 .rc-spinner-mini {
+                    width:1rem;
+                    height:1rem;
+                    border-width:2px;
+                }
+
+                .rc-list-popover-progress-v105 {
+                    display:grid;
+                    gap:.42rem;
+                    padding:.72rem .9rem .82rem;
+                    border-top:1px solid #edf0f4;
+                    color:#667085;
+                    font-size:.72rem;
+                    font-weight:750;
+                    line-height:1.35;
+                }
+
+                .rc-list-progress-bar-v105 {
+                    position:relative;
+                    height:.28rem;
+                    overflow:hidden;
+                    border-radius:999px;
+                    background:#ffe4dd;
+                }
+
+                .rc-list-progress-bar-v105 > span {
+                    position:absolute;
+                    top:0;
+                    bottom:0;
+                    left:-38%;
+                    width:38%;
+                    border-radius:inherit;
+                    background:#ff6338;
+                    animation:rcListSavingBarV105 1.05s ease-in-out infinite;
+                }
+
+                @keyframes rcListSavingBarV105 {
+                    0% { transform:translateX(0); }
+                    100% { transform:translateX(365%); }
+                }
+
+                .dark .rc-list-popover-v105,
+                .dark .rc-list-quick-create-v105 {
+                    border-color:#34343b !important;
+                    background:#18181b !important;
+                    color:#f4f4f5 !important;
+                }
+
+                .dark .rc-list-popover-title-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-popover-row-v105:hover {
+                    background:#27272a !important;
+                }
+
+                .dark .rc-list-popover-label-v105 {
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-popover-count-v105 {
+                    background:#27272a;
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-new-input-v105 {
+                    border-color:#3f3f46;
+                    background:#202024;
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-quick-create-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    border-top-color:#34343b !important;
+                }
+
 </style>
 
-            <div class="rc-discover-v29">
+            <div class="rc-discover-v29" x-data="window.rcDiscoverSelection ? window.rcDiscoverSelection(@js($selectedSchoolIds), @js($this->visibleSchoolsSelected)) : {}">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -8353,7 +8625,10 @@
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
                         <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click.stop="toggleAllFiltered()">
+                            <input type="checkbox" x-bind:checked="allFilteredSelected" readonly tabindex="-1">
+                            <span>Select All ({{ number_format($discoverSchoolCount) }})</span>
+                        </button>
                     </div>
 
                     <div class="rc-discover-right-v27">
@@ -8365,15 +8640,16 @@
                     </div>
                 </div>
 
-                @if($this->selectedSchoolCount > 0)
-                    <div
+                <div
                         class="rc-discover-bulk-v36"
+                        x-show="count() > 0"
+                        x-cloak
                         wire:key="discover-bulk-selection-bar"
-                        x-data="window.rcBulkSchoolList ? window.rcBulkSchoolList() : { open: false, pendingLists: {}, statusText: '', queue() {}, isPending() { return false }, pendingCount() { return 0 } }"
+                        x-data="window.rcBulkSchoolList ? window.rcBulkSchoolList(@js(collect($this->lists)->map(fn ($list) => ['key' => (string) ($list['key'] ?? ''), 'label' => (string) ($list['label'] ?? ''), 'color' => (string) ($list['color'] ?? '#ff6338'), 'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? []))])->filter(fn ($list) => $list['key'] !== '')->values()->all())) : { open: false, lists: [], pendingLists: {}, statusText: '', queue() {}, isPending() { return false }, pendingCount() { return 0 } }"
                     >
                         <div class="rc-discover-bulk-left-v36">
-                            <span class="rc-discover-bulk-count-v36">{{ number_format($this->selectedSchoolCount) }} {{ \Illuminate\Support\Str::plural('selected', $this->selectedSchoolCount) }}</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" wire:click="emailSelectedSchools" wire:loading.attr="disabled" wire:target="emailSelectedSchools">
+                            <span class="rc-discover-bulk-count-v36"><span x-text="count().toLocaleString()"></span> selected</span>
+                            <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                 <span>Email</span>
                             </button>
@@ -8384,26 +8660,84 @@
                                     <span x-show="pendingCount() > 0" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                                 </button>
-                                <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
-                                    @forelse($this->lists as $list)
-                                        @php
-                                            $listKey = (string) ($list['key'] ?? '');
-                                            $listLabel = (string) ($list['label'] ?? \Illuminate\Support\Str::headline($listKey));
-                                        @endphp
-                                        @if($listKey !== '')
+                                <div class="rc-discover-bulk-menu-v36 rc-list-popover-v105" x-cloak x-show="open" x-transition.origin.top.left>
+                                    <div class="rc-list-popover-title-v105">
+                                        ADD <span x-text="count().toLocaleString()"></span> TO A LIST
+                                    </div>
+
+                                    <div class="rc-list-popover-options-v105">
+                                        <template x-for="list in lists" x-bind:key="list.key">
                                             <button
                                                 type="button"
-                                                class="rc-discover-bulk-option-v36"
-                                                x-on:click.stop="queue({{ \Illuminate\Support\Js::from($listKey) }}, {{ \Illuminate\Support\Js::from($listLabel) }}, {{ (int) $this->selectedSchoolCount }})"
+                                                class="rc-discover-bulk-option-v36 rc-list-popover-row-v105"
+                                                x-on:click.stop="queue(list.key, list.label, count())"
+                                                x-bind:disabled="isPending(list.key)"
                                             >
-                                                <span>{{ $listLabel }}</span>
-                                                <span x-show="!isPending({{ \Illuminate\Support\Js::from($listKey) }})">+</span>
-                                                <span x-show="isPending({{ \Illuminate\Support\Js::from($listKey) }})" x-cloak class="rc-spinner-mini" aria-label="Adding in background"></span>
+                                                <span class="rc-list-popover-row-main-v105">
+                                                    <span
+                                                        class="rc-list-popover-dot-v105"
+                                                        x-bind:style="`background:${list.color || '#ff6338'}`"
+                                                    ></span>
+                                                    <span class="rc-list-popover-label-v105" x-text="list.label"></span>
+                                                </span>
+
+                                                <span class="rc-list-popover-row-side-v105">
+                                                    <span
+                                                        class="rc-list-popover-count-v105"
+                                                        x-show="!isPending(list.key)"
+                                                        x-text="Number(list.count || 0).toLocaleString()"
+                                                    ></span>
+                                                    <span
+                                                        x-show="isPending(list.key)"
+                                                        x-cloak
+                                                        class="rc-list-saving-v105"
+                                                        aria-label="Saving selected schools"
+                                                    >
+                                                        <span class="rc-spinner-mini"></span>
+                                                        <span>Saving</span>
+                                                    </span>
+                                                </span>
                                             </button>
-                                        @endif
-                                    @empty
-                                        <div class="rc-school-list-empty">No lists yet.</div>
-                                    @endforelse
+                                        </template>
+                                    </div>
+
+                                    <div class="rc-discover-quick-list-v97 rc-list-quick-create-v105" x-on:click.stop>
+                                        <input
+                                            type="text"
+                                            class="rc-list-new-input-v105"
+                                            placeholder="New list name..."
+                                            x-model="newListName"
+                                            x-on:keydown.enter.prevent="createQuickList()"
+                                            x-bind:disabled="creating"
+                                        >
+
+                                        <button
+                                            type="button"
+                                            class="rc-list-new-button-v105"
+                                            x-on:click="createQuickList()"
+                                            x-bind:disabled="creating || !newListName.trim()"
+                                            aria-label="Create new list"
+                                        >
+                                            <svg x-show="!creating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                                                <path d="M12 5v14"></path>
+                                                <path d="M5 12h14"></path>
+                                            </svg>
+                                            <span x-show="creating" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        class="rc-list-popover-progress-v105"
+                                        x-show="pendingCount() > 0 || creating"
+                                        x-cloak
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        <span class="rc-list-progress-bar-v105">
+                                            <span></span>
+                                        </span>
+                                        <span x-text="creating ? 'Creating new list...' : (statusText || 'Saving selected schools...')"></span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="rc-discover-bulk-status-v92" x-show="pendingCount() > 0" x-cloak role="status" aria-live="polite">
@@ -8411,11 +8745,10 @@
                                 <span x-text="statusText || 'Updating selected schools in the background...'"></span>
                             </div>
                         </div>
-                        <button type="button" class="rc-discover-bulk-clear-v36" wire:click="clearSelectedSchools">Clear</button>
+                        <button type="button" class="rc-discover-bulk-clear-v36" x-on:click.stop="clearAll()">Clear</button>
                     </div>
-                @endif
 
-                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
+                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch">
                     <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
                     @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
                 </div>
@@ -9597,22 +9930,7 @@
                             <p style="margin:.22rem 0 0;color:var(--rc-muted);font-size:.8rem">Reusable email templates for your coach outreach.</p>
                         </div>
                         <div class="rc-templates-actions-v50">
-                            <button
-                                class="rc-btn rc-btn-primary"
-                                type="button"
-                                data-rc-no-loading-shell="1"
-                                data-rc-no-pending="1"
-                                data-rc-local-action="1"
-                                wire:click="newTemplate"
-                                wire:loading.attr="disabled"
-                                wire:target="newTemplate"
-                            >
-                                <span wire:loading.remove wire:target="newTemplate">+ New Template</span>
-                                <span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline">
-                                    <span class="rc-spinner-mini"></span>
-                                    Loading
-                                </span>
-                            </button>
+                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate" wire:loading.attr="disabled" wire:target="newTemplate"><span wire:loading.remove wire:target="newTemplate">+ New Template</span><span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
                         </div>
                     </div>
 
