@@ -1,7 +1,7 @@
 (() => {
     if (window.__recruitingCenterUiLoaded) return;
     window.__recruitingCenterUiLoaded = true;
-    window.__recruitingCenterUiVersion = '2026-07-13.3';
+    window.__recruitingCenterUiVersion = '2026-07-13.4';
 
     const state = {
         pending: new Set(),
@@ -27,6 +27,78 @@
     const progress = () => qs('#rc-ui-progress');
     const shell = () => qs('#rc-ui-instant-shell');
     const own = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
+
+
+    /**
+     * Clear Discover Schools selection without depending on the currently
+     * mounted Alpine component factory. This remains safe when a CDN serves an
+     * older rcBulkSchoolList implementation during a rolling deployment.
+     */
+    window.rcClearDiscoverSelection = async (wire = null) => {
+        if (window.__rcDiscoverClearRunning) return;
+        window.__rcDiscoverClearRunning = true;
+
+        const storeKey = window.location.pathname;
+        const stores = window.__rcDiscoverSelectionStores;
+        const store = stores instanceof Map ? stores.get(storeKey) : null;
+
+        try {
+            if (store?.pendingPromise) {
+                try {
+                    await store.pendingPromise;
+                } catch (_) {
+                    // Continue with the deterministic clear action.
+                }
+            }
+
+            if (store) {
+                clearTimeout(store.timer);
+                store.operationToken = Number(store.operationToken || 0) + 1;
+                store.selected = new Set();
+                store.allFilteredSelected = false;
+                store.dirty = false;
+                store.needsFlush = false;
+                store.version = Number(store.version || 0) + 1;
+            }
+
+            const detail = {
+                selected: [],
+                count: 0,
+                allFilteredSelected: false,
+                version: Number(store?.version || Date.now()),
+            };
+
+            window.dispatchEvent(new CustomEvent('rc-discover-selection-changed', { detail }));
+            window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', { detail }));
+
+            const instance = wire?.call
+                ? wire
+                : component();
+
+            if (!instance?.call) {
+                throw new Error('The Discover Schools Livewire component is unavailable.');
+            }
+
+            const result = await instance.call('clearSelectedSchools');
+
+            if (!result || result.success === false) {
+                throw new Error(result?.error || 'Unable to clear the selected schools.');
+            }
+        } catch (error) {
+            console.error(error);
+            showToast(error?.message || 'Unable to clear the selected schools.', 'error');
+        } finally {
+            window.__rcDiscoverClearRunning = false;
+            window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                detail: {
+                    selected: [],
+                    count: 0,
+                    allFilteredSelected: false,
+                    version: Number(store?.version || Date.now()),
+                },
+            }));
+        }
+    };
 
     // A locally closed overlay must stay closed while older background Livewire
     // requests finish. Otherwise an optimistic favorite/list update can morph the

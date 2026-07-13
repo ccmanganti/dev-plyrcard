@@ -9274,7 +9274,18 @@
                                 <span x-text="statusText || 'Updating selected schools in the background...'"></span>
                             </div>
                         </div>
-                        <button type="button" class="rc-discover-bulk-clear-v36" x-on:click.stop="clearAll()">Clear</button>
+                        <button
+                            type="button"
+                            class="rc-discover-bulk-clear-v36"
+                            x-on:click.stop="window.rcClearDiscoverSelection($wire)"
+                            x-bind:disabled="Boolean(window.__rcDiscoverClearRunning)"
+                        >
+                            <span x-show="!window.__rcDiscoverClearRunning">Clear</span>
+                            <span x-show="window.__rcDiscoverClearRunning" x-cloak class="rc-loading-inline">
+                                <span class="rc-spinner-mini"></span>
+                                Clearing
+                            </span>
+                        </button>
                     </div>
 
                 <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch">
