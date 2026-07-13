@@ -3012,8 +3012,62 @@ trait InteractsWithCoachDatabase
 
     public function loadTemplates(): void
     {
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            $this->isLoadingTemplates = false;
+            return;
+        }
+
         $this->isLoadingTemplates = true;
-        $this->startDeferredUiSync('templates');
+        $this->error = null;
+
+        try {
+            $result = app(CoachDatabaseService::class)->getEmailTemplatesForUser($user);
+            $remoteTemplates = collect($result['templates'] ?? [])
+                ->filter(fn ($template): bool => is_array($template))
+                ->map(function (array $template): array {
+                    $id = trim((string) ($template['id'] ?? $template['_id'] ?? $template['templateId'] ?? ''));
+                    if ($id !== '') {
+                        $template['id'] = $id;
+                    }
+
+                    $template['source_type'] = $template['source_type'] ?? 'ghl';
+                    return $template;
+                })
+                ->filter(fn (array $template): bool => filled($template['id'] ?? null))
+                ->values();
+
+            $this->templates = $remoteTemplates
+                ->merge($this->hardcodedEmailTemplates())
+                ->unique(fn (array $template): string => (string) ($template['id'] ?? md5(json_encode($template))))
+                ->values()
+                ->all();
+
+            $this->templateSourceSummary = (string) ($result['source'] ?? 'GoHighLevel');
+            $this->templateSourceDebug = is_array($result['debug'] ?? null) ? $result['debug'] : [];
+
+            if (! ($result['success'] ?? false) && $remoteTemplates->isEmpty()) {
+                $this->error = $result['error'] ?? 'Unable to load GoHighLevel templates.';
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Unable to load GoHighLevel email templates.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->templates = collect($this->templates)
+                ->merge($this->hardcodedEmailTemplates())
+                ->unique(fn (array $template): string => (string) ($template['id'] ?? md5(json_encode($template))))
+                ->values()
+                ->all();
+
+            $this->error = 'Unable to load GoHighLevel templates.';
+        } finally {
+            $this->isLoadingTemplates = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
+        }
     }
 
     protected function templateConnectionKeyForUser($user): string
@@ -3114,7 +3168,10 @@ trait InteractsWithCoachDatabase
         $this->templateInlineImageUpload = null;
         $this->templateAttachmentUploads = [];
         $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->templateBody = $this->templateHtml($template);
+        if ($this->templateBody === '') {
+            $this->templateBody = $this->coerceTemplateHtml($template);
+        }
         $this->templateEditorRefreshKey++;
         $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
 
@@ -3129,14 +3186,65 @@ trait InteractsWithCoachDatabase
 
     public function loadSelectedTemplateDetail(): void
     {
+        $user = Auth::user();
         $templateId = trim((string) $this->selectedTemplateId);
-        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
+
+        if (! $user || $templateId === '' || $this->isBuiltInTemplateId($templateId)) {
             $this->isLoadingTemplateDetail = false;
             return;
         }
 
         $this->isLoadingTemplateDetail = true;
-        $this->startDeferredUiSync('template-detail', $templateId);
+
+        try {
+            $result = app(CoachDatabaseService::class)->getEmailTemplateForUser($user, $templateId);
+
+            if (! ($result['success'] ?? false) || ! is_array($result['template'] ?? null)) {
+                Notification::make()
+                    ->title('Templates')
+                    ->body($this->templateErrorMessage($result, 'Unable to load template content.'))
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $template = $result['template'];
+            $template['id'] = $templateId;
+            $this->templateDetails[$templateId] = $template;
+
+            $this->templateName = trim((string) ($template['name'] ?? $template['title'] ?? 'Untitled Template')) ?: 'Untitled Template';
+            $this->templateSubject = $this->templateSubject($template);
+            $this->templatePreviewText = $this->templatePreviewText($template);
+
+            $html = $this->templateHtml($template);
+            if ($html === '') {
+                $html = $this->coerceTemplateHtml($template);
+            }
+
+            $this->templateBody = $html;
+            $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($html);
+            $this->templateEditorRefreshKey++;
+
+            $this->dispatch(
+                'rc-template-editor-refresh',
+                body: base64_encode($this->templateBody),
+                key: $this->templateEditorRefreshKey
+            );
+        } catch (\Throwable $exception) {
+            Log::error('Unable to load GoHighLevel template detail.', [
+                'user_id' => $user->id,
+                'template_id' => $templateId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Templates')
+                ->body('Unable to load template content.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isLoadingTemplateDetail = false;
+        }
     }
 
     protected function starterTemplateHtml(): string
@@ -3183,8 +3291,10 @@ HTML;
 
         $this->isSavingTemplate = true;
         $this->resolveTemplateGraphicUpload();
+        // Preserve the original GoHighLevel HTML, inline CSS, style tags,
+        // tables, and document structure returned by the visual editor.
         $html = $this->appendAttachmentLinksToHtml(
-            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
+            trim($bodyText),
             $this->templateAttachments
         );
 
@@ -3383,8 +3493,20 @@ HTML;
         }
 
         $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
-        $template = $this->loadTemplateDetail($templateId)
-            ?: collect($this->templates)->firstWhere('id', $templateId);
+        $template = $this->loadTemplateDetail($templateId);
+
+        if (! $hasFullDetail && ! $this->isBuiltInTemplateId($templateId) && Auth::user()) {
+            $detailResult = app(CoachDatabaseService::class)->getEmailTemplateForUser(Auth::user(), $templateId);
+
+            if (($detailResult['success'] ?? false) && is_array($detailResult['template'] ?? null)) {
+                $template = $detailResult['template'];
+                $template['id'] = $templateId;
+                $this->templateDetails[$templateId] = $template;
+                $hasFullDetail = true;
+            }
+        }
+
+        $template = $template ?: collect($this->templates)->firstWhere('id', $templateId);
 
         if (! is_array($template)) {
             Notification::make()->title('Templates')->body('Template could not be duplicated.')->danger()->send();
@@ -3488,7 +3610,10 @@ HTML;
         $this->campaignPreviewText = $this->templatePreviewText($template);
         $this->composeGraphicUrl = '';
         $this->composeAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->campaignBody = $this->templateHtml($template);
+        if ($this->campaignBody === '') {
+            $this->campaignBody = $this->coerceTemplateHtml($template);
+        }
 
         if (trim($this->campaignBody) === '') {
             $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));

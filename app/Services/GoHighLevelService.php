@@ -4196,9 +4196,56 @@ class GoHighLevelService
             }
 
             if ($templateId === '') {
+                $createFallbacks = [
+                    ['version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates"],
+                    ['version' => 'v3', 'url' => "{$this->baseUrl}/locations/{$locationId}/templates"],
+                ];
+
+                foreach ($createFallbacks as $fallback) {
+                    $createResponse = Http::withHeaders(['Version' => $fallback['version']])
+                        ->timeout((int) config('ghl.timeout', 20))
+                        ->withToken($token)
+                        ->acceptJson()
+                        ->asJson()
+                        ->post($fallback['url'], $basePayload);
+
+                    $createData = $createResponse->json();
+                    $createData = is_array($createData) ? $createData : [];
+
+                    $attemptDebug[] = [
+                        'method' => 'POST',
+                        'url' => $fallback['url'],
+                        'status' => $createResponse->status(),
+                    ];
+
+                    if ($createResponse->successful()) {
+                        $templateId = (string) (
+                            $createData['id']
+                            ?? $createData['_id']
+                            ?? $createData['templateId']
+                            ?? data_get($createData, 'data.id')
+                            ?? data_get($createData, 'template.id')
+                            ?? ''
+                        );
+
+                        $lastData = $createData;
+                        $lastStatus = $createResponse->status();
+
+                        if ($templateId !== '') {
+                            break;
+                        }
+                    }
+
+                    $lastError = $this->extractApiErrorMessage($createData, $lastError);
+                    $lastStatus = $createResponse->status();
+                    $lastData = $createData;
+                }
+            }
+
+            if ($templateId === '') {
                 return [
                     'success' => false,
-                    'error' => 'Template was created, but no template id was returned.',
+                    'error' => $lastError ?: 'Template was not created.',
                     'status' => $lastStatus,
                     'raw' => $lastData,
                     'debug' => $attemptDebug,
@@ -4207,14 +4254,12 @@ class GoHighLevelService
         }
 
         $updateAttempts = [
-            ['method' => 'patch', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => '/emails/builder/{id}'],
-            ['method' => 'put', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/builder/{id}'],
-            ['method' => 'patch', 'version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/locations/{locationId}/templates/{id}'],
+            ['method' => 'put', 'version' => '2021-07-28', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/builder/{id}'],
+            ['method' => 'patch', 'version' => '2021-07-28', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/builder/{id}'],
+            ['method' => 'put', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/builder/{id} 2023-02-21'],
+            ['method' => 'patch', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/builder/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/builder/{id} 2023-02-21'],
             ['method' => 'put', 'version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/locations/{locationId}/templates/{id}'],
-            ['method' => 'patch', 'version' => 'v3', 'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}", 'payload' => array_merge($basePayload, ['templateType' => 'email']), 'source' => 'PATCH /locations/{locationId}/templates/{id}'],
-            ['method' => 'put', 'version' => 'v3', 'url' => "{$this->baseUrl}/locations/{$locationId}/templates/{$templateId}", 'payload' => array_merge($basePayload, ['templateType' => 'email']), 'source' => 'PUT /locations/{locationId}/templates/{id}'],
-            ['method' => 'patch', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/templates/{id}'],
-            ['method' => 'put', 'version' => '2023-02-21', 'url' => "{$this->baseUrl}/emails/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PUT /emails/templates/{id}'],
+            ['method' => 'patch', 'version' => 'v3', 'url' => "{$this->baseUrl}/emails/locations/{$locationId}/templates/{$templateId}", 'payload' => $basePayload, 'source' => 'PATCH /emails/locations/{locationId}/templates/{id}'],
         ];
 
         foreach ($updateAttempts as $attempt) {

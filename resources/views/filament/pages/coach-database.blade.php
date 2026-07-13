@@ -9597,7 +9597,22 @@
                             <p style="margin:.22rem 0 0;color:var(--rc-muted);font-size:.8rem">Reusable email templates for your coach outreach.</p>
                         </div>
                         <div class="rc-templates-actions-v50">
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate" wire:loading.attr="disabled" wire:target="newTemplate"><span wire:loading.remove wire:target="newTemplate">+ New Template</span><span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
+                            <button
+                                class="rc-btn rc-btn-primary"
+                                type="button"
+                                data-rc-no-loading-shell="1"
+                                data-rc-no-pending="1"
+                                data-rc-local-action="1"
+                                wire:click="newTemplate"
+                                wire:loading.attr="disabled"
+                                wire:target="newTemplate"
+                            >
+                                <span wire:loading.remove wire:target="newTemplate">+ New Template</span>
+                                <span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline">
+                                    <span class="rc-spinner-mini"></span>
+                                    Loading
+                                </span>
+                            </button>
                         </div>
                     </div>
 
