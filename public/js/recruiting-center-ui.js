@@ -249,8 +249,15 @@
             },
 
             hasAnyList() {
-                return Object.values(this.optimisticLists || {})
-                    .some((value) => Boolean(value));
+                const keys = new Set([
+                    ...Object.keys(initial || {}),
+                    ...Object.keys(this.optimisticLists || {}),
+                    ...Object.keys(this.queuedChanges || {}),
+                ]);
+
+                return Array.from(keys).some((listKey) =>
+                    this.isInList(listKey, Boolean(initial?.[listKey]))
+                );
             },
 
             isListPending(listKey) {
