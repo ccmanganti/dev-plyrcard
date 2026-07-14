@@ -9097,14 +9097,15 @@ HTML;
         return $this->schoolSelectionResponse(false);
     }
 
-    public function toggleVisibleSchoolsSelection(): array
+    public function setFilteredSchoolsSelection(bool $select = true): array
     {
         if (method_exists($this, 'skipRender')) {
             $this->skipRender();
         }
 
-        // This is intentionally the complete filtered query, not the 24-row
-        // display slice returned by the filteredSchools computed property.
+        // Use the complete filtered query, not only the currently displayed
+        // school cards. This keeps Select All compatible with division,
+        // conference, search, and Load More.
         $filteredIds = $this->filteredSchoolIds();
 
         if ($filteredIds->isEmpty()) {
@@ -9117,14 +9118,26 @@ HTML;
             ->unique()
             ->values();
 
-        $allFilteredSelected = $filteredIds
-            ->every(fn (string $id): bool => $current->contains($id));
+        $this->selectedSchoolIds = $select
+            ? $current->merge($filteredIds)->unique()->values()->all()
+            : $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all();
 
-        $this->selectedSchoolIds = $allFilteredSelected
-            ? $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all()
-            : $current->merge($filteredIds)->unique()->values()->all();
+        return $this->schoolSelectionResponse($select, $filteredIds->count());
+    }
 
-        return $this->schoolSelectionResponse(! $allFilteredSelected, $filteredIds->count());
+    public function toggleVisibleSchoolsSelection(): array
+    {
+        $filteredIds = $this->filteredSchoolIds();
+        $current = collect($this->selectedSchoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $allFilteredSelected = $filteredIds->isNotEmpty()
+            && $filteredIds->every(fn (string $id): bool => $current->contains($id));
+
+        return $this->setFilteredSchoolsSelection(! $allFilteredSelected);
     }
 
     protected function filteredSchoolIds(): Collection
