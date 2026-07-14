@@ -7555,7 +7555,12 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Recent Activity</h2>
-                            <a href="#">View All</a>
+                            <a
+                                href="#"
+                                x-on:click.prevent="$dispatch('rc-open-profile-views')"
+                                data-rc-stat-open="profile-views"
+                                data-rc-no-pending
+                            >View All</a>
                         </div>
 
                         <div class="rc-home-activity-list-v2">
@@ -7646,8 +7651,8 @@
                         <button
                             type="button"
                             class="rc-home-outline-btn-v2"
-                            x-on:click="$dispatch('rc-open-profile-views')"
-                            data-rc-stat-open="profile-views"
+                            x-on:click="$dispatch('rc-open-coach-engagement')"
+                            data-rc-stat-open="coach-engagement"
                             data-rc-no-pending
                         >View Full Analytics</button>
                     </section>
