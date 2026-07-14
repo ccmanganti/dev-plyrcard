@@ -9097,12 +9097,14 @@ HTML;
         return $this->schoolSelectionResponse(false);
     }
 
-    public function setFilteredSchoolsSelection(bool $select = true): array
+    public function toggleVisibleSchoolsSelection(): array
     {
         if (method_exists($this, 'skipRender')) {
             $this->skipRender();
         }
 
+        // This is intentionally the complete filtered query, not the 24-row
+        // display slice returned by the filteredSchools computed property.
         $filteredIds = $this->filteredSchoolIds();
 
         if ($filteredIds->isEmpty()) {
@@ -9115,26 +9117,14 @@ HTML;
             ->unique()
             ->values();
 
-        $this->selectedSchoolIds = $select
-            ? $current->merge($filteredIds)->unique()->values()->all()
-            : $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all();
+        $allFilteredSelected = $filteredIds
+            ->every(fn (string $id): bool => $current->contains($id));
 
-        return $this->schoolSelectionResponse($select, $filteredIds->count());
-    }
+        $this->selectedSchoolIds = $allFilteredSelected
+            ? $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all()
+            : $current->merge($filteredIds)->unique()->values()->all();
 
-    public function toggleVisibleSchoolsSelection(): array
-    {
-        $filteredIds = $this->filteredSchoolIds();
-        $current = collect($this->selectedSchoolIds)
-            ->map(fn ($id): string => trim((string) $id))
-            ->filter()
-            ->unique()
-            ->values();
-
-        $allFilteredSelected = $filteredIds->isNotEmpty()
-            && $filteredIds->every(fn (string $id): bool => $current->contains($id));
-
-        return $this->setFilteredSchoolsSelection(! $allFilteredSelected);
+        return $this->schoolSelectionResponse(! $allFilteredSelected, $filteredIds->count());
     }
 
     protected function filteredSchoolIds(): Collection
@@ -9223,6 +9213,83 @@ HTML;
         $this->section = 'compose';
 
         Notification::make()->title('Recruiting Center')->body('Selected schools were added to Compose Email.')->success()->send();
+    }
+
+    public function emailSchoolsInList(string $listKey): void
+    {
+        $listKey = trim($listKey);
+        $ids = collect($this->allSchools())
+            ->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))
+            ->map(fn (array $school): string => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim((string) ($school['name'] ?? ''))))))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->emailSchoolIdsFromList($ids, $listKey);
+    }
+
+    public function emailSchoolIdsFromList(array $schoolIds, string $listKey = ''): void
+    {
+        $this->selectedSchoolIds = collect($schoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->emailSelectedSchools();
+    }
+
+    public function renameRecruitingList(string $listKey, string $newLabel): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $listKey = trim($listKey);
+        $newLabel = trim($newLabel);
+
+        if ($listKey === '' || $newLabel === '') {
+            return ['success' => false, 'error' => 'Enter a valid list name.'];
+        }
+
+        $overridesKey = $this->activeCacheKey() . ':list-label-overrides';
+        $overrides = Cache::get($overridesKey, []);
+        $overrides = is_array($overrides) ? $overrides : [];
+
+        // Store both canonical custom-list key forms so the label survives
+        // hydration regardless of whether the list row uses `slug` or
+        // `custom:slug` as its key.
+        $normalizedKey = str_starts_with($listKey, 'custom:')
+            ? substr($listKey, 7)
+            : $listKey;
+
+        $overrides[$listKey] = $newLabel;
+        if ($normalizedKey !== '') {
+            $overrides[$normalizedKey] = $newLabel;
+            $overrides['custom:' . $normalizedKey] = $newLabel;
+        }
+
+        Cache::put($overridesKey, $overrides, now()->addMonths(12));
+
+        $this->lists = collect($this->lists)
+            ->map(function ($list) use ($listKey, $newLabel) {
+                if (is_array($list) && (string) ($list['key'] ?? '') === $listKey) {
+                    $list['label'] = $newLabel;
+                }
+                return $list;
+            })
+            ->values()
+            ->all();
+
+        $definitions = $this->customListDefinitions();
+        if (isset($definitions[$normalizedKey]) && is_array($definitions[$normalizedKey])) {
+            $definitions[$normalizedKey]['label'] = $newLabel;
+            Cache::put($this->customListDefinitionsCacheKey(), $definitions, now()->addMonths(12));
+        }
+
+        return ['success' => true, 'label' => $newLabel];
     }
 
     public function queueSelectedSchoolsToList(string $listKey): array
@@ -10298,9 +10365,19 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
 
+        $labelOverrides = Cache::get($this->activeCacheKey() . ':list-label-overrides', []);
+        $labelOverrides = is_array($labelOverrides) ? $labelOverrides : [];
+
         $this->lists = collect($snapshot['lists'] ?? [])
             ->merge($this->customListRows())
             ->unique(fn (array $list): string => (string) ($list['key'] ?? $list['tag'] ?? md5(json_encode($list))))
+            ->map(function (array $list) use ($labelOverrides): array {
+                $key = (string) ($list['key'] ?? '');
+                if ($key !== '' && isset($labelOverrides[$key])) {
+                    $list['label'] = (string) $labelOverrides[$key];
+                }
+                return $list;
+            })
             ->values()
             ->all();
         $this->stats = $snapshot['stats'] ?? [];

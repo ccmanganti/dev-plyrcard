@@ -9766,7 +9766,101 @@
                         ->values()
                         ->all();
                 };
+                $allListSchoolOptions = collect($this->allSchools())
+                    ->filter(fn ($school): bool => is_array($school))
+                    ->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                        $name = (string) ($school['name'] ?? 'School');
+                        return [
+                            'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                            'name' => $name,
+                            'logo' => $listLogoUrlFor($school),
+                            'initials' => $listInitials($name),
+                        ];
+                    })
+                    ->filter(fn (array $school): bool => $school['id'] !== '')
+                    ->unique('id')
+                    ->values()
+                    ->all();
             @endphp
+
+            <style>
+                .rc-list-card-v120{background:#fff;border:1px solid #e7e9ee;border-radius:1rem;padding:1rem 1.15rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+                .rc-list-card-head-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+                .rc-list-card-title-v120{display:flex;align-items:center;gap:.72rem;min-width:0}
+                .rc-list-card-title-v120 strong{font-size:1rem;color:#111827}
+                .rc-list-card-actions-v120{display:flex;align-items:center;gap:.45rem;margin-left:auto}
+                .rc-list-action-v120{width:2.35rem;height:2.35rem;border:0;border-radius:.72rem;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s ease}
+                .rc-list-action-v120:hover,.rc-list-action-v120.is-active{background:#fff0ec;color:#ff6338}
+                .rc-list-email-v120{width:auto;padding:0 .9rem;gap:.45rem;background:#ff6338;color:#fff;font-weight:750;box-shadow:0 8px 20px rgba(255,99,56,.22)}
+                .rc-list-email-v120:hover{background:#ef5530;color:#fff}
+                .rc-list-panel-v120{margin-top:.85rem;display:grid;gap:.72rem}
+                .rc-list-confirm-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 1rem;border-radius:.8rem;background:#fee7e4;color:#b42318;font-weight:650}
+                .rc-list-confirm-actions-v120{display:flex;gap:.55rem}
+                .rc-list-confirm-actions-v120 button{border:0;border-radius:.65rem;padding:.62rem 1rem;font-weight:750;cursor:pointer}
+                .rc-list-confirm-cancel-v120{background:#fff;color:#344054}
+                .rc-list-confirm-delete-v120{background:#e94e43;color:#fff}
+                .rc-list-tools-v120{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}
+                .rc-list-search-v120{flex:1 1 20rem;position:relative}
+                .rc-list-search-v120 input{width:100%;height:2.75rem;border:1px solid #e1e5eb;border-radius:.72rem;padding:0 .9rem;background:#f8f9fb;color:#111827;outline:none}
+                .rc-list-search-v120 input:focus{border-color:#ff8b70;box-shadow:0 0 0 3px rgba(255,99,56,.1);background:#fff}
+                .rc-list-add-results-v120{position:absolute;z-index:40;top:calc(100% + .35rem);left:0;right:0;max-height:17rem;overflow:auto;background:#fff;border:1px solid #e2e6ec;border-radius:.75rem;box-shadow:0 18px 40px rgba(15,23,42,.18);padding:.35rem}
+                .rc-list-add-result-v120{width:100%;border:0;background:#fff;padding:.62rem .7rem;border-radius:.55rem;display:flex;align-items:center;gap:.65rem;text-align:left;cursor:pointer;color:#111827}
+                .rc-list-add-result-v120:hover{background:#fff3ef}
+                .rc-list-selection-bar-v120{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.72rem .85rem;border-radius:.72rem;background:#f7f8fa;flex-wrap:wrap}
+                .rc-list-selection-meta-v120{display:flex;gap:.8rem;align-items:center;color:#667085;font-size:.78rem}
+                .rc-list-selection-meta-v120 strong{color:#1d2939}
+                .rc-list-selection-meta-v120 button{border:0;background:transparent;color:#667085;cursor:pointer;padding:0}
+                .rc-list-selection-email-v120{border:0;border-radius:.65rem;background:#ff6338;color:#fff;padding:.62rem .9rem;font-weight:750;cursor:pointer}
+                .rc-list-chip-wrap-v120{display:flex;flex-wrap:wrap;gap:.55rem}
+                .rc-list-school-chip-v120{display:inline-flex;align-items:center;gap:.5rem;min-height:2.65rem;padding:.38rem .65rem;border:1px solid #e4e7ec;border-radius:.72rem;background:#f7f8fa;color:#111827;transition:.15s ease}
+                .rc-list-school-chip-v120.is-selected{border-color:#ff6338;background:#fff1ed}
+                .rc-list-chip-logo-v120{width:2rem;height:2rem;border-radius:.52rem;background:#fff;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;font-size:.72rem;flex:0 0 auto}
+                .rc-list-chip-logo-v120 img{width:100%;height:100%;object-fit:contain}
+                .rc-list-chip-name-v120{border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.35rem;height:1.35rem;border:0;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+                .rc-list-chip-check-v120{border:1px solid #d9dee7;border-radius:.35rem;background:#fff}
+                .rc-list-chip-check-v120.is-checked{background:#ff6338;border-color:#ff6338;color:#fff}
+                .rc-list-expand-v120{justify-self:start;border:1px solid #e2e6ec;border-radius:.65rem;background:#fff;color:#344054;padding:.62rem .9rem;font-weight:700;cursor:pointer}
+                .rc-list-rename-v120{display:flex;align-items:center;gap:.55rem}
+                .rc-list-rename-v120 input{height:2.55rem;min-width:14rem;border:1px solid #ff6338;border-radius:.65rem;padding:0 .75rem;outline:none}
+                .rc-list-rename-v120 button{height:2.55rem;border:0;border-radius:.65rem;padding:0 .8rem;font-weight:700;cursor:pointer}
+                .rc-list-empty-v120{color:#667085;font-size:.85rem;padding:.8rem 0}
+                .dark .rc-list-card-v120,.dark .rc-list-add-results-v120{background:#18181b;border-color:#34343b}
+
+                /* Compact My Lists controls and chips. */
+                .rc-list-card-v120{padding:1rem 1.05rem;border-radius:1rem}
+                .rc-list-card-head-v120{gap:.65rem;margin-bottom:.7rem}
+                .rc-list-card-title-v120{gap:.48rem}
+                .rc-list-card-title-v120 strong{font-size:1rem;font-weight:700}
+                .rc-list-count-pill-v41{min-height:1.7rem;padding:.15rem .58rem;font-size:.72rem;font-weight:500}
+                .rc-list-card-actions-v120{gap:.3rem}
+                .rc-list-action-v120{min-width:2.15rem;height:2.15rem;padding:0 .52rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-email-v120{padding:0 .7rem;gap:.35rem}
+                .rc-list-tools-v120{margin:.45rem 0}
+                .rc-list-search-v120{margin:.45rem 0}
+                .rc-list-search-v120 input{height:2.35rem;padding:0 .72rem;font-size:.8rem;border-radius:.58rem}
+                .rc-list-add-results-v120{max-height:14rem;border-radius:.65rem}
+                .rc-list-add-result-v120{min-height:2.25rem;padding:.38rem .55rem;font-size:.78rem;font-weight:500}
+                .rc-list-selection-bar-v120{min-height:3rem;padding:.55rem .7rem;border-radius:.65rem}
+                .rc-list-selection-meta-v120{gap:.55rem;font-size:.75rem}
+                .rc-list-selection-meta-v120 strong{font-size:.76rem;font-weight:650}
+                .rc-list-selection-email-v120{min-height:2.15rem;padding:0 .72rem;border-radius:.58rem;font-size:.75rem;font-weight:650}
+                .rc-list-chip-wrap-v120{gap:.42rem}
+                .rc-list-school-chip-v120{gap:.36rem;min-height:2.15rem;padding:.24rem .48rem;border-radius:.58rem;font-size:.78rem}
+                .rc-list-chip-logo-v120{width:1.65rem;height:1.65rem;border-radius:.45rem;font-size:.72rem}
+                .rc-list-chip-name-v120{font-size:.78rem;font-weight:550}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.45rem;height:1.45rem}
+                .rc-list-expand-v120{min-height:2.15rem;padding:0 .68rem;margin-top:.65rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-rename-v120{gap:.35rem;flex-wrap:wrap}
+                .rc-list-rename-v120 input{height:2.2rem;min-width:11rem;padding:0 .62rem;border-radius:.55rem;font-size:.8rem}
+                .rc-list-rename-v120 button{height:2.2rem;padding:0 .62rem;border-radius:.55rem;font-size:.74rem;font-weight:600}
+                .rc-list-rename-v120 .is-save{background:#ff6338;color:#fff}
+                .rc-list-rename-v120 .is-cancel{background:#f2f4f7;color:#344054}
+                .rc-list-inline-error-v121{flex-basis:100%;color:#d92d20;font-size:.7rem;font-weight:500}
+
+                .dark .rc-list-card-title-v120 strong,.dark .rc-list-add-result-v120,.dark .rc-list-school-chip-v120{color:#f4f4f5}
+                .dark .rc-list-school-chip-v120,.dark .rc-list-selection-bar-v120,.dark .rc-list-search-v120 input{background:#222226;border-color:#3f3f46}
+            </style>
 
             <div class="rc-my-lists-v41">
                 <div class="rc-my-lists-head-v41">
@@ -9785,22 +9879,10 @@
                         <input class="rc-input" placeholder="List name (e.g. Dream Schools)" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
                         <div class="rc-list-color-picker-v42" aria-label="Choose list color">
                             @foreach(['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'] as $colorOption)
-                                <button
-                                    type="button"
-                                    class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}"
-                                    style="color: {{ $colorOption }};"
-                                    wire:click="$set('newListColor', '{{ $colorOption }}')"
-                                    title="Use {{ $colorOption }}"
-                                    aria-label="Use list color {{ $colorOption }}"
-                                >
-                                    <span style="background: {{ $colorOption }};"></span>
-                                </button>
+                                <button type="button" class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}" style="color: {{ $colorOption }};" wire:click="$set('newListColor', '{{ $colorOption }}')"><span style="background: {{ $colorOption }};"></span></button>
                             @endforeach
                         </div>
-                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
-                            <span wire:loading.remove wire:target="createCustomList">Create</span>
-                            <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
-                        </button>
+                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList"><span wire:loading.remove wire:target="createCustomList">Create</span><span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span></button>
                         <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
                     </div>
                 @endif
@@ -9811,61 +9893,239 @@
                             $listKey = (string) ($list['key'] ?? '');
                             $listLabel = (string) ($list['label'] ?? 'List');
                             $listSchools = $schoolsForListKey($list);
-                            $schoolCount = count($listSchools);
-                            $isSelectedList = $selectedListKey === $listKey;
+                            $listSchoolsLight = collect($listSchools)->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                                $name = (string) ($school['name'] ?? 'School');
+                                return [
+                                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                                    'name' => $name,
+                                    'logo' => $listLogoUrlFor($school),
+                                    'initials' => $listInitials($name),
+                                ];
+                            })->values()->all();
                             $listColor = $safeListColor($list['color'] ?? null, $listIndex);
                         @endphp
-                        <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
-                            <div class="rc-list-card-head-v41">
-                                <div class="rc-list-card-title-v41">
+                        <article
+                            class="rc-list-card-v120"
+                            wire:key="list-card-{{ md5($listKey) }}"
+                            wire:ignore
+                            x-data="{
+                                key: @js($listKey),
+                                label: @js($listLabel),
+                                items: @js($listSchoolsLight),
+                                allSchools: @js($allListSchoolOptions),
+                                expanded: false,
+                                addOpen: false,
+                                selectMode: false,
+                                renameOpen: false,
+                                confirmDelete: false,
+                                addQuery: '',
+                                listQuery: '',
+                                renameValue: @js($listLabel),
+                                selected: [],
+                                removing: {},
+                                adding: {},
+                                savingRename: false,
+                                renameError: '',
+                                get visibleItems() {
+                                    const q = this.listQuery.trim().toLowerCase();
+                                    const filtered = q === '' ? this.items : this.items.filter(s => String(s.name || '').toLowerCase().includes(q));
+                                    return this.expanded || q !== '' ? filtered : filtered.slice(0, 10);
+                                },
+                                get addResults() {
+                                    const q = this.addQuery.trim().toLowerCase();
+                                    if (q.length < 2) return [];
+                                    const current = new Set(this.items.map(s => String(s.id)));
+                                    return this.allSchools.filter(s => !current.has(String(s.id)) && String(s.name || '').toLowerCase().includes(q)).slice(0, 12);
+                                },
+                                isSelected(id) { return this.selected.includes(String(id)); },
+                                toggleSelected(id) {
+                                    id = String(id);
+                                    this.selected = this.isSelected(id) ? this.selected.filter(v => v !== id) : [...this.selected, id];
+                                },
+                                selectAllVisible() { this.selected = this.items.map(s => String(s.id)); },
+                                clearSelection() { this.selected = []; },
+                                async removeSchool(school) {
+                                    const id = String(school.id);
+                                    if (this.removing[id]) return;
+                                    const index = this.items.findIndex(s => String(s.id) === id);
+                                    if (index < 0) return;
+                                    this.removing = { ...this.removing, [id]: true };
+                                    const removed = this.items[index];
+                                    this.items = this.items.filter(s => String(s.id) !== id);
+                                    this.selected = this.selected.filter(v => v !== id);
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: false });
+                                        if (!result || result.success === false) throw new Error(result?.error || 'Unable to remove school');
+                                    } catch (error) {
+                                        const copy = [...this.items];
+                                        copy.splice(Math.min(index, copy.length), 0, removed);
+                                        this.items = copy;
+                                        window.console.error(error);
+                                    } finally {
+                                        const next = { ...this.removing }; delete next[id]; this.removing = next;
+                                    }
+                                },
+                                async addSchool(schoolItem) {
+                                    const normalized = {
+                                        id: String(schoolItem?.id || ''),
+                                        name: String(schoolItem?.name || 'School'),
+                                        logo: String(schoolItem?.logo || ''),
+                                        initials: String(schoolItem?.initials || ''),
+                                    };
+                                    const id = normalized.id;
+                                    if (!id || this.adding[id] || this.items.some(item => String(item.id) === id)) return;
+
+                                    // Add to the visible list immediately. The remote GHL action
+                                    // is queued afterward and does not block the interface.
+                                    this.items = [...this.items, normalized];
+                                    this.addQuery = '';
+                                    this.expanded = true;
+                                    this.adding = { ...this.adding, [id]: true };
+
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: true });
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to add school');
+                                        }
+                                    } catch (error) {
+                                        this.items = this.items.filter(item => String(item.id) !== id);
+                                        this.renameError = error?.message || 'Unable to add school.';
+                                        window.console.error(error);
+                                    } finally {
+                                        const nextAdding = { ...this.adding };
+                                        delete nextAdding[id];
+                                        this.adding = nextAdding;
+                                    }
+                                },
+                                async emailAll() { await $wire.call('emailSchoolsInList', this.key); },
+                                async emailSelected() {
+                                    if (this.selected.length === 0) return;
+                                    await $wire.call('emailSchoolIdsFromList', this.selected, this.key);
+                                },
+                                async saveRename() {
+                                    const nextLabel = String(this.renameValue || '').trim();
+                                    if (!nextLabel || this.savingRename) return;
+
+                                    this.savingRename = true;
+                                    this.renameError = '';
+
+                                    try {
+                                        const result = await $wire.call('renameRecruitingList', this.key, nextLabel);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to rename this list.');
+                                        }
+
+                                        this.label = String(result.label || nextLabel);
+                                        this.renameValue = this.label;
+                                        this.renameOpen = false;
+                                    } catch (error) {
+                                        this.renameError = error?.message || 'Unable to rename this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.savingRename = false;
+                                    }
+                                },
+                                async deleteList() { await $wire.call('deleteCustomList', this.key); }
+                            }"
+                        >
+                            <div class="rc-list-card-head-v120">
+                                <div class="rc-list-card-title-v120">
                                     <span class="rc-list-dot-v41" style="--list-color: {{ $listColor }};"></span>
-                                    <strong>{{ $listLabel }}</strong>
-                                    <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
+                                    <template x-if="!renameOpen"><strong x-text="label"></strong></template>
+                                    <template x-if="renameOpen">
+                                        <span class="rc-list-rename-v120">
+                                            <input type="text" x-model="renameValue" x-on:keydown.enter.prevent="saveRename()" x-on:keydown.escape.prevent="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">
+                                            <button type="button" class="is-save" x-on:click="saveRename()" x-bind:disabled="savingRename || !renameValue.trim()">
+                                                <span x-show="!savingRename">Save</span>
+                                                <span x-show="savingRename" x-cloak>Saving…</span>
+                                            </button>
+                                            <button type="button" class="is-cancel" x-on:click="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">Cancel</button>
+                                            <small class="rc-list-inline-error-v121" x-show="renameError" x-text="renameError"></small>
+                                        </span>
+                                    </template>
+                                    <span class="rc-list-count-pill-v41"><span x-text="items.length.toLocaleString()"></span> <span x-text="items.length === 1 ? 'school' : 'schools'"></span></span>
                                 </div>
-                                <div class="rc-list-card-actions-v41">
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="startAddingSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" title="Add schools to {{ $listLabel }}" aria-label="Add schools to {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+
+                                <div class="rc-list-card-actions-v120">
+                                    <button type="button" class="rc-list-action-v120 rc-list-email-v120" x-on:click="emailAll()" title="Email all schools in this list">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
+                                        Email Schools
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41 {{ $isSelectedList ? 'is-active' : '' }}" wire:click="selectList({{ \Illuminate\Support\Js::from($listKey) }})" title="Open {{ $listLabel }}" aria-label="Open {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="selectMode ? 'is-active' : ''" x-on:click="selectMode=!selectMode" title="Select specific schools to email">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="deleteCustomList({{ \Illuminate\Support\Js::from($listKey) }})" wire:confirm="Remove this list? This does not delete schools or coaches." title="Delete {{ $listLabel }}" aria-label="Delete {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="addOpen ? 'is-active' : ''" x-on:click="addOpen=!addOpen" title="Add a school">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="renameOpen ? 'is-active' : ''" x-on:click="renameOpen=!renameOpen;renameValue=label;renameError=''" title="Rename list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-action-v120" x-on:click="confirmDelete=true" title="Delete list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="rc-list-chip-wrap-v41">
-                                @forelse($listSchools as $school)
-                                    @php
-                                        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? '');
-                                        $schoolName = (string) ($school['name'] ?? 'School');
-                                        $logoUrl = $listLogoUrlFor($school);
-                                        $initials = $listInitials($schoolName);
-                                    @endphp
-                                    <span class="rc-list-school-chip-v41" wire:key="list-chip-{{ md5($listKey.'-'.$schoolId) }}">
-                                        <span class="rc-list-chip-logo-v41">
-                                            @if($logoUrl !== '')
-                                                <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
-                                            @else
-                                                {{ $initials }}
-                                            @endif
-                                        </span>
-                                        <button type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">{{ $schoolName }}</button>
-                                        <button type="button" class="rc-list-chip-remove-v41" wire:click="removeSchoolFromListById({{ \Illuminate\Support\Js::from($schoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" title="Remove {{ $schoolName }} from {{ $listLabel }}" aria-label="Remove {{ $schoolName }} from {{ $listLabel }}">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                                        </button>
+                            <div class="rc-list-panel-v120">
+                                <div class="rc-list-confirm-v120" x-show="confirmDelete" x-cloak>
+                                    <span>Delete “<span x-text="label"></span>” and its schools?</span>
+                                    <span class="rc-list-confirm-actions-v120">
+                                        <button type="button" class="rc-list-confirm-cancel-v120" x-on:click="confirmDelete=false">Cancel</button>
+                                        <button type="button" class="rc-list-confirm-delete-v120" x-on:click="deleteList()">Delete</button>
                                     </span>
-                                @empty
-                                    <div class="rc-subtle">No schools in this list yet. Use the plus button to add schools from Discover Schools.</div>
-                                @endforelse
+                                </div>
+
+                                <div class="rc-list-tools-v120" x-show="addOpen" x-cloak>
+                                    <div class="rc-list-search-v120">
+                                        <input type="search" placeholder="Search a school to add..." x-model.debounce.150ms="addQuery">
+                                        <div class="rc-list-add-results-v120" x-show="addResults.length > 0" x-cloak>
+                                            <template x-for="schoolItem in addResults" :key="`add-${key}-${schoolItem.id}`">
+                                                <button type="button" class="rc-list-add-result-v120" x-on:click.prevent.stop="addSchool(schoolItem)" x-bind:disabled="Boolean(adding[String(schoolItem.id)])">
+                                                    <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                                    <span x-text="schoolItem.name"></span>
+                                                    <span class="rc-spinner-mini" x-show="Boolean(adding[String(schoolItem.id)])" x-cloak></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rc-list-selection-bar-v120" x-show="selectMode" x-cloak>
+                                    <div class="rc-list-selection-meta-v120">
+                                        <strong><span x-text="selected.length"></span> of <span x-text="items.length"></span> selected</strong>
+                                        <button type="button" x-on:click="selectAllVisible()">Select all</button>
+                                        <button type="button" x-on:click="clearSelection()">Clear</button>
+                                    </div>
+                                    <button type="button" class="rc-list-selection-email-v120" x-bind:disabled="selected.length === 0" x-on:click="emailSelected()">Email Selected (<span x-text="selected.length"></span>)</button>
+                                </div>
+
+                                <div class="rc-list-search-v120" x-show="items.length > 10 || listQuery !== ''" x-cloak>
+                                    <input type="search" placeholder="Search in this list..." x-model.debounce.120ms="listQuery">
+                                </div>
+
+                                <div class="rc-list-chip-wrap-v120">
+                                    <template x-for="schoolItem in visibleItems" :key="`list-${key}-${schoolItem.id}`">
+                                        <span class="rc-list-school-chip-v120" x-bind:class="isSelected(schoolItem.id) ? 'is-selected' : ''">
+                                            <button type="button" class="rc-list-chip-check-v120" x-show="selectMode" x-bind:class="isSelected(schoolItem.id) ? 'is-checked' : ''" x-on:click.prevent.stop="toggleSelected(schoolItem.id)">
+                                                <svg x-show="isSelected(schoolItem.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg>
+                                            </button>
+                                            <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                            <button type="button" class="rc-list-chip-name-v120" x-text="schoolItem.name" x-on:click.prevent.stop="$wire.call('openSchoolDashboardModal', schoolItem.id)"></button>
+                                            <button type="button" class="rc-list-chip-remove-v120" x-show="!selectMode" x-on:click.prevent.stop="removeSchool(schoolItem)" title="Remove school">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                            </button>
+                                        </span>
+                                    </template>
+                                    <div class="rc-list-empty-v120" x-show="items.length === 0">No schools in this list yet. Use the plus button to add one.</div>
+                                </div>
+
+                                <button type="button" class="rc-list-expand-v120" x-show="items.length > 10 && listQuery === ''" x-on:click="expanded=!expanded">
+                                    <span x-text="expanded ? 'Show fewer schools' : `See All ${items.length.toLocaleString()} Schools`"></span>
+                                </button>
                             </div>
                         </article>
                     @empty
-                        <div class="rc-list-empty-card-v41">
-                            <strong>No lists yet.</strong>
-                            <div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div>
-                        </div>
+                        <div class="rc-list-empty-card-v41"><strong>No lists yet.</strong><div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div></div>
                     @endforelse
                 </div>
             </div>
