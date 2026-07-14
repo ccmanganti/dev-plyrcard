@@ -10958,7 +10958,7 @@
             @endphp
 
             <div class="rc-drawer rc-school-modal-backdrop rc-ui-stable-modal" wire:key="school-drawer-{{ $slideSchoolId }}" x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcRequestSchoolClose($el); }" data-rc-modal="school" data-rc-modal-id="school-{{ $slideSchoolId }}" data-rc-school-id="{{ $slideSchoolId }}" data-rc-drawer-backdrop>
-                <div class="rc-drawer-panel rc-school-modal-panel rc-ui-stable-panel" wire:ignore.self x-data="window.rcSchoolDrawer ? window.rcSchoolDrawer({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($initialListMemberships) }}, @js((bool) ($slideSchool['is_favorite'] ?? false))) : { tab: 'coaches', listsOpen: false, isInList(key, value) { return value }, isListPending() { return false }, toggleList() {} }" x-init="init && init()" x-on:click.stop x-on:pointerdown.stop x-on:mousedown.stop x-on:touchstart.stop data-rc-interaction-boundary role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                <div class="rc-drawer-panel rc-school-modal-panel rc-ui-stable-panel" wire:ignore.self x-data="window.rcSchoolDrawer ? window.rcSchoolDrawer({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($initialListMemberships) }}, @js((bool) ($slideSchool['is_favorite'] ?? false))) : { tab: 'coaches', listsOpen: false, optimisticLists: {{ \Illuminate\Support\Js::from($initialListMemberships) }}, isInList(key, value) { return Object.prototype.hasOwnProperty.call(this.optimisticLists || {}, String(key || '')) ? Boolean(this.optimisticLists[String(key || '')]) : Boolean(value) }, hasAnyList() { return Object.entries(this.optimisticLists || {}).some(([key, value]) => this.isInList(key, value)) }, isListPending() { return false }, toggleList() {} }" x-init="init && init()" x-on:click.stop x-on:pointerdown.stop x-on:mousedown.stop x-on:touchstart.stop data-rc-interaction-boundary role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
                     <button class="rc-school-modal-close" type="button" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcRequestSchoolClose($el)" x-on:click.prevent.stop aria-label="Close school details">×</button>
 
                     <div class="rc-school-modal-hero-v72">
@@ -11009,9 +11009,16 @@
                         </button>
 
                         <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false" x-on:click.stop data-rc-dropdown-boundary>
-                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click.stop="listsOpen=!listsOpen" x-bind:aria-expanded="listsOpen ? 'true' : 'false'" aria-haspopup="menu">
+                            <button
+                                class="rc-school-action"
+                                type="button"
+                                x-on:click.stop="listsOpen=!listsOpen"
+                                x-bind:class="{ 'is-in-list': hasAnyList() }"
+                                x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
+                                aria-haspopup="menu"
+                            >
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-                                <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
+                                <span x-text="hasAnyList() ? 'In List' : 'Add to List'"></span>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
                             <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-on:click.stop role="menu">
