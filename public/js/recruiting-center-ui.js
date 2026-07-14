@@ -1,5 +1,5 @@
 (() => {
-    const RC_UI_VERSION = '2026-07-13.6';
+    const RC_UI_VERSION = '2026-07-14.1';
 
     // A stale production asset may have set __recruitingCenterUiLoaded first.
     // Only skip when this exact revision is already active. A newer revision
@@ -246,6 +246,11 @@
                 return own(this.optimisticLists, normalized)
                     ? Boolean(this.optimisticLists[normalized])
                     : Boolean(serverValue);
+            },
+
+            hasAnyList() {
+                return Object.values(this.optimisticLists || {})
+                    .some((value) => Boolean(value));
             },
 
             isListPending(listKey) {
