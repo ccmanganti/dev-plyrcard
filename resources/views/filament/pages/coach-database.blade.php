@@ -11013,12 +11013,12 @@
                                 class="rc-school-action"
                                 type="button"
                                 x-on:click.stop="listsOpen=!listsOpen"
-                                x-bind:class="{ 'is-in-list': hasAnyList() }"
+                                x-bind:class="{ 'is-in-list': Object.values(optimisticLists || {}).some(value => Boolean(value)) }"
                                 x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
                                 aria-haspopup="menu"
                             >
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-                                <span x-text="hasAnyList() ? 'In List' : 'Add to List'"></span>
+                                <span x-text="Object.values(optimisticLists || {}).some(value => Boolean(value)) ? 'In List' : 'Add to List'"></span>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
                             <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-on:click.stop role="menu">
