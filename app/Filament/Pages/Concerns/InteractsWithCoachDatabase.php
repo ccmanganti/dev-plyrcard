@@ -2897,6 +2897,10 @@ trait InteractsWithCoachDatabase
             $this->stats = $this->mergeDashboardTrackingStats($this->stats ?? [], $remoteStats);
         }
 
+        $localMembershipCounts = $this->localDashboardSchoolMembershipCounts();
+        $this->stats['saved_schools'] = (int) ($localMembershipCounts['saved_schools'] ?? 0);
+        $this->stats['favorite_schools'] = (int) ($localMembershipCounts['favorite_schools'] ?? 0);
+
         $recent = collect(is_array($summary['recent_activity'] ?? null) ? $summary['recent_activity'] : [])
             ->filter(fn ($row): bool => is_array($row))
             ->values()
@@ -6853,21 +6857,51 @@ HTML;
             ->all();
     }
 
+    /**
+     * Local database is the source of truth for Dashboard school membership stats.
+     * GHL is retrieval-only and must not influence Favorite/My List totals.
+     *
+     * @return array{favorite_schools:int,saved_schools:int}
+     */
+    protected function localDashboardSchoolMembershipCounts(): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return [
+                'favorite_schools' => 0,
+                'saved_schools' => 0,
+            ];
+        }
+
+        $locationId = trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? ''));
+
+        $rows = DB::table('coach_database_school_memberships')
+            ->where('user_id', $user->id)
+            ->where('ghl_location_id', $locationId)
+            ->selectRaw("COUNT(DISTINCT CASE WHEN list_key = '__favorite__' THEN business_id END) AS favorite_schools")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN list_key <> '__favorite__' THEN business_id END) AS saved_schools")
+            ->first();
+
+        return [
+            'favorite_schools' => (int) ($rows->favorite_schools ?? 0),
+            'saved_schools' => (int) ($rows->saved_schools ?? 0),
+        ];
+    }
+
     public function getDashboardMetricsProperty(): array
     {
         $stats = $this->stats ?? [];
         $schools = collect($this->allSchools());
 
-        $savedSchools = max(
-            (int) ($stats['saved_schools'] ?? 0),
-            $schools->filter(fn (array $school): bool => $this->schoolRowHasSavedFlag($school))->count(),
-            $this->schoolCountFromListLabels(['saved', 'saved schools']),
-        );
-        $favoriteSchools = max(
-            (int) ($stats['favorite_schools'] ?? 0),
-            $schools->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school))->count(),
-            $this->schoolCountFromListLabels(['favorite', 'favorites', 'favorite schools']),
-        );
+        $localMembershipCounts = $this->localDashboardSchoolMembershipCounts();
+        $savedSchools = (int) ($localMembershipCounts['saved_schools'] ?? 0);
+        $favoriteSchools = (int) ($localMembershipCounts['favorite_schools'] ?? 0);
+
+        // Keep the public stats array synchronized for every Dashboard widget,
+        // while ensuring remote/cached GHL values can never override local truth.
+        $this->stats['saved_schools'] = $savedSchools;
+        $this->stats['favorite_schools'] = $favoriteSchools;
 
         $profileRows = collect($this->profileViewRows);
         $engagementRows = collect($this->coachEngagementRows);
