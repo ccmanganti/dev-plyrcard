@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
 use App\Services\LocalSchoolMembershipService;
+use App\Services\LocalCoachDatabaseSchoolService;
 use App\Services\CoachDatabaseActionQueueService;
 use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
@@ -214,12 +215,8 @@ trait InteractsWithCoachDatabase
         $this->hydrateDeferredUiCache();
         $this->refreshRecruitingSyncStatus();
 
-        if (in_array($this->section, ['favorites', 'lists'], true) && $this->allowed && ! $this->locked) {
-            // Favorites and Lists must be cache-only during the HTTP request. A slow
-            // contacts/search call here previously caused the entire page to fail with
-            // cURL error 28. Refresh tag data in a detached CLI process instead.
-            $this->syncTagsIfStale(false);
-        }
+        // Discover Schools, Favorites, and My Lists are database-backed.
+        // Do not start the legacy GHL contact-tag synchronization for these pages.
 
         if ($this->section === 'dashboard') {
             $this->loadDashboardActivity();
@@ -2096,7 +2093,7 @@ trait InteractsWithCoachDatabase
         $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
 
         if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This school is missing a GHL company ID.'];
+            return ['success' => false, 'error' => 'This school is missing its local database business ID.'];
         }
 
         $currentKeys = collect($school['list_keys'] ?? $school['lists'] ?? [])
@@ -2158,7 +2155,7 @@ trait InteractsWithCoachDatabase
         $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
 
         if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
-            $result = ['success' => false, 'favorite' => ! $favorite, 'error' => 'This school is missing a GHL company ID.'];
+            $result = ['success' => false, 'favorite' => ! $favorite, 'error' => 'This school is missing its local database business ID.'];
             if (! $returnResult) {
                 Notification::make()->title('Recruiting Center')->body($result['error'])->danger()->send();
             }
@@ -2198,7 +2195,7 @@ trait InteractsWithCoachDatabase
         $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
 
         if (! $user || ! $school || $businessId === '' || $listKey === '') {
-            return ['success' => false, 'error' => 'This school is missing a GHL company ID.'];
+            return ['success' => false, 'error' => 'This school is missing its local database business ID.'];
         }
 
         $previous = collect($school['list_keys'] ?? $school['lists'] ?? [])->values()->all();
@@ -2230,22 +2227,31 @@ trait InteractsWithCoachDatabase
 
     protected function schoolRowForCompanyMembership(string $schoolId): ?array
     {
+        $user = Auth::user();
+
+        if ($user) {
+            $snapshot = $this->activeSnapshotRows();
+            $service = app(LocalCoachDatabaseSchoolService::class);
+            $service->ensureSeeded($user, $snapshot);
+
+            $local = $service->find($user, $schoolId);
+            if (is_array($local)) {
+                return $local;
+            }
+        }
+
         $schoolId = trim($schoolId);
-        if ($schoolId === '') return null;
+        if ($schoolId === '') {
+            return null;
+        }
 
-        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-
-        return collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
-            ->filter(fn ($row): bool => is_array($row))
-            ->first(function (array $school) use ($schoolId): bool {
-                $name = strtolower(trim((string) ($school['name'] ?? '')));
-                return in_array($schoolId, array_filter([
-                    trim((string) ($school['id'] ?? '')),
-                    trim((string) ($school['business_id'] ?? '')),
-                    trim((string) ($school['company_id'] ?? '')),
-                    $name !== '' ? md5($name) : '',
-                ]), true);
-            });
+        return collect($this->allSchools())->first(function (array $school) use ($schoolId): bool {
+            return in_array($schoolId, array_filter([
+                trim((string) ($school['id'] ?? '')),
+                trim((string) ($school['business_id'] ?? '')),
+                trim((string) ($school['company_id'] ?? '')),
+            ]), true);
+        });
     }
 
     protected function applyCompanyFavoriteToCachedSchool(string $schoolId, bool $favorite): void
@@ -7768,6 +7774,26 @@ HTML;
         $this->listSchoolSearch = '';
     }
 
+    /**
+     * Lightweight, cache-backed dataset consumed by the client-side Discover
+     * Schools controller. This is a computed Livewire property, so Blade can
+     * safely read `$this->discoverSchoolsClientDataset`.
+     */
+    public function getDiscoverSchoolsClientDatasetProperty(): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return [];
+        }
+
+        $snapshot = $this->activeSnapshotRows();
+        $service = app(LocalCoachDatabaseSchoolService::class);
+        $service->ensureSeeded($user, $snapshot);
+
+        return $service->discoverDataset($user);
+    }
+
     public function getFilteredSchoolsProperty(): array
     {
         return $this->filteredSchoolsQuery()
@@ -8224,7 +8250,26 @@ HTML;
     }
 
 
-    public function getFavoriteSchoolsProperty(): array { return $this->filterSchoolsForSearch(collect($this->allSchools())->filter(fn (array $school): bool => $this->schoolRowHasFavoriteFlag($school)), $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search)->take((int) config('coach-database-sync.ui.school_row_cap', 96))->values()->all(); }
+    public function getFavoriteSchoolsProperty(): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return [];
+        }
+
+        $snapshot = $this->activeSnapshotRows();
+        $service = app(LocalCoachDatabaseSchoolService::class);
+        $service->ensureSeeded($user, $snapshot);
+
+        return $this->filterSchoolsForSearch(
+            collect($service->favoriteSchools($user)),
+            $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search,
+        )
+            ->take((int) config('coach-database-sync.ui.school_row_cap', 96))
+            ->values()
+            ->all();
+    }
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
@@ -10800,6 +10845,11 @@ HTML;
         $this->schoolCoachIndexMemo = null;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
+
+        $user = Auth::user();
+        if ($user) {
+            app(LocalCoachDatabaseSchoolService::class)->ensureSeeded($user, $snapshot);
+        }
 
         $labelOverrides = Cache::get($this->activeCacheKey() . ':list-label-overrides', []);
         $labelOverrides = is_array($labelOverrides) ? $labelOverrides : [];

@@ -175,15 +175,21 @@ class LocalSchoolMembershipService
 
     public function removeListFromAllSchools(User $user, string $listKey): int
     {
-        $listKey = strtolower(trim($listKey));
-        if ($listKey === '') {
+        return $this->removeListsFromAllSchools($user, [$listKey]);
+    }
+
+    public function removeListsFromAllSchools(User $user, array $listKeys): int
+    {
+        $keys = $this->normalizeKeys($listKeys);
+
+        if (empty($keys)) {
             return 0;
         }
 
         $deleted = CoachDatabaseSchoolMembership::query()
             ->where('user_id', $user->getKey())
             ->where('ghl_location_id', $this->locationId($user))
-            ->where('list_key', $listKey)
+            ->whereIn('list_key', $keys)
             ->delete();
 
         $this->forgetRequestMap($user);
