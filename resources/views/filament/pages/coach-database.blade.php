@@ -53,7 +53,7 @@
             };
 
             if (typeof window.rcDiscoverSelection !== 'function') {
-                window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false) => {
+                window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false, initialFilteredIds = []) => {
                     let store = stores.get(key());
 
                     if (!store) {
@@ -65,9 +65,14 @@
                             needsFlush: false,
                             timer: null,
                             version: 0,
+                            filteredIds: new Set((initialFilteredIds || []).map((id) => String(id))),
                         };
                         stores.set(key(), store);
                     }
+
+                    store.filteredIds = new Set((initialFilteredIds || []).map((id) => String(id)));
+                    store.allFilteredSelected = store.filteredIds.size > 0
+                        && Array.from(store.filteredIds).every((id) => store.selected.has(id));
 
                     return {
                         revision: Number(store.version || 0),
@@ -146,107 +151,48 @@
                             this.allFilteredSelected = false;
                             announce(store);
 
-                            clearTimeout(store.timer);
-                            store.timer = setTimeout(() => this.flush(), 220);
+                            // Keep checkbox interactions entirely client-side.
+                            // Selection is sent only for Add to List or Email.
                         },
 
                         async flush() {
-                            if (store.inFlight) {
-                                store.needsFlush = true;
-                                return;
-                            }
-
-                            store.inFlight = true;
-                            store.needsFlush = false;
-
-                            try {
-                                const result = await this.$wire.call(
-                                    'setSelectedSchoolIds',
-                                    Array.from(store.selected)
-                                );
-
-                                if (!result || result.success === false) {
-                                    toast(result?.error || 'Unable to update selected schools.');
-                                } else {
-                                    store.dirty = false;
-                                }
-                            } catch (error) {
-                                console.error(error);
-                                toast('Unable to update selected schools.');
-                            } finally {
-                                store.inFlight = false;
-
-                                if (store.needsFlush) {
-                                    clearTimeout(store.timer);
-                                    store.timer = setTimeout(() => this.flush(), 40);
-                                }
-                            }
+                            // Selection is intentionally browser-local for speed.
+                            return true;
                         },
 
-                        async toggleAllFiltered() {
-                            if (store.inFlight) return;
-                            store.inFlight = true;
+                        toggleAllFiltered() {
+                            const ids = Array.from(store.filteredIds || []);
+                            if (!ids.length) return;
 
-                            try {
-                                const result = await this.$wire.call(
-                                    'toggleVisibleSchoolsSelection'
-                                );
+                            const allSelected = ids.every((id) => store.selected.has(id));
 
-                                if (!result || result.success === false) {
-                                    toast(
-                                        result?.error
-                                        || 'Unable to select the filtered schools.'
-                                    );
-                                    return;
-                                }
-
-                                this.updateLocal(
-                                    result.selected || [],
-                                    result.all_filtered_selected
-                                );
-                                store.dirty = false;
-                                store.needsFlush = false;
-                            } catch (error) {
-                                console.error(error);
-                                toast('Unable to select the filtered schools.');
-                            } finally {
-                                store.inFlight = false;
+                            if (allSelected) {
+                                ids.forEach((id) => store.selected.delete(id));
+                            } else {
+                                ids.forEach((id) => store.selected.add(id));
                             }
+
+                            store.allFilteredSelected = !allSelected;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = store.allFilteredSelected;
+                            announce(store);
                         },
 
                         async clearAll() {
-                            if (store.inFlight) return;
-                            store.inFlight = true;
-
-                            try {
-                                const result = await this.$wire.call(
-                                    'clearSelectedSchools'
-                                );
-
-                                if (!result || result.success === false) {
-                                    toast(
-                                        result?.error
-                                        || 'Unable to clear selected schools.'
-                                    );
-                                    return;
-                                }
-
-                                this.updateLocal([], false);
-                                store.dirty = false;
-                                store.needsFlush = false;
-                            } catch (error) {
-                                console.error(error);
-                                toast('Unable to clear selected schools.');
-                            } finally {
-                                store.inFlight = false;
-                            }
+                            this.updateLocal([], false);
+                            store.dirty = false;
+                            store.needsFlush = false;
                         },
 
                         async emailSelected() {
                             await this.flush();
 
                             try {
-                                await this.$wire.call('emailSelectedSchools');
+                                await this.$wire.call(
+                                'emailSchoolIds',
+                                Array.from(store.selected)
+                            );
                             } catch (error) {
                                 console.error(error);
                                 toast(
@@ -258,8 +204,234 @@
                 };
             }
 
-            if (typeof window.rcBulkSchoolList !== 'function') {
-                window.rcBulkSchoolList = (initialLists = []) => ({
+
+            window.__rcDiscoverClientCacheVersion = '2026-07-15.7-grid-view-restored';
+            window.rcDiscoverClientCache = (initialSchools = [], initialLists = [], initialView = 'grid') => ({
+                schools: [],
+                lists: Array.isArray(initialLists) ? initialLists : [],
+                search: '',
+                division: '',
+                conference: '',
+                viewMode: initialView === 'list' ? 'list' : 'grid',
+                limit: 48,
+                selected: new Set(),
+                listMenuOpen: false,
+                creating: false,
+                newListName: '',
+                newListColor: '#ff6338',
+                pendingListKey: '',
+                revision: 0,
+
+                init() {
+                    const rows = Array.isArray(initialSchools) ? initialSchools : [];
+                    this.schools = rows.map((row) => ({
+                        ...row,
+                        id: String(row?.id || row?.business_id || ''),
+                        business_id: String(row?.business_id || row?.id || ''),
+                        name: String(row?.name || 'Unnamed School'),
+                        division: String(row?.division || ''),
+                        conference: String(row?.conference || ''),
+                        logo_url: String(row?.logo_url || ''),
+                        coach_count: Number(row?.coach_count || 0),
+                        head_coach_name: String(row?.head_coach_name || '—'),
+                        head_coach_title: String(row?.head_coach_title || 'Coach'),
+                        head_coach_email: String(row?.head_coach_email || ''),
+                        search_text: String(row?.search_text || '').toLowerCase(),
+                    })).filter((row) => row.id !== '');
+
+                    try {
+                        sessionStorage.setItem('rcDiscoverSchools:' + window.location.pathname, JSON.stringify({
+                            cachedAt: @js($cachedAt ?? null),
+                            rows: this.schools,
+                        }));
+                    } catch (_) {}
+                },
+
+                get divisionTabs() {
+                    return ['', 'NCAA D-I', 'NCAA D-II', 'NCAA D-III', 'NAIA', 'NJCAA'];
+                },
+
+                normalize(value) {
+                    return String(value || '').trim().toLowerCase();
+                },
+
+                divisionMatches(value, filter) {
+                    if (!filter) return true;
+                    const current = this.normalize(value).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
+                    const wanted = this.normalize(filter).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
+                    return current === wanted || current.includes(wanted) || wanted.includes(current);
+                },
+
+                get conferenceOptions() {
+                    return [...new Set(this.schools
+                        .filter((row) => this.divisionMatches(row.division, this.division))
+                        .map((row) => row.conference)
+                        .filter(Boolean))]
+                        .sort((a, b) => a.localeCompare(b));
+                },
+
+                initialsFor(name) {
+                    return String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'S';
+                },
+                shortDivision(value) {
+                    const division = String(value || '').trim();
+                    if (!division) return '—';
+                    return division.replace('NCAA Division ', 'D').replace('NCAA D-', 'D').replace('Division ', 'D');
+                },
+                get filteredSchools() {
+                    const query = this.normalize(this.search);
+                    const conference = this.normalize(this.conference);
+                    return this.schools.filter((row) => {
+                        if (!this.divisionMatches(row.division, this.division)) return false;
+                        if (conference && this.normalize(row.conference) !== conference) return false;
+                        if (query && !row.search_text.includes(query)) return false;
+                        return true;
+                    });
+                },
+
+                get visibleSchools() {
+                    return this.filteredSchools.slice(0, this.limit);
+                },
+
+                get canLoadMore() {
+                    return this.limit < this.filteredSchools.length;
+                },
+
+                get selectedCount() {
+                    this.revision;
+                    return this.selected.size;
+                },
+
+                get allFilteredSelected() {
+                    this.revision;
+                    const rows = this.filteredSchools;
+                    return rows.length > 0 && rows.every((row) => this.selected.has(row.id));
+                },
+
+                setDivision(value) {
+                    this.division = this.division === value ? '' : value;
+                    this.conference = '';
+                    this.limit = 48;
+                },
+
+                setConference(value) {
+                    this.conference = value;
+                    this.limit = 48;
+                },
+
+                setViewMode(mode) {
+                    this.viewMode = mode === 'list' ? 'list' : 'grid';
+                    this.limit = Math.max(48, Number(this.limit || 48));
+                },
+
+                setSearch(value) {
+                    this.search = value;
+                    this.limit = 48;
+                },
+
+                toggleSchool(id) {
+                    id = String(id || '');
+                    if (!id) return;
+                    if (this.selected.has(id)) this.selected.delete(id);
+                    else this.selected.add(id);
+                    this.revision++;
+                },
+
+                isSelected(id) {
+                    this.revision;
+                    return this.selected.has(String(id || ''));
+                },
+
+                toggleAllFiltered() {
+                    const rows = this.filteredSchools;
+                    if (!rows.length) return;
+                    const remove = rows.every((row) => this.selected.has(row.id));
+                    rows.forEach((row) => remove ? this.selected.delete(row.id) : this.selected.add(row.id));
+                    this.revision++;
+                },
+
+                clearSelection() {
+                    this.selected.clear();
+                    this.revision++;
+                    this.listMenuOpen = false;
+                },
+
+                loadMore() {
+                    this.limit += 48;
+                },
+
+                async openSchool(id) {
+                    try {
+                        await this.$wire.call('openSchoolDashboardModal', String(id));
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to open this school.');
+                    }
+                },
+
+                async emailSelected() {
+                    if (!this.selected.size) return;
+                    try {
+                        await this.$wire.call('emailSchoolIds', Array.from(this.selected));
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to open Compose Email for the selected schools.');
+                    }
+                },
+
+                isPending(key) {
+                    return this.pendingListKey === String(key || '');
+                },
+
+                async addToList(listKey, listLabel) {
+                    if (!this.selected.size || this.pendingListKey) return;
+                    const ids = Array.from(this.selected);
+                    this.pendingListKey = String(listKey || '');
+                    try {
+                        const result = await this.$wire.call('queueSchoolIdsToList', ids, this.pendingListKey);
+                        if (!result || result.success === false) {
+                            toast(result?.error || 'Unable to save the selected schools.');
+                            return;
+                        }
+                        const row = this.lists.find((item) => String(item?.key || '') === this.pendingListKey);
+                        if (row) row.count = Number(row.count || 0) + Number(result.updated_schools || ids.length);
+                        this.clearSelection();
+                        toast(result.message || `${ids.length.toLocaleString()} school(s) added to ${listLabel}.`, 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to save the selected schools.');
+                    } finally {
+                        this.pendingListKey = '';
+                    }
+                },
+
+                async createQuickList() {
+                    const name = String(this.newListName || '').trim();
+                    if (!name || this.creating) return;
+                    this.creating = true;
+                    try {
+                        const result = await this.$wire.call('createCustomListQuick', name, this.newListColor);
+                        if (!result || result.success === false || !result.list) {
+                            toast(result?.error || 'Unable to create the list.');
+                            return;
+                        }
+                        this.lists.push({
+                            ...result.list,
+                            count: Number(result.list?.count || result.list?.schools_count || 0),
+                        });
+                        this.newListName = '';
+                        toast(result.message || 'List created.', 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to create the list.');
+                    } finally {
+                        this.creating = false;
+                    }
+                },
+            });
+
+            window.__rcLocalListControllerVersion = '2026-07-15.4-responsive';
+            window.rcBulkSchoolListLocalV2 = (initialLists = []) => ({
                     open: false,
                     creating: false,
                     newListName: '',
@@ -403,13 +575,6 @@
                         const listKeyValue = String(listKey || '').trim();
                         if (!listKeyValue) return;
 
-                        const synced = await this.syncSelection();
-
-                        if (!synced) {
-                            toast('Unable to synchronize the current school selection.');
-                            return;
-                        }
-
                         const actualCount = getStore()?.selected?.size
                             || Number(selectedCount || 0);
                         const label = String(listLabel || listKeyValue);
@@ -427,7 +592,8 @@
 
                         try {
                             const result = await this.$wire.call(
-                                'queueSelectedSchoolsToList',
+                                'queueSchoolIdsToList',
+                                Array.from(getStore()?.selected || []),
                                 listKeyValue
                             );
 
@@ -448,11 +614,36 @@
                                 return;
                             }
 
-                            const queuedCount = Number(
-                                result.school_count || actualCount || 0
+                            const savedCount = Number(
+                                result.updated_schools
+                                || result.school_count
+                                || actualCount
+                                || 0
                             );
-                            this.statusText = `Adding ${queuedCount.toLocaleString()} selected school(s) to ${result.list_label || label} in the background...`;
-                            this.watchUntilComplete();
+
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+
+                            const listRow = this.lists.find(
+                                (item) => String(item?.key || '') === listKeyValue
+                            );
+                            if (listRow) {
+                                listRow.count = Number(listRow.count || 0) + savedCount;
+                            }
+
+                            this.open = false;
+                            this.clearSelectionLocally();
+
+                            toast(
+                                result.message
+                                || `${savedCount.toLocaleString()} school(s) added to ${result.list_label || label}.`,
+                                'success'
+                            );
                         } catch (error) {
                             console.error(error);
                             const nextPending = { ...this.pendingLists };
@@ -466,67 +657,19 @@
                         }
                     },
 
-                    watchUntilComplete() {
-                        if (this.watching) return;
-                        this.watching = true;
-                        clearTimeout(this.watchTimer);
+                    clearSelectionLocally() {
+                        const store = getStore();
+                        if (store?.selected instanceof Set) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
 
-                        const check = async () => {
-                            try {
-                                const status = await this.$wire.call(
-                                    'pollCoachDatabaseActionStatus'
-                                );
-                                const current = String(status?.status || 'idle');
-
-                                if (
-                                    current === 'completed'
-                                    || current === 'completed_with_errors'
-                                ) {
-                                    if (current === 'completed') {
-                                        this.lists = this.lists.map((list) => {
-                                            const listKeyValue = String(
-                                                list?.key || ''
-                                            );
-                                            const added = Number(
-                                                this.pendingAdds?.[listKeyValue] || 0
-                                            );
-
-                                            return added > 0
-                                                ? {
-                                                    ...list,
-                                                    count: Number(list.count || 0)
-                                                        + added,
-                                                }
-                                                : list;
-                                        });
-                                    }
-
-                                    this.pendingLists = {};
-                                    this.pendingAdds = {};
-                                    this.statusText = '';
-                                    this.watching = false;
-                                    return;
-                                }
-
-                                if (this.pendingCount() > 0) {
-                                    this.watchTimer = setTimeout(
-                                        check,
-                                        current === 'running' ? 850 : 500
-                                    );
-                                    return;
-                                }
-
-                                this.watching = false;
-                            } catch (error) {
-                                console.error(error);
-                                this.watchTimer = setTimeout(check, 1200);
-                            }
-                        };
-
-                        this.watchTimer = setTimeout(check, 450);
+                        this.$dispatch('rc-discover-selection-cleared');
                     },
+
                 });
-            }
         })();
     </script>
 
@@ -6738,6 +6881,9 @@
             .rc-message-stream-v56 { max-height: 36rem !important; }
         }
 
+
+        .rc-discover-select-v27.is-updating { opacity:.72; cursor:progress; }
+        .rc-discover-tab-v27 { transition: background-color .12s ease, color .12s ease, border-color .12s ease; }
 </style>
 
     @php
@@ -7696,7 +7842,7 @@
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
+                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.180ms="search">
 
                             @if($search !== '')
                                 <div class="rc-global-suggestions">
@@ -9317,7 +9463,21 @@
 
 </style>
 
-            <div class="rc-discover-v29" x-data="window.rcDiscoverSelection(@js($selectedSchoolIds), @js($this->visibleSchoolsSelected))">
+            <div
+                class="rc-discover-v29"
+                wire:ignore
+                x-data="window.rcDiscoverClientCache(
+                    @js($this->discoverSchoolsClientDataset),
+                    @js(collect($this->lists)->map(fn ($list) => [
+                        'key' => (string) ($list['key'] ?? ''),
+                        'label' => (string) ($list['label'] ?? ''),
+                        'color' => (string) ($list['color'] ?? '#ff6338'),
+                        'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? [])),
+                    ])->filter(fn ($list) => $list['key'] !== '')->values()->all()),
+                    @js($schoolViewMode)
+                )"
+                x-init="init()"
+            >
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -9326,169 +9486,101 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
+                    <input placeholder="Search women's soccer programs & coaches..." x-model.debounce.80ms="search" x-on:input="limit = 48" />
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
-                        @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">{{ $divisionLabel }}</button>
-                        @endforeach
+                        <template x-for="divisionValue in divisionTabs" :key="divisionValue || 'all'">
+                            <button
+                                type="button"
+                                class="rc-discover-tab-v27"
+                                x-bind:class="{ 'is-active': division === divisionValue }"
+                                x-on:click="setDivision(divisionValue)"
+                                x-text="divisionValue || 'All Divisions'"
+                            ></button>
+                        </template>
                     </div>
 
-                    <select class="rc-discover-select-v27" wire:model.live="conferenceFilter" aria-label="Conference filter">
-                        <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
-                        @foreach($this->conferences as $conference)
-                            <option value="{{ $conference }}">{{ $conference }}</option>
-                        @endforeach
+                    <select class="rc-discover-select-v27" x-bind:value="conference" x-on:change="setConference($event.target.value)" aria-label="Conference filter">
+                        <option value="">All Conferences</option>
+                        <template x-for="conferenceName in conferenceOptions" :key="conferenceName">
+                            <option x-bind:value="conferenceName" x-text="conferenceName"></option>
+                        </template>
                     </select>
                 </div>
 
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
-                        <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
+                        <span><strong x-text="filteredSchools.length.toLocaleString()"></strong> schools</span>
                         <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click.stop="toggleAllFiltered()">
                             <input type="checkbox" x-bind:checked="allFilteredSelected" readonly tabindex="-1">
-                            <span>Select All ({{ number_format($discoverSchoolCount) }})</span>
+                            <span>Select All (<span x-text="filteredSchools.length.toLocaleString()"></span>)</span>
                         </button>
                     </div>
 
                     <div class="rc-discover-right-v27">
-                        <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'grid' }" x-on:click.stop="setViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'list' }" x-on:click.stop="setViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
 
-                <div
-                        class="rc-discover-bulk-v36"
-                        x-show="count() > 0"
-                        x-cloak
-                        wire:key="discover-bulk-selection-bar"
-                        x-data="window.rcBulkSchoolList(@js(collect($this->lists)->map(fn ($list) => ['key' => (string) ($list['key'] ?? ''), 'label' => (string) ($list['label'] ?? ''), 'color' => (string) ($list['color'] ?? '#ff6338'), 'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? []))])->filter(fn ($list) => $list['key'] !== '')->values()->all()))"
-                    >
-                        <div class="rc-discover-bulk-left-v36">
-                            <span class="rc-discover-bulk-count-v36"><span x-text="count().toLocaleString()"></span> selected</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                                <span>Email</span>
+                <div class="rc-discover-bulk-v36" x-show="selectedCount > 0" x-cloak>
+                    <div class="rc-discover-bulk-left-v36">
+                        <span class="rc-discover-bulk-count-v36"><span x-text="selectedCount.toLocaleString()"></span> selected</span>
+                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                            <span>Email</span>
+                        </button>
+                        <div class="rc-discover-bulk-list-v36" x-on:click.outside="listMenuOpen = false">
+                            <button type="button" x-on:click.stop="listMenuOpen = !listMenuOpen">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                <span>Add to List</span>
+                                <span x-show="Boolean(pendingListKey)" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </button>
-                            <div class="rc-discover-bulk-list-v36" x-on:click.outside="open = false">
-                                <button type="button" x-on:click.stop="open = ! open">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                    <span>Add to List</span>
-                                    <span x-show="pendingCount() > 0" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                                <div class="rc-discover-bulk-menu-v36 rc-list-popover-v105" x-cloak x-show="open" x-transition.origin.top.left>
-                                    <div class="rc-list-popover-title-v105">
-                                        ADD <span x-text="count().toLocaleString()"></span> TO A LIST
-                                    </div>
-
-                                    <div class="rc-list-popover-options-v105">
-                                        <template x-for="list in lists" x-bind:key="list.key">
-                                            <button
-                                                type="button"
-                                                class="rc-discover-bulk-option-v36 rc-list-popover-row-v105"
-                                                x-on:click.stop="queue(list.key, list.label, count())"
-                                                x-bind:disabled="isPending(list.key)"
-                                            >
-                                                <span class="rc-list-popover-row-main-v105">
-                                                    <span
-                                                        class="rc-list-popover-dot-v105"
-                                                        x-bind:style="`background:${list.color || '#ff6338'}`"
-                                                    ></span>
-                                                    <span class="rc-list-popover-label-v105" x-text="list.label"></span>
-                                                </span>
-
-                                                <span class="rc-list-popover-row-side-v105">
-                                                    <span
-                                                        class="rc-list-popover-count-v105"
-                                                        x-show="!isPending(list.key)"
-                                                        x-text="Number(list.count || 0).toLocaleString()"
-                                                    ></span>
-                                                    <span
-                                                        x-show="isPending(list.key)"
-                                                        x-cloak
-                                                        class="rc-list-saving-v105"
-                                                        aria-label="Saving selected schools"
-                                                    >
-                                                        <span class="rc-spinner-mini"></span>
-                                                        <span>Saving</span>
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        </template>
-                                    </div>
-
-                                    <div class="rc-discover-quick-list-v97 rc-list-quick-create-v105" x-on:click.stop>
-                                        <input
-                                            type="text"
-                                            class="rc-list-new-input-v105"
-                                            placeholder="New list name..."
-                                            x-model="newListName"
-                                            x-on:keydown.enter.prevent="createQuickList()"
-                                            x-bind:disabled="creating"
-                                        >
-
-                                        <button
-                                            type="button"
-                                            class="rc-list-new-button-v105"
-                                            x-on:click="createQuickList()"
-                                            x-bind:disabled="creating || !newListName.trim()"
-                                            aria-label="Create new list"
-                                        >
-                                            <svg x-show="!creating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-                                                <path d="M12 5v14"></path>
-                                                <path d="M5 12h14"></path>
-                                            </svg>
-                                            <span x-show="creating" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
+                            <div class="rc-discover-bulk-menu-v36 rc-list-popover-v105" x-cloak x-show="listMenuOpen" x-transition.origin.top.left>
+                                <div class="rc-list-popover-title-v105">ADD <span x-text="selectedCount.toLocaleString()"></span> TO A LIST</div>
+                                <div class="rc-list-popover-options-v105">
+                                    <template x-for="listItem in lists" :key="listItem.key">
+                                        <button type="button" class="rc-discover-bulk-option-v36 rc-list-popover-row-v105" x-on:click.stop="addToList(listItem.key, listItem.label)" x-bind:disabled="Boolean(pendingListKey)">
+                                            <span class="rc-list-popover-row-main-v105">
+                                                <span class="rc-list-popover-dot-v105" x-bind:style="`background:${listItem.color || '#ff6338'}`"></span>
+                                                <span class="rc-list-popover-label-v105" x-text="listItem.label"></span>
+                                            </span>
+                                            <span class="rc-list-popover-row-side-v105">
+                                                <span class="rc-list-popover-count-v105" x-show="!isPending(listItem.key)" x-text="Number(listItem.count || 0).toLocaleString()"></span>
+                                                <span x-show="isPending(listItem.key)" x-cloak class="rc-list-saving-v105" aria-label="Saving selected schools"><span class="rc-spinner-mini"></span></span>
+                                            </span>
                                         </button>
-                                    </div>
-
-                                    <div
-                                        class="rc-list-popover-progress-v105"
-                                        x-show="pendingCount() > 0 || creating"
-                                        x-cloak
-                                        role="status"
-                                        aria-live="polite"
-                                    >
-                                        <span class="rc-list-progress-bar-v105">
-                                            <span></span>
-                                        </span>
-                                        <span x-text="creating ? 'Creating new list...' : (statusText || 'Saving selected schools...')"></span>
+                                    </template>
+                                </div>
+                                <div class="rc-list-quick-create-v105" x-on:click.stop>
+                                    <div class="rc-list-popover-title-v105">CREATE NEW LIST</div>
+                                    <div class="rc-list-new-row-v105">
+                                        <input type="text" class="rc-list-new-input-v105" placeholder="New list name..." x-model="newListName" x-on:keydown.enter.prevent="createQuickList()" x-bind:disabled="creating">
+                                        <button type="button" class="rc-list-new-button-v105" x-on:click="createQuickList()" x-bind:disabled="creating || !newListName.trim()"><span x-show="!creating">+</span><span x-show="creating" x-cloak class="rc-spinner-mini"></span></button>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="rc-discover-bulk-status-v92" x-show="pendingCount() > 0" x-cloak role="status" aria-live="polite">
-                                <span class="rc-spinner-mini" aria-hidden="true"></span>
-                                <span x-text="statusText || 'Updating selected schools in the background...'"></span>
+                                <div class="rc-list-popover-progress-v105" x-show="Boolean(pendingListKey) || creating" x-cloak role="status" aria-live="polite">
+                                    <span class="rc-list-progress-bar-v105"><span></span></span>
+                                    <span x-text="creating ? 'Creating new list.' : 'Saving selected schools.'"></span>
+                                </div>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            class="rc-discover-bulk-clear-v36"
-                            data-rc-clear-discover-selection="1"
-                            x-bind:disabled="Boolean(window.__rcDiscoverClearRunning)"
-                        >
-                            <span x-show="!window.__rcDiscoverClearRunning">Clear</span>
-                            <span x-show="window.__rcDiscoverClearRunning" x-cloak class="rc-loading-inline">
-                                <span class="rc-spinner-mini"></span>
-                                Clearing
-                            </span>
-                        </button>
                     </div>
-
-                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch">
-                    <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                    <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="clearSelection()">Clear</button>
                 </div>
 
-                @if($this->canLoadMoreSchools)
-                    <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
-                @endif
+                <div class="rc-discover-loading-v27">
+                    @include('filament.partials.coach-database-school-grid')
+                </div>
+
+                <div x-show="canLoadMore" style="margin-top:.35rem;text-align:center" x-cloak>
+                    <button class="rc-btn" type="button" x-on:click="loadMore()">Load more</button>
+                </div>
             </div>
         @endif
 

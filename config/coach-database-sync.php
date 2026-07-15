@@ -81,4 +81,18 @@ return [
         'message_row_cap' => (int) env('COACH_DATABASE_UI_MESSAGE_ROW_CAP', 100),
         'template_row_cap' => (int) env('COACH_DATABASE_UI_TEMPLATE_ROW_CAP', 100),
     ],
+
+    'coach_database' => [
+        'bulk_list_max_schools' => 2000,
+
+        // Number of resolved coach contacts sent in each bulk tag request.
+        'bulk_list_contacts_per_request' => 70,
+
+        // Maximum paced bulk requests started each second.
+        'bulk_list_requests_per_second' => 8,
+
+        // Retry temporary API failures and rate-limit responses.
+        'bulk_list_retry_attempts' => 4,
+    ],
+
 ];

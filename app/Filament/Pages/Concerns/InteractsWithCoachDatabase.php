@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Services\CoachDatabaseService;
+use App\Services\LocalSchoolMembershipService;
 use App\Services\CoachDatabaseActionQueueService;
 use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
@@ -45,6 +46,8 @@ trait InteractsWithCoachDatabase
     protected ?array $allSchoolsMemo = null;
     protected ?array $allCoachesMemo = null;
     protected ?array $trackingCoachesMemo = null;
+    protected ?array $coachesByIdMemo = null;
+    protected ?array $coachesByEmailMemo = null;
 
     public bool $allowed = false;
     public bool $locked = false;
@@ -118,6 +121,9 @@ trait InteractsWithCoachDatabase
     public bool $campaignTemplateIsDesign = false;
     public array $campaignEditableBlocks = [];
     public array $selectedSchoolIds = [];
+
+    /** @var array<string, \Illuminate\Support\Collection> */
+    protected array $filteredSchoolsQueryMemo = [];
     public string $campaignTargetMode = 'coaches';
     public string $campaignCoachSearch = '';
     public array $campaignCoachIds = [];
@@ -628,6 +634,9 @@ trait InteractsWithCoachDatabase
             $this->allSchoolsMemo = null;
             $this->allCoachesMemo = null;
             $this->trackingCoachesMemo = null;
+            $this->coachesByIdMemo = null;
+            $this->coachesByEmailMemo = null;
+        $this->filteredSchoolsQueryMemo = [];
 
             if (function_exists('gc_collect_cycles')) {
                 gc_collect_cycles();
@@ -1859,10 +1868,25 @@ trait InteractsWithCoachDatabase
     }
 
 
-    public function saveSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->savedSchoolTag(), 'add'); }
-    public function unsaveSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->savedSchoolTag(), 'remove'); }
-    public function favoriteSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->favoriteSchoolTag(), 'add'); }
-    public function unfavoriteSchoolById(string $schoolId): void { $this->runSchoolContactTagAction($schoolId, app(CoachDatabaseService::class)->favoriteSchoolTag(), 'remove'); }
+    public function saveSchoolById(string $schoolId): void
+    {
+        $this->setSchoolCompanyFavoriteState($schoolId, true);
+    }
+
+    public function unsaveSchoolById(string $schoolId): void
+    {
+        $this->setSchoolCompanyFavoriteState($schoolId, false);
+    }
+
+    public function favoriteSchoolById(string $schoolId): void
+    {
+        $this->setSchoolCompanyFavoriteState($schoolId, true);
+    }
+
+    public function unfavoriteSchoolById(string $schoolId): void
+    {
+        $this->setSchoolCompanyFavoriteState($schoolId, false);
+    }
 
     /**
      * Queue a favorite change without morphing the active Livewire component.
@@ -1875,43 +1899,7 @@ trait InteractsWithCoachDatabase
             $this->skipRender();
         }
 
-        $user = Auth::user();
-        $schoolId = trim($schoolId);
-
-        if (! $user || $schoolId === '' || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This action is not available.'];
-        }
-
-        $contactIds = $this->contactIdsForSchool($schoolId);
-        if (empty($contactIds)) {
-            return ['success' => false, 'error' => 'No coaches were found for this school.'];
-        }
-
-        $tag = app(CoachDatabaseService::class)->favoriteSchoolTag();
-        $type = $favorite ? 'add' : 'remove';
-
-        $this->applyTagToCachedContacts($contactIds, $tag, $type, false);
-
-        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, [[
-            'school_id' => $schoolId,
-            'contact_ids' => $contactIds,
-            'tag' => $tag,
-            'type' => $type,
-        ]]);
-
-        if (! ($queued['success'] ?? false)) {
-            // Revert the optimistic cache mutation when the queue itself failed.
-            $this->applyTagToCachedContacts($contactIds, $tag, $favorite ? 'remove' : 'add', false);
-            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue the favorite change.'];
-        }
-
-        $this->startCoachDatabaseActionWorker($user);
-
-        return [
-            'success' => true,
-            'favorite' => $favorite,
-            'queued' => (int) ($queued['queued'] ?? 1),
-        ];
+        return $this->setSchoolCompanyFavoriteState($schoolId, $favorite, true);
     }
 
     public function pollCoachDatabaseActionStatus(): array
@@ -1996,21 +1984,14 @@ trait InteractsWithCoachDatabase
 
     public function addSchoolToListById(string $schoolId, string $listKey): void
     {
-        $tag = app(CoachDatabaseService::class)->listTagForKey($listKey, Auth::user());
-        if ($tag) $this->runSchoolContactTagAction($schoolId, $tag, 'add');
+        $this->setSchoolCompanyListMembership($schoolId, $listKey, true);
     }
 
     public function removeSchoolFromListById(string $schoolId, string $listKey): void
     {
-        $tag = app(CoachDatabaseService::class)->listTagForKey($listKey, Auth::user());
-        if ($tag) $this->runSchoolContactTagAction($schoolId, $tag, 'remove');
+        $this->setSchoolCompanyListMembership($schoolId, $listKey, false);
     }
 
-    /**
-     * Optimistically apply several list checkbox changes in one lightweight
-     * Livewire request, then send the remote contact updates in a detached
-     * worker. This keeps the drawer interactive during stress/rapid clicking.
-     */
     public function queueSchoolListMemberships(string $schoolId, array $memberships): array
     {
         if (method_exists($this, 'skipRender')) {
@@ -2018,65 +1999,50 @@ trait InteractsWithCoachDatabase
         }
 
         $user = Auth::user();
-        $schoolId = trim($schoolId);
+        $school = $this->schoolRowForCompanyMembership($schoolId);
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
 
-        if (! $user || $schoolId === '' || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This action is not available.'];
+        if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This school is missing a GHL company ID.'];
         }
 
-        $desired = collect($memberships)
-            ->mapWithKeys(function ($value, $key): array {
-                $listKey = trim((string) $key);
-                return $listKey === '' ? [] : [$listKey => filter_var($value, FILTER_VALIDATE_BOOL)];
-            })
-            ->all();
+        $currentKeys = collect($school['list_keys'] ?? $school['lists'] ?? [])
+            ->map(fn ($key): string => trim((string) $key))
+            ->filter()
+            ->unique()
+            ->values();
 
-        if (empty($desired)) {
-            return ['success' => true, 'queued' => 0, 'states' => []];
+        foreach ($memberships as $listKey => $inList) {
+            $listKey = trim((string) $listKey);
+            if ($listKey === '') continue;
+
+            $desired = filter_var($inList, FILTER_VALIDATE_BOOL);
+            $currentKeys = $desired
+                ? $currentKeys->push($listKey)->unique()->values()
+                : $currentKeys->reject(fn (string $key): bool => $key === $listKey)->values();
         }
 
-        $contactIds = $this->contactIdsForSchool($schoolId);
-        if (empty($contactIds)) {
-            return ['success' => false, 'error' => 'No coaches were found for this school.'];
+        $this->applyCompanyListKeysToCachedSchool($schoolId, $currentKeys->all());
+
+        $result = app(LocalSchoolMembershipService::class)->replaceListKeys(
+            $user,
+            $businessId,
+            $currentKeys->all(),
+        );
+
+        if (! ($result['success'] ?? false)) {
+            $this->applyCompanyListKeysToCachedSchool(
+                $schoolId,
+                collect($school['list_keys'] ?? $school['lists'] ?? [])->values()->all(),
+            );
+
+            return ['success' => false, 'error' => $result['error'] ?? 'Unable to update school lists.'];
         }
-
-        $actions = [];
-        $resolvedStates = [];
-        $service = app(CoachDatabaseService::class);
-
-        foreach ($desired as $listKey => $inList) {
-            $tag = $service->listTagForKey($listKey, $user);
-            if (! $tag) {
-                continue;
-            }
-
-            $resolvedStates[$listKey] = (bool) $inList;
-            $actions[] = [
-                'school_id' => $schoolId,
-                'list_key' => $listKey,
-                'contact_ids' => $contactIds,
-                'tag' => $tag,
-                'type' => $inList ? 'add' : 'remove',
-            ];
-        }
-
-        if (empty($actions)) {
-            return ['success' => false, 'error' => 'No valid list changes were found.'];
-        }
-
-        $this->applySchoolListMembershipsToCache($schoolId, $contactIds, $actions, false);
-        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, $actions);
-
-        if (! ($queued['success'] ?? false)) {
-            return ['success' => false, 'error' => $queued['error'] ?? 'Unable to queue list changes.'];
-        }
-
-        $this->startCoachDatabaseActionWorker($user);
 
         return [
             'success' => true,
-            'queued' => (int) ($queued['queued'] ?? count($actions)),
-            'states' => $resolvedStates,
+            'states' => collect($memberships)->map(fn ($value): bool => filter_var($value, FILTER_VALIDATE_BOOL))->all(),
+            'school_updates' => 1,
         ];
     }
 
@@ -2090,6 +2056,147 @@ trait InteractsWithCoachDatabase
     {
         $tag = app(CoachDatabaseService::class)->listTagForKey($listKey, Auth::user());
         if ($tag) $this->runContactTagAction([$contactId], $tag, 'remove');
+    }
+
+    protected function setSchoolCompanyFavoriteState(string $schoolId, bool $favorite, bool $returnResult = false): array
+    {
+        $user = Auth::user();
+        $school = $this->schoolRowForCompanyMembership($schoolId);
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
+
+        if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
+            $result = ['success' => false, 'favorite' => ! $favorite, 'error' => 'This school is missing a GHL company ID.'];
+            if (! $returnResult) {
+                Notification::make()->title('Recruiting Center')->body($result['error'])->danger()->send();
+            }
+            return $result;
+        }
+
+        $previous = (bool) ($school['is_favorite'] ?? $school['is_favorite_school'] ?? false);
+        $membershipKeys = collect($this->schoolMembershipKeysForRow($school));
+        $membershipKeys = $favorite
+            ? $membershipKeys->push('__favorite__')->unique()->values()
+            : $membershipKeys->reject(fn (string $key): bool => $key === '__favorite__')->values();
+
+        $this->applyCompanyFavoriteToCachedSchool($schoolId, $favorite);
+        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys(
+            $user,
+            $businessId,
+            $membershipKeys->all(),
+        );
+
+        if (! ($result['success'] ?? false)) {
+            $this->applyCompanyFavoriteToCachedSchool($schoolId, $previous);
+            $result = ['success' => false, 'favorite' => $previous, 'error' => $result['error'] ?? 'Unable to update favorite school.'];
+            if (! $returnResult) {
+                Notification::make()->title('Recruiting Center')->body($result['error'])->danger()->send();
+            }
+            return $result;
+        }
+
+        return ['success' => true, 'favorite' => $favorite, 'school_updates' => 1];
+    }
+
+    protected function setSchoolCompanyListMembership(string $schoolId, string $listKey, bool $inList): array
+    {
+        $user = Auth::user();
+        $listKey = trim($listKey);
+        $school = $this->schoolRowForCompanyMembership($schoolId);
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
+
+        if (! $user || ! $school || $businessId === '' || $listKey === '') {
+            return ['success' => false, 'error' => 'This school is missing a GHL company ID.'];
+        }
+
+        $previous = collect($school['list_keys'] ?? $school['lists'] ?? [])->values()->all();
+        $membershipKeys = collect($this->schoolMembershipKeysForRow($school));
+
+        $membershipKeys = $inList
+            ? $membershipKeys->push($listKey)->unique()->values()
+            : $membershipKeys->reject(fn (string $key): bool => $key === $listKey)->values();
+
+        $visibleListKeys = $membershipKeys
+            ->reject(fn (string $key): bool => $key === '__favorite__')
+            ->values()
+            ->all();
+
+        $this->applyCompanyListKeysToCachedSchool($schoolId, $visibleListKeys);
+        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys(
+            $user,
+            $businessId,
+            $membershipKeys->all(),
+        );
+
+        if (! ($result['success'] ?? false)) {
+            $this->applyCompanyListKeysToCachedSchool($schoolId, $previous);
+            return ['success' => false, 'error' => $result['error'] ?? 'Unable to update the school list.'];
+        }
+
+        return ['success' => true, 'in_list' => $inList, 'school_updates' => 1];
+    }
+
+    protected function schoolRowForCompanyMembership(string $schoolId): ?array
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') return null;
+
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+
+        return collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->first(function (array $school) use ($schoolId): bool {
+                $name = strtolower(trim((string) ($school['name'] ?? '')));
+                return in_array($schoolId, array_filter([
+                    trim((string) ($school['id'] ?? '')),
+                    trim((string) ($school['business_id'] ?? '')),
+                    trim((string) ($school['company_id'] ?? '')),
+                    $name !== '' ? md5($name) : '',
+                ]), true);
+            });
+    }
+
+    protected function applyCompanyFavoriteToCachedSchool(string $schoolId, bool $favorite): void
+    {
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])->map(function ($row) use ($schoolId, $favorite) {
+            if (! is_array($row)) return $row;
+            $name = strtolower(trim((string) ($row['name'] ?? '')));
+            $matches = in_array($schoolId, array_filter([
+                trim((string) ($row['id'] ?? '')),
+                trim((string) ($row['business_id'] ?? '')),
+                trim((string) ($row['company_id'] ?? '')),
+                $name !== '' ? md5($name) : '',
+            ]), true);
+            if ($matches) {
+                $row['is_favorite'] = $favorite;
+                $row['is_favorite_school'] = $favorite;
+            }
+            return $row;
+        })->values()->all();
+        $snapshot['stats']['favorite_schools'] = collect($snapshot['schools'])->filter(fn ($row): bool => is_array($row) && (bool) ($row['is_favorite'] ?? false))->count();
+        $this->storeSnapshot($snapshot);
+    }
+
+    protected function applyCompanyListKeysToCachedSchool(string $schoolId, array $listKeys): void
+    {
+        $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
+        $keys = collect($listKeys)->map(fn ($key): string => trim((string) $key))->filter()->unique()->values()->all();
+        $snapshot['schools'] = collect($snapshot['schools'] ?? [])->map(function ($row) use ($schoolId, $keys) {
+            if (! is_array($row)) return $row;
+            $name = strtolower(trim((string) ($row['name'] ?? '')));
+            $matches = in_array($schoolId, array_filter([
+                trim((string) ($row['id'] ?? '')),
+                trim((string) ($row['business_id'] ?? '')),
+                trim((string) ($row['company_id'] ?? '')),
+                $name !== '' ? md5($name) : '',
+            ]), true);
+            if ($matches) {
+                $row['list_keys'] = $keys;
+                $row['lists'] = $keys;
+            }
+            return $row;
+        })->values()->all();
+        $this->storeSnapshot($snapshot);
     }
 
     protected function runSchoolContactTagAction(string $schoolId, string $tag, string $type): void
@@ -7568,6 +7675,70 @@ HTML;
         $this->listSchoolSearch = '';
     }
 
+    public function getDiscoverSchoolsClientDatasetProperty(): array
+    {
+        return collect($this->allSchools())
+            ->filter(fn ($school): bool => is_array($school))
+            ->map(function (array $school): array {
+                $school = $this->hydrateSchoolRowForDisplay($school);
+                $id = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? ''));
+                $name = trim((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? 'Unnamed School'));
+                if ($id === '') {
+                    $id = md5(strtolower($name));
+                }
+
+                $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
+                if (blank($headCoach['name'] ?? null)) {
+                    $headCoach = collect($school['coaches_preview'] ?? $school['coaches'] ?? [])
+                        ->first(fn ($coach): bool => is_array($coach) && filled($coach['name'] ?? null)) ?: [];
+                }
+
+                $logo = $this->normalizeSchoolLogoCandidate(
+                    $school['logo_url']
+                    ?? $school['school_logo_url']
+                    ?? $school['business_logo_url']
+                    ?? $school['logo']
+                    ?? ''
+                );
+
+                $conference = trim((string) ($school['conference'] ?? ''));
+                $division = trim((string) ($school['division'] ?? ''));
+                $coachName = trim((string) ($headCoach['name'] ?? ''));
+                $coachTitle = trim((string) ($headCoach['title'] ?? ''));
+                $coachEmail = trim((string) ($headCoach['email'] ?? ''));
+                $coachCount = max(
+                    (int) ($school['coach_count'] ?? 0),
+                    (int) ($school['coaches_count'] ?? 0),
+                    is_array($school['coaches'] ?? null) ? count($school['coaches']) : 0,
+                    is_array($school['coaches_preview'] ?? null) ? count($school['coaches_preview']) : 0,
+                );
+
+                return [
+                    'id' => $id,
+                    'business_id' => trim((string) ($school['business_id'] ?? $school['company_id'] ?? $id)),
+                    'name' => $name,
+                    'logo_url' => $logo,
+                    'conference' => $conference,
+                    'division' => $division,
+                    'coach_count' => $coachCount,
+                    'head_coach_name' => $coachName !== '' ? $coachName : '—',
+                    'head_coach_title' => $coachTitle !== '' ? $coachTitle : 'Coach',
+                    'head_coach_email' => $coachEmail,
+                    'search_text' => strtolower(trim(implode(' ', [
+                        $name,
+                        $conference,
+                        $division,
+                        $coachName,
+                        $coachTitle,
+                        $coachEmail,
+                    ]))),
+                ];
+            })
+            ->sortBy(fn (array $school): string => strtolower($school['name']))
+            ->values()
+            ->all();
+    }
+
     public function getFilteredSchoolsProperty(): array
     {
         return $this->filteredSchoolsQuery()
@@ -7831,6 +8002,147 @@ HTML;
         return '';
     }
 
+    protected function schoolMembershipKeysForRow(array $school): array
+    {
+        $user = Auth::user();
+        $businessId = trim((string) (
+            $school['business_id']
+            ?? $school['company_id']
+            ?? $school['id']
+            ?? ''
+        ));
+
+        // Favorites and My Lists are now stored locally. GHL remains the source
+        // of school/coach data only. An empty local result intentionally means
+        // the school is not in any list; do not fall back to old coach tags or
+        // experimental Business custom fields, or removed memberships reappear.
+        if ($user && $businessId !== '') {
+            return app(LocalSchoolMembershipService::class)
+                ->keysForBusiness($user, $businessId);
+        }
+
+        return collect($school['membership_keys'] ?? [])
+            ->merge($school['list_keys'] ?? [])
+            ->merge($school['lists'] ?? [])
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function schoolMembershipKeysFromCustomFieldContainers(array $row): array
+    {
+        $keys = collect();
+
+        foreach (['customFields', 'customField', 'custom_fields', 'customFieldValues', 'custom_field_values', 'customValues', 'custom_values', 'properties'] as $containerKey) {
+            $raw = data_get($row, $containerKey, []);
+
+            if (! is_array($raw)) {
+                continue;
+            }
+
+            foreach ($raw as $fieldKey => $fieldValue) {
+                $identifiers = [$fieldKey];
+
+                if (is_array($fieldValue)) {
+                    foreach (['id', '_id', 'key', 'name', 'label', 'fieldKey', 'field_key', 'customFieldId', 'custom_field_id', 'fieldId', 'field_id', 'mergeField', 'merge_field', 'placeholder', 'slug'] as $identifierKey) {
+                        $identifiers[] = $fieldValue[$identifierKey] ?? null;
+                    }
+                }
+
+                $isMembershipField = collect($identifiers)
+                    ->contains(fn ($identifier): bool => $this->looksLikeSchoolMembershipIdentifier($identifier));
+
+                if (! $isMembershipField) {
+                    continue;
+                }
+
+                $value = is_array($fieldValue)
+                    ? ($fieldValue['valueString'] ?? $fieldValue['value'] ?? $fieldValue['fieldValue'] ?? $fieldValue['field_value'] ?? $fieldValue['text'] ?? $fieldValue)
+                    : $fieldValue;
+
+                $keys = $keys->merge($this->normalizeSchoolMembershipValue($value));
+            }
+        }
+
+        foreach (['business', 'company', 'data', 'record', 'result'] as $nestedKey) {
+            $nested = data_get($row, $nestedKey);
+            if (is_array($nested)) {
+                $keys = $keys->merge($this->schoolMembershipKeysFromCustomFieldContainers($nested));
+            }
+        }
+
+        return $keys
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function looksLikeSchoolMembershipIdentifier(mixed $identifier): bool
+    {
+        if (! is_scalar($identifier)) {
+            return false;
+        }
+
+        $key = strtolower(trim((string) $identifier));
+        $key = trim(str_replace(['{{', '}}'], '', $key), '{} ' . "\t\n\r\0\x0B");
+        $key = str_replace([' ', '-', '.', ':', '/', '\\'], '_', $key);
+
+        return in_array($key, [
+            'plyrcard_lists',
+            'plyrcard_list_keys',
+            'business_plyrcard_lists',
+            'business_plyrcard_list_keys',
+            'school_lists',
+            'school_list_keys',
+        ], true)
+            || str_contains($key, 'plyrcard_lists')
+            || str_contains($key, 'plyrcard_list_keys');
+    }
+
+    protected function normalizeSchoolMembershipValue(mixed $value): array
+    {
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                return collect($value)
+                    ->flatMap(fn ($item): array => $this->normalizeSchoolMembershipValue($item))
+                    ->values()
+                    ->all();
+            }
+
+            foreach (['valueString', 'value', 'fieldValue', 'field_value', 'text'] as $key) {
+                if (array_key_exists($key, $value)) {
+                    return $this->normalizeSchoolMembershipValue($value[$key]);
+                }
+            }
+
+            return [];
+        }
+
+        if (! is_scalar($value)) {
+            return [];
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return $this->normalizeSchoolMembershipValue($decoded);
+        }
+
+        return collect(preg_split('/[\r\n,|]+/', $raw) ?: [])
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function enrichSchoolForDisplay(array $school): array
     {
         return $this->hydrateSchoolRowForDisplay($school);
@@ -7848,6 +8160,19 @@ HTML;
 
         $school['coach_count'] = $count;
         $school['coaches_count'] = $count;
+
+        // Read school list membership from the same Business custom-field
+        // containers already used for the school logo. The Business record is
+        // the source of truth; coach/contact tags are not used for school lists.
+        $membershipKeys = $this->schoolMembershipKeysForRow($school);
+        $school['membership_keys'] = $membershipKeys;
+        $school['list_keys'] = collect($membershipKeys)
+            ->reject(fn (string $key): bool => $key === '__favorite__')
+            ->values()
+            ->all();
+        $school['lists'] = $school['list_keys'];
+        $school['is_favorite'] = in_array('__favorite__', $membershipKeys, true);
+        $school['is_favorite_school'] = $school['is_favorite'];
 
         if (blank(data_get($school, 'head_coach.name'))) {
             foreach ($this->coachesForSchoolSearch($school) as $coach) {
@@ -8902,7 +9227,7 @@ HTML;
 
                 $coach = $contactId !== '' ? $coachesById->get($contactId) : null;
                 if (! $coach && $email !== '') {
-                    $coach = $coachesByEmail->get($email);
+                    $coach = $coachesByEmail[$email] ?? null;
                 }
 
                 $conversationSchool = trim((string) ($conversation['school'] ?? $conversation['company_name'] ?? ''));
@@ -9103,9 +9428,6 @@ HTML;
             $this->skipRender();
         }
 
-        // Use the complete filtered query, not only the currently displayed
-        // school cards. This keeps Select All compatible with division,
-        // conference, search, and Load More.
         $filteredIds = $this->filteredSchoolIds();
 
         if ($filteredIds->isEmpty()) {
@@ -9127,17 +9449,32 @@ HTML;
 
     public function toggleVisibleSchoolsSelection(): array
     {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        // This is intentionally the complete filtered query, not the 24-row
+        // display slice returned by the filteredSchools computed property.
         $filteredIds = $this->filteredSchoolIds();
+
+        if ($filteredIds->isEmpty()) {
+            return $this->schoolSelectionResponse(false, 0);
+        }
+
         $current = collect($this->selectedSchoolIds)
             ->map(fn ($id): string => trim((string) $id))
             ->filter()
             ->unique()
             ->values();
 
-        $allFilteredSelected = $filteredIds->isNotEmpty()
-            && $filteredIds->every(fn (string $id): bool => $current->contains($id));
+        $allFilteredSelected = $filteredIds
+            ->every(fn (string $id): bool => $current->contains($id));
 
-        return $this->setFilteredSchoolsSelection(! $allFilteredSelected);
+        $this->selectedSchoolIds = $allFilteredSelected
+            ? $current->reject(fn (string $id): bool => $filteredIds->contains($id))->values()->all()
+            : $current->merge($filteredIds)->unique()->values()->all();
+
+        return $this->schoolSelectionResponse(! $allFilteredSelected, $filteredIds->count());
     }
 
     protected function filteredSchoolIds(): Collection
@@ -9175,6 +9512,11 @@ HTML;
             'filtered_count' => (int) ($filteredCount ?? 0),
             'all_filtered_selected' => (bool) $allFilteredSelected,
         ];
+    }
+
+    public function getFilteredSchoolIdsForClientProperty(): array
+    {
+        return $this->filteredSchoolIds()->all();
     }
 
     public function getSelectedSchoolCountProperty(): int
@@ -9305,7 +9647,7 @@ HTML;
         return ['success' => true, 'label' => $newLabel];
     }
 
-    public function queueSelectedSchoolsToList(string $listKey): array
+    public function queueSchoolIdsToList(array $schoolIds, string $listKey): array
     {
         if (method_exists($this, 'skipRender')) {
             $this->skipRender();
@@ -9313,89 +9655,112 @@ HTML;
 
         $user = Auth::user();
         $listKey = trim($listKey);
+        $schoolIds = collect($schoolIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
 
-        $schoolIds = collect($this->selectedSchoolIds)
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+        if ($listKey === '') {
+            return ['success' => false, 'error' => 'Choose a list first.'];
+        }
+        if ($schoolIds->isEmpty()) {
+            return ['success' => false, 'error' => 'Select at least one school first.'];
+        }
+
+        // Build one in-memory index instead of scanning the full school dataset
+        // once for every selected ID.
+        $schoolIndex = collect($this->allSchools())
+            ->filter(fn ($school): bool => is_array($school))
+            ->flatMap(function (array $school): array {
+                $name = strtolower(trim((string) ($school['name'] ?? '')));
+                $keys = array_values(array_unique(array_filter([
+                    trim((string) ($school['id'] ?? '')),
+                    trim((string) ($school['business_id'] ?? '')),
+                    trim((string) ($school['company_id'] ?? '')),
+                    $name !== '' ? md5($name) : '',
+                ])));
+
+                return collect($keys)
+                    ->mapWithKeys(fn (string $key): array => [$key => $school])
+                    ->all();
+            });
+
+        $rows = $schoolIds
+            ->map(fn (string $id): ?array => $schoolIndex->get($id))
+            ->filter()
+            ->map(function (array $school) use ($listKey): array {
+                $keys = collect($school['list_keys'] ?? $school['lists'] ?? [])
+                    ->map(fn ($key): string => trim((string) $key))
+                    ->filter()
+                    ->push($listKey)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'school_id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
+                    'business_id' => (string) ($school['business_id'] ?? $school['company_id'] ?? ''),
+                    'list_keys' => $keys,
+                ];
+            })
+            ->filter(fn (array $row): bool => trim($row['business_id']) !== '')
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return ['success' => false, 'error' => 'The selected schools do not have GHL company IDs.'];
+        }
+
+        $ids = $schoolIds->all();
+        $this->applyBulkSchoolListMembershipToCache($ids, $listKey, true);
+
+        $result = app(LocalSchoolMembershipService::class)->replaceListKeysBulk(
+            $user,
+            $rows->all(),
+        );
+
+        $list = collect($this->lists)->first(
+            fn ($item): bool => is_array($item)
+                && (string) ($item['key'] ?? '') === $listKey
+        );
+        $listLabel = is_array($list)
+            ? (string) ($list['label'] ?? Str::headline($listKey))
+            : Str::headline($listKey);
+
+        return [
+            'success' => (bool) ($result['success'] ?? false),
+            'partial_success' => (bool) ($result['partial_success'] ?? false),
+            'school_count' => $schoolIds->count(),
+            'updated_schools' => (int) ($result['updated'] ?? 0),
+            'failed_schools' => (int) ($result['failed'] ?? 0),
+            'list_key' => $listKey,
+            'list_label' => $listLabel,
+            'error' => $result['error'] ?? null,
+            'message' => number_format((int) ($result['updated'] ?? 0)) . ' school(s) added to ' . $listLabel
+                . ((int) ($result['failed'] ?? 0) > 0
+                    ? '; ' . number_format((int) $result['failed']) . ' failed.'
+                    : '.'),
+        ];
+    }
+
+    public function emailSchoolIds(array $schoolIds): void
+    {
+        $this->selectedSchoolIds = collect($schoolIds)
             ->map(fn ($id): string => trim((string) $id))
             ->filter()
             ->unique()
             ->values()
             ->all();
 
-        if (! $user || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This action is not available.'];
-        }
+        $this->emailSelectedSchools();
+    }
 
-        if ($listKey === '') {
-            return ['success' => false, 'error' => 'Choose a list first.'];
-        }
-
-        if (empty($schoolIds)) {
-            return ['success' => false, 'error' => 'Select at least one school first.'];
-        }
-
-        $maximumSchools = max(50, (int) config('ghl.coach_database.bulk_list_max_schools', 2000));
-        if (count($schoolIds) > $maximumSchools) {
-            return [
-                'success' => false,
-                'error' => 'This batch contains ' . number_format(count($schoolIds))
-                    . ' schools. The configured maximum is ' . number_format($maximumSchools) . '.',
-            ];
-        }
-
-        $service = app(CoachDatabaseService::class);
-        $tag = $service->listTagForKey($listKey, $user);
-
-        if (blank($tag)) {
-            return ['success' => false, 'error' => 'That list could not be found.'];
-        }
-
-        $queued = app(CoachDatabaseActionQueueService::class)->enqueue($user, [[
-            'kind' => 'school_list_bulk',
-            'school_ids' => $schoolIds,
-            'list_key' => $listKey,
-            'tag' => $tag,
-            'type' => 'add',
-            'contact_batch_size' => max(1, min(
-                50,
-                (int) config('ghl.coach_database.bulk_list_contacts_per_second', 50)
-            )),
-        ]]);
-
-        if (! ($queued['success'] ?? false)) {
-            return [
-                'success' => false,
-                'error' => $queued['error'] ?? 'Unable to queue the selected schools.',
-            ];
-        }
-
-        // Do not call applyBulkSchoolListMembershipToCache() here. That method
-        // reads and rewrites the entire Coach Database snapshot inside the
-        // Livewire request and is what makes 200+ school batches run out of
-        // memory before the background worker can start.
-        $this->startCoachDatabaseActionWorker($user);
-
-        $list = collect($this->lists)->first(
-            fn ($item): bool => is_array($item)
-                && (string) ($item['key'] ?? '') === $listKey
-        );
-
-        $listLabel = is_array($list)
-            ? (string) ($list['label'] ?? Str::headline($listKey))
-            : Str::headline($listKey);
-
-        return [
-            'success' => true,
-            'queued' => (int) ($queued['queued'] ?? 1),
-            'school_count' => count($schoolIds),
-            'list_key' => $listKey,
-            'list_label' => $listLabel,
-            'contacts_per_second' => max(1, min(
-                50,
-                (int) config('ghl.coach_database.bulk_list_contacts_per_second', 50)
-            )),
-            'message' => number_format(count($schoolIds))
-                . ' schools were queued. Coach contacts will be processed in controlled background batches.',
-        ];
+    public function queueSelectedSchoolsToList(string $listKey): array
+    {
+        return $this->queueSchoolIdsToList($this->selectedSchoolIds, $listKey);
     }
 
     /**
@@ -9502,6 +9867,7 @@ HTML;
         $this->divisionFilter = $this->divisionFilter === $division ? '' : $division;
         $this->conferenceFilter = '';
         $this->schoolDisplayLimit = 24;
+        $this->filteredSchoolsQueryMemo = [];
     }
 
     public function setSchoolViewMode(string $mode): void
@@ -9776,27 +10142,47 @@ HTML;
         $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? $school['business_name'] ?? ''));
         $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
 
-        $allCoaches = collect($this->allCoaches())
-            ->filter(fn ($coach): bool => is_array($coach))
-            ->values();
-        $coachesById = $allCoaches
-            ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null))
-            ->keyBy(fn (array $coach): string => trim((string) ($coach['id'] ?? $coach['contact_id'] ?? '')));
-        $coachesByEmail = $allCoaches
-            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
-            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
+        // Build these indexes once per request. The previous implementation rebuilt
+        // both maps for every school while generating the client-side Discover
+        // Schools cache, producing O(schools x coaches) work and 30-second timeouts.
+        if ($this->coachesByIdMemo === null || $this->coachesByEmailMemo === null) {
+            $coachesById = [];
+            $coachesByEmail = [];
+
+            foreach ($this->allCoaches() as $coach) {
+                if (! is_array($coach)) {
+                    continue;
+                }
+
+                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''));
+                if ($coachId !== '') {
+                    $coachesById[$coachId] = $coach;
+                }
+
+                $email = strtolower(trim((string) ($coach['email'] ?? '')));
+                if ($email !== '') {
+                    $coachesByEmail[$email] = $coach;
+                }
+            }
+
+            $this->coachesByIdMemo = $coachesById;
+            $this->coachesByEmailMemo = $coachesByEmail;
+        }
+
+        $coachesById = $this->coachesByIdMemo;
+        $coachesByEmail = $this->coachesByEmailMemo;
 
         $coaches = [];
 
         // First use the exact reconciled contact references saved on the school row.
         foreach (collect($school['coach_ids'] ?? [])->map(fn ($id): string => trim((string) $id))->filter()->unique() as $coachId) {
-            $coach = $coachesById->get($coachId);
+            $coach = $coachesById[$coachId] ?? null;
             if (is_array($coach)) {
                 $coaches[$this->coachTrackingIdentity($coach)] = $coach;
             }
         }
         foreach (collect($school['coach_emails'] ?? [])->map(fn ($email): string => strtolower(trim((string) $email)))->filter()->unique() as $email) {
-            $coach = $coachesByEmail->get($email);
+            $coach = $coachesByEmail[$email] ?? null;
             if (is_array($coach)) {
                 $coaches[$this->coachTrackingIdentity($coach)] = $coach;
             }
@@ -10074,23 +10460,50 @@ HTML;
     protected function filteredSchoolsQuery(): Collection
     {
         $query = $this->normalizeSearchText($this->search);
-        $divisionFilter = $this->divisionFilter;
+        $divisionFilter = trim((string) $this->divisionFilter);
+        $conferenceFilter = trim((string) $this->conferenceFilter);
+        $sort = (string) $this->sort;
+        $memoKey = md5(json_encode([$query, $divisionFilter, $conferenceFilter, $sort]));
 
-        return collect($this->allSchools())->filter(function (array $school) use ($query, $divisionFilter): bool {
-            if ($query !== '' && ! str_contains($this->schoolSearchHaystack($school), $query)) {
-                return false;
-            }
+        if (isset($this->filteredSchoolsQueryMemo[$memoKey])) {
+            return $this->filteredSchoolsQueryMemo[$memoKey];
+        }
 
-            if ($divisionFilter !== '' && ! $this->divisionMatches($school['division'] ?? '', $divisionFilter)) {
-                return false;
-            }
+        $schools = collect($this->allSchools());
 
-            if ($this->conferenceFilter !== '' && ! $this->conferenceMatches($school['conference'] ?? '', $this->conferenceFilter)) {
-                return false;
-            }
+        // Apply the cheap exact filters before building search haystacks.
+        if ($divisionFilter !== '') {
+            $schools = $schools->filter(
+                fn (array $school): bool => $this->divisionMatches(
+                    $school['division'] ?? '',
+                    $divisionFilter
+                )
+            );
+        }
 
-            return true;
-        })->sortBy($this->sort === 'coach_count' ? 'coach_count' : 'name');
+        if ($conferenceFilter !== '') {
+            $schools = $schools->filter(
+                fn (array $school): bool => $this->conferenceMatches(
+                    $school['conference'] ?? '',
+                    $conferenceFilter
+                )
+            );
+        }
+
+        if ($query !== '') {
+            $schools = $schools->filter(
+                fn (array $school): bool => str_contains(
+                    $this->schoolSearchHaystack($school),
+                    $query
+                )
+            );
+        }
+
+        $result = $schools
+            ->sortBy($sort === 'coach_count' ? 'coach_count' : 'name')
+            ->values();
+
+        return $this->filteredSchoolsQueryMemo[$memoKey] = $result;
     }
 
     protected function filteredCoachesQuery(): Collection
@@ -10139,6 +10552,8 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
         $this->trackingCoachesMemo = null;
+        $this->coachesByIdMemo = null;
+        $this->coachesByEmailMemo = null;
     }
 
     protected function allSchools(): array
@@ -10152,6 +10567,7 @@ HTML;
         if ((bool) ($snapshot['dataset_reconciled'] ?? false) && is_array($snapshot['schools'] ?? null)) {
             return $this->allSchoolsMemo = collect($snapshot['schools'])
                 ->filter(fn ($school): bool => is_array($school))
+                ->map(fn (array $school): array => $this->hydrateSchoolRowForDisplay($school))
                 ->values()
                 ->all();
         }
@@ -10328,7 +10744,7 @@ HTML;
 
                 unset($primary['coaches'], $primary['staff'], $primary['coaching_staff'], $primary['contacts']);
 
-                return $primary;
+                return $this->hydrateSchoolRowForDisplay($primary);
             })
             ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
             ->values()

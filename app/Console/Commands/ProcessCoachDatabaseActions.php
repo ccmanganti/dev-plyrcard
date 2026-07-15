@@ -5,15 +5,13 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\CoachDatabaseActionQueueService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 class ProcessCoachDatabaseActions extends Command
 {
-    protected $signature = 'recruiting:process-actions {--user=} {--release-lock}';
+    protected $signature = 'recruiting:process-actions {--user= : User ID}';
+    protected $description = 'Process checkpointed Recruiting Center background actions.';
 
-    protected $description = 'Process queued Recruiting Center contact and list actions outside Livewire.';
-
-    public function handle(CoachDatabaseActionQueueService $service): int
+    public function handle(CoachDatabaseActionQueueService $queue): int
     {
         $userId = (int) $this->option('user');
         $user = User::query()->find($userId);
@@ -23,14 +21,11 @@ class ProcessCoachDatabaseActions extends Command
             return self::FAILURE;
         }
 
-        if ($this->option('release-lock')) {
-            Cache::forget(CoachDatabaseActionQueueService::workerLockKey($user));
-            Cache::forget(CoachDatabaseActionQueueService::launchKey($user));
-        }
+        $result = $queue->process($user);
+        $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-        $result = $service->process($user);
-        $this->line(json_encode($result, JSON_UNESCAPED_SLASHES));
-
-        return ($result['success'] ?? false) ? self::SUCCESS : self::FAILURE;
+        return ($result['status'] ?? '') === 'failed'
+            ? self::FAILURE
+            : self::SUCCESS;
     }
 }

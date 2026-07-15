@@ -35,6 +35,9 @@ return [
         'page_limit' => env('GHL_COACH_DATABASE_PAGE_LIMIT', 100),
         'max_pages' => env('GHL_COACH_DATABASE_MAX_PAGES', 25),
 
+        'company_membership_field_name' => 'PLYRCARD Lists',
+        'company_membership_concurrency' => 4,
+
         'tags' => [
             'coach' => env('GHL_TAG_COACH', 'coach'),
             'coach_database' => env('GHL_TAG_COACH_DATABASE', 'coach database'),
