@@ -9998,6 +9998,8 @@
                         @endphp
                         <article
                             class="rc-list-card-v120"
+                            x-show="!deleted"
+                            x-cloak
                             wire:key="list-card-{{ md5($listKey) }}"
                             wire:ignore
                             x-data="{
@@ -10010,6 +10012,9 @@
                                 selectMode: false,
                                 renameOpen: false,
                                 confirmDelete: false,
+                                deleted: false,
+                                deleting: false,
+                                deleteError: '',
                                 addQuery: '',
                                 listQuery: '',
                                 renameValue: @js($listLabel),
@@ -10041,6 +10046,7 @@
                                     if (this.removing[id]) return;
                                     const index = this.items.findIndex(s => String(s.id) === id);
                                     if (index < 0) return;
+                                    this.renameError = '';
                                     this.removing = { ...this.removing, [id]: true };
                                     const removed = this.items[index];
                                     this.items = this.items.filter(s => String(s.id) !== id);
@@ -10052,6 +10058,7 @@
                                         const copy = [...this.items];
                                         copy.splice(Math.min(index, copy.length), 0, removed);
                                         this.items = copy;
+                                        this.renameError = error?.message || 'Unable to remove this school.';
                                         window.console.error(error);
                                     } finally {
                                         const next = { ...this.removing }; delete next[id]; this.removing = next;
@@ -10069,6 +10076,7 @@
 
                                     // Add to the visible list immediately. The remote GHL action
                                     // is queued afterward and does not block the interface.
+                                    this.renameError = '';
                                     this.items = [...this.items, normalized];
                                     this.addQuery = '';
                                     this.expanded = true;
@@ -10117,7 +10125,31 @@
                                         this.savingRename = false;
                                     }
                                 },
-                                async deleteList() { await $wire.call('deleteCustomList', this.key); }
+                                async deleteList() {
+                                    if (this.deleting) return;
+
+                                    this.deleting = true;
+                                    this.deleteError = '';
+
+                                    try {
+                                        const result = await $wire.call('deleteCustomList', this.key);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to delete this list.');
+                                        }
+
+                                        // The card is wire:ignore, so remove it optimistically
+                                        // instead of waiting for a Livewire DOM morph.
+                                        this.confirmDelete = false;
+                                        this.deleted = true;
+                                        this.items = [];
+                                        this.selected = [];
+                                    } catch (error) {
+                                        this.deleteError = error?.message || 'Unable to delete this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.deleting = false;
+                                    }
+                                }
                             }"
                         >
                             <div class="rc-list-card-head-v120">
@@ -10162,9 +10194,13 @@
                                 <div class="rc-list-confirm-v120" x-show="confirmDelete" x-cloak>
                                     <span>Delete “<span x-text="label"></span>” and its schools?</span>
                                     <span class="rc-list-confirm-actions-v120">
-                                        <button type="button" class="rc-list-confirm-cancel-v120" x-on:click="confirmDelete=false">Cancel</button>
-                                        <button type="button" class="rc-list-confirm-delete-v120" x-on:click="deleteList()">Delete</button>
+                                        <button type="button" class="rc-list-confirm-cancel-v120" x-on:click="confirmDelete=false;deleteError=''" x-bind:disabled="deleting">Cancel</button>
+                                        <button type="button" class="rc-list-confirm-delete-v120" x-on:click="deleteList()" x-bind:disabled="deleting">
+                                            <span x-show="!deleting">Delete</span>
+                                            <span x-show="deleting" x-cloak>Deleting…</span>
+                                        </button>
                                     </span>
+                                    <small class="rc-list-inline-error-v121" x-show="deleteError" x-text="deleteError"></small>
                                 </div>
 
                                 <div class="rc-list-tools-v120" x-show="addOpen" x-cloak>

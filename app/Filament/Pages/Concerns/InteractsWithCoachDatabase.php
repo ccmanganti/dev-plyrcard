@@ -14,6 +14,8 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\PhpExecutableFinder;
@@ -46,8 +48,6 @@ trait InteractsWithCoachDatabase
     protected ?array $allSchoolsMemo = null;
     protected ?array $allCoachesMemo = null;
     protected ?array $trackingCoachesMemo = null;
-    protected ?array $coachesByIdMemo = null;
-    protected ?array $coachesByEmailMemo = null;
 
     public bool $allowed = false;
     public bool $locked = false;
@@ -634,8 +634,6 @@ trait InteractsWithCoachDatabase
             $this->allSchoolsMemo = null;
             $this->allCoachesMemo = null;
             $this->trackingCoachesMemo = null;
-            $this->coachesByIdMemo = null;
-            $this->coachesByEmailMemo = null;
         $this->filteredSchoolsQueryMemo = [];
 
             if (function_exists('gc_collect_cycles')) {
@@ -1738,41 +1736,136 @@ trait InteractsWithCoachDatabase
             ->send();
     }
 
-    public function deleteCustomList(string $listKey): void
+    protected function deletedRecruitingListsCacheKey(): string
     {
-        $listKey = trim($listKey);
+        return $this->activeCacheKey() . ':deleted-list-keys';
+    }
+
+    protected function deletedRecruitingListKeys(): array
+    {
+        $keys = Cache::get($this->deletedRecruitingListsCacheKey(), []);
+
+        return collect(is_array($keys) ? $keys : [])
+            ->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function deleteCustomList(string $listKey): array
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+
+        $user = Auth::user();
+        $listKey = strtolower(trim($listKey));
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
         if ($listKey === '') {
-            return;
+            return ['success' => false, 'error' => 'The list key is missing.'];
         }
 
         $normalizedKey = str_starts_with($listKey, 'custom:')
             ? substr($listKey, 7)
             : $listKey;
+        $canonicalKey = str_starts_with($listKey, 'custom:')
+            ? 'custom:' . $normalizedKey
+            : $listKey;
 
-        $definitions = $this->customListDefinitions();
-        unset($definitions[$listKey], $definitions[$normalizedKey]);
-
-        Cache::put(
-            $this->customListDefinitionsCacheKey(),
-            $definitions,
-            now()->addMonths(12)
-        );
-
-        $this->lists = collect($this->lists)
-            ->reject(fn ($list): bool => is_array($list)
-                && in_array((string) ($list['key'] ?? ''), [$listKey, $normalizedKey, 'custom:' . $normalizedKey], true))
+        $keyVariants = collect([
+            $listKey,
+            $normalizedKey,
+            'custom:' . $normalizedKey,
+        ])->map(fn ($key): string => strtolower(trim((string) $key)))
+            ->filter()
+            ->unique()
             ->values()
             ->all();
 
-        if (in_array($this->selectedListKey, [$listKey, $normalizedKey, 'custom:' . $normalizedKey], true)) {
-            $this->selectedListKey = '';
-        }
+        try {
+            $deletedMemberships = 0;
+            $table = 'coach_database_school_memberships';
 
-        Notification::make()
-            ->title('My Lists')
-            ->body('List removed. Existing Recruiting Center contact tags are left untouched.')
-            ->success()
-            ->send();
+            // Perform the delete directly against Laravel's local table. This
+            // deliberately avoids GHL and avoids depending on a possibly stale
+            // service class/opcache copy on shared hosting.
+            if (Schema::hasTable($table)) {
+                $locationId = trim((string) (
+                    $user->ghl_location_id
+                    ?? config('ghl.location_id')
+                    ?? ''
+                ));
+
+                $query = DB::table($table)
+                    ->where('user_id', $user->getKey())
+                    ->whereIn('list_key', $keyVariants);
+
+                if ($locationId !== '') {
+                    $query->where('ghl_location_id', $locationId);
+                }
+
+                $deletedMemberships = $query->delete();
+            }
+
+            $definitions = $this->customListDefinitions();
+            foreach ($keyVariants as $key) {
+                unset($definitions[$key]);
+            }
+            Cache::put($this->customListDefinitionsCacheKey(), $definitions, now()->addMonths(12));
+
+            $overridesKey = $this->activeCacheKey() . ':list-label-overrides';
+            $overrides = Cache::get($overridesKey, []);
+            $overrides = is_array($overrides) ? $overrides : [];
+            foreach ($keyVariants as $key) {
+                unset($overrides[$key]);
+            }
+            Cache::put($overridesKey, $overrides, now()->addMonths(12));
+
+            // Tombstones also hide built-in lists such as Dream Schools after
+            // deletion, preventing the base snapshot from recreating the card.
+            $deletedKeys = collect($this->deletedRecruitingListKeys())
+                ->merge($keyVariants)
+                ->unique()
+                ->values()
+                ->all();
+            Cache::put($this->deletedRecruitingListsCacheKey(), $deletedKeys, now()->addMonths(12));
+
+            $this->lists = collect($this->lists)
+                ->reject(fn ($list): bool => is_array($list)
+                    && in_array(strtolower(trim((string) ($list['key'] ?? ''))), $keyVariants, true))
+                ->values()
+                ->all();
+
+            if (in_array(strtolower(trim($this->selectedListKey)), $keyVariants, true)) {
+                $this->selectedListKey = '';
+            }
+
+            return [
+                'success' => true,
+                'list_key' => $canonicalKey,
+                'deleted_memberships' => (int) $deletedMemberships,
+                'message' => 'List permanently deleted from the local database.',
+            ];
+        } catch (\Throwable $exception) {
+            Log::error('Unable to permanently delete local recruiting list.', [
+                'user_id' => $user->getKey(),
+                'list_key' => $listKey,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => app()->isLocal()
+                    ? 'Delete failed: ' . $exception->getMessage()
+                    : 'Unable to delete this list from the database. Check laravel.log for the exact exception.',
+            ];
+        }
     }
 
     public function selectSchoolById(string $schoolId): void
@@ -7675,70 +7768,6 @@ HTML;
         $this->listSchoolSearch = '';
     }
 
-    public function getDiscoverSchoolsClientDatasetProperty(): array
-    {
-        return collect($this->allSchools())
-            ->filter(fn ($school): bool => is_array($school))
-            ->map(function (array $school): array {
-                $school = $this->hydrateSchoolRowForDisplay($school);
-                $id = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? ''));
-                $name = trim((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? 'Unnamed School'));
-                if ($id === '') {
-                    $id = md5(strtolower($name));
-                }
-
-                $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
-                if (blank($headCoach['name'] ?? null)) {
-                    $headCoach = collect($school['coaches_preview'] ?? $school['coaches'] ?? [])
-                        ->first(fn ($coach): bool => is_array($coach) && filled($coach['name'] ?? null)) ?: [];
-                }
-
-                $logo = $this->normalizeSchoolLogoCandidate(
-                    $school['logo_url']
-                    ?? $school['school_logo_url']
-                    ?? $school['business_logo_url']
-                    ?? $school['logo']
-                    ?? ''
-                );
-
-                $conference = trim((string) ($school['conference'] ?? ''));
-                $division = trim((string) ($school['division'] ?? ''));
-                $coachName = trim((string) ($headCoach['name'] ?? ''));
-                $coachTitle = trim((string) ($headCoach['title'] ?? ''));
-                $coachEmail = trim((string) ($headCoach['email'] ?? ''));
-                $coachCount = max(
-                    (int) ($school['coach_count'] ?? 0),
-                    (int) ($school['coaches_count'] ?? 0),
-                    is_array($school['coaches'] ?? null) ? count($school['coaches']) : 0,
-                    is_array($school['coaches_preview'] ?? null) ? count($school['coaches_preview']) : 0,
-                );
-
-                return [
-                    'id' => $id,
-                    'business_id' => trim((string) ($school['business_id'] ?? $school['company_id'] ?? $id)),
-                    'name' => $name,
-                    'logo_url' => $logo,
-                    'conference' => $conference,
-                    'division' => $division,
-                    'coach_count' => $coachCount,
-                    'head_coach_name' => $coachName !== '' ? $coachName : '—',
-                    'head_coach_title' => $coachTitle !== '' ? $coachTitle : 'Coach',
-                    'head_coach_email' => $coachEmail,
-                    'search_text' => strtolower(trim(implode(' ', [
-                        $name,
-                        $conference,
-                        $division,
-                        $coachName,
-                        $coachTitle,
-                        $coachEmail,
-                    ]))),
-                ];
-            })
-            ->sortBy(fn (array $school): string => strtolower($school['name']))
-            ->values()
-            ->all();
-    }
-
     public function getFilteredSchoolsProperty(): array
     {
         return $this->filteredSchoolsQuery()
@@ -9227,7 +9256,7 @@ HTML;
 
                 $coach = $contactId !== '' ? $coachesById->get($contactId) : null;
                 if (! $coach && $email !== '') {
-                    $coach = $coachesByEmail[$email] ?? null;
+                    $coach = $coachesByEmail->get($email);
                 }
 
                 $conversationSchool = trim((string) ($conversation['school'] ?? $conversation['company_name'] ?? ''));
@@ -10142,47 +10171,27 @@ HTML;
         $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? $school['business_name'] ?? ''));
         $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
 
-        // Build these indexes once per request. The previous implementation rebuilt
-        // both maps for every school while generating the client-side Discover
-        // Schools cache, producing O(schools x coaches) work and 30-second timeouts.
-        if ($this->coachesByIdMemo === null || $this->coachesByEmailMemo === null) {
-            $coachesById = [];
-            $coachesByEmail = [];
-
-            foreach ($this->allCoaches() as $coach) {
-                if (! is_array($coach)) {
-                    continue;
-                }
-
-                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''));
-                if ($coachId !== '') {
-                    $coachesById[$coachId] = $coach;
-                }
-
-                $email = strtolower(trim((string) ($coach['email'] ?? '')));
-                if ($email !== '') {
-                    $coachesByEmail[$email] = $coach;
-                }
-            }
-
-            $this->coachesByIdMemo = $coachesById;
-            $this->coachesByEmailMemo = $coachesByEmail;
-        }
-
-        $coachesById = $this->coachesByIdMemo;
-        $coachesByEmail = $this->coachesByEmailMemo;
+        $allCoaches = collect($this->allCoaches())
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->values();
+        $coachesById = $allCoaches
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null))
+            ->keyBy(fn (array $coach): string => trim((string) ($coach['id'] ?? $coach['contact_id'] ?? '')));
+        $coachesByEmail = $allCoaches
+            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
 
         $coaches = [];
 
         // First use the exact reconciled contact references saved on the school row.
         foreach (collect($school['coach_ids'] ?? [])->map(fn ($id): string => trim((string) $id))->filter()->unique() as $coachId) {
-            $coach = $coachesById[$coachId] ?? null;
+            $coach = $coachesById->get($coachId);
             if (is_array($coach)) {
                 $coaches[$this->coachTrackingIdentity($coach)] = $coach;
             }
         }
         foreach (collect($school['coach_emails'] ?? [])->map(fn ($email): string => strtolower(trim((string) $email)))->filter()->unique() as $email) {
-            $coach = $coachesByEmail[$email] ?? null;
+            $coach = $coachesByEmail->get($email);
             if (is_array($coach)) {
                 $coaches[$this->coachTrackingIdentity($coach)] = $coach;
             }
@@ -10552,8 +10561,6 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
         $this->trackingCoachesMemo = null;
-        $this->coachesByIdMemo = null;
-        $this->coachesByEmailMemo = null;
     }
 
     protected function allSchools(): array
@@ -10797,8 +10804,18 @@ HTML;
         $labelOverrides = Cache::get($this->activeCacheKey() . ':list-label-overrides', []);
         $labelOverrides = is_array($labelOverrides) ? $labelOverrides : [];
 
+        $deletedListKeys = $this->deletedRecruitingListKeys();
+
         $this->lists = collect($snapshot['lists'] ?? [])
             ->merge($this->customListRows())
+            ->reject(function (array $list) use ($deletedListKeys): bool {
+                $key = strtolower(trim((string) ($list['key'] ?? '')));
+                $plain = str_starts_with($key, 'custom:') ? substr($key, 7) : $key;
+
+                return in_array($key, $deletedListKeys, true)
+                    || in_array($plain, $deletedListKeys, true)
+                    || in_array('custom:' . $plain, $deletedListKeys, true);
+            })
             ->unique(fn (array $list): string => (string) ($list['key'] ?? $list['tag'] ?? md5(json_encode($list))))
             ->map(function (array $list) use ($labelOverrides): array {
                 $key = (string) ($list['key'] ?? '');
