@@ -627,6 +627,22 @@ class AdminPanelProvider extends PanelProvider
                             pointer-events: auto !important;
                         }
 
+                        /* Keep resource actions, but hide Filament's duplicate page title/description. */
+                        .fi-header-heading,
+                        .fi-header-subheading,
+                        .fi-page-header-heading,
+                        .fi-page-header-subheading,
+                        .fi-header > div:first-child:not(.fi-header-actions):not(.fi-page-header-actions) {
+                            display: none !important;
+                        }
+
+                        .fi-header:has(.fi-header-actions),
+                        .fi-page-header:has(.fi-page-header-actions) {
+                            justify-content: flex-end !important;
+                            min-height: 0 !important;
+                            margin-bottom: .75rem !important;
+                        }
+
                         .fi-header-actions,
                         .fi-page-header-actions {
                             display: flex !important;
