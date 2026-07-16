@@ -3145,7 +3145,7 @@ trait InteractsWithCoachDatabase
     public function starSelectedConversation(): void
     {
         $coach = $this->selectedConversationCoachRow();
-        $contactId = trim((string) ($coach['id'] ?? ''));
+        $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? $coach['email'] ?? ''));
 
         if ($contactId === '') {
             Notification::make()->title('Recruiting Center')->body('No matched coach contact found to star.')->warning()->send();
@@ -3309,10 +3309,15 @@ trait InteractsWithCoachDatabase
 
         $trackingContext = [
             'athlete_id' => $user->id,
+            'athlete_email' => $user->email ?: $user->personal_email,
+            'athlete_ghl_contact_id' => $user->ghl_contact_id,
+            'athlete_ghl_location_id' => $user->ghl_location_id,
+            'profile_url' => app(LocalTemplateMergeValueService::class)->profileUrlFor($user),
             'contact_id' => $contactId,
+            'coach_contact_id' => $contactId,
             'ghl_contact_id' => $contactId,
             'email_subject' => $subject,
-            'source' => 'coach_database_email',
+            'source' => 'compose_email',
             'message_uuid' => (string) Str::uuid(),
             'template_id' => $this->campaignTemplateId ?: $this->selectedTemplateId,
             'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
@@ -3346,8 +3351,7 @@ trait InteractsWithCoachDatabase
 
         try {
             $rewriter = app(TrackingLinkRewriter::class);
-            $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
-            $trackedBody = $rewriter->appendOpenPixel($trackedBody, $trackingContext);
+            $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
         } catch (\Throwable $exception) {
             \Log::warning('Recruiting email link rewrite failed. Sending original body.', [
                 'contact_id' => $contactId,
@@ -3381,7 +3385,7 @@ trait InteractsWithCoachDatabase
 
         try {
             $trackResult = app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
-                'source' => 'coach_database_email',
+                'source' => 'compose_email',
                 'subject' => $subject,
                 'to' => $to,
                 'host' => request()?->getHost(),
@@ -4327,6 +4331,94 @@ HTML;
         return collect($attachments)->unique('url')->values()->all();
     }
 
+    protected function replaceExactProfileDestinationInEmail(string $html, string $profileUrl, string $trackedProfileUrl): string
+    {
+        $profileUrl = trim(html_entity_decode($profileUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $trackedProfileUrl = trim($trackedProfileUrl);
+
+        if ($profileUrl === '' || $trackedProfileUrl === '') {
+            return $html;
+        }
+
+        $normalize = static function (string $url): string {
+            $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $url = preg_replace('/[\x{00A0}\x{2007}\x{202F}\x{200B}\x{FEFF}]+/u', '', $url) ?? $url;
+            $parts = parse_url($url);
+            if (! is_array($parts)) {
+                return strtolower(rtrim($url, '/'));
+            }
+            $host = strtolower((string) ($parts['host'] ?? ''));
+            $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+            $path = '/' . ltrim(rawurldecode((string) ($parts['path'] ?? '/')), '/');
+            return $host . $port . rtrim(strtolower($path), '/');
+        };
+
+        $profileKey = $normalize($profileUrl);
+
+        $html = preg_replace_callback(
+            '/(<a\b[^>]*?\bhref=["\'])([^"\']+)(["\'][^>]*>)/i',
+            function (array $matches) use ($normalize, $profileKey, $trackedProfileUrl): string {
+                return $normalize($matches[2]) === $profileKey
+                    ? $matches[1] . e($trackedProfileUrl) . $matches[3]
+                    : $matches[0];
+            },
+            $html,
+        ) ?? $html;
+
+        // Plain-text merge values are converted to a tracked anchor here so
+        // Gmail cannot auto-link the untracked destination after delivery.
+        $quoted = preg_quote($profileUrl, '/');
+        $parts = preg_split('/(<a\b[^>]*>.*?<\/a>)/isu', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (! is_array($parts)) {
+            return $html;
+        }
+        foreach ($parts as $index => $part) {
+            if (preg_match('/^<a\b/iu', $part)) {
+                continue;
+            }
+            $parts[$index] = preg_replace(
+                '/' . $quoted . '/u',
+                '<a data-plyrcard-profile-link="1" href="' . e($trackedProfileUrl) . '">View Profile</a>',
+                $part,
+            ) ?? $part;
+        }
+
+        return implode('', $parts);
+    }
+
+    protected function trackedPlainTextFromHtml(string $html): string
+    {
+        // Preserve tracked hrefs in the text alternative. Some email providers
+        // prefer the text/message field and otherwise strip the HTML anchor,
+        // which would expose the untracked player destination.
+        $html = preg_replace_callback(
+            '/<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/isu',
+            static function (array $matches): string {
+                $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                $label = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($matches[2] ?? ''))) ?? '');
+
+                if ($href === '') {
+                    return $label;
+                }
+
+                if ($label === '' || filter_var($label, FILTER_VALIDATE_URL)) {
+                    return $href;
+                }
+
+                return $label . ': ' . $href;
+            },
+            $html,
+        ) ?? $html;
+
+        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
+        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
     public function sendComposedEmail(): void
     {
         $user = Auth::user();
@@ -4370,7 +4462,7 @@ HTML;
         $failed = 0;
 
         foreach ($recipients as $coach) {
-            $contactId = trim((string) ($coach['id'] ?? ''));
+            $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
             $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
             $personalizedBody = $this->replaceCampaignTokens($html, $coach);
 
@@ -4382,6 +4474,7 @@ HTML;
                 'profile_url' => app(LocalTemplateMergeValueService::class)->profileUrlFor($user),
                 'contact_id' => $contactId,
                 'ghl_contact_id' => $contactId,
+                'coach_contact_id' => $contactId,
                 'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
                 'ghl_business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
                 'coach_name' => $coach['name'] ?? null,
@@ -4390,7 +4483,7 @@ HTML;
                 'school_name' => $coach['school'] ?? $coach['company_name'] ?? null,
                 'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
                 'email_subject' => $personalizedSubject,
-                'source' => 'coach_database_campaign_email',
+                'source' => 'compose_email',
                 'campaign_uuid' => (string) Str::uuid(),
                 'message_uuid' => (string) Str::uuid(),
                 'template_id' => $this->campaignTemplateId,
@@ -4399,6 +4492,20 @@ HTML;
             $trackedBody = $personalizedBody;
             try {
                 $rewriter = app(TrackingLinkRewriter::class);
+
+                // Force the exact player website through /track/profile/{token}
+                // before the generic link pass. This works for root domains,
+                // custom domains, parked domains, localhost, dev and production.
+                $profileUrl = trim((string) ($trackingContext['profile_url'] ?? ''));
+                if ($profileUrl !== '') {
+                    $trackedProfileUrl = $rewriter->trackedProfileUrl($profileUrl, $trackingContext);
+                    $trackedBody = $this->replaceExactProfileDestinationInEmail(
+                        $trackedBody,
+                        $profileUrl,
+                        $trackedProfileUrl,
+                    );
+                }
+
                 $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
             } catch (\Throwable $exception) {
                 \Log::warning('Recruiting campaign link rewrite failed. Sending original body.', [
@@ -4413,12 +4520,22 @@ HTML;
                 'subject' => $personalizedSubject,
                 'body' => $trackedBody,
                 'html' => $trackedBody,
-                'text' => trim(strip_tags($trackedBody)),
+                'text' => $this->trackedPlainTextFromHtml($trackedBody),
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
                 'cc' => trim($this->campaignCc),
                 'bcc' => trim($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
+                'tracking_context' => $trackingContext,
+                'tracking_source' => 'compose_email',
+                'source' => 'compose_email',
+                'profile_url' => $trackingContext['profile_url'] ?? null,
+                'public_profile_url' => $trackingContext['profile_url'] ?? null,
+                'coach_contact_id' => $trackingContext['coach_contact_id'] ?? $contactId,
+                'coach_name' => $trackingContext['coach_name'] ?? null,
+                'coach_email' => $trackingContext['coach_email'] ?? null,
+                'school_business_id' => $trackingContext['business_id'] ?? null,
+                'school_name' => $trackingContext['school_name'] ?? null,
                 'skip_internal_sent_tracking' => true,
                 'attachments' => $this->composeAttachments,
             ];
@@ -4429,7 +4546,7 @@ HTML;
 
                 try {
                     app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
-                        'source' => 'coach_database_campaign_email',
+                        'source' => 'compose_email',
                         'subject' => $personalizedSubject,
                         'to' => (string) ($coach['email'] ?? ''),
                         'host' => request()?->getHost(),
@@ -6900,12 +7017,9 @@ HTML;
         $profileRows = collect($this->profileViewRows);
         $engagementRows = collect($this->coachEngagementRows);
 
-        $trackedProfileTotal = max(
-            (int) $profileRows->sum('views'),
-            (int) ($stats['view_profile_total'] ?? 0),
-            (int) ($stats['profile_views'] ?? 0),
-            (int) ($stats['unique_profile_views'] ?? 0),
-        );
+        $trackedProfileTotal = (int) ($stats['profile_views'] ?? $stats['view_profile_total'] ?? 0);
+        $uniqueProfileViews = (int) ($stats['unique_profile_views'] ?? $stats['unique_profile_view_count'] ?? 0);
+        $knownCoachProfileViews = (int) ($stats['known_coach_profile_views'] ?? 0);
 
         $trackedWebsiteViews = max((int) ($stats['view_profile_website'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_website'] ?? 0)));
         $trackedInstagramViews = max((int) ($stats['view_profile_instagram'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_instagram'] ?? 0)));
@@ -6922,9 +7036,13 @@ HTML;
 
         $profileContactIds = $profileRows->pluck('coach_id')->filter()->unique();
         $linkContactIds = $engagementRows->pluck('coach_id')->filter()->unique();
-        $uniqueProfileViewContacts = max($profileContactIds->count(), (int) ($stats['unique_profile_view_contacts'] ?? 0), (int) ($stats['profile_view_unique_contact_count'] ?? 0));
-        $uniqueLinkClickContacts = max($linkContactIds->count(), (int) ($stats['unique_link_click_contacts'] ?? 0), (int) ($stats['unique_contact_clicks'] ?? 0));
-        $uniqueContactClicks = $profileContactIds->merge($linkContactIds)->unique()->count();
+        $uniqueProfileViewContacts = (int) ($stats['profile_view_unique_contact_count'] ?? $stats['unique_profile_view_contacts'] ?? $profileContactIds->count());
+        $uniqueLinkClickContacts = (int) ($stats['unique_link_click_contacts'] ?? $stats['unique_contact_clicks'] ?? $linkContactIds->count());
+        $uniqueContactClicks = max(
+            $uniqueLinkClickContacts,
+            (int) ($stats['unique_clicks'] ?? 0),
+            (int) ($stats['unique_contact_clicks'] ?? 0)
+        );
         $profileViewUniqueSchools = $profileRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
         $profileViewSchoolClicks = $profileRows->where('school_key', '!=', '')->sum('views');
         $overallSchoolClicks = $engagementRows->where('school_key', '!=', '')->sum('clicks');
@@ -6962,13 +7080,14 @@ HTML;
             'view_profile_x' => $trackedXViews,
             'view_profile_email_link' => $trackedEmailProfileLinks,
             'profile_view_unique_contact_count' => $uniqueProfileViewContacts,
+            'known_coach_profile_views' => max($knownCoachProfileViews, (int) ($stats['known_coach_profile_views'] ?? 0)),
             'profile_view_unique_school_count' => $profileViewUniqueSchools,
             'profile_view_school_click_count' => $profileViewSchoolClicks,
             'link_clicks' => $linkClicks,
             'trigger_link_clicks' => $linkClicks,
             'unique_contact_clicks' => $uniqueContactClicks,
             'unique_profile_view_contacts' => $uniqueProfileViewContacts,
-            'unique_profile_views' => $uniqueProfileViewContacts,
+            'unique_profile_views' => $uniqueProfileViews,
             'unique_link_click_contacts' => $uniqueLinkClickContacts,
             'unique_clicks' => $uniqueContactClicks,
             'contact_link_clicks' => $ghlContactClicks,

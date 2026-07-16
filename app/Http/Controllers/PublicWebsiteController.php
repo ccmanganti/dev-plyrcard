@@ -46,6 +46,8 @@ class PublicWebsiteController extends Controller
 
         $this->recordProfileVisit($website, $request, $tracking);
 
+        $this->recordDirectVisitUnlessTracked($website, $request);
+
         return $this->renderWebsite($website, $youtube);
     }
 
@@ -154,6 +156,19 @@ class PublicWebsiteController extends Controller
             'website' => $website,
             'autoHighlightVideos' => $autoHighlightVideos,
         ]);
+    }
+
+    protected function recordDirectVisitUnlessTracked(Website $website, Request $request): void
+    {
+        if ($request->boolean('rc_tracked') || $request->query('rc_source') === 'compose_email') {
+            return;
+        }
+
+        try {
+            app(LocalRecruitingTrackingService::class)->recordDirectProfileVisit($website, $request);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     protected function websiteRelations(): array

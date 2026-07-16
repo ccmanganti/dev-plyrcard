@@ -20,6 +20,7 @@ class TrackingLinkRewriter
         'destination_url' => 'd',
         'contact_id' => 'c',
         'ghl_contact_id' => 'c',
+        'coach_contact_id' => 'c',
         'athlete_id' => 'a',
         'athlete_email' => 'ae',
         'athlete_ghl_location_id' => 'al',
@@ -38,6 +39,7 @@ class TrackingLinkRewriter
         'coach_name' => 'cn',
         'contact_name' => 'cn',
         'coach_email' => 'ce',
+        'coach_title' => 'ct',
         'contact_email' => 'ce',
         'email_subject' => 'sj',
         'issued_at' => 'iat',
@@ -45,6 +47,7 @@ class TrackingLinkRewriter
         'campaign_uuid' => 'cu',
         'message_uuid' => 'mu',
         'template_id' => 'ti',
+        'recipient_key' => 'rk',
     ];
 
 
@@ -117,9 +120,16 @@ class TrackingLinkRewriter
             return $html;
         }
 
-        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
-        if ($contactId === '') {
+        $contactId = trim((string) ($context['coach_contact_id'] ?? $context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        $coachEmail = trim((string) ($context['coach_email'] ?? $context['contact_email'] ?? ''));
+        if ($contactId === '' && $coachEmail === '') {
             return $html;
+        }
+
+        if ($contactId !== '') {
+            $context['contact_id'] = $contactId;
+            $context['ghl_contact_id'] = $contactId;
+            $context['coach_contact_id'] = $contactId;
         }
 
         $token = $this->makeToken(array_merge($context, [
@@ -148,9 +158,16 @@ class TrackingLinkRewriter
             return $destinationUrl;
         }
 
-        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
-        if ($contactId === '') {
+        $contactId = trim((string) ($context['coach_contact_id'] ?? $context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        $coachEmail = trim((string) ($context['coach_email'] ?? $context['contact_email'] ?? ''));
+        if ($contactId === '' && $coachEmail === '') {
             return $destinationUrl;
+        }
+
+        if ($contactId !== '') {
+            $context['contact_id'] = $contactId;
+            $context['ghl_contact_id'] = $contactId;
+            $context['coach_contact_id'] = $contactId;
         }
 
         if (($context['event_type'] ?? null) === 'profile_view' || $this->isProfileDestinationUrl($destinationUrl, $context)) {
@@ -174,9 +191,24 @@ class TrackingLinkRewriter
             return $profileUrl;
         }
 
-        $contactId = trim((string) ($context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
-        if ($contactId === '') {
+        $contactId = trim((string) ($context['coach_contact_id'] ?? $context['contact_id'] ?? $context['ghl_contact_id'] ?? ''));
+        $coachEmail = trim((string) ($context['coach_email'] ?? $context['contact_email'] ?? ''));
+        if ($contactId === '' && $coachEmail === '') {
             return $profileUrl;
+        }
+
+        if ($contactId !== '') {
+            $context['contact_id'] = $contactId;
+            $context['ghl_contact_id'] = $contactId;
+            $context['coach_contact_id'] = $contactId;
+        }
+
+        // Always carry a stable recipient identity. When a GHL contact ID is
+        // unavailable, the coach email becomes the attribution key.
+        $context['recipient_key'] = $contactId !== '' ? $contactId : strtolower($coachEmail);
+        if (empty($context['coach_contact_id']) && $coachEmail !== '') {
+            $context['coach_contact_id'] = strtolower($coachEmail);
+            $context['contact_id'] = strtolower($coachEmail);
         }
 
         $payload = array_merge($context, [
@@ -200,9 +232,64 @@ class TrackingLinkRewriter
 
         $html = $this->appendTrackedSignature($html, $user, $context);
         $html = $this->linkifyPlainUrls($html);
+        $html = $this->rewriteKnownProfileUrl($html, $context);
         $html = $this->rewriteHtml($html, $context);
 
         return $this->appendOpenPixel($html, $context);
+    }
+
+
+    /**
+     * Guarantees that the resolved player website uses /track/profile/{token},
+     * even when the destination is a custom/parked domain outside PLYRCARD.
+     */
+    protected function rewriteKnownProfileUrl(string $html, array $context): string
+    {
+        $profileUrl = $this->cleanUrl((string) (
+            $context['profile_url']
+            ?? $context['public_profile_url']
+            ?? $context['athlete_profile_url']
+            ?? $context['website_url']
+            ?? ''
+        ));
+
+        if ($profileUrl === '') {
+            return $html;
+        }
+
+        $tracked = $this->trackedProfileUrl($profileUrl, $context);
+        if ($tracked === '' || $tracked === $profileUrl) {
+            return $html;
+        }
+
+        $quotedProfile = preg_quote($profileUrl, '/');
+
+        // Replace the exact profile destination inside existing anchors.
+        $html = preg_replace_callback(
+            '/(<a\b[^>]*\bhref=["\'])' . $quotedProfile . '(["\'][^>]*>)/iu',
+            static fn (array $matches): string => $matches[1] . e($tracked) . $matches[2],
+            $html
+        ) ?? $html;
+
+        // Linkify an exact plain-text profile URL that remains outside an anchor.
+        $parts = preg_split('/(<a\b[^>]*>.*?<\/a>)/isu', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (! is_array($parts)) {
+            return $html;
+        }
+
+        foreach ($parts as $index => $part) {
+            if (preg_match('/^<a\b/iu', $part)) {
+                continue;
+            }
+
+            $parts[$index] = preg_replace(
+                '/' . $quotedProfile . '/u',
+                '<a href="' . e($tracked) . '">' . e($profileUrl) . '</a>',
+                $part
+            ) ?? $part;
+        }
+
+        return implode('', $parts);
     }
 
     /**
@@ -560,12 +647,14 @@ class TrackingLinkRewriter
             'sl' => 'school_logo_url',
             'cn' => 'coach_name',
             'ce' => 'coach_email',
+            'ct' => 'coach_title',
             'sj' => 'email_subject',
             'iat' => 'issued_at',
             'h' => 'tracking_host',
             'cu' => 'campaign_uuid',
             'mu' => 'message_uuid',
             'ti' => 'template_id',
+            'rk' => 'recipient_key',
         ];
 
         foreach ($aliases as $alias => $fullKey) {
@@ -576,6 +665,10 @@ class TrackingLinkRewriter
 
         if (! empty($expanded['contact_id']) && empty($expanded['ghl_contact_id'])) {
             $expanded['ghl_contact_id'] = $expanded['contact_id'];
+        }
+
+        if (! empty($expanded['contact_id']) && empty($expanded['coach_contact_id'])) {
+            $expanded['coach_contact_id'] = $expanded['contact_id'];
         }
 
         if (! empty($expanded['business_id']) && empty($expanded['ghl_business_id'])) {

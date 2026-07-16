@@ -3026,6 +3026,36 @@ class GoHighLevelService
         ];
     }
 
+    protected function trackedPlainTextFromHtml(string $html): string
+    {
+        $html = preg_replace_callback(
+            '/<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/isu',
+            static function (array $matches): string {
+                $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                $label = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($matches[2] ?? ''))) ?? '');
+
+                if ($href === '') {
+                    return $label;
+                }
+
+                if ($label === '' || filter_var($label, FILTER_VALIDATE_URL)) {
+                    return $href;
+                }
+
+                return $label . ': ' . $href;
+            },
+            $html,
+        ) ?? $html;
+
+        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
+        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
     public function sendEmailMessageForUser(User $user, array $payload): array
     {
         $credentials = $this->credentialsForUser($user);
@@ -3065,7 +3095,7 @@ class GoHighLevelService
 
             if ($attachmentLinks !== '' && ! str_contains($html, 'data-plyrcard-attachments="1"')) {
                 $html .= '<div data-plyrcard-attachments="1" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $attachmentLinks . '</ul></div>';
-                $text = trim(strip_tags($html));
+                $text = $this->trackedPlainTextFromHtml($html);
             }
         }
 
@@ -3108,12 +3138,14 @@ class GoHighLevelService
 
         try {
             $html = app(TrackingLinkRewriter::class)->prepareTrackedEmailHtml($html, $user, $trackingContext);
-            $text = trim(strip_tags($html));
+            $text = $this->trackedPlainTextFromHtml($html);
 
             Log::info('Recruiting tracked email body prepared.', [
                 'contact_id' => $contactId,
                 'has_open_pixel' => str_contains($html, '/track/open/'),
                 'tracked_link_count' => substr_count($html, '/track/click/'),
+                'tracked_profile_count' => substr_count($html, '/track/profile/'),
+                'text_has_tracked_profile' => str_contains($text, '/track/profile/'),
                 'tracking_base_url' => rtrim((string) (config('services.tracking.base_url') ?: config('app.tracking_base_url') ?: env('TRACKING_BASE_URL') ?: config('app.url')), '/'),
             ]);
         } catch (\Throwable $exception) {

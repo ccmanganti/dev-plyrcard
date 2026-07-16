@@ -7186,6 +7186,7 @@
                     (int) ($dashboardMetrics['unique_clicks'] ?? 0),
                     (int) ($dashboardMetrics['unique_contact_clicks'] ?? 0),
                     (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0),
+                    (int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0),
                     $trackedWebsiteViews
                         + $trackedInstagramViews
                         + $trackedYoutubeViews

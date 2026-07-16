@@ -41,7 +41,8 @@ class LocalRecruitingTrackingService
         $eventType = strtolower(trim((string) ($payload['event_type'] ?? $fallbackEventType ?? 'link_click'))) ?: 'link_click';
         $platform = strtolower(trim((string) ($payload['platform'] ?? 'website'))) ?: 'website';
         $source = mb_substr(trim((string) ($payload['source'] ?? 'tracked_link')) ?: 'tracked_link', 0, 80);
-        $coachContactId = $this->text($payload['coach_contact_id'] ?? $payload['contact_id'] ?? $payload['ghl_contact_id'] ?? null);
+        $coachContactId = $this->text($payload['coach_contact_id'] ?? $payload['contact_id'] ?? $payload['ghl_contact_id'] ?? $payload['recipient_key'] ?? null)
+            ?: $this->text($payload['coach_email'] ?? $payload['contact_email'] ?? null);
         $ip = trim((string) ($request?->ip() ?? ''));
         $agent = mb_substr(trim((string) ($request?->userAgent() ?? '')), 0, 500);
         $now = now();
@@ -50,6 +51,8 @@ class LocalRecruitingTrackingService
             'token_athlete_id' => $payload['athlete_id'] ?? null,
             'resolved_athlete_id' => $user->getKey(),
             'athlete_email' => $payload['athlete_email'] ?? $user->email ?? $user->personal_email ?? null,
+            'coach_contact_id' => $coachContactId,
+            'recipient_key' => $payload['recipient_key'] ?? null,
             'coach_name' => $payload['coach_name'] ?? null,
             'coach_email' => $payload['coach_email'] ?? null,
             'coach_title' => $payload['coach_title'] ?? null,
@@ -95,21 +98,7 @@ class LocalRecruitingTrackingService
         ];
 
         try {
-            // Profile views are unique by visitor hash. A direct visitor counts once,
-            // while an email-origin view is unique per coach because coach_contact_id
-            // participates in the hash.
-            if ($eventType === 'profile_view') {
-                $existingId = DB::table('coach_database_tracking_events')
-                    ->where('athlete_user_id', $user->getKey())
-                    ->where('event_type', 'profile_view')
-                    ->where('visitor_hash', $visitorHash)
-                    ->value('id');
-
-                if ($existingId) {
-                    return CoachDatabaseTrackingEvent::query()->find($existingId);
-                }
-            }
-
+            // Every visit is an event row. Uniqueness is calculated only in dashboard queries.
             $id = DB::table('coach_database_tracking_events')->insertGetId($row);
             $event = CoachDatabaseTrackingEvent::query()->find($id);
 
@@ -208,16 +197,20 @@ class LocalRecruitingTrackingService
         $eventCount = fn (string $event): int => (clone $query)->where('event_type', $event)->count();
         $clicks = (clone $query)->where('event_type', 'link_click');
         $profile = (clone $query)->where('event_type', 'profile_view');
-        $uniqueProfileViews = (clone $profile)->distinct()->count('visitor_hash');
+        $totalProfileViews = (clone $profile)->count();
+        $uniqueProfileViews = (clone $profile)->whereNotNull('visitor_hash')->distinct()->count('visitor_hash');
+        $knownCoachProfileViews = (clone $profile)->whereNotNull('coach_contact_id')->count();
 
         return [
-            'profile_views' => $uniqueProfileViews,
-            'view_profile_total' => $uniqueProfileViews,
+            'profile_views' => $totalProfileViews,
+            'view_profile_total' => $totalProfileViews,
             'unique_profile_views' => $uniqueProfileViews,
-            'view_profile_website' => (clone $profile)->where('platform', 'website')->distinct()->count('visitor_hash'),
-            'view_profile_instagram' => (clone $profile)->where('platform', 'instagram')->distinct()->count('visitor_hash'),
-            'view_profile_youtube' => (clone $profile)->where('platform', 'youtube')->distinct()->count('visitor_hash'),
-            'view_profile_x' => (clone $profile)->where('platform', 'x')->distinct()->count('visitor_hash'),
+            'unique_profile_view_count' => $uniqueProfileViews,
+            'known_coach_profile_views' => $knownCoachProfileViews,
+            'view_profile_website' => (clone $profile)->where('platform', 'website')->count(),
+            'view_profile_instagram' => (clone $profile)->where('platform', 'instagram')->count(),
+            'view_profile_youtube' => (clone $profile)->where('platform', 'youtube')->count(),
+            'view_profile_x' => (clone $profile)->where('platform', 'x')->count(),
             'email_sent_count' => $eventCount('email_sent'),
             'emails_sent' => $eventCount('email_sent'),
             'email_open_count' => $eventCount('email_open'),
