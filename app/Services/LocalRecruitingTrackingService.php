@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CoachDatabaseEmailMessage;
 use App\Models\CoachDatabaseTrackingEvent;
 use App\Models\User;
+use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +40,8 @@ class LocalRecruitingTrackingService
         $destination = $this->cleanUrl((string) ($payload['destination_url'] ?? ''));
         $eventType = strtolower(trim((string) ($payload['event_type'] ?? $fallbackEventType ?? 'link_click'))) ?: 'link_click';
         $platform = strtolower(trim((string) ($payload['platform'] ?? 'website'))) ?: 'website';
+        $source = mb_substr(trim((string) ($payload['source'] ?? 'tracked_link')) ?: 'tracked_link', 0, 80);
+        $coachContactId = $this->text($payload['coach_contact_id'] ?? $payload['contact_id'] ?? $payload['ghl_contact_id'] ?? null);
         $ip = trim((string) ($request?->ip() ?? ''));
         $agent = mb_substr(trim((string) ($request?->userAgent() ?? '')), 0, 500);
         $now = now();
@@ -49,41 +52,42 @@ class LocalRecruitingTrackingService
             'athlete_email' => $payload['athlete_email'] ?? $user->email ?? $user->personal_email ?? null,
             'coach_name' => $payload['coach_name'] ?? null,
             'coach_email' => $payload['coach_email'] ?? null,
+            'coach_title' => $payload['coach_title'] ?? null,
             'school_name' => $payload['school_name'] ?? $payload['school'] ?? null,
             'email_subject' => $payload['email_subject'] ?? null,
+            'website_id' => $payload['website_id'] ?? null,
+            'website_name' => $payload['website_name'] ?? null,
             'request_host' => $request?->getHost(),
             'token_tracking_host' => $payload['tracking_host'] ?? null,
             'tracking_signature_valid' => $payload['_tracking_signature_valid'] ?? null,
             'tracking_signature_error' => $payload['_tracking_signature_error'] ?? null,
         ], static fn ($value): bool => $value !== null && $value !== '');
 
-        $visitorSeed = implode('|', [
-            strtolower($ip),
-            strtolower($agent),
-            (string) $user->getKey(),
-            $eventType,
-            $platform,
-            $destination,
-            (string) ($payload['contact_id'] ?? $payload['ghl_contact_id'] ?? ''),
-        ]);
+        $visitorHash = $this->visitorHash(
+            user: $user,
+            request: $request,
+            eventType: $eventType,
+            platform: $platform,
+            destination: $destination,
+            coachContactId: $coachContactId,
+        );
 
         $row = [
             'athlete_user_id' => $user->getKey(),
             'ghl_location_id' => $this->text($payload['athlete_ghl_location_id'] ?? $payload['ghl_location_id'] ?? $user->ghl_location_id ?? '') ?? '',
-            'coach_contact_id' => $this->text($payload['coach_contact_id'] ?? $payload['contact_id'] ?? $payload['ghl_contact_id'] ?? null),
+            'coach_contact_id' => $coachContactId,
             'school_business_id' => $this->text($payload['school_business_id'] ?? $payload['business_id'] ?? $payload['ghl_business_id'] ?? $payload['company_id'] ?? null),
             'campaign_uuid' => $this->uuid($payload['campaign_uuid'] ?? $payload['campaign_id'] ?? null),
             'message_uuid' => $this->uuid($payload['message_uuid'] ?? $payload['message_id'] ?? null),
             'template_id' => $this->text($payload['template_id'] ?? $payload['template_uuid'] ?? null),
             'event_type' => $eventType,
             'platform' => $platform,
-            'source' => mb_substr(trim((string) ($payload['source'] ?? 'tracked_link')) ?: 'tracked_link', 0, 80),
+            'source' => $source,
             'destination_url' => $destination !== '' ? $destination : null,
-            'visitor_hash' => hash('sha256', $visitorSeed),
+            'visitor_hash' => $visitorHash,
             'ip_hash' => $ip !== '' ? hash_hmac('sha256', $ip, (string) config('app.key')) : null,
             'user_agent' => $agent !== '' ? $agent : null,
             'referer' => $request?->headers->get('referer'),
-            // Use explicit JSON because query-builder inserts do not apply model casts.
             'metadata' => empty($metadata) ? null : json_encode($metadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
             'occurred_at' => $now,
             'created_at' => $now,
@@ -91,6 +95,21 @@ class LocalRecruitingTrackingService
         ];
 
         try {
+            // Profile views are unique by visitor hash. A direct visitor counts once,
+            // while an email-origin view is unique per coach because coach_contact_id
+            // participates in the hash.
+            if ($eventType === 'profile_view') {
+                $existingId = DB::table('coach_database_tracking_events')
+                    ->where('athlete_user_id', $user->getKey())
+                    ->where('event_type', 'profile_view')
+                    ->where('visitor_hash', $visitorHash)
+                    ->value('id');
+
+                if ($existingId) {
+                    return CoachDatabaseTrackingEvent::query()->find($existingId);
+                }
+            }
+
             $id = DB::table('coach_database_tracking_events')->insertGetId($row);
             $event = CoachDatabaseTrackingEvent::query()->find($id);
 
@@ -99,6 +118,8 @@ class LocalRecruitingTrackingService
                 'athlete_user_id' => $user->getKey(),
                 'event_type' => $eventType,
                 'platform' => $platform,
+                'source' => $source,
+                'coach_contact_id' => $coachContactId,
                 'request_host' => $request?->getHost(),
                 'destination_url' => $destination,
             ]);
@@ -109,6 +130,7 @@ class LocalRecruitingTrackingService
                 'athlete_user_id' => $user->getKey(),
                 'event_type' => $eventType,
                 'platform' => $platform,
+                'source' => $source,
                 'request_host' => $request?->getHost(),
                 'destination_url' => $destination,
                 'error' => $exception->getMessage(),
@@ -116,6 +138,27 @@ class LocalRecruitingTrackingService
             ]);
             return null;
         }
+    }
+
+    public function recordDirectProfileVisit(Website $website, Request $request): ?CoachDatabaseTrackingEvent
+    {
+        $user = $website->user;
+        if (! $user) {
+            return null;
+        }
+
+        return $this->record([
+            'athlete_id' => $user->getKey(),
+            'athlete_email' => $user->email ?: $user->personal_email,
+            'athlete_ghl_contact_id' => $user->ghl_contact_id,
+            'athlete_ghl_location_id' => $user->ghl_location_id,
+            'event_type' => 'profile_view',
+            'platform' => 'website',
+            'source' => 'direct_website_visit',
+            'destination_url' => $request->fullUrlWithoutQuery(['rc_tracked', 'rc_source']),
+            'website_id' => $website->getKey(),
+            'website_name' => $website->name,
+        ], $request, 'profile_view');
     }
 
     public function recordSentEmail(User $user, array $context, string $subject, string $html, array $sendResult = []): string
@@ -165,14 +208,16 @@ class LocalRecruitingTrackingService
         $eventCount = fn (string $event): int => (clone $query)->where('event_type', $event)->count();
         $clicks = (clone $query)->where('event_type', 'link_click');
         $profile = (clone $query)->where('event_type', 'profile_view');
+        $uniqueProfileViews = (clone $profile)->distinct()->count('visitor_hash');
 
         return [
-            'profile_views' => (clone $profile)->count(),
-            'view_profile_total' => (clone $profile)->count(),
-            'view_profile_website' => (clone $profile)->where('platform', 'website')->count(),
-            'view_profile_instagram' => (clone $profile)->where('platform', 'instagram')->count(),
-            'view_profile_youtube' => (clone $profile)->where('platform', 'youtube')->count(),
-            'view_profile_x' => (clone $profile)->where('platform', 'x')->count(),
+            'profile_views' => $uniqueProfileViews,
+            'view_profile_total' => $uniqueProfileViews,
+            'unique_profile_views' => $uniqueProfileViews,
+            'view_profile_website' => (clone $profile)->where('platform', 'website')->distinct()->count('visitor_hash'),
+            'view_profile_instagram' => (clone $profile)->where('platform', 'instagram')->distinct()->count('visitor_hash'),
+            'view_profile_youtube' => (clone $profile)->where('platform', 'youtube')->distinct()->count('visitor_hash'),
+            'view_profile_x' => (clone $profile)->where('platform', 'x')->distinct()->count('visitor_hash'),
             'email_sent_count' => $eventCount('email_sent'),
             'emails_sent' => $eventCount('email_sent'),
             'email_open_count' => $eventCount('email_open'),
@@ -193,6 +238,22 @@ class LocalRecruitingTrackingService
             'overall_school_clicks' => (clone $clicks)->whereNotNull('school_business_id')->count(),
             'schools_with_clicks' => (clone $clicks)->whereNotNull('school_business_id')->distinct()->count('school_business_id'),
         ];
+    }
+
+    protected function visitorHash(User $user, ?Request $request, string $eventType, string $platform, string $destination, ?string $coachContactId): string
+    {
+        $ip = strtolower(trim((string) ($request?->ip() ?? 'unknown-ip')));
+        $agent = strtolower(trim((string) ($request?->userAgent() ?? 'unknown-agent')));
+
+        return hash('sha256', implode('|', [
+            $ip,
+            $agent,
+            (string) $user->getKey(),
+            $eventType,
+            $platform,
+            $destination,
+            $coachContactId ?: 'direct',
+        ]));
     }
 
     protected function resolveAthlete(array $payload): ?User

@@ -7163,7 +7163,12 @@
                 $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
                 $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
-                $trackedProfileTotal = $trackedProfileComponentTotal;
+                $trackedProfileTotal = max(
+                    $trackedProfileComponentTotal,
+                    (int) ($dashboardMetrics['view_profile_total'] ?? 0),
+                    (int) ($dashboardMetrics['profile_views'] ?? 0),
+                    (int) ($dashboardMetrics['unique_profile_views'] ?? 0),
+                );
                 $profileViews = $trackedProfileTotal;
 
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
@@ -7177,15 +7182,20 @@
 
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
-                $coachEngagementTotal = $trackedWebsiteViews
-                    + $trackedInstagramViews
-                    + $trackedYoutubeViews
-                    + $trackedXViews
-                    + $trackedEmailLinkViews
-                    + $emailClickCount
-                    + $socialClickCount
-                    + $emailOpenCount
-                    + $coachReplies;
+                $coachEngagementTotal = max(
+                    (int) ($dashboardMetrics['unique_clicks'] ?? 0),
+                    (int) ($dashboardMetrics['unique_contact_clicks'] ?? 0),
+                    (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0),
+                    $trackedWebsiteViews
+                        + $trackedInstagramViews
+                        + $trackedYoutubeViews
+                        + $trackedXViews
+                        + $trackedEmailLinkViews
+                        + $emailClickCount
+                        + $socialClickCount
+                        + $emailOpenCount
+                        + $coachReplies,
+                );
 
                 $profileCompletion = 0;
                 $profileUrl = '#';

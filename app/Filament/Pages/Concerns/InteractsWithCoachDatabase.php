@@ -4376,6 +4376,9 @@ HTML;
 
             $trackingContext = [
                 'athlete_id' => $user->id,
+                'athlete_email' => $user->email ?: $user->personal_email,
+                'athlete_ghl_contact_id' => $user->ghl_contact_id,
+                'athlete_ghl_location_id' => $user->ghl_location_id,
                 'profile_url' => app(LocalTemplateMergeValueService::class)->profileUrlFor($user),
                 'contact_id' => $contactId,
                 'ghl_contact_id' => $contactId,
@@ -4396,9 +4399,7 @@ HTML;
             $trackedBody = $personalizedBody;
             try {
                 $rewriter = app(TrackingLinkRewriter::class);
-                $trackedBody = $rewriter->linkifyPlainUrls($trackedBody);
-                $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
-                $trackedBody = $rewriter->appendOpenPixel($trackedBody, $trackingContext);
+                $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
             } catch (\Throwable $exception) {
                 \Log::warning('Recruiting campaign link rewrite failed. Sending original body.', [
                     'contact_id' => $contactId,
@@ -6873,6 +6874,18 @@ HTML;
     public function getDashboardMetricsProperty(): array
     {
         $stats = $this->stats ?? [];
+
+        // The local tracking table is authoritative. The detail drawers already read
+        // these events, so the headline dashboard cards must use the same source.
+        $dashboardUser = Auth::user();
+        if ($dashboardUser) {
+            $localTrackingStats = app(LocalRecruitingTrackingService::class)->dashboardStats($dashboardUser);
+            foreach ($localTrackingStats as $key => $value) {
+                $stats[$key] = (int) $value;
+                $this->stats[$key] = (int) $value;
+            }
+        }
+
         $schools = collect($this->allSchools());
 
         $localMembershipCounts = $this->localDashboardSchoolMembershipCounts();
@@ -6887,15 +6900,17 @@ HTML;
         $profileRows = collect($this->profileViewRows);
         $engagementRows = collect($this->coachEngagementRows);
 
-        $trackedProfileTotal = $profileRows->sum('views');
-        if ($trackedProfileTotal === 0) {
-            $trackedProfileTotal = (int) ($stats['view_profile_total'] ?? $stats['profile_views'] ?? 0);
-        }
+        $trackedProfileTotal = max(
+            (int) $profileRows->sum('views'),
+            (int) ($stats['view_profile_total'] ?? 0),
+            (int) ($stats['profile_views'] ?? 0),
+            (int) ($stats['unique_profile_views'] ?? 0),
+        );
 
-        $trackedWebsiteViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_website'] ?? 0));
-        $trackedInstagramViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_instagram'] ?? 0));
-        $trackedYoutubeViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_youtube'] ?? 0));
-        $trackedXViews = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_x'] ?? 0));
+        $trackedWebsiteViews = max((int) ($stats['view_profile_website'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_website'] ?? 0)));
+        $trackedInstagramViews = max((int) ($stats['view_profile_instagram'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_instagram'] ?? 0)));
+        $trackedYoutubeViews = max((int) ($stats['view_profile_youtube'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_youtube'] ?? 0)));
+        $trackedXViews = max((int) ($stats['view_profile_x'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_x'] ?? 0)));
         $trackedEmailProfileLinks = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_email_link'] ?? 0));
 
         $websiteClicks = $engagementRows->where('platform_key', 'website')->sum('clicks');
@@ -6907,8 +6922,8 @@ HTML;
 
         $profileContactIds = $profileRows->pluck('coach_id')->filter()->unique();
         $linkContactIds = $engagementRows->pluck('coach_id')->filter()->unique();
-        $uniqueProfileViewContacts = $profileContactIds->count();
-        $uniqueLinkClickContacts = $linkContactIds->count();
+        $uniqueProfileViewContacts = max($profileContactIds->count(), (int) ($stats['unique_profile_view_contacts'] ?? 0), (int) ($stats['profile_view_unique_contact_count'] ?? 0));
+        $uniqueLinkClickContacts = max($linkContactIds->count(), (int) ($stats['unique_link_click_contacts'] ?? 0), (int) ($stats['unique_contact_clicks'] ?? 0));
         $uniqueContactClicks = $profileContactIds->merge($linkContactIds)->unique()->count();
         $profileViewUniqueSchools = $profileRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
         $profileViewSchoolClicks = $profileRows->where('school_key', '!=', '')->sum('views');

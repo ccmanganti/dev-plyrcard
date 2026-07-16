@@ -42,6 +42,9 @@ class TrackingLinkRewriter
         'email_subject' => 'sj',
         'issued_at' => 'iat',
         'tracking_host' => 'h',
+        'campaign_uuid' => 'cu',
+        'message_uuid' => 'mu',
+        'template_id' => 'ti',
     ];
 
 
@@ -439,7 +442,11 @@ class TrackingLinkRewriter
                 return $matches[0];
             }
 
-            return $matches[1] . e($this->trackedUrl($url, $context)) . $matches[3];
+            $tracked = $this->isProfileDestinationUrl($url, $context)
+                ? $this->trackedProfileUrl($url, $context)
+                : $this->trackedUrl($url, $context);
+
+            return $matches[1] . e($tracked) . $matches[3];
         }, $html) ?: $html;
     }
 
@@ -556,6 +563,9 @@ class TrackingLinkRewriter
             'sj' => 'email_subject',
             'iat' => 'issued_at',
             'h' => 'tracking_host',
+            'cu' => 'campaign_uuid',
+            'mu' => 'message_uuid',
+            'ti' => 'template_id',
         ];
 
         foreach ($aliases as $alias => $fullKey) {
@@ -585,47 +595,43 @@ class TrackingLinkRewriter
 
     protected function isProfileDestinationUrl(string $url, array $context = []): bool
     {
-        if (empty($context['athlete_id']) && empty($context['profile_url']) && empty($context['public_profile_url']) && empty($context['athlete_profile_url']) && empty($context['plyrcard_url'])) {
+        $url = $this->cleanUrl($url);
+        if ($url === '') {
             return false;
         }
 
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+        $profileCandidates = collect([
+            $context['profile_url'] ?? null,
+            $context['public_profile_url'] ?? null,
+            $context['athlete_profile_url'] ?? null,
+            $context['website_url'] ?? null,
+        ])->filter()->map(fn ($value): string => $this->cleanUrl((string) $value));
 
-        if ($host === '') {
-            return false;
-        }
-
-        if (str_contains($path, '/track/')) {
-            return false;
-        }
-
-        // Exact recipient profile URL always wins, including localhost and
-        // custom player domains that are not part of the main PLYRCARD hosts.
-        foreach (['profile_url', 'public_profile_url', 'athlete_profile_url', 'plyrcard_url', 'website_url'] as $key) {
-            $profileUrl = trim((string) ($context[$key] ?? ''));
-            if ($profileUrl !== '' && rtrim($profileUrl, '/') === rtrim($url, '/')) {
-                return true;
+        $normalize = static function (string $value): string {
+            $parts = parse_url($value);
+            if (! is_array($parts)) {
+                return strtolower(rtrim($value, '/'));
             }
+            $host = strtolower((string) ($parts['host'] ?? ''));
+            $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+            $path = '/' . ltrim(rawurldecode((string) ($parts['path'] ?? '/')), '/');
+            return $host . $port . rtrim(strtolower($path), '/');
+        };
+
+        $needle = $normalize($url);
+        if ($profileCandidates->contains(fn (string $candidate): bool => $normalize($candidate) === $needle)) {
+            return true;
         }
 
-        $knownHosts = collect([
-            parse_url((string) config('app.url'), PHP_URL_HOST),
-            parse_url((string) config('services.tracking.base_url'), PHP_URL_HOST),
-            parse_url((string) env('PLYRCARD_TRACKING_BASE_URL'), PHP_URL_HOST),
-            parse_url((string) env('TRACKING_BASE_URL'), PHP_URL_HOST),
-            request()?->getHost(),
-            'plyrcard.com',
-            'dev.plyrcard.com',
-        ])->filter()->map(fn ($value): string => preg_replace('/^www\./', '', strtolower((string) $value)))->unique()->all();
+        // Profile links on the platform use a single root-level website slug.
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $path = trim(rawurldecode((string) parse_url($url, PHP_URL_PATH)), '/');
+        $segments = $path === '' ? [] : explode('/', $path);
+        $platformHosts = ['localhost', '127.0.0.1', 'dev.plyrcard.com', 'plyrcard.com', 'www.plyrcard.com'];
 
-        $host = preg_replace('/^www\./', '', $host) ?: $host;
-
-        if (! in_array($host, $knownHosts, true)) {
-            return false;
-        }
-
-        return $path !== '' && ! str_contains($path, '/admin');
+        return in_array($host, $platformHosts, true)
+            && count($segments) === 1
+            && ! in_array(strtolower($segments[0]), ['admin', 'login', 'register', 'api', 'track'], true);
     }
 
     protected function trackingSecretForPayload(array $payload): string

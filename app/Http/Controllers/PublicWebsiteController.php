@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use App\Services\LocalRecruitingTrackingService;
 use App\Services\YouTubeChannelService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -29,35 +30,21 @@ class PublicWebsiteController extends Controller
         'filament',
         'storage',
         'api',
+        'track',
     ];
 
-    public function home(Request $request, YouTubeChannelService $youtube)
+    public function home(Request $request, YouTubeChannelService $youtube, LocalRecruitingTrackingService $tracking)
     {
         $host = strtolower($request->getHost());
-
-        /*
-        |--------------------------------------------------------------------------
-        | Platform domains show the marketing homepage
-        |--------------------------------------------------------------------------
-        |
-        | Localhost should also show the platform homepage.
-        | Do not automatically render the first website record locally.
-        |
-        */
 
         if ($this->isPlatformHost($host)) {
             return view('pages.index');
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Parked/custom player domains show the matching player website
-        |--------------------------------------------------------------------------
-        */
-
         $website = $this->findWebsiteByDomain($host);
-
         abort_unless($website, 404);
+
+        $this->recordProfileVisit($website, $request, $tracking);
 
         return $this->renderWebsite($website, $youtube);
     }
@@ -66,43 +53,62 @@ class PublicWebsiteController extends Controller
     {
         $website->load($this->websiteRelations());
 
+        // Preview is an authenticated editing action, not a public profile view.
         return $this->renderWebsite($website, $youtube);
     }
 
-public function showByName(Request $request, string $websiteName, YouTubeChannelService $youtube)
-{
-    if ($this->isReservedPath($websiteName)) {
-        abort(404);
-    }
+    public function showByName(
+        Request $request,
+        string $websiteName,
+        YouTubeChannelService $youtube,
+        LocalRecruitingTrackingService $tracking,
+    ) {
+        if ($this->isReservedPath($websiteName)) {
+            abort(404);
+        }
 
-    $normalizedRequestedName = $this->normalizeWebsiteName($websiteName);
+        $normalizedRequestedName = $this->normalizeWebsiteName($websiteName);
 
-    $website = Website::query()
-        ->with($this->websiteRelations())
-        ->where('is_active', true)
-        ->where('is_published', true)
-        ->where(function ($query) use ($websiteName, $normalizedRequestedName) {
-            $query
-                ->whereRaw('LOWER(slug) = ?', [strtolower($websiteName)])
-                ->orWhereRaw('LOWER(slug) = ?', [$normalizedRequestedName]);
-        })
-        ->first();
-
-    if (! $website) {
         $website = Website::query()
             ->with($this->websiteRelations())
             ->where('is_active', true)
             ->where('is_published', true)
-            ->get()
-            ->first(function (Website $website) use ($normalizedRequestedName) {
-                return $this->normalizeWebsiteName($website->name) === $normalizedRequestedName;
-            });
+            ->where(function ($query) use ($websiteName, $normalizedRequestedName) {
+                $query
+                    ->whereRaw('LOWER(slug) = ?', [strtolower($websiteName)])
+                    ->orWhereRaw('LOWER(slug) = ?', [$normalizedRequestedName]);
+            })
+            ->first();
+
+        if (! $website) {
+            $website = Website::query()
+                ->with($this->websiteRelations())
+                ->where('is_active', true)
+                ->where('is_published', true)
+                ->get()
+                ->first(function (Website $website) use ($normalizedRequestedName) {
+                    return $this->normalizeWebsiteName($website->name) === $normalizedRequestedName;
+                });
+        }
+
+        abort_unless($website, 404);
+
+        $this->recordProfileVisit($website, $request, $tracking);
+
+        return $this->renderWebsite($website, $youtube);
     }
 
-    abort_unless($website, 404);
+    protected function recordProfileVisit(Website $website, Request $request, LocalRecruitingTrackingService $tracking): void
+    {
+        // A tracked email click records the attributed coach event before redirecting.
+        // The redirect adds rc_tracked=1 so the destination request does not create
+        // a second anonymous/direct event for the same click.
+        if ($request->boolean('rc_tracked')) {
+            return;
+        }
 
-    return $this->renderWebsite($website, $youtube);
-}
+        $tracking->recordDirectProfileVisit($website, $request);
+    }
 
     protected function findWebsiteByDomain(string $host): ?Website
     {
