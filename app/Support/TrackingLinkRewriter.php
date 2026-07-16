@@ -44,6 +44,61 @@ class TrackingLinkRewriter
         'tracking_host' => 'h',
     ];
 
+
+    /**
+     * Converts plain HTTP(S) URLs in email text nodes into anchors before the
+     * normal tracking rewrite runs. Mail clients otherwise auto-link the raw
+     * text after delivery, which bypasses /track/click and /track/profile.
+     */
+    public function linkifyPlainUrls(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        $parts = preg_split('/(<[^>]+>)/s', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (! is_array($parts)) {
+            return $html;
+        }
+
+        $insideAnchor = false;
+
+        foreach ($parts as $index => $part) {
+            if ($part === '') {
+                continue;
+            }
+
+            if ($part[0] === '<') {
+                if (preg_match('/^<a\b/i', $part)) {
+                    $insideAnchor = true;
+                } elseif (preg_match('/^<\/a\s*>/i', $part)) {
+                    $insideAnchor = false;
+                }
+                continue;
+            }
+
+            if ($insideAnchor) {
+                continue;
+            }
+
+            $parts[$index] = preg_replace_callback(
+                '~(?<!["\'=])(https?://[^\s<>]+)~i',
+                function (array $matches): string {
+                    $url = rtrim($matches[1], '.,;:!?)\]');
+                    $suffix = substr($matches[1], strlen($url));
+
+                    return '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer">'
+                        . e($url)
+                        . '</a>'
+                        . $suffix;
+                },
+                $part
+            ) ?? $part;
+        }
+
+        return implode('', $parts);
+    }
+
     public function rewriteHtml(string $html, array $context = []): string
     {
         if (trim($html) === '') {
@@ -84,7 +139,7 @@ class TrackingLinkRewriter
 
     public function trackedUrl(string $destinationUrl, array $context = []): string
     {
-        $destinationUrl = trim($destinationUrl);
+        $destinationUrl = $this->cleanUrl($destinationUrl);
 
         if ($destinationUrl === '' || $this->shouldSkipUrl($destinationUrl)) {
             return $destinationUrl;
@@ -110,7 +165,7 @@ class TrackingLinkRewriter
 
     public function trackedProfileUrl(string $profileUrl, array $context = []): string
     {
-        $profileUrl = trim($profileUrl);
+        $profileUrl = $this->cleanUrl($profileUrl);
 
         if ($profileUrl === '' || $this->shouldSkipUrl($profileUrl)) {
             return $profileUrl;
@@ -141,6 +196,7 @@ class TrackingLinkRewriter
         $context = $this->trackingContextForUser($user, $context);
 
         $html = $this->appendTrackedSignature($html, $user, $context);
+        $html = $this->linkifyPlainUrls($html);
         $html = $this->rewriteHtml($html, $context);
 
         return $this->appendOpenPixel($html, $context);
@@ -377,7 +433,7 @@ class TrackingLinkRewriter
     protected function rewriteAnchorHrefs(string $html, array $context): string
     {
         return preg_replace_callback('/(<a\b[^>]*?\bhref=["\'])([^"\']+)(["\'][^>]*>)/i', function (array $matches) use ($context): string {
-            $url = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $url = $this->cleanUrl(html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
             if ($this->shouldSkipUrl($url)) {
                 return $matches[0];
@@ -385,6 +441,21 @@ class TrackingLinkRewriter
 
             return $matches[1] . e($this->trackedUrl($url, $context)) . $matches[3];
         }, $html) ?: $html;
+    }
+
+    protected function cleanUrl(string $url): string
+    {
+        $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $url = preg_replace(
+            '/[\x{00A0}\x{2007}\x{202F}\x{200B}\x{FEFF}]+/u',
+            ' ',
+            $url
+        ) ?? $url;
+
+        $url = preg_replace('/\s+/u', ' ', $url) ?? $url;
+
+        return trim($url);
     }
 
     protected function shouldSkipUrl(string $url): bool
@@ -525,11 +596,25 @@ class TrackingLinkRewriter
             return false;
         }
 
+        if (str_contains($path, '/track/')) {
+            return false;
+        }
+
+        // Exact recipient profile URL always wins, including localhost and
+        // custom player domains that are not part of the main PLYRCARD hosts.
+        foreach (['profile_url', 'public_profile_url', 'athlete_profile_url', 'plyrcard_url', 'website_url'] as $key) {
+            $profileUrl = trim((string) ($context[$key] ?? ''));
+            if ($profileUrl !== '' && rtrim($profileUrl, '/') === rtrim($url, '/')) {
+                return true;
+            }
+        }
+
         $knownHosts = collect([
             parse_url((string) config('app.url'), PHP_URL_HOST),
             parse_url((string) config('services.tracking.base_url'), PHP_URL_HOST),
             parse_url((string) env('PLYRCARD_TRACKING_BASE_URL'), PHP_URL_HOST),
             parse_url((string) env('TRACKING_BASE_URL'), PHP_URL_HOST),
+            request()?->getHost(),
             'plyrcard.com',
             'dev.plyrcard.com',
         ])->filter()->map(fn ($value): string => preg_replace('/^www\./', '', strtolower((string) $value)))->unique()->all();
@@ -538,17 +623,6 @@ class TrackingLinkRewriter
 
         if (! in_array($host, $knownHosts, true)) {
             return false;
-        }
-
-        if (str_contains($path, '/track/')) {
-            return false;
-        }
-
-        foreach (['profile_url', 'public_profile_url', 'athlete_profile_url', 'plyrcard_url', 'website_url'] as $key) {
-            $profileUrl = trim((string) ($context[$key] ?? ''));
-            if ($profileUrl !== '' && rtrim($profileUrl, '/') === rtrim($url, '/')) {
-                return true;
-            }
         }
 
         return $path !== '' && ! str_contains($path, '/admin');
@@ -702,15 +776,11 @@ class TrackingLinkRewriter
         }
 
         $requestHost = request()?->getSchemeAndHttpHost();
-        $host = strtolower((string) request()?->getHost());
 
-        // Localhost/127 links inside emails are not reachable by coaches. When emails
-        // are sent from local and no explicit tracking base URL is configured, default
-        // to dev so the tracking redirect can still execute and record to GHL.
-        if ($host === 'localhost' || $host === '127.0.0.1' || str_ends_with($host, '.test') || str_ends_with($host, '.local')) {
-            return 'https://dev.plyrcard.com';
-        }
-
+        // Use the same application root that generated the email. This ensures
+        // local tests write to the local tracking table, dev writes to dev, and
+        // production writes to production. An explicit tracking base URL above
+        // can still override this behavior.
         if ($requestHost) {
             return rtrim($requestHost, '/');
         }

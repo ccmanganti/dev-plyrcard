@@ -5,6 +5,8 @@ namespace App\Filament\Pages\Concerns;
 use App\Services\CoachDatabaseService;
 use App\Services\LocalSchoolMembershipService;
 use App\Services\LocalCoachDatabaseSchoolService;
+use App\Services\LocalRecruitingTrackingService;
+use App\Services\LocalTemplateMergeValueService;
 use App\Services\CoachDatabaseActionQueueService;
 use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
@@ -2897,6 +2899,13 @@ trait InteractsWithCoachDatabase
             $this->stats = $this->mergeDashboardTrackingStats($this->stats ?? [], $remoteStats);
         }
 
+        // Local tracking events are authoritative for profile views, coach engagement,
+        // social clicks, email opens, and sent-email totals.
+        $localTrackingStats = app(LocalRecruitingTrackingService::class)->dashboardStats($user);
+        foreach ($localTrackingStats as $key => $value) {
+            $this->stats[$key] = (int) $value;
+        }
+
         $localMembershipCounts = $this->localDashboardSchoolMembershipCounts();
         $this->stats['saved_schools'] = (int) ($localMembershipCounts['saved_schools'] ?? 0);
         $this->stats['favorite_schools'] = (int) ($localMembershipCounts['favorite_schools'] ?? 0);
@@ -3304,6 +3313,8 @@ trait InteractsWithCoachDatabase
             'ghl_contact_id' => $contactId,
             'email_subject' => $subject,
             'source' => 'coach_database_email',
+            'message_uuid' => (string) Str::uuid(),
+            'template_id' => $this->campaignTemplateId ?: $this->selectedTemplateId,
             'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
             'ghl_business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
             'coach_name' => $coach['name'] ?? $conversation['contact_name'] ?? null,
@@ -3864,6 +3875,58 @@ HTML;
     /**
      * Backward-compatible alias for older Compose Email send buttons.
      */
+    public function sendComposedEmailWithCoachIds(array $coachIds = []): void
+    {
+        $this->campaignCoachIds = collect($coachIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! empty($this->campaignCoachIds)) {
+            $this->campaignTargetMode = 'coaches';
+            $this->campaignHeadCoachOnly = false;
+        }
+
+        $this->sendComposedEmail();
+    }
+
+    /**
+     * Receives the browser-local Compose recipient state only when Send is clicked.
+     * School selection, target-mode switching, and coach checkboxes stay entirely
+     * in Alpine and therefore do not cause Livewire round-trips or full rerenders.
+     */
+    public function sendComposedEmailWithComposeState(
+        string $schoolId = '',
+        string $targetMode = 'school',
+        bool $headCoachOnly = true,
+        array $coachIds = [],
+    ): void {
+        $this->campaignSchoolId = trim($schoolId);
+        $this->campaignTargetMode = in_array($targetMode, ['school', 'coaches', 'all', 'list'], true)
+            ? $targetMode
+            : 'school';
+        $this->campaignHeadCoachOnly = $this->campaignTargetMode === 'school' && $headCoachOnly;
+        $this->campaignCoachIds = collect($coachIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($this->campaignTargetMode === 'coaches' && empty($this->campaignCoachIds)) {
+            Notification::make()
+                ->title('Compose Email')
+                ->body('Choose at least one coach.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $this->sendComposedEmail();
+    }
+
     public function sendCampaign(): void
     {
         $this->sendComposedEmail();
@@ -4313,6 +4376,7 @@ HTML;
 
             $trackingContext = [
                 'athlete_id' => $user->id,
+                'profile_url' => app(LocalTemplateMergeValueService::class)->profileUrlFor($user),
                 'contact_id' => $contactId,
                 'ghl_contact_id' => $contactId,
                 'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
@@ -4324,11 +4388,15 @@ HTML;
                 'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
                 'email_subject' => $personalizedSubject,
                 'source' => 'coach_database_campaign_email',
+                'campaign_uuid' => (string) Str::uuid(),
+                'message_uuid' => (string) Str::uuid(),
+                'template_id' => $this->campaignTemplateId,
             ];
 
             $trackedBody = $personalizedBody;
             try {
                 $rewriter = app(TrackingLinkRewriter::class);
+                $trackedBody = $rewriter->linkifyPlainUrls($trackedBody);
                 $trackedBody = $rewriter->rewriteHtml($trackedBody, $trackingContext);
                 $trackedBody = $rewriter->appendOpenPixel($trackedBody, $trackingContext);
             } catch (\Throwable $exception) {
@@ -5943,99 +6011,12 @@ HTML;
 
     protected function replaceCampaignTokens(string $content, array $coach): string
     {
-        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        $coachName = trim((string) ($coach['name'] ?? ''));
-        $parts = preg_split('/\s+/', $coachName, 2) ?: [];
-        $firstName = trim((string) ($coach['first_name'] ?? ($parts[0] ?? '')));
-        $lastName = trim((string) ($coach['last_name'] ?? ($parts[1] ?? '')));
-
-        if ($coachName === '') {
-            $coachName = trim($firstName . ' ' . $lastName);
-        }
-
-        if ($firstName === '' && $coachName !== '') {
-            $firstName = trim((string) ($parts[0] ?? $coachName));
-        }
-
-        $schoolName = trim((string) ($coach['school'] ?? ''));
-        $title = trim((string) ($coach['title'] ?? 'Coach')) ?: 'Coach';
         $user = Auth::user();
-
-        $values = [
-            'CoachFirstName' => $firstName ?: 'Coach',
-            'CoachLastName' => $lastName,
-            'CoachName' => $coachName ?: trim(($firstName ?: 'Coach') . ' ' . $lastName),
-            'SchoolName' => $schoolName,
-            'CoachTitle' => $title,
-            'CoachEmail' => $this->tokenText($coach['email'] ?? null),
-            'CoachPhone' => $this->tokenText($coach['phone'] ?? null),
-            'Sport' => $this->tokenText($coach['sport'] ?? null),
-            'Conference' => $this->tokenText($coach['conference'] ?? null),
-            'Division' => $this->tokenText($coach['division'] ?? null),
-            'City' => $this->tokenText($coach['city'] ?? null),
-            'State' => $this->tokenText($coach['state'] ?? null),
-            'AthleteName' => $this->tokenText($user?->name ?? null, '[Your Name]'),
-            'GraduationYear' => $this->userTokenText('graduation_year', '[Graduation Year]'),
-            'Position' => $this->userTokenText('position', '[Position]'),
-            'ClubTeam' => $this->userTokenText('club_team', '[Club Team]'),
-            'GPA' => $this->userTokenText('gpa', '[GPA]'),
-            'AthleteEmail' => $this->firstUserTokenText(['email', 'athlete_email', 'player_email'], '[Email]'),
-            'AthletePhone' => $this->firstUserTokenText(['phone', 'phone_number', 'mobile', 'athlete_phone'], '[Phone]'),
-            'HighlightLink' => $this->userHighlightUrlForCoach($coach, '[Highlight Link]'),
-            'ProfileLink' => $this->userProfileUrlForCoach($coach, '[Profile Link]'),
-            'InstagramLink' => $this->userSocialUrlForCoach('instagram', $coach, '#'),
-            'TwitterLink' => $this->userSocialUrlForCoach('x', $coach, '#'),
-            'XLink' => $this->userSocialUrlForCoach('x', $coach, '#'),
-            'YoutubeLink' => $this->userSocialUrlForCoach('youtube', $coach, '#'),
-            'YouTubeLink' => $this->userSocialUrlForCoach('youtube', $coach, '#'),
-        ];
-
-        $aliases = [
-            'CoachFirstName' => ['coach_first_name', 'first_name', 'firstname', 'coach.first_name', 'contact.first_name', 'contact.firstName', 'custom_values.coach_first_name'],
-            'CoachLastName' => ['coach_last_name', 'last_name', 'lastname', 'coach.last_name', 'contact.last_name', 'contact.lastName', 'custom_values.coach_last_name'],
-            'CoachName' => ['coach_name', 'name', 'full_name', 'coach.name', 'contact.name', 'contact.full_name'],
-            'SchoolName' => ['school_name', 'school', 'school.name', 'custom_values.school_name'],
-            'CoachTitle' => ['coach_title', 'title', 'coach.title', 'contact.title'],
-            'CoachEmail' => ['coach_email', 'email', 'coach.email', 'contact.email'],
-            'CoachPhone' => ['coach_phone', 'phone', 'coach.phone', 'contact.phone'],
-            'Sport' => ['sport'],
-            'Conference' => ['conference'],
-            'Division' => ['division'],
-            'City' => ['city'],
-            'State' => ['state'],
-            'AthleteName' => ['athlete_name', 'player_name', 'user.name'],
-            'GraduationYear' => ['graduation_year', 'grad_year', 'gradYear'],
-            'Position' => ['position'],
-            'ClubTeam' => ['club_team', 'team'],
-            'GPA' => ['gpa'],
-            'AthleteEmail' => ['athlete_email', 'player_email', 'email', 'user.email'],
-            'AthletePhone' => ['athlete_phone', 'player_phone', 'phone', 'phone_number', 'mobile'],
-            'HighlightLink' => ['highlight_link', 'highlights_link', 'highlightLink'],
-            'ProfileLink' => ['profile_link', 'plyrcard_link', 'profileLink'],
-            'InstagramLink' => ['instagram_link', 'instagram_url', 'instagram', 'ig_handle', 'social_links.instagram', 'social.instagram'],
-            'TwitterLink' => ['twitter_link', 'twitter_url', 'x_link', 'x_url', 'twitter', 'x_handle', 'social_links.twitter', 'social_links.x', 'social.twitter', 'social.x'],
-            'XLink' => ['x_link', 'x_url', 'x', 'twitter_link', 'twitter_url', 'x_handle'],
-            'YoutubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'yt_url', 'social_links.youtube', 'social.youtube'],
-            'YouTubeLink' => ['youtube_link', 'youtube_url', 'youtube', 'yt_url', 'social_links.youtube', 'social.youtube'],
-        ];
-
-        foreach ($values as $canonical => $value) {
-            $names = collect([$canonical, lcfirst($canonical), Str::snake($canonical)])
-                ->merge($aliases[$canonical] ?? [])
-                ->filter()
-                ->unique()
-                ->values();
-
-            foreach ($names as $name) {
-                $quoted = preg_quote((string) $name, '/');
-                $content = preg_replace('/\{\{\s*' . $quoted . '\s*\}\}/i', (string) $value, $content) ?? $content;
-                $content = preg_replace('/\[\s*' . $quoted . '\s*\]/i', (string) $value, $content) ?? $content;
-                $content = preg_replace('/%' . $quoted . '%/i', (string) $value, $content) ?? $content;
-            }
+        if (! $user) {
+            return $content;
         }
 
-        return $content;
+        return app(LocalTemplateMergeValueService::class)->replace($content, $user, $coach);
     }
 
     protected function userProfileUrl(string $fallback = ''): string
@@ -8887,13 +8868,116 @@ HTML;
     }
 
 
+    /**
+     * Lightweight one-time dataset used by the Compose Email Alpine controller.
+     * After initial page load, school search, school selection, Head Coach / All
+     * Coaches / Choose Coaches, coach filtering, and checkboxes require no request.
+     */
+    public function getComposeClientDatasetProperty(): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return ['schools' => []];
+        }
+
+        try {
+            $schools = app(LocalCoachDatabaseSchoolService::class)->discoverDataset($user);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to build local Compose school dataset.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+            $schools = $this->composeSchoolOptions;
+        }
+
+        $coaches = collect($this->allCoaches())
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null) && filled($coach['email'] ?? null))
+            ->map(function (array $coach): array {
+                $id = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
+                $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? ''));
+                $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+                $title = trim((string) ($coach['title'] ?? $coach['job_title'] ?? 'Coach'));
+
+                return [
+                    'id' => $id,
+                    'business_id' => $businessId,
+                    'school_key' => strtolower($schoolName),
+                    'name' => trim((string) ($coach['name'] ?? 'Coach')) ?: 'Coach',
+                    'title' => $title !== '' ? $title : 'Coach',
+                    'email' => trim((string) ($coach['email'] ?? '')),
+                    'is_head' => str_contains(strtolower($title), 'head'),
+                    'search_text' => strtolower(trim(implode(' ', array_filter([
+                        $coach['name'] ?? '', $title, $coach['email'] ?? '', $schoolName,
+                    ])))),
+                ];
+            })
+            ->filter(fn (array $coach): bool => $coach['id'] !== '')
+            ->unique('id')
+            ->values();
+
+        $byBusiness = $coaches->filter(fn (array $coach): bool => $coach['business_id'] !== '')->groupBy('business_id');
+        $byName = $coaches->filter(fn (array $coach): bool => $coach['school_key'] !== '')->groupBy('school_key');
+
+        $rows = collect($schools)
+            ->filter(fn ($school): bool => is_array($school) && filled($school['id'] ?? $school['business_id'] ?? null))
+            ->map(function (array $school) use ($byBusiness, $byName): array {
+                $id = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
+                $name = trim((string) ($school['name'] ?? 'School')) ?: 'School';
+                $schoolCoaches = $byBusiness->get($id, collect());
+                if ($schoolCoaches->isEmpty()) {
+                    $schoolCoaches = $byName->get(strtolower($name), collect());
+                }
+
+                return [
+                    'id' => $id,
+                    'name' => $name,
+                    'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
+                    'conference' => trim((string) ($school['conference'] ?? '')),
+                    'division' => trim((string) ($school['division'] ?? '')),
+                    'city' => trim((string) ($school['city'] ?? '')),
+                    'state' => trim((string) ($school['state'] ?? '')),
+                    'search_text' => strtolower(trim(implode(' ', array_filter([
+                        $name, $school['conference'] ?? '', $school['division'] ?? '',
+                        $school['city'] ?? '', $school['state'] ?? '',
+                    ])))),
+                    'coaches' => $schoolCoaches->values()->all(),
+                    'coach_count' => $schoolCoaches->count(),
+                ];
+            })
+            ->sortBy(fn (array $school): string => strtolower($school['name']))
+            ->values()
+            ->all();
+
+        return ['schools' => $rows];
+    }
+
     public function getComposeSelectedSchoolProperty(): ?array
     {
-        if ($this->campaignSchoolId === '') {
+        $schoolId = trim($this->campaignSchoolId);
+        if ($schoolId === '') {
             return null;
         }
 
-        return collect($this->allSchools())->firstWhere('id', $this->campaignSchoolId);
+        $user = Auth::user();
+        if ($user) {
+            try {
+                $local = app(LocalCoachDatabaseSchoolService::class)->find($user, $schoolId);
+                if (is_array($local)) {
+                    return $local;
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Unable to resolve Compose Email school from local database.', [
+                    'user_id' => $user->id,
+                    'school_id' => $schoolId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return collect($this->allSchools())->first(function (array $school) use ($schoolId): bool {
+            return (string) ($school['id'] ?? $school['business_id'] ?? '') === $schoolId;
+        });
     }
 
     public function getComposeSchoolCoachesProperty(): array
@@ -9044,13 +9128,38 @@ HTML;
             ->all();
     }
 
-    public function selectComposeSchool(string $schoolId): void
+    public function selectComposeSchool(string $schoolId): array
     {
         $schoolId = trim($schoolId);
 
         if ($schoolId === '') {
             $this->campaignSchoolId = '';
-            return;
+            return ['success' => false, 'error' => 'Missing school ID.'];
+        }
+
+        $user = Auth::user();
+        $school = null;
+
+        if ($user) {
+            try {
+                $school = app(LocalCoachDatabaseSchoolService::class)->find($user, $schoolId);
+            } catch (\Throwable $exception) {
+                Log::warning('Unable to select Compose Email school from local database.', [
+                    'user_id' => $user->id,
+                    'school_id' => $schoolId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if (! is_array($school)) {
+            $school = collect($this->allSchools())->first(function (array $row) use ($schoolId): bool {
+                return (string) ($row['id'] ?? $row['business_id'] ?? '') === $schoolId;
+            });
+        }
+
+        if (! is_array($school)) {
+            return ['success' => false, 'error' => 'The selected school could not be found.'];
         }
 
         $this->campaignTargetMode = 'school';
@@ -9059,13 +9168,13 @@ HTML;
         $this->campaignCoachIds = [];
         $this->composeSchoolPickerOpen = false;
         $this->composeChooseCoachesOpen = false;
-
-        $school = collect($this->allSchools())->first(function (array $school) use ($schoolId): bool {
-            return (string) ($school['id'] ?? '') === $schoolId;
-        });
-
-        // Clear the picker after selection so the suggestion dropdown does not remain open.
         $this->composeSchoolSearch = '';
+
+        return [
+            'success' => true,
+            'school_id' => $schoolId,
+            'school_name' => (string) ($school['name'] ?? 'School'),
+        ];
     }
 
     /** Backward-compatible alias for older school picker markup. */

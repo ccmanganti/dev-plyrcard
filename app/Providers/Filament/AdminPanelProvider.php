@@ -581,12 +581,11 @@ class AdminPanelProvider extends PanelProvider
                         }
 
 
-                        /* Headerless admin shell: keep logo and navigation together in the sidebar. */
-                        .fi-topbar,
-                        .fi-header,
-                        header.fi-header,
-                        .fi-ta-header,
-                        .fi-page-header {
+                        /* Headerless shell: hide only the global topbar.
+                         * Keep Filament page/resource headers visible because they
+                         * contain Create, Edit, Import, Export, and other actions.
+                         */
+                        .fi-topbar {
                             display: none !important;
                             height: 0 !important;
                             min-height: 0 !important;
@@ -594,6 +593,48 @@ class AdminPanelProvider extends PanelProvider
                             padding: 0 !important;
                             border: 0 !important;
                             overflow: hidden !important;
+                        }
+
+                        /* Restore resource/page actions that were previously hidden. */
+                        .fi-header,
+                        header.fi-header,
+                        .fi-page-header,
+                        .fi-ta-header {
+                            display: flex !important;
+                            height: auto !important;
+                            min-height: 0 !important;
+                            overflow: visible !important;
+                        }
+
+                        .fi-header,
+                        header.fi-header,
+                        .fi-page-header {
+                            align-items: flex-start !important;
+                            justify-content: space-between !important;
+                            gap: 1rem !important;
+                            margin: 0 0 1rem 0 !important;
+                            padding: 0 !important;
+                            border: 0 !important;
+                        }
+
+                        .fi-header-actions,
+                        .fi-page-header-actions,
+                        .fi-ac,
+                        .fi-ac-action,
+                        .fi-btn {
+                            visibility: visible !important;
+                            opacity: 1 !important;
+                            pointer-events: auto !important;
+                        }
+
+                        .fi-header-actions,
+                        .fi-page-header-actions {
+                            display: flex !important;
+                            align-items: center !important;
+                            justify-content: flex-end !important;
+                            gap: .5rem !important;
+                            margin-left: auto !important;
+                            flex-wrap: wrap !important;
                         }
 
                         html,

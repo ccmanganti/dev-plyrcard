@@ -10683,7 +10683,90 @@
                 @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
             </style>
 
-            <div class="rc-compose-page-v45">
+            <div class="rc-compose-page-v45"
+                x-data="{
+                    dataset: @js($this->composeClientDataset),
+                    schoolQuery: '',
+                    coachQuery: '',
+                    selectedSchoolId: @js((string) ($campaignSchoolId ?? '')),
+                    targetMode: @js((string) ($campaignTargetMode ?? 'school')),
+                    headCoachOnly: @js((bool) ($campaignHeadCoachOnly ?? true)),
+                    chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
+                    selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
+                    coachRevision: 0,
+                    sendingFast: false,
+                    get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
+                    get schoolResults() {
+                        const q = String(this.schoolQuery || '').trim().toLowerCase();
+                        if (!q) return [];
+                        return this.schools.filter(row => String(row.search_text || '').includes(q)).slice(0, 15);
+                    },
+                    get selectedSchool() {
+                        return this.schools.find(row => String(row.id) === String(this.selectedSchoolId)) || null;
+                    },
+                    get schoolCoaches() {
+                        return Array.isArray(this.selectedSchool?.coaches) ? this.selectedSchool.coaches : [];
+                    },
+                    get visibleCoaches() {
+                        const q = String(this.coachQuery || '').trim().toLowerCase();
+                        if (!q) return this.schoolCoaches;
+                        return this.schoolCoaches.filter(row => String(row.search_text || '').includes(q));
+                    },
+                    get activeCoachIds() {
+                        if (!this.selectedSchool) return [];
+                        if (this.targetMode === 'coaches') return Array.from(this.selectedCoachIds);
+                        if (this.headCoachOnly) {
+                            const head = this.schoolCoaches.find(row => row.is_head) || this.schoolCoaches[0];
+                            return head ? [String(head.id)] : [];
+                        }
+                        return this.schoolCoaches.map(row => String(row.id));
+                    },
+                    get recipientCount() { this.coachRevision; return this.activeCoachIds.length; },
+                    get sendingDescription() {
+                        if (!this.selectedSchool) return 'No school selected — search to add one below';
+                        if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
+                        return `Sending to ${this.headCoachOnly ? 'head coach only' : 'all coaches'} at ${this.selectedSchool.name}`;
+                    },
+                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.has(String(id || '')); },
+                    toggleCoach(id) {
+                        id = String(id || ''); if (!id) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.selectedCoachIds.has(id) ? this.selectedCoachIds.delete(id) : this.selectedCoachIds.add(id);
+                        this.coachRevision++;
+                    },
+                    selectAllCoaches() {
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    clearCoaches() { this.selectedCoachIds.clear(); this.coachRevision++; },
+                    clearRecipients() {
+                        this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
+                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++;
+                    },
+                    chooseSchool(school) {
+                        const id = String(school?.id || ''); if (!id) return;
+                        this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
+                        this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
+                        this.selectedCoachIds.clear(); this.coachRevision++;
+                    },
+                    chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
+                    chooseAllCoaches() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = false; this.chooserOpen = false; this.coachRevision++; },
+                    chooseSpecificCoaches() {
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        if (!this.selectedCoachIds.size) this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    async sendFast() {
+                        if (this.sendingFast) return;
+                        if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
+                        this.sendingFast = true;
+                        try {
+                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, Array.from(this.selectedCoachIds));
+                        } finally { this.sendingFast = false; }
+                    },
+                }">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -10703,10 +10786,10 @@
                             <span wire:loading.remove wire:target="saveTemplate">Save as Template</span>
                             <span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
                         </button>
-                        <button class="rc-btn rc-btn-primary" type="button" wire:click="sendComposedEmail" wire:loading.attr="disabled" wire:target="sendComposedEmail">
+                        <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
-                            <span wire:loading.remove wire:target="sendComposedEmail">{{ $this->composeTargetLabel }}</span>
-                            <span wire:loading.flex wire:target="sendComposedEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                            <span x-show="!sendingFast" x-text="recipientCount > 0 ? `Send to ${recipientCount.toLocaleString()} coach${recipientCount === 1 ? '' : 'es'}` : 'Add a school'"></span>
+                            <span x-cloak x-show="sendingFast" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
                         </button>
                     </div>
                 </div>
@@ -10717,97 +10800,62 @@
                             <div>
                                 <div class="rc-compose-label-v45">Recipients</div>
                                 <div class="rc-compose-recipient-bar-v45">
-                                    @if(is_array($this->composeSelectedSchool))
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients">×</button></span>
-                                    @elseif($campaignTargetMode === 'list' && $campaignListKey)
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedList['label'] ?? 'Selected List' }} ({{ number_format($this->campaignRecipientCount) }} coaches) <button type="button" wire:click="$set('campaignListKey','')">×</button></span>
-                                    @elseif($campaignTargetMode === 'coaches' && count($campaignCoachIds))
-                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection">×</button></span>
-                                    @else
-                                        <em class="rc-subtle">No school selected — search to add one below</em>
-                                    @endif
+                                    <template x-if="selectedSchool">
+                                        <span class="rc-compose-chip-v45"><span x-text="`${selectedSchool.name} (${schoolCoaches.length.toLocaleString()} coaches)`"></span> <button type="button" x-on:click="clearRecipients()">×</button></span>
+                                    </template>
+                                    <template x-if="!selectedSchool"><em class="rc-subtle">No school selected — search to add one below</em></template>
 
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches">All Coaches</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser">Choose Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && headCoachOnly}" x-on:click="chooseHeadCoach()">Head Coach Only</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && !headCoachOnly}" x-on:click="chooseAllCoaches()">All Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='coaches'}" x-on:click="chooseSpecificCoaches()">Choose Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
                                 </div>
 
                                 <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
                                     <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
                                         <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
-                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.300ms="composeSchoolSearch" />
-                                        @if(trim($composeSchoolSearch) !== '')
-                                            <button type="button" class="rc-global-search-clear" wire:click="$set('composeSchoolSearch','')" aria-label="Clear school search">×</button>
-                                        @endif
+                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." x-model="schoolQuery" />
+                                        <button x-cloak x-show="schoolQuery.length" type="button" class="rc-global-search-clear" x-on:click="schoolQuery=''" aria-label="Clear school search">×</button>
                                     </div>
-
-                                    @if(trim($composeSchoolSearch) !== '')
-                                        <div class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
-                                            @forelse($this->composeSchoolResults as $school)
-                                                <?php
-                                                    $sid = (string) ($school['id'] ?? '');
-                                                    $schoolName = (string) ($school['name'] ?? 'School');
-                                                    $schoolLogo = (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '');
-                                                    $coachCount = (int) ($school['coach_count'] ?? 0);
-                                                    $detail = trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • '));
-                                                ?>
-                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))">
-                                                    <span class="rc-global-suggestion-icon">
-                                                        @if($schoolLogo !== '')
-                                                            <img src="{{ $schoolLogo }}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($schoolName) }}';">
-                                                        @else
-                                                            {{ $globalSearchInitials($schoolName) }}
-                                                        @endif
-                                                    </span>
-                                                    <span class="rc-global-suggestion-copy">
-                                                        <strong>{{ $schoolName }}</strong>
-                                                        <small>{{ $detail !== '' ? $detail : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ $coachCount === 1 ? 'coach' : 'coaches' }}</small>
-                                                    </span>
-                                                    <span class="rc-global-suggestion-category">School</span>
-                                                </button>
-                                            @empty
-                                                <div class="rc-empty-state" style="padding:.8rem">No schools found for “{{ $composeSchoolSearch }}”.</div>
-                                            @endforelse
-                                        </div>
-                                    @endif
+                                    <div x-cloak x-show="schoolQuery.length" class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
+                                        <template x-for="school in schoolResults" :key="school.id">
+                                            <button type="button" class="rc-global-suggestion-item" x-on:pointerdown.prevent.stop x-on:click.prevent.stop="chooseSchool(school)">
+                                                <span class="rc-global-suggestion-icon">
+                                                    <template x-if="school.logo_url"><img :src="school.logo_url" alt="" referrerpolicy="no-referrer"></template>
+                                                    <template x-if="!school.logo_url"><span x-text="String(school.name).split(/\s+/).slice(0,2).map(v=>v[0]).join('').toUpperCase()"></span></template>
+                                                </span>
+                                                <span class="rc-global-suggestion-copy"><strong x-text="school.name"></strong><small><span x-text="[school.conference,school.division].filter(Boolean).join(' • ') || 'Conference unavailable'"></span> · <span x-text="Number(school.coach_count||0).toLocaleString()"></span> coaches</small></span>
+                                                <span class="rc-global-suggestion-category">School</span>
+                                            </button>
+                                        </template>
+                                        <div x-show="schoolResults.length===0" class="rc-empty-state" style="padding:.8rem">No schools found.</div>
+                                    </div>
                                 </div>
 
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
-                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.500ms="campaignCc" />
-                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.500ms="campaignBcc" />
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
                                     </div>
                                 @endif
 
-                                @if($composeChooseCoachesOpen || ($campaignTargetMode === 'coaches' && is_array($this->composeSelectedSchool)))
+                                <div x-cloak x-show="selectedSchool && chooserOpen" style="margin-top:.65rem">
+                                    <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
-                                        @foreach($this->composeSchoolCoaches as $coach)
-                                            <?php $cid = (string) ($coach['id'] ?? ''); $selectedCoach = in_array($cid, $campaignCoachIds, true); ?>
-                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))">
-                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45">{{ $selectedCoach ? '✓' : '' }}</span><span>{{ $coach['name'] ?? 'Coach' }}</span>@if(str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'))<span style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>@endif</span>
-                                                <span class="rc-compose-coach-title-v45">{{ $coach['title'] ?? 'Coach' }}</span>
+                                        <template x-for="coach in visibleCoaches" :key="coach.id">
+                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{'is-selected':coachSelected(coach.id)}" x-on:click="toggleCoach(coach.id)">
+                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="coachSelected(coach.id) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
+                                                <span class="rc-compose-coach-title-v45" x-text="coach.title"></span>
                                             </button>
-                                        @endforeach
+                                        </template>
                                     </div>
                                     <div style="display:flex;gap:.45rem;margin-top:.55rem">
-                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches">Select all</button>
-                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection">Clear coaches</button>
+                                        <button type="button" class="rc-btn" x-on:click="selectAllCoaches()">Select all</button>
+                                        <button type="button" class="rc-btn" x-on:click="clearCoaches()">Clear coaches</button>
                                     </div>
-                                @elseif($campaignTargetMode === 'list')
-                                    <div style="margin-top:.65rem;max-width:28rem">
-                                        <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
-                                            <option value="">Select a list</option>
-                                            @foreach($lists as $list)
-                                                <option value="{{ $list['key'] ?? '' }}">{{ $list['label'] ?? 'List' }} ({{ number_format($list['coaches_count'] ?? $list['count'] ?? 0) }})</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                @endif
-
-                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem">
-                                    {{ $this->composeSendingDescription }}
                                 </div>
+
+                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem" x-text="sendingDescription"></div>
                             </div>
 
                             <div>
