@@ -2663,6 +2663,28 @@ trait InteractsWithCoachDatabase
         $this->startDeferredUiSync('conversations');
     }
 
+    /**
+     * Load email templates through the detached/local-cache UI sync.
+     * This method is called by bootDeferredUiData() for both the campaigns
+     * and compose sections, so it must remain available on every page using
+     * this trait.
+     */
+    public function loadTemplates(): void
+    {
+        if (! $this->allowed || $this->locked) {
+            $this->isLoadingTemplates = false;
+            return;
+        }
+
+        $this->isLoadingTemplates = true;
+
+        // Keep any existing cached or hardcoded templates visible while the
+        // detached sync refreshes the local cache. No GHL request runs inside
+        // this Livewire request.
+        $this->hydrateDeferredUiCache();
+        $this->startDeferredUiSync('templates');
+    }
+
     public function updatedConversationSearch(): void
     {
         // Search the already loaded/cached conversation rows. Remote searching
@@ -3329,1132 +3351,6 @@ trait InteractsWithCoachDatabase
             'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
         ];
 
-        try {
-            app(GoHighLevelService::class)->ensureRecruitingTrackingFieldsForUser($user);
-        } catch (\Throwable $exception) {
-            \Log::warning('Recruiting tracking field preparation failed before email send.', [
-                'contact_id' => $contactId,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
-        $trackedBody = $this->ensurePlyrcardEmailSignature($body);
-        $conversationForTokens = is_array($conversation ?? null) ? $conversation : [];
-        $tokenCoach = is_array($coach) ? $coach : [
-            'id' => $contactId,
-            'name' => $conversationForTokens['contact_name'] ?? $conversationForTokens['name'] ?? 'Coach',
-            'email' => $to,
-            'school' => $conversationForTokens['school'] ?? $conversationForTokens['company_name'] ?? null,
-            'business_id' => $conversationForTokens['business_id'] ?? $conversationForTokens['ghl_business_id'] ?? null,
-        ];
-        $trackedBody = $this->replaceCampaignTokens($trackedBody, $tokenCoach);
-
-        try {
-            $rewriter = app(TrackingLinkRewriter::class);
-            $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
-        } catch (\Throwable $exception) {
-            \Log::warning('Recruiting email link rewrite failed. Sending original body.', [
-                'contact_id' => $contactId,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
-        $payload = [
-            'contact_id' => $contactId,
-            'contactId' => $contactId,
-            'conversation_id' => $this->selectedConversationId,
-            'conversationId' => $this->selectedConversationId,
-            'subject' => $subject,
-            'body' => $trackedBody,
-            'html' => $trackedBody,
-            'text' => trim(strip_tags($trackedBody)),
-            'fromName' => (string) ($user->name ?? 'PLYRCard'),
-            'to' => $to,
-            'emailTo' => $to,
-            'skip_internal_sent_tracking' => true,
-        ];
-
-        $this->isSendingEmail = true;
-        $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
-        $this->isSendingEmail = false;
-
-        if (! ($result['success'] ?? false)) {
-            Notification::make()->title('Recruiting Center')->body($result['error'] ?? 'Unable to send email.')->danger()->send();
-            return;
-        }
-
-        try {
-            $trackResult = app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
-                'source' => 'compose_email',
-                'subject' => $subject,
-                'to' => $to,
-                'host' => request()?->getHost(),
-            ]);
-
-            \Log::info('Recruiting email sent tracking result.', [
-                'contact_id' => $contactId,
-                'tracked' => (bool) ($trackResult['success'] ?? false),
-                'result' => $trackResult,
-            ]);
-
-            $this->stats['email_sent_count'] = (int) ($this->stats['email_sent_count'] ?? 0) + 1;
-            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
-            $this->prependDashboardActivity([
-                'type' => 'email_sent',
-                'title' => 'Email sent to ' . (string) ($coachForTokens['name'] ?? $to ?? 'coach'),
-                'copy' => trim(($coachForTokens['school'] ?? '') . (($coachForTokens['school'] ?? '') !== '' ? ' • ' : '') . $subject),
-                'time' => now()->toIso8601String(),
-                'school_id' => $this->trackingSchoolIdForCoach(is_array($coachForTokens) ? $coachForTokens : []),
-                'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
-            ]);
-            $this->persistDashboardStatsAfterTracking($user);
-        } catch (\Throwable $exception) {
-            \Log::warning('Recruiting email sent tracking failed.', [
-                'contact_id' => $contactId,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
-        $this->emailSubject = '';
-        $this->emailBody = '';
-        $this->showNewConversationComposer = false;
-
-        if ($this->selectedConversationId) {
-            $this->messages = [];
-            $this->messageLastId = null;
-            $this->isLoadingConversationMessages = true;
-            $this->dispatch('rc-load-conversation-messages');
-        }
-
-        $this->loadDashboardActivity();
-
-        Notification::make()->title('Recruiting Center')->body('Email sent.')->success()->send();
-    }
-
-    public function loadTemplates(): void
-    {
-        $this->isLoadingTemplates = true;
-        $this->startDeferredUiSync('templates');
-    }
-
-    protected function templateConnectionKeyForUser($user): string
-    {
-        if (! $user) {
-            return 'guest';
-        }
-
-        $locationId = trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? ''));
-        $token = trim((string) ($user->ghl_api_key ?? ''));
-
-        return sha1((string) ($user->id ?? 'user') . '|' . $locationId . '|' . substr(sha1($token), 0, 12));
-    }
-
-    protected function hardcodedEmailTemplates(): array
-    {
-        return [
-            [
-                'id' => 'plyrcard-intro-email',
-                'name' => 'Intro to Coach',
-                'subjectLine' => 'Prospect for {{SchoolName}} - {{AthleteName}}',
-                'previewText' => 'Quick introduction from {{AthleteName}}.',
-                'body' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
-                'source_type' => 'built_in',
-            ],
-            [
-                'id' => 'plyrcard-follow-up-email',
-                'name' => 'Follow Up',
-                'subjectLine' => 'Following up - {{AthleteName}}',
-                'previewText' => 'Following up with {{CoachFirstName}} at {{SchoolName}}.',
-                'body' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
-                'source_type' => 'built_in',
-            ],
-            [
-                'id' => 'plyrcard-camp-invite-email',
-                'name' => 'Camp / Visit Interest',
-                'subjectLine' => '{{AthleteName}} - camp interest for {{SchoolName}}',
-                'previewText' => 'Camp and visit interest from {{AthleteName}}.',
-                'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
-                'source_type' => 'built_in',
-            ],
-        ];
-    }
-
-    public function newTemplate(): void
-    {
-        $this->templateEditorOpen = true;
-        $this->selectedTemplateId = null;
-        $this->previewTemplateId = null;
-        $this->campaignTemplateId = null;
-        $this->templateIsNew = true;
-        $this->templateName = 'New Recruiting Email';
-        $this->templateSubject = '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
-        $this->templatePreviewText = 'Quick intro, profile, and highlight link from {{AthleteName}}.';
-        $this->templateGraphicUrl = '';
-        $this->templateGraphicUpload = null;
-        $this->templateInlineImageUpload = null;
-        $this->templateAttachmentUploads = [];
-        $this->templateAttachments = [];
-        $this->templateBody = $this->starterTemplateHtml();
-        $this->templateEditorRefreshKey++;
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
-    }
-
-    public function selectTemplate(string $templateId): void
-    {
-        $templateId = trim($templateId);
-
-        if ($templateId === '') {
-            return;
-        }
-
-        // Open immediately from the local summary/built-in record. Remote HTML
-        // is fetched in a second request after the editor is visible.
-        $template = $this->templateDetails[$templateId] ?? null;
-        if (! is_array($template)) {
-            $template = collect($this->templates)->firstWhere('id', $templateId)
-                ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
-        }
-
-        if (! is_array($template)) {
-            return;
-        }
-
-        $this->templateEditorOpen = true;
-        $this->selectedTemplateId = $templateId;
-        $this->previewTemplateId = $templateId;
-        $this->campaignTemplateId = null;
-        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
-        $this->templateName = trim((string) ($template['name'] ?? 'Untitled Template')) ?: 'Untitled Template';
-        $this->templateSubject = $this->templateSubject($template);
-        $this->templatePreviewText = $this->templatePreviewText($template);
-        $this->templateGraphicUrl = '';
-        $this->templateGraphicUpload = null;
-        $this->templateInlineImageUpload = null;
-        $this->templateAttachmentUploads = [];
-        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
-        $this->templateEditorRefreshKey++;
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
-
-        $isRemoteSummary = ! $this->templateIsNew && (($template['source_type'] ?? null) !== 'built_in');
-        $hasFullBody = isset($this->templateDetails[$templateId]);
-        $this->isLoadingTemplateDetail = $isRemoteSummary && ! $hasFullBody;
-
-        if ($this->isLoadingTemplateDetail) {
-            $this->dispatch('rc-load-template-detail');
-        }
-    }
-
-    public function loadSelectedTemplateDetail(): void
-    {
-        $templateId = trim((string) $this->selectedTemplateId);
-        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
-            $this->isLoadingTemplateDetail = false;
-            return;
-        }
-
-        $this->isLoadingTemplateDetail = true;
-        $this->startDeferredUiSync('template-detail', $templateId);
-    }
-
-    protected function starterTemplateHtml(): string
-    {
-        $body = <<<'HTML'
-<div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
-    <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
-        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
-        <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
-        <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
-        <p style="margin:0 0 12px;">
-            <a class="rc-email-button" href="{{ProfileLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#ff5b32;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0 0 10px;">View PLYRCard Profile</a>
-            <a class="rc-email-button" href="{{HighlightLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#111827;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0;">Watch Highlights</a>
-        </p>
-        <p style="margin:0 0 16px;">Thank you for your time and consideration. I look forward to learning more about your program.</p>
-        <p style="margin:0;">Best,<br><strong>{{AthleteName}}</strong></p>
-    </div>
-</div>
-HTML;
-
-        return $this->canonicalizeTemplateEditorHtml($body);
-    }
-
-    public function createTemplate(): void
-    {
-        $this->newTemplate();
-    }
-
-    public function saveTemplate(): void
-    {
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        $name = trim($this->templateName);
-        $subject = trim($this->templateSubject);
-        $bodyText = trim($this->templateBody);
-
-        if ($name === '' || $subject === '' || $bodyText === '') {
-            Notification::make()->title('Templates')->body('Add a name, subject, and message.')->danger()->send();
-            return;
-        }
-
-        $this->isSavingTemplate = true;
-        $this->resolveTemplateGraphicUpload();
-        $html = $this->appendAttachmentLinksToHtml(
-            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
-            $this->templateAttachments
-        );
-
-        $shouldUpdateGhl = $this->selectedTemplateId
-            && ! $this->templateIsNew
-            && ! $this->isBuiltInTemplateId($this->selectedTemplateId);
-
-        $result = null;
-        $updatedTemplateId = $this->selectedTemplateId;
-        $updateFailures = [];
-
-        if ($shouldUpdateGhl) {
-            foreach ($this->templateUpdateCandidateIds((string) $this->selectedTemplateId) as $candidateId) {
-                $result = app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $candidateId, $name, $subject, $html, $this->templatePreviewText);
-
-                if ($result['success'] ?? false) {
-                    $updatedTemplateId = $candidateId;
-                    break;
-                }
-
-                $updateFailures[] = [
-                    'template_id' => $candidateId,
-                    'status' => $result['status'] ?? null,
-                    'error' => $result['error'] ?? 'Unable to update template.',
-                ];
-            }
-
-            if (! ($result['success'] ?? false) && $this->templateSaveFailedBecauseNotFound($result, $updateFailures)) {
-                // Some Recruiting Center HTML-builder templates expose one id for loading and a different/internal
-                // id for editing. If none of the known ids can be updated, save the edited version as
-                // a new Recruiting Center template instead of failing with "Template not found" and losing the work.
-                $copyName = Str::endsWith($name, ' (Edited Copy)') ? $name : $name . ' (Edited Copy)';
-                $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $copyName, $subject, $html, $this->templatePreviewText);
-                if ($result['success'] ?? false) {
-                    $name = $copyName;
-                    $this->templateName = $copyName;
-                    $updatedTemplateId = null;
-                }
-            }
-        } else {
-            $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
-        }
-
-        $this->isSavingTemplate = false;
-
-        if (! ($result['success'] ?? false)) {
-            Notification::make()->title('Templates')->body($this->templateErrorMessage($result ?? [], 'Unable to save template.'))->danger()->send();
-            return;
-        }
-
-        $saved = $result['template'] ?? [];
-        if (is_array($saved)) {
-            $savedId = (string) ($saved['id'] ?? $saved['_id'] ?? $saved['templateId'] ?? $updatedTemplateId ?? $this->selectedTemplateId ?? '');
-            if ($savedId !== '') {
-                $this->selectedTemplateId = $savedId;
-                $this->templateIsNew = false;
-                $this->templateDetails[$savedId] = $this->mergeTemplateRecord($saved, [
-                    'id' => $savedId,
-                    'connection_key' => $this->templateConnectionKey,
-                    'name' => $name,
-                    'subjectLine' => $subject,
-                    'previewText' => $this->templatePreviewText,
-                    'graphicUrl' => $this->templateGraphicUrl,
-                    'html' => $html,
-                    'body' => $html,
-                    'update_failures' => $updateFailures,
-                ]);
-            }
-        }
-
-        $this->loadTemplates();
-
-        $message = ! empty($updateFailures) && blank($updatedTemplateId)
-            ? 'Template saved as a new edited copy because Recruiting Center would not update the original template id.'
-            : 'Template saved.';
-
-        Notification::make()->title('Templates')->body($message)->success()->send();
-    }
-
-    protected function templateUpdateCandidateIds(string $templateId): array
-    {
-        $summary = collect($this->templates)->firstWhere('id', $templateId) ?: [];
-        $detail = $this->templateDetails[$templateId] ?? [];
-        $values = [$templateId];
-
-        foreach ([$summary, $detail] as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
-
-            foreach ([
-                'id', '_id', 'templateId', 'template_id', 'campaignId', 'campaign_id', 'emailCampaignId', 'email_campaign_id',
-                'builderId', 'builder_id', 'contentId', 'content_id', 'emailId', 'email_id', 'detail_candidate_id',
-                'raw.id', 'raw._id', 'raw.templateId', 'raw.template_id', 'raw.campaignId', 'raw.campaign_id', 'raw.emailCampaignId', 'raw.email_campaign_id',
-                'raw.builderId', 'raw.builder_id', 'raw.contentId', 'raw.content_id', 'raw.emailId', 'raw.email_id',
-                'raw.data.id', 'raw.data._id', 'raw.data.templateId', 'raw.data.template_id', 'raw.data.campaignId', 'raw.data.builderId', 'raw.data.contentId',
-                'raw.template.id', 'raw.template._id', 'raw.template.templateId', 'raw.template.campaignId',
-                'raw.email.id', 'raw.email._id', 'raw.email.templateId',
-                'raw.campaign.id', 'raw.campaign._id', 'raw.campaign.templateId',
-            ] as $path) {
-                $value = data_get($record, $path);
-                if (is_scalar($value)) {
-                    $values[] = (string) $value;
-                }
-            }
-        }
-
-        return collect($values)
-            ->map(fn ($value): string => trim((string) $value))
-            ->filter(fn (string $value): bool => $value !== '' && ! in_array(strtolower($value), ['null', 'undefined'], true))
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    protected function templateSaveFailedBecauseNotFound(?array $result, array $failures = []): bool
-    {
-        if (is_array($result) && (int) ($result['status'] ?? 0) === 404) {
-            return true;
-        }
-
-        $message = strtolower((string) ($result['error'] ?? ''));
-        if ($message !== '' && (str_contains($message, 'not found') || str_contains($message, 'does not exist') || str_contains($message, 'invalid template'))) {
-            return true;
-        }
-
-        foreach ($failures as $failure) {
-            if ((int) ($failure['status'] ?? 0) === 404) {
-                return true;
-            }
-
-            $failureMessage = strtolower((string) ($failure['error'] ?? ''));
-            if ($failureMessage !== '' && (str_contains($failureMessage, 'not found') || str_contains($failureMessage, 'does not exist') || str_contains($failureMessage, 'invalid template'))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public function deleteTemplate(): void
-    {
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        if (! $this->selectedTemplateId || $this->templateIsNew) {
-            $this->newTemplate();
-            return;
-        }
-
-        $result = app(CoachDatabaseService::class)->deleteEmailTemplateForUser($user, $this->selectedTemplateId);
-
-        if (! ($result['success'] ?? false)) {
-            Notification::make()->title('Templates')->body($this->templateErrorMessage($result, 'Unable to delete template.'))->danger()->send();
-            return;
-        }
-
-        $this->selectedTemplateId = null;
-        $this->templateDetails = [];
-        $this->templateGraphicUrl = '';
-        $this->templateGraphicUpload = null;
-        $this->loadTemplates();
-        Notification::make()->title('Templates')->body('Template deleted.')->success()->send();
-    }
-
-
-    public function closeTemplateEditor(): void
-    {
-        $this->templateEditorOpen = false;
-        $this->selectedTemplateId = null;
-        $this->previewTemplateId = null;
-        $this->templateIsNew = false;
-    }
-
-
-    public function deleteTemplateById(string $templateId): void
-    {
-        $templateId = trim($templateId);
-        if ($templateId === '') {
-            return;
-        }
-
-        $this->selectedTemplateId = $templateId;
-        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
-        $this->deleteTemplate();
-        $this->templateEditorOpen = false;
-    }
-
-    public function duplicateTemplate(string $templateId): void
-    {
-        $templateId = trim($templateId);
-        if ($templateId === '') {
-            return;
-        }
-
-        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
-        $template = $this->loadTemplateDetail($templateId)
-            ?: collect($this->templates)->firstWhere('id', $templateId);
-
-        if (! is_array($template)) {
-            Notification::make()->title('Templates')->body('Template could not be duplicated.')->danger()->send();
-            return;
-        }
-
-        $this->templateEditorOpen = true;
-        $this->selectedTemplateId = $hasFullDetail ? null : $templateId;
-        $this->previewTemplateId = null;
-        $this->campaignTemplateId = null;
-        $this->templateIsNew = true;
-        $this->templateName = trim((string) ($template['name'] ?? 'Email Template')) . ' Copy';
-        $this->templateSubject = $this->templateSubject($template);
-        $this->templatePreviewText = $this->templatePreviewText($template);
-        $this->templateGraphicUrl = '';
-        $this->templateGraphicUpload = null;
-        $this->templateInlineImageUpload = null;
-        $this->templateAttachmentUploads = [];
-        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
-        $this->templateEditorRefreshKey++;
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
-
-        if (! $hasFullDetail) {
-            $this->pendingTemplateAction = 'duplicate';
-            $this->pendingTemplateActionId = $templateId;
-            $this->isLoadingTemplateDetail = true;
-            $this->dispatch('rc-load-template-detail');
-        }
-    }
-
-    public function templateQuickAction(string $action): void
-    {
-        $action = trim($action);
-        $body = trim((string) $this->templateBody);
-
-        if ($body === '') {
-            Notification::make()->title('Templates')->body('Add template copy first.')->warning()->send();
-            return;
-        }
-
-        if ($action === 'shorter') {
-            $body = preg_replace('/<p>\s*<\/p>/i', '', $body) ?: $body;
-            $body = str_replace(['I would love the opportunity to', 'I wanted to'], ['I would like to', 'I want to'], $body);
-        } elseif ($action === 'professional') {
-            $body = str_replace(['Hi ', 'Thanks,'], ['Hello ', 'Best regards,'], $body);
-        } elseif ($action === 'personalize') {
-            if (! str_contains($body, '{{SchoolName}}')) {
-                $body = '<p>Hello {{CoachFirstName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
-            }
-        } elseif ($action === 'improve') {
-            if (! str_contains($body, '{{ProfileLink}}')) {
-                $body .= '<p>You can view my profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p>';
-            }
-        }
-
-        $this->templateBody = $body;
-        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
-        Notification::make()->title('Templates')->body('Template updated. Review before saving.')->success()->send();
-    }
-
-
-    /**
-     * Backward-compatible alias for older Compose Email markup/cached Livewire payloads.
-     */
-    public function useCampaignTemplate(string $templateId): void
-    {
-        $this->useTemplateForCompose($templateId);
-    }
-
-    /**
-     * Backward-compatible alias for older Compose Email send buttons.
-     */
-    public function sendComposedEmailWithCoachIds(array $coachIds = []): void
-    {
-        $this->campaignCoachIds = collect($coachIds)
-            ->map(fn ($id): string => trim((string) $id))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if (! empty($this->campaignCoachIds)) {
-            $this->campaignTargetMode = 'coaches';
-            $this->campaignHeadCoachOnly = false;
-        }
-
-        $this->sendComposedEmail();
-    }
-
-    /**
-     * Receives the browser-local Compose recipient state only when Send is clicked.
-     * School selection, target-mode switching, and coach checkboxes stay entirely
-     * in Alpine and therefore do not cause Livewire round-trips or full rerenders.
-     */
-    public function sendComposedEmailWithComposeState(
-        string $schoolId = '',
-        string $targetMode = 'school',
-        bool $headCoachOnly = true,
-        array $coachIds = [],
-    ): void {
-        $this->campaignSchoolId = trim($schoolId);
-        $this->campaignTargetMode = in_array($targetMode, ['school', 'coaches', 'all', 'list'], true)
-            ? $targetMode
-            : 'school';
-        $this->campaignHeadCoachOnly = $this->campaignTargetMode === 'school' && $headCoachOnly;
-        $this->campaignCoachIds = collect($coachIds)
-            ->map(fn ($id): string => trim((string) $id))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($this->campaignTargetMode === 'coaches' && empty($this->campaignCoachIds)) {
-            Notification::make()
-                ->title('Compose Email')
-                ->body('Choose at least one coach.')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        $this->sendComposedEmail();
-    }
-
-    public function sendCampaign(): void
-    {
-        $this->sendComposedEmail();
-    }
-
-    public function useTemplateForCompose(string $templateId): void
-    {
-        $templateId = trim($templateId);
-
-        if ($templateId === '') {
-            return;
-        }
-
-        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
-        $template = $this->loadTemplateDetail($templateId)
-            ?: collect($this->templates)->firstWhere('id', $templateId);
-
-        if (! is_array($template)) {
-            Notification::make()->title('Compose Email')->body('Template could not be opened.')->danger()->send();
-            return;
-        }
-
-        $this->campaignTemplateId = $templateId;
-        $this->selectedTemplateId = $templateId;
-        $this->previewTemplateId = $templateId;
-        $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
-        $this->campaignSubject = $this->templateSubject($template);
-        $this->campaignPreviewText = $this->templatePreviewText($template);
-        $this->composeGraphicUrl = '';
-        $this->composeAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-        $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
-
-        if (trim($this->campaignBody) === '') {
-            $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
-        }
-
-        $this->section = 'compose';
-        $this->activeSubpage = 'compose-email';
-        $this->composeTemplateAppliedRecently = true;
-        $this->composeTemplateMenuOpen = false;
-        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
-        if (! $hasFullDetail) {
-            $this->pendingTemplateAction = 'use-compose';
-            $this->pendingTemplateActionId = $templateId;
-            $this->isLoadingTemplateDetail = true;
-            $this->dispatch('rc-load-template-detail');
-        }
-
-        Notification::make()->title('Compose Email')->body($hasFullDetail ? 'Template loaded in Compose Email.' : 'Template opened. The latest content is loading.')->success()->send();
-    }
-
-
-    public function openComposePreview(): void
-    {
-        $this->showComposePreview = true;
-    }
-
-    public function closeComposePreview(): void
-    {
-        $this->showComposePreview = false;
-    }
-
-    public function clearComposeRecipients(): void
-    {
-        $this->campaignSchoolId = '';
-        $this->campaignListKey = '';
-        $this->campaignCoachIds = [];
-        $this->campaignHeadCoachOnly = false;
-        $this->composeSchoolSearch = '';
-        $this->campaignCoachSearch = '';
-        $this->composeChooseCoachesOpen = false;
-        $this->composeSchoolPickerOpen = false;
-        $this->campaignTargetMode = 'coaches';
-    }
-
-    public function setComposeSchoolHeadCoachOnly(): void
-    {
-        if ($this->campaignSchoolId === '') {
-            $this->campaignTargetMode = 'school';
-            return;
-        }
-
-        $this->campaignTargetMode = 'school';
-        $this->campaignHeadCoachOnly = true;
-        $this->campaignCoachIds = [];
-        $this->composeChooseCoachesOpen = false;
-    }
-
-    public function setComposeSchoolAllCoaches(): void
-    {
-        if ($this->campaignSchoolId === '') {
-            $this->campaignTargetMode = 'school';
-            return;
-        }
-
-        $this->campaignTargetMode = 'school';
-        $this->campaignHeadCoachOnly = false;
-        $this->campaignCoachIds = [];
-        $this->composeChooseCoachesOpen = false;
-    }
-
-    public function openComposeCoachChooser(): void
-    {
-        $this->campaignTargetMode = 'coaches';
-        $this->campaignHeadCoachOnly = false;
-        $this->composeChooseCoachesOpen = true;
-
-        if (! empty($this->campaignCoachIds)) {
-            return;
-        }
-
-        if ($this->campaignSchoolId !== '') {
-            $this->campaignCoachIds = collect($this->composeSchoolCoaches)
-                ->pluck('id')
-                ->filter()
-                ->map(fn ($id): string => (string) $id)
-                ->values()
-                ->all();
-        }
-    }
-
-    public function toggleCampaignCoach(string $coachId): void
-    {
-        $coachId = trim($coachId);
-        if ($coachId === '') {
-            return;
-        }
-
-        $ids = collect($this->campaignCoachIds)
-            ->map(fn ($id): string => (string) $id)
-            ->filter()
-            ->values();
-
-        if ($ids->contains($coachId)) {
-            $this->campaignCoachIds = $ids->reject(fn (string $id): bool => $id === $coachId)->values()->all();
-        } else {
-            $this->campaignCoachIds = $ids->push($coachId)->unique()->values()->all();
-        }
-
-        $this->campaignTargetMode = 'coaches';
-        $this->campaignHeadCoachOnly = false;
-        $this->composeChooseCoachesOpen = true;
-    }
-
-    public function selectAllComposeSchoolCoaches(): void
-    {
-        $this->campaignCoachIds = collect($this->composeSchoolCoaches)
-            ->pluck('id')
-            ->filter()
-            ->map(fn ($id): string => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $this->campaignTargetMode = 'coaches';
-        $this->campaignHeadCoachOnly = false;
-        $this->composeChooseCoachesOpen = true;
-    }
-
-    public function clearComposeCoachSelection(): void
-    {
-        $this->campaignCoachIds = [];
-        $this->campaignTargetMode = $this->campaignSchoolId !== '' ? 'school' : 'coaches';
-        $this->campaignHeadCoachOnly = false;
-    }
-
-    public function clearComposeTemplate(): void
-    {
-        $this->campaignTemplateId = null;
-        $this->previewTemplateId = null;
-        $this->campaignName = '';
-        $this->campaignSubject = '';
-        $this->campaignPreviewText = '';
-        $this->campaignBody = '';
-        $this->composeGraphicUrl = '';
-        $this->composeGraphicUpload = null;
-        $this->composeAttachmentUploads = [];
-        $this->composeAttachments = [];
-    }
-
-    public function removeComposeGraphic(): void
-    {
-        $this->composeGraphicUrl = '';
-        $this->composeGraphicUpload = null;
-    }
-
-    public function updatedComposeAttachmentUploads(): void
-    {
-        $this->addComposeAttachments();
-    }
-
-    public function addComposeAttachments(): void
-    {
-        if (empty($this->composeAttachmentUploads)) {
-            return;
-        }
-
-        $user = Auth::user();
-        if (! $user) {
-            $this->composeAttachmentUploads = [];
-            return;
-        }
-
-        $files = collect($this->composeAttachmentUploads)
-            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
-            ->values();
-
-        if ($files->isEmpty()) {
-            $this->composeAttachmentUploads = [];
-            return;
-        }
-
-        try {
-            $this->validate([
-                'composeAttachmentUploads.*' => ['file', 'max:25600'],
-            ]);
-        } catch (\Throwable $exception) {
-            $this->composeAttachmentUploads = [];
-            Notification::make()->title('Attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
-            return;
-        }
-
-        foreach ($files as $file) {
-            try {
-                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
-
-                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
-                    Notification::make()
-                        ->title('Attachments')
-                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
-                        ->danger()
-                        ->send();
-                    continue;
-                }
-
-                $name = method_exists($file, 'getClientOriginalName')
-                    ? (string) $file->getClientOriginalName()
-                    : basename((string) ($result['url'] ?? 'attachment'));
-
-                $this->composeAttachments[] = [
-                    'id' => $result['id'] ?? null,
-                    'name' => $name,
-                    'url' => trim((string) $result['url']),
-                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
-                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
-                ];
-            } catch (\Throwable $exception) {
-                Notification::make()->title('Attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
-            }
-        }
-
-        $this->composeAttachmentUploads = [];
-    }
-
-    public function removeComposeAttachment(int $index): void
-    {
-        if (! array_key_exists($index, $this->composeAttachments)) {
-            return;
-        }
-
-        unset($this->composeAttachments[$index]);
-        $this->composeAttachments = array_values($this->composeAttachments);
-    }
-
-
-    public function updatedTemplateAttachmentUploads(): void
-    {
-        $this->addTemplateAttachments();
-    }
-
-    public function addTemplateAttachments(): void
-    {
-        if (empty($this->templateAttachmentUploads)) {
-            return;
-        }
-
-        $user = Auth::user();
-        if (! $user) {
-            $this->templateAttachmentUploads = [];
-            return;
-        }
-
-        $files = collect($this->templateAttachmentUploads)
-            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
-            ->values();
-
-        if ($files->isEmpty()) {
-            $this->templateAttachmentUploads = [];
-            return;
-        }
-
-        try {
-            $this->validate([
-                'templateAttachmentUploads.*' => ['file', 'max:25600'],
-            ]);
-        } catch (\Throwable $exception) {
-            $this->templateAttachmentUploads = [];
-            Notification::make()->title('Template attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
-            return;
-        }
-
-        foreach ($files as $file) {
-            try {
-                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
-
-                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
-                    Notification::make()
-                        ->title('Template attachments')
-                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
-                        ->danger()
-                        ->send();
-                    continue;
-                }
-
-                $name = method_exists($file, 'getClientOriginalName')
-                    ? (string) $file->getClientOriginalName()
-                    : basename((string) ($result['url'] ?? 'attachment'));
-
-                $this->templateAttachments[] = [
-                    'id' => $result['id'] ?? null,
-                    'name' => $name,
-                    'url' => trim((string) $result['url']),
-                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
-                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
-                ];
-            } catch (\Throwable $exception) {
-                Notification::make()->title('Template attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
-            }
-        }
-
-        $this->templateAttachmentUploads = [];
-    }
-
-    public function removeTemplateAttachment(int $index): void
-    {
-        if (! array_key_exists($index, $this->templateAttachments)) {
-            return;
-        }
-
-        unset($this->templateAttachments[$index]);
-        $this->templateAttachments = array_values($this->templateAttachments);
-    }
-
-    protected function appendAttachmentLinksToHtml(string $html, array $attachments): string
-    {
-        $attachments = collect($attachments)
-            ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
-            ->values();
-
-        if ($attachments->isEmpty() || str_contains($html, 'data-plyrcard-attachments="1"') || str_contains($html, 'data-plyrcard-attachments="template"')) {
-            return $html;
-        }
-
-        $links = $attachments->map(function (array $attachment): string {
-            $name = e((string) ($attachment['name'] ?? 'Attachment'));
-            $url = e((string) ($attachment['url'] ?? ''));
-            return '<li style="margin:6px 0"><a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $name . '</a></li>';
-        })->implode('');
-
-        if ($links === '') {
-            return $html;
-        }
-
-        return rtrim($html) . '<div data-plyrcard-attachments="1" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $links . '</ul></div>';
-    }
-
-    protected function extractPlyrcardAttachmentLinks(string $html): array
-    {
-        if (trim($html) === '') {
-            return [];
-        }
-
-        $document = $this->loadTemplateDom($html);
-        if (! $document) {
-            return [];
-        }
-
-        $attachments = [];
-        foreach ($document->getElementsByTagName('div') as $div) {
-            if ((string) $div->getAttribute('data-plyrcard-attachments') === '') {
-                continue;
-            }
-
-            foreach ($div->getElementsByTagName('a') as $a) {
-                $url = trim((string) $a->getAttribute('href'));
-                if ($url === '' || ! preg_match('/^https?:\/\//i', $url)) {
-                    continue;
-                }
-                $attachments[] = [
-                    'name' => trim((string) $a->textContent) ?: basename(parse_url($url, PHP_URL_PATH) ?: 'Attachment'),
-                    'url' => $url,
-                    'mime_type' => null,
-                    'size' => null,
-                ];
-            }
-        }
-
-        return collect($attachments)->unique('url')->values()->all();
-    }
-
-    protected function replaceExactProfileDestinationInEmail(string $html, string $profileUrl, string $trackedProfileUrl): string
-    {
-        $profileUrl = trim(html_entity_decode($profileUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        $trackedProfileUrl = trim($trackedProfileUrl);
-
-        if ($profileUrl === '' || $trackedProfileUrl === '') {
-            return $html;
-        }
-
-        $normalize = static function (string $url): string {
-            $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-            $url = preg_replace('/[\x{00A0}\x{2007}\x{202F}\x{200B}\x{FEFF}]+/u', '', $url) ?? $url;
-            $parts = parse_url($url);
-            if (! is_array($parts)) {
-                return strtolower(rtrim($url, '/'));
-            }
-            $host = strtolower((string) ($parts['host'] ?? ''));
-            $port = isset($parts['port']) ? ':' . $parts['port'] : '';
-            $path = '/' . ltrim(rawurldecode((string) ($parts['path'] ?? '/')), '/');
-            return $host . $port . rtrim(strtolower($path), '/');
-        };
-
-        $profileKey = $normalize($profileUrl);
-
-        $html = preg_replace_callback(
-            '/(<a\b[^>]*?\bhref=["\'])([^"\']+)(["\'][^>]*>)/i',
-            function (array $matches) use ($normalize, $profileKey, $trackedProfileUrl): string {
-                return $normalize($matches[2]) === $profileKey
-                    ? $matches[1] . e($trackedProfileUrl) . $matches[3]
-                    : $matches[0];
-            },
-            $html,
-        ) ?? $html;
-
-        // Plain-text merge values are converted to a tracked anchor here so
-        // Gmail cannot auto-link the untracked destination after delivery.
-        $quoted = preg_quote($profileUrl, '/');
-        $parts = preg_split('/(<a\b[^>]*>.*?<\/a>)/isu', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
-        if (! is_array($parts)) {
-            return $html;
-        }
-        foreach ($parts as $index => $part) {
-            if (preg_match('/^<a\b/iu', $part)) {
-                continue;
-            }
-            $parts[$index] = preg_replace(
-                '/' . $quoted . '/u',
-                '<a data-plyrcard-profile-link="1" href="' . e($trackedProfileUrl) . '">View Profile</a>',
-                $part,
-            ) ?? $part;
-        }
-
-        return implode('', $parts);
-    }
-
-    protected function trackedPlainTextFromHtml(string $html): string
-    {
-        // Preserve tracked hrefs in the text alternative. Some email providers
-        // prefer the text/message field and otherwise strip the HTML anchor,
-        // which would expose the untracked player destination.
-        $html = preg_replace_callback(
-            '/<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/isu',
-            static function (array $matches): string {
-                $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-                $label = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($matches[2] ?? ''))) ?? '');
-
-                if ($href === '') {
-                    return $label;
-                }
-
-                if ($label === '' || filter_var($label, FILTER_VALIDATE_URL)) {
-                    return $href;
-                }
-
-                return $label . ': ' . $href;
-            },
-            $html,
-        ) ?? $html;
-
-        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
-        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
-        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
-        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
-
-        return trim($text);
-    }
-
-    public function sendComposedEmail(): void
-    {
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        $subject = trim($this->campaignSubject);
-        $bodyText = trim($this->campaignBody);
-
-        if ($subject === '' || $bodyText === '') {
-            Notification::make()->title('Compose Email')->body('Choose a template or write a subject and message.')->danger()->send();
-            return;
-        }
-
-        $recipients = $this->campaignRecipientCoaches();
-
-        if ($recipients->isEmpty()) {
-            Notification::make()->title('Compose Email')->body('Choose at least one coach with an email address.')->danger()->send();
-            return;
-        }
-
-        $limit = (int) config('ghl.coach_database.campaign_send_limit', 250);
-        if ($recipients->count() > $limit) {
-            Notification::make()->title('Compose Email')->body('Too many recipients. Choose fewer coaches or raise the send limit.')->danger()->send();
-            return;
-        }
-
-        try {
-            app(GoHighLevelService::class)->ensureRecruitingTrackingFieldsForUser($user);
-        } catch (\Throwable $exception) {
-            \Log::warning('Recruiting tracking field preparation failed before campaign send.', [
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
         $this->isSendingCampaign = true;
         $this->resolveComposeGraphicUpload();
         $html = $this->ensurePlyrcardEmailSignature($this->normalizeTemplateLinksForCurrentTracking($this->buildComposeHtml($bodyText)));
@@ -4465,6 +3361,8 @@ HTML;
             $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
             $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
             $personalizedBody = $this->replaceCampaignTokens($html, $coach);
+            $campaignUuid = (string) Str::uuid();
+            $messageUuid = (string) Str::uuid();
 
             $trackingContext = [
                 'athlete_id' => $user->id,
@@ -4484,10 +3382,19 @@ HTML;
                 'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
                 'email_subject' => $personalizedSubject,
                 'source' => 'compose_email',
-                'campaign_uuid' => (string) Str::uuid(),
-                'message_uuid' => (string) Str::uuid(),
+                'campaign_uuid' => $campaignUuid,
+                'message_uuid' => $messageUuid,
                 'template_id' => $this->campaignTemplateId,
             ];
+
+            // Store who this unique email/link set belongs to before delivery.
+            // Click handling later resolves attribution from this local row by message_uuid.
+            app(LocalRecruitingTrackingService::class)->storePendingEmailRecipient(
+                user: $user,
+                context: $trackingContext,
+                subject: $personalizedSubject,
+                html: $personalizedBody,
+            );
 
             $trackedBody = $personalizedBody;
             try {
@@ -4543,27 +3450,20 @@ HTML;
             $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
             if ($result['success'] ?? false) {
                 $sent++;
+                app(LocalRecruitingTrackingService::class)->markEmailSent(
+                    messageUuid: $messageUuid,
+                    sendResult: $result,
+                    renderedHtml: $trackedBody,
+                );
 
-                try {
-                    app(GoHighLevelService::class)->trackRecruitingEmailSentForUser($user, $contactId, [
-                        'source' => 'compose_email',
-                        'subject' => $personalizedSubject,
-                        'to' => (string) ($coach['email'] ?? ''),
-                        'host' => request()?->getHost(),
-                    ]);
-                    $this->prependDashboardActivity([
+                $this->prependDashboardActivity([
                         'type' => 'email_sent',
                         'title' => 'Campaign email sent to ' . (string) ($coach['name'] ?? $coach['email'] ?? 'coach'),
                         'copy' => trim((string) ($coach['school'] ?? $coach['company_name'] ?? '') . (filled($coach['school'] ?? $coach['company_name'] ?? null) ? ' • ' : '') . $personalizedSubject),
                         'time' => now()->toIso8601String(),
                         'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
                     ]);
-                } catch (\Throwable $exception) {
-                    \Log::warning('Recruiting campaign sent tracking failed.', [
-                        'contact_id' => $contactId,
-                        'error' => $exception->getMessage(),
-                    ]);
-                }
+
             } else {
                 $failed++;
             }
@@ -4582,6 +3482,40 @@ HTML;
         $notification = Notification::make()->title('Compose Email')->body($message);
         ($failed ? $notification->warning() : $notification->success())->send();
     }
+
+    protected function hardcodedEmailTemplates(): array
+    {
+        return [
+            [
+                'id' => 'plyrcard-intro-email',
+                'name' => 'Intro to Coach',
+                'subjectLine' => 'Prospect for {{SchoolName}} - {{AthleteName}}',
+                'previewText' => 'Quick introduction from {{AthleteName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
+            ],
+            [
+                'id' => 'plyrcard-follow-up-email',
+                'name' => 'Follow Up',
+                'subjectLine' => 'Following up - {{AthleteName}}',
+                'previewText' => 'Following up with {{CoachFirstName}} at {{SchoolName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>I wanted to follow up on my previous email and share my PLYRCard again.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>I would appreciate the chance to learn more about your program at {{SchoolName}}.</p><p>Thanks,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
+            ],
+            [
+                'id' => 'plyrcard-camp-invite-email',
+                'name' => 'Camp / Visit Interest',
+                'subjectLine' => '{{AthleteName}} - camp interest for {{SchoolName}}',
+                'previewText' => 'Camp and visit interest from {{AthleteName}}.',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'source_type' => 'built_in',
+            ],
+        ];
+    }
+
 
     public function loadTemplateDetail(string $templateId): ?array
     {
@@ -6900,60 +5834,16 @@ HTML;
 
     public function getProfileViewRowsProperty(): array
     {
-        return collect($this->trackingCoaches())
-            ->map(function (array $coach): ?array {
-                $views = $this->coachTrackedProfileViewTotal($coach);
-                if ($views <= 0) {
-                    return null;
-                }
+        $user = Auth::user();
 
-                $name = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Known coach contact';
-                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
-                $initials = strtoupper(collect(preg_split('/\s+/', $name) ?: [])->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'PV');
+        if ($user) {
+            $rows = app(LocalRecruitingTrackingService::class)->profileViewRows($user);
+            if (! empty($rows)) {
+                return $rows;
+            }
+        }
 
-                $platforms = collect([
-                    'Website' => (int) ($coach['view_profile_website'] ?? 0),
-                    'Instagram' => (int) ($coach['view_profile_instagram'] ?? 0),
-                    'YouTube' => (int) ($coach['view_profile_youtube'] ?? 0),
-                    'X' => (int) ($coach['view_profile_x'] ?? 0),
-                    'Email Link' => (int) ($coach['view_profile_email_link'] ?? 0),
-                    'QR' => (int) ($coach['view_profile_qr'] ?? 0),
-                ])->filter(fn (int $count): bool => $count > 0);
-
-                $primaryPlatform = (string) ($platforms->sortDesc()->keys()->first() ?? 'Profile');
-                $breakdown = $platforms->map(fn (int $count, string $label): string => $label . ' ' . number_format($count))->values()->implode(' • ');
-                $copy = collect([$school, $breakdown !== '' ? $breakdown : number_format($views) . ' tracked profile ' . Str::plural('view', $views)])
-                    ->filter()
-                    ->implode(' • ');
-                $time = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
-
-                try {
-                    $timeLabel = $time ? \Carbon\Carbon::parse($time)->diffForHumans() : 'Synced';
-                } catch (\Throwable $exception) {
-                    $timeLabel = 'Synced';
-                }
-
-                return [
-                    'coach_id' => $this->coachTrackingIdentity($coach),
-                    'school_key' => $this->coachTrackingSchoolKey($coach),
-                    'school_id' => $this->trackingSchoolIdForCoach($coach),
-                    'school' => $school,
-                    'title' => $name,
-                    'copy' => $copy !== '' ? $copy : 'Tracked profile view from a known coach contact',
-                    'views' => $views,
-                    'type' => $primaryPlatform,
-                    'logo' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
-                    'initials' => $initials,
-                    'time' => $time,
-                    'time_label' => $timeLabel,
-                ];
-            })
-            ->filter()
-            ->unique('coach_id')
-            ->sortByDesc(fn (array $row): int => (int) ($row['views'] ?? 0))
-            ->values()
-            ->map(fn (array $row, int $index): array => array_merge($row, ['rank' => $index + 1]))
-            ->all();
+        return [];
     }
 
     /**
@@ -7104,104 +5994,16 @@ HTML;
 
     public function getCoachEngagementRowsProperty(): array
     {
-        $platforms = [
-            'website' => ['label' => 'Website', 'key' => 'website_click_count', 'class' => 'is-blue', 'icon_file' => 'website.png'],
-            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count', 'class' => 'is-pink', 'icon_file' => 'instagram.png'],
-            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count', 'class' => 'is-red', 'icon_file' => 'youtube.png'],
-            'x' => ['label' => 'X', 'key' => 'x_click_count', 'class' => 'is-neutral', 'icon_file' => 'x.png'],
-            'email' => ['label' => 'Email link', 'key' => 'email_click_count', 'class' => 'is-coral', 'icon_file' => 'email.png'],
-        ];
+        $user = Auth::user();
 
-        return collect($this->trackingCoaches())
-            ->flatMap(function (array $coach) use ($platforms): array {
-                $rows = [];
-                $coachId = $this->coachTrackingIdentity($coach);
-                $schoolKey = $this->coachTrackingSchoolKey($coach);
-                $schoolId = $this->trackingSchoolIdForCoach($coach);
-                $coachName = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Known coach contact';
-                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
-                $lastPlatform = strtolower(trim((string) ($coach['last_clicked_platform'] ?? '')));
-                $lastPlatform = match ($lastPlatform) {
-                    'twitter' => 'x',
-                    'ig' => 'instagram',
-                    'email_link' => 'email',
-                    default => $lastPlatform,
-                };
-                $lastUrl = trim((string) ($coach['last_clicked_url'] ?? ''));
-                $lastTime = $coach['last_clicked_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? $coach['last_profile_view_at'] ?? null;
-
-                foreach ($platforms as $platform => $config) {
-                    $count = (int) ($coach[$config['key']] ?? 0);
-                    if ($count <= 0) {
-                        continue;
-                    }
-
-                    try {
-                        $timeLabel = $lastTime ? \Carbon\Carbon::parse($lastTime)->diffForHumans() : 'Synced';
-                    } catch (\Throwable $exception) {
-                        $timeLabel = 'Synced';
-                    }
-
-                    $rows[] = [
-                        'coach_id' => $coachId,
-                        'school_key' => $schoolKey,
-                        'school_id' => $schoolId,
-                        'coach_name' => $coachName,
-                        'school' => $school,
-                        'title' => $coachName,
-                        'copy' => collect([
-                            $coachName . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . Str::plural('time', $count),
-                            $school,
-                        ])->filter()->implode(' • '),
-                        'platform' => $config['label'],
-                        'platform_key' => $platform,
-                        'platform_class' => $config['class'],
-                        'platform_icon_file' => $config['icon_file'],
-                        'clicks' => $count,
-                        'url' => $lastPlatform === $platform ? $lastUrl : '',
-                        'time' => $lastTime,
-                        'time_label' => $timeLabel,
-                    ];
-                }
-
-                if (empty($rows)) {
-                    $fallback = max((int) ($coach['trigger_link_click_count'] ?? 0), (bool) ($coach['trigger_link_clicked'] ?? false) ? 1 : 0);
-                    if ($fallback > 0) {
-                        $rows[] = [
-                            'coach_id' => $coachId,
-                            'school_key' => $schoolKey,
-                            'school_id' => $schoolId,
-                            'coach_name' => $coachName,
-                            'school' => $school,
-                            'title' => $coachName,
-                            'copy' => collect([$coachName . ' clicked a tracked recruiting link ' . number_format($fallback) . ' ' . Str::plural('time', $fallback), $school])->filter()->implode(' • '),
-                            'platform' => 'Tracked link',
-                            'platform_key' => 'tracked',
-                            'platform_class' => 'is-blue',
-                            'platform_icon_file' => 'link.png',
-                            'clicks' => $fallback,
-                            'url' => $lastUrl,
-                            'time' => $lastTime,
-                            'time_label' => 'Synced',
-                        ];
-                    }
-                }
-
+        if ($user) {
+            $rows = app(LocalRecruitingTrackingService::class)->coachEngagementRows($user);
+            if (! empty($rows)) {
                 return $rows;
-            })
-            ->sortByDesc(function (array $row): int {
-                $timestamp = 0;
-                try {
-                    $timestamp = filled($row['time'] ?? null) ? \Carbon\Carbon::parse($row['time'])->getTimestamp() : 0;
-                } catch (\Throwable $exception) {
-                    $timestamp = 0;
-                }
+            }
+        }
 
-                return ($timestamp * 1000000) + min(999999, max(0, (int) ($row['clicks'] ?? 0)));
-            })
-            ->take(100)
-            ->values()
-            ->all();
+        return [];
     }
 
     protected function fallbackDashboardSparks(array $stats = []): array
@@ -7497,89 +6299,11 @@ HTML;
 
     protected function localCoachDashboardActivityRows(): array
     {
-        $platforms = [
-            'website' => ['label' => 'Website', 'key' => 'website_click_count'],
-            'instagram' => ['label' => 'Instagram', 'key' => 'instagram_click_count'],
-            'youtube' => ['label' => 'YouTube', 'key' => 'youtube_click_count'],
-            'x' => ['label' => 'X', 'key' => 'x_click_count'],
-            'email' => ['label' => 'Email link', 'key' => 'email_click_count'],
-        ];
+        $user = Auth::user();
 
-        return collect($this->trackingCoaches())
-            ->flatMap(function (array $coach) use ($platforms): array {
-                $rows = [];
-                $name = trim((string) ($coach['name'] ?? collect([$coach['first_name'] ?? null, $coach['last_name'] ?? null])->filter()->implode(' '))) ?: 'Coach contact';
-                $school = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
-                $coachId = $this->coachTrackingIdentity($coach);
-                $schoolId = $this->trackingSchoolIdForCoach($coach);
-                $clickTime = $coach['last_clicked_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
-                $viewTime = $coach['last_profile_view_at'] ?? $coach['date_updated'] ?? $coach['updated_at'] ?? null;
-
-                if ((bool) ($coach['replied'] ?? false) || (int) ($coach['coach_reply_count'] ?? 0) > 0) {
-                    $rows[] = [
-                        'type' => 'coach_reply',
-                        'title' => $name . ' replied',
-                        'copy' => collect([$school, 'Inbound coach reply'])->filter()->implode(' • '),
-                        'time' => $coach['last_reply_at'] ?? $clickTime,
-                        'coach_id' => $coachId,
-                        'school_id' => $schoolId,
-                        'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
-                    ];
-                }
-
-                $clickCounts = collect($platforms)->mapWithKeys(fn (array $config, string $key): array => [$key => (int) ($coach[$config['key']] ?? 0)]);
-                $lastPlatform = strtolower(trim((string) ($coach['last_clicked_platform'] ?? '')));
-                $lastPlatform = match ($lastPlatform) {
-                    'twitter' => 'x',
-                    'ig' => 'instagram',
-                    'email_link' => 'email',
-                    default => $lastPlatform,
-                };
-                if (! isset($platforms[$lastPlatform]) || (int) $clickCounts->get($lastPlatform, 0) <= 0) {
-                    $lastPlatform = (string) ($clickCounts->sortDesc()->keys()->first() ?? '');
-                }
-
-                if ($lastPlatform !== '' && (int) $clickCounts->get($lastPlatform, 0) > 0) {
-                    $count = (int) $clickCounts->get($lastPlatform);
-                    $label = $platforms[$lastPlatform]['label'];
-                    $rows[] = [
-                        'type' => $lastPlatform === 'email' ? 'email_click' : 'social_click_' . $lastPlatform,
-                        'title' => $name . ' clicked ' . $label,
-                        'copy' => collect([$school, number_format($count) . ' total ' . $label . ' ' . Str::plural('click', $count)])->filter()->implode(' • '),
-                        'time' => $clickTime,
-                        'coach_id' => $coachId,
-                        'school_id' => $schoolId,
-                        'platform_key' => $lastPlatform,
-                        'url' => $schoolId !== '' ? '#' : \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
-                    ];
-                }
-
-                $views = $this->coachTrackedProfileViewTotal($coach);
-                if ($views > 0) {
-                    $rows[] = [
-                        'type' => 'profile_view',
-                        'title' => $name . ' viewed your profile',
-                        'copy' => collect([$school, number_format($views) . ' total profile ' . Str::plural('view', $views)])->filter()->implode(' • '),
-                        'time' => $viewTime,
-                        'coach_id' => $coachId,
-                        'school_id' => $schoolId,
-                        'url' => $schoolId !== '' ? '#' : \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
-                    ];
-                }
-
-                return $rows;
-            })
-            ->filter(fn ($row): bool => is_array($row))
-            ->sortByDesc(function (array $item): int {
-                try {
-                    return filled($item['time'] ?? null) ? \Carbon\Carbon::parse($item['time'])->getTimestamp() : 0;
-                } catch (\Throwable $exception) {
-                    return 0;
-                }
-            })
-            ->take(50)
-            ->values()
-            ->all();
+        return $user
+            ? app(LocalRecruitingTrackingService::class)->dashboardCoachActivityRows($user)
+            : [];
     }
 
     public function getDashboardRecentActivityProperty(): array
@@ -8593,6 +7317,1029 @@ HTML;
         }
 
         return collect($this->templates)->firstWhere('id', $this->previewTemplateId);
+    }
+
+    public function addComposeAttachments(): void
+    {
+        if (empty($this->composeAttachmentUploads)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            $this->composeAttachmentUploads = [];
+            return;
+        }
+
+        $files = collect($this->composeAttachmentUploads)
+            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
+            ->values();
+
+        if ($files->isEmpty()) {
+            $this->composeAttachmentUploads = [];
+            return;
+        }
+
+        try {
+            $this->validate([
+                'composeAttachmentUploads.*' => ['file', 'max:25600'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->composeAttachmentUploads = [];
+            Notification::make()->title('Attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
+            return;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
+
+                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                    Notification::make()
+                        ->title('Attachments')
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
+                        ->danger()
+                        ->send();
+                    continue;
+                }
+
+                $name = method_exists($file, 'getClientOriginalName')
+                    ? (string) $file->getClientOriginalName()
+                    : basename((string) ($result['url'] ?? 'attachment'));
+
+                $this->composeAttachments[] = [
+                    'id' => $result['id'] ?? null,
+                    'name' => $name,
+                    'url' => trim((string) $result['url']),
+                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
+                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
+                ];
+            } catch (\Throwable $exception) {
+                Notification::make()->title('Attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
+            }
+        }
+
+        $this->composeAttachmentUploads = [];
+    }
+
+    public function addTemplateAttachments(): void
+    {
+        if (empty($this->templateAttachmentUploads)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            $this->templateAttachmentUploads = [];
+            return;
+        }
+
+        $files = collect($this->templateAttachmentUploads)
+            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
+            ->values();
+
+        if ($files->isEmpty()) {
+            $this->templateAttachmentUploads = [];
+            return;
+        }
+
+        try {
+            $this->validate([
+                'templateAttachmentUploads.*' => ['file', 'max:25600'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->templateAttachmentUploads = [];
+            Notification::make()->title('Template attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
+            return;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $result = app(CoachDatabaseService::class)->uploadMediaForUser($user, $file);
+
+                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                    Notification::make()
+                        ->title('Template attachments')
+                        ->body($this->templateErrorMessage($result, 'Unable to upload one attachment to Recruiting Center media.'))
+                        ->danger()
+                        ->send();
+                    continue;
+                }
+
+                $name = method_exists($file, 'getClientOriginalName')
+                    ? (string) $file->getClientOriginalName()
+                    : basename((string) ($result['url'] ?? 'attachment'));
+
+                $this->templateAttachments[] = [
+                    'id' => $result['id'] ?? null,
+                    'name' => $name,
+                    'url' => trim((string) $result['url']),
+                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
+                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
+                ];
+            } catch (\Throwable $exception) {
+                Notification::make()->title('Template attachments')->body('Unable to upload one attachment to Recruiting Center media.')->danger()->send();
+            }
+        }
+
+        $this->templateAttachmentUploads = [];
+    }
+
+    protected function appendAttachmentLinksToHtml(string $html, array $attachments): string
+    {
+        $attachments = collect($attachments)
+            ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
+            ->values();
+
+        if ($attachments->isEmpty() || str_contains($html, 'data-plyrcard-attachments="1"') || str_contains($html, 'data-plyrcard-attachments="template"')) {
+            return $html;
+        }
+
+        $links = $attachments->map(function (array $attachment): string {
+            $name = e((string) ($attachment['name'] ?? 'Attachment'));
+            $url = e((string) ($attachment['url'] ?? ''));
+            return '<li style="margin:6px 0"><a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $name . '</a></li>';
+        })->implode('');
+
+        if ($links === '') {
+            return $html;
+        }
+
+        return rtrim($html) . '<div data-plyrcard-attachments="1" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $links . '</ul></div>';
+    }
+
+    public function clearComposeCoachSelection(): void
+    {
+        $this->campaignCoachIds = [];
+        $this->campaignTargetMode = $this->campaignSchoolId !== '' ? 'school' : 'coaches';
+        $this->campaignHeadCoachOnly = false;
+    }
+
+    public function clearComposeRecipients(): void
+    {
+        $this->campaignSchoolId = '';
+        $this->campaignListKey = '';
+        $this->campaignCoachIds = [];
+        $this->campaignHeadCoachOnly = false;
+        $this->composeSchoolSearch = '';
+        $this->campaignCoachSearch = '';
+        $this->composeChooseCoachesOpen = false;
+        $this->composeSchoolPickerOpen = false;
+        $this->campaignTargetMode = 'coaches';
+    }
+
+    public function clearComposeTemplate(): void
+    {
+        $this->campaignTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->campaignName = '';
+        $this->campaignSubject = '';
+        $this->campaignPreviewText = '';
+        $this->campaignBody = '';
+        $this->composeGraphicUrl = '';
+        $this->composeGraphicUpload = null;
+        $this->composeAttachmentUploads = [];
+        $this->composeAttachments = [];
+    }
+
+    public function closeComposePreview(): void
+    {
+        $this->showComposePreview = false;
+    }
+
+    public function closeTemplateEditor(): void
+    {
+        $this->templateEditorOpen = false;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->templateIsNew = false;
+    }
+
+    public function createTemplate(): void
+    {
+        $this->newTemplate();
+    }
+
+    public function deleteTemplate(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        if (! $this->selectedTemplateId || $this->templateIsNew) {
+            $this->newTemplate();
+            return;
+        }
+
+        $result = app(CoachDatabaseService::class)->deleteEmailTemplateForUser($user, $this->selectedTemplateId);
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()->title('Templates')->body($this->templateErrorMessage($result, 'Unable to delete template.'))->danger()->send();
+            return;
+        }
+
+        $this->selectedTemplateId = null;
+        $this->templateDetails = [];
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->loadTemplates();
+        Notification::make()->title('Templates')->body('Template deleted.')->success()->send();
+    }
+
+    public function deleteTemplateById(string $templateId): void
+    {
+        $templateId = trim($templateId);
+        if ($templateId === '') {
+            return;
+        }
+
+        $this->selectedTemplateId = $templateId;
+        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
+        $this->deleteTemplate();
+        $this->templateEditorOpen = false;
+    }
+
+    public function duplicateTemplate(string $templateId): void
+    {
+        $templateId = trim($templateId);
+        if ($templateId === '') {
+            return;
+        }
+
+        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
+
+        if (! is_array($template)) {
+            Notification::make()->title('Templates')->body('Template could not be duplicated.')->danger()->send();
+            return;
+        }
+
+        $this->templateEditorOpen = true;
+        $this->selectedTemplateId = $hasFullDetail ? null : $templateId;
+        $this->previewTemplateId = null;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = true;
+        $this->templateName = trim((string) ($template['name'] ?? 'Email Template')) . ' Copy';
+        $this->templateSubject = $this->templateSubject($template);
+        $this->templatePreviewText = $this->templatePreviewText($template);
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+
+        if (! $hasFullDetail) {
+            $this->pendingTemplateAction = 'duplicate';
+            $this->pendingTemplateActionId = $templateId;
+            $this->isLoadingTemplateDetail = true;
+            $this->dispatch('rc-load-template-detail');
+        }
+    }
+
+    protected function extractPlyrcardAttachmentLinks(string $html): array
+    {
+        if (trim($html) === '') {
+            return [];
+        }
+
+        $document = $this->loadTemplateDom($html);
+        if (! $document) {
+            return [];
+        }
+
+        $attachments = [];
+        foreach ($document->getElementsByTagName('div') as $div) {
+            if ((string) $div->getAttribute('data-plyrcard-attachments') === '') {
+                continue;
+            }
+
+            foreach ($div->getElementsByTagName('a') as $a) {
+                $url = trim((string) $a->getAttribute('href'));
+                if ($url === '' || ! preg_match('/^https?:\/\//i', $url)) {
+                    continue;
+                }
+                $attachments[] = [
+                    'name' => trim((string) $a->textContent) ?: basename(parse_url($url, PHP_URL_PATH) ?: 'Attachment'),
+                    'url' => $url,
+                    'mime_type' => null,
+                    'size' => null,
+                ];
+            }
+        }
+
+        return collect($attachments)->unique('url')->values()->all();
+    }
+
+    public function loadSelectedTemplateDetail(): void
+    {
+        $templateId = trim((string) $this->selectedTemplateId);
+        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
+            $this->isLoadingTemplateDetail = false;
+            return;
+        }
+
+        $this->isLoadingTemplateDetail = true;
+        $this->startDeferredUiSync('template-detail', $templateId);
+    }
+
+    public function newTemplate(): void
+    {
+        $this->templateEditorOpen = true;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = true;
+        $this->templateName = 'New Recruiting Email';
+        $this->templateSubject = '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
+        $this->templatePreviewText = 'Quick intro, profile, and highlight link from {{AthleteName}}.';
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = [];
+        $this->templateBody = $this->starterTemplateHtml();
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+    }
+
+    public function openComposeCoachChooser(): void
+    {
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+
+        if (! empty($this->campaignCoachIds)) {
+            return;
+        }
+
+        if ($this->campaignSchoolId !== '') {
+            $this->campaignCoachIds = collect($this->composeSchoolCoaches)
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id): string => (string) $id)
+                ->values()
+                ->all();
+        }
+    }
+
+    public function openComposePreview(): void
+    {
+        $this->showComposePreview = true;
+    }
+
+    public function removeComposeAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->composeAttachments)) {
+            return;
+        }
+
+        unset($this->composeAttachments[$index]);
+        $this->composeAttachments = array_values($this->composeAttachments);
+    }
+
+    public function removeComposeGraphic(): void
+    {
+        $this->composeGraphicUrl = '';
+        $this->composeGraphicUpload = null;
+    }
+
+    public function removeTemplateAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->templateAttachments)) {
+            return;
+        }
+
+        unset($this->templateAttachments[$index]);
+        $this->templateAttachments = array_values($this->templateAttachments);
+    }
+
+    public function saveTemplate(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $name = trim($this->templateName);
+        $subject = trim($this->templateSubject);
+        $bodyText = trim($this->templateBody);
+
+        if ($name === '' || $subject === '' || $bodyText === '') {
+            Notification::make()->title('Templates')->body('Add a name, subject, and message.')->danger()->send();
+            return;
+        }
+
+        $this->isSavingTemplate = true;
+        $this->resolveTemplateGraphicUpload();
+        $html = $this->appendAttachmentLinksToHtml(
+            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
+            $this->templateAttachments
+        );
+
+        $shouldUpdateGhl = $this->selectedTemplateId
+            && ! $this->templateIsNew
+            && ! $this->isBuiltInTemplateId($this->selectedTemplateId);
+
+        $result = null;
+        $updatedTemplateId = $this->selectedTemplateId;
+        $updateFailures = [];
+
+        if ($shouldUpdateGhl) {
+            foreach ($this->templateUpdateCandidateIds((string) $this->selectedTemplateId) as $candidateId) {
+                $result = app(CoachDatabaseService::class)->updateEmailTemplateForUser($user, $candidateId, $name, $subject, $html, $this->templatePreviewText);
+
+                if ($result['success'] ?? false) {
+                    $updatedTemplateId = $candidateId;
+                    break;
+                }
+
+                $updateFailures[] = [
+                    'template_id' => $candidateId,
+                    'status' => $result['status'] ?? null,
+                    'error' => $result['error'] ?? 'Unable to update template.',
+                ];
+            }
+
+            if (! ($result['success'] ?? false) && $this->templateSaveFailedBecauseNotFound($result, $updateFailures)) {
+                // Some Recruiting Center HTML-builder templates expose one id for loading and a different/internal
+                // id for editing. If none of the known ids can be updated, save the edited version as
+                // a new Recruiting Center template instead of failing with "Template not found" and losing the work.
+                $copyName = Str::endsWith($name, ' (Edited Copy)') ? $name : $name . ' (Edited Copy)';
+                $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $copyName, $subject, $html, $this->templatePreviewText);
+                if ($result['success'] ?? false) {
+                    $name = $copyName;
+                    $this->templateName = $copyName;
+                    $updatedTemplateId = null;
+                }
+            }
+        } else {
+            $result = app(CoachDatabaseService::class)->createEmailTemplateForUser($user, $name, $subject, $html, $this->templatePreviewText);
+        }
+
+        $this->isSavingTemplate = false;
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()->title('Templates')->body($this->templateErrorMessage($result ?? [], 'Unable to save template.'))->danger()->send();
+            return;
+        }
+
+        $saved = $result['template'] ?? [];
+        if (is_array($saved)) {
+            $savedId = (string) ($saved['id'] ?? $saved['_id'] ?? $saved['templateId'] ?? $updatedTemplateId ?? $this->selectedTemplateId ?? '');
+            if ($savedId !== '') {
+                $this->selectedTemplateId = $savedId;
+                $this->templateIsNew = false;
+                $this->templateDetails[$savedId] = $this->mergeTemplateRecord($saved, [
+                    'id' => $savedId,
+                    'connection_key' => $this->templateConnectionKey,
+                    'name' => $name,
+                    'subjectLine' => $subject,
+                    'previewText' => $this->templatePreviewText,
+                    'graphicUrl' => $this->templateGraphicUrl,
+                    'html' => $html,
+                    'body' => $html,
+                    'update_failures' => $updateFailures,
+                ]);
+            }
+        }
+
+        $this->loadTemplates();
+
+        $message = ! empty($updateFailures) && blank($updatedTemplateId)
+            ? 'Template saved as a new edited copy because Recruiting Center would not update the original template id.'
+            : 'Template saved.';
+
+        Notification::make()->title('Templates')->body($message)->success()->send();
+    }
+
+    public function selectAllComposeSchoolCoaches(): void
+    {
+        $this->campaignCoachIds = collect($this->composeSchoolCoaches)
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+    }
+
+    public function selectTemplate(string $templateId): void
+    {
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return;
+        }
+
+        // Open immediately from the local summary/built-in record. Remote HTML
+        // is fetched in a second request after the editor is visible.
+        $template = $this->templateDetails[$templateId] ?? null;
+        if (! is_array($template)) {
+            $template = collect($this->templates)->firstWhere('id', $templateId)
+                ?: collect($this->hardcodedEmailTemplates())->firstWhere('id', $templateId);
+        }
+
+        if (! is_array($template)) {
+            return;
+        }
+
+        $this->templateEditorOpen = true;
+        $this->selectedTemplateId = $templateId;
+        $this->previewTemplateId = $templateId;
+        $this->campaignTemplateId = null;
+        $this->templateIsNew = $this->isBuiltInTemplateId($templateId);
+        $this->templateName = trim((string) ($template['name'] ?? 'Untitled Template')) ?: 'Untitled Template';
+        $this->templateSubject = $this->templateSubject($template);
+        $this->templatePreviewText = $this->templatePreviewText($template);
+        $this->templateGraphicUrl = '';
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+        $this->templateAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->templateBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+        $this->templateEditorRefreshKey++;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody), key: $this->templateEditorRefreshKey);
+
+        $isRemoteSummary = ! $this->templateIsNew && (($template['source_type'] ?? null) !== 'built_in');
+        $hasFullBody = isset($this->templateDetails[$templateId]);
+        $this->isLoadingTemplateDetail = $isRemoteSummary && ! $hasFullBody;
+
+        if ($this->isLoadingTemplateDetail) {
+            $this->dispatch('rc-load-template-detail');
+        }
+    }
+
+    public function sendCampaign(): void
+    {
+        $this->sendComposedEmail();
+    }
+
+    protected function trackedPlainTextFromHtml(string $html): string
+    {
+        // Preserve tracked hrefs in the plain-text email alternative.
+        $html = preg_replace_callback(
+            '/<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/isu',
+            static function (array $matches): string {
+                $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                $label = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($matches[2] ?? ''))) ?? '');
+
+                if ($href === '') {
+                    return $label;
+                }
+
+                if ($label === '' || filter_var($label, FILTER_VALIDATE_URL)) {
+                    return $href;
+                }
+
+                return $label . ': ' . $href;
+            },
+            $html,
+        ) ?? $html;
+
+        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
+        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
+    public function sendComposedEmail(): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $subject = trim($this->campaignSubject);
+        $bodyText = trim($this->campaignBody);
+
+        if ($subject === '' || $bodyText === '') {
+            Notification::make()->title('Compose Email')->body('Choose a template or write a subject and message.')->danger()->send();
+            return;
+        }
+
+        $recipients = $this->campaignRecipientCoaches();
+
+        if ($recipients->isEmpty()) {
+            Notification::make()->title('Compose Email')->body('Choose at least one coach with an email address.')->danger()->send();
+            return;
+        }
+
+        $limit = (int) config('ghl.coach_database.campaign_send_limit', 250);
+        if ($recipients->count() > $limit) {
+            Notification::make()->title('Compose Email')->body('Too many recipients. Choose fewer coaches or raise the send limit.')->danger()->send();
+            return;
+        }
+
+        $this->isSendingCampaign = true;
+        $this->resolveComposeGraphicUpload();
+        $html = $this->ensurePlyrcardEmailSignature($this->normalizeTemplateLinksForCurrentTracking($this->buildComposeHtml($bodyText)));
+        $sent = 0;
+        $failed = 0;
+
+        foreach ($recipients as $coach) {
+            $contactId = trim((string) ($coach['id'] ?? ''));
+            $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
+            $personalizedBody = $this->replaceCampaignTokens($html, $coach);
+
+            $trackingContext = [
+                'athlete_id' => $user->id,
+                'athlete_email' => $user->email ?: $user->personal_email,
+                'athlete_ghl_contact_id' => $user->ghl_contact_id,
+                'athlete_ghl_location_id' => $user->ghl_location_id,
+                'profile_url' => app(LocalTemplateMergeValueService::class)->profileUrlFor($user),
+                'contact_id' => $contactId,
+                'ghl_contact_id' => $contactId,
+                'coach_contact_id' => $contactId,
+                'business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+                'ghl_business_id' => $coach['business_id'] ?? $coach['ghl_business_id'] ?? null,
+                'coach_name' => $coach['name'] ?? null,
+                'coach_email' => $coach['email'] ?? null,
+                'school' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'school_name' => $coach['school'] ?? $coach['company_name'] ?? null,
+                'school_logo_url' => $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null,
+                'email_subject' => $personalizedSubject,
+                'source' => 'coach_database_campaign_email',
+                'campaign_uuid' => (string) Str::uuid(),
+                'message_uuid' => (string) Str::uuid(),
+                'template_id' => $this->campaignTemplateId,
+            ];
+
+            $messageUuid = (string) $trackingContext['message_uuid'];
+
+            // Persist the recipient before delivery. Every rewritten link carries this
+            // message UUID, so a later click can resolve the exact coach locally.
+            app(LocalRecruitingTrackingService::class)->storePendingEmailRecipient(
+                user: $user,
+                context: $trackingContext,
+                subject: $personalizedSubject,
+                html: $personalizedBody,
+            );
+
+            $trackedBody = $personalizedBody;
+            try {
+                $rewriter = app(TrackingLinkRewriter::class);
+                $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
+            } catch (\Throwable $exception) {
+                \Log::warning('Recruiting campaign link rewrite failed. Sending original body.', [
+                    'contact_id' => $contactId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
+            $payload = [
+                'contact_id' => $contactId,
+                'contactId' => $contactId,
+                'subject' => $personalizedSubject,
+                'body' => $trackedBody,
+                'html' => $trackedBody,
+                'text' => $this->trackedPlainTextFromHtml($trackedBody),
+                'to' => (string) ($coach['email'] ?? ''),
+                'emailTo' => (string) ($coach['email'] ?? ''),
+                'cc' => trim($this->campaignCc),
+                'bcc' => trim($this->campaignBcc),
+                'fromName' => (string) ($user->name ?? 'PLYRCard'),
+                'tracking_context' => $trackingContext,
+                'tracking_source' => 'compose_email',
+                'source' => 'compose_email',
+                'profile_url' => $trackingContext['profile_url'] ?? null,
+                'public_profile_url' => $trackingContext['profile_url'] ?? null,
+                'coach_contact_id' => $trackingContext['coach_contact_id'] ?? $contactId,
+                'coach_name' => $trackingContext['coach_name'] ?? null,
+                'coach_email' => $trackingContext['coach_email'] ?? null,
+                'school_business_id' => $trackingContext['business_id'] ?? null,
+                'school_name' => $trackingContext['school_name'] ?? null,
+                'message_uuid' => $messageUuid,
+                'skip_internal_sent_tracking' => true,
+                'attachments' => $this->composeAttachments,
+            ];
+
+            $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
+            if ($result['success'] ?? false) {
+                $sent++;
+
+                app(LocalRecruitingTrackingService::class)->markEmailSent(
+                    messageUuid: $messageUuid,
+                    sendResult: $result,
+                    renderedHtml: $trackedBody,
+                );
+
+                $this->prependDashboardActivity([
+                    'type' => 'email_sent',
+                    'title' => 'Campaign email sent to ' . (string) ($coach['name'] ?? $coach['email'] ?? 'coach'),
+                    'copy' => trim((string) ($coach['school'] ?? $coach['company_name'] ?? '') . (filled($coach['school'] ?? $coach['company_name'] ?? null) ? ' • ' : '') . $personalizedSubject),
+                    'time' => now()->toIso8601String(),
+                    'url' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
+                ]);
+            } else {
+                $failed++;
+            }
+        }
+
+        $this->isSendingCampaign = false;
+
+        if ($sent > 0) {
+            $this->stats['email_sent_count'] = (int) ($this->stats['email_sent_count'] ?? 0) + $sent;
+            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + $sent;
+            $this->persistDashboardStatsAfterTracking($user);
+            $this->loadDashboardActivity();
+        }
+
+        $message = 'Sent to ' . number_format($sent) . ' coach' . ($sent === 1 ? '' : 'es') . ($failed ? '. Failed: ' . number_format($failed) . '.' : '.');
+        $notification = Notification::make()->title('Compose Email')->body($message);
+        ($failed ? $notification->warning() : $notification->success())->send();
+    }
+
+    public function sendComposedEmailWithCoachIds(array $coachIds = []): void
+    {
+        $this->campaignCoachIds = collect($coachIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! empty($this->campaignCoachIds)) {
+            $this->campaignTargetMode = 'coaches';
+            $this->campaignHeadCoachOnly = false;
+        }
+
+        $this->sendComposedEmail();
+    }
+
+    public function sendComposedEmailWithComposeState(
+        string $schoolId = '',
+        string $targetMode = 'school',
+        bool $headCoachOnly = true,
+        array $coachIds = [],
+    ): void {
+        $this->campaignSchoolId = trim($schoolId);
+        $this->campaignTargetMode = in_array($targetMode, ['school', 'coaches', 'all', 'list'], true)
+            ? $targetMode
+            : 'school';
+        $this->campaignHeadCoachOnly = $this->campaignTargetMode === 'school' && $headCoachOnly;
+        $this->campaignCoachIds = collect($coachIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($this->campaignTargetMode === 'coaches' && empty($this->campaignCoachIds)) {
+            Notification::make()
+                ->title('Compose Email')
+                ->body('Choose at least one coach.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $this->sendComposedEmail();
+    }
+
+    public function setComposeSchoolAllCoaches(): void
+    {
+        if ($this->campaignSchoolId === '') {
+            $this->campaignTargetMode = 'school';
+            return;
+        }
+
+        $this->campaignTargetMode = 'school';
+        $this->campaignHeadCoachOnly = false;
+        $this->campaignCoachIds = [];
+        $this->composeChooseCoachesOpen = false;
+    }
+
+    public function setComposeSchoolHeadCoachOnly(): void
+    {
+        if ($this->campaignSchoolId === '') {
+            $this->campaignTargetMode = 'school';
+            return;
+        }
+
+        $this->campaignTargetMode = 'school';
+        $this->campaignHeadCoachOnly = true;
+        $this->campaignCoachIds = [];
+        $this->composeChooseCoachesOpen = false;
+    }
+
+    protected function starterTemplateHtml(): string
+    {
+        $body = <<<'HTML'
+<div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
+    <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
+        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
+        <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
+        <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
+        <p style="margin:0 0 12px;">
+            <a class="rc-email-button" href="{{ProfileLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#ff5b32;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0 0 10px;">View PLYRCard Profile</a>
+            <a class="rc-email-button" href="{{HighlightLink}}" target="_blank" style="display:block;width:100%;box-sizing:border-box;background:#111827;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;text-align:center;margin:0;">Watch Highlights</a>
+        </p>
+        <p style="margin:0 0 16px;">Thank you for your time and consideration. I look forward to learning more about your program.</p>
+        <p style="margin:0;">Best,<br><strong>{{AthleteName}}</strong></p>
+    </div>
+</div>
+HTML;
+
+        return $this->canonicalizeTemplateEditorHtml($body);
+    }
+
+    protected function templateConnectionKeyForUser($user): string
+    {
+        if (! $user) {
+            return 'guest';
+        }
+
+        $locationId = trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? ''));
+        $token = trim((string) ($user->ghl_api_key ?? ''));
+
+        return sha1((string) ($user->id ?? 'user') . '|' . $locationId . '|' . substr(sha1($token), 0, 12));
+    }
+
+    public function templateQuickAction(string $action): void
+    {
+        $action = trim($action);
+        $body = trim((string) $this->templateBody);
+
+        if ($body === '') {
+            Notification::make()->title('Templates')->body('Add template copy first.')->warning()->send();
+            return;
+        }
+
+        if ($action === 'shorter') {
+            $body = preg_replace('/<p>\s*<\/p>/i', '', $body) ?: $body;
+            $body = str_replace(['I would love the opportunity to', 'I wanted to'], ['I would like to', 'I want to'], $body);
+        } elseif ($action === 'professional') {
+            $body = str_replace(['Hi ', 'Thanks,'], ['Hello ', 'Best regards,'], $body);
+        } elseif ($action === 'personalize') {
+            if (! str_contains($body, '{{SchoolName}}')) {
+                $body = '<p>Hello {{CoachFirstName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
+            }
+        } elseif ($action === 'improve') {
+            if (! str_contains($body, '{{ProfileLink}}')) {
+                $body .= '<p>You can view my profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p>';
+            }
+        }
+
+        $this->templateBody = $body;
+        $this->dispatch('rc-template-editor-refresh', body: base64_encode($this->templateBody));
+        Notification::make()->title('Templates')->body('Template updated. Review before saving.')->success()->send();
+    }
+
+    protected function templateSaveFailedBecauseNotFound(?array $result, array $failures = []): bool
+    {
+        if (is_array($result) && (int) ($result['status'] ?? 0) === 404) {
+            return true;
+        }
+
+        $message = strtolower((string) ($result['error'] ?? ''));
+        if ($message !== '' && (str_contains($message, 'not found') || str_contains($message, 'does not exist') || str_contains($message, 'invalid template'))) {
+            return true;
+        }
+
+        foreach ($failures as $failure) {
+            if ((int) ($failure['status'] ?? 0) === 404) {
+                return true;
+            }
+
+            $failureMessage = strtolower((string) ($failure['error'] ?? ''));
+            if ($failureMessage !== '' && (str_contains($failureMessage, 'not found') || str_contains($failureMessage, 'does not exist') || str_contains($failureMessage, 'invalid template'))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function templateUpdateCandidateIds(string $templateId): array
+    {
+        $summary = collect($this->templates)->firstWhere('id', $templateId) ?: [];
+        $detail = $this->templateDetails[$templateId] ?? [];
+        $values = [$templateId];
+
+        foreach ([$summary, $detail] as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+
+            foreach ([
+                'id', '_id', 'templateId', 'template_id', 'campaignId', 'campaign_id', 'emailCampaignId', 'email_campaign_id',
+                'builderId', 'builder_id', 'contentId', 'content_id', 'emailId', 'email_id', 'detail_candidate_id',
+                'raw.id', 'raw._id', 'raw.templateId', 'raw.template_id', 'raw.campaignId', 'raw.campaign_id', 'raw.emailCampaignId', 'raw.email_campaign_id',
+                'raw.builderId', 'raw.builder_id', 'raw.contentId', 'raw.content_id', 'raw.emailId', 'raw.email_id',
+                'raw.data.id', 'raw.data._id', 'raw.data.templateId', 'raw.data.template_id', 'raw.data.campaignId', 'raw.data.builderId', 'raw.data.contentId',
+                'raw.template.id', 'raw.template._id', 'raw.template.templateId', 'raw.template.campaignId',
+                'raw.email.id', 'raw.email._id', 'raw.email.templateId',
+                'raw.campaign.id', 'raw.campaign._id', 'raw.campaign.templateId',
+            ] as $path) {
+                $value = data_get($record, $path);
+                if (is_scalar($value)) {
+                    $values[] = (string) $value;
+                }
+            }
+        }
+
+        return collect($values)
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter(fn (string $value): bool => $value !== '' && ! in_array(strtolower($value), ['null', 'undefined'], true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function toggleCampaignCoach(string $coachId): void
+    {
+        $coachId = trim($coachId);
+        if ($coachId === '') {
+            return;
+        }
+
+        $ids = collect($this->campaignCoachIds)
+            ->map(fn ($id): string => (string) $id)
+            ->filter()
+            ->values();
+
+        if ($ids->contains($coachId)) {
+            $this->campaignCoachIds = $ids->reject(fn (string $id): bool => $id === $coachId)->values()->all();
+        } else {
+            $this->campaignCoachIds = $ids->push($coachId)->unique()->values()->all();
+        }
+
+        $this->campaignTargetMode = 'coaches';
+        $this->campaignHeadCoachOnly = false;
+        $this->composeChooseCoachesOpen = true;
+    }
+
+    public function updatedComposeAttachmentUploads(): void
+    {
+        $this->addComposeAttachments();
+    }
+
+    public function updatedTemplateAttachmentUploads(): void
+    {
+        $this->addTemplateAttachments();
+    }
+
+    public function useCampaignTemplate(string $templateId): void
+    {
+        $this->useTemplateForCompose($templateId);
+    }
+
+    public function useTemplateForCompose(string $templateId): void
+    {
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return;
+        }
+
+        $hasFullDetail = $this->isBuiltInTemplateId($templateId) || isset($this->templateDetails[$templateId]);
+        $template = $this->loadTemplateDetail($templateId)
+            ?: collect($this->templates)->firstWhere('id', $templateId);
+
+        if (! is_array($template)) {
+            Notification::make()->title('Compose Email')->body('Template could not be opened.')->danger()->send();
+            return;
+        }
+
+        $this->campaignTemplateId = $templateId;
+        $this->selectedTemplateId = $templateId;
+        $this->previewTemplateId = $templateId;
+        $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
+        $this->campaignSubject = $this->templateSubject($template);
+        $this->campaignPreviewText = $this->templatePreviewText($template);
+        $this->composeGraphicUrl = '';
+        $this->composeAttachments = $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+        $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateHtmlForNativeEditor($template));
+
+        if (trim($this->campaignBody) === '') {
+            $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->templateTextToHtml(trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')))));
+        }
+
+        $this->section = 'compose';
+        $this->activeSubpage = 'compose-email';
+        $this->composeTemplateAppliedRecently = true;
+        $this->composeTemplateMenuOpen = false;
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        if (! $hasFullDetail) {
+            $this->pendingTemplateAction = 'use-compose';
+            $this->pendingTemplateActionId = $templateId;
+            $this->isLoadingTemplateDetail = true;
+            $this->dispatch('rc-load-template-detail');
+        }
+
+        Notification::make()->title('Compose Email')->body($hasFullDetail ? 'Template loaded in Compose Email.' : 'Template opened. The latest content is loading.')->success()->send();
     }
 
     public function getPreviewTemplateSubjectProperty(): string

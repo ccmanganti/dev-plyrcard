@@ -48,6 +48,7 @@ class TrackingLinkRewriter
         'message_uuid' => 'mu',
         'template_id' => 'ti',
         'recipient_key' => 'rk',
+        'link_uuid' => 'lu',
     ];
 
 
@@ -175,6 +176,7 @@ class TrackingLinkRewriter
         }
 
         $payload = array_merge($context, [
+            'link_uuid' => $context['link_uuid'] ?? (string) Str::uuid(),
             'event_type' => $context['event_type'] ?? 'link_click',
             'platform' => $context['platform'] ?? $this->detectPlatform($destinationUrl),
             'destination_url' => $destinationUrl,
@@ -212,6 +214,7 @@ class TrackingLinkRewriter
         }
 
         $payload = array_merge($context, [
+            'link_uuid' => $context['link_uuid'] ?? (string) Str::uuid(),
             'event_type' => 'profile_view',
             'platform' => $context['platform'] ?? $this->detectPlatform($profileUrl),
             'source' => $context['source'] ?? 'profile_tracking_link',

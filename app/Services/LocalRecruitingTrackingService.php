@@ -24,6 +24,8 @@ class LocalRecruitingTrackingService
             return null;
         }
 
+        $payload = $this->hydratePayloadFromStoredEmail($payload);
+
         $user = $this->resolveAthlete($payload);
         if (! $user) {
             Log::error('Recruiting tracking athlete could not be resolved.', [
@@ -53,6 +55,8 @@ class LocalRecruitingTrackingService
             'athlete_email' => $payload['athlete_email'] ?? $user->email ?? $user->personal_email ?? null,
             'coach_contact_id' => $coachContactId,
             'recipient_key' => $payload['recipient_key'] ?? null,
+            'link_uuid' => $payload['link_uuid'] ?? null,
+            'message_uuid' => $payload['message_uuid'] ?? null,
             'coach_name' => $payload['coach_name'] ?? null,
             'coach_email' => $payload['coach_email'] ?? null,
             'coach_title' => $payload['coach_title'] ?? null,
@@ -148,6 +152,83 @@ class LocalRecruitingTrackingService
             'website_id' => $website->getKey(),
             'website_name' => $website->name,
         ], $request, 'profile_view');
+    }
+
+    public function storePendingEmailRecipient(User $user, array $context, string $subject, string $html): string
+    {
+        $messageUuid = $this->uuid($context['message_uuid'] ?? null) ?: (string) Str::uuid();
+
+        if (Schema::hasTable('coach_database_email_messages')) {
+            CoachDatabaseEmailMessage::query()->updateOrCreate(
+                ['message_uuid' => $messageUuid],
+                [
+                    'athlete_user_id' => $user->getKey(),
+                    'ghl_location_id' => trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? '')),
+                    'campaign_uuid' => $this->uuid($context['campaign_uuid'] ?? null),
+                    'coach_contact_id' => $this->text($context['coach_contact_id'] ?? $context['contact_id'] ?? null),
+                    'school_business_id' => $this->text($context['school_business_id'] ?? $context['business_id'] ?? null),
+                    'template_id' => $this->text($context['template_id'] ?? null),
+                    'recipient_email' => $this->text($context['coach_email'] ?? $context['to'] ?? null),
+                    'recipient_name' => $this->text($context['coach_name'] ?? null),
+                    'school_name' => $this->text($context['school_name'] ?? $context['school'] ?? null),
+                    'subject' => $subject,
+                    'rendered_html' => $html,
+                    'sent_at' => null,
+                ]
+            );
+        }
+
+        return $messageUuid;
+    }
+
+    public function markEmailSent(string $messageUuid, array $sendResult = [], ?string $renderedHtml = null): void
+    {
+        if (! Schema::hasTable('coach_database_email_messages')) {
+            return;
+        }
+
+        CoachDatabaseEmailMessage::query()
+            ->where('message_uuid', $messageUuid)
+            ->update(array_filter([
+                'ghl_message_id' => $this->text($sendResult['message_id'] ?? $sendResult['id'] ?? null),
+                'rendered_html' => $renderedHtml,
+                'sent_at' => now(),
+                'updated_at' => now(),
+            ], static fn ($value): bool => $value !== null));
+    }
+
+    protected function hydratePayloadFromStoredEmail(array $payload): array
+    {
+        $messageUuid = $this->uuid($payload['message_uuid'] ?? $payload['message_id'] ?? null);
+        if (! $messageUuid || ! Schema::hasTable('coach_database_email_messages')) {
+            return $payload;
+        }
+
+        $message = CoachDatabaseEmailMessage::query()
+            ->where('message_uuid', $messageUuid)
+            ->first();
+
+        if (! $message) {
+            return $payload;
+        }
+
+        return array_merge([
+            'athlete_id' => $message->athlete_user_id,
+            'athlete_ghl_location_id' => $message->ghl_location_id,
+            'coach_contact_id' => $message->coach_contact_id,
+            'contact_id' => $message->coach_contact_id,
+            'ghl_contact_id' => $message->coach_contact_id,
+            'coach_email' => $message->recipient_email,
+            'coach_name' => $message->recipient_name,
+            'school_business_id' => $message->school_business_id,
+            'business_id' => $message->school_business_id,
+            'school_name' => $message->school_name,
+            'campaign_uuid' => $message->campaign_uuid,
+            'message_uuid' => $message->message_uuid,
+            'template_id' => $message->template_id,
+            'email_subject' => $message->subject,
+            'source' => 'compose_email',
+        ], array_filter($payload, static fn ($value): bool => $value !== null && $value !== ''));
     }
 
     public function recordSentEmail(User $user, array $context, string $subject, string $html, array $sendResult = []): string
@@ -247,6 +328,178 @@ class LocalRecruitingTrackingService
             $destination,
             $coachContactId ?: 'direct',
         ]));
+    }
+
+
+
+    /**
+     * Build coach-attributed profile-view rows directly from the local event table.
+     * Totals and coach lists must use the same source of truth.
+     */
+    public function profileViewRows(User $user, int $limit = 500): array
+    {
+        return $this->attributedEventRows($user, 'profile_view', $limit)
+            ->groupBy('coach_identity')
+            ->map(function ($events): array {
+                $latest = $events->sortByDesc('occurred_at')->first();
+                $views = $events->count();
+                $name = trim((string) ($latest['coach_name'] ?? '')) ?: 'Known coach contact';
+                $school = trim((string) ($latest['school_name'] ?? ''));
+                $initials = strtoupper(collect(preg_split('/\\s+/', $name) ?: [])
+                    ->filter()->map(fn ($part) => mb_substr((string) $part, 0, 1))->take(2)->implode('') ?: 'PV');
+
+                return [
+                    'coach_id' => (string) $latest['coach_identity'],
+                    'coach_contact_id' => $latest['coach_contact_id'],
+                    'coach_email' => $latest['coach_email'],
+                    'school_key' => $latest['school_business_id'] ?: ($school !== '' ? 'school:' . strtolower(trim($school)) : ''),
+                    'school_id' => $latest['school_business_id'] ?: '',
+                    'school' => $school,
+                    'title' => $name,
+                    'copy' => collect([$school, number_format($views) . ' tracked profile ' . \Illuminate\Support\Str::plural('view', $views)])
+                        ->filter()->implode(' • '),
+                    'views' => $views,
+                    'type' => 'Website',
+                    'logo' => $latest['school_logo_url'],
+                    'initials' => $initials,
+                    'time' => $latest['occurred_at'],
+                    'time_label' => $this->timeLabel($latest['occurred_at']),
+                ];
+            })
+            ->sortByDesc('views')
+            ->values()
+            ->map(fn (array $row, int $index): array => array_merge($row, ['rank' => $index + 1]))
+            ->all();
+    }
+
+    /**
+     * Build click rows from local events without requiring the coach to still be
+     * present in the cached GHL coach collection.
+     */
+    public function coachEngagementRows(User $user, int $limit = 500): array
+    {
+        $platformConfig = [
+            'website' => ['label' => 'Website', 'class' => 'is-blue', 'icon' => 'website.png'],
+            'instagram' => ['label' => 'Instagram', 'class' => 'is-pink', 'icon' => 'instagram.png'],
+            'youtube' => ['label' => 'YouTube', 'class' => 'is-red', 'icon' => 'youtube.png'],
+            'x' => ['label' => 'X', 'class' => 'is-neutral', 'icon' => 'x.png'],
+            'email' => ['label' => 'Email link', 'class' => 'is-coral', 'icon' => 'email.png'],
+        ];
+
+        return $this->attributedEventRows($user, 'link_click', $limit)
+            ->groupBy(fn (array $row): string => $row['coach_identity'] . '|' . $row['platform'])
+            ->map(function ($events) use ($platformConfig): array {
+                $latest = $events->sortByDesc('occurred_at')->first();
+                $count = $events->count();
+                $platform = strtolower((string) ($latest['platform'] ?? 'website'));
+                $platform = match ($platform) { 'twitter' => 'x', 'ig' => 'instagram', default => $platform };
+                $config = $platformConfig[$platform] ?? ['label' => ucfirst($platform ?: 'Tracked link'), 'class' => 'is-blue', 'icon' => 'link.png'];
+                $name = trim((string) ($latest['coach_name'] ?? '')) ?: 'Known coach contact';
+                $school = trim((string) ($latest['school_name'] ?? ''));
+
+                return [
+                    'coach_id' => (string) $latest['coach_identity'],
+                    'coach_contact_id' => $latest['coach_contact_id'],
+                    'coach_email' => $latest['coach_email'],
+                    'school_key' => $latest['school_business_id'] ?: ($school !== '' ? 'school:' . strtolower(trim($school)) : ''),
+                    'school_id' => $latest['school_business_id'] ?: '',
+                    'coach_name' => $name,
+                    'school' => $school,
+                    'title' => $name,
+                    'copy' => collect([$name . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count), $school])
+                        ->filter()->implode(' • '),
+                    'platform' => $config['label'],
+                    'platform_key' => $platform,
+                    'platform_class' => $config['class'],
+                    'platform_icon_file' => $config['icon'],
+                    'clicks' => $count,
+                    'url' => (string) ($latest['destination_url'] ?? ''),
+                    'time' => $latest['occurred_at'],
+                    'time_label' => $this->timeLabel($latest['occurred_at']),
+                ];
+            })
+            ->sortByDesc('time')
+            ->take(100)
+            ->values()
+            ->all();
+    }
+
+    public function dashboardCoachActivityRows(User $user, int $limit = 500): array
+    {
+        $profile = collect($this->profileViewRows($user, $limit))->map(fn (array $row): array => [
+            'type' => 'profile_view',
+            'title' => ($row['title'] ?? 'Coach contact') . ' viewed your profile',
+            'copy' => $row['copy'] ?? 'Tracked profile view',
+            'time' => $row['time'] ?? null,
+            'coach_id' => $row['coach_id'] ?? null,
+            'school_id' => $row['school_id'] ?? null,
+            'url' => '#',
+        ]);
+
+        $clicks = collect($this->coachEngagementRows($user, $limit))->map(fn (array $row): array => [
+            'type' => ($row['platform_key'] ?? '') === 'email' ? 'email_click' : 'social_click_' . ($row['platform_key'] ?? 'tracked'),
+            'title' => ($row['coach_name'] ?? 'Coach contact') . ' clicked ' . ($row['platform'] ?? 'a tracked link'),
+            'copy' => $row['copy'] ?? 'Tracked link click',
+            'time' => $row['time'] ?? null,
+            'coach_id' => $row['coach_id'] ?? null,
+            'school_id' => $row['school_id'] ?? null,
+            'platform_key' => $row['platform_key'] ?? null,
+            'url' => $row['url'] ?? '#',
+        ]);
+
+        return $profile->merge($clicks)->sortByDesc('time')->take(50)->values()->all();
+    }
+
+    protected function attributedEventRows(User $user, string $eventType, int $limit)
+    {
+        if (! Schema::hasTable('coach_database_tracking_events')) {
+            return collect();
+        }
+
+        return DB::table('coach_database_tracking_events')
+            ->where('athlete_user_id', $user->getKey())
+            ->where('event_type', $eventType)
+            ->whereNotNull('coach_contact_id')
+            ->where('coach_contact_id', '<>', '')
+            ->orderByDesc('id')
+            ->limit(max(1, $limit))
+            ->get()
+            ->map(function ($row): array {
+                $metadata = [];
+                if (is_string($row->metadata ?? null) && trim((string) $row->metadata) !== '') {
+                    $decoded = json_decode((string) $row->metadata, true);
+                    $metadata = is_array($decoded) ? $decoded : [];
+                }
+
+                $contactId = trim((string) ($row->coach_contact_id ?? ''));
+                $coachEmail = strtolower(trim((string) ($metadata['coach_email'] ?? '')));
+                $identity = $contactId !== '' ? $contactId : $coachEmail;
+
+                return [
+                    'coach_identity' => $identity,
+                    'coach_contact_id' => $contactId !== '' ? $contactId : null,
+                    'coach_name' => trim((string) ($metadata['coach_name'] ?? '')),
+                    'coach_email' => $coachEmail !== '' ? $coachEmail : null,
+                    'school_name' => trim((string) ($metadata['school_name'] ?? '')),
+                    'school_logo_url' => $metadata['school_logo_url'] ?? null,
+                    'school_business_id' => trim((string) ($row->school_business_id ?? '')),
+                    'platform' => strtolower(trim((string) ($row->platform ?? 'website'))) ?: 'website',
+                    'destination_url' => $row->destination_url ?? null,
+                    'source' => $row->source ?? null,
+                    'occurred_at' => $row->occurred_at ?? $row->created_at ?? null,
+                ];
+            })
+            ->filter(fn (array $row): bool => trim((string) ($row['coach_identity'] ?? '')) !== '')
+            ->values();
+    }
+
+    protected function timeLabel(mixed $time): string
+    {
+        try {
+            return $time ? \Illuminate\Support\Carbon::parse($time)->diffForHumans() : 'Recorded';
+        } catch (\Throwable) {
+            return 'Recorded';
+        }
     }
 
     protected function resolveAthlete(array $payload): ?User
