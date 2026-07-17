@@ -7174,29 +7174,19 @@
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
-                $socialClickCount = (int) ($dashboardMetrics['website_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['x_click_count'] ?? 0);
-                $emailsSent = $emailSentCount;
+                $instagramClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $youtubeClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
 
+                // Coach Engagement must match the drawer:
+                // Instagram + YouTube + X social clicks only.
+                // Do not include profile views, website clicks, email opens, email clicks, or replies.
+                $socialClickCount = $instagramClicks + $youtubeClicks + $xClicks;
+                $coachEngagementTotal = $socialClickCount;
+
+                $emailsSent = $emailSentCount;
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
-                $coachEngagementTotal = max(
-                    (int) ($dashboardMetrics['unique_clicks'] ?? 0),
-                    (int) ($dashboardMetrics['unique_contact_clicks'] ?? 0),
-                    (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0),
-                    (int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0),
-                    $trackedWebsiteViews
-                        + $trackedInstagramViews
-                        + $trackedYoutubeViews
-                        + $trackedXViews
-                        + $trackedEmailLinkViews
-                        + $emailClickCount
-                        + $socialClickCount
-                        + $emailOpenCount
-                        + $coachReplies,
-                );
 
                 $profileCompletion = 0;
                 $profileUrl = '#';
@@ -7440,7 +7430,7 @@
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
-                        'sub' => 'Tracked opens, clicks, replies',
+                        'sub' => 'Tracked social clicks',
                         'icon' => 'mail',
                         'tone' => 'green',
                         'target' => 'coach-engagement',

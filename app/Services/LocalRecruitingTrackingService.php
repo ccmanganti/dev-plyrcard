@@ -42,6 +42,12 @@ class LocalRecruitingTrackingService
         $destination = $this->cleanUrl((string) ($payload['destination_url'] ?? ''));
         $eventType = strtolower(trim((string) ($payload['event_type'] ?? $fallbackEventType ?? 'link_click'))) ?: 'link_click';
         $platform = strtolower(trim((string) ($payload['platform'] ?? 'website'))) ?: 'website';
+        $platform = match ($platform) {
+            'ig' => 'instagram',
+            'twitter' => 'x',
+            'yt' => 'youtube',
+            default => $platform,
+        };
         $source = mb_substr(trim((string) ($payload['source'] ?? 'tracked_link')) ?: 'tracked_link', 0, 80);
         $coachContactId = $this->text($payload['coach_contact_id'] ?? $payload['contact_id'] ?? $payload['ghl_contact_id'] ?? $payload['recipient_key'] ?? null)
             ?: $this->text($payload['coach_email'] ?? $payload['contact_email'] ?? null);
@@ -274,13 +280,34 @@ class LocalRecruitingTrackingService
             return [];
         }
 
-        $query = DB::table('coach_database_tracking_events')->where('athlete_user_id', $user->getKey());
-        $eventCount = fn (string $event): int => (clone $query)->where('event_type', $event)->count();
-        $clicks = (clone $query)->where('event_type', 'link_click');
+        $query = DB::table('coach_database_tracking_events')
+            ->where('athlete_user_id', $user->getKey());
+
+        $eventCount = fn (string $event): int =>
+            (clone $query)->where('event_type', $event)->count();
+
         $profile = (clone $query)->where('event_type', 'profile_view');
+
+        // Coach Engagement excludes profile views.
+        // It only counts social clicks from tracked emails.
+        $emailClicks = (clone $query)
+            ->where('event_type', 'link_click')
+            ->whereNotNull('message_uuid')
+            ->where('message_uuid', '<>', '');
+
+        $socialClicks = (clone $emailClicks)
+            ->whereIn('platform', ['instagram', 'youtube', 'x']);
+
         $totalProfileViews = (clone $profile)->count();
-        $uniqueProfileViews = (clone $profile)->whereNotNull('visitor_hash')->distinct()->count('visitor_hash');
-        $knownCoachProfileViews = (clone $profile)->whereNotNull('coach_contact_id')->count();
+
+        $uniqueProfileViews = (clone $profile)
+            ->whereNotNull('visitor_hash')
+            ->distinct()
+            ->count('visitor_hash');
+
+        $knownCoachProfileViews = (clone $profile)
+            ->whereNotNull('coach_contact_id')
+            ->count();
 
         return [
             'profile_views' => $totalProfileViews,
@@ -288,29 +315,76 @@ class LocalRecruitingTrackingService
             'unique_profile_views' => $uniqueProfileViews,
             'unique_profile_view_count' => $uniqueProfileViews,
             'known_coach_profile_views' => $knownCoachProfileViews,
+
             'view_profile_website' => (clone $profile)->where('platform', 'website')->count(),
             'view_profile_instagram' => (clone $profile)->where('platform', 'instagram')->count(),
             'view_profile_youtube' => (clone $profile)->where('platform', 'youtube')->count(),
             'view_profile_x' => (clone $profile)->where('platform', 'x')->count(),
+
             'email_sent_count' => $eventCount('email_sent'),
             'emails_sent' => $eventCount('email_sent'),
             'email_open_count' => $eventCount('email_open'),
             'email_opens' => $eventCount('email_open'),
-            'email_click_count' => (clone $clicks)->count(),
-            'website_click_count' => (clone $clicks)->where('platform', 'website')->count(),
-            'instagram_click_count' => (clone $clicks)->where('platform', 'instagram')->count(),
-            'youtube_click_count' => (clone $clicks)->where('platform', 'youtube')->count(),
-            'x_click_count' => (clone $clicks)->where('platform', 'x')->count(),
-            'link_clicks' => (clone $clicks)->count(),
-            'trigger_link_clicks' => (clone $clicks)->count(),
-            'unique_contact_clicks' => (clone $clicks)->whereNotNull('coach_contact_id')->distinct()->count('coach_contact_id'),
-            'unique_link_click_contacts' => (clone $clicks)->whereNotNull('coach_contact_id')->distinct()->count('coach_contact_id'),
-            'unique_profile_view_contacts' => (clone $profile)->whereNotNull('coach_contact_id')->distinct()->count('coach_contact_id'),
-            'profile_view_unique_contact_count' => (clone $profile)->whereNotNull('coach_contact_id')->distinct()->count('coach_contact_id'),
-            'profile_view_unique_school_count' => (clone $profile)->whereNotNull('school_business_id')->distinct()->count('school_business_id'),
-            'school_clicks_total' => (clone $clicks)->whereNotNull('school_business_id')->count(),
-            'overall_school_clicks' => (clone $clicks)->whereNotNull('school_business_id')->count(),
-            'schools_with_clicks' => (clone $clicks)->whereNotNull('school_business_id')->distinct()->count('school_business_id'),
+
+            // All email-link clicks, including profile links.
+            'email_click_count' => (clone $emailClicks)->count(),
+            'email_clicks' => (clone $emailClicks)->count(),
+
+            // Coach Engagement social-only counts.
+            'website_click_count' => 0,
+            'website_clicks' => 0,
+
+            'instagram_click_count' => (clone $socialClicks)->where('platform', 'instagram')->count(),
+            'instagram_clicks' => (clone $socialClicks)->where('platform', 'instagram')->count(),
+
+            'youtube_click_count' => (clone $socialClicks)->where('platform', 'youtube')->count(),
+            'youtube_clicks' => (clone $socialClicks)->where('platform', 'youtube')->count(),
+
+            'x_click_count' => (clone $socialClicks)->where('platform', 'x')->count(),
+            'x_clicks' => (clone $socialClicks)->where('platform', 'x')->count(),
+            'twitter_clicks' => (clone $socialClicks)->where('platform', 'x')->count(),
+
+            'social_clicks' => (clone $socialClicks)->count(),
+            'link_clicks' => (clone $socialClicks)->count(),
+            'trigger_link_clicks' => (clone $socialClicks)->count(),
+
+            'unique_contact_clicks' => (clone $socialClicks)
+                ->whereNotNull('coach_contact_id')
+                ->distinct()
+                ->count('coach_contact_id'),
+
+            'unique_link_click_contacts' => (clone $socialClicks)
+                ->whereNotNull('coach_contact_id')
+                ->distinct()
+                ->count('coach_contact_id'),
+
+            'unique_profile_view_contacts' => (clone $profile)
+                ->whereNotNull('coach_contact_id')
+                ->distinct()
+                ->count('coach_contact_id'),
+
+            'profile_view_unique_contact_count' => (clone $profile)
+                ->whereNotNull('coach_contact_id')
+                ->distinct()
+                ->count('coach_contact_id'),
+
+            'profile_view_unique_school_count' => (clone $profile)
+                ->whereNotNull('school_business_id')
+                ->distinct()
+                ->count('school_business_id'),
+
+            'school_clicks_total' => (clone $socialClicks)
+                ->whereNotNull('school_business_id')
+                ->count(),
+
+            'overall_school_clicks' => (clone $socialClicks)
+                ->whereNotNull('school_business_id')
+                ->count(),
+
+            'schools_with_clicks' => (clone $socialClicks)
+                ->whereNotNull('school_business_id')
+                ->distinct()
+                ->count('school_business_id'),
         ];
     }
 
@@ -379,43 +453,73 @@ class LocalRecruitingTrackingService
     public function coachEngagementRows(User $user, int $limit = 500): array
     {
         $platformConfig = [
-            'website' => ['label' => 'Website', 'class' => 'is-blue', 'icon' => 'website.png'],
-            'instagram' => ['label' => 'Instagram', 'class' => 'is-pink', 'icon' => 'instagram.png'],
-            'youtube' => ['label' => 'YouTube', 'class' => 'is-red', 'icon' => 'youtube.png'],
-            'x' => ['label' => 'X', 'class' => 'is-neutral', 'icon' => 'x.png'],
-            'email' => ['label' => 'Email link', 'class' => 'is-coral', 'icon' => 'email.png'],
+            'instagram' => [
+                'label' => 'Instagram',
+                'class' => 'is-pink',
+                'icon' => 'instagram.png',
+            ],
+            'youtube' => [
+                'label' => 'YouTube',
+                'class' => 'is-red',
+                'icon' => 'youtube.png',
+            ],
+            'x' => [
+                'label' => 'X',
+                'class' => 'is-neutral',
+                'icon' => 'x.png',
+            ],
         ];
 
         return $this->attributedEventRows($user, 'link_click', $limit)
-            ->groupBy(fn (array $row): string => $row['coach_identity'] . '|' . $row['platform'])
+            ->filter(function (array $row): bool {
+                return filled($row['message_uuid'] ?? null)
+                    && in_array((string) ($row['platform'] ?? ''), ['instagram', 'youtube', 'x'], true);
+            })
+            ->groupBy(fn (array $row): string => $row['coach_identity'].'|'.$row['platform'])
             ->map(function ($events) use ($platformConfig): array {
                 $latest = $events->sortByDesc('occurred_at')->first();
+
                 $count = $events->count();
-                $platform = strtolower((string) ($latest['platform'] ?? 'website'));
-                $platform = match ($platform) { 'twitter' => 'x', 'ig' => 'instagram', default => $platform };
-                $config = $platformConfig[$platform] ?? ['label' => ucfirst($platform ?: 'Tracked link'), 'class' => 'is-blue', 'icon' => 'link.png'];
+
+                $platform = strtolower((string) ($latest['platform'] ?? ''));
+                $platform = match ($platform) {
+                    'twitter' => 'x',
+                    'ig' => 'instagram',
+                    'yt' => 'youtube',
+                    default => $platform,
+                };
+
+                $config = $platformConfig[$platform] ?? [
+                    'label' => ucfirst($platform ?: 'Tracked link'),
+                    'class' => 'is-blue',
+                    'icon' => 'link.png',
+                ];
+
                 $name = trim((string) ($latest['coach_name'] ?? '')) ?: 'Known coach contact';
                 $school = trim((string) ($latest['school_name'] ?? ''));
 
                 return [
-                    'coach_id' => (string) $latest['coach_identity'],
-                    'coach_contact_id' => $latest['coach_contact_id'],
-                    'coach_email' => $latest['coach_email'],
-                    'school_key' => $latest['school_business_id'] ?: ($school !== '' ? 'school:' . strtolower(trim($school)) : ''),
-                    'school_id' => $latest['school_business_id'] ?: '',
+                    'coach_id' => (string) ($latest['coach_identity'] ?? ''),
+                    'coach_contact_id' => $latest['coach_contact_id'] ?? null,
+                    'coach_email' => $latest['coach_email'] ?? null,
+                    'school_key' => ($latest['school_business_id'] ?? '') ?: ($school !== '' ? 'school:'.strtolower(trim($school)) : ''),
+                    'school_id' => $latest['school_business_id'] ?? '',
                     'coach_name' => $name,
                     'school' => $school,
                     'title' => $name,
-                    'copy' => collect([$name . ' clicked ' . $config['label'] . ' ' . number_format($count) . ' ' . \Illuminate\Support\Str::plural('time', $count), $school])
-                        ->filter()->implode(' • '),
+                    'copy' => collect([
+                        $name.' clicked '.$config['label'].' '.number_format($count).' '.\Illuminate\Support\Str::plural('time', $count),
+                        $school,
+                    ])->filter()->implode(' • '),
                     'platform' => $config['label'],
                     'platform_key' => $platform,
                     'platform_class' => $config['class'],
                     'platform_icon_file' => $config['icon'],
                     'clicks' => $count,
                     'url' => (string) ($latest['destination_url'] ?? ''),
-                    'time' => $latest['occurred_at'],
-                    'time_label' => $this->timeLabel($latest['occurred_at']),
+                    'time' => $latest['occurred_at'] ?? null,
+                    'time_label' => $this->timeLabel($latest['occurred_at'] ?? null),
+                    'message_uuid' => $latest['message_uuid'] ?? null,
                 ];
             })
             ->sortByDesc('time')
@@ -466,6 +570,7 @@ class LocalRecruitingTrackingService
             ->get()
             ->map(function ($row): array {
                 $metadata = [];
+
                 if (is_string($row->metadata ?? null) && trim((string) $row->metadata) !== '') {
                     $decoded = json_decode((string) $row->metadata, true);
                     $metadata = is_array($decoded) ? $decoded : [];
@@ -475,15 +580,26 @@ class LocalRecruitingTrackingService
                 $coachEmail = strtolower(trim((string) ($metadata['coach_email'] ?? '')));
                 $identity = $contactId !== '' ? $contactId : $coachEmail;
 
+                $platform = strtolower(trim((string) ($row->platform ?? 'website'))) ?: 'website';
+                $platform = match ($platform) {
+                    'twitter' => 'x',
+                    'ig' => 'instagram',
+                    'yt' => 'youtube',
+                    default => $platform,
+                };
+
                 return [
+                    'event_id' => (int) ($row->id ?? 0),
+                    'event_type' => trim((string) ($row->event_type ?? $eventType)),
                     'coach_identity' => $identity,
                     'coach_contact_id' => $contactId !== '' ? $contactId : null,
                     'coach_name' => trim((string) ($metadata['coach_name'] ?? '')),
                     'coach_email' => $coachEmail !== '' ? $coachEmail : null,
-                    'school_name' => trim((string) ($metadata['school_name'] ?? '')),
-                    'school_logo_url' => $metadata['school_logo_url'] ?? null,
+                    'school_name' => trim((string) ($metadata['school_name'] ?? $metadata['school'] ?? '')),
+                    'school_logo_url' => $metadata['school_logo_url'] ?? $metadata['business_logo_url'] ?? null,
                     'school_business_id' => trim((string) ($row->school_business_id ?? '')),
-                    'platform' => strtolower(trim((string) ($row->platform ?? 'website'))) ?: 'website',
+                    'message_uuid' => trim((string) ($row->message_uuid ?? '')),
+                    'platform' => $platform,
                     'destination_url' => $row->destination_url ?? null,
                     'source' => $row->source ?? null,
                     'occurred_at' => $row->occurred_at ?? $row->created_at ?? null,

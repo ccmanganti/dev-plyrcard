@@ -175,10 +175,22 @@ class TrackingLinkRewriter
             return $this->trackedProfileUrl($destinationUrl, $context);
         }
 
+        $platform = $context['platform'] ?? $this->detectPlatform($destinationUrl);
+
+        $platform = match (strtolower((string) $platform)) {
+            'ig' => 'instagram',
+            'twitter' => 'x',
+            'yt' => 'youtube',
+            default => strtolower((string) $platform),
+        };
+
         $payload = array_merge($context, [
             'link_uuid' => $context['link_uuid'] ?? (string) Str::uuid(),
             'event_type' => $context['event_type'] ?? 'link_click',
-            'platform' => $context['platform'] ?? $this->detectPlatform($destinationUrl),
+            'platform' => $platform,
+            'source' => in_array($platform, ['instagram', 'youtube', 'x'], true)
+                ? 'compose_email_social'
+                : ($context['source'] ?? 'compose_email_link'),
             'destination_url' => $destinationUrl,
         ]);
 

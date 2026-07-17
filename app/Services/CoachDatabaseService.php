@@ -902,7 +902,7 @@ class CoachDatabaseService
             'x_clicks' => $xClicks,
             'x_click_count' => $xClicks,
             'twitter_clicks' => $xClicks,
-            'social_clicks' => $websiteClicks + $instagramClicks + $youtubeClicks + $xClicks,
+            'social_clicks' => $instagramClicks + $youtubeClicks + $xClicks,
             'email_sent_count' => $emailSent,
             'email_open_count' => $emailOpens,
             'email_click_count' => $emailClicks,

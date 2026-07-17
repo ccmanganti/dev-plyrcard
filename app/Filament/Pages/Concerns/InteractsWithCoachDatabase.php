@@ -5917,12 +5917,14 @@ HTML;
         $trackedXViews = max((int) ($stats['view_profile_x'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_x'] ?? 0)));
         $trackedEmailProfileLinks = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_email_link'] ?? 0));
 
-        $websiteClicks = $engagementRows->where('platform_key', 'website')->sum('clicks');
+        // Coach Engagement only contains social clicks attributed to a tracked email.
+        // Profile views are counted separately in Profile Views.
+        $websiteClicks = 0;
         $instagramClicks = $engagementRows->where('platform_key', 'instagram')->sum('clicks');
         $youtubeClicks = $engagementRows->where('platform_key', 'youtube')->sum('clicks');
         $xClicks = $engagementRows->where('platform_key', 'x')->sum('clicks');
-        $emailClicks = $engagementRows->where('platform_key', 'email')->sum('clicks');
-        $linkClicks = $engagementRows->sum('clicks');
+        $emailClicks = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
+        $linkClicks = $instagramClicks + $youtubeClicks + $xClicks;
 
         $profileContactIds = $profileRows->pluck('coach_id')->filter()->unique();
         $linkContactIds = $engagementRows->pluck('coach_id')->filter()->unique();
@@ -5975,11 +5977,11 @@ HTML;
             'profile_view_school_click_count' => $profileViewSchoolClicks,
             'link_clicks' => $linkClicks,
             'trigger_link_clicks' => $linkClicks,
-            'unique_contact_clicks' => $uniqueContactClicks,
+            'unique_contact_clicks' => $linkContactIds->count(),
             'unique_profile_view_contacts' => $uniqueProfileViewContacts,
             'unique_profile_views' => $uniqueProfileViews,
-            'unique_link_click_contacts' => $uniqueLinkClickContacts,
-            'unique_clicks' => $uniqueContactClicks,
+            'unique_link_click_contacts' => $linkContactIds->count(),
+            'unique_clicks' => $linkContactIds->count(),
             'contact_link_clicks' => $ghlContactClicks,
             'ghl_contact_clicks' => $ghlContactClicks,
             'overall_school_clicks' => $overallSchoolClicks,
