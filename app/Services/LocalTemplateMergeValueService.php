@@ -29,10 +29,10 @@ class LocalTemplateMergeValueService
             'AthleteName' => $athleteName,
             'AthleteFirstName' => $this->text($athlete->first_name ?? ($athleteParts[0] ?? '')),
             'AthleteLastName' => $this->text($athlete->last_name ?? ($athleteParts[1] ?? '')),
-            'AthleteEmail' => $this->text($athlete->email),
             'AthletePhone' => $this->text($athlete->phone),
-            'GraduationYear' => $this->text($athlete->graduation_year),
-            'Position' => $this->text($athlete->position),
+            'AthleteEmail' => $this->text($athlete->email ?: $athlete->personal_email),
+            'GraduationYear' => $this->text($athlete->graduation_year ?? $athlete->year ?? ''),
+            'Position' => $this->readableText($athlete->position),
             'ClubTeam' => $this->text($athlete->club_team),
             'GPA' => $this->text($athlete->gpa),
             'CoachName' => $coachName ?: trim($first.' '.$last),
@@ -102,6 +102,17 @@ class LocalTemplateMergeValueService
         }
 
         return $content;
+    }
+
+    protected function readableText(mixed $value): string
+    {
+        $text = $this->text($value);
+
+        $text = str_replace('_', ' ', $text);
+        $text = preg_replace('/\s*,\s*/', ', ', $text) ?? $text;
+        $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+
+        return trim($text);
     }
 
     public function availableValues(): array

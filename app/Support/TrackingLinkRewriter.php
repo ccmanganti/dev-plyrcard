@@ -313,7 +313,11 @@ class TrackingLinkRewriter
      */
     public function appendTrackedSignature(string $html, $user = null, array $context = []): string
     {
-        if (stripos($html, 'data-recruiting-signature') !== false) {
+        if (
+            stripos($html, 'data-recruiting-signature') !== false
+            || stripos($html, 'data-plyrcard-signature') !== false
+            || stripos($html, 'plyrcard-email-signature') !== false
+        ) {
             return $html;
         }
 
