@@ -3056,6 +3056,53 @@ class GoHighLevelService
         return trim($text);
     }
 
+
+    protected function normalizeEmailRecipientList(mixed $value): array
+    {
+        $items = [];
+
+        if (is_array($value)) {
+            foreach ($value as $entry) {
+                if (is_array($entry)) {
+                    $entry = $entry['email'] ?? $entry['address'] ?? $entry['value'] ?? '';
+                }
+
+                foreach (preg_split('/[,;\s]+/', (string) $entry, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $email) {
+                    $email = strtolower(trim($email));
+
+                    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $items[$email] = $email;
+                    }
+                }
+            }
+        } else {
+            foreach (preg_split('/[,;\s]+/', (string) $value, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $email) {
+                $email = strtolower(trim($email));
+
+                if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $items[$email] = $email;
+                }
+            }
+        }
+
+        return array_values($items);
+    }
+
+    protected function emailRecipientListFromPayload(array $payload, array $keys): array
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload)) {
+                $emails = $this->normalizeEmailRecipientList($payload[$key]);
+
+                if ($emails !== []) {
+                    return $emails;
+                }
+            }
+        }
+
+        return [];
+    }
+
     public function sendEmailMessageForUser(User $user, array $payload): array
     {
         $credentials = $this->credentialsForUser($user);
@@ -3073,8 +3120,8 @@ class GoHighLevelService
         $text = trim((string) ($payload['text'] ?? strip_tags($html)));
         $to = $payload['to'] ?? $payload['emailTo'] ?? null;
         $fromName = trim((string) ($payload['fromName'] ?? $payload['senderName'] ?? $user->name ?? 'PLYRCard'));
-        $cc = trim((string) ($payload['cc'] ?? $payload['emailCc'] ?? ''));
-        $bcc = trim((string) ($payload['bcc'] ?? $payload['emailBcc'] ?? ''));
+        $ccEmails = $this->emailRecipientListFromPayload($payload, ['emailCc', 'cc_emails', 'cc', 'ccEmails']);
+        $bccEmails = $this->emailRecipientListFromPayload($payload, ['emailBcc', 'bcc_emails', 'bcc', 'bccEmails']);
         $skipInternalSentTracking = (bool) ($payload['skip_internal_sent_tracking'] ?? false);
         $fromEmail = trim((string) ($payload['fromEmail'] ?? $payload['emailFrom'] ?? ''));
         $attachments = collect($payload['attachments'] ?? [])
@@ -3155,60 +3202,93 @@ class GoHighLevelService
             ]);
         }
 
-        $payloads = [];
-
-        $base = array_filter([
-            'locationId' => $locationId,
-            'contactId' => $contactId,
-            'conversationId' => $conversationId,
-            'subject' => $subject,
-            // Send the tracked HTML through every body key used by the conversation API.
-            // If only the plain-text message is sent, the open pixel/signature links never exist in the delivered email.
-            'html' => $html,
-            'body' => $html,
-            'message' => $html,
-            'text' => $text,
-            'emailTo' => $to,
-            'cc' => $cc !== '' ? $cc : null,
-            'bcc' => $bcc !== '' ? $bcc : null,
-            'emailCc' => $cc !== '' ? $cc : null,
-            'emailBcc' => $bcc !== '' ? $bcc : null,
-            'fromEmail' => $fromEmail,
-            'emailFrom' => $fromEmail,
-            'fromName' => $fromName,
-            'senderName' => $fromName,
-        ], fn ($value) => filled($value));
-
-        $payloads[] = array_merge($base, ['type' => 'Email']);
-        $payloads[] = array_merge($base, ['type' => 'TYPE_EMAIL']);
-        $payloads[] = array_merge($base, ['messageType' => 'TYPE_EMAIL']);
-        $payloads[] = array_filter([
-            'locationId' => $locationId,
-            'contactId' => $contactId,
-            'conversationId' => $conversationId,
+        $officialPayload = [
             'type' => 'Email',
+            'contactId' => $contactId,
+            'subject' => $subject,
+            'html' => $html,
+            'message' => $text !== '' ? $text : trim(strip_tags($html)),
+            'emailFrom' => $fromEmail,
+            'fromName' => $fromName,
+            'status' => 'delivered',
+        ];
+
+        if ($conversationId) {
+            $officialPayload['conversationId'] = $conversationId;
+        }
+
+        if ($to) {
+            $officialPayload['emailTo'] = $to;
+        }
+
+        if ($ccEmails !== []) {
+            $officialPayload['emailCc'] = array_values($ccEmails);
+        }
+
+        if ($bccEmails !== []) {
+            $officialPayload['emailBcc'] = array_values($bccEmails);
+        }
+
+        if (! empty($attachments)) {
+            $officialPayload['attachments'] = collect($attachments)
+                ->pluck('url')
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        // BCC only works reliably on the current HighLevel Conversations v3 endpoint.
+        // Older configured versions can return success while silently dropping emailBcc.
+        $payloads = [$officialPayload];
+
+        $legacyBase = array_filter([
+            'locationId' => $locationId,
+            'contactId' => $contactId,
+            'conversationId' => $conversationId,
             'subject' => $subject,
             'html' => $html,
             'body' => $html,
             'message' => $html,
             'text' => $text,
             'emailTo' => $to,
-            'cc' => $cc !== '' ? $cc : null,
-            'bcc' => $bcc !== '' ? $bcc : null,
-            'emailCc' => $cc !== '' ? $cc : null,
-            'emailBcc' => $bcc !== '' ? $bcc : null,
+            'emailCc' => $ccEmails !== [] ? array_values($ccEmails) : null,
+            'emailBcc' => $bccEmails !== [] ? array_values($bccEmails) : null,
             'fromEmail' => $fromEmail,
             'emailFrom' => $fromEmail,
             'fromName' => $fromName,
             'senderName' => $fromName,
-        ], fn ($value) => filled($value));
+        ], fn ($value) => is_array($value) ? $value !== [] : filled($value));
 
-        $versions = array_values(array_unique(array_filter([
-            config('ghl.conversations_send_version'),
-            '2021-04-15',
-            'v3',
-            '2023-02-21',
-        ])));
+        // Only use legacy fallbacks when there is no BCC. This prevents a false
+        // "successful" send through an older API version that ignores BCC.
+        if ($bccEmails === []) {
+            $payloads[] = array_merge($legacyBase, ['type' => 'Email']);
+            $payloads[] = array_merge($legacyBase, ['type' => 'TYPE_EMAIL']);
+            $payloads[] = array_merge($legacyBase, ['messageType' => 'TYPE_EMAIL']);
+        }
+
+        $configuredVersion = trim((string) config('ghl.conversations_send_version'));
+        $versions = ['v3'];
+
+        if ($bccEmails === []) {
+            foreach ([$configuredVersion, '2021-04-15', '2023-02-21'] as $version) {
+                $version = trim((string) $version);
+
+                if ($version !== '' && ! in_array($version, $versions, true)) {
+                    $versions[] = $version;
+                }
+            }
+        }
+
+        Log::info('Recruiting email API payload recipients prepared.', [
+            'contact_id' => $contactId,
+            'to' => $to,
+            'cc_count' => count($ccEmails),
+            'bcc_count' => count($bccEmails),
+            'uses_v3_only' => $bccEmails !== [],
+            'has_email_cc' => $ccEmails !== [],
+            'has_email_bcc' => $bccEmails !== [],
+        ]);
 
         $lastError = null;
         $lastStatus = null;

@@ -248,7 +248,13 @@ trait InteractsWithCoachDatabase
             if ($coachId !== '') {
                 $this->selectComposeCoach($coachId);
             }
-            $this->ensureComposeBodyHasFooter();
+
+            $templateId = trim((string) request()->query('template', ''));
+            if ($templateId !== '') {
+                $this->applyTemplateToCompose($templateId, false);
+            } else {
+                $this->ensureComposeBodyHasFooter();
+            }
         }
 
         if ($this->section === 'settings') {
@@ -522,9 +528,6 @@ trait InteractsWithCoachDatabase
             $this->loadTemplates();
         }
 
-        if (empty($this->templates) && in_array($this->section, ['campaigns', 'compose'], true)) {
-            $this->templates = $this->hardcodedEmailTemplates();
-        }
     }
 
     public function startBackgroundLoad(bool $force = false): void
@@ -2648,56 +2651,25 @@ trait InteractsWithCoachDatabase
      * this trait.
      */
 
-    protected function ensureLocalSampleEmailTemplates(): void
+protected function ensureLocalSampleEmailTemplates(): void
     {
         if (! Schema::hasTable('coach_database_email_templates')) {
             return;
         }
 
-        $defaultName = 'PLYRCARD Default Recruiting Email';
+        $defaultName = $this->defaultRecruitingTemplateName();
 
         CoachDatabaseEmailTemplate::query()
             ->whereNull('user_id')
             ->where('name', '<>', $defaultName)
             ->delete();
 
-        $bodyHtml = $this->canonicalizeTemplateEditorHtml(
-            $this->defaultRecruitingTemplateBodyHtml()
-        );
-
-        $template = CoachDatabaseEmailTemplate::withTrashed()
-            ->whereNull('user_id')
-            ->where('name', $defaultName)
-            ->first();
-
-        if (! $template) {
-            CoachDatabaseEmailTemplate::query()->create([
-                'user_id' => null,
-                'name' => $defaultName,
-                'subject' => $this->defaultRecruitingTemplateSubject(),
-                'preview_text' => $this->defaultRecruitingTemplatePreviewText(),
-                'body_html' => $bodyHtml,
-                'graphic_url' => null,
-                'attachments' => [],
-                'is_sample' => true,
-                'is_locked' => true,
-                'is_active' => true,
-                'sort_order' => 0,
-            ]);
-
-            return;
-        }
-
-        if (method_exists($template, 'restore')) {
-            $template->restore();
-        }
-
-        $template->forceFill([
+        $payload = [
             'user_id' => null,
             'name' => $defaultName,
             'subject' => $this->defaultRecruitingTemplateSubject(),
             'preview_text' => $this->defaultRecruitingTemplatePreviewText(),
-            'body_html' => $bodyHtml,
+            'body_html' => $this->defaultRecruitingTemplateEditorHtml(),
             'graphic_url' => null,
             'attachments' => [],
             'is_sample' => true,
@@ -2705,8 +2677,25 @@ trait InteractsWithCoachDatabase
             'is_active' => true,
             'sort_order' => 0,
             'deleted_at' => null,
-        ])->save();
+        ];
+
+        $template = CoachDatabaseEmailTemplate::withTrashed()
+            ->whereNull('user_id')
+            ->where('name', $defaultName)
+            ->first();
+
+        if (! $template) {
+            CoachDatabaseEmailTemplate::query()->create($payload);
+            return;
+        }
+
+        if (method_exists($template, 'restore')) {
+            $template->restore();
+        }
+
+        $template->forceFill($payload)->save();
     }
+
 
     protected function localSampleEmailTemplates(): array
     {
@@ -2724,9 +2713,10 @@ trait InteractsWithCoachDatabase
         ];
     }
 
-    protected function isDefaultRecruitingTemplateName(?string $name): bool
+
+    protected function defaultRecruitingTemplateName(): string
     {
-        return trim((string) $name) === 'PLYRCARD Default Recruiting Email';
+        return 'PLYRCARD Default Recruiting Email';
     }
 
     protected function defaultRecruitingTemplateSubject(): string
@@ -2739,42 +2729,63 @@ trait InteractsWithCoachDatabase
         return 'Quick intro, profile, and recruiting links from {{AthleteName}}.';
     }
 
+    protected function isDefaultRecruitingTemplateArray(array $template): bool
+    {
+        return (bool) ($template['is_default'] ?? false)
+            || trim((string) ($template['name'] ?? '')) === $this->defaultRecruitingTemplateName()
+            || ((bool) ($template['is_locked'] ?? false) && (bool) ($template['is_sample'] ?? false));
+    }
+
     protected function defaultRecruitingTemplateBodyHtml(): string
     {
         return <<<'HTML'
-    <p>Hi {{CoachFirstName}},</p>
+<p>Hi {{CoachFirstName}},</p>
 
-    <p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
+<p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
 
-    <p>I would love for your staff to review my player profile, highlights, and recruiting information.</p>
+<p>I would love for your staff to review my player profile, highlights, and recruiting information.</p>
 
-    <p>
-        <a href="{{ProfileLink}}" style="display:inline-block;background:#101010;color:#ffffff;text-decoration:none;border-radius:4px;padding:10px 16px;font-weight:700;">
-            View My Player Profile
-        </a>
-    </p>
+<p>
+    <a href="{{ProfileLink}}" style="display:inline-block;background:#101010;color:#ffffff;text-decoration:none;border-radius:4px;padding:10px 16px;font-weight:700;">
+        View My Player Profile
+    </a>
+</p>
 
-    <p>You can also follow my recruiting updates here:</p>
+<p>You can also follow my recruiting updates here:</p>
 
-    <p>
-        <a href="{{InstagramLink}}">Instagram</a>
-        |
-        <a href="{{XLink}}">X / Twitter</a>
-        |
-        <a href="{{YouTubeLink}}">YouTube</a>
-    </p>
+<p>
+    <a href="{{InstagramLink}}">Instagram</a>
+    |
+    <a href="{{XLink}}">X / Twitter</a>
+    |
+    <a href="{{YouTubeLink}}">YouTube</a>
+</p>
 
-    <p>Thank you for your time. I appreciate the opportunity to introduce myself and would be excited to learn more about your program.</p>
+<p>Thank you for your time. I appreciate the opportunity to introduce myself and would be excited to learn more about your program.</p>
 
-    <p>Best,<br>{{AthleteName}}</p>
-    HTML;
+<p>Best,<br>{{AthleteName}}</p>
+HTML;
     }
 
-    protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $template): array
+    protected function defaultRecruitingTemplateEditorHtml(): string
+    {
+        // Editor templates should show only the editable email body.
+        // The PLYRCARD signature/footer is intentionally hidden in both
+        // Template Editor and Compose Email.
+        return trim($this->defaultRecruitingTemplateBodyHtml());
+    }
+
+    protected function blankTemplateEditorHtml(): string
+    {
+        // New templates start completely blank. Do not preload the footer/signature.
+        return '<p><br></p>';
+    }
+
+protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $template): array
     {
         $id = 'local-template-'.$template->getKey();
 
-        $isDefault = $this->isDefaultRecruitingTemplateName($template->name)
+        $isDefault = trim((string) $template->name) === $this->defaultRecruitingTemplateName()
             || ((bool) $template->is_locked && is_null($template->user_id));
 
         $subject = $isDefault
@@ -2786,13 +2797,13 @@ trait InteractsWithCoachDatabase
             : (string) ($template->preview_text ?? '');
 
         $bodyHtml = $isDefault
-            ? $this->canonicalizeTemplateEditorHtml($this->defaultRecruitingTemplateBodyHtml())
+            ? $this->defaultRecruitingTemplateEditorHtml()
             : (string) $template->body_html;
 
         return [
             'id' => $id,
             'local_id' => $template->getKey(),
-            'name' => $template->name,
+            'name' => $isDefault ? $this->defaultRecruitingTemplateName() : $template->name,
             'subjectLine' => $subject,
             'subject' => $subject,
             'previewText' => $previewText,
@@ -2802,7 +2813,7 @@ trait InteractsWithCoachDatabase
             'graphicUrl' => $template->graphic_url,
             'graphic_url' => $template->graphic_url,
             'attachments' => is_array($template->attachments) ? $template->attachments : [],
-            'source_type' => $template->is_sample ? 'local_sample' : 'local',
+            'source_type' => $isDefault ? 'local_default' : ($template->is_sample ? 'local_sample' : 'local'),
             'is_sample' => (bool) $template->is_sample,
             'is_locked' => (bool) $template->is_locked,
             'is_default' => $isDefault,
@@ -2816,6 +2827,7 @@ trait InteractsWithCoachDatabase
             ],
         ];
     }
+
 
     protected function localTemplateIdToDatabaseId(string $templateId): ?int
     {
@@ -3688,8 +3700,12 @@ trait InteractsWithCoachDatabase
                 'text' => $this->trackedPlainTextFromHtml($trackedBody),
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
-                'cc' => trim($this->campaignCc),
-                'bcc' => trim($this->campaignBcc),
+                'cc' => $this->normalizeRecruitingEmailCsv($this->campaignCc),
+                'bcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
+                'cc_emails' => $this->normalizeRecruitingEmailList($this->campaignCc),
+                'bcc_emails' => $this->normalizeRecruitingEmailList($this->campaignBcc),
+                'emailCc' => $this->normalizeRecruitingEmailList($this->campaignCc),
+                'emailBcc' => $this->normalizeRecruitingEmailList($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
                 'tracking_context' => $trackingContext,
                 'tracking_source' => 'compose_email',
@@ -3775,7 +3791,7 @@ trait InteractsWithCoachDatabase
     }
 
 
-    public function loadTemplateDetail(string $templateId): ?array
+public function loadTemplateDetail(string $templateId): ?array
     {
         $templateId = trim($templateId);
 
@@ -3790,11 +3806,11 @@ trait InteractsWithCoachDatabase
         }
 
         $row = $this->localEmailTemplateToArray($template);
-
         $this->templateDetails[(string) $row['id']] = $row;
 
         return $row;
     }
+
 
     public function insertTemplateVariable(string $token, string $field = 'body'): void
     {
@@ -3980,10 +3996,9 @@ trait InteractsWithCoachDatabase
      * automatically use the newest cross-domain tracking format without being recreated.
      */
     /**
-     * Rebuilds template/compose HTML from scratch around one canonical signature.
-     * This is the actual signature pipeline: old footer blocks are removed first,
-     * then exactly one current footer is appended. No previous social logo/footer
-     * markup is trusted or kept.
+     * Normalize template/compose editor HTML without showing the PLYRCARD
+     * signature/footer. The footer may still be handled by the send pipeline,
+     * but it should not appear while editing templates or composing emails.
      */
     protected function canonicalizeTemplateEditorHtml(string $html): string
     {
@@ -3997,10 +4012,10 @@ trait InteractsWithCoachDatabase
         $html = trim($html);
 
         if ($html === '') {
-            return $this->dedupePlyrcardSocialIconAnchors($this->plyrcardEmailSignatureHtml());
+            return '<p><br></p>';
         }
 
-        return $this->dedupePlyrcardSocialIconAnchors($html . "\n" . $this->plyrcardEmailSignatureHtml());
+        return $this->dedupePlyrcardSocialIconAnchors($html);
     }
 
     protected function normalizeTemplateLinksForCurrentTracking(string $html): string
@@ -4126,9 +4141,34 @@ HTML;
         return $hasContactLine && $hasSocials;
     }
 
+    /**
+     * Build the final send-time body.
+     *
+     * The editor/canonicalizer intentionally strips the PLYRCARD signature so it
+     * does not appear while creating templates or composing emails. Before the
+     * message is personalized, rewritten for tracking, and sent, append exactly
+     * one canonical signature/footer here.
+     */
     protected function ensurePlyrcardEmailSignature(string $html): string
     {
-        return $this->canonicalizeTemplateEditorHtml($html);
+        $html = trim($html);
+
+        $html = $this->repairBrokenTemplateLinkFragments($html);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($html);
+        $html = $this->stripPlyrcardEmailSignatures($html);
+        $html = $this->stripLoosePlyrcardSocialFooter($html);
+        $html = $this->stripAllPlyrcardSocialAnchors($html);
+        $html = trim($html);
+
+        if ($html === '' || $html === '<p><br></p>') {
+            return $this->plyrcardEmailSignatureHtml();
+        }
+
+        return $this->dedupePlyrcardSocialIconAnchors(
+            $html."
+
+".$this->plyrcardEmailSignatureHtml()
+        );
     }
 
     protected function stripPlyrcardEmailSignatures(string $html): string
@@ -4711,8 +4751,12 @@ HTML;
         return is_string($templateId) && str_starts_with($templateId, 'plyrcard-');
     }
 
-    protected function templateHtmlForNativeEditor(array $template): string
+protected function templateHtmlForNativeEditor(array $template): string
     {
+        if ($this->isDefaultRecruitingTemplateArray($template)) {
+            return $this->defaultRecruitingTemplateEditorHtml();
+        }
+
         $html = $this->templateHtml($template);
 
         if ($html === '') {
@@ -4720,7 +4764,8 @@ HTML;
         }
 
         return $this->normalizeHtmlForNativeEditor($html);
-    }   
+    }
+   
 
     protected function normalizeHtmlForNativeEditor(string $html): string
     {
@@ -8029,7 +8074,7 @@ HTML;
         $this->startDeferredUiSync('template-detail', $templateId);
     }
 
-    public function newTemplate(): void
+public function newTemplate(): void
     {
         $this->templateEditorOpen = true;
         $this->selectedTemplateId = null;
@@ -8037,17 +8082,16 @@ HTML;
         $this->campaignTemplateId = null;
         $this->templateIsNew = true;
         $this->templateName = 'New Recruiting Email';
-        $this->templateSubject = '{{AthleteName}} - {{Position}} interested in {{SchoolName}}';
-        $this->templatePreviewText = 'Quick intro, profile, and recruiting links from {{AthleteName}}.';
+        $this->templateSubject = '';
+        $this->templatePreviewText = '';
         $this->templateGraphicUrl = '';
         $this->templateGraphicUpload = null;
         $this->templateInlineImageUpload = null;
         $this->templateAttachmentUploads = [];
         $this->templateAttachments = [];
 
-        $this->templateBody = $this->canonicalizeTemplateEditorHtml(
-            $this->defaultRecruitingTemplateBodyHtml()
-        );
+        // New templates start blank. Do not preload the footer/signature.
+        $this->templateBody = $this->blankTemplateEditorHtml();
 
         $this->templateEditorRefreshKey++;
 
@@ -8058,18 +8102,22 @@ HTML;
         );
     }
 
-    protected function ensureComposeBodyHasFooter(): void
+
+protected function ensureComposeBodyHasFooter(): void
     {
+        // Kept for compatibility with existing mount calls, but it no longer
+        // appends or displays the footer/signature in Compose Email.
         if (trim($this->campaignBody) === '') {
-            $this->campaignBody = $this->canonicalizeTemplateEditorHtml(
-                $this->defaultRecruitingTemplateBodyHtml()
-            );
+            $this->campaignBody = $this->blankTemplateEditorHtml();
         } else {
             $this->campaignBody = $this->canonicalizeTemplateEditorHtml($this->campaignBody);
         }
 
+        $this->emailBody = $this->campaignBody;
+
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
     }
+
 
     public function openComposeCoachChooser(): void
     {
@@ -8093,6 +8141,11 @@ HTML;
 
     public function openComposePreview(): void
     {
+        $this->campaignSubject = trim($this->campaignSubject);
+        $this->campaignPreviewText = trim($this->campaignPreviewText);
+        $this->campaignBody = trim($this->campaignBody);
+        $this->emailSubject = $this->campaignSubject;
+        $this->emailBody = $this->campaignBody;
         $this->showComposePreview = true;
     }
 
@@ -8122,6 +8175,69 @@ HTML;
         $this->templateAttachments = array_values($this->templateAttachments);
     }
 
+
+    protected function normalizeRecruitingEmailList(string|array|null $value): array
+    {
+        $items = is_array($value) ? $value : preg_split('/[,;\s]+/', (string) $value);
+
+        return collect($items ?: [])
+            ->map(fn ($item): string => strtolower(trim((string) $item)))
+            ->filter(fn (string $email): bool => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function normalizeRecruitingEmailCsv(string|array|null $value): string
+    {
+        return implode(',', $this->normalizeRecruitingEmailList($value));
+    }
+
+    protected function composeTemplateNameFromSubject(string $subject): string
+    {
+        $name = trim(strip_tags($subject));
+        $name = preg_replace('/\s+/', ' ', $name) ?: '';
+
+        if ($name === '') {
+            return 'Compose Email Template';
+        }
+
+        return Str::limit($name, 70, '');
+    }
+
+    public function saveComposeAsTemplate(): void
+    {
+        $this->templateEditorOpen = false;
+        $this->templateIsNew = true;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+
+        $this->templateName = trim($this->campaignName) !== ''
+            ? trim($this->campaignName)
+            : $this->composeTemplateNameFromSubject($this->campaignSubject);
+
+        $this->templateSubject = trim($this->campaignSubject);
+        $this->templatePreviewText = trim($this->campaignPreviewText);
+        $this->templateBody = trim($this->campaignBody);
+        $this->templateGraphicUrl = trim($this->composeGraphicUrl);
+        $this->templateAttachments = $this->composeAttachments;
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+
+        if ($this->templateSubject === '' || $this->templateBody === '') {
+            Notification::make()
+                ->title('Templates')
+                ->body('Add a subject and message before saving as a template.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->saveTemplate();
+    }
+
     public function saveTemplate(): void
 {
     $user = Auth::user();
@@ -8138,6 +8254,20 @@ HTML;
             ->send();
 
         return;
+    }
+
+    if ($this->section === 'compose' && ! $this->templateEditorOpen) {
+        $this->templateName = trim($this->templateName) !== ''
+            ? trim($this->templateName)
+            : $this->composeTemplateNameFromSubject($this->campaignSubject);
+        $this->templateSubject = trim($this->campaignSubject);
+        $this->templatePreviewText = trim($this->campaignPreviewText);
+        $this->templateBody = trim($this->campaignBody);
+        $this->templateGraphicUrl = trim($this->composeGraphicUrl);
+        $this->templateAttachments = $this->composeAttachments;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->templateIsNew = true;
     }
 
     $name = trim($this->templateName);
@@ -8431,8 +8561,12 @@ HTML;
                 'text' => $this->trackedPlainTextFromHtml($trackedBody),
                 'to' => (string) ($coach['email'] ?? ''),
                 'emailTo' => (string) ($coach['email'] ?? ''),
-                'cc' => trim($this->campaignCc),
-                'bcc' => trim($this->campaignBcc),
+                'cc' => $this->normalizeRecruitingEmailCsv($this->campaignCc),
+                'bcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
+                'cc_emails' => $this->normalizeRecruitingEmailList($this->campaignCc),
+                'bcc_emails' => $this->normalizeRecruitingEmailList($this->campaignBcc),
+                'emailCc' => $this->normalizeRecruitingEmailList($this->campaignCc),
+                'emailBcc' => $this->normalizeRecruitingEmailList($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
                 'tracking_context' => $trackingContext,
                 'tracking_source' => 'compose_email',
@@ -8720,7 +8854,7 @@ HTML;
         $this->useTemplateForCompose($templateId);
     }
 
-    public function useTemplateForCompose(string $templateId): void
+protected function applyTemplateToCompose(string $templateId, bool $notify = true): void
     {
         $templateId = trim($templateId);
 
@@ -8734,31 +8868,46 @@ HTML;
             ?: collect($this->templates)->firstWhere('id', $templateId);
 
         if (! is_array($template)) {
-            Notification::make()
-                ->title('Compose Email')
-                ->body('Template could not be opened.')
-                ->danger()
-                ->send();
+            if ($notify) {
+                Notification::make()
+                    ->title('Compose Email')
+                    ->body('Template could not be opened.')
+                    ->danger()
+                    ->send();
+            }
 
             return;
         }
+
+        $subject = $this->templateSubject($template);
+        $previewText = $this->templatePreviewText($template);
+        $body = $this->templateHtmlForNativeEditor($template);
+
+        if (trim($body) === '') {
+            $body = $this->blankTemplateEditorHtml();
+        }
+
+        $attachments = is_array($template['attachments'] ?? null)
+            ? $template['attachments']
+            : $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
 
         $this->campaignTemplateId = (string) ($template['id'] ?? $templateId);
         $this->selectedTemplateId = (string) ($template['id'] ?? $templateId);
         $this->previewTemplateId = (string) ($template['id'] ?? $templateId);
 
         $this->campaignName = trim((string) ($template['name'] ?? 'Recruiting Email')) ?: 'Recruiting Email';
-        $this->campaignSubject = $this->templateSubject($template);
-        $this->campaignPreviewText = $this->templatePreviewText($template);
+        $this->campaignSubject = $subject;
+        $this->campaignPreviewText = $previewText;
+        $this->campaignBody = $body;
+        $this->campaignOriginalHtml = $body;
+
+        // Keep the legacy/simple compose fields in sync. Some parts of the page
+        // still bind/read these names instead of campaignSubject/campaignBody.
+        $this->emailSubject = $subject;
+        $this->emailBody = $body;
+
         $this->composeGraphicUrl = (string) ($template['graphicUrl'] ?? $template['graphic_url'] ?? '');
-
-        $this->composeAttachments = is_array($template['attachments'] ?? null)
-            ? $template['attachments']
-            : $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
-
-        $this->campaignBody = $this->canonicalizeTemplateEditorHtml(
-            $this->templateHtmlForNativeEditor($template)
-        );
+        $this->composeAttachments = $attachments;
 
         $this->section = 'compose';
         $this->activeSubpage = 'compose-email';
@@ -8770,12 +8919,36 @@ HTML;
 
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
 
-        Notification::make()
-            ->title('Compose Email')
-            ->body('Template loaded in Compose Email.')
-            ->success()
-            ->send();
+        if ($notify) {
+            Notification::make()
+                ->title('Compose Email')
+                ->body('Template loaded in Compose Email.')
+                ->success()
+                ->send();
+        }
     }
+
+    public function useTemplateForCompose(string $templateId): void
+    {
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return;
+        }
+
+        // From the Templates/Campaigns page this component cannot carry large editor
+        // state into the separate Compose page route. Redirect with a small template id,
+        // then mount() applies the template immediately on the Compose page.
+        if ($this->section !== 'compose') {
+            $url = $this->pageUrl('compose');
+            $separator = str_contains($url, '?') ? '&' : '?';
+            $this->redirect($url . $separator . 'template=' . urlencode($templateId));
+            return;
+        }
+
+        $this->applyTemplateToCompose($templateId);
+    }
+
 
     public function getPreviewTemplateSubjectProperty(): string
     {

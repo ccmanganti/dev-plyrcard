@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root" wire:init="bootDeferredUiData">
+    <div class="rc-livewire-root">
         @include('filament.partials.coach-database-ui-shell')
 
     <script>
@@ -10778,14 +10778,14 @@
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openComposePreview">
+                        <button class="rc-btn" type="button" x-data x-on:click.prevent="window.dispatchEvent(new CustomEvent('plyr-native-editor-sync')); setTimeout(() => $wire.openComposePreview(), 80)">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
-                        <button class="rc-btn" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
+                        <button class="rc-btn" type="button" x-data x-on:click.prevent="window.dispatchEvent(new CustomEvent('plyr-native-editor-sync')); setTimeout(() => $wire.saveComposeAsTemplate(), 80)" wire:loading.attr="disabled" wire:target="saveComposeAsTemplate">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-                            <span wire:loading.remove wire:target="saveTemplate">Save as Template</span>
-                            <span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                            <span wire:loading.remove wire:target="saveComposeAsTemplate">Save as Template</span>
+                            <span wire:loading.flex wire:target="saveComposeAsTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
                         </button>
                         <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
@@ -10835,8 +10835,8 @@
 
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
-                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
-                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.300ms="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.300ms="campaignBcc" />
                                     </div>
                                 @endif
 
@@ -11104,7 +11104,7 @@
                         </div>
                     </div>
 
-                    <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate,deleteTemplateById,useTemplateForCompose">
+                    <div class="rc-template-grid-v50">
                         @forelse($templateRows as $template)
                             @php
                                 $templateId = (string) ($template['id'] ?? '');
@@ -11138,11 +11138,11 @@
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
-                                        <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                        Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
-                                    </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
+                                    <a class="rc-template-use-v52" href="{{ url('/admin/coach-database/compose-email') }}?template={{ urlencode($templateId) }}" style="text-decoration:none;">
+                                        <span style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                        Use Template</span>
+                                    </a>
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -11574,6 +11574,25 @@
 
     <script>
 
+        window.socialIcon = window.socialIcon || function (platform) {
+            const raw = typeof platform === 'object' && platform !== null ? (platform.platform || platform.token || platform.label || '') : platform;
+            const key = String(raw || '').toLowerCase().trim();
+
+            if (key === 'instagram' || key === 'instagramlink') {
+                return 'https://img.icons8.com/color/48/instagram-new--v1.png';
+            }
+
+            if (key === 'x' || key === 'twitter' || key === 'xlink' || key === 'twitterlink') {
+                return 'https://img.icons8.com/ios-filled/50/twitterx--v1.png';
+            }
+
+            if (key === 'youtube' || key === 'yt' || key === 'youtubelink' || key === 'youtubelink') {
+                return 'https://img.icons8.com/color/48/youtube-play.png';
+            }
+
+            return '';
+        };
+
         window.plyrRepairBrokenEditorLinkFragments = function (html) {
             let source = String(html || '');
             if (!source) return '';
@@ -11589,8 +11608,7 @@
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
-                const iconReplacement = socialIcon(item);
-                const replacement = iconReplacement || ('<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>');
+                const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
                     source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
@@ -11627,6 +11645,10 @@
                         const encoded = event.detail?.body || '';
                         const html = this.decodeInitialBody(encoded);
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
+                        this.syncNow();
+                    });
+                    window.addEventListener('plyr-native-editor-sync', () => {
+                        if (modelName !== 'campaignBody' || !this.$refs.editor) return;
                         this.syncNow();
                     });
                 },
