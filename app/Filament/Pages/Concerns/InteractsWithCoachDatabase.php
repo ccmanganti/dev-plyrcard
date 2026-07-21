@@ -185,6 +185,8 @@ trait InteractsWithCoachDatabase
     public ?string $activeUiOperation = null;
     public ?string $pendingTemplateAction = null;
     public ?string $pendingTemplateActionId = null;
+    public bool $showSaveTemplateNamePrompt = false;
+    public string $composeTemplateSaveName = '';
 
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
@@ -244,15 +246,20 @@ trait InteractsWithCoachDatabase
                 $this->selectComposeSchool($schoolId);
             }
 
+            $conversationId = trim((string) request()->query('conversation', ''));
+            if ($conversationId !== '') {
+                $this->prepareComposeFromConversation($conversationId);
+            }
+
             $coachId = trim((string) request()->query('coach', ''));
-            if ($coachId !== '') {
+            if ($coachId !== '' && $conversationId === '') {
                 $this->selectComposeCoach($coachId);
             }
 
             $templateId = trim((string) request()->query('template', ''));
             if ($templateId !== '') {
                 $this->applyTemplateToCompose($templateId, false);
-            } else {
+            } elseif ($conversationId === '') {
                 $this->ensureComposeBodyHasFooter();
             }
         }
@@ -2638,10 +2645,170 @@ trait InteractsWithCoachDatabase
         return 'recruiting:tag-sync-status:' . $user->id;
     }
 
+    protected function conversationInboxCacheKey(): string
+    {
+        $user = Auth::user();
+
+        return 'coach-database:ghl-inbox:' . ($user?->id ?? 'guest');
+    }
+
+    protected function cacheInboxConversations(array $rows): void
+    {
+        Cache::put($this->conversationInboxCacheKey(), [
+            'rows' => $rows,
+            'cached_at' => now()->toIso8601String(),
+        ], now()->addMinutes(10));
+
+        $user = Auth::user();
+        if ($user) {
+            Cache::put($this->deferredUiCacheKey('conversations'), [
+                'rows' => $rows,
+                'cached_at' => now()->toIso8601String(),
+            ], now()->addMinutes(10));
+        }
+    }
+
+    protected function hydrateCachedInboxConversations(): void
+    {
+        $cached = Cache::get($this->conversationInboxCacheKey(), []);
+
+        if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+            $cached = Cache::get($this->deferredUiCacheKey('conversations'), []);
+        }
+
+        if (is_array($cached) && is_array($cached['rows'] ?? null)) {
+            $this->conversations = collect($cached['rows'])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values()
+                ->all();
+        }
+    }
+
+    protected function enrichConversationRowsWithLocalDatabase(array $rows): array
+    {
+        $coachesById = collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null))
+            ->keyBy(fn (array $coach): string => (string) ($coach['id'] ?? ''));
+
+        $coachesByEmail = collect($this->allCoaches())
+            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
+
+        $schoolsByName = collect($this->allSchools())
+            ->filter(fn (array $school): bool => filled($school['name'] ?? null))
+            ->keyBy(fn (array $school): string => strtolower(trim((string) ($school['name'] ?? ''))));
+
+        return collect($rows)
+            ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
+            ->map(function (array $row) use ($coachesById, $coachesByEmail, $schoolsByName): array {
+                $contactId = trim((string) ($row['contact_id'] ?? $row['contactId'] ?? ''));
+                $email = strtolower(trim((string) ($row['email'] ?? $row['contact_email'] ?? '')));
+
+                $coach = $contactId !== '' ? $coachesById->get($contactId) : null;
+                if (! is_array($coach) && $email !== '') {
+                    $coach = $coachesByEmail->get($email);
+                }
+
+                if (is_array($coach)) {
+                    $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
+                    $school = $schoolName !== '' ? $schoolsByName->get(strtolower($schoolName)) : null;
+
+                    $row['contact_name'] = trim((string) ($row['contact_name'] ?? $row['name'] ?? '')) ?: (string) ($coach['name'] ?? 'Coach');
+                    $row['name'] = $row['contact_name'];
+                    $row['email'] = trim((string) ($row['email'] ?? '')) ?: (string) ($coach['email'] ?? '');
+                    $row['phone'] = trim((string) ($row['phone'] ?? '')) ?: (string) ($coach['phone'] ?? '');
+                    $row['title'] = trim((string) ($row['title'] ?? '')) ?: (string) ($coach['title'] ?? 'Coach');
+                    $row['school'] = $schoolName ?: (string) ($row['school'] ?? 'School');
+                    $row['company_name'] = trim((string) ($row['company_name'] ?? '')) ?: $row['school'];
+                    $row['conference'] = trim((string) ($row['conference'] ?? '')) ?: (string) ($coach['conference'] ?? $school['conference'] ?? '');
+                    $row['division'] = trim((string) ($row['division'] ?? '')) ?: (string) ($coach['division'] ?? $school['division'] ?? '');
+                    $row['city'] = trim((string) ($row['city'] ?? '')) ?: (string) ($coach['city'] ?? $school['city'] ?? '');
+                    $row['state'] = trim((string) ($row['state'] ?? '')) ?: (string) ($coach['state'] ?? $school['state'] ?? '');
+                    $row['school_logo_url'] = trim((string) ($row['school_logo_url'] ?? $row['logo_url'] ?? ''))
+                        ?: (string) ($coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? '');
+                    $row['logo_url'] = trim((string) ($row['logo_url'] ?? '')) ?: (string) ($row['school_logo_url'] ?? '');
+                    $row['local_coach'] = $coach;
+
+                    if (is_array($school)) {
+                        $row['local_school'] = $school;
+                        $row['business_id'] = $row['business_id'] ?? $school['business_id'] ?? $school['id'] ?? null;
+                    }
+                }
+
+                $row['last_message'] = trim(strip_tags((string) ($row['last_message'] ?? $row['snippet'] ?? '')));
+                $row['unread_count'] = (int) ($row['unread_count'] ?? 0);
+
+                return $row;
+            })
+            ->sortByDesc(function (array $row): int {
+                $value = $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null;
+
+                if (is_numeric($value)) {
+                    return (int) $value;
+                }
+
+                try {
+                    return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                } catch (\Throwable) {
+                    return 0;
+                }
+            })
+            ->values()
+            ->all();
+    }
+
     public function loadConversations(): void
     {
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            $this->isLoadingConversations = false;
+            return;
+        }
+
+        $this->hydrateCachedInboxConversations();
         $this->isLoadingConversations = true;
-        $this->startDeferredUiSync('conversations');
+
+        try {
+            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                'limit' => 100,
+                'status' => 'all',
+                'search' => trim($this->conversationSearch),
+                'fetch_all' => true,
+            ]);
+
+            if (! ($result['success'] ?? false)) {
+                Notification::make()
+                    ->title('Inbox')
+                    ->body((string) ($result['error'] ?? 'Unable to load conversations from HighLevel. Cached inbox was kept.'))
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $rows = $this->enrichConversationRowsWithLocalDatabase((array) ($result['conversations'] ?? []));
+            $this->conversations = $rows;
+            $this->cacheInboxConversations($rows);
+
+            if (! $this->selectedConversationId && ! empty($this->conversations)) {
+                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+                $this->loadConversationMessages();
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to load GHL conversations for inbox.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Inbox')
+                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversations from HighLevel.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isLoadingConversations = false;
+        }
     }
 
     /**
@@ -3011,61 +3178,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // Poll only local cache. When data becomes stale, launch a detached CLI
-        // refresh and return immediately so no network request can hold the UI.
-        $conversationCache = Cache::get($this->deferredUiCacheKey('conversations'), []);
-        if (is_array($conversationCache['rows'] ?? null)) {
-            $this->conversations = collect($conversationCache['rows'])
-                ->filter(fn ($row): bool => is_array($row))
-                ->take((int) config('coach-database-sync.ui.conversation_row_cap', 25))
-                ->values()
-                ->all();
-        }
-
-        $conversationCachedAt = is_array($conversationCache) ? ($conversationCache['cached_at'] ?? null) : null;
-        $conversationIsStale = ! $conversationCachedAt;
-        if ($conversationCachedAt) {
-            try {
-                $conversationIsStale = \Illuminate\Support\Carbon::parse($conversationCachedAt)->lessThan(now()->subSeconds(60));
-            } catch (\Throwable) {
-                $conversationIsStale = true;
-            }
-        }
-
-        $user = Auth::user();
-        if ($conversationIsStale && $user
-            && ! Cache::has(CoachDatabaseUiSyncService::lockKey($user, 'conversations'))) {
-            $this->startDeferredUiSync('conversations');
-            $this->isLoadingConversations = true;
-        }
-
-        if ($this->selectedConversationId) {
-            $messageCache = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
-            if (is_array($messageCache['rows'] ?? null)) {
-                $this->messages = collect($messageCache['rows'])
-                    ->filter(fn ($row): bool => is_array($row))
-                    ->values()
-                    ->all();
-                $this->messageLastId = $messageCache['last_message_id'] ?? $this->messageLastId;
-                $this->hasMoreMessages = (bool) ($messageCache['has_more'] ?? $this->hasMoreMessages);
-            }
-
-            $messageCachedAt = is_array($messageCache) ? ($messageCache['cached_at'] ?? null) : null;
-            $messageIsStale = ! $messageCachedAt;
-            if ($messageCachedAt) {
-                try {
-                    $messageIsStale = \Illuminate\Support\Carbon::parse($messageCachedAt)->lessThan(now()->subSeconds(30));
-                } catch (\Throwable) {
-                    $messageIsStale = true;
-                }
-            }
-
-            if ($messageIsStale && $user
-                && ! Cache::has(CoachDatabaseUiSyncService::lockKey($user, 'messages', $this->selectedConversationId))) {
-                $this->startDeferredUiSync('messages', $this->selectedConversationId);
-                $this->isLoadingConversationMessages = true;
-            }
-        }
+        $this->hydrateCachedInboxConversations();
     }
 
 
@@ -3419,33 +3532,245 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     public function openSelectedConversationInComposer(): void
     {
         $conversation = $this->selectedConversationRow();
+
+        if (! is_array($conversation)) {
+            Notification::make()
+                ->title('Inbox')
+                ->body('Choose a conversation before opening Compose Email.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $conversationId = trim((string) ($conversation['id'] ?? $this->selectedConversationId ?? ''));
+
+        if ($conversationId === '') {
+            Notification::make()
+                ->title('Inbox')
+                ->body('This conversation could not be opened in Compose Email.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $this->redirect($this->pageUrl('compose') . '?conversation=' . urlencode($conversationId), navigate: true);
+    }
+
+    protected function prepareComposeFromConversation(string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+
+        if ($conversationId === '') {
+            return;
+        }
+
+        if (empty($this->conversations)) {
+            $this->hydrateCachedInboxConversations();
+        }
+
+        $conversation = collect($this->conversations ?? [])
+            ->firstWhere('id', $conversationId);
+
+        if (! is_array($conversation)) {
+            $this->selectedConversationId = $conversationId;
+            $this->loadConversations();
+            $conversation = collect($this->conversations ?? [])->firstWhere('id', $conversationId);
+        }
+
+        if (! is_array($conversation)) {
+            return;
+        }
+
+        $this->selectedConversationId = $conversationId;
+        $this->selectedCoachId = null;
+
         $coach = $this->selectedConversationCoachRow();
         $contactId = trim((string) ($coach['id'] ?? $conversation['contact_id'] ?? $conversation['contactId'] ?? ''));
 
         if ($contactId !== '') {
-            $this->selectedCoachId = $contactId;
+            $this->selectComposeCoach($contactId);
         }
 
-        $coachName = (string) ($coach['name'] ?? $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach');
+        if (empty($this->messages)) {
+            $this->messageLastId = null;
+            $this->hasMoreMessages = false;
+            $this->loadConversationMessages();
+        }
+
+        $coachName = trim((string) ($coach['name'] ?? $conversation['contact_name'] ?? $conversation['name'] ?? 'Coach')) ?: 'Coach';
         $first = trim(explode(' ', $coachName)[0] ?? 'Coach') ?: 'Coach';
-        $this->emailSubject = $this->emailSubject ?: 'Re: ' . trim((string) ($conversation['subject'] ?? 'Coach conversation'));
-        $this->emailBody = '<p>Hi ' . e($first) . ',</p><p><br></p>';
-        $this->section = 'compose';
-        $this->activeSubpage = 'compose-email';
+        $subjectBase = trim((string) ($conversation['subject'] ?? $conversation['last_subject'] ?? ''));
+        $subjectBase = $subjectBase !== '' ? $subjectBase : $coachName;
+
+        if (! str_starts_with(strtolower($subjectBase), 're:')) {
+            $subjectBase = 'Re: ' . $subjectBase;
+        }
+
+        $historyHtml = $this->composeConversationHistoryHtml(2);
+        $body = '<p>Hi ' . e($first) . ',</p><p><br></p>';
+
+        if ($historyHtml !== '') {
+            $body .= $historyHtml;
+        }
+
+        $this->campaignSubject = $subjectBase;
+        $this->emailSubject = $subjectBase;
+        $this->campaignBody = $body;
+        $this->emailBody = $body;
+        $this->campaignPreviewText = trim((string) ($conversation['last_message'] ?? $conversation['snippet'] ?? ''));
+        $this->campaignTargetMode = $contactId !== '' ? 'coaches' : $this->campaignTargetMode;
+        $this->campaignTemplateId = null;
+        $this->selectedTemplateId = null;
+
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+    }
+
+    protected function composeConversationHistoryHtml(int $limit = 2): string
+    {
+        $rows = collect($this->messages ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->sortBy(function (array $row): int {
+                $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+
+                if (is_numeric($value)) {
+                    $number = (int) $value;
+                    return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                }
+
+                try {
+                    return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                } catch (\Throwable) {
+                    return 0;
+                }
+            })
+            ->take(-1 * max(1, $limit))
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return '';
+        }
+
+        $conversation = $this->selectedConversationRow() ?? [];
+        $coachName = trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? 'Coach')) ?: 'Coach';
+
+        $items = $rows->map(function (array $row) use ($coachName): string {
+            $direction = strtolower((string) ($row['direction'] ?? $row['type'] ?? $row['message_direction'] ?? ''));
+            $isOutbound = str_contains($direction, 'out');
+            $author = $isOutbound ? 'You' : $coachName;
+            $date = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+
+            try {
+                $dateLabel = $date ? \Illuminate\Support\Carbon::parse($date)->format('M j, g:i A') : '';
+            } catch (\Throwable) {
+                $dateLabel = is_scalar($date) ? (string) $date : '';
+            }
+
+            $body = trim((string) ($row['body'] ?? $row['html'] ?? $row['text'] ?? $row['message'] ?? ''));
+            $body = $body !== '' ? $body : 'No message body available.';
+            $body = $this->compactComposeHistoryMessageHtml($body);
+
+            return '<div class="rc-compose-history-message" style="padding:.7rem .8rem;border-left:3px solid #ff6338;background:#f8fafc;border-radius:.65rem;margin:.55rem 0;">'
+                . '<div style="display:flex;justify-content:space-between;gap:.8rem;margin-bottom:.35rem;color:#64748b;font-size:12px;font-weight:700;">'
+                . '<span>' . e($author) . '</span><span>' . e($dateLabel) . '</span></div>'
+                . '<div style="color:#334155;font-size:13px;line-height:1.55;">' . $body . '</div>'
+                . '</div>';
+        })->implode('');
+
+        return '<div class="rc-compose-history" data-rc-compose-history="1" contenteditable="false" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #e5e7eb;">'
+            . '<div style="margin-bottom:.55rem;color:#64748b;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">Conversation history</div>'
+            . $items
+            . '</div>';
+    }
+
+    protected function compactComposeHistoryMessageHtml(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('/<\s*(script|style|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? $html;
+
+        if (! preg_match('/<\s*(p|div|br|span|a|strong|em|ul|ol|li|blockquote)\b/i', $html)) {
+            $html = e($html);
+            $html = preg_replace('/(https?:\/\/[^\s<>()\[\]]+)/i', '<a href="$1" target="_blank" rel="noopener noreferrer">Open link</a>', $html) ?? $html;
+            return nl2br($html);
+        }
+
+        $html = preg_replace_callback('/<a\b([^>]*)>(.*?)<\/a>/is', function (array $matches): string {
+            $attributes = $matches[1] ?? '';
+            $label = trim(strip_tags($matches[2] ?? ''));
+            $href = '';
+
+            if (preg_match('/href\s*=\s*(["\'])(.*?)\1/i', $attributes, $hrefMatch)) {
+                $href = html_entity_decode((string) ($hrefMatch[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $display = $label !== '' ? $label : 'Open link';
+            $looksRawUrl = preg_match('/^https?:\/\//i', $display) === 1 || mb_strlen($display) > 70;
+
+            if ($looksRawUrl) {
+                if (str_contains($href, '/track/profile/')) {
+                    $display = 'View My Player Profile';
+                } elseif (str_contains($href, '/track/click/')) {
+                    $display = 'Open tracked link';
+                } else {
+                    $display = 'Open link';
+                }
+            }
+
+            $safeHref = e($href !== '' ? $href : '#');
+
+            return '<a href="' . $safeHref . '" target="_blank" rel="noopener noreferrer">' . e($display) . '</a>';
+        }, $html) ?? $html;
+
+        return $html;
     }
 
     public function starSelectedConversation(): void
     {
+        $conversation = $this->selectedConversationRow();
         $coach = $this->selectedConversationCoachRow();
-        $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? $coach['email'] ?? ''));
+        $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? $conversation['contact_id'] ?? $conversation['contactId'] ?? $coach['email'] ?? $conversation['email'] ?? ''));
 
         if ($contactId === '') {
             Notification::make()->title('Recruiting Center')->body('No matched coach contact found to star.')->warning()->send();
             return;
         }
 
-        $this->favoriteCoach($contactId);
-        Notification::make()->title('Recruiting Center')->body('Coach starred.')->success()->send();
+        $currentlyStarred = (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false);
+
+        if ($currentlyStarred) {
+            $this->unfavoriteCoach($contactId);
+        } else {
+            $this->favoriteCoach($contactId);
+        }
+
+        $this->conversations = collect($this->conversations ?? [])
+            ->map(function ($row) use ($conversation, $currentlyStarred) {
+                if (! is_array($row)) {
+                    return $row;
+                }
+
+                if ((string) ($row['id'] ?? '') === (string) ($conversation['id'] ?? '')) {
+                    $row['starred'] = ! $currentlyStarred;
+                    $row['is_starred'] = ! $currentlyStarred;
+                }
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        $this->cacheInboxConversations($this->conversations);
+
+        Notification::make()
+            ->title('Recruiting Center')
+            ->body($currentlyStarred ? 'Coach removed from Starred.' : 'Coach starred.')
+            ->success()
+            ->send();
     }
 
     public function scheduleSelectedConversation(): void
@@ -3515,29 +3840,94 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->selectedConversationId = $conversationId;
         $this->messageLastId = null;
         $this->hasMoreMessages = false;
+        $this->messages = [];
 
-        $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
-        $this->messages = is_array($cached['rows'] ?? null)
-            ? collect($cached['rows'])->filter(fn ($row): bool => is_array($row))->values()->all()
-            : [];
-        $this->messageLastId = $cached['last_message_id'] ?? null;
-        $this->hasMoreMessages = (bool) ($cached['has_more'] ?? false);
-        $this->isLoadingConversationMessages = true;
-
-        // The conversation pane is now rendered immediately. JavaScript starts
-        // the slower message request after the DOM morph completes.
-        $this->dispatch('rc-load-conversation-messages');
+        $this->loadConversationMessages();
     }
 
     public function loadConversationMessages(): void
     {
-        if (! $this->selectedConversationId) {
+        $user = Auth::user();
+
+        if (! $user || ! $this->selectedConversationId) {
             $this->isLoadingConversationMessages = false;
             return;
         }
 
         $this->isLoadingConversationMessages = true;
-        $this->startDeferredUiSync('messages', $this->selectedConversationId);
+
+        try {
+            $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
+                $user,
+                (string) $this->selectedConversationId,
+                $this->messageLastId,
+                100
+            );
+
+            if (! ($result['success'] ?? false)) {
+                Notification::make()
+                    ->title('Inbox')
+                    ->body((string) ($result['error'] ?? 'Unable to load conversation messages from HighLevel.'))
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $rows = collect($result['messages'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->sortBy(function (array $row): int {
+                    $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+
+                    if (is_numeric($value)) {
+                        $number = (int) $value;
+                        return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                    }
+
+                    try {
+                        return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                })
+                ->values()
+                ->all();
+
+            if ($this->messageLastId) {
+                $this->messages = collect($this->messages)
+                    ->merge($rows)
+                    ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                    ->values()
+                    ->all();
+            } else {
+                $this->messages = $rows;
+            }
+
+            $this->messageLastId = $result['last_message_id'] ?? $this->messageLastId;
+            $this->hasMoreMessages = (bool) ($result['has_more'] ?? false);
+
+            Cache::put($this->deferredUiCacheKey('messages', $this->selectedConversationId), [
+                'rows' => $this->messages,
+                'last_message_id' => $this->messageLastId,
+                'has_more' => $this->hasMoreMessages,
+                'cached_at' => now()->toIso8601String(),
+            ], now()->addMinutes(10));
+
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to load GHL conversation messages for inbox.', [
+                'user_id' => $user->id,
+                'conversation_id' => $this->selectedConversationId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Inbox')
+                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversation messages from HighLevel.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isLoadingConversationMessages = false;
+        }
     }
 
     public function composeToCoach(string $contactId): void
@@ -3704,8 +4094,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'bcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
                 'cc_emails' => $this->normalizeRecruitingEmailList($this->campaignCc),
                 'bcc_emails' => $this->normalizeRecruitingEmailList($this->campaignBcc),
-                'emailCc' => $this->normalizeRecruitingEmailList($this->campaignCc),
-                'emailBcc' => $this->normalizeRecruitingEmailList($this->campaignBcc),
+                'emailCc' => $this->normalizeRecruitingEmailCsv($this->campaignCc),
+                'emailBcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
                 'tracking_context' => $trackingContext,
                 'tracking_source' => 'compose_email',
@@ -8116,6 +8506,7 @@ protected function ensureComposeBodyHasFooter(): void
         $this->emailBody = $this->campaignBody;
 
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        $this->dispatch('rc-compose-template-applied', body: base64_encode($this->campaignBody), subject: $subject, preview: $previewText);
     }
 
 
@@ -8205,6 +8596,25 @@ protected function ensureComposeBodyHasFooter(): void
         return Str::limit($name, 70, '');
     }
 
+    public function openSaveComposeTemplatePrompt(): void
+    {
+        $this->composeTemplateSaveName = trim($this->composeTemplateSaveName) !== ''
+            ? trim($this->composeTemplateSaveName)
+            : $this->composeTemplateNameFromSubject($this->campaignSubject);
+
+        $this->showSaveTemplateNamePrompt = true;
+    }
+
+    public function closeSaveComposeTemplatePrompt(): void
+    {
+        $this->showSaveTemplateNamePrompt = false;
+    }
+
+    public function confirmSaveComposeAsTemplate(): void
+    {
+        $this->saveComposeAsTemplate();
+    }
+
     public function saveComposeAsTemplate(): void
     {
         $this->templateEditorOpen = false;
@@ -8212,8 +8622,8 @@ protected function ensureComposeBodyHasFooter(): void
         $this->selectedTemplateId = null;
         $this->previewTemplateId = null;
 
-        $this->templateName = trim($this->campaignName) !== ''
-            ? trim($this->campaignName)
+        $this->templateName = trim($this->composeTemplateSaveName) !== ''
+            ? trim($this->composeTemplateSaveName)
             : $this->composeTemplateNameFromSubject($this->campaignSubject);
 
         $this->templateSubject = trim($this->campaignSubject);
@@ -8225,17 +8635,21 @@ protected function ensureComposeBodyHasFooter(): void
         $this->templateInlineImageUpload = null;
         $this->templateAttachmentUploads = [];
 
-        if ($this->templateSubject === '' || $this->templateBody === '') {
+        if ($this->templateName === '' || $this->templateSubject === '' || $this->templateBody === '') {
             Notification::make()
                 ->title('Templates')
-                ->body('Add a subject and message before saving as a template.')
+                ->body('Add a template name, subject, and message before saving.')
                 ->danger()
                 ->send();
 
+            $this->showSaveTemplateNamePrompt = true;
             return;
         }
 
         $this->saveTemplate();
+
+        $this->composeTemplateSaveName = '';
+        $this->showSaveTemplateNamePrompt = false;
     }
 
     public function saveTemplate(): void
@@ -8565,8 +8979,8 @@ protected function ensureComposeBodyHasFooter(): void
                 'bcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
                 'cc_emails' => $this->normalizeRecruitingEmailList($this->campaignCc),
                 'bcc_emails' => $this->normalizeRecruitingEmailList($this->campaignBcc),
-                'emailCc' => $this->normalizeRecruitingEmailList($this->campaignCc),
-                'emailBcc' => $this->normalizeRecruitingEmailList($this->campaignBcc),
+                'emailCc' => $this->normalizeRecruitingEmailCsv($this->campaignCc),
+                'emailBcc' => $this->normalizeRecruitingEmailCsv($this->campaignBcc),
                 'fromName' => (string) ($user->name ?? 'PLYRCard'),
                 'tracking_context' => $trackingContext,
                 'tracking_source' => 'compose_email',
@@ -9901,6 +10315,7 @@ HTML;
     {
         $schoolFilter = trim($this->conversationSchoolFilter);
         $statusFilter = strtolower(trim((string) ($this->conversationStatusFilter ?? 'all')));
+        $query = $this->normalizeSearchText($this->conversationSearch);
 
         $base = collect($this->conversations ?? []);
 
@@ -9914,36 +10329,32 @@ HTML;
             });
         }
 
-        if ($schoolFilter === '') {
-            return $base->values()->all();
+        if ($schoolFilter !== '') {
+            $base = $base->filter(function (array $conversation) use ($schoolFilter): bool {
+                return strcasecmp(trim((string) ($conversation['school'] ?? '')), $schoolFilter) === 0
+                    || strcasecmp(trim((string) ($conversation['company_name'] ?? '')), $schoolFilter) === 0;
+            });
         }
 
-        $coachesByEmail = collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
-            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
+        if ($query !== '') {
+            $base = $base->filter(function (array $conversation) use ($query): bool {
+                $haystack = $this->normalizeSearchText([
+                    $conversation['contact_name'] ?? '',
+                    $conversation['name'] ?? '',
+                    $conversation['email'] ?? '',
+                    $conversation['school'] ?? '',
+                    $conversation['company_name'] ?? '',
+                    $conversation['title'] ?? '',
+                    $conversation['conference'] ?? '',
+                    $conversation['division'] ?? '',
+                    $conversation['last_message'] ?? '',
+                ]);
 
-        $coachesById = collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null))
-            ->keyBy(fn (array $coach): string => (string) ($coach['id'] ?? ''));
+                return str_contains($haystack, $query);
+            });
+        }
 
-        return $base
-            ->filter(function (array $conversation) use ($schoolFilter, $coachesByEmail, $coachesById): bool {
-                $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
-                $contactId = (string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '');
-
-                $coach = $contactId !== '' ? $coachesById->get($contactId) : null;
-                if (! $coach && $email !== '') {
-                    $coach = $coachesByEmail->get($email);
-                }
-
-                $conversationSchool = trim((string) ($conversation['school'] ?? $conversation['company_name'] ?? ''));
-                $coachSchool = is_array($coach) ? trim((string) ($coach['school'] ?? '')) : '';
-
-                return strcasecmp($conversationSchool, $schoolFilter) === 0
-                    || strcasecmp($coachSchool, $schoolFilter) === 0;
-            })
-            ->values()
-            ->all();
+        return $base->values()->all();
     }
 
     public function getSelectedCoachProperty(): ?array

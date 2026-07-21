@@ -2953,9 +2953,14 @@ class GoHighLevelService
             return ['success' => false, 'conversations' => [], 'error' => 'Missing recruiting data connection.'];
         }
 
-        $params = array_filter([
+        $requestedLimit = (int) ($query['limit'] ?? 100);
+        $requestedLimit = min(max($requestedLimit, 1), 100);
+        $fetchAll = (bool) ($query['fetch_all'] ?? false);
+        $maxRows = (int) ($query['max_rows'] ?? 500);
+        $maxRows = min(max($maxRows, $requestedLimit), 1000);
+
+        $baseParams = array_filter([
             'locationId' => $locationId,
-            'limit' => $query['limit'] ?? 50,
             'contactId' => $query['contactId'] ?? null,
             'query' => $query['search'] ?? null,
             'status' => $query['status'] ?? 'all',
@@ -2963,34 +2968,106 @@ class GoHighLevelService
             'sort' => $query['sort'] ?? 'desc',
         ], fn ($value) => filled($value));
 
-        $response = Http::withHeaders(['Version' => config('ghl.conversations_search_version', '2023-02-21')])
-            ->timeout((int) config('ghl.timeout', 20))
-            ->withToken($token)
-            ->acceptJson()
-            ->get("{$this->baseUrl}/conversations/search", $params);
+        $versions = array_values(array_unique(array_filter([
+            trim((string) config('ghl.conversations_search_version', '2023-02-21')),
+            '2023-02-21',
+            'v3',
+        ])));
 
-        $data = $response->json() ?? [];
+        $lastError = null;
+        $lastStatus = null;
+        $lastRaw = null;
 
-        if ($response->failed()) {
-            Log::error('Recruiting conversations request failed.', ['status' => $response->status(), 'params' => $params, 'body' => $response->body()]);
-            return ['success' => false, 'conversations' => [], 'error' => 'Unable to load conversations.', 'status' => $response->status(), 'raw' => $data];
+        foreach ($versions as $version) {
+            $allItems = [];
+            $skip = 0;
+            $page = 0;
+            $pageSuccess = false;
+            $total = 0;
+
+            do {
+                $params = array_merge($baseParams, ['limit' => $requestedLimit]);
+
+                if ($skip > 0) {
+                    $params['skip'] = $skip;
+                }
+
+                $response = Http::withHeaders(['Version' => $version])
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get("{$this->baseUrl}/conversations/search", $params);
+
+                $data = $response->json() ?? [];
+                $lastRaw = $data;
+
+                if ($response->failed()) {
+                    $lastStatus = $response->status();
+                    $lastError = $response->body();
+
+                    Log::error('Recruiting conversations request failed.', [
+                        'status' => $response->status(),
+                        'version' => $version,
+                        'params' => $params,
+                        'body' => $response->body(),
+                    ]);
+
+                    break;
+                }
+
+                $pageSuccess = true;
+                $items = $this->extractConversationsFromResponse($data);
+
+                foreach ($items as $item) {
+                    if (is_array($item)) {
+                        $id = (string) ($item['id'] ?? $item['_id'] ?? $item['conversationId'] ?? md5(json_encode($item) ?: uniqid('', true)));
+                        $allItems[$id] = $item;
+                    }
+                }
+
+                $total = (int) ($data['total'] ?? $data['meta']['total'] ?? data_get($data, 'conversations.total') ?? 0);
+                $count = count($items);
+                $skip += $requestedLimit;
+                $page++;
+
+                $hasMore = $fetchAll
+                    && $count >= $requestedLimit
+                    && count($allItems) < $maxRows
+                    && ($total === 0 || count($allItems) < $total)
+                    && $page < 10;
+            } while ($hasMore);
+
+            if ($pageSuccess) {
+                $conversations = collect(array_values($allItems))
+                    ->filter(fn ($item) => is_array($item))
+                    ->map(fn (array $item): array => $this->transformConversation($item))
+                    ->filter(fn (array $item): bool => filled($item['id'] ?? null))
+                    ->values()
+                    ->all();
+
+                return [
+                    'success' => true,
+                    'conversations' => $conversations,
+                    'total' => $total ?: count($conversations),
+                    'error' => null,
+                ];
+            }
         }
 
-        $items = $this->extractConversationsFromResponse($data);
-
         return [
-            'success' => true,
-            'conversations' => collect($items)->filter(fn ($item) => is_array($item))->map(fn (array $item): array => $this->transformConversation($item))->filter(fn (array $item): bool => filled($item['id'] ?? null))->values()->all(),
-            'total' => $data['total'] ?? $data['meta']['total'] ?? null,
-            'error' => null,
+            'success' => false,
+            'conversations' => [],
+            'error' => 'Unable to load conversations.',
+            'status' => $lastStatus,
+            'raw' => $lastRaw,
+            'last_error' => $lastError,
         ];
     }
 
     public function getConversationMessagesForUser(User $user, string $conversationId, ?string $lastMessageId = null, int $limit = 50): array
     {
         $credentials = $this->credentialsForUser($user);
-        $locationId = $credentials['location_id'];
-        $token = $this->tokenForLocation($locationId, $credentials['token_override']);
+        $token = $this->tokenForLocation($credentials['location_id'], $credentials['token_override']);
 
         if (! $token || ! $conversationId) {
             return ['success' => false, 'messages' => [], 'error' => 'Missing conversation connection.'];
@@ -3001,29 +3078,57 @@ class GoHighLevelService
             $params['lastMessageId'] = $lastMessageId;
         }
 
-        $response = Http::withHeaders(['Version' => config('ghl.conversations_messages_version', '2021-04-15')])
-            ->timeout((int) config('ghl.timeout', 20))
-            ->withToken($token)
-            ->acceptJson()
-            ->get("{$this->baseUrl}/conversations/{$conversationId}/messages", $params);
+        $versions = array_values(array_unique(array_filter([
+            trim((string) config('ghl.conversations_messages_version', '2021-04-15')),
+            '2021-04-15',
+            '2023-02-21',
+            'v3',
+        ])));
 
-        $data = $response->json() ?? [];
+        $lastStatus = null;
+        $lastData = null;
 
-        if ($response->failed()) {
-            Log::error('Recruiting conversation messages request failed.', ['conversation_id' => $conversationId, 'status' => $response->status(), 'body' => $response->body()]);
-            return ['success' => false, 'messages' => [], 'error' => 'Unable to load messages.', 'status' => $response->status(), 'raw' => $data];
+        foreach ($versions as $version) {
+            $response = Http::withHeaders(['Version' => $version])
+                ->timeout((int) config('ghl.timeout', 20))
+                ->withToken($token)
+                ->acceptJson()
+                ->get("{$this->baseUrl}/conversations/{$conversationId}/messages", $params);
+
+            $data = $response->json() ?? [];
+            $lastData = $data;
+
+            if ($response->failed()) {
+                $lastStatus = $response->status();
+
+                Log::error('Recruiting conversation messages request failed.', [
+                    'conversation_id' => $conversationId,
+                    'version' => $version,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                continue;
+            }
+
+            $items = $this->extractConversationMessagesFromResponse($data);
+            $messages = collect($items)
+                ->filter(fn ($item) => is_array($item))
+                ->map(fn (array $item): array => $this->transformConversationMessage($item))
+                ->filter(fn (array $item): bool => filled($item['id'] ?? null))
+                ->values()
+                ->all();
+
+            return [
+                'success' => true,
+                'messages' => $messages,
+                'last_message_id' => collect($messages)->last()['id'] ?? $lastMessageId,
+                'has_more' => count($messages) >= $params['limit'],
+                'error' => null,
+            ];
         }
 
-        $items = $this->extractConversationMessagesFromResponse($data);
-        $messages = collect($items)->filter(fn ($item) => is_array($item))->map(fn (array $item): array => $this->transformConversationMessage($item))->filter(fn (array $item): bool => filled($item['id'] ?? null))->values()->all();
-
-        return [
-            'success' => true,
-            'messages' => $messages,
-            'last_message_id' => collect($messages)->last()['id'] ?? $lastMessageId,
-            'has_more' => count($messages) >= $params['limit'],
-            'error' => null,
-        ];
+        return ['success' => false, 'messages' => [], 'error' => 'Unable to load messages.', 'status' => $lastStatus, 'raw' => $lastData];
     }
 
     protected function trackedPlainTextFromHtml(string $html): string
@@ -4775,13 +4880,20 @@ class GoHighLevelService
             $item['html'] ?? null,
             $item['body'] ?? null,
             $item['emailMessage'] ?? null,
+            $item['messageBody'] ?? null,
+            $item['content'] ?? null,
+            $item['bodyText'] ?? null,
+            $item['text'] ?? null,
             data_get($item, 'email.html'),
             data_get($item, 'email.body'),
+            data_get($item, 'email.content'),
             data_get($item, 'message.html'),
             data_get($item, 'message.body'),
+            data_get($item, 'message.content'),
             $item['message'] ?? null,
-            $item['text'] ?? null,
             data_get($item, 'message.text'),
+            data_get($item, 'payload.body'),
+            data_get($item, 'payload.text'),
         ] as $candidate) {
             $value = $this->conversationHtmlValue($candidate);
             if (trim(strip_tags($value)) !== '' || str_contains(strtolower($value), '<img')) {
@@ -4866,9 +4978,14 @@ class GoHighLevelService
             $item['emailAttachments'] ?? null,
             $item['files'] ?? null,
             $item['media'] ?? null,
+            $item['fileAttachments'] ?? null,
+            $item['messageAttachments'] ?? null,
+            $item['images'] ?? null,
             data_get($item, 'email.attachments'),
             data_get($item, 'message.attachments'),
             data_get($item, 'body.attachments'),
+            data_get($item, 'payload.attachments'),
+            data_get($item, 'payload.files'),
         ];
 
         $attachments = [];
@@ -4889,7 +5006,7 @@ class GoHighLevelService
             return;
         }
 
-        $url = $this->conversationScalar($value['url'] ?? $value['link'] ?? $value['mediaUrl'] ?? $value['fileUrl'] ?? $value['downloadUrl'] ?? $value['thumbnailUrl'] ?? $value['src'] ?? '');
+        $url = $this->conversationScalar($value['url'] ?? $value['link'] ?? $value['mediaUrl'] ?? $value['mediaURL'] ?? $value['fileUrl'] ?? $value['fileURL'] ?? $value['downloadUrl'] ?? $value['downloadURL'] ?? $value['attachmentUrl'] ?? $value['attachmentURL'] ?? $value['thumbnailUrl'] ?? $value['thumbnailURL'] ?? $value['src'] ?? $value['href'] ?? '');
         if ($url !== '') {
             $attachments[] = [
                 'url' => $url,

@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root">
+    <div class="rc-livewire-root" wire:init="bootDeferredUiData">
         @include('filament.partials.coach-database-ui-shell')
 
     <script>
@@ -6884,6 +6884,27 @@
 
         .rc-discover-select-v27.is-updating { opacity:.72; cursor:progress; }
         .rc-discover-tab-v27 { transition: background-color .12s ease, color .12s ease, border-color .12s ease; }
+
+        /* v96 inbox message readability: no huge tracking URLs, no forced bottom scroll */
+        .rc-message-stream-v56 { scroll-behavior: auto !important; }
+        .rc-msg-bubble-v56 { overflow-wrap: break-word !important; word-break: normal !important; }
+        .rc-msg-bubble-v56 a { word-break: normal !important; overflow-wrap: break-word !important; }
+        .rc-msg-bubble-v56 .rc-message-link-short {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            border-radius: .45rem;
+            padding: .1rem .38rem;
+            background: rgba(37,99,235,.08);
+            color: #2563eb;
+            font-weight: 700;
+            text-decoration: none;
+            vertical-align: baseline;
+        }
+        .rc-msg-bubble-v56 .rc-message-link-short:hover { text-decoration: underline; }
+        .rc-msg-bubble-v56 .rc-message-image-link { display:block; max-width:100%; margin:.45rem 0; }
+        .rc-msg-bubble-v56 .rc-message-image-link img { max-width:min(100%, 24rem); height:auto; border-radius:.7rem; display:block; }
+
 </style>
 
     @php
@@ -10279,8 +10300,17 @@
                 'showNewEmail' => false,
             ])
 
+
+
+            <style>
+                .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
+                .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
+                @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
+                @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
+            </style>
+
             <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
-                Refreshing conversations while the current inbox stays available.
+                Loading conversations. Use the refresh button to update the inbox.
             </div>
 
             @php
@@ -10305,6 +10335,7 @@
                 $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
                 $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
+                $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = $conversationStatusFilter ?? 'all';
                 $threadInitials = function (string $name): string {
@@ -10348,9 +10379,140 @@
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
+                $renderInboxMessageBody = function ($body): string {
+                    $raw = trim((string) $body);
+
+                    if ($raw === '') {
+                        return '<p>No message body.</p>';
+                    }
+
+                    $decoded = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $hasHtml = preg_match('/<\s*(p|div|br|a|img|table|ul|ol|li|span|strong|em|blockquote|h[1-6])\b/i', $decoded);
+
+                    $shortUrlLabel = function (string $url): string {
+                        $path = parse_url($url, PHP_URL_PATH) ?: '';
+                        $host = parse_url($url, PHP_URL_HOST) ?: '';
+
+                        if (str_contains($path, '/track/profile/')) {
+                            return 'View My Player Profile';
+                        }
+
+                        if (str_contains($path, '/track/click/')) {
+                            return 'Open tracked link';
+                        }
+
+                        $label = trim($host . $path);
+                        $label = $label !== '' ? $label : $url;
+
+                        if (mb_strlen($label) > 58) {
+                            $label = mb_substr($label, 0, 32) . '...' . mb_substr($label, -16);
+                        }
+
+                        return $label;
+                    };
+
+                    $renderPlainWithLinks = function (string $text) use ($shortUrlLabel): string {
+                        $parts = preg_split('/(https?:\/\/[^\s<]+)/i', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+
+                        if (! is_array($parts) || $parts === []) {
+                            return nl2br(e($text));
+                        }
+
+                        $html = '';
+
+                        foreach ($parts as $part) {
+                            if (! preg_match('/^https?:\/\//i', $part)) {
+                                $html .= e($part);
+                                continue;
+                            }
+
+                            $url = rtrim($part, "\"'.,;:!?)]}");
+                            $suffix = substr($part, strlen($url));
+
+                            if (str_ends_with($html, '[') && str_starts_with($suffix, ']')) {
+                                $html = substr($html, 0, -1);
+                                $suffix = substr($suffix, 1);
+                            }
+
+                            $safeUrl = e($url);
+
+                            if (preg_match('/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i', $url)) {
+                                $html .= '<a class="rc-message-image-link" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'
+                                    . '<img src="'.$safeUrl.'" alt="Conversation image" loading="lazy" referrerpolicy="no-referrer">'
+                                    . '</a>';
+                            } else {
+                                $label = e($shortUrlLabel($url));
+                                $html .= '<a class="rc-message-link-short" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
+                            }
+
+                            if ($suffix !== '') {
+                                $html .= e($suffix);
+                            }
+                        }
+
+                        return nl2br($html);
+                    };
+
+                    if (! $hasHtml) {
+                        return $renderPlainWithLinks($decoded);
+                    }
+
+                    $clean = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $decoded) ?? $decoded;
+                    $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+                    $clean = preg_replace('/javascript\s*:/i', '', $clean) ?? $clean;
+
+                    if (class_exists(\DOMDocument::class)) {
+                        try {
+                            $document = new \DOMDocument('1.0', 'UTF-8');
+                            $previous = libxml_use_internal_errors(true);
+                            $document->loadHTML('<?xml encoding="utf-8" ?><div data-rc-message-root="1">' . $clean . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+                            libxml_clear_errors();
+                            libxml_use_internal_errors($previous);
+
+                            foreach ($document->getElementsByTagName('a') as $anchor) {
+                                $href = trim((string) $anchor->getAttribute('href'));
+                                $label = trim((string) $anchor->textContent);
+
+                                if ($href === '' || $anchor->getElementsByTagName('img')->length > 0) {
+                                    continue;
+                                }
+
+                                $labelLooksLikeUrl = preg_match('/^https?:\/\//i', $label) || str_contains($label, '/track/profile/') || str_contains($label, '/track/click/');
+                                $shouldShortenAnchor = $label === '' || $label === $href || $labelLooksLikeUrl || mb_strlen($label) > 90;
+
+                                if ($shouldShortenAnchor) {
+                                    while ($anchor->firstChild) {
+                                        $anchor->removeChild($anchor->firstChild);
+                                    }
+
+                                    $anchor->appendChild($document->createTextNode($shortUrlLabel($href)));
+                                    $anchor->setAttribute('class', trim($anchor->getAttribute('class') . ' rc-message-link-short'));
+                                }
+
+                                $anchor->setAttribute('target', '_blank');
+                                $anchor->setAttribute('rel', 'noopener noreferrer');
+                            }
+
+                            $root = $document->getElementsByTagName('div')->item(0);
+                            if ($root) {
+                                $next = '';
+                                foreach ($root->childNodes as $child) {
+                                    $next .= $document->saveHTML($child);
+                                }
+                                if (trim($next) !== '') {
+                                    $clean = $next;
+                                }
+                            }
+                        } catch (\Throwable $exception) {
+                            // Keep sanitized HTML when DOM cleanup is unavailable.
+                        }
+                    }
+
+                    return $clean;
+                };
             @endphp
 
-            <div class="rc-inbox-page-v56" wire:poll.30s.visible="pollConversationUpdates">
+            <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
@@ -10378,7 +10540,7 @@
                             <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
                         </div>
 
-                        <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+                        <div wire:loading.flex wire:target="loadConversations,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
 
                         <div class="rc-inbox-list-v56">
                             @forelse($inboxConversations as $inboxConversation)
@@ -10439,13 +10601,13 @@
                                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
                                         Open in Composer
                                     </button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
                                     <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                     <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
                                 </div>
                             </div>
 
-                            <div class="rc-message-stream-v56">
+                            <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
                                 <div class="rc-thread-loading-skeleton {{ $isLoadingConversationMessages ? 'is-visible' : '' }}">
                                     <span class="rc-skeleton"></span>
                                     <span class="rc-skeleton"></span>
@@ -10471,7 +10633,7 @@
                                             <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
-                                                <div class="rc-msg-bubble-v56">{!! $messageBody !== '' ? $messageBody : '<p>No message body.</p>' !!}</div>
+                                                <div class="rc-msg-bubble-v56">{!! $renderInboxMessageBody($messageBody) !!}</div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
                                                         @foreach($messageAttachments as $attachment)
@@ -10778,14 +10940,14 @@
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" x-data x-on:click.prevent="window.dispatchEvent(new CustomEvent('plyr-native-editor-sync')); setTimeout(() => $wire.openComposePreview(), 80)">
+                        <button class="rc-btn" type="button" wire:click="openComposePreview">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
-                        <button class="rc-btn" type="button" x-data x-on:click.prevent="window.dispatchEvent(new CustomEvent('plyr-native-editor-sync')); setTimeout(() => $wire.saveComposeAsTemplate(), 80)" wire:loading.attr="disabled" wire:target="saveComposeAsTemplate">
+                        <button class="rc-btn" type="button" wire:click="openSaveComposeTemplatePrompt" wire:loading.attr="disabled" wire:target="openSaveComposeTemplatePrompt">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-                            <span wire:loading.remove wire:target="saveComposeAsTemplate">Save as Template</span>
-                            <span wire:loading.flex wire:target="saveComposeAsTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                            <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
+                            <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
                         <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
@@ -10835,8 +10997,8 @@
 
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
-                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.300ms="campaignCc" />
-                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.300ms="campaignBcc" />
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
                                     </div>
                                 @endif
 
@@ -11104,7 +11266,7 @@
                         </div>
                     </div>
 
-                    <div class="rc-template-grid-v50">
+                    <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate,deleteTemplateById,useTemplateForCompose">
                         @forelse($templateRows as $template)
                             @php
                                 $templateId = (string) ($template['id'] ?? '');
@@ -11138,11 +11300,11 @@
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <a class="rc-template-use-v52" href="{{ url('/admin/coach-database/compose-email') }}?template={{ urlencode($templateId) }}" style="text-decoration:none;">
-                                        <span style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                        Use Template</span>
-                                    </a>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
+                                        <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                        Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
+                                    </button>
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -11574,25 +11736,6 @@
 
     <script>
 
-        window.socialIcon = window.socialIcon || function (platform) {
-            const raw = typeof platform === 'object' && platform !== null ? (platform.platform || platform.token || platform.label || '') : platform;
-            const key = String(raw || '').toLowerCase().trim();
-
-            if (key === 'instagram' || key === 'instagramlink') {
-                return 'https://img.icons8.com/color/48/instagram-new--v1.png';
-            }
-
-            if (key === 'x' || key === 'twitter' || key === 'xlink' || key === 'twitterlink') {
-                return 'https://img.icons8.com/ios-filled/50/twitterx--v1.png';
-            }
-
-            if (key === 'youtube' || key === 'yt' || key === 'youtubelink' || key === 'youtubelink') {
-                return 'https://img.icons8.com/color/48/youtube-play.png';
-            }
-
-            return '';
-        };
-
         window.plyrRepairBrokenEditorLinkFragments = function (html) {
             let source = String(html || '');
             if (!source) return '';
@@ -11608,7 +11751,8 @@
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
-                const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
+                const iconReplacement = socialIcon(item);
+                const replacement = iconReplacement || ('<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>');
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
                     source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
@@ -11640,21 +11784,24 @@
                         setTimeout(() => this.bootEditor(true), 80);
                         setTimeout(() => this.bootEditor(true), 250);
                     });
-                    window.addEventListener('rc-compose-editor-refresh', (event) => {
-                        if (modelName !== 'campaignBody' || !this.$refs.editor) return;
-                        const encoded = event.detail?.body || '';
+                    const applyRefresh = (event) => {
+                        if (modelName !== 'campaignBody') return;
+                        const detail = Array.isArray(event.detail) ? (event.detail[0] || {}) : (event.detail || {});
+                        const encoded = detail.body || '';
+                        if (!encoded) return;
+                        window.__rcPendingComposeEditorBody = encoded;
                         const html = this.decodeInitialBody(encoded);
+                        if (!this.$refs.editor) return;
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
                         this.syncNow();
-                    });
-                    window.addEventListener('plyr-native-editor-sync', () => {
-                        if (modelName !== 'campaignBody' || !this.$refs.editor) return;
-                        this.syncNow();
-                    });
+                    };
+                    window.addEventListener('rc-compose-editor-refresh', applyRefresh);
+                    window.addEventListener('rc-compose-template-applied', applyRefresh);
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
-                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
+                    const pending = modelName === 'campaignBody' ? (window.__rcPendingComposeEditorBody || '') : '';
+                    const html = this.decodeInitialBody(pending || initialBody || this.$refs.editor.dataset.initialBody || '');
                     if (html && this.$refs.editor.innerHTML.trim() === '') {
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
                     } else {
@@ -12176,6 +12323,44 @@
                 }
             };
         };
-    </script>
+    
+
+        window.rcScrollInboxToLatest = function () {
+            // Disabled: repeated forced scroll-to-bottom made long conversations sluggish.
+            // Users can scroll naturally; messages remain ordered with newest at the bottom.
+        };
+</script>
+
+    @if($showSaveTemplateNamePrompt)
+        <div class="rc-preview-modal-backdrop" wire:key="compose-save-template-name-modal">
+            <div class="rc-preview-modal" style="max-width:34rem">
+                <div class="rc-preview-modal-head">
+                    <div>
+                        <strong>Save Compose Email as Template</strong>
+                        <div class="rc-subtle" style="margin-top:.2rem">Name this template so it appears in the Compose Email template picker.</div>
+                    </div>
+                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="closeSaveComposeTemplatePrompt" aria-label="Close">×</button>
+                </div>
+                <div class="rc-preview-modal-body">
+                    <label class="rc-template-field-label" style="color:#475569">Template name</label>
+                    <input
+                        type="text"
+                        class="rc-input"
+                        style="width:100%"
+                        placeholder="Example: First Touch Email"
+                        wire:model.live.debounce.300ms="composeTemplateSaveName"
+                        wire:keydown.enter="confirmSaveComposeAsTemplate"
+                    >
+                    <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem">
+                        <button type="button" class="rc-btn" wire:click="closeSaveComposeTemplatePrompt">Cancel</button>
+                        <button type="button" class="rc-btn rc-btn-primary" wire:click="confirmSaveComposeAsTemplate" wire:loading.attr="disabled" wire:target="confirmSaveComposeAsTemplate">
+                            <span wire:loading.remove wire:target="confirmSaveComposeAsTemplate">Save Template</span>
+                            <span wire:loading.flex wire:target="confirmSaveComposeAsTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
 </x-filament-panels::page>
