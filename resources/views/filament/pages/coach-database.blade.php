@@ -10305,6 +10305,35 @@
             <style>
                 .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
                 .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
+
+                .rc-inbox-shell-v56,
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    scroll-behavior: auto !important;
+                    overscroll-behavior: contain;
+                    contain: layout paint style;
+                }
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    transform: translateZ(0);
+                    will-change: auto;
+                }
+                .rc-inbox-message-v56 {
+                    content-visibility: auto;
+                    contain-intrinsic-size: 9rem;
+                    contain: layout paint style;
+                }
+                .rc-msg-bubble-v56,
+                .rc-msg-bubble-v56 * {
+                    max-width: 100%;
+                }
+                .rc-msg-bubble-v56 a {
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                }
+
+                .rc-inbox-history-trimmed{margin:.3rem 0 .7rem;padding:.5rem .7rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.72rem;text-align:center;}
+
                 @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
                 @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
             </style>
@@ -10540,7 +10569,7 @@
                             <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
                         </div>
 
-                        <div wire:loading.flex wire:target="loadConversations,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+                        <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem"><span class="rc-spinner-mini"></span> Refreshing inbox</div>
 
                         <div class="rc-inbox-list-v56">
                             @forelse($inboxConversations as $inboxConversation)
@@ -10558,7 +10587,7 @@
                                 <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" data-rc-open="conversation" data-rc-title="{{ $inboxContactName }}" data-rc-copy="Opening the conversation now. Messages will load inside the thread." wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
-                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ $threadInitials($inboxContactName) }}
                                         @endif
@@ -10586,7 +10615,7 @@
                                 <div class="rc-inbox-coach-title-v56">
                                     <span class="rc-inbox-school-logo-v56">
                                         @if($selectedSchoolLogo !== '')
-                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ strtoupper(substr($selectedSchool, 0, 2)) }}
                                         @endif
@@ -10616,7 +10645,14 @@
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
-                                    @foreach($threadMessages as $message)
+                                    @php
+                                        $visibleThreadMessages = collect($threadMessages)->take(-30)->values();
+                                        $hiddenThreadMessageCount = max(0, count($threadMessages) - $visibleThreadMessages->count());
+                                    @endphp
+                                    @if($hiddenThreadMessageCount > 0)
+                                        <div class="rc-inbox-history-trimmed">Showing the latest {{ $visibleThreadMessages->count() }} messages. Use “Load older emails” to view earlier history.</div>
+                                    @endif
+                                    @foreach($visibleThreadMessages as $message)
                                         @php
                                             $message = is_array($message) ? $message : [];
                                             $isOut = str_contains(strtolower((string) ($message['direction'] ?? $message['type'] ?? '')), 'out');
@@ -10644,7 +10680,7 @@
                                                                 $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
                                                             @endphp
                                                             @if($isImageAttachment)
-                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}">
+                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}" loading="lazy" decoding="async">
                                                             @else
                                                                 <a class="rc-message-attachment-link" href="{{ $attachmentUrl }}" target="_blank" rel="noopener">Open {{ $attachmentName }}</a>
                                                             @endif
@@ -12325,10 +12361,7 @@
         };
     
 
-        window.rcScrollInboxToLatest = function () {
-            // Disabled: repeated forced scroll-to-bottom made long conversations sluggish.
-            // Users can scroll naturally; messages remain ordered with newest at the bottom.
-        };
+        window.rcScrollInboxToLatest = function () { return; };
 </script>
 
     @if($showSaveTemplateNamePrompt)

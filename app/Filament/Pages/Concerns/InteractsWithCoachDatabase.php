@@ -2771,10 +2771,10 @@ trait InteractsWithCoachDatabase
 
         try {
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
-                'limit' => 100,
+                'limit' => 50,
                 'status' => 'all',
                 'search' => trim($this->conversationSearch),
-                'fetch_all' => true,
+                'fetch_all' => false,
             ]);
 
             if (! ($result['success'] ?? false)) {
@@ -3861,7 +3861,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 $user,
                 (string) $this->selectedConversationId,
                 $this->messageLastId,
-                100
+                30
             );
 
             if (! ($result['success'] ?? false)) {
@@ -3897,10 +3897,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 $this->messages = collect($this->messages)
                     ->merge($rows)
                     ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                    ->take(-60)
                     ->values()
                     ->all();
             } else {
-                $this->messages = $rows;
+                $this->messages = collect($rows)
+                    ->take(-30)
+                    ->values()
+                    ->all();
             }
 
             $this->messageLastId = $result['last_message_id'] ?? $this->messageLastId;
