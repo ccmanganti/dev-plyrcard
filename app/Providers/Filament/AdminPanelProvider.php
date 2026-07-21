@@ -36,6 +36,19 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->homeUrl(function (): string {
+                $user = auth()->user();
+
+                if ($user && method_exists($user, 'hasRole') && $user->hasRole('Free') && ! $user->hasRole('My Journey')) {
+                    try {
+                        return ProfileResource::getUrl('index');
+                    } catch (\Throwable $exception) {
+                        return url('/admin/profile');
+                    }
+                }
+
+                return url('/admin/coach-database');
+            })
             ->font('BlinkMacSystemFont')
             ->maxContentWidth(Width::Full)
             ->login(Login::class)
@@ -625,22 +638,6 @@ class AdminPanelProvider extends PanelProvider
                             visibility: visible !important;
                             opacity: 1 !important;
                             pointer-events: auto !important;
-                        }
-
-                        /* Keep resource actions, but hide Filament's duplicate page title/description. */
-                        .fi-header-heading,
-                        .fi-header-subheading,
-                        .fi-page-header-heading,
-                        .fi-page-header-subheading,
-                        .fi-header > div:first-child:not(.fi-header-actions):not(.fi-page-header-actions) {
-                            display: none !important;
-                        }
-
-                        .fi-header:has(.fi-header-actions),
-                        .fi-page-header:has(.fi-page-header-actions) {
-                            justify-content: flex-end !important;
-                            min-height: 0 !important;
-                            margin-bottom: .75rem !important;
                         }
 
                         .fi-header-actions,
@@ -1304,11 +1301,13 @@ class AdminPanelProvider extends PanelProvider
                         $user->last_name ?? null,
                     ])->filter()->implode(' ')) ?: 'My Profile';
 
-                    $profileUrl = Route::has('filament.admin.auth.profile')
-                        ? route('filament.admin.auth.profile')
-                        : ProfileResource::getUrl('index');
+                    try {
+                        $editProfileUrl = ProfileResource::getUrl('index');
+                    } catch (\Throwable $exception) {
+                        $editProfileUrl = url('/admin/my-profile');
+                    }
 
-                    $editProfileUrl = $profileUrl;
+                    $profileUrl = $editProfileUrl;
 
                     $changePasswordUrl = Route::has('filament.admin.pages.force-password-change')
                         ? route('filament.admin.pages.force-password-change')
@@ -1352,18 +1351,24 @@ class AdminPanelProvider extends PanelProvider
                         default => $normalizedRoles->first() ?: 'Free',
                     };
 
+                    $hasMyJourneyRole = method_exists($user, 'hasRole')
+                        ? $user->hasRole('My Journey')
+                        : $normalizedRoles->contains(fn ($role) => strcasecmp($role, 'My Journey') === 0);
+
+                    $hasFreeRole = method_exists($user, 'hasRole')
+                        ? $user->hasRole('Free')
+                        : $normalizedRoles->contains(fn ($role) => strcasecmp($role, 'Free') === 0);
+
+                    $freeRestricted = $hasFreeRole && ! $hasMyJourneyRole;
+
+                    $settingsUrl = class_exists(\App\Filament\Pages\CoachDatabaseSettings::class)
+                        ? \App\Filament\Pages\CoachDatabaseSettings::getUrl()
+                        : url('/admin/coach-database/settings');
+
                     return Blade::render(<<<'BLADE'
                         <div class="plyr-sidebar-footer">
                             <div class="plyr-sidebar-account" x-data="{ open: false, closeTimer: null, show() { clearTimeout(this.closeTimer); this.open = true }, hide() { clearTimeout(this.closeTimer); this.closeTimer = setTimeout(() => this.open = false, 220) } }" x-bind:data-open="open ? 'true' : 'false'" x-on:mouseenter="show()" x-on:mouseleave="hide()">
                                 <div class="plyr-sidebar-user-actions" x-cloak x-show="open" x-transition.opacity.scale.origin.bottom aria-label="Account options">
-                                    <a href="{{ $profileUrl }}" class="plyr-sidebar-user-action">
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M20 21a8 8 0 0 0-16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            <path d="M12 13a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.8"/>
-                                        </svg>
-                                        <span>View Profile</span>
-                                    </a>
-
                                     <a href="{{ $editProfileUrl }}" class="plyr-sidebar-user-action">
                                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                             <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -1372,28 +1377,13 @@ class AdminPanelProvider extends PanelProvider
                                         <span>Edit Profile</span>
                                     </a>
 
-                                    <a href="{{ $changePasswordUrl }}" class="plyr-sidebar-user-action">
+                                    <a href="{{ $settingsUrl }}" class="plyr-sidebar-user-action">
                                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M12 15.5v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            <path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            <path d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" stroke-width="1.8"/>
+                                            <path d="M12 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/>
+                                            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2.05 2.05 0 1 1-2.9 2.9l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.08.08a2.05 2.05 0 0 1-3.84-1.08v-.1A1.7 1.7 0 0 0 9 17.34a1.7 1.7 0 0 0-1.87.34l-.06.06a2.05 2.05 0 1 1-2.9-2.9l.06-.06A1.7 1.7 0 0 0 4.6 13a1.7 1.7 0 0 0-.6-1l-.08-.08A2.05 2.05 0 0 1 5 8.08h.1A1.7 1.7 0 0 0 6.66 7a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2.05 2.05 0 1 1 2.9-2.9l.06.06A1.7 1.7 0 0 0 11 2.6a1.7 1.7 0 0 0 1-.6l.08-.08A2.05 2.05 0 0 1 15.92 3v.1A1.7 1.7 0 0 0 17 4.66a1.7 1.7 0 0 0 1.87-.34l.06-.06a2.05 2.05 0 1 1 2.9 2.9l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.35.2.65 0 1Z" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
                                         </svg>
-                                        <span>Change Password</span>
+                                        <span>Settings</span>
                                     </a>
-
-                                    <div class="plyr-sidebar-user-actions-separator"></div>
-
-                                    <form method="POST" action="{{ $logoutUrl }}">
-                                        @csrf
-                                        <button type="submit" class="plyr-sidebar-user-action-button plyr-sidebar-user-action-danger">
-                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                <path d="M15 17l5-5l-5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                                <path d="M20 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                                <path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            </svg>
-                                            <span>Sign Out</span>
-                                        </button>
-                                    </form>
                                 </div>
 
                                 <button type="button" class="plyr-sidebar-profile plyr-sidebar-account-trigger" x-on:click="open = ! open" x-on:keydown.escape.window="open = false" aria-label="Open account menu">
@@ -1403,7 +1393,7 @@ class AdminPanelProvider extends PanelProvider
 
                                     <span class="plyr-sidebar-profile-main">
                                         <span class="plyr-sidebar-profile-name">{{ $name }}</span>
-                                        <span class="plyr-sidebar-profile-link">View Profile</span>
+                                        <span class="plyr-sidebar-profile-link">Edit Profile</span>
                                     </span>
 
                                     <svg class="plyr-sidebar-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true" x-bind:style="open ? 'transform: rotate(180deg)' : ''">
@@ -1412,7 +1402,7 @@ class AdminPanelProvider extends PanelProvider
                                 </button>
                             </div>
 
-                            <a href="{{ $managePlanUrl }}" class="plyr-sidebar-plan" aria-label="Manage current plan">
+                            <a href="{{ $managePlanUrl }}" class="plyr-sidebar-plan" data-plyr-open-upgrade aria-label="Manage current plan">
                                 <span class="plyr-sidebar-plan-icon">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M13 2L5 13H11L10 22L19 10H13L13 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -1425,6 +1415,461 @@ class AdminPanelProvider extends PanelProvider
                                 </span>
                             </a>
                         </div>
+
+                        @if ($freeRestricted)
+                            <style>
+                                .fi-sidebar a.plyr-free-locked-link {
+                                    opacity: .52 !important;
+                                    filter: grayscale(.25);
+                                    cursor: pointer !important;
+                                }
+
+                                .fi-sidebar a.plyr-free-locked-link .fi-sidebar-item-label {
+                                    color: #9ca3af !important;
+                                }
+
+                                .plyr-free-lock-badge {
+                                    margin-left: auto;
+                                    display: inline-flex;
+                                    width: 1rem;
+                                    height: 1rem;
+                                    align-items: center;
+                                    justify-content: center;
+                                    color: #9ca3af;
+                                }
+
+                                .plyr-free-lock-badge svg {
+                                    width: .9rem;
+                                    height: .9rem;
+                                }
+
+                                .plyr-free-upgrade-modal {
+                                    position: fixed !important;
+                                    inset: 0 !important;
+                                    width: 100vw !important;
+                                    height: 100dvh !important;
+                                    z-index: 2147483000 !important;
+                                    display: block !important;
+                                    padding: 0 !important;
+                                    background: rgba(15, 23, 42, .54) !important;
+                                    backdrop-filter: blur(5px);
+                                    -webkit-backdrop-filter: blur(5px);
+                                    opacity: 0;
+                                    visibility: hidden;
+                                    pointer-events: none;
+                                    overflow: hidden !important;
+                                    transition: opacity .22s ease, visibility .22s ease;
+                                }
+
+                                .plyr-free-upgrade-modal.is-open {
+                                    opacity: 1;
+                                    visibility: visible;
+                                    pointer-events: auto;
+                                }
+
+                                html.plyr-free-upgrade-open,
+                                body.plyr-free-upgrade-open {
+                                    overflow: hidden !important;
+                                }
+
+                                .plyr-free-upgrade-card {
+                                    position: fixed !important;
+                                    top: 1rem !important;
+                                    right: 1rem !important;
+                                    bottom: 1rem !important;
+                                    left: auto !important;
+                                    width: min(38rem, calc(100vw - 2rem)) !important;
+                                    height: auto !important;
+                                    max-height: calc(100dvh - 2rem) !important;
+                                    overflow: hidden !important;
+                                    border-radius: 1.45rem !important;
+                                    background: #ffffff !important;
+                                    box-shadow: -28px 0 90px rgba(15, 23, 42, .30) !important;
+                                    transform: translate3d(calc(100% + 1.25rem), 0, 0) !important;
+                                    transition: transform .28s cubic-bezier(.22, 1, .36, 1) !important;
+                                    display: flex !important;
+                                    flex-direction: column !important;
+                                    isolation: isolate;
+                                }
+
+                                .plyr-free-upgrade-modal.is-open .plyr-free-upgrade-card {
+                                    transform: translate3d(0, 0, 0) !important;
+                                }
+
+                                .plyr-free-upgrade-head {
+                                    position: relative !important;
+                                    flex: 0 0 auto !important;
+                                    padding: 2rem 2.15rem 1.85rem !important;
+                                    background: linear-gradient(135deg, #ff6338 0%, #ff432f 100%) !important;
+                                    color: #ffffff !important;
+                                }
+
+                                .plyr-free-upgrade-head strong {
+                                    display: block !important;
+                                    max-width: 28rem;
+                                    font-size: 1.45rem !important;
+                                    line-height: 1.18 !important;
+                                    font-weight: 900 !important;
+                                    letter-spacing: -.03em;
+                                    color: #ffffff !important;
+                                }
+
+                                .plyr-free-upgrade-head p {
+                                    max-width: 30rem;
+                                    margin: .65rem 0 0 !important;
+                                    color: rgba(255, 255, 255, .92) !important;
+                                    font-size: .96rem !important;
+                                    line-height: 1.5 !important;
+                                }
+
+                                .plyr-free-upgrade-close {
+                                    position: absolute !important;
+                                    top: 1rem !important;
+                                    right: 1rem !important;
+                                    width: 2.35rem !important;
+                                    height: 2.35rem !important;
+                                    min-width: 2.35rem !important;
+                                    min-height: 2.35rem !important;
+                                    display: inline-grid !important;
+                                    place-items: center !important;
+                                    padding: 0 !important;
+                                    border: 0 !important;
+                                    border-radius: .8rem !important;
+                                    background: rgba(255, 255, 255, .18) !important;
+                                    color: #ffffff !important;
+                                    font-size: 1.35rem !important;
+                                    line-height: 1 !important;
+                                    cursor: pointer !important;
+                                    transition: background .18s ease, transform .18s ease;
+                                }
+
+                                .plyr-free-upgrade-close:hover {
+                                    background: rgba(255, 255, 255, .26) !important;
+                                    transform: translateY(-1px);
+                                }
+
+                                .plyr-free-upgrade-body {
+                                    flex: 1 1 auto !important;
+                                    min-height: 0 !important;
+                                    padding: 1.45rem 2.15rem 1.35rem !important;
+                                    display: flex !important;
+                                    flex-direction: column !important;
+                                    gap: 1rem !important;
+                                    overflow-y: auto !important;
+                                    scrollbar-width: thin;
+                                    background: #ffffff !important;
+                                }
+
+                                .plyr-free-upgrade-item {
+                                    display: flex !important;
+                                    gap: .8rem !important;
+                                    align-items: flex-start !important;
+                                    color: #4b5563 !important;
+                                    font-size: .95rem !important;
+                                    line-height: 1.45 !important;
+                                }
+
+                                .plyr-free-upgrade-check {
+                                    width: 1.45rem !important;
+                                    height: 1.45rem !important;
+                                    min-width: 1.45rem !important;
+                                    border-radius: 999px !important;
+                                    display: inline-flex !important;
+                                    align-items: center !important;
+                                    justify-content: center !important;
+                                    flex: 0 0 1.45rem !important;
+                                    background: #dcfce7 !important;
+                                    color: #059669 !important;
+                                    font-weight: 900 !important;
+                                    font-size: .85rem !important;
+                                }
+
+                                .plyr-free-upgrade-actions {
+                                    margin-top: auto !important;
+                                    padding-top: 1.15rem !important;
+                                    border-top: 1px solid rgba(226, 232, 240, .82) !important;
+                                    display: flex !important;
+                                    align-items: center !important;
+                                    justify-content: flex-end !important;
+                                    gap: .75rem !important;
+                                    flex-wrap: wrap !important;
+                                }
+
+                                .plyr-free-upgrade-actions a,
+                                .plyr-free-upgrade-actions button {
+                                    appearance: none !important;
+                                    -webkit-appearance: none !important;
+                                    width: auto !important;
+                                    max-width: none !important;
+                                    height: auto !important;
+                                    min-height: 2.85rem !important;
+                                    min-width: 7.5rem !important;
+                                    display: inline-flex !important;
+                                    align-items: center !important;
+                                    justify-content: center !important;
+                                    flex: 0 0 auto !important;
+                                    border-radius: .85rem !important;
+                                    padding: .7rem 1.05rem !important;
+                                    font-weight: 850 !important;
+                                    font-size: .9rem !important;
+                                    line-height: 1 !important;
+                                    text-decoration: none !important;
+                                    text-align: center !important;
+                                    cursor: pointer !important;
+                                    box-shadow: none !important;
+                                    transform: none !important;
+                                }
+
+                                .plyr-free-upgrade-actions button {
+                                    border: 1px solid #e5e7eb !important;
+                                    background: #ffffff !important;
+                                    color: #111827 !important;
+                                }
+
+                                .plyr-free-upgrade-actions a {
+                                    border: 1px solid #ff6338 !important;
+                                    background: #ff6338 !important;
+                                    color: #ffffff !important;
+                                    box-shadow: 0 12px 24px rgba(255, 99, 56, .24) !important;
+                                }
+
+                                .plyr-free-upgrade-actions button:hover {
+                                    border-color: rgba(255, 99, 56, .32) !important;
+                                    color: #ff6338 !important;
+                                }
+
+                                .plyr-free-upgrade-actions a:hover {
+                                    background: #ff4f2f !important;
+                                    border-color: #ff4f2f !important;
+                                    transform: translateY(-1px) !important;
+                                }
+
+                                .plyr-sidebar-plan {
+                                    cursor: pointer !important;
+                                }
+
+                                .plyr-sidebar-plan:hover {
+                                    border-color: rgba(255, 99, 56, .42) !important;
+                                    background: rgba(255, 99, 56, .11) !important;
+                                    transform: translateY(-1px);
+                                }
+
+                                @media (max-width: 640px) {
+                                    .plyr-free-upgrade-card {
+                                        top: .75rem !important;
+                                        right: .75rem !important;
+                                        bottom: .75rem !important;
+                                        width: min(30rem, calc(100vw - 1.5rem)) !important;
+                                        max-height: calc(100dvh - 1.5rem) !important;
+                                        border-radius: 1.25rem !important;
+                                    }
+
+                                    .plyr-free-upgrade-head {
+                                        padding: 1.6rem 1.45rem 1.45rem !important;
+                                    }
+
+                                    .plyr-free-upgrade-body {
+                                        padding: 1.2rem 1.45rem 1.2rem !important;
+                                    }
+
+                                    .plyr-free-upgrade-actions {
+                                        justify-content: stretch !important;
+                                    }
+
+                                    .plyr-free-upgrade-actions a,
+                                    .plyr-free-upgrade-actions button {
+                                        flex: 1 1 0 !important;
+                                        min-width: 0 !important;
+                                    }
+                                }
+                            </style>
+
+                            <div class="plyr-free-upgrade-modal" id="plyr-free-upgrade-modal" aria-hidden="true">
+                                <div class="plyr-free-upgrade-card" role="dialog" aria-modal="true" aria-label="Upgrade required">
+                                    <div class="plyr-free-upgrade-head">
+                                        <button type="button" class="plyr-free-upgrade-close" data-plyr-free-close aria-label="Close">×</button>
+                                        <span style="display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1.3rem;padding:.36rem .72rem;border:1px solid rgba(255,255,255,.35);border-radius:999px;font-size:.74rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#fff;">
+                                            ♕ My Journey
+                                        </span>
+                                        <strong><span data-plyr-upgrade-feature>This</span> is a My Journey feature</strong>
+                                        <p>Your Free plan includes Athlete Profile and Settings. Upgrade to My Journey to unlock everything you need to get recruited.</p>
+                                    </div>
+
+                                    <div class="plyr-free-upgrade-body">
+                                        <div class="plyr-free-upgrade-item"><span class="plyr-free-upgrade-check">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, Schedule, Amplify, and Analytics are locked on Free.</span></div>
+                                        <div class="plyr-free-upgrade-item"><span class="plyr-free-upgrade-check">✓</span><span>My Journey unlocks all recruiting workflows and coach outreach tools.</span></div>
+
+                                        <div class="plyr-free-upgrade-actions">
+                                            <button type="button" data-plyr-free-close>Not now</button>
+                                            <a href="{{ $settingsUrl }}">Manage Plan</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <script>
+                                (() => {
+                                    const profileUrl = @js($editProfileUrl);
+                                    const settingsUrl = @js($settingsUrl);
+                                    const lockSvg = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" stroke-width="1.9"/></svg>';
+
+                                    const pathOf = (url) => {
+                                        try {
+                                            return new URL(url, window.location.origin).pathname.replace(/\/+$/, '');
+                                        } catch (_) {
+                                            return String(url || '').replace(/\/+$/, '');
+                                        }
+                                    };
+
+                                    const profilePath = pathOf(profileUrl);
+                                    const settingsPath = pathOf(settingsUrl);
+
+                                    const isAllowedPath = () => {
+                                        const current = window.location.pathname.replace(/\/+$/, '');
+                                        return current === profilePath
+                                            || current.startsWith(profilePath + '/')
+                                            || current === settingsPath
+                                            || current.startsWith(settingsPath + '/')
+                                            || current.includes('/profile')
+                                            || current.includes('/settings');
+                                    };
+
+                                    const ensureUpgradeDrawerMountedToBody = () => {
+                                        const node = document.getElementById('plyr-free-upgrade-modal');
+
+                                        if (! node) {
+                                            return null;
+                                        }
+
+                                        // The modal is rendered from the sidebar hook. Some sidebar wrappers create
+                                        // a transformed/clipped containing block, so fixed positioning can look like
+                                        // it opens from the left/sidebar. Move it to <body> before opening.
+                                        if (node.parentElement !== document.body) {
+                                            document.body.appendChild(node);
+                                        }
+
+                                        return node;
+                                    };
+
+                                    const modal = () => ensureUpgradeDrawerMountedToBody();
+
+                                    const openModal = (featureLabel = 'This') => {
+                                        const node = modal();
+                                        if (! node) return;
+
+                                        const title = node.querySelector('[data-plyr-upgrade-feature]');
+                                        const label = String(featureLabel || 'This').trim();
+
+                                        if (title) {
+                                            title.textContent = label || 'This';
+                                        }
+
+                                        node.classList.add('is-open');
+                                        node.setAttribute('aria-hidden', 'false');
+                                        document.documentElement.classList.add('plyr-free-upgrade-open');
+                                        document.body.classList.add('plyr-free-upgrade-open');
+                                    };
+
+                                    const closeModal = () => {
+                                        const node = modal();
+                                        if (! node) return;
+                                        node.classList.remove('is-open');
+                                        node.setAttribute('aria-hidden', 'true');
+                                        document.documentElement.classList.remove('plyr-free-upgrade-open');
+                                        document.body.classList.remove('plyr-free-upgrade-open');
+                                    };
+
+                                    const allowedLabel = (text) => ['Athlete Profile', 'Settings'].includes(String(text || '').trim());
+
+                                    const applyFreeLocks = () => {
+                                        document.querySelectorAll('[data-plyr-free-close]').forEach((button) => {
+                                            if (button.dataset.boundFreeClose === '1') return;
+                                            button.dataset.boundFreeClose = '1';
+                                            button.addEventListener('click', closeModal);
+                                        });
+
+                                        document.querySelectorAll('[data-plyr-open-upgrade]').forEach((button) => {
+                                            if (button.dataset.boundUpgradeOpen === '1') return;
+                                            button.dataset.boundUpgradeOpen = '1';
+                                            button.addEventListener('click', (event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                openModal('Upgrade');
+                                            }, true);
+                                        });
+
+                                        const modalNode = modal();
+                                        if (modalNode && modalNode.dataset.boundOverlayClose !== '1') {
+                                            modalNode.dataset.boundOverlayClose = '1';
+                                            modalNode.addEventListener('click', (event) => {
+                                                if (event.target === modalNode) {
+                                                    closeModal();
+                                                }
+                                            });
+                                        }
+
+                                        document.querySelectorAll('.fi-sidebar a[href]').forEach((link) => {
+                                            if (link.closest('.plyr-sidebar-footer') || link.closest('.plyr-sidebar-brand-wrap')) {
+                                                return;
+                                            }
+
+                                            const labelNode = link.querySelector('.fi-sidebar-item-label') || link.querySelector('span');
+                                            const label = (labelNode ? labelNode.textContent : '').trim();
+                                            const hrefPath = pathOf(link.href);
+                                            const allowed = allowedLabel(label)
+                                                || hrefPath === profilePath
+                                                || hrefPath.startsWith(profilePath + '/')
+                                                || hrefPath === settingsPath
+                                                || hrefPath.startsWith(settingsPath + '/')
+                                                || hrefPath.includes('/profile')
+                                                || hrefPath.includes('/settings');
+
+                                            if (allowed) {
+                                                link.classList.remove('plyr-free-locked-link');
+                                                return;
+                                            }
+
+                                            link.classList.add('plyr-free-locked-link');
+                                            link.setAttribute('aria-disabled', 'true');
+                                            link.setAttribute('title', 'Upgrade to My Journey to unlock this feature.');
+
+                                            if (! link.querySelector('.plyr-free-lock-badge')) {
+                                                const badge = document.createElement('span');
+                                                badge.className = 'plyr-free-lock-badge';
+                                                badge.innerHTML = lockSvg;
+                                                link.appendChild(badge);
+                                            }
+
+                                            if (link.dataset.boundFreeLock === '1') {
+                                                return;
+                                            }
+
+                                            link.dataset.boundFreeLock = '1';
+                                            link.addEventListener('click', (event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                openModal(label || 'This');
+                                            }, true);
+                                        });
+                                    };
+
+                                    if (! isAllowedPath()) {
+                                        window.location.replace(profileUrl);
+                                        return;
+                                    }
+
+                                    document.addEventListener('DOMContentLoaded', () => { ensureUpgradeDrawerMountedToBody(); applyFreeLocks(); });
+                                    document.addEventListener('livewire:navigated', () => { ensureUpgradeDrawerMountedToBody(); applyFreeLocks(); });
+                                    document.addEventListener('keydown', (event) => {
+                                        if (event.key === 'Escape') {
+                                            closeModal();
+                                        }
+                                    });
+                                    setTimeout(applyFreeLocks, 100);
+                                    setTimeout(applyFreeLocks, 600);
+                                })();
+                            </script>
+                        @endif
                     BLADE, [
                         'user' => $user,
                         'name' => $name,
@@ -1433,8 +1878,10 @@ class AdminPanelProvider extends PanelProvider
                         'changePasswordUrl' => $changePasswordUrl,
                         'logoutUrl' => $logoutUrl,
                         'managePlanUrl' => $managePlanUrl,
+                        'settingsUrl' => $settingsUrl,
                         'avatarUrl' => $avatarUrl,
                         'planLabel' => $planLabel,
+                        'freeRestricted' => $freeRestricted,
                     ]);
                 },
             )

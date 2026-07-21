@@ -200,6 +200,12 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        if ($this->isFreeRoleRestrictedUser($user) && ! $this->canFreeRoleAccessCoachDatabaseSection($this->section)) {
+            $this->redirect($this->freeRoleDefaultProfileUrl());
+
+            return;
+        }
+
         $state = $coachDatabaseService->getInitialState($user);
         $this->allowed = (bool) ($state['allowed'] ?? false);
         $this->locked = (bool) ($state['locked'] ?? false);
@@ -228,10 +234,12 @@ trait InteractsWithCoachDatabase
         }
 
         if ($this->section === 'conversations') {
-            // Do not call the remote conversations endpoint during mount.
-            // The cached rows are already visible and bootDeferredUiData()
-            // refreshes them after first paint.
-            $this->isLoadingConversations = empty($this->conversations);
+            // Inbox is intentionally manual-refresh only.
+            // Keep cached conversations visible and do not trigger an automatic
+            // remote refresh during mount/first paint, because that request can
+            // block scrolling while GHL is slow.
+            $this->hydrateCachedInboxConversations();
+            $this->isLoadingConversations = false;
         }
 
         if (in_array($this->section, ['campaigns', 'compose'], true)) {
@@ -278,6 +286,69 @@ trait InteractsWithCoachDatabase
         return 'dashboard';
     }
 
+    protected function isFreeRoleRestrictedUser($user): bool
+    {
+        return $this->userHasRoleName($user, 'Free')
+            && ! $this->userHasRoleName($user, 'My Journey');
+    }
+
+    protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
+    {
+        return in_array($section, ['profile', 'settings'], true);
+    }
+
+    protected function userHasRoleName($user, string $roleName): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if (method_exists($user, 'hasRole')) {
+            try {
+                if ($user->hasRole($roleName)) {
+                    return true;
+                }
+            } catch (\Throwable $exception) {
+                // Fall back to relation/name checks below.
+            }
+        }
+
+        $roles = collect();
+
+        if (method_exists($user, 'getRoleNames')) {
+            try {
+                $roles = $user->getRoleNames();
+            } catch (\Throwable $exception) {
+                $roles = collect();
+            }
+        } elseif ($user->relationLoaded('roles')) {
+            $roles = $user->roles->pluck('name');
+        } elseif (method_exists($user, 'roles')) {
+            try {
+                $roles = $user->roles()->pluck('name');
+            } catch (\Throwable $exception) {
+                $roles = collect();
+            }
+        }
+
+        return $roles
+            ->filter()
+            ->contains(fn ($role): bool => strcasecmp(trim((string) $role), $roleName) === 0);
+    }
+
+    protected function freeRoleDefaultProfileUrl(): string
+    {
+        if (class_exists(\App\Filament\Resources\Profiles\ProfileResource::class)) {
+            try {
+                return \App\Filament\Resources\Profiles\ProfileResource::getUrl('index');
+            } catch (\Throwable $exception) {
+                // Continue to the fallback below.
+            }
+        }
+
+        return url('/admin/profile');
+    }
+
     public function pageUrl(string $section): string
     {
         return match ($section) {
@@ -290,6 +361,7 @@ trait InteractsWithCoachDatabase
             'compose' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
             'schedule' => class_exists(\App\Filament\Pages\CoachDatabaseSchedule::class) ? \App\Filament\Pages\CoachDatabaseSchedule::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'schedule']),
             'settings' => class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'settings']),
+            'profile' => $this->freeRoleDefaultProfileUrl(),
             default => \App\Filament\Pages\CoachDatabase::getUrl(),
         };
     }
@@ -309,7 +381,11 @@ trait InteractsWithCoachDatabase
 
         try {
             if ($this->section === 'conversations') {
-                $this->loadConversations();
+                // Do not auto-refresh the inbox from wire:init.
+                // The inbox updates only from the manual refresh button, search
+                // over cached rows, or selecting a conversation.
+                $this->hydrateCachedInboxConversations();
+                $this->isLoadingConversations = false;
             }
         } finally {
             $this->isBootingRemoteSection = false;
@@ -3174,11 +3250,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     public function pollConversationUpdates(): void
     {
-        if ($this->section !== 'conversations' || ! $this->allowed || $this->locked) {
-            return;
-        }
-
-        $this->hydrateCachedInboxConversations();
+        // Disabled for inbox performance. The old periodic refresh repeatedly
+        // rehydrated the conversation list while the user scrolled, which caused
+        // visible lag on long threads. Use the inbox refresh button to pull GHL.
+        return;
     }
 
 
@@ -8510,7 +8585,12 @@ protected function ensureComposeBodyHasFooter(): void
         $this->emailBody = $this->campaignBody;
 
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
-        $this->dispatch('rc-compose-template-applied', body: base64_encode($this->campaignBody), subject: $subject, preview: $previewText);
+        $this->dispatch(
+            'rc-compose-template-applied',
+            body: base64_encode($this->campaignBody),
+            subject: (string) ($this->campaignSubject ?? ''),
+            preview: (string) ($this->campaignPreviewText ?? '')
+        );
     }
 
 
