@@ -11876,7 +11876,7 @@
 
                         <div wire:loading.flex wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-loading-v1">
                             <span class="rc-spinner-mini"></span>
-                            Loading communication history from HighLevel...
+                            Loading communication history...
                         </div>
 
                         <div wire:loading.remove wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-history-v1">
