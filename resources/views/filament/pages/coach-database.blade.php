@@ -204,7 +204,80 @@
                 };
             }
 
+            const openDiscoverSchoolShell = (school = {}) => {
+                const shell = document.getElementById('rc-ui-instant-shell');
 
+                if (!shell) return;
+
+                const title = document.getElementById('rc-ui-shell-title');
+                const copy = document.getElementById('rc-ui-shell-copy');
+
+                const schoolName = String(
+                    school?.name
+                    || school?.school_name
+                    || school?.company_name
+                    || 'School'
+                ).trim();
+
+                const division = String(school?.division || '').trim();
+                const conference = String(school?.conference || '').trim();
+
+                if (title) {
+                    title.textContent = schoolName || 'Opening school';
+                }
+
+                if (copy) {
+                    copy.textContent = [division, conference].filter(Boolean).join(' • ')
+                        || 'Opening school profile from local database.';
+                }
+
+                shell.dataset.kind = 'school';
+                shell.dataset.rcModal = 'loading';
+                shell.dataset.rcModalId = 'instant-school-shell';
+                shell.setAttribute('aria-hidden', 'false');
+                shell.classList.add('is-open');
+
+                document.documentElement.classList.add('rc-has-overlay-stack');
+                document.body?.classList.add('rc-has-overlay-stack-body');
+            };
+
+            const closeDiscoverSchoolShellWhenRealDrawerAppears = () => {
+                const shell = document.getElementById('rc-ui-instant-shell');
+
+                if (!shell || !shell.classList.contains('is-open')) {
+                    return;
+                }
+
+                const realSchoolDrawer = Array.from(document.querySelectorAll('.rc-drawer, .rc-school-modal-backdrop'))
+                    .find((node) => {
+                        if (!node || node.id === 'rc-ui-instant-shell') return false;
+
+                        const text = String(node.textContent || '').trim();
+
+                        return text.includes('View School')
+                            || text.includes('Add to List')
+                            || text.includes('Head Coach')
+                            || text.includes('Coaches')
+                            || node.querySelector('[wire\\:click*="selectComposeSchool"], [wire\\:click*="emailSchool"], [data-rc-school-id]');
+                    });
+
+                if (!realSchoolDrawer) {
+                    return;
+                }
+
+                setTimeout(() => {
+                    shell.classList.remove('is-open');
+                    shell.setAttribute('aria-hidden', 'true');
+                }, 180);
+            };
+
+            const schoolShellObserver = new MutationObserver(() => {
+                requestAnimationFrame(() => {
+                    setTimeout(closeDiscoverSchoolShellWhenRealDrawerAppears, 120);
+                });
+            });
+
+            schoolShellObserver.observe(document.documentElement, { childList: true, subtree: true });
             window.__rcDiscoverClientCacheVersion = '2026-07-15.7-grid-view-restored';
             window.rcDiscoverClientCache = (initialSchools = [], initialLists = [], initialView = 'grid') => ({
                 schools: [],
@@ -360,13 +433,31 @@
                     this.limit += 48;
                 },
 
-                async openSchool(id) {
-                    try {
-                        await this.$wire.call('openSchoolDashboardModal', String(id));
-                    } catch (error) {
-                        console.error(error);
-                        toast('Unable to open this school.');
-                    }
+                openSchool(id) {
+                    const schoolId = String(id || '');
+
+                    if (!schoolId) return;
+
+                    const school = (this.schools || []).find((row) => String(row.id || row.business_id || '') === schoolId)
+                        || (this.visibleSchools || []).find((row) => String(row.id || row.business_id || '') === schoolId)
+                        || { id: schoolId, name: 'Opening school' };
+
+                    openDiscoverSchoolShell(school);
+
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            this.$wire.call('openSchoolDashboardModal', schoolId)
+                                .catch((error) => {
+                                    console.error(error);
+
+                                    const shell = document.getElementById('rc-ui-instant-shell');
+                                    shell?.classList.remove('is-open');
+                                    shell?.setAttribute('aria-hidden', 'true');
+
+                                    toast('Unable to open this school.');
+                                });
+                        }, 0);
+                    });
                 },
 
                 async emailSelected() {
