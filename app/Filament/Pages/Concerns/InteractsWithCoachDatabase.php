@@ -183,6 +183,7 @@ trait InteractsWithCoachDatabase
     public bool $isLoadingTemplateDetail = false;
     public bool $isRefreshingRemoteData = false;
     public ?string $activeUiOperation = null;
+    public bool $inboxInitialLoadCompleted = false;
     public ?string $pendingTemplateAction = null;
     public ?string $pendingTemplateActionId = null;
     public bool $showSaveTemplateNamePrompt = false;
@@ -234,12 +235,12 @@ trait InteractsWithCoachDatabase
         }
 
         if ($this->section === 'conversations') {
-            // Inbox is intentionally manual-refresh only.
-            // Keep cached conversations visible and do not trigger an automatic
-            // remote refresh during mount/first paint, because that request can
-            // block scrolling while GHL is slow.
             $this->hydrateCachedInboxConversations();
+
             $this->isLoadingConversations = false;
+            $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
         }
 
         if (in_array($this->section, ['campaigns', 'compose'], true)) {
@@ -381,11 +382,22 @@ trait InteractsWithCoachDatabase
 
         try {
             if ($this->section === 'conversations') {
-                // Do not auto-refresh the inbox from wire:init.
-                // The inbox updates only from the manual refresh button, search
-                // over cached rows, or selecting a conversation.
                 $this->hydrateCachedInboxConversations();
+
                 $this->isLoadingConversations = false;
+                $this->isLoadingConversationMessages = false;
+                $this->isRefreshingRemoteData = false;
+                $this->activeUiOperation = null;
+
+                if (! $this->inboxInitialLoadCompleted) {
+                    $this->inboxInitialLoadCompleted = true;
+                    $this->loadConversations();
+                }
+
+                $this->isLoadingConversations = false;
+                $this->isLoadingConversationMessages = false;
+                $this->isRefreshingRemoteData = false;
+                $this->activeUiOperation = null;
             }
         } finally {
             $this->isBootingRemoteSection = false;
@@ -479,25 +491,24 @@ trait InteractsWithCoachDatabase
 
     protected function deferredUiStatusIsRunning(array $status, $user, string $type, ?string $reference = null): bool
     {
-        if (Cache::has(CoachDatabaseUiSyncService::lockKey($user, $type, $reference))) {
-            return true;
-        }
-
         $state = strtolower((string) ($status['status'] ?? ''));
-        if (! in_array($state, ['queued', 'running', 'already_running'], true)) {
-            return false;
-        }
-
         $startedAt = $status['started_at'] ?? $status['queued_at'] ?? null;
+        $isFreshStatus = false;
+
         if ($startedAt) {
             try {
-                return \Illuminate\Support\Carbon::parse($startedAt)->greaterThan(now()->subMinutes(2));
+                $isFreshStatus = \Illuminate\Support\Carbon::parse($startedAt)->greaterThan(now()->subSeconds(75));
             } catch (\Throwable) {
-                return false;
+                $isFreshStatus = false;
             }
         }
 
-        return false;
+        if (! in_array($state, ['queued', 'running', 'already_running'], true) || ! $isFreshStatus) {
+            Cache::forget(CoachDatabaseUiSyncService::lockKey($user, $type, $reference));
+            return false;
+        }
+
+        return Cache::has(CoachDatabaseUiSyncService::lockKey($user, $type, $reference)) || $isFreshStatus;
     }
 
     protected function startDeferredUiSync(string $type, ?string $reference = null, bool $force = false): void
@@ -791,10 +802,18 @@ trait InteractsWithCoachDatabase
 
     public function refreshConversationsRealtime(): void
     {
+        $this->inboxInitialLoadCompleted = true;
+
         $this->loadConversations();
+
         if ($this->selectedConversationId) {
             $this->loadConversationMessages();
         }
+
+        $this->isLoadingConversations = false;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
 
@@ -2839,11 +2858,17 @@ trait InteractsWithCoachDatabase
 
         if (! $user || ! $this->allowed || $this->locked) {
             $this->isLoadingConversations = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
             return;
         }
 
+        $this->clearStaleInboxLoadingState();
         $this->hydrateCachedInboxConversations();
+
         $this->isLoadingConversations = true;
+        $this->isRefreshingRemoteData = false;
+        // $this->activeUiOperation = 'Loading conversations';
 
         try {
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
@@ -2864,12 +2889,15 @@ trait InteractsWithCoachDatabase
             }
 
             $rows = $this->enrichConversationRowsWithLocalDatabase((array) ($result['conversations'] ?? []));
+
             $this->conversations = $rows;
             $this->cacheInboxConversations($rows);
 
             if (! $this->selectedConversationId && ! empty($this->conversations)) {
                 $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
-                $this->loadConversationMessages();
+                $this->messageLastId = null;
+                $this->hasMoreMessages = false;
+                $this->messages = [];
             }
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversations for inbox.', [
@@ -2884,6 +2912,8 @@ trait InteractsWithCoachDatabase
                 ->send();
         } finally {
             $this->isLoadingConversations = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
         }
     }
 
@@ -3926,15 +3956,23 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         if (! $user || ! $this->selectedConversationId) {
             $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
             return;
         }
 
+        $conversationId = (string) $this->selectedConversationId;
+
+        $this->hydrateCachedConversationMessages($conversationId);
+
         $this->isLoadingConversationMessages = true;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = 'Loading messages';
 
         try {
             $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
                 $user,
-                (string) $this->selectedConversationId,
+                $conversationId,
                 $this->messageLastId,
                 30
             );
@@ -3985,17 +4023,16 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $this->messageLastId = $result['last_message_id'] ?? $this->messageLastId;
             $this->hasMoreMessages = (bool) ($result['has_more'] ?? false);
 
-            Cache::put($this->deferredUiCacheKey('messages', $this->selectedConversationId), [
+            Cache::put($this->deferredUiCacheKey('messages', $conversationId), [
                 'rows' => $this->messages,
                 'last_message_id' => $this->messageLastId,
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
-
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversation messages for inbox.', [
                 'user_id' => $user->id,
-                'conversation_id' => $this->selectedConversationId,
+                'conversation_id' => $conversationId,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -4006,7 +4043,53 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 ->send();
         } finally {
             $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
         }
+    }
+
+    protected function hydrateCachedConversationMessages(string $conversationId): bool
+{
+    $conversationId = trim($conversationId);
+
+    if ($conversationId === '') {
+        return false;
+    }
+
+    $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
+
+    if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+        return false;
+    }
+
+    $this->messages = collect($cached['rows'])
+        ->filter(fn ($row): bool => is_array($row))
+        ->values()
+        ->all();
+
+    $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
+    $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
+
+    return ! empty($this->messages);
+}
+
+    protected function clearStaleInboxLoadingState(): void
+    {
+        $user = Auth::user();
+
+        if ($user) {
+            Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'conversations'));
+            Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'conversations'));
+
+            if ($this->selectedConversationId) {
+                Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $this->selectedConversationId));
+            }
+        }
+
+        $this->isLoadingConversations = false;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
     public function composeToCoach(string $contactId): void
@@ -8534,13 +8617,40 @@ protected function templateHtmlForNativeEditor(array $template): string
     public function loadSelectedTemplateDetail(): void
     {
         $templateId = trim((string) $this->selectedTemplateId);
-        if ($templateId === '' || $this->isBuiltInTemplateId($templateId)) {
+
+        if ($templateId === '') {
             $this->isLoadingTemplateDetail = false;
             return;
         }
 
-        $this->isLoadingTemplateDetail = true;
-        $this->startDeferredUiSync('template-detail', $templateId);
+        $template = $this->loadTemplateDetail($templateId);
+
+        if (is_array($template)) {
+            $this->templateDetails[$templateId] = $template;
+
+            $this->templateName = trim((string) ($template['name'] ?? $this->templateName)) ?: 'Untitled Template';
+            $this->templateSubject = $this->templateSubject($template);
+            $this->templatePreviewText = $this->templatePreviewText($template);
+            $this->templateAttachments = is_array($template['attachments'] ?? null)
+                ? $template['attachments']
+                : $this->extractPlyrcardAttachmentLinks($this->templateHtml($template));
+
+            $this->templateBody = $this->canonicalizeTemplateEditorHtml(
+                $this->templateHtmlForNativeEditor($template)
+            );
+
+            $this->templateEditorRefreshKey++;
+
+            $this->dispatch(
+                'rc-template-editor-refresh',
+                body: base64_encode($this->templateBody),
+                key: $this->templateEditorRefreshKey
+            );
+        }
+
+        $this->isLoadingTemplateDetail = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
 public function newTemplate(): void
@@ -8585,6 +8695,12 @@ protected function ensureComposeBodyHasFooter(): void
         $this->emailBody = $this->campaignBody;
 
         $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        $this->dispatch(
+            'rc-compose-template-applied',
+            body: base64_encode($this->campaignBody),
+            subject: (string) $this->campaignSubject,
+            preview: (string) $this->campaignPreviewText,
+        );
         $this->dispatch(
             'rc-compose-template-applied',
             body: base64_encode($this->campaignBody),
@@ -9380,6 +9496,14 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
         $subject = $this->templateSubject($template);
         $previewText = $this->templatePreviewText($template);
         $body = $this->templateHtmlForNativeEditor($template);
+
+        if (trim($body) === '') {
+            $body = (string) ($template['body'] ?? $template['html'] ?? $template['body_html'] ?? '');
+
+            if (trim($body) !== '') {
+                $body = $this->normalizeHtmlForNativeEditor($body);
+            }
+        }
 
         if (trim($body) === '') {
             $body = $this->blankTemplateEditorHtml();

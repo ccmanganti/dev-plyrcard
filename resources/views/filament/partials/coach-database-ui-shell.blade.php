@@ -2,7 +2,7 @@
 
 <div id="rc-ui-progress" wire:ignore aria-hidden="true"></div>
 
-@if ($isRefreshingRemoteData || $isLoadingConversations || $isLoadingConversationMessages || $isLoadingTemplates || $isLoadingTemplateDetail)
+@if ($isRefreshingRemoteData || $isLoadingTemplates)
     <span class="rc-ui-poll-anchor" wire:poll.2s="pollDeferredUiData" aria-hidden="true"></span>
 @endif
 
@@ -66,7 +66,7 @@
     </section>
 </div>
 
-<div class="rc-ui-deferred-toast {{ ($isRefreshingRemoteData && blank($selectedSchoolId ?? null)) ? 'is-visible' : 'is-suppressed' }}">
+<div class="rc-ui-deferred-toast {{ (($section ?? '') !== 'conversations' && $isRefreshingRemoteData && blank($selectedSchoolId ?? null)) ? 'is-visible' : 'is-suppressed' }}">
     {{ $activeUiOperation ?: 'Updating the current view…' }}
 </div>
 
