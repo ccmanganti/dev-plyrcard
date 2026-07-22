@@ -448,6 +448,430 @@
             }
         }
 
+
+
+        /* Light/dark adaptive profile polish: keeps existing tabs, only restyles the page. */
+        .profile-shell {
+            --pc-page-bg: #f8fafc;
+            --pc-panel: #ffffff;
+            --pc-panel-2: #ffffff;
+            --pc-border: rgba(226, 232, 240, .95);
+            --pc-border-soft: rgba(226, 232, 240, .72);
+            --pc-text: #0f172a;
+            --pc-heading: #111827;
+            --pc-muted: #7c8798;
+            --pc-input: #ffffff;
+            --pc-input-border: #e5e7eb;
+            --pc-input-icon: #9ca3af;
+            --pc-orange: #ff6338;
+            --pc-orange-2: #ff7a58;
+            --pc-orange-soft: rgba(255, 99, 56, .12);
+            --pc-orange-soft-2: rgba(255, 99, 56, .08);
+            --pc-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+            color: var(--pc-text);
+        }
+
+        .dark .profile-shell {
+            --pc-page-bg: #020617;
+            --pc-panel: #0f172a;
+            --pc-panel-2: #111827;
+            --pc-border: rgba(148, 163, 184, .18);
+            --pc-border-soft: rgba(148, 163, 184, .12);
+            --pc-text: #f8fafc;
+            --pc-heading: #f8fafc;
+            --pc-muted: #94a3b8;
+            --pc-input: rgba(15, 23, 42, .86);
+            --pc-input-border: rgba(148, 163, 184, .18);
+            --pc-input-icon: #94a3b8;
+            --pc-orange-soft: rgba(255, 99, 56, .18);
+            --pc-orange-soft-2: rgba(255, 99, 56, .1);
+            --pc-shadow: none;
+        }
+
+        .profile-header-layout {
+            display: block !important;
+            margin-bottom: 1.15rem !important;
+        }
+
+        .profile-header-title {
+            display: none !important;
+        }
+
+        .profile-header-card {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .profile-overview-card {
+            border-radius: 1.15rem !important;
+            background: var(--pc-panel) !important;
+            border: 1px solid var(--pc-border) !important;
+            box-shadow: var(--pc-shadow) !important;
+            padding: 1.05rem 1.2rem !important;
+            color: var(--pc-text) !important;
+        }
+
+        .dark .profile-overview-card {
+            background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)), var(--pc-panel) !important;
+        }
+
+        .profile-overview-card::before {
+            height: 3px !important;
+            background: linear-gradient(90deg, var(--pc-orange), #ff7a58 34%, #9b6dff 66%, #368bff) !important;
+        }
+
+        .profile-name,
+        .profile-shell h1,
+        .profile-shell h2,
+        .profile-shell h3,
+        .profile-shell .fi-section-header-heading,
+        .profile-shell .fi-fo-field-wrp-label span {
+            color: var(--pc-heading) !important;
+        }
+
+        .profile-meta-row,
+        .profile-shell .fi-section-header-description,
+        .profile-shell .fi-fo-field-wrp-helper-text,
+        .profile-shell .fi-fo-field-wrp-hint,
+        .profile-shell .fi-placeholder,
+        .profile-shell .fi-input::placeholder,
+        .profile-shell textarea::placeholder {
+            color: var(--pc-muted) !important;
+        }
+
+        .profile-avatar {
+            width: 3.45rem !important;
+            height: 3.45rem !important;
+            border: 2px solid #ffffff !important;
+            outline: 2px solid var(--pc-orange) !important;
+            box-shadow: 0 12px 28px rgba(255, 99, 56, .18) !important;
+        }
+
+        .dark .profile-avatar {
+            border-color: #020617 !important;
+        }
+
+        .profile-pill,
+        .profile-pill--accent {
+            border-color: var(--pc-border-soft) !important;
+            background: var(--pc-orange-soft-2) !important;
+            color: var(--pc-orange) !important;
+        }
+
+        .profile-action-btn {
+            min-width: 9.6rem !important;
+            height: 2.75rem !important;
+            border-radius: .85rem !important;
+            font-size: .82rem !important;
+            font-weight: 800 !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }
+
+        .profile-action-btn--ghost {
+            background: var(--pc-panel) !important;
+            border: 1px solid var(--pc-border) !important;
+            color: var(--pc-heading) !important;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .04) !important;
+        }
+
+        .dark .profile-action-btn--ghost {
+            background: rgba(15, 23, 42, .88) !important;
+            box-shadow: none !important;
+        }
+
+        .profile-action-btn--primary {
+            background: var(--pc-orange) !important;
+            border-color: var(--pc-orange) !important;
+            color: #ffffff !important;
+            box-shadow: 0 16px 28px rgba(255, 99, 56, .22) !important;
+        }
+
+        .profile-page-tabs [role="tablist"] {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: .45rem !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+            width: 100% !important;
+            margin: 0 0 1rem !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .profile-page-tabs [role="tab"],
+        .profile-page-tabs button[role="tab"] {
+            min-height: 2.65rem !important;
+            border-radius: .72rem !important;
+            border: 1px solid var(--pc-border) !important;
+            background: var(--pc-panel) !important;
+            color: #667085 !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .035) !important;
+            padding: .62rem .92rem !important;
+            font-weight: 700 !important;
+            transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease !important;
+        }
+
+        .dark .profile-page-tabs [role="tab"],
+        .dark .profile-page-tabs button[role="tab"] {
+            background: rgba(15, 23, 42, .78) !important;
+            color: #94a3b8 !important;
+            box-shadow: none !important;
+        }
+
+        .profile-page-tabs [role="tab"]:hover,
+        .profile-page-tabs button[role="tab"]:hover {
+            border-color: rgba(255, 99, 56, .28) !important;
+            color: var(--pc-orange) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .profile-page-tabs [role="tab"][aria-selected="true"],
+        .profile-page-tabs button[role="tab"][aria-selected="true"],
+        .profile-page-tabs [role="tab"].fi-active,
+        .profile-page-tabs button[role="tab"].fi-active {
+            background: var(--pc-orange-soft) !important;
+            border-color: rgba(255, 99, 56, .22) !important;
+            color: var(--pc-orange) !important;
+            box-shadow: none !important;
+        }
+
+        .profile-page-tabs [role="tab"] svg,
+        .profile-page-tabs button[role="tab"] svg {
+            width: 1rem !important;
+            height: 1rem !important;
+            color: currentColor !important;
+        }
+
+        .profile-shell .fi-section,
+        .profile-shell section.fi-section {
+            border-radius: 1.15rem !important;
+            border: 1px solid var(--pc-border) !important;
+            background: var(--pc-panel) !important;
+            box-shadow: var(--pc-shadow) !important;
+            overflow: hidden !important;
+        }
+
+        .profile-shell .fi-section + .fi-section,
+        .profile-shell section.fi-section + section.fi-section {
+            margin-top: 1rem !important;
+        }
+
+        .profile-shell .fi-section-header {
+            border-bottom: 1px solid var(--pc-border-soft) !important;
+            padding: 1.15rem 1.35rem !important;
+        }
+
+        .profile-shell .fi-section-content,
+        .profile-shell .fi-section-content-ctn {
+            background: transparent !important;
+        }
+
+        .profile-shell .fi-section-content {
+            padding: 1.35rem !important;
+        }
+
+        .profile-shell .fi-input-wrp,
+        .profile-shell .fi-select-input,
+        .profile-shell .fi-textarea-wrp {
+            border-radius: .78rem !important;
+            border-color: var(--pc-input-border) !important;
+            background: var(--pc-input) !important;
+            box-shadow: none !important;
+        }
+
+        .profile-shell .fi-input,
+        .profile-shell textarea,
+        .profile-shell select {
+            color: var(--pc-heading) !important;
+            background: transparent !important;
+        }
+
+        .profile-shell .fi-input-wrp svg,
+        .profile-shell .fi-fo-field-wrp-prefix svg,
+        .profile-shell .fi-fo-field-wrp-suffix svg {
+            color: var(--pc-input-icon) !important;
+        }
+
+        .pc-inline-lock {
+            border-color: rgba(255, 99, 56, .28) !important;
+            background: var(--pc-orange-soft-2) !important;
+        }
+
+        .pc-inline-lock__content h4 {
+            color: var(--pc-heading) !important;
+        }
+
+        .pc-inline-lock__content p {
+            color: var(--pc-muted) !important;
+        }
+
+        .pc-lock-modal-card {
+            background: var(--pc-panel) !important;
+            border-color: rgba(255, 99, 56, .24) !important;
+            color: var(--pc-text) !important;
+        }
+
+        .pc-lock-modal-title {
+            color: var(--pc-heading) !important;
+        }
+
+        .pc-lock-modal-copy,
+        .pc-lock-btn-secondary {
+            color: var(--pc-muted) !important;
+        }
+
+        .pc-lock-btn {
+            height: 3.35rem !important;
+            min-width: 10rem !important;
+            border-radius: .9rem !important;
+            font-size: .86rem !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }
+
+        @media (max-width: 900px) {
+            .profile-page-tabs [role="tab"],
+            .profile-page-tabs button[role="tab"] {
+                flex: 1 1 calc(50% - .45rem) !important;
+                justify-content: center !important;
+            }
+
+            .profile-section .fi-section-content,
+            .profile-shell .fi-section-content {
+                padding: 1rem !important;
+            }
+        }
+
+
+
+        /* Final readability pass: softer typography + clearly visible inputs. */
+        .profile-shell .profile-name {
+            font-weight: 700 !important;
+            letter-spacing: .01em !important;
+        }
+
+        .profile-shell .profile-meta-row,
+        .profile-shell .profile-meta-item,
+        .profile-shell .profile-pill {
+            font-weight: 500 !important;
+            letter-spacing: 0 !important;
+        }
+
+        .profile-shell .profile-action-btn,
+        .profile-shell .pc-lock-btn,
+        .profile-shell .pc-inline-lock__button {
+            font-weight: 600 !important;
+            letter-spacing: 0 !important;
+        }
+
+        .profile-page-tabs [role="tab"],
+        .profile-page-tabs button[role="tab"] {
+            font-weight: 500 !important;
+            color: #667085 !important;
+        }
+
+        .profile-page-tabs [role="tab"][aria-selected="true"],
+        .profile-page-tabs button[role="tab"][aria-selected="true"],
+        .profile-page-tabs [role="tab"].fi-active,
+        .profile-page-tabs button[role="tab"].fi-active {
+            font-weight: 600 !important;
+            color: var(--pc-orange) !important;
+        }
+
+        .profile-shell .fi-section-header-heading,
+        .profile-shell .fi-section-header h2,
+        .profile-shell .fi-section-header h3 {
+            font-weight: 600 !important;
+            letter-spacing: 0 !important;
+        }
+
+        .profile-shell .fi-section-header-description,
+        .profile-shell .fi-fo-field-wrp-helper-text,
+        .profile-shell .fi-fo-field-wrp-hint {
+            font-weight: 400 !important;
+        }
+
+        .profile-shell .fi-fo-field-wrp-label,
+        .profile-shell .fi-fo-field-wrp-label span,
+        .profile-shell label {
+            font-weight: 500 !important;
+        }
+
+        .profile-shell .fi-input-wrp,
+        .profile-shell .fi-select-input,
+        .profile-shell .fi-textarea-wrp,
+        .profile-shell input,
+        .profile-shell textarea,
+        .profile-shell select {
+            border-color: #d0d5dd !important;
+        }
+
+        .profile-shell .fi-input-wrp,
+        .profile-shell .fi-textarea-wrp {
+            border-width: 1.25px !important;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, .05) !important;
+        }
+
+        .profile-shell .fi-select-input {
+            border-width: 1.25px !important;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, .05) !important;
+        }
+
+        .profile-shell .fi-input-wrp:focus-within,
+        .profile-shell .fi-textarea-wrp:focus-within {
+            border-color: rgba(255, 99, 56, .72) !important;
+            box-shadow: 0 0 0 3px rgba(255, 99, 56, .12) !important;
+        }
+
+        .profile-shell .fi-input,
+        .profile-shell textarea,
+        .profile-shell select {
+            font-weight: 400 !important;
+        }
+
+        .profile-shell .fi-input::placeholder,
+        .profile-shell textarea::placeholder,
+        .profile-shell select::placeholder {
+            font-weight: 400 !important;
+            color: #98a2b3 !important;
+        }
+
+        .dark .profile-shell .profile-page-tabs [role="tab"],
+        .dark .profile-shell .profile-page-tabs button[role="tab"] {
+            color: #a8b3c4 !important;
+        }
+
+        .dark .profile-shell .fi-input-wrp,
+        .dark .profile-shell .fi-select-input,
+        .dark .profile-shell .fi-textarea-wrp,
+        .dark .profile-shell input,
+        .dark .profile-shell textarea,
+        .dark .profile-shell select {
+            border-color: rgba(148, 163, 184, .36) !important;
+        }
+
+        .dark .profile-shell .fi-input-wrp,
+        .dark .profile-shell .fi-textarea-wrp,
+        .dark .profile-shell .fi-select-input {
+            box-shadow: none !important;
+        }
+
+        .dark .profile-shell .fi-input-wrp:focus-within,
+        .dark .profile-shell .fi-textarea-wrp:focus-within {
+            border-color: rgba(255, 99, 56, .78) !important;
+            box-shadow: 0 0 0 3px rgba(255, 99, 56, .16) !important;
+        }
+
+        .dark .profile-shell .fi-input::placeholder,
+        .dark .profile-shell textarea::placeholder,
+        .dark .profile-shell select::placeholder {
+            color: #94a3b8 !important;
+        }
+
+
         @media (max-width: 900px) {
             .profile-overview-grid {
                 flex-direction: column;

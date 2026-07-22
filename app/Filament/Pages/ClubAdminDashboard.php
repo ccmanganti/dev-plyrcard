@@ -96,7 +96,7 @@ class ClubAdminDashboard extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return ClubManagerAccess::canAccessClubArea(auth()->user());
+        return false;
     }
 
     public function getTitle(): string | Htmlable

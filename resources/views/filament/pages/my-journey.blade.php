@@ -18,63 +18,110 @@
 
     <style>
         .mj-wrap {
-            --bg: #050608;
-            --panel: #0b0d10;
-            --panel-2: #11141a;
-            --muted: #7f8896;
-            --text: #f7f8fa;
-            --border: rgba(255,255,255,.08);
-            --orange: #ff6347;
-            --orange-2: #ff6347;
-            --blue: #19a7ff;
-            --green: #19cf7a;
-            color: var(--text);
+            --mj-bg: #f7f8fb;
+            --mj-panel: #ffffff;
+            --mj-panel-2: #f3f5f8;
+            --mj-text: #101828;
+            --mj-heading: #0b1220;
+            --mj-muted: #667085;
+            --mj-soft: #98a2b3;
+            --mj-border: rgba(15, 23, 42, .11);
+            --mj-border-strong: rgba(15, 23, 42, .18);
+            --mj-shadow: 0 18px 45px rgba(15, 23, 42, .08);
+            --mj-shadow-soft: 0 10px 28px rgba(15, 23, 42, .06);
+            --mj-orange: #ff6338;
+            --mj-orange-dark: #e34e29;
+            --mj-orange-soft: rgba(255, 99, 56, .10);
+            --mj-blue: #0ea5e9;
+            --mj-blue-soft: rgba(14, 165, 233, .10);
+            --mj-gold: #d89b17;
+            --mj-gold-soft: rgba(216, 155, 23, .13);
+            --mj-green: #16a34a;
+            --mj-green-soft: rgba(22, 163, 74, .10);
+            color: var(--mj-text);
         }
 
-        .mj-wrap * { box-sizing: border-box; }
+        .dark .mj-wrap {
+            --mj-bg: #050608;
+            --mj-panel: #0b0d10;
+            --mj-panel-2: #11141a;
+            --mj-text: #f7f8fa;
+            --mj-heading: #ffffff;
+            --mj-muted: #a0a9b4;
+            --mj-soft: #7f8896;
+            --mj-border: rgba(255, 255, 255, .08);
+            --mj-border-strong: rgba(255, 255, 255, .13);
+            --mj-shadow: 0 18px 45px rgba(0, 0, 0, .28);
+            --mj-shadow-soft: 0 10px 30px rgba(0, 0, 0, .22);
+            --mj-orange-soft: rgba(255, 99, 56, .14);
+            --mj-blue-soft: rgba(25, 167, 255, .13);
+            --mj-gold: #f5c451;
+            --mj-gold-soft: rgba(245, 196, 81, .15);
+            --mj-green-soft: rgba(25, 207, 122, .12);
+        }
+
+        .mj-wrap,
+        .mj-wrap * {
+            box-sizing: border-box;
+        }
+
+        .mj-wrap {
+            width: 100%;
+        }
 
         .mj-hero {
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255,100,61,.25);
-            border-radius: 20px;
-            background:
-                radial-gradient(circle at top right, rgba(255,100,61,.16), transparent 25%),
-                linear-gradient(180deg, rgba(54,14,9,.95) 0%, rgba(28,9,9,.98) 100%);
-            padding: 2rem;
             min-height: 180px;
+            border: 1px solid rgba(255, 99, 56, .18);
+            border-radius: 22px;
+            background:
+                radial-gradient(circle at top right, rgba(255, 99, 56, .15), transparent 30%),
+                linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
+            box-shadow: var(--mj-shadow-soft);
+            padding: 2rem;
+        }
+
+        .dark .mj-hero {
+            border-color: rgba(255, 100, 61, .25);
+            background:
+                radial-gradient(circle at top right, rgba(255, 100, 61, .16), transparent 25%),
+                linear-gradient(180deg, rgba(54, 14, 9, .95) 0%, rgba(28, 9, 9, .98) 100%);
+            box-shadow: var(--mj-shadow);
         }
 
         .mj-eyebrow {
             display: inline-flex;
             align-items: center;
             gap: .5rem;
-            color: var(--orange);
+            color: var(--mj-orange);
             font-size: .72rem;
-            font-weight: 800;
-            letter-spacing: .18em;
+            font-weight: 750;
+            letter-spacing: .16em;
             text-transform: uppercase;
         }
 
         .mj-hero-title {
             margin-top: .8rem;
-            font-size: clamp(2rem, 4vw, 3.4rem);
-            line-height: .95;
-            font-weight: 900;
-            letter-spacing: .02em;
+            max-width: 760px;
+            color: var(--mj-heading);
+            font-size: clamp(2rem, 4vw, 3.35rem);
+            line-height: .98;
+            font-weight: 850;
+            letter-spacing: -.02em;
             text-transform: uppercase;
         }
 
         .mj-hero-title span {
-            color: var(--orange);
+            color: var(--mj-orange);
         }
 
         .mj-hero-text {
             margin-top: .85rem;
             max-width: 740px;
-            color: #b0b7c1;
+            color: var(--mj-muted);
             font-size: .96rem;
-            line-height: 1.55;
+            line-height: 1.58;
         }
 
         .mj-hero-badge {
@@ -87,20 +134,25 @@
             align-items: center;
             gap: .7rem;
             text-align: center;
-            color: #c5ccd5;
+            color: var(--mj-muted);
         }
 
         .mj-hero-badge-circle {
             width: 84px;
             height: 84px;
             border-radius: 999px;
-            border: 2px solid rgba(255,100,61,.65);
+            border: 2px solid rgba(255, 99, 56, .48);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--orange);
-            box-shadow: 0 0 0 10px rgba(255,100,61,.05);
-            background: rgba(255,255,255,.02);
+            color: var(--mj-orange);
+            box-shadow: 0 0 0 10px rgba(255, 99, 56, .06);
+            background: rgba(255, 255, 255, .62);
+        }
+
+        .dark .mj-hero-badge-circle {
+            background: rgba(255, 255, 255, .03);
+            border-color: rgba(255, 100, 61, .65);
         }
 
         .mj-hero-badge-circle svg {
@@ -117,30 +169,68 @@
 
         .mj-card {
             position: relative;
-            border-radius: 18px;
+            border-radius: 20px;
             padding: 1.25rem;
-            background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%);
-            border: 1px solid var(--border);
-            box-shadow: 0 14px 34px rgba(0,0,0,.28);
+            background: var(--mj-panel);
+            border: 1px solid var(--mj-border);
+            box-shadow: var(--mj-shadow-soft);
             overflow: hidden;
+            color: var(--mj-text);
+        }
+
+        .dark .mj-card {
+            background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%);
+            box-shadow: var(--mj-shadow);
         }
 
         .mj-card.current {
-            box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.28);
+            box-shadow: 0 0 0 1px rgba(255, 99, 56, .12), var(--mj-shadow-soft);
+        }
+
+        .dark .mj-card.current {
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), var(--mj-shadow);
         }
 
         .mj-card.orange {
-            border-color: rgba(255,100,61,.7);
+            border-color: rgba(255, 99, 56, .48);
             background:
-                radial-gradient(circle at top left, rgba(255,100,61,.08), transparent 28%),
+                radial-gradient(circle at top left, rgba(255, 99, 56, .09), transparent 30%),
+                var(--mj-panel);
+        }
+
+        .dark .mj-card.orange {
+            border-color: rgba(255, 100, 61, .7);
+            background:
+                radial-gradient(circle at top left, rgba(255, 100, 61, .10), transparent 30%),
                 linear-gradient(180deg, #140c0d 0%, #0a0b10 100%);
         }
 
         .mj-card.blue {
-            border-color: rgba(25,167,255,.35);
+            border-color: rgba(14, 165, 233, .34);
             background:
-                radial-gradient(circle at top left, rgba(25,167,255,.08), transparent 28%),
+                radial-gradient(circle at top left, rgba(14, 165, 233, .08), transparent 30%),
+                var(--mj-panel);
+        }
+
+        .dark .mj-card.blue {
+            border-color: rgba(25, 167, 255, .35);
+            background:
+                radial-gradient(circle at top left, rgba(25, 167, 255, .10), transparent 30%),
                 linear-gradient(180deg, #08111a 0%, #0a0f16 100%);
+        }
+
+        .mj-card.gold {
+            border-color: rgba(216, 155, 23, .40);
+            background:
+                radial-gradient(circle at top left, rgba(216, 155, 23, .10), transparent 30%),
+                var(--mj-panel);
+        }
+
+        .dark .mj-card.gold {
+            border-color: rgba(245, 196, 81, .55);
+            background:
+                radial-gradient(circle at top left, rgba(245, 196, 81, .12), transparent 30%),
+                linear-gradient(180deg, #171107 0%, #0a0b10 100%);
         }
 
         .mj-card.current::after {
@@ -149,14 +239,14 @@
             top: 1rem;
             right: 1rem;
             font-size: .68rem;
-            font-weight: 900;
-            letter-spacing: .12em;
+            font-weight: 800;
+            letter-spacing: .11em;
             text-transform: uppercase;
-            color: #d9dee5;
+            color: var(--mj-muted);
             padding: .35rem .65rem;
             border-radius: 999px;
-            background: rgba(255,255,255,.08);
-            border: 1px solid rgba(255,255,255,.10);
+            background: var(--mj-panel-2);
+            border: 1px solid var(--mj-border);
         }
 
         .mj-popular {
@@ -164,26 +254,27 @@
             top: -1px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--orange);
+            background: var(--mj-orange);
             color: white;
             font-size: .68rem;
-            font-weight: 900;
+            font-weight: 850;
             padding: .32rem .85rem;
             border-radius: 999px;
-            letter-spacing: .13em;
+            letter-spacing: .12em;
             text-transform: uppercase;
         }
 
         .mj-plan-icon {
             width: 48px;
             height: 48px;
-            border-radius: 12px;
+            border-radius: 14px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 1rem;
-            background: rgba(255,255,255,.05);
-            color: #d5dbe2;
+            background: var(--mj-panel-2);
+            color: var(--mj-muted);
+            border: 1px solid var(--mj-border);
         }
 
         .mj-plan-icon svg {
@@ -192,20 +283,29 @@
         }
 
         .mj-card.orange .mj-plan-icon {
-            background: rgba(255,100,61,.12);
-            color: var(--orange);
+            background: var(--mj-orange-soft);
+            color: var(--mj-orange);
+            border-color: rgba(255, 99, 56, .20);
         }
 
         .mj-card.blue .mj-plan-icon {
-            background: rgba(25,167,255,.12);
-            color: var(--blue);
+            background: var(--mj-blue-soft);
+            color: var(--mj-blue);
+            border-color: rgba(14, 165, 233, .20);
+        }
+
+        .mj-card.gold .mj-plan-icon {
+            background: var(--mj-gold-soft);
+            color: var(--mj-gold);
+            border-color: rgba(216, 155, 23, .22);
         }
 
         .mj-name {
-            font-size: 2rem;
-            font-weight: 900;
+            color: var(--mj-heading);
+            font-size: 1.9rem;
+            font-weight: 850;
             line-height: 1;
-            letter-spacing: .03em;
+            letter-spacing: .015em;
             text-transform: uppercase;
         }
 
@@ -217,31 +317,28 @@
         }
 
         .mj-price strong {
+            color: var(--mj-heading);
             font-size: 3rem;
-            font-weight: 900;
+            font-weight: 850;
             line-height: .9;
             letter-spacing: -.04em;
         }
 
-        .mj-card.orange .mj-price strong {
-            color: var(--orange);
-        }
-
-        .mj-card.blue .mj-price strong {
-            color: var(--blue);
-        }
+        .mj-card.orange .mj-price strong { color: var(--mj-orange); }
+        .mj-card.blue .mj-price strong { color: var(--mj-blue); }
+        .mj-card.gold .mj-price strong { color: var(--mj-gold); }
 
         .mj-price span {
-            color: #9aa3ae;
+            color: var(--mj-muted);
             font-size: .92rem;
             padding-bottom: .28rem;
         }
 
         .mj-tagline {
             margin-top: .35rem;
-            color: #8f98a4;
-            font-style: italic;
+            color: var(--mj-muted);
             font-size: .93rem;
+            line-height: 1.45;
         }
 
         .mj-features {
@@ -258,8 +355,8 @@
             line-height: 1.45;
         }
 
-        .mj-feature.included { color: #eff4f8; }
-        .mj-feature.excluded { color: #717986; }
+        .mj-feature.included { color: var(--mj-text); }
+        .mj-feature.excluded { color: var(--mj-soft); }
 
         .mj-feature svg {
             width: 16px;
@@ -268,16 +365,16 @@
             margin-top: .18rem;
         }
 
-        .mj-feature.included svg { color: #22c55e; }
-        .mj-feature.excluded svg { color: #6b7280; }
+        .mj-feature.included svg { color: var(--mj-green); }
+        .mj-feature.excluded svg { color: var(--mj-soft); }
 
         .mj-note {
             margin-top: 1rem;
-            border: 1px solid rgba(255,255,255,.08);
-            background: rgba(255,255,255,.03);
-            border-radius: 12px;
+            border: 1px solid var(--mj-border);
+            background: var(--mj-panel-2);
+            border-radius: 14px;
             padding: .85rem .9rem;
-            color: #98a1ac;
+            color: var(--mj-muted);
             font-size: .9rem;
             line-height: 1.45;
         }
@@ -288,58 +385,80 @@
             width: 100%;
             align-items: center;
             justify-content: center;
-            border-radius: 12px;
+            border-radius: 14px;
             min-height: 46px;
             padding: .85rem 1rem;
             text-decoration: none;
-            font-size: .9rem;
-            font-weight: 900;
-            letter-spacing: .08em;
+            font-size: .88rem;
+            font-weight: 800;
+            letter-spacing: .065em;
             text-transform: uppercase;
             border: 1px solid transparent;
-            transition: .2s ease;
+            transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
+        }
+
+        .mj-btn:hover {
+            transform: translateY(-1px);
         }
 
         .mj-btn.disabled {
-            background: rgba(255,255,255,.08);
-            color: #7d8592;
+            background: var(--mj-panel-2);
+            color: var(--mj-soft);
             pointer-events: none;
         }
 
         .mj-btn.orange {
-            background: var(--orange);
+            background: var(--mj-orange);
             color: white;
-            box-shadow: 0 8px 24px rgba(255,100,61,.25);
+            box-shadow: 0 8px 22px rgba(255, 99, 56, .22);
         }
 
-        .mj-btn.orange:hover { filter: brightness(1.05); }
+        .mj-btn.orange:hover {
+            background: var(--mj-orange-dark);
+        }
 
         .mj-btn.blue {
-            background: rgba(25,167,255,.12);
-            border-color: rgba(25,167,255,.35);
-            color: var(--blue);
+            background: var(--mj-blue-soft);
+            border-color: rgba(14, 165, 233, .32);
+            color: var(--mj-blue);
         }
 
         .mj-btn.blue:hover {
-            background: rgba(25,167,255,.18);
+            background: rgba(14, 165, 233, .16);
+        }
+
+        .mj-btn.gold {
+            background: var(--mj-gold-soft);
+            border-color: rgba(216, 155, 23, .35);
+            color: var(--mj-gold);
+        }
+
+        .mj-btn.gold:hover {
+            background: rgba(216, 155, 23, .19);
         }
 
         .mj-btn.ghost {
-            background: rgba(255,255,255,.03);
-            border-color: rgba(255,255,255,.10);
-            color: #dde4eb;
+            background: transparent;
+            border-color: var(--mj-border-strong);
+            color: var(--mj-heading);
         }
 
         .mj-btn.ghost:hover {
-            background: rgba(255,255,255,.06);
+            background: var(--mj-panel-2);
         }
 
         .mj-addon-wrap {
             margin-top: 1.4rem;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 18px;
-            background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%);
+            border: 1px solid var(--mj-border);
+            border-radius: 20px;
+            background: var(--mj-panel);
+            box-shadow: var(--mj-shadow-soft);
             overflow: hidden;
+        }
+
+        .dark .mj-addon-wrap {
+            background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%);
+            box-shadow: var(--mj-shadow);
         }
 
         .mj-addon-header {
@@ -347,35 +466,38 @@
             align-items: flex-start;
             gap: 1rem;
             padding: 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,.06);
+            border-bottom: 1px solid var(--mj-border);
+        }
+
+        .mj-addon-icon,
+        .mj-addon-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--mj-blue-soft);
+            color: var(--mj-blue);
+            border: 1px solid rgba(14, 165, 233, .18);
         }
 
         .mj-addon-icon {
             width: 48px;
             height: 48px;
             flex: 0 0 48px;
-            border-radius: 12px;
-            background: rgba(25,167,255,.12);
-            color: var(--blue);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border-radius: 14px;
         }
 
-        .mj-addon-icon svg {
-            width: 20px;
-            height: 20px;
-        }
+        .mj-addon-icon svg { width: 20px; height: 20px; }
 
         .mj-addon-title {
-            font-size: 1.55rem;
-            font-weight: 900;
+            color: var(--mj-heading);
+            font-size: 1.5rem;
+            font-weight: 850;
             line-height: 1;
             text-transform: uppercase;
         }
 
         .mj-addon-subtitle {
-            color: #a0a9b4;
+            color: var(--mj-muted);
             margin-top: .35rem;
             font-size: .94rem;
             line-height: 1.5;
@@ -392,9 +514,9 @@
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
-            border: 1px solid rgba(255,255,255,.07);
-            background: rgba(255,255,255,.025);
-            border-radius: 12px;
+            border: 1px solid var(--mj-border);
+            background: var(--mj-panel-2);
+            border-radius: 14px;
             padding: 1rem 1.1rem;
         }
 
@@ -409,27 +531,19 @@
             width: 40px;
             height: 40px;
             flex: 0 0 40px;
-            border-radius: 10px;
-            background: rgba(25,167,255,.1);
-            color: var(--blue);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border-radius: 12px;
         }
 
-        .mj-addon-badge svg {
-            width: 18px;
-            height: 18px;
-        }
+        .mj-addon-badge svg { width: 18px; height: 18px; }
 
         .mj-addon-name {
             font-size: 1rem;
-            font-weight: 800;
-            color: #f1f5f9;
+            font-weight: 750;
+            color: var(--mj-heading);
         }
 
         .mj-addon-desc {
-            color: #8e98a5;
+            color: var(--mj-muted);
             font-size: .87rem;
             margin-top: .2rem;
         }
@@ -440,15 +554,15 @@
         }
 
         .mj-addon-price {
-            color: var(--blue);
+            color: var(--mj-blue);
             font-size: 1.6rem;
-            font-weight: 900;
+            font-weight: 850;
             line-height: 1;
         }
 
         .mj-addon-unit {
             margin-top: .18rem;
-            color: #95a0ad;
+            color: var(--mj-muted);
             font-size: .72rem;
             font-weight: 800;
             letter-spacing: .08em;
@@ -457,24 +571,24 @@
 
         .mj-footer-note {
             margin-top: 1rem;
-            border: 1px solid rgba(25,207,122,.22);
-            border-radius: 14px;
-            background: rgba(25,207,122,.08);
-            color: #c8f5db;
+            border: 1px solid rgba(22, 163, 74, .22);
+            border-radius: 16px;
+            background: var(--mj-green-soft);
+            color: var(--mj-text);
             padding: 1rem 1.1rem;
         }
 
         .mj-footer-note strong {
             display: block;
-            color: #32e08e;
+            color: var(--mj-green);
             font-size: .98rem;
-            font-weight: 900;
+            font-weight: 850;
         }
 
         .mj-footer-note span {
             display: block;
             margin-top: .2rem;
-            color: #a7d9bc;
+            color: var(--mj-muted);
             font-size: .9rem;
         }
 
@@ -497,6 +611,18 @@
             .mj-card,
             .mj-addon-wrap {
                 border-radius: 16px;
+            }
+
+            .mj-hero {
+                padding: 1.4rem;
+            }
+
+            .mj-name {
+                font-size: 1.65rem;
+            }
+
+            .mj-price strong {
+                font-size: 2.55rem;
             }
 
             .mj-addon-item {
@@ -539,7 +665,7 @@
             @foreach ($plans as $plan)
                 <article class="mj-card {{ $plan['accent'] }} {{ $plan['current'] ? 'current' : '' }}">
                     @if ($plan['popular'])
-                        <div class="mj-popular">Most Popular</div>
+                        <div class="mj-popular" @if (($plan['accent'] ?? '') === 'gold') style="background:#f5c451;color:#241701;" @endif>{{ $plan['badge'] ?? 'Most Popular' }}</div>
                     @endif
 
                     <div class="mj-plan-icon">
@@ -554,6 +680,10 @@
                     </div>
 
                     <div class="mj-tagline">{{ $plan['tagline'] }}</div>
+
+                    @if (! empty($plan['setup']))
+                        <div class="mj-note" style="margin-top:.85rem;">{{ $plan['setup'] }}</div>
+                    @endif
 
                     <div class="mj-features">
                         @foreach ($plan['features'] as $feature)

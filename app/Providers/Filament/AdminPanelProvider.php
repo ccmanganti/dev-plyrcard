@@ -7,6 +7,7 @@ use App\Filament\Pages\Auth\PasswordReset\RequestPasswordReset;
 use App\Filament\Pages\Auth\PasswordReset\ResetPassword;
 use App\Filament\Pages\CoachDatabase;
 use App\Filament\Pages\ForcePasswordChange;
+use App\Filament\Pages\MyJourney;
 use App\Filament\Resources\Profiles\ProfileResource;
 use App\Filament\Widgets\GhlProfileViewersWidget;
 use App\Filament\Widgets\PlayerCardOverview;
@@ -14,7 +15,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use App\Filament\Pages\SuperadminDashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Enums\Width;
@@ -80,7 +81,7 @@ class AdminPanelProvider extends PanelProvider
                 for: 'App\\Filament\\Pages',
             )
             ->pages([
-                Dashboard::class,
+                SuperadminDashboard::class,
                 CoachDatabase::class,
                 ForcePasswordChange::class,
             ])
@@ -1317,7 +1318,9 @@ class AdminPanelProvider extends PanelProvider
                         ? route('filament.admin.auth.logout')
                         : url('/admin/logout');
 
-                    $managePlanUrl = url('/admin');
+                    $managePlanUrl = class_exists(MyJourney::class)
+                        ? MyJourney::getUrl()
+                        : url('/admin/my-journey');
 
                     $avatarUrl = null;
 
@@ -1402,7 +1405,7 @@ class AdminPanelProvider extends PanelProvider
                                 </button>
                             </div>
 
-                            <a href="{{ $managePlanUrl }}" class="plyr-sidebar-plan" data-plyr-open-upgrade aria-label="Manage current plan">
+                            <a href="{{ $managePlanUrl }}" class="plyr-sidebar-plan" aria-label="Manage current plan">
                                 <span class="plyr-sidebar-plan-icon">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M13 2L5 13H11L10 22L19 10H13L13 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -1701,7 +1704,7 @@ class AdminPanelProvider extends PanelProvider
 
                                         <div class="plyr-free-upgrade-actions">
                                             <button type="button" data-plyr-free-close>Not now</button>
-                                            <a href="{{ $settingsUrl }}">Manage Plan</a>
+                                            <a href="{{ $managePlanUrl }}">Manage Plan</a>
                                         </div>
                                     </div>
                                 </div>
@@ -1711,6 +1714,7 @@ class AdminPanelProvider extends PanelProvider
                                 (() => {
                                     const profileUrl = @js($editProfileUrl);
                                     const settingsUrl = @js($settingsUrl);
+                                    const managePlanUrl = @js($managePlanUrl);
                                     const lockSvg = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" stroke-width="1.9"/></svg>';
 
                                     const pathOf = (url) => {
@@ -1723,6 +1727,7 @@ class AdminPanelProvider extends PanelProvider
 
                                     const profilePath = pathOf(profileUrl);
                                     const settingsPath = pathOf(settingsUrl);
+                                    const managePlanPath = pathOf(managePlanUrl);
 
                                     const isAllowedPath = () => {
                                         const current = window.location.pathname.replace(/\/+$/, '');
@@ -1730,8 +1735,11 @@ class AdminPanelProvider extends PanelProvider
                                             || current.startsWith(profilePath + '/')
                                             || current === settingsPath
                                             || current.startsWith(settingsPath + '/')
+                                            || current === managePlanPath
+                                            || current.startsWith(managePlanPath + '/')
                                             || current.includes('/profile')
-                                            || current.includes('/settings');
+                                            || current.includes('/settings')
+                                            || current.includes('/my-journey');
                                     };
 
                                     const ensureUpgradeDrawerMountedToBody = () => {
@@ -1821,8 +1829,11 @@ class AdminPanelProvider extends PanelProvider
                                                 || hrefPath.startsWith(profilePath + '/')
                                                 || hrefPath === settingsPath
                                                 || hrefPath.startsWith(settingsPath + '/')
+                                                || hrefPath === managePlanPath
+                                                || hrefPath.startsWith(managePlanPath + '/')
                                                 || hrefPath.includes('/profile')
-                                                || hrefPath.includes('/settings');
+                                                || hrefPath.includes('/settings')
+                                                || hrefPath.includes('/my-journey');
 
                                             if (allowed) {
                                                 link.classList.remove('plyr-free-locked-link');

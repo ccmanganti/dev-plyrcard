@@ -38,7 +38,7 @@ class ProfileResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->check() && ! static::isSuperadminNavigationUser();
+        return false;
     }
 
     public static function getNavigationUrl(): string
