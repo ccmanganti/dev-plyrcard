@@ -2,6 +2,37 @@
     <div class="rc-livewire-root" wire:init="bootDeferredUiData">
         @include('filament.partials.coach-database-ui-shell')
 
+        @if(($section ?? '') === 'schools')
+            <div
+                wire:loading.flex
+                wire:target="selectSchoolById"
+                class="rc-discover-wire-school-loader"
+                aria-live="polite"
+                aria-label="Opening school profile"
+            >
+                <section class="rc-discover-wire-school-loader-panel" role="dialog" aria-modal="true">
+                    <header class="rc-discover-wire-school-loader-head">
+                        <div>
+                            <strong>Opening school profile</strong>
+                            <span>Loading local school data...</span>
+                        </div>
+                        <span class="rc-discover-wire-school-spinner" aria-hidden="true"></span>
+                    </header>
+
+                    <div class="rc-discover-wire-school-loader-body">
+                        <span class="rc-discover-wire-school-hero"></span>
+                        <span class="rc-discover-wire-school-grid">
+                            <span></span>
+                            <span></span>
+                        </span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                    </div>
+                </section>
+            </div>
+        @endif
+
     <script>
         /*
          * Discover Schools Alpine bootstrap.
@@ -204,80 +235,6 @@
                 };
             }
 
-            const openDiscoverSchoolShell = (school = {}) => {
-                const shell = document.getElementById('rc-ui-instant-shell');
-
-                if (!shell) return;
-
-                const title = document.getElementById('rc-ui-shell-title');
-                const copy = document.getElementById('rc-ui-shell-copy');
-
-                const schoolName = String(
-                    school?.name
-                    || school?.school_name
-                    || school?.company_name
-                    || 'School'
-                ).trim();
-
-                const division = String(school?.division || '').trim();
-                const conference = String(school?.conference || '').trim();
-
-                if (title) {
-                    title.textContent = schoolName || 'Opening school';
-                }
-
-                if (copy) {
-                    copy.textContent = [division, conference].filter(Boolean).join(' • ')
-                        || 'Opening school profile from local database.';
-                }
-
-                shell.dataset.kind = 'school';
-                shell.dataset.rcModal = 'loading';
-                shell.dataset.rcModalId = 'instant-school-shell';
-                shell.setAttribute('aria-hidden', 'false');
-                shell.classList.add('is-open');
-
-                document.documentElement.classList.add('rc-has-overlay-stack');
-                document.body?.classList.add('rc-has-overlay-stack-body');
-            };
-
-            const closeDiscoverSchoolShellWhenRealDrawerAppears = () => {
-                const shell = document.getElementById('rc-ui-instant-shell');
-
-                if (!shell || !shell.classList.contains('is-open')) {
-                    return;
-                }
-
-                const realSchoolDrawer = Array.from(document.querySelectorAll('.rc-drawer, .rc-school-modal-backdrop'))
-                    .find((node) => {
-                        if (!node || node.id === 'rc-ui-instant-shell') return false;
-
-                        const text = String(node.textContent || '').trim();
-
-                        return text.includes('View School')
-                            || text.includes('Add to List')
-                            || text.includes('Head Coach')
-                            || text.includes('Coaches')
-                            || node.querySelector('[wire\\:click*="selectComposeSchool"], [wire\\:click*="emailSchool"], [data-rc-school-id]');
-                    });
-
-                if (!realSchoolDrawer) {
-                    return;
-                }
-
-                setTimeout(() => {
-                    shell.classList.remove('is-open');
-                    shell.setAttribute('aria-hidden', 'true');
-                }, 180);
-            };
-
-            const schoolShellObserver = new MutationObserver(() => {
-                requestAnimationFrame(() => {
-                    setTimeout(closeDiscoverSchoolShellWhenRealDrawerAppears, 120);
-                });
-            });
-
-            schoolShellObserver.observe(document.documentElement, { childList: true, subtree: true });
             window.__rcDiscoverClientCacheVersion = '2026-07-15.7-grid-view-restored';
             window.rcDiscoverClientCache = (initialSchools = [], initialLists = [], initialView = 'grid') => ({
                 schools: [],
@@ -438,26 +395,14 @@
 
                     if (!schoolId) return;
 
-                    const school = (this.schools || []).find((row) => String(row.id || row.business_id || '') === schoolId)
-                        || (this.visibleSchools || []).find((row) => String(row.id || row.business_id || '') === schoolId)
-                        || { id: schoolId, name: 'Opening school' };
-
-                    openDiscoverSchoolShell(school);
-
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            this.$wire.call('openSchoolDashboardModal', schoolId)
-                                .catch((error) => {
-                                    console.error(error);
-
-                                    const shell = document.getElementById('rc-ui-instant-shell');
-                                    shell?.classList.remove('is-open');
-                                    shell?.setAttribute('aria-hidden', 'true');
-
-                                    toast('Unable to open this school.');
-                                });
-                        }, 0);
-                    });
+                    // Let Livewire control the temporary loader through wire:loading.
+                    // This avoids the old blink where a JS-created ghost drawer closed
+                    // before the real school drawer finished morphing in.
+                    this.$wire.call('selectSchoolById', schoolId)
+                        .catch((error) => {
+                            console.error(error);
+                            toast('Unable to open this school.');
+                        });
                 },
 
                 async emailSelected() {
@@ -781,6 +726,93 @@
             --rc-surface: rgb(24 24 27);
             --rc-soft: rgb(39 39 42);
             --rc-text: rgb(244 244 245);
+        }
+
+
+        .rc-discover-wire-school-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 100900;
+            justify-content: flex-end;
+            background: rgba(15, 23, 42, .28);
+            backdrop-filter: blur(2px);
+        }
+
+        .rc-discover-wire-school-loader-panel {
+            width: min(560px, 100%);
+            height: 100%;
+            overflow: auto;
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            box-shadow: -20px 0 40px rgba(15, 23, 42, .16);
+            padding: .95rem;
+            display: grid;
+            align-content: start;
+            gap: .85rem;
+        }
+
+        .rc-discover-wire-school-loader-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding-bottom: .85rem;
+            border-bottom: 1px solid var(--rc-border);
+        }
+
+        .rc-discover-wire-school-loader-head strong {
+            display: block;
+            font-size: .98rem;
+            line-height: 1.2;
+        }
+
+        .rc-discover-wire-school-loader-head span {
+            display: block;
+            margin-top: .22rem;
+            color: var(--rc-muted);
+            font-size: .78rem;
+        }
+
+        .rc-discover-wire-school-spinner {
+            width: 1.05rem;
+            height: 1.05rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 999px;
+            color: var(--rc-accent);
+            animation: rcSpin .7s linear infinite;
+            flex: 0 0 auto;
+        }
+
+        .rc-discover-wire-school-loader-body {
+            display: grid;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-hero,
+        .rc-discover-wire-school-grid > span,
+        .rc-discover-wire-school-line {
+            display: block;
+            border-radius: .85rem;
+            background: linear-gradient(90deg, rgba(148,163,184,.14), rgba(148,163,184,.28), rgba(148,163,184,.14));
+            background-size: 220% 100%;
+            animation: rcDiscoverWireSchoolPulse 1.05s ease-in-out infinite;
+        }
+
+        .rc-discover-wire-school-hero { height: 7.5rem; }
+
+        .rc-discover-wire-school-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-grid > span { height: 4.75rem; }
+        .rc-discover-wire-school-line { height: 2.75rem; }
+
+        @keyframes rcDiscoverWireSchoolPulse {
+            0% { background-position: 120% 0; }
+            100% { background-position: -120% 0; }
         }
 
         [x-cloak] { display: none !important; }
@@ -11688,6 +11720,7 @@
                     $key = (string) ($listRow['key'] ?? '');
                     return $key === '' ? [] : [$key => $schoolListKeys->contains(strtolower($key))];
                 })->all();
+                $slideCommunicationRows = collect($this->schoolCommunicationHistories[$slideSchoolId] ?? [])->values();
             @endphp
 
             <div class="rc-drawer rc-school-modal-backdrop rc-ui-stable-modal" wire:key="school-drawer-{{ $slideSchoolId }}" x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcRequestSchoolClose($el); }" data-rc-modal="school" data-rc-modal-id="school-{{ $slideSchoolId }}" data-rc-school-id="{{ $slideSchoolId }}" data-rc-drawer-backdrop>
@@ -11789,7 +11822,7 @@
                     <div class="rc-school-tabbar-v72">
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'coaches' ? 'is-active' : ''" x-on:click="tab='coaches'">Coaching Staff</button>
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'roster' ? 'is-active' : ''" x-on:click="tab='roster'">Roster & Stats</button>
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'" wire:click="loadSchoolCommunicationHistory({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="loadSchoolCommunicationHistory">Communications</button>
                     </div>
 
                     <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'">
@@ -11822,11 +11855,61 @@
                     </section>
 
                     <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'">
-                        <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 10 4 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 0 1-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                        <style>
+                            .rc-school-comms-history-v1{display:grid;gap:.72rem;padding:.15rem 0 .4rem;}
+                            .rc-school-comms-loading-v1{display:flex;align-items:center;gap:.45rem;color:var(--rc-muted);font-size:.78rem;padding:.65rem .2rem;}
+                            .rc-school-comms-item-v1{display:grid;grid-template-columns:2.35rem minmax(0,1fr) auto;gap:.7rem;align-items:start;padding:.7rem 0;border-bottom:1px solid var(--rc-border);}
+                            .rc-school-comms-item-v1:last-child{border-bottom:0;}
+                            .rc-school-comms-icon-v1{width:2.15rem;height:2.15rem;border-radius:.7rem;display:grid;place-items:center;background:rgba(255,99,56,.12);color:#ff6338;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-icon-v1{background:rgba(16,185,129,.14);color:#10b981;}
+                            .rc-school-comms-copy-v1{min-width:0;display:grid;gap:.22rem;}
+                            .rc-school-comms-title-v1{font-size:.86rem;font-weight:850;color:var(--rc-text);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-title-v1{color:#10b981;}
+                            .rc-school-comms-preview-v1{color:var(--rc-muted);font-size:.8rem;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+                            .rc-school-comms-badges-v1{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.18rem;}
+                            .rc-school-comms-badge-v1{display:inline-flex;align-items:center;border-radius:.45rem;padding:.16rem .45rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.66rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;}
+                            .rc-school-comms-badge-v1.is-opened{background:rgba(59,130,246,.14);color:#3b82f6;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-badge-v1.is-reply{background:rgba(16,185,129,.14);color:#10b981;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-date-v1{color:var(--rc-muted);font-size:.74rem;white-space:nowrap;padding-top:.08rem;}
+                            .rc-school-comms-empty-v1{border:1px dashed var(--rc-border);border-radius:.85rem;padding:.9rem;color:var(--rc-muted);font-size:.8rem;line-height:1.45;}
+                        </style>
+
+                        <div wire:loading.flex wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-loading-v1">
+                            <span class="rc-spinner-mini"></span>
+                            Loading communication history from HighLevel...
+                        </div>
+
+                        <div wire:loading.remove wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-history-v1">
+                            @forelse($slideCommunicationRows as $historyRow)
+                                @php
+                                    $historyDirection = strtolower((string) ($historyRow['direction'] ?? 'outbound'));
+                                    $historyInbound = $historyDirection === 'inbound';
+                                    $historyTitle = (string) ($historyRow['title'] ?? ($historyInbound ? 'Received from coach' : 'Sent to coach'));
+                                    $historyPreview = trim((string) ($historyRow['preview'] ?? 'No preview available.'));
+                                    $historyDate = (string) ($historyRow['date_label'] ?? '');
+                                    $historyOpened = (bool) ($historyRow['opened'] ?? false);
+                                    $historyReply = (bool) ($historyRow['reply'] ?? $historyInbound);
+                                @endphp
+                                <article class="rc-school-comms-item-v1 {{ $historyInbound ? 'is-inbound' : 'is-outbound' }}">
+                                    <span class="rc-school-comms-icon-v1" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
+                                    <span class="rc-school-comms-copy-v1">
+                                        <strong class="rc-school-comms-title-v1">{{ $historyTitle }}</strong>
+                                        <span class="rc-school-comms-preview-v1">{{ $historyPreview }}</span>
+                                        <span class="rc-school-comms-badges-v1">
+                                            <span class="rc-school-comms-badge-v1">EMAIL</span>
+                                            @if($historyOpened)<span class="rc-school-comms-badge-v1 is-opened">Opened</span>@endif
+                                            @if($historyReply)<span class="rc-school-comms-badge-v1 is-reply">Reply</span>@endif
+                                        </span>
+                                    </span>
+                                    <time class="rc-school-comms-date-v1">{{ $historyDate }}</time>
+                                </article>
+                            @empty
+                                <div class="rc-school-comms-empty-v1">
+                                    No communication history loaded yet. Open this tab to pull the latest conversations from HighLevel for coaches at this school.
+                                </div>
+                            @endforelse
                         </div>
                     </section>
                 </div>

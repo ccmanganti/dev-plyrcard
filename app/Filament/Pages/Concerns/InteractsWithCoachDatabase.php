@@ -34,6 +34,7 @@ trait InteractsWithCoachDatabase
     public array $topSchools = [];
     public array $conversations = [];
     public array $messages = [];
+    public array $schoolCommunicationHistories = [];
     public array $dashboardRecentActivity = [];
     public array $dashboardActivitySummary = [];
     public array $templates = [];
@@ -3934,6 +3935,275 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         Notification::make()->title('Recruiting Center')->body('School added to General Recruiting.')->success()->send();
     }
 
+
+
+    public function loadSchoolCommunicationHistory(string $schoolId): void
+    {
+        $user = Auth::user();
+        $schoolId = trim($schoolId);
+
+        if (! $user || $schoolId === '') {
+            return;
+        }
+
+        $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
+            $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
+
+            return (string) ($item['id'] ?? '') === $schoolId
+                || (string) ($item['business_id'] ?? '') === $schoolId
+                || $nameHash === $schoolId
+                || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
+        }) ?: ($this->selectedSchool ?? []);
+
+        $schoolName = trim((string) ($school['name'] ?? ''));
+        $schoolBusinessId = trim((string) ($school['business_id'] ?? $school['id'] ?? $schoolId));
+        $cacheKey = 'coach-database:school-comms-history:' . $user->getKey() . ':' . md5($schoolBusinessId . '|' . $schoolName);
+
+        $cached = Cache::get($cacheKey, []);
+        if (is_array($cached) && is_array($cached['rows'] ?? null)) {
+            $this->schoolCommunicationHistories[$schoolId] = collect($cached['rows'])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values()
+                ->all();
+        }
+
+        $coaches = collect($school['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->values();
+
+        if ($coaches->isEmpty() && $schoolName !== '') {
+            $coaches = collect($this->allCoaches())
+                ->filter(function (array $coach) use ($schoolName, $schoolBusinessId): bool {
+                    $coachSchool = strtolower(trim((string) ($coach['school'] ?? $coach['company_name'] ?? '')));
+                    $coachBusiness = strtolower(trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? '')));
+
+                    return ($coachSchool !== '' && $coachSchool === strtolower($schoolName))
+                        || ($schoolBusinessId !== '' && $coachBusiness !== '' && $coachBusiness === strtolower($schoolBusinessId));
+                })
+                ->values();
+        }
+
+        $coachIds = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''))))->filter()->unique()->values();
+        $coachEmails = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? $coach['contact_email'] ?? ''))))->filter()->unique()->values();
+        $coachNames = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? ''))))))->filter()->unique()->values();
+
+        try {
+            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                'limit' => 200,
+                'status' => 'all',
+                'search' => '',
+                'fetch_all' => true,
+            ]);
+
+            if (! ($result['success'] ?? false)) {
+                Notification::make()
+                    ->title('Communications')
+                    ->body((string) ($result['error'] ?? 'Unable to load school communication history from HighLevel.'))
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $this->conversations = $this->enrichConversationRowsWithLocalDatabase((array) ($result['conversations'] ?? []));
+            $this->cacheInboxConversations($this->conversations);
+
+            $schoolNameKey = strtolower(trim($schoolName));
+            $matchedConversations = collect($this->conversations)
+                ->filter(function (array $conversation) use ($schoolNameKey, $coachIds, $coachEmails, $coachNames): bool {
+                    $contactId = strtolower(trim((string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '')));
+                    $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+                    $conversationSchool = strtolower(trim((string) ($conversation['school'] ?? $conversation['company_name'] ?? '')));
+                    $name = strtolower(trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? '')));
+
+                    return ($contactId !== '' && $coachIds->contains($contactId))
+                        || ($email !== '' && $coachEmails->contains($email))
+                        || ($schoolNameKey !== '' && $conversationSchool === $schoolNameKey)
+                        || ($name !== '' && $coachNames->contains($name));
+                })
+                ->take(12)
+                ->values();
+
+            $historyRows = [];
+
+            foreach ($matchedConversations as $conversation) {
+                $conversationId = (string) ($conversation['id'] ?? '');
+                if ($conversationId === '') {
+                    continue;
+                }
+
+                $messageResult = app(GoHighLevelService::class)->getConversationMessagesForUser(
+                    $user,
+                    $conversationId,
+                    null,
+                    12
+                );
+
+                if (! ($messageResult['success'] ?? false)) {
+                    $historyRows[] = $this->schoolCommunicationHistoryRowFromConversation($conversation);
+                    continue;
+                }
+
+                $messages = collect($messageResult['messages'] ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+
+                if ($messages->isEmpty()) {
+                    $historyRows[] = $this->schoolCommunicationHistoryRowFromConversation($conversation);
+                    continue;
+                }
+
+                foreach ($messages as $message) {
+                    $historyRows[] = $this->schoolCommunicationHistoryRowFromMessage($message, $conversation);
+                }
+            }
+
+            $historyRows = collect($historyRows)
+                ->filter(fn ($row): bool => is_array($row) && trim((string) ($row['preview'] ?? '')) !== '')
+                ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
+                ->take(30)
+                ->map(function (array $row): array {
+                    unset($row['_timestamp']);
+                    return $row;
+                })
+                ->values()
+                ->all();
+
+            $this->schoolCommunicationHistories[$schoolId] = $historyRows;
+
+            Cache::put($cacheKey, [
+                'rows' => $historyRows,
+                'cached_at' => now()->toIso8601String(),
+            ], now()->addMinutes(10));
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to load school communication history from GHL.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $schoolId,
+                'school_name' => $schoolName,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Communications')
+                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load school communication history from HighLevel.')
+                ->danger()
+                ->send();
+        }
+    }
+
+    protected function schoolCommunicationHistoryRowFromConversation(array $conversation): array
+    {
+        $direction = $this->normalizeCommunicationDirection($conversation);
+        $coachName = trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? 'Coach')) ?: 'Coach';
+        $preview = $this->communicationPreviewText((string) ($conversation['last_message'] ?? $conversation['snippet'] ?? 'Recruiting email activity'));
+        $time = $conversation['last_message_at'] ?? $conversation['updated_at'] ?? $conversation['created_at'] ?? null;
+        $timestamp = $this->communicationTimestamp($time);
+
+        return [
+            'id' => 'conversation:' . (string) ($conversation['id'] ?? md5(json_encode($conversation) ?: '')),
+            'direction' => $direction,
+            'title' => ($direction === 'inbound' ? 'Received from ' : 'Sent to ') . $coachName,
+            'preview' => $preview,
+            'date_label' => $this->communicationDateLabel($time),
+            'opened' => (bool) ($conversation['opened'] ?? $conversation['is_opened'] ?? $conversation['email_opened'] ?? false),
+            'reply' => $direction === 'inbound' || (bool) ($conversation['replied'] ?? $conversation['has_reply'] ?? false),
+            '_timestamp' => $timestamp,
+        ];
+    }
+
+    protected function schoolCommunicationHistoryRowFromMessage(array $message, array $conversation = []): array
+    {
+        $direction = $this->normalizeCommunicationDirection($message, $conversation);
+        $coachName = trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? 'Coach')) ?: 'Coach';
+        $body = (string) (
+            $message['body']
+            ?? $message['html']
+            ?? $message['message']
+            ?? $message['text']
+            ?? $message['content']
+            ?? $message['snippet']
+            ?? $conversation['last_message']
+            ?? ''
+        );
+        $time = $message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? $message['dateAdded'] ?? $message['createdAt'] ?? $conversation['last_message_at'] ?? $conversation['updated_at'] ?? null;
+        $timestamp = $this->communicationTimestamp($time);
+
+        return [
+            'id' => 'message:' . (string) ($message['id'] ?? $message['messageId'] ?? md5(json_encode($message) ?: '')),
+            'direction' => $direction,
+            'title' => ($direction === 'inbound' ? 'Received from ' : 'Sent to ') . $coachName,
+            'preview' => $this->communicationPreviewText($body),
+            'date_label' => $this->communicationDateLabel($time),
+            'opened' => (bool) ($message['opened'] ?? $message['is_opened'] ?? $message['email_opened'] ?? $conversation['opened'] ?? false),
+            'reply' => $direction === 'inbound',
+            '_timestamp' => $timestamp,
+        ];
+    }
+
+    protected function normalizeCommunicationDirection(array $row, array $fallback = []): string
+    {
+        $raw = strtolower(trim((string) (
+            $row['direction']
+            ?? $row['message_direction']
+            ?? $row['messageDirection']
+            ?? $row['last_message_direction']
+            ?? $row['lastMessageDirection']
+            ?? $row['type']
+            ?? $row['message_type']
+            ?? $fallback['last_message_direction']
+            ?? $fallback['direction']
+            ?? ''
+        )));
+
+        if (str_contains($raw, 'inbound') || str_contains($raw, 'incoming') || in_array($raw, ['in', 'received', 'reply'], true)) {
+            return 'inbound';
+        }
+
+        return 'outbound';
+    }
+
+    protected function communicationPreviewText(string $value): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: '');
+
+        return Str::limit($text !== '' ? $text : 'No message preview available.', 118);
+    }
+
+    protected function communicationTimestamp($value): int
+    {
+        if (! $value) {
+            return 0;
+        }
+
+        if (is_numeric($value)) {
+            $number = (int) $value;
+            return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->getTimestamp();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    protected function communicationDateLabel($value): string
+    {
+        if (! $value) {
+            return '';
+        }
+
+        try {
+            $date = is_numeric($value)
+                ? \Illuminate\Support\Carbon::createFromTimestamp($this->communicationTimestamp($value))
+                : \Illuminate\Support\Carbon::parse($value);
+
+            return $date->isCurrentYear() ? $date->format('M j') : $date->format('M j, Y');
+        } catch (\Throwable) {
+            return is_scalar($value) ? (string) $value : '';
+        }
+    }
 
     public function selectConversation(string $conversationId): void
     {
