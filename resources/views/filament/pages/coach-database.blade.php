@@ -10550,8 +10550,11 @@
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 </button>
-                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="loadConversations" title="Refresh conversations" aria-label="Refresh conversations">
+                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime" title="Refresh conversations" aria-label="Refresh conversations">
+                                <span wire:loading.remove wire:target="refreshConversationsRealtime">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </span>
+                                <span wire:loading.flex wire:target="refreshConversationsRealtime" class="rc-spinner-mini"></span>
                                 </button>
                             </div>
                         </div>
@@ -10569,7 +10572,11 @@
                             <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
                         </div>
 
-                        <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem"><span class="rc-spinner-mini"></span> Refreshing inbox</div>
+                        @if(empty($inboxConversations))
+                            <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
+                                <span class="rc-spinner-mini"></span> Loading inbox
+                            </div>
+                        @endif
 
                         <div class="rc-inbox-list-v56">
                             @forelse($inboxConversations as $inboxConversation)
