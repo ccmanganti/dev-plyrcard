@@ -4491,6 +4491,11 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $trackedBody = $personalizedBody;
             try {
                 $rewriter = app(TrackingLinkRewriter::class);
+                $trackedBody = $this->forceSocialLinksThroughRecruitingTracking(
+                $trackedBody,
+                $trackingContext,
+                $coach
+            );
 
                 // Force the exact player website through /track/profile/{token}
                 // before the generic link pass. This works for root domains,
@@ -6875,6 +6880,57 @@ protected function templateHtmlForNativeEditor(array $template): string
         return 'fallback:' . md5(strtolower(trim((string) ($coach['name'] ?? ''))) . '|' . strtolower(trim((string) ($coach['school'] ?? $coach['company_name'] ?? ''))));
     }
 
+    protected function forceSocialLinksThroughRecruitingTracking(string $html, array $trackingContext, array $coach = []): string
+{
+    if (trim($html) === '') {
+        return $html;
+    }
+
+    $coachForTracking = array_merge($coach, [
+        'id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['id'] ?? null,
+        'contact_id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['contact_id'] ?? null,
+        'ghl_contact_id' => $trackingContext['ghl_contact_id'] ?? $coach['ghl_contact_id'] ?? null,
+        'business_id' => $trackingContext['business_id'] ?? $trackingContext['ghl_business_id'] ?? $coach['business_id'] ?? null,
+        'ghl_business_id' => $trackingContext['ghl_business_id'] ?? $trackingContext['business_id'] ?? $coach['ghl_business_id'] ?? null,
+        'school' => $trackingContext['school'] ?? $trackingContext['school_name'] ?? $coach['school'] ?? $coach['company_name'] ?? null,
+        'school_name' => $trackingContext['school_name'] ?? $trackingContext['school'] ?? $coach['school_name'] ?? null,
+    ]);
+
+    $platforms = [
+        'instagram' => ['InstagramLink', 'instagram'],
+        'x' => ['XLink', 'x'],
+        'youtube' => ['YoutubeLink', 'youtube'],
+        'youtube_alt' => ['YouTubeLink', 'youtube'],
+    ];
+
+    foreach ($platforms as [$token, $platform]) {
+        $destination = $this->userSocialUrl($platform, '');
+
+        if (trim($destination) === '') {
+            continue;
+        }
+
+        $tracked = $this->appendRecruitingTrackingQuery(
+            $destination,
+            $platform,
+            'profile_view',
+            $coachForTracking,
+            $platform
+        );
+
+        $html = str_replace('{{' . $token . '}}', $tracked, $html);
+
+        // This existing helper safely replaces exact href destinations inside anchors.
+        $html = $this->replaceExactProfileDestinationInEmail(
+            $html,
+            $destination,
+            $tracked
+        );
+    }
+
+    return $html;
+}
+
     /**
      * Return one canonical tracking row per coach/contact. The dataset can contain
      * the same contact from both the school association feed and the full contacts
@@ -6895,6 +6951,11 @@ protected function templateHtmlForNativeEditor(array $template): string
             'website_click_count', 'instagram_click_count', 'youtube_click_count',
             'x_click_count', 'email_click_count', 'trigger_link_click_count',
             'coach_reply_count', 'email_sent_count', 'email_open_count',
+            'instagram_clicks',
+            'youtube_clicks',
+            'x_clicks',
+            'twitter_click_count',
+            'twitter_clicks',
         ];
         $booleanFields = ['viewed_profile', 'trigger_link_clicked', 'replied'];
         $fillFields = [
@@ -6924,6 +6985,23 @@ protected function templateHtmlForNativeEditor(array $template): string
                 foreach ($numericFields as $field) {
                     $base[$field] = (int) $rows->max(fn (array $row): int => max(0, (int) ($row[$field] ?? 0)));
                 }
+
+                $base['instagram_click_count'] = max(
+                    (int) ($base['instagram_click_count'] ?? 0),
+                    (int) ($base['instagram_clicks'] ?? 0),
+                );
+
+                $base['youtube_click_count'] = max(
+                    (int) ($base['youtube_click_count'] ?? 0),
+                    (int) ($base['youtube_clicks'] ?? 0),
+                );
+
+                $base['x_click_count'] = max(
+                    (int) ($base['x_click_count'] ?? 0),
+                    (int) ($base['twitter_click_count'] ?? 0),
+                    (int) ($base['x_clicks'] ?? 0),
+                    (int) ($base['twitter_clicks'] ?? 0),
+                );
 
                 foreach ($booleanFields as $field) {
                     $base[$field] = $rows->contains(fn (array $row): bool => (bool) ($row[$field] ?? false));
@@ -7046,6 +7124,84 @@ protected function templateHtmlForNativeEditor(array $template): string
         ];
     }
 
+    protected function normalizeDashboardSocialPlatform(mixed $platform = null, array $row = []): string
+{
+    $raw = strtolower(trim((string) $platform));
+
+    $haystack = strtolower(trim(implode(' ', array_filter(array_map(
+        fn ($value): string => is_scalar($value) ? (string) $value : '',
+        [
+            $raw,
+            $row['platform_key'] ?? null,
+            $row['platform'] ?? null,
+            $row['rc_platform'] ?? null,
+            $row['utm_content'] ?? null,
+            $row['source'] ?? null,
+            $row['type'] ?? null,
+            $row['event_type'] ?? null,
+            $row['url'] ?? null,
+            $row['destination_url'] ?? null,
+            $row['href'] ?? null,
+            $row['link'] ?? null,
+            $row['last_clicked_url'] ?? null,
+        ]
+    )))));
+
+    return match (true) {
+        str_contains($haystack, 'instagram'),
+        preg_match('/(^|[^a-z0-9])ig([^a-z0-9]|$)/', $haystack) === 1 => 'instagram',
+
+        str_contains($haystack, 'youtube'),
+        str_contains($haystack, 'youtu.be'),
+        preg_match('/(^|[^a-z0-9])yt([^a-z0-9]|$)/', $haystack) === 1 => 'youtube',
+
+        str_contains($haystack, 'twitter'),
+        str_contains($haystack, 'x.com'),
+        $raw === 'x' => 'x',
+
+        default => $raw === 'twitter' ? 'x' : $raw,
+    };
+}
+
+protected function dashboardTrackingRowClickCount(array $row): int
+{
+    foreach ([
+        'clicks',
+        'click_count',
+        'clicks_count',
+        'total',
+        'count',
+        'events_count',
+        'value',
+    ] as $key) {
+        if (isset($row[$key]) && is_numeric($row[$key])) {
+            return max(0, (int) $row[$key]);
+        }
+    }
+
+    // A raw activity/event row with no aggregate count still means one click.
+    return 1;
+}
+
+protected function dashboardSocialClickTotal(Collection $rows, string $platform): int
+{
+    $platform = $platform === 'twitter' ? 'x' : strtolower(trim($platform));
+
+    return $rows
+        ->filter(fn ($row): bool => is_array($row))
+        ->filter(function (array $row) use ($platform): bool {
+            return $this->normalizeDashboardSocialPlatform(
+                $row['platform_key']
+                    ?? $row['platform']
+                    ?? $row['rc_platform']
+                    ?? $row['utm_content']
+                    ?? null,
+                $row
+            ) === $platform;
+        })
+        ->sum(fn (array $row): int => $this->dashboardTrackingRowClickCount($row));
+}
+
     public function getDashboardMetricsProperty(): array
     {
         $stats = $this->stats ?? [];
@@ -7086,11 +7242,40 @@ protected function templateHtmlForNativeEditor(array $template): string
         $trackedEmailProfileLinks = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_email_link'] ?? 0));
 
         // Coach Engagement only contains social clicks attributed to a tracked email.
-        // Profile views are counted separately in Profile Views.
+        // Normalize platform names because stored rows can be instagram/ig/instagram.com,
+        // x/twitter/x.com, or youtube/youtube.com depending on where the event was captured.
         $websiteClicks = 0;
-        $instagramClicks = $engagementRows->where('platform_key', 'instagram')->sum('clicks');
-        $youtubeClicks = $engagementRows->where('platform_key', 'youtube')->sum('clicks');
-        $xClicks = $engagementRows->where('platform_key', 'x')->sum('clicks');
+        $trackingCoachRows = collect($this->trackingCoaches());
+
+        $instagramClicks = max(
+            (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
+            $this->dashboardSocialClickTotal($engagementRows, 'instagram'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['instagram_click_count'] ?? 0),
+                (int) ($coach['instagram_clicks'] ?? 0),
+            )),
+        );
+
+        $youtubeClicks = max(
+            (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
+            $this->dashboardSocialClickTotal($engagementRows, 'youtube'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['youtube_click_count'] ?? 0),
+                (int) ($coach['youtube_clicks'] ?? 0),
+            )),
+        );
+
+        $xClicks = max(
+            (int) ($stats['x_click_count'] ?? $stats['twitter_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
+            $this->dashboardSocialClickTotal($engagementRows, 'x'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['x_click_count'] ?? 0),
+                (int) ($coach['twitter_click_count'] ?? 0),
+                (int) ($coach['x_clicks'] ?? 0),
+                (int) ($coach['twitter_clicks'] ?? 0),
+            )),
+        );
+
         $emailClicks = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
         $linkClicks = $instagramClicks + $youtubeClicks + $xClicks;
 
@@ -9428,6 +9613,12 @@ protected function ensureComposeBodyHasFooter(): void
             $trackedBody = $personalizedBody;
             try {
                 $rewriter = app(TrackingLinkRewriter::class);
+
+                $trackedBody = $this->forceSocialLinksThroughRecruitingTracking(
+                $trackedBody,
+                $trackingContext,
+                $coach
+            );
                 $trackedBody = $rewriter->prepareTrackedEmailHtml($trackedBody, $user, $trackingContext);
             } catch (\Throwable $exception) {
                 \Log::warning('Recruiting campaign link rewrite failed. Sending original body.', [
