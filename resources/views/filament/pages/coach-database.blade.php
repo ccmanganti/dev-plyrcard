@@ -10316,10 +10316,10 @@
                                 </div>
 
                                 <div class="rc-list-card-actions-v120">
-                                    <button type="button" class="rc-list-action-v120 rc-list-email-v120" x-on:click="emailAll()" title="Email all schools in this list">
+                                    <!-- <button type="button" class="rc-list-action-v120 rc-list-email-v120" x-on:click="emailAll()" title="Email all schools in this list">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
                                         Email Schools
-                                    </button>
+                                    </button> -->
                                     <button type="button" class="rc-list-action-v120" x-bind:class="selectMode ? 'is-active' : ''" x-on:click="selectMode=!selectMode" title="Select specific schools to email">
                                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
                                     </button>
@@ -10845,16 +10845,16 @@
 
                                 <div class="rc-contact-lines-v56">
                                     <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6Zm0 0 8 7 8-7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>{{ data_get($selectedCoach, 'email') ?? $selectedConversation['email'] ?? 'Email unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div>
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div> -->
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
 
-                                <div class="rc-profile-actions-v56">
+                                <!-- <div class="rc-profile-actions-v56">
                                     <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
-                                </div>
+                                </div> -->
 
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
