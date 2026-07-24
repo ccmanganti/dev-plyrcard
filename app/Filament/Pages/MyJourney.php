@@ -139,7 +139,7 @@ class MyJourney extends Page
                 'name' => 'FREE',
                 'price' => '$0',
                 'suffix' => '/mo',
-                'setup' => 'No credit card required',
+                // 'setup' => 'No credit card required',
                 'tagline' => 'A simple PLYRSite with your quick info. Get started in minutes.',
                 'accent' => 'gray',
                 'popular' => false,
@@ -158,7 +158,7 @@ class MyJourney extends Page
                     ['text' => 'Coach database access', 'included' => false],
                     ['text' => 'Coach engagement tracking', 'included' => false],
                 ],
-                'note' => 'Best for athletes who want a simple online presence before upgrading.',
+                'note' => 'Best for Athelete getting started and building presence in minutes.',
             ],
 
             [
@@ -166,7 +166,7 @@ class MyJourney extends Page
                 'name' => 'MY JOURNEY',
                 'price' => '$49',
                 'suffix' => '/mo',
-                'setup' => 'Monthly subscription · Cancel anytime',
+                // 'setup' => 'Monthly subscription · Cancel anytime',
                 'tagline' => 'Your own recruiting HQ — domain, email, tracking, templates, and the coach database.',
                 'accent' => 'orange',
                 'popular' => true,
@@ -185,16 +185,16 @@ class MyJourney extends Page
                     ['text' => 'Coach database access — weekly verifications', 'included' => true],
                     ['text' => '1-on-1 onboarding', 'included' => true],
                 ],
-                'note' => 'Best for athletes who want a complete recruiting workspace and coach outreach tools.',
+                'note' => "Best for athletes ready to run their own outreach and track what's working.",
             ],
 
             [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
-                'price' => '$49',
-                'suffix' => '/mo',
-                'setup' => '$500 one-time setup fee · Covers graphics, production, and done-for-you setup',
-                'tagline' => 'Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.',
+                'price' => '$550',
+                'suffix' => 'One time',
+                // 'setup' => '$500 one-time setup fee · Covers graphics, production, and done-for-you setup',
+                'tagline' => 'Paired with My Journey ($49/mo). Perfect right before your seasons',
                 'accent' => 'gold',
                 'popular' => true,
                 'badge' => 'Done For You',
@@ -211,7 +211,7 @@ class MyJourney extends Page
                     ['text' => '8 Hours of Support', 'included' => true],
                     ['text' => 'Full onboarding', 'included' => true],
                 ],
-                'note' => 'Best for athletes who want a full done-for-you recruiting package every month.',
+                'note' => 'Best for atheletes heading into a new season or showcases who want the full push from our team.',
             ],
         ];
     }

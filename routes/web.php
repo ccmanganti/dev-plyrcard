@@ -12,7 +12,31 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\RecruitingProfileViewTrackingController;
+use App\Http\Controllers\Admin\ExternalTrackingUrlGeneratorController;
+use App\Http\Controllers\ExternalSocialTrackingController;
 
+/*
+ * Load this file from routes/web.php before any catch-all /{slug} route:
+ * require __DIR__ . '/external_tracking.php';
+ */
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
+        ->name('admin.external-tracking-url-generator');
+
+    Route::post('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'generate'])
+        ->name('admin.external-tracking-url-generator.generate');
+});
+
+/* Platform-hosted player: /Sample/out/instagram */
+Route::get('/{slug}/out/{platform}', [ExternalSocialTrackingController::class, 'platform'])
+    ->where('platform', 'instagram|youtube|x')
+    ->name('external.social.platform');
+
+/* Parked/custom domain player: /out/instagram */
+Route::get('/out/{platform}', [ExternalSocialTrackingController::class, 'customDomain'])
+    ->where('platform', 'instagram|youtube|x')
+    ->name('external.social.custom-domain');
 
 Route::get('/track/click/{token}', [TrackingController::class, 'click'])->where('token', '[^/]+')->name('tracking.click');
 Route::get('/track/profile/{token}', [TrackingController::class, 'profile'])->where('token', '[^/]+')->name('tracking.profile');

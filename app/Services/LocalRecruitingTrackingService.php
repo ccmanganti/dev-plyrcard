@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\CoachDatabaseEmailMessage;
+use App\Models\CoachDatabaseSchool;
 use App\Models\CoachDatabaseTrackingEvent;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -67,6 +69,11 @@ class LocalRecruitingTrackingService
             'coach_email' => $payload['coach_email'] ?? null,
             'coach_title' => $payload['coach_title'] ?? null,
             'school_name' => $payload['school_name'] ?? $payload['school'] ?? null,
+            'school_logo_url' => $payload['school_logo_url'] ?? $payload['business_logo_url'] ?? null,
+            'business_logo_url' => $payload['business_logo_url'] ?? $payload['school_logo_url'] ?? null,
+            'identity_type' => $payload['identity_type'] ?? null,
+            'coach_match_source' => $payload['coach_match_source'] ?? null,
+            'recipient_email' => $payload['recipient_email'] ?? $payload['coach_email'] ?? null,
             'email_subject' => $payload['email_subject'] ?? null,
             'website_id' => $payload['website_id'] ?? null,
             'website_name' => $payload['website_name'] ?? null,
@@ -141,23 +148,220 @@ class LocalRecruitingTrackingService
 
     public function recordDirectProfileVisit(Website $website, Request $request): ?CoachDatabaseTrackingEvent
     {
+        // Compatibility guard only. The recommended setup removes the old external
+        // middleware and lets this existing profile-view path record exactly one row.
+        if ($request->attributes->get('external_tracking_recorded') === true) {
+            return null;
+        }
+
         $user = $website->user;
         if (! $user) {
             return null;
         }
 
-        return $this->record([
+        // GHL places the recipient email/contact ID in the public profile URL.
+        // Resolve that recipient against our existing local cache/database before
+        // inserting the same profile_view event used by the rest of the dashboard.
+        $identity = $this->resolveProfileViewerIdentity($user, $request);
+        $isTrackedRecipient = filled($request->query('rc_email'))
+            || filled($request->query('rc_contact_id'));
+
+        return $this->record(array_filter([
             'athlete_id' => $user->getKey(),
             'athlete_email' => $user->email ?: $user->personal_email,
             'athlete_ghl_contact_id' => $user->ghl_contact_id,
             'athlete_ghl_location_id' => $user->ghl_location_id,
             'event_type' => 'profile_view',
             'platform' => 'website',
-            'source' => 'direct_website_visit',
-            'destination_url' => $request->fullUrlWithoutQuery(['rc_tracked', 'rc_source']),
+            'source' => $isTrackedRecipient ? 'ghl_email_profile_view' : 'direct_website_visit',
+            'destination_url' => $request->fullUrlWithoutQuery(['rc_email', 'rc_contact_id', 'rc_external']),
             'website_id' => $website->getKey(),
             'website_name' => $website->name,
-        ], $request, 'profile_view');
+            'coach_contact_id' => $identity['coach_contact_id'],
+            'school_business_id' => $identity['school_business_id'],
+            'coach_name' => $identity['coach_name'],
+            'coach_email' => $identity['coach_email'],
+            'coach_title' => $identity['coach_title'],
+            'school_name' => $identity['school_name'],
+            'school_logo_url' => $identity['school_logo_url'],
+            'business_logo_url' => $identity['school_logo_url'],
+            'identity_type' => $identity['identity_type'],
+            'coach_match_source' => $identity['match_source'],
+            'recipient_email' => $identity['coach_email'],
+        ], static fn ($value): bool => $value !== null && $value !== ''), $request, 'profile_view');
+    }
+
+    /**
+     * Resolve the viewer from the email/contact ID embedded in a GHL campaign URL.
+     * A match becomes a coach-attributed profile view. No match stays anonymous and
+     * therefore contributes only to total/unique profile views.
+     */
+    protected function resolveProfileViewerIdentity(User $user, Request $request): array
+    {
+        $email = $this->normalizedEmail($request->query('rc_email'));
+        $suppliedContactId = $this->normalizedMergeValue($request->query('rc_contact_id'));
+        $locationId = trim((string) ($user->ghl_location_id ?? ''));
+
+        // Fastest and richest source: the same cached coach rows used by the UI.
+        $locationSlug = Str::slug($locationId !== '' ? $locationId : 'default');
+        $snapshot = Cache::get('coach-database:v10:' . $user->getKey() . ':' . $locationSlug, []);
+        $cachedCoach = collect(is_array($snapshot) ? ($snapshot['coaches'] ?? []) : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->first(function (array $coach) use ($email, $suppliedContactId): bool {
+                $coachEmail = $this->normalizedEmail(
+                    $coach['email'] ?? $coach['contact_email'] ?? null
+                );
+
+                if ($email !== '' && $coachEmail === $email) {
+                    return true;
+                }
+
+                if ($suppliedContactId === '') {
+                    return false;
+                }
+
+                return collect([
+                    $coach['id'] ?? null,
+                    $coach['contact_id'] ?? null,
+                    $coach['ghl_contact_id'] ?? null,
+                ])->map(fn ($value): string => trim((string) $value))
+                    ->contains($suppliedContactId);
+            });
+
+        if (is_array($cachedCoach)) {
+            return $this->profileViewerIdentityFromCoachRow(
+                $cachedCoach,
+                $email,
+                $suppliedContactId,
+                'coach_database_cache_snapshot'
+            );
+        }
+
+        // App-sent recipients are persisted here, so the same lookup also supports
+        // links generated by the built-in email composer.
+        if (Schema::hasTable('coach_database_email_messages')) {
+            $message = CoachDatabaseEmailMessage::query()
+                ->where('athlete_user_id', $user->getKey())
+                ->when($locationId !== '', fn ($query) => $query->where('ghl_location_id', $locationId))
+                ->where(function ($query) use ($email, $suppliedContactId): void {
+                    if ($email !== '') {
+                        $query->whereRaw('LOWER(recipient_email) = ?', [$email]);
+                        if ($suppliedContactId !== '') {
+                            $query->orWhere('coach_contact_id', $suppliedContactId);
+                        }
+                    } elseif ($suppliedContactId !== '') {
+                        $query->where('coach_contact_id', $suppliedContactId);
+                    } else {
+                        $query->whereRaw('1 = 0');
+                    }
+                })
+                ->latest('id')
+                ->first();
+
+            if ($message) {
+                return [
+                    'identity_type' => 'known_coach',
+                    'coach_contact_id' => $this->text($message->coach_contact_id) ?: ($suppliedContactId ?: $email),
+                    'school_business_id' => $this->text($message->school_business_id),
+                    'coach_name' => $this->text($message->recipient_name) ?: 'Known coach contact',
+                    'coach_email' => $this->normalizedEmail($message->recipient_email) ?: ($email ?: null),
+                    'coach_title' => null,
+                    'school_name' => $this->text($message->school_name),
+                    'school_logo_url' => null,
+                    'match_source' => 'coach_database_email_messages',
+                ];
+            }
+        }
+
+        // The local school table reliably supports the normalized head coach.
+        if ($email !== '' && Schema::hasTable('coach_database_schools')) {
+            $school = CoachDatabaseSchool::query()
+                ->where('user_id', $user->getKey())
+                ->when($locationId !== '', fn ($query) => $query->where('ghl_location_id', $locationId))
+                ->whereRaw('LOWER(head_coach_email) = ?', [$email])
+                ->first();
+
+            if ($school) {
+                return [
+                    'identity_type' => 'known_coach',
+                    'coach_contact_id' => $suppliedContactId ?: $email,
+                    'school_business_id' => $this->text($school->business_id),
+                    'coach_name' => $this->text($school->head_coach_name) ?: 'Known coach contact',
+                    'coach_email' => $email,
+                    'coach_title' => $this->text($school->head_coach_title),
+                    'school_name' => $this->text($school->name),
+                    'school_logo_url' => $this->text($school->logo_url),
+                    'match_source' => 'coach_database_schools.head_coach_email',
+                ];
+            }
+        }
+
+        return [
+            'identity_type' => $email !== '' ? 'unmatched_email' : 'anonymous',
+            'coach_contact_id' => null,
+            'school_business_id' => null,
+            'coach_name' => null,
+            'coach_email' => $email ?: null,
+            'coach_title' => null,
+            'school_name' => null,
+            'school_logo_url' => null,
+            'match_source' => null,
+        ];
+    }
+
+    protected function profileViewerIdentityFromCoachRow(
+        array $coach,
+        string $email,
+        string $suppliedContactId,
+        string $source
+    ): array {
+        $contactId = $this->text(
+            $coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? null
+        ) ?: ($suppliedContactId ?: null);
+        $coachEmail = $this->normalizedEmail(
+            $coach['email'] ?? $coach['contact_email'] ?? null
+        ) ?: ($email ?: null);
+        $firstName = trim((string) ($coach['first_name'] ?? $coach['firstName'] ?? ''));
+        $lastName = trim((string) ($coach['last_name'] ?? $coach['lastName'] ?? ''));
+        $name = $this->text(
+            $coach['name'] ?? $coach['full_name'] ?? trim($firstName . ' ' . $lastName)
+        ) ?: 'Known coach contact';
+
+        return [
+            'identity_type' => 'known_coach',
+            'coach_contact_id' => $contactId ?: $coachEmail,
+            'school_business_id' => $this->text(
+                $coach['business_id'] ?? $coach['company_id'] ?? $coach['school_id'] ?? null
+            ),
+            'coach_name' => $name,
+            'coach_email' => $coachEmail,
+            'coach_title' => $this->text($coach['title'] ?? $coach['job_title'] ?? null),
+            'school_name' => $this->text(
+                $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? null
+            ),
+            'school_logo_url' => $this->text(
+                $coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? null
+            ),
+            'match_source' => $source,
+        ];
+    }
+
+    protected function normalizedMergeValue(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '' || str_contains($value, '{{') || str_contains($value, '}}')) {
+            return '';
+        }
+
+        return Str::limit($value, 191, '');
+    }
+
+    protected function normalizedEmail(mixed $value): string
+    {
+        $email = strtolower($this->normalizedMergeValue($value));
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
     }
 
     public function storePendingEmailRecipient(User $user, array $context, string $subject, string $html): string
