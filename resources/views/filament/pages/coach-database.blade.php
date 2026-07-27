@@ -11305,7 +11305,17 @@ CSS;
                                     @foreach($visibleThreadMessages as $message)
                                         @php
                                             $message = is_array($message) ? $message : [];
-                                            $isOut = str_contains(strtolower((string) ($message['direction'] ?? $message['type'] ?? '')), 'out');
+                                            $normalizedDirection = strtolower(trim((string) (
+                                                $message['direction']
+                                                ?? $message['message_direction']
+                                                ?? $message['messageDirection']
+                                                ?? data_get($message, 'meta.email.direction')
+                                                ?? data_get($message, 'email.direction')
+                                                ?? data_get($message, 'message.direction')
+                                                ?? ''
+                                            )));
+                                            $isOut = str_contains($normalizedDirection, 'out')
+                                                || in_array($normalizedDirection, ['sent', 'send', 'outgoing', 'out'], true);
                                             $fromLabel = $isOut ? 'You' : ($message['from_name'] ?? $selectedName);
                                             $toLabel = $message['to'] ?? ($isOut ? $selectedName : 'You');
                                             if (is_array($toLabel)) {
@@ -11332,12 +11342,31 @@ CSS;
                                                 $message['text_body'] ?? null,
                                                 $message['textBody'] ?? null,
                                                 $message['text'] ?? null,
+                                                $message['content'] ?? null,
+                                                $message['snippet'] ?? null,
+                                                is_scalar($message['message'] ?? null) ? $message['message'] : null,
+                                                data_get($message, 'message.html'),
+                                                data_get($message, 'message.body'),
+                                                data_get($message, 'message.content'),
+                                                data_get($message, 'message.text'),
+                                                data_get($message, 'emailMessage.html'),
+                                                data_get($message, 'emailMessage.body'),
+                                                data_get($message, 'emailMessage.content'),
                                                 data_get($message, 'email.html'),
                                                 data_get($message, 'email.body'),
+                                                data_get($message, 'email.content'),
+                                                data_get($message, 'meta.email.html'),
+                                                data_get($message, 'meta.email.body'),
+                                                data_get($message, 'meta.email.content'),
                                                 data_get($message, 'payload.html'),
                                                 data_get($message, 'payload.body'),
+                                                data_get($message, 'payload.content'),
+                                                data_get($message, 'payload.text'),
                                             ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
                                             $messageBody = is_scalar($messageBody) ? (string) $messageBody : '';
+                                            if (trim($messageBody) === '') {
+                                                $messageBody = '<p><em>This email was received, but HighLevel did not include its body in the message payload.</em></p>';
+                                            }
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
                                         @endphp

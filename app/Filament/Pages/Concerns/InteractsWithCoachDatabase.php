@@ -519,7 +519,7 @@ trait InteractsWithCoachDatabase
             if (is_array($cached['rows'] ?? null)) {
                 $this->messages = collect($cached['rows'])
                     ->filter(fn ($row): bool => is_array($row))
-                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
                     ->values()
                     ->all();
                 $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
@@ -4511,7 +4511,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
             $rows = collect($result['messages'] ?? [])
                 ->filter(fn ($row): bool => is_array($row))
-                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
                 ->sortBy(function (array $row): int {
                     $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
 
@@ -4598,6 +4598,197 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
      * Keep full email rendering while preventing large HTML bodies from being
      * serialized verbatim into every Livewire request snapshot.
      */
+    /**
+     * Normalize both outbound and inbound HighLevel message payloads before they
+     * enter Livewire state. Received emails can place their body, direction,
+     * sender, recipients, and attachments inside nested message/email/meta nodes,
+     * while sent emails are usually already flattened at the top level.
+     */
+    protected function normalizeConversationMessageRow(array $row): array
+    {
+        $nestedMessage = is_array($row['message'] ?? null) ? $row['message'] : [];
+        $nestedEmail = is_array($row['email'] ?? null) ? $row['email'] : [];
+        $emailMessage = is_array($row['emailMessage'] ?? null) ? $row['emailMessage'] : [];
+        $metaEmail = is_array(data_get($row, 'meta.email')) ? data_get($row, 'meta.email') : [];
+        $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+
+        $firstScalar = static function (array $values, string $default = ''): string {
+            foreach ($values as $value) {
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    return trim((string) $value);
+                }
+            }
+
+            return $default;
+        };
+
+        $directionRaw = strtolower($firstScalar([
+            $row['direction'] ?? null,
+            $row['message_direction'] ?? null,
+            $row['messageDirection'] ?? null,
+            $nestedMessage['direction'] ?? null,
+            $nestedEmail['direction'] ?? null,
+            $emailMessage['direction'] ?? null,
+            $metaEmail['direction'] ?? null,
+            $payload['direction'] ?? null,
+            $row['status'] ?? null,
+        ]));
+
+        $inboundFlag = (bool) (
+            $row['inbound']
+            ?? $row['is_inbound']
+            ?? $row['isInbound']
+            ?? $nestedMessage['inbound']
+            ?? $nestedEmail['inbound']
+            ?? false
+        );
+
+        $outboundFlag = (bool) (
+            $row['outbound']
+            ?? $row['is_outbound']
+            ?? $row['isOutbound']
+            ?? $nestedMessage['outbound']
+            ?? $nestedEmail['outbound']
+            ?? false
+        );
+
+        if ($inboundFlag
+            || str_contains($directionRaw, 'inbound')
+            || str_contains($directionRaw, 'incoming')
+            || in_array($directionRaw, ['in', 'received', 'receive', 'reply', 'replied'], true)) {
+            $row['direction'] = 'inbound';
+        } elseif ($outboundFlag
+            || str_contains($directionRaw, 'outbound')
+            || str_contains($directionRaw, 'outgoing')
+            || in_array($directionRaw, ['out', 'sent', 'send'], true)) {
+            $row['direction'] = 'outbound';
+        } else {
+            // A sender that matches the conversation contact is an inbound email.
+            // Keep unknown rows neutral rather than incorrectly marking them sent.
+            $from = strtolower($firstScalar([
+                $row['from'] ?? null,
+                $row['from_email'] ?? null,
+                $row['fromEmail'] ?? null,
+                data_get($row, 'from.email'),
+                $nestedMessage['from'] ?? null,
+                $nestedMessage['from_email'] ?? null,
+                $nestedEmail['from'] ?? null,
+                $emailMessage['from'] ?? null,
+            ]));
+            $conversation = collect($this->conversations ?? [])->firstWhere('id', (string) ($row['conversationId'] ?? $row['conversation_id'] ?? $this->selectedConversationId)) ?: [];
+            $contactEmail = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+            $row['direction'] = ($from !== '' && $contactEmail !== '' && str_contains($from, $contactEmail))
+                ? 'inbound'
+                : 'unknown';
+        }
+
+        $body = $firstScalar([
+            $row['html_body'] ?? null,
+            $row['htmlBody'] ?? null,
+            $row['message_html'] ?? null,
+            $row['body'] ?? null,
+            $row['html'] ?? null,
+            $row['content'] ?? null,
+            $row['text_body'] ?? null,
+            $row['textBody'] ?? null,
+            is_scalar($row['message'] ?? null) ? $row['message'] : null,
+            $row['text'] ?? null,
+            $row['snippet'] ?? null,
+            $nestedMessage['html_body'] ?? null,
+            $nestedMessage['htmlBody'] ?? null,
+            $nestedMessage['html'] ?? null,
+            $nestedMessage['body'] ?? null,
+            $nestedMessage['content'] ?? null,
+            $nestedMessage['text'] ?? null,
+            $nestedMessage['message'] ?? null,
+            $nestedEmail['html'] ?? null,
+            $nestedEmail['html_body'] ?? null,
+            $nestedEmail['body'] ?? null,
+            $nestedEmail['content'] ?? null,
+            $nestedEmail['text'] ?? null,
+            $emailMessage['html'] ?? null,
+            $emailMessage['html_body'] ?? null,
+            $emailMessage['body'] ?? null,
+            $emailMessage['content'] ?? null,
+            $emailMessage['text'] ?? null,
+            $metaEmail['html'] ?? null,
+            $metaEmail['body'] ?? null,
+            $metaEmail['content'] ?? null,
+            $metaEmail['text'] ?? null,
+            $payload['html'] ?? null,
+            $payload['body'] ?? null,
+            $payload['content'] ?? null,
+            $payload['text'] ?? null,
+        ]);
+
+        if ($body !== '') {
+            $row['body'] = $body;
+        }
+
+        $row['id'] = $firstScalar([
+            $row['id'] ?? null,
+            $row['messageId'] ?? null,
+            $row['message_id'] ?? null,
+            $nestedMessage['id'] ?? null,
+            $nestedMessage['messageId'] ?? null,
+            $nestedEmail['id'] ?? null,
+            $emailMessage['id'] ?? null,
+        ], sha1(json_encode($row) ?: serialize($row)));
+
+        $row['created_at'] = $firstScalar([
+            $row['created_at'] ?? null,
+            $row['createdAt'] ?? null,
+            $row['dateAdded'] ?? null,
+            $row['date'] ?? null,
+            $row['messageDate'] ?? null,
+            $row['timestamp'] ?? null,
+            $nestedMessage['createdAt'] ?? null,
+            $nestedMessage['dateAdded'] ?? null,
+            $nestedMessage['date'] ?? null,
+            $nestedEmail['createdAt'] ?? null,
+            $emailMessage['createdAt'] ?? null,
+        ], (string) now()->timestamp);
+
+        $row['subject'] = $firstScalar([
+            $row['subject'] ?? null,
+            $row['subjectLine'] ?? null,
+            $nestedMessage['subject'] ?? null,
+            $nestedEmail['subject'] ?? null,
+            $emailMessage['subject'] ?? null,
+            $metaEmail['subject'] ?? null,
+            $payload['subject'] ?? null,
+        ]);
+
+        $row['from_name'] = $firstScalar([
+            $row['from_name'] ?? null,
+            $row['fromName'] ?? null,
+            data_get($row, 'from.name'),
+            $nestedMessage['from_name'] ?? null,
+            $nestedMessage['fromName'] ?? null,
+            data_get($nestedMessage, 'from.name'),
+            $nestedEmail['from_name'] ?? null,
+            data_get($nestedEmail, 'from.name'),
+        ]);
+
+        $attachments = collect([
+            $row['attachments'] ?? null,
+            $nestedMessage['attachments'] ?? null,
+            $nestedEmail['attachments'] ?? null,
+            $emailMessage['attachments'] ?? null,
+            $payload['attachments'] ?? null,
+        ])->first(fn ($value): bool => is_array($value) && ! empty($value));
+
+        if (is_array($attachments)) {
+            $row['attachments'] = $attachments;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Keep full email rendering while preventing large HTML bodies from being
+     * serialized verbatim into every Livewire request snapshot.
+     */
     protected function compactConversationMessageForLivewire(array $row): array
     {
         if (filled($row['_livewire_body_gzip'] ?? null)) {
@@ -4615,22 +4806,34 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $row['textBody'] ?? null,
             is_scalar($row['message'] ?? null) ? $row['message'] : null,
             $row['text'] ?? null,
+            $row['snippet'] ?? null,
+            data_get($row, 'message.html'),
+            data_get($row, 'message.body'),
+            data_get($row, 'message.content'),
+            data_get($row, 'message.text'),
+            data_get($row, 'emailMessage.html'),
             data_get($row, 'emailMessage.body'),
+            data_get($row, 'emailMessage.content'),
+            data_get($row, 'email.html'),
             data_get($row, 'email.body'),
+            data_get($row, 'email.content'),
+            data_get($row, 'meta.email.html'),
             data_get($row, 'meta.email.body'),
+            data_get($row, 'meta.email.content'),
             data_get($row, 'payload.html'),
             data_get($row, 'payload.body'),
+            data_get($row, 'payload.content'),
         ];
 
         $body = collect($bodyCandidates)
             ->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
 
-        if (is_scalar($body) && (string) $body !== '') {
+        if (is_scalar($body) && trim((string) $body) !== '') {
             $encoded = base64_encode(gzencode((string) $body, 6));
             $row['_livewire_body_gzip'] = $encoded;
         }
 
-        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text'] as $key) {
+        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text', 'snippet'] as $key) {
             unset($row[$key]);
         }
 
@@ -4639,16 +4842,26 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         foreach ([
+            'message.html',
+            'message.body',
+            'message.content',
+            'message.text',
+            'emailMessage.html',
             'emailMessage.body',
+            'emailMessage.content',
+            'email.html',
             'email.body',
+            'email.content',
+            'meta.email.html',
             'meta.email.body',
+            'meta.email.content',
             'payload.html',
             'payload.body',
+            'payload.content',
         ] as $path) {
             data_forget($row, $path);
         }
 
-        // Raw API payloads are not used by the inbox view and can be very large.
         foreach (['raw', 'raw_body', 'response', 'debug'] as $key) {
             unset($row[$key]);
         }
@@ -4672,7 +4885,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     $this->messages = collect($cached['rows'])
         ->filter(fn ($row): bool => is_array($row))
-        ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+        ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
         ->values()
         ->all();
 
