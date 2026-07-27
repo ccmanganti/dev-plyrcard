@@ -4520,20 +4520,6 @@
 
         .rc-radar-card-v2 small { color: #7d8798; font-size: .73rem; }
 
-        .rc-home-empty-v2 {
-            min-height: 10.5rem;
-            display: grid;
-            place-content: center;
-            gap: .35rem;
-            padding: 1.25rem;
-            border: 1px dashed rgba(148, 163, 184, .24);
-            border-radius: 1rem;
-            background: rgba(148, 163, 184, .045);
-            text-align: center;
-        }
-        .rc-home-empty-v2 strong { color: var(--rc-text); font-size: .9rem; }
-        .rc-home-empty-v2 span { max-width: 26rem; color: var(--rc-muted); font-size: .76rem; line-height: 1.5; }
-
         .rc-radar-card-v2 em {
             width: max-content;
             border-radius: 999px;
@@ -7420,9 +7406,9 @@
         @if($section === 'dashboard' || $isStatDrawerOpen)
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->filter(fn ($row): bool => is_array($row))->take(5)->values()->all();
-                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->filter(fn ($row): bool => is_array($row))->take(5)->values()->all();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->filter(fn ($row): bool => is_array($row))->values()->all();
+                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(5)->values()->all();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
                 $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
@@ -7440,22 +7426,19 @@
                     count($this->favoriteSchools ?? []),
                 );
 
-                // Use the exact same concrete tracking rows as the Profile Views drawer.
-                // Do not use cached/GHL aggregate counters here because those can retain
-                // the legacy default value of 12 even when the detail drawer has no rows.
-                $dashboardProfileViewRows = collect($this->profileViewRows ?? [])
-                    ->filter(fn ($row): bool => is_array($row))
-                    ->values();
-
-                $profileViews = $dashboardProfileViewRows->sum(function (array $row): int {
-                    foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
-                        if (isset($row[$key]) && is_numeric($row[$key])) {
-                            return max(0, (int) $row[$key]);
-                        }
-                    }
-
-                    return 1;
-                });
+                $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
+                $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $trackedYoutubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
+                $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
+                $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
+                $trackedProfileTotal = max(
+                    $trackedProfileComponentTotal,
+                    (int) ($dashboardMetrics['view_profile_total'] ?? 0),
+                    (int) ($dashboardMetrics['profile_views'] ?? 0),
+                    (int) ($dashboardMetrics['unique_profile_views'] ?? 0),
+                );
+                $profileViews = $trackedProfileTotal;
 
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
@@ -7748,18 +7731,11 @@
                     ->values()
                     ->all();
 
-                // Only show schools backed by real, user-specific tracked activity.
-                // Do not populate On The Radar from the general school directory.
-                $radarSchools = collect($dashboardMostInterestedSchools)
-                    ->filter(fn ($school) => is_array($school))
-                    ->filter(fn (array $school): bool =>
-                        (int) ($school['profile_views'] ?? 0) > 0
-                        || (int) ($school['interest_clicks'] ?? 0) > 0
-                        || (int) ($school['coach_replies'] ?? $school['replies'] ?? 0) > 0
-                    )
-                    ->take(4)
-                    ->values()
-                    ->all();
+                $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
+
+                if (empty($radarSchools)) {
+                    $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
+                }
 
                 $formatActivityTimeLabel = function ($time): string {
                     if (! $time) {
@@ -7779,9 +7755,7 @@
                     }
                 };
 
-                $dashboardActivityRows = collect($dashboardRecentActivity)
-                    ->filter(fn ($activity): bool => is_array($activity))
-                    ->map(function (array $activity) use ($formatActivityTimeLabel) {
+                $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) use ($formatActivityTimeLabel) {
                     $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
                     $tone = 'blue';
                     $icon = '◉';
@@ -7838,15 +7812,13 @@
                     );
                 };
 
-                $radarSchoolRows = collect($radarSchools)
-                    ->filter(fn ($school): bool => is_array($school))
-                    ->map(function (array $school) use ($radarScoreForSchool) {
+                $maxRadarScore = max(1, collect($radarSchools)->map(fn ($school) => $radarScoreForSchool($school))->max() ?: 1);
+
+                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool, $maxRadarScore) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
                     $rawScore = $radarScoreForSchool($school);
-                    // Absolute activity score: the strongest row is no longer
-                    // automatically normalized to a fake 100% match.
-                    $match = $rawScore > 0 ? min(99, $rawScore) : 0;
+                    $match = $rawScore > 0 ? max(1, min(100, (int) round(($rawScore / $maxRadarScore) * 100))) : 0;
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                     $logoUrl = trim((string) (
                         $school['logo_url']
@@ -7869,12 +7841,16 @@
                     ];
                 })->values();
 
+                if ($radarSchoolRows->isEmpty()) {
+                    $radarSchoolRows = collect([
+                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU', 'logo_url' => ''],
+                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU', 'logo_url' => ''],
+                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU', 'logo_url' => ''],
+                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF', 'logo_url' => ''],
+                    ]);
+                }
 
-                $interestedSchoolRows = collect($dashboardMostInterestedSchools)
-                    ->filter(fn ($school): bool => is_array($school))
-                    ->take(4)
-                    ->values()
-                    ->map(function (array $school, $rank) {
+                $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $views = max(0, (int) ($school['profile_views'] ?? 0));
                     $engagementClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
@@ -8038,28 +8014,21 @@
                             <a href="{{ $this->pageUrl('lists') }}">View All</a>
                         </div>
 
-                        @if($radarSchoolRows->isEmpty())
-                            <div class="rc-home-empty-v2">
-                                <strong>No schools on your radar yet</strong>
-                                <span>Schools will appear here after real profile views, tracked clicks, or coach replies are recorded.</span>
-                            </div>
-                        @else
-                            <div class="rc-radar-schools-v2">
-                                @foreach($radarSchoolRows as $radarSchool)
-                                    <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
-                                        <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
-                                            @if(! empty($radarSchool['logo_url']))
-                                                <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
-                                            @endif
-                                            <span class="rc-logo-fallback-text">{{ $radarSchool['initials'] }}</span>
-                                        </span>
-                                        <strong>{{ $radarSchool['name'] }}</strong>
-                                        <small>{{ $radarSchool['conference'] }}</small>
-                                        <em>{{ $radarSchool['match'] }}% Interest</em>
-                                    </button>
-                                @endforeach
-                            </div>
-                        @endif
+                        <div class="rc-radar-schools-v2">
+                            @foreach($radarSchoolRows as $radarSchool)
+                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
+                                    <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
+                                        @if(! empty($radarSchool['logo_url']))
+                                            <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
+                                        @endif
+                                        <span class="rc-logo-fallback-text">{{ $radarSchool['initials'] }}</span>
+                                    </span>
+                                    <strong>{{ $radarSchool['name'] }}</strong>
+                                    <small>{{ $radarSchool['conference'] }}</small>
+                                    <em>{{ $radarSchool['match'] }}% Match</em>
+                                </button>
+                            @endforeach
+                        </div>
 
                         <div class="rc-home-dots-v2">
                             <span></span>
@@ -8110,18 +8079,11 @@
         @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $profileViewRows = collect($this->profileViewRows ?? [])
-                    ->filter(fn ($row): bool => is_array($row))
-                    ->values();
-                $profileViewsTotal = $profileViewRows->sum(function (array $row): int {
-                    foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
-                        if (isset($row[$key]) && is_numeric($row[$key])) {
-                            return max(0, (int) $row[$key]);
-                        }
-                    }
-
-                    return 1;
-                });
+                $profileViewRows = collect($this->profileViewRows ?? [])->values();
+                $profileViewsTotal = max(
+                    (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0),
+                    (int) $profileViewRows->sum('views'),
+                );
             @endphp
 
             <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"

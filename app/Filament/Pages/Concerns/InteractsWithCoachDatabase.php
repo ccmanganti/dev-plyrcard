@@ -56,6 +56,7 @@ trait InteractsWithCoachDatabase
 
     public bool $allowed = false;
     public bool $locked = false;
+    public bool $isRecruitingAccountReady = false;
     public ?string $reason = null;
     public ?string $error = null;
 
@@ -197,27 +198,52 @@ trait InteractsWithCoachDatabase
 
 
     protected function refreshRecruitingAccountReadiness($user = null): void
-{
-    $user ??= Auth::user();
+    {
+        $user ??= Auth::user();
 
-    if (! $user) {
-        $this->isRecruitingAccountReady = false;
+        if (! $user) {
+            $this->isRecruitingAccountReady = false;
 
-        return;
+            return;
+        }
+
+        // Always evaluate the actual database columns. This prevents a model
+        // accessor or application-level GHL fallback from making an account
+        // look activated while its own fields are still empty.
+        try {
+            $user->refresh();
+        } catch (\Throwable) {
+            // Continue with the currently hydrated model when refresh is unavailable.
+        }
+
+        $rawApiKey = method_exists($user, 'getRawOriginal')
+            ? $user->getRawOriginal('ghl_api_key')
+            : ($user->ghl_api_key ?? null);
+
+        $rawLocationId = method_exists($user, 'getRawOriginal')
+            ? $user->getRawOriginal('ghl_location_id')
+            : ($user->ghl_location_id ?? null);
+
+        $apiKey = trim((string) $rawApiKey);
+        $locationId = trim((string) $rawLocationId);
+
+        $missingValues = ['', 'null', 'none', 'pending', 'not set', 'n/a'];
+
+        $this->isRecruitingAccountReady =
+            ! in_array(strtolower($apiKey), $missingValues, true)
+            && ! in_array(strtolower($locationId), $missingValues, true);
     }
 
-    $apiKey = trim((string) ($user->ghl_api_key ?? ''));
-    $locationId = trim((string) ($user->ghl_location_id ?? ''));
+    public function checkRecruitingAccountReadiness(): void
+    {
+        $wasReady = $this->isRecruitingAccountReady;
 
-    $this->isRecruitingAccountReady =
-        $apiKey !== ''
-        && $locationId !== '';
-}
+        $this->refreshRecruitingAccountReadiness();
 
-public function checkRecruitingAccountReadiness(): void
-{
-    $this->refreshRecruitingAccountReadiness();
-}
+        if (! $wasReady && $this->isRecruitingAccountReady) {
+            $this->dispatch('rc-recruiting-account-ready');
+        }
+    }
 
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
@@ -230,6 +256,17 @@ public function checkRecruitingAccountReadiness(): void
         $this->refreshRecruitingAccountReadiness($user);
 
         if (! $user) {
+            return;
+        }
+
+        // Do not initialize Recruiting Center services or cached account data
+        // until this user's own GHL credentials have been assigned.
+        if (! $this->isRecruitingAccountReady) {
+            $this->allowed = false;
+            $this->locked = true;
+            $this->reason = 'account_preparation';
+            $this->error = null;
+
             return;
         }
 
@@ -4815,8 +4852,6 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
         ->all();
 }
 
-    public bool $isRecruitingAccountReady = false;
-
     public function sendQuickReply(): void
     {
         $user = Auth::user();
@@ -8035,43 +8070,15 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     {
         $stats = $this->stats ?? [];
 
-        // Dashboard activity is user-specific. Start every tracked metric at zero so
-        // a brand-new account can never inherit cached/demo/GHL aggregate values.
-        $trackingDefaults = array_fill_keys($this->dashboardTrackingStatKeys(), 0);
-        $trackingDefaults = array_merge($trackingDefaults, [
-            'profile_views' => 0,
-            'view_profile_total' => 0,
-            'view_profile_website' => 0,
-            'view_profile_instagram' => 0,
-            'view_profile_youtube' => 0,
-            'view_profile_x' => 0,
-            'view_profile_email_link' => 0,
-            'known_coach_profile_views' => 0,
-            'profile_view_unique_contact_count' => 0,
-            'profile_view_unique_school_count' => 0,
-            'profile_view_school_click_count' => 0,
-            'instagram_click_count' => 0,
-            'youtube_click_count' => 0,
-            'x_click_count' => 0,
-            'email_sent_count' => 0,
-            'emails_sent' => 0,
-            'email_open_count' => 0,
-            'email_click_count' => 0,
-            'coach_replies' => 0,
-        ]);
-
-        // The local tracking table is authoritative. Missing keys remain zero instead
-        // of falling back to an old snapshot or account-wide HighLevel counters.
+        // The local tracking table is authoritative. The detail drawers already read
+        // these events, so the headline dashboard cards must use the same source.
         $dashboardUser = Auth::user();
-        $localTrackingStats = $dashboardUser
-            ? app(LocalRecruitingTrackingService::class)->dashboardStats($dashboardUser)
-            : [];
-        $localTrackingStats = is_array($localTrackingStats) ? $localTrackingStats : [];
-
-        foreach ($trackingDefaults as $key => $defaultValue) {
-            $value = (int) ($localTrackingStats[$key] ?? $defaultValue);
-            $stats[$key] = $value;
-            $this->stats[$key] = $value;
+        if ($dashboardUser) {
+            $localTrackingStats = app(LocalRecruitingTrackingService::class)->dashboardStats($dashboardUser);
+            foreach ($localTrackingStats as $key => $value) {
+                $stats[$key] = (int) $value;
+                $this->stats[$key] = (int) $value;
+            }
         }
 
         $schools = collect($this->allSchools());
@@ -8085,93 +8092,52 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $this->stats['saved_schools'] = $savedSchools;
         $this->stats['favorite_schools'] = $favoriteSchools;
 
-        $profileRows = collect($this->profileViewRows)
-            ->filter(fn ($row): bool => is_array($row))
-            ->values();
-        $engagementRows = collect($this->coachEngagementRows)
-            ->filter(fn ($row): bool => is_array($row))
-            ->values();
+        $profileRows = collect($this->profileViewRows);
+        $engagementRows = collect($this->coachEngagementRows);
 
-        // Do not trust snapshot/GHL aggregate profile counters here. The visible
-        // dashboard count must come from concrete user-specific tracking rows.
-        // This prevents the legacy default value of 12 from appearing for a new
-        // account when no actual profile-view rows exist.
-        $trackedProfileTotal = $profileRows->sum(function (array $row): int {
-            foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
-                if (isset($row[$key]) && is_numeric($row[$key])) {
-                    return max(0, (int) $row[$key]);
-                }
-            }
+        $trackedProfileTotal = (int) ($stats['profile_views'] ?? $stats['view_profile_total'] ?? 0);
+        $uniqueProfileViews = (int) ($stats['unique_profile_views'] ?? $stats['unique_profile_view_count'] ?? 0);
+        $knownCoachProfileViews = (int) ($stats['known_coach_profile_views'] ?? 0);
 
-            return 1;
-        });
-
-        $uniqueProfileViews = $profileRows
-            ->map(fn (array $row): string => trim((string) (
-                $row['visitor_hash']
-                ?? $row['coach_contact_id']
-                ?? $row['coach_id']
-                ?? $row['contact_id']
-                ?? $row['id']
-                ?? ''
-            )))
-            ->filter()
-            ->unique()
-            ->count();
-
-        $knownCoachProfileViews = $profileRows
-            ->filter(fn (array $row): bool => filled(
-                $row['coach_contact_id']
-                ?? $row['coach_id']
-                ?? $row['contact_id']
-                ?? null
-            ))
-            ->sum(function (array $row): int {
-                foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
-                    if (isset($row[$key]) && is_numeric($row[$key])) {
-                        return max(0, (int) $row[$key]);
-                    }
-                }
-
-                return 1;
-            });
-
-        $stats['profile_views'] = $trackedProfileTotal;
-        $stats['view_profile_total'] = $trackedProfileTotal;
-        $stats['unique_profile_views'] = $uniqueProfileViews;
-        $stats['unique_profile_view_count'] = $uniqueProfileViews;
-        $stats['known_coach_profile_views'] = $knownCoachProfileViews;
-
-        $this->stats['profile_views'] = $trackedProfileTotal;
-        $this->stats['view_profile_total'] = $trackedProfileTotal;
-        $this->stats['unique_profile_views'] = $uniqueProfileViews;
-        $this->stats['unique_profile_view_count'] = $uniqueProfileViews;
-        $this->stats['known_coach_profile_views'] = $knownCoachProfileViews;
-
-        $trackedWebsiteViews = (int) ($stats['view_profile_website'] ?? 0);
-        $trackedInstagramViews = (int) ($stats['view_profile_instagram'] ?? 0);
-        $trackedYoutubeViews = (int) ($stats['view_profile_youtube'] ?? 0);
-        $trackedXViews = (int) ($stats['view_profile_x'] ?? 0);
-        $trackedEmailProfileLinks = (int) ($stats['view_profile_email_link'] ?? 0);
+        $trackedWebsiteViews = max((int) ($stats['view_profile_website'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_website'] ?? 0)));
+        $trackedInstagramViews = max((int) ($stats['view_profile_instagram'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_instagram'] ?? 0)));
+        $trackedYoutubeViews = max((int) ($stats['view_profile_youtube'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_youtube'] ?? 0)));
+        $trackedXViews = max((int) ($stats['view_profile_x'] ?? 0), collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_x'] ?? 0)));
+        $trackedEmailProfileLinks = collect($this->trackingCoaches())->sum(fn (array $coach): int => (int) ($coach['view_profile_email_link'] ?? 0));
 
         // Coach Engagement only contains social clicks attributed to a tracked email.
         // Normalize platform names because stored rows can be instagram/ig/instagram.com,
         // x/twitter/x.com, or youtube/youtube.com depending on where the event was captured.
         $websiteClicks = 0;
+        $trackingCoachRows = collect($this->trackingCoaches());
 
         $instagramClicks = max(
-            (int) ($stats['instagram_click_count'] ?? 0),
+            (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
             $this->dashboardSocialClickTotal($engagementRows, 'instagram'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['instagram_click_count'] ?? 0),
+                (int) ($coach['instagram_clicks'] ?? 0),
+            )),
         );
 
         $youtubeClicks = max(
-            (int) ($stats['youtube_click_count'] ?? 0),
+            (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
             $this->dashboardSocialClickTotal($engagementRows, 'youtube'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['youtube_click_count'] ?? 0),
+                (int) ($coach['youtube_clicks'] ?? 0),
+            )),
         );
 
         $xClicks = max(
-            (int) ($stats['x_click_count'] ?? 0),
+            (int) ($stats['x_click_count'] ?? $stats['twitter_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
             $this->dashboardSocialClickTotal($engagementRows, 'x'),
+            $trackingCoachRows->sum(fn (array $coach): int => max(
+                (int) ($coach['x_click_count'] ?? 0),
+                (int) ($coach['twitter_click_count'] ?? 0),
+                (int) ($coach['x_clicks'] ?? 0),
+                (int) ($coach['twitter_clicks'] ?? 0),
+            )),
         );
 
         $emailClicks = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
