@@ -517,29 +517,9 @@ trait InteractsWithCoachDatabase
         if ($this->selectedConversationId) {
             $cached = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
             if (is_array($cached['rows'] ?? null)) {
-                $cachedRows = collect($cached['rows'])
-                    ->filter(fn ($row): bool => is_array($row));
-
-                // Detached message sync can return only the sent rows. Re-apply the
-                // selected conversation preview every time cached rows replace Livewire
-                // state so a received reply does not disappear after the poll finishes.
-                $this->messages = $this->appendSelectedConversationPreviewMessage(
-                    $cachedRows,
-                    (string) $this->selectedConversationId
-                )
-                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
-                    ->sortBy(function (array $row): int {
-                        $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
-                        if (is_numeric($value)) {
-                            $number = (int) $value;
-                            return $number > 9999999999 ? (int) floor($number / 1000) : $number;
-                        }
-                        try {
-                            return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
-                        } catch (\Throwable) {
-                            return 0;
-                        }
-                    })
+                $this->messages = collect($cached['rows'])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
                     ->values()
                     ->all();
                 $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
@@ -4530,14 +4510,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             }
 
             $rows = collect($result['messages'] ?? [])
-                ->filter(fn ($row): bool => is_array($row));
-
-            // The conversation search endpoint can expose the newest inbound reply in
-            // last_message even when HighLevel's paginated messages endpoint temporarily
-            // omits that row. Preserve that received message in the opened thread instead
-            // of showing it only as a conversation-list preview.
-            $rows = $this->appendSelectedConversationPreviewMessage($rows, $conversationId)
-                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
                 ->sortBy(function (array $row): int {
                     $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
 
@@ -4621,159 +4595,194 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
     /**
-     * Merge the latest conversation preview into the opened thread when GHL's
-     * message-history endpoint does not return that newest inbound email.
-     *
-     * HighLevel's conversation search response is often fresher than the paginated
-     * message endpoint. Without this bridge, the left-side preview can show a coach
-     * reply while the opened conversation contains only the athlete's sent email.
+     * Keep full email rendering while preventing large HTML bodies from being
+     * serialized verbatim into every Livewire request snapshot.
      */
-    protected function appendSelectedConversationPreviewMessage(Collection $rows, string $conversationId): Collection
+    /**
+     * Normalize both outbound and inbound HighLevel message payloads before they
+     * enter Livewire state. Received emails can place their body, direction,
+     * sender, recipients, and attachments inside nested message/email/meta nodes,
+     * while sent emails are usually already flattened at the top level.
+     */
+    protected function normalizeConversationMessageRow(array $row): array
     {
-        $conversation = collect($this->conversations ?? [])
-            ->first(function ($row) use ($conversationId): bool {
-                return is_array($row)
-                    && trim((string) ($row['id'] ?? $row['conversation_id'] ?? $row['conversationId'] ?? '')) === $conversationId;
-            });
+        $nestedMessage = is_array($row['message'] ?? null) ? $row['message'] : [];
+        $nestedEmail = is_array($row['email'] ?? null) ? $row['email'] : [];
+        $emailMessage = is_array($row['emailMessage'] ?? null) ? $row['emailMessage'] : [];
+        $metaEmail = is_array(data_get($row, 'meta.email')) ? data_get($row, 'meta.email') : [];
+        $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
 
-        if (! is_array($conversation)) {
-            return $rows;
-        }
-
-        $rawDirection = strtolower(trim((string) (
-            $conversation['last_message_direction']
-            ?? $conversation['lastMessageDirection']
-            ?? $conversation['message_direction']
-            ?? $conversation['messageDirection']
-            ?? $conversation['direction']
-            ?? $conversation['last_message_type']
-            ?? ''
-        )));
-
-        $explicitlyOutbound = str_contains($rawDirection, 'outbound')
-            || str_contains($rawDirection, 'outgoing')
-            || in_array($rawDirection, ['out', 'sent'], true);
-
-        // An explicit outbound preview is already represented by the normal message
-        // history. When direction is missing, keep the preview: GHL commonly omits
-        // direction on received replies even though last_message contains the reply.
-        if ($explicitlyOutbound) {
-            return $rows;
-        }
-
-        $previewBody = collect([
-            $conversation['last_message'] ?? null,
-            $conversation['lastMessage'] ?? null,
-            $conversation['snippet'] ?? null,
-            $conversation['preview'] ?? null,
-            $conversation['message'] ?? null,
-        ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
-
-        $previewBody = is_scalar($previewBody) ? trim((string) $previewBody) : '';
-
-        if ($previewBody === '') {
-            return $rows;
-        }
-
-        $normalizeText = static function ($value): string {
-            if (! is_scalar($value)) {
-                return '';
+        $firstScalar = static function (array $values, string $default = ''): string {
+            foreach ($values as $value) {
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    return trim((string) $value);
+                }
             }
 
-            $text = html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
-
-            return strtolower(trim($text));
+            return $default;
         };
 
-        $normalizedPreview = $normalizeText($previewBody);
+        $directionRaw = strtolower($firstScalar([
+            $row['direction'] ?? null,
+            $row['message_direction'] ?? null,
+            $row['messageDirection'] ?? null,
+            $nestedMessage['direction'] ?? null,
+            $nestedEmail['direction'] ?? null,
+            $emailMessage['direction'] ?? null,
+            $metaEmail['direction'] ?? null,
+            $payload['direction'] ?? null,
+            $row['status'] ?? null,
+        ]));
 
-        $alreadyPresent = $rows->contains(function ($row) use ($normalizedPreview, $normalizeText): bool {
-            if (! is_array($row)) {
-                return false;
-            }
+        $inboundFlag = (bool) (
+            $row['inbound']
+            ?? $row['is_inbound']
+            ?? $row['isInbound']
+            ?? $nestedMessage['inbound']
+            ?? $nestedEmail['inbound']
+            ?? false
+        );
 
-            $candidate = collect([
-                $row['html_body'] ?? null,
-                $row['htmlBody'] ?? null,
-                $row['message_html'] ?? null,
-                $row['body'] ?? null,
-                $row['html'] ?? null,
-                $row['content'] ?? null,
-                $row['text_body'] ?? null,
-                $row['textBody'] ?? null,
-                is_scalar($row['message'] ?? null) ? $row['message'] : null,
-                $row['text'] ?? null,
-                data_get($row, 'emailMessage.body'),
-                data_get($row, 'email.body'),
-                data_get($row, 'meta.email.body'),
-                data_get($row, 'payload.html'),
-                data_get($row, 'payload.body'),
-            ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+        $outboundFlag = (bool) (
+            $row['outbound']
+            ?? $row['is_outbound']
+            ?? $row['isOutbound']
+            ?? $nestedMessage['outbound']
+            ?? $nestedEmail['outbound']
+            ?? false
+        );
 
-            $normalizedCandidate = $normalizeText($candidate);
-
-            if ($normalizedCandidate === '' || $normalizedPreview === '') {
-                return false;
-            }
-
-            return $normalizedCandidate === $normalizedPreview
-                || str_contains($normalizedCandidate, $normalizedPreview)
-                || str_contains($normalizedPreview, $normalizedCandidate);
-        });
-
-        if ($alreadyPresent) {
-            return $rows;
+        if ($inboundFlag
+            || str_contains($directionRaw, 'inbound')
+            || str_contains($directionRaw, 'incoming')
+            || in_array($directionRaw, ['in', 'received', 'receive', 'reply', 'replied'], true)) {
+            $row['direction'] = 'inbound';
+        } elseif ($outboundFlag
+            || str_contains($directionRaw, 'outbound')
+            || str_contains($directionRaw, 'outgoing')
+            || in_array($directionRaw, ['out', 'sent', 'send'], true)) {
+            $row['direction'] = 'outbound';
+        } else {
+            // A sender that matches the conversation contact is an inbound email.
+            // Keep unknown rows neutral rather than incorrectly marking them sent.
+            $from = strtolower($firstScalar([
+                $row['from'] ?? null,
+                $row['from_email'] ?? null,
+                $row['fromEmail'] ?? null,
+                data_get($row, 'from.email'),
+                $nestedMessage['from'] ?? null,
+                $nestedMessage['from_email'] ?? null,
+                $nestedEmail['from'] ?? null,
+                $emailMessage['from'] ?? null,
+            ]));
+            $conversation = collect($this->conversations ?? [])->firstWhere('id', (string) ($row['conversationId'] ?? $row['conversation_id'] ?? $this->selectedConversationId)) ?: [];
+            $contactEmail = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+            $row['direction'] = ($from !== '' && $contactEmail !== '' && str_contains($from, $contactEmail))
+                ? 'inbound'
+                : 'unknown';
         }
 
-        $previewMessageId = trim((string) (
-            $conversation['last_message_id']
-            ?? $conversation['lastMessageId']
-            ?? $conversation['message_id']
-            ?? $conversation['messageId']
-            ?? ''
-        ));
-
-        $previewTime = $conversation['last_message_at']
-            ?? $conversation['lastMessageDate']
-            ?? $conversation['last_message_date']
-            ?? $conversation['dateUpdated']
-            ?? $conversation['updated_at']
-            ?? $conversation['updatedAt']
-            ?? now()->toIso8601String();
-
-        $contactName = trim((string) (
-            $conversation['contact_name']
-            ?? $conversation['contactName']
-            ?? $conversation['name']
-            ?? $conversation['coach_name']
-            ?? 'Coach'
-        )) ?: 'Coach';
-
-        $fallbackId = $previewMessageId !== ''
-            ? $previewMessageId
-            : 'conversation-preview-' . sha1($conversationId . '|' . $normalizedPreview . '|' . (string) $previewTime);
-
-        return $rows->push([
-            'id' => $fallbackId,
-            'conversation_id' => $conversationId,
-            'contact_id' => $conversation['contact_id'] ?? $conversation['contactId'] ?? null,
-            'direction' => 'inbound',
-            'message_direction' => 'inbound',
-            'type' => 'Email',
-            'messageType' => 'TYPE_EMAIL',
-            'subject' => $conversation['last_message_subject']
-                ?? $conversation['lastMessageSubject']
-                ?? $conversation['subject']
-                ?? '',
-            'body' => $previewBody,
-            'from_name' => $contactName,
-            'from' => $conversation['email'] ?? $conversation['contact_email'] ?? null,
-            'to' => 'You',
-            'created_at' => $previewTime,
-            'date' => $previewTime,
-            '_conversation_preview_fallback' => true,
+        $body = $firstScalar([
+            $row['html_body'] ?? null,
+            $row['htmlBody'] ?? null,
+            $row['message_html'] ?? null,
+            $row['body'] ?? null,
+            $row['html'] ?? null,
+            $row['content'] ?? null,
+            $row['text_body'] ?? null,
+            $row['textBody'] ?? null,
+            is_scalar($row['message'] ?? null) ? $row['message'] : null,
+            $row['text'] ?? null,
+            $row['snippet'] ?? null,
+            $nestedMessage['html_body'] ?? null,
+            $nestedMessage['htmlBody'] ?? null,
+            $nestedMessage['html'] ?? null,
+            $nestedMessage['body'] ?? null,
+            $nestedMessage['content'] ?? null,
+            $nestedMessage['text'] ?? null,
+            $nestedMessage['message'] ?? null,
+            $nestedEmail['html'] ?? null,
+            $nestedEmail['html_body'] ?? null,
+            $nestedEmail['body'] ?? null,
+            $nestedEmail['content'] ?? null,
+            $nestedEmail['text'] ?? null,
+            $emailMessage['html'] ?? null,
+            $emailMessage['html_body'] ?? null,
+            $emailMessage['body'] ?? null,
+            $emailMessage['content'] ?? null,
+            $emailMessage['text'] ?? null,
+            $metaEmail['html'] ?? null,
+            $metaEmail['body'] ?? null,
+            $metaEmail['content'] ?? null,
+            $metaEmail['text'] ?? null,
+            $payload['html'] ?? null,
+            $payload['body'] ?? null,
+            $payload['content'] ?? null,
+            $payload['text'] ?? null,
         ]);
+
+        if ($body !== '') {
+            $row['body'] = $body;
+        }
+
+        $row['id'] = $firstScalar([
+            $row['id'] ?? null,
+            $row['messageId'] ?? null,
+            $row['message_id'] ?? null,
+            $nestedMessage['id'] ?? null,
+            $nestedMessage['messageId'] ?? null,
+            $nestedEmail['id'] ?? null,
+            $emailMessage['id'] ?? null,
+        ], sha1(json_encode($row) ?: serialize($row)));
+
+        $row['created_at'] = $firstScalar([
+            $row['created_at'] ?? null,
+            $row['createdAt'] ?? null,
+            $row['dateAdded'] ?? null,
+            $row['date'] ?? null,
+            $row['messageDate'] ?? null,
+            $row['timestamp'] ?? null,
+            $nestedMessage['createdAt'] ?? null,
+            $nestedMessage['dateAdded'] ?? null,
+            $nestedMessage['date'] ?? null,
+            $nestedEmail['createdAt'] ?? null,
+            $emailMessage['createdAt'] ?? null,
+        ], (string) now()->timestamp);
+
+        $row['subject'] = $firstScalar([
+            $row['subject'] ?? null,
+            $row['subjectLine'] ?? null,
+            $nestedMessage['subject'] ?? null,
+            $nestedEmail['subject'] ?? null,
+            $emailMessage['subject'] ?? null,
+            $metaEmail['subject'] ?? null,
+            $payload['subject'] ?? null,
+        ]);
+
+        $row['from_name'] = $firstScalar([
+            $row['from_name'] ?? null,
+            $row['fromName'] ?? null,
+            data_get($row, 'from.name'),
+            $nestedMessage['from_name'] ?? null,
+            $nestedMessage['fromName'] ?? null,
+            data_get($nestedMessage, 'from.name'),
+            $nestedEmail['from_name'] ?? null,
+            data_get($nestedEmail, 'from.name'),
+        ]);
+
+        $attachments = collect([
+            $row['attachments'] ?? null,
+            $nestedMessage['attachments'] ?? null,
+            $nestedEmail['attachments'] ?? null,
+            $emailMessage['attachments'] ?? null,
+            $payload['attachments'] ?? null,
+        ])->first(fn ($value): bool => is_array($value) && ! empty($value));
+
+        if (is_array($attachments)) {
+            $row['attachments'] = $attachments;
+        }
+
+        return $row;
     }
 
     /**
@@ -4797,22 +4806,34 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $row['textBody'] ?? null,
             is_scalar($row['message'] ?? null) ? $row['message'] : null,
             $row['text'] ?? null,
+            $row['snippet'] ?? null,
+            data_get($row, 'message.html'),
+            data_get($row, 'message.body'),
+            data_get($row, 'message.content'),
+            data_get($row, 'message.text'),
+            data_get($row, 'emailMessage.html'),
             data_get($row, 'emailMessage.body'),
+            data_get($row, 'emailMessage.content'),
+            data_get($row, 'email.html'),
             data_get($row, 'email.body'),
+            data_get($row, 'email.content'),
+            data_get($row, 'meta.email.html'),
             data_get($row, 'meta.email.body'),
+            data_get($row, 'meta.email.content'),
             data_get($row, 'payload.html'),
             data_get($row, 'payload.body'),
+            data_get($row, 'payload.content'),
         ];
 
         $body = collect($bodyCandidates)
             ->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
 
-        if (is_scalar($body) && (string) $body !== '') {
+        if (is_scalar($body) && trim((string) $body) !== '') {
             $encoded = base64_encode(gzencode((string) $body, 6));
             $row['_livewire_body_gzip'] = $encoded;
         }
 
-        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text'] as $key) {
+        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text', 'snippet'] as $key) {
             unset($row[$key]);
         }
 
@@ -4821,16 +4842,26 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         foreach ([
+            'message.html',
+            'message.body',
+            'message.content',
+            'message.text',
+            'emailMessage.html',
             'emailMessage.body',
+            'emailMessage.content',
+            'email.html',
             'email.body',
+            'email.content',
+            'meta.email.html',
             'meta.email.body',
+            'meta.email.content',
             'payload.html',
             'payload.body',
+            'payload.content',
         ] as $path) {
             data_forget($row, $path);
         }
 
-        // Raw API payloads are not used by the inbox view and can be very large.
         foreach (['raw', 'raw_body', 'response', 'debug'] as $key) {
             unset($row[$key]);
         }
@@ -4852,26 +4883,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return false;
     }
 
-    $cachedRows = collect($cached['rows'])
-        ->filter(fn ($row): bool => is_array($row));
-
-    $this->messages = $this->appendSelectedConversationPreviewMessage(
-        $cachedRows,
-        $conversationId
-    )
-        ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
-        ->sortBy(function (array $row): int {
-            $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
-            if (is_numeric($value)) {
-                $number = (int) $value;
-                return $number > 9999999999 ? (int) floor($number / 1000) : $number;
-            }
-            try {
-                return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
-            } catch (\Throwable) {
-                return 0;
-            }
-        })
+    $this->messages = collect($cached['rows'])
+        ->filter(fn ($row): bool => is_array($row))
+        ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
         ->values()
         ->all();
 

@@ -2385,8 +2385,6 @@ class GoHighLevelService
             'state' => $getCustomField('school_state'),
             'city' => $getCustomField('school_city'),
             'tags' => $contact['tags'] ?? [],
-            'starred' => $this->numericCustomFieldFromContact($contact, ['starred'], $trackingFieldMap) > 0,
-            'is_starred' => $this->numericCustomFieldFromContact($contact, ['starred'], $trackingFieldMap) > 0,
             'is_saved_school' => $this->contactHasTag($contact, config('ghl.coach_database.tags.saved_school', 'saved school')),
             'is_favorite_school' => $this->contactHasTag($contact, config('ghl.coach_database.tags.favorite_school', 'favorite school')),
             'is_saved_coach' => $this->contactHasTag($contact, config('ghl.coach_database.tags.saved_coach', 'saved coach')),
@@ -2529,72 +2527,6 @@ class GoHighLevelService
         }
 
         return $contactId;
-    }
-
-    public function setContactStarredForUser(User $user, string $contactId, bool $starred): array
-    {
-        $contactId = trim($contactId);
-        $credentials = $this->credentialsForUser($user);
-        $locationId = trim((string) ($credentials['location_id'] ?? ''));
-        $token = $this->tokenForLocation($locationId, $credentials['token_override'] ?? null);
-
-        if ($contactId === '' || $locationId === '' || ! $token) {
-            return [
-                'success' => false,
-                'starred' => $starred,
-                'error' => 'Missing contact or Recruiting Center connection.',
-            ];
-        }
-
-        $fieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
-        if (! isset($fieldMap['starred'])) {
-            $fieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, true);
-        }
-
-        $field = $fieldMap['starred'] ?? [];
-        $customField = [
-            'key' => $field['fieldKey'] ?? $field['key'] ?? 'starred',
-            'field_value' => $starred ? 1 : 0,
-        ];
-
-        if (! empty($field['id'])) {
-            $customField['id'] = $field['id'];
-        }
-
-        $response = Http::withHeaders(['Version' => '2021-07-28'])
-            ->timeout((int) config('ghl.timeout', 20))
-            ->withToken($token)
-            ->acceptJson()
-            ->put("{$this->baseUrl}/contacts/{$contactId}", [
-                'customFields' => [$customField],
-            ]);
-
-        if ($response->failed()) {
-            Log::error('Recruiting contact starred custom field update failed.', [
-                'user_id' => $user->id,
-                'contact_id' => $contactId,
-                'location_id' => $locationId,
-                'starred' => $starred,
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'custom_field' => $customField,
-            ]);
-
-            return [
-                'success' => false,
-                'starred' => $starred,
-                'error' => 'Unable to update the starred value in HighLevel.',
-                'status' => $response->status(),
-            ];
-        }
-
-        return [
-            'success' => true,
-            'starred' => $starred,
-            'contact_id' => $contactId,
-            'custom_field' => $customField,
-            'error' => null,
-        ];
     }
 
     private function updateContactCustomFields(string $contactId, array $customFields, array $context = []): bool
@@ -3132,48 +3064,6 @@ class GoHighLevelService
         ];
     }
 
-    public function updateConversationUnreadForUser(User $user, string $conversationId, int $unreadCount): array
-    {
-        $credentials = $this->credentialsForUser($user);
-        $token = $this->tokenForLocation($credentials['location_id'], $credentials['token_override']);
-
-        if (! $token || trim($conversationId) === '') {
-            return ['success' => false, 'error' => 'Missing conversation connection.'];
-        }
-
-        try {
-            $response = Http::withHeaders(['Version' => '2021-04-15'])
-                ->timeout((int) config('ghl.timeout', 20))
-                ->withToken($token)
-                ->acceptJson()
-                ->asJson()
-                ->put("{$this->baseUrl}/conversations/{$conversationId}", [
-                    'unreadCount' => max(0, $unreadCount),
-                ]);
-        } catch (\Throwable $exception) {
-            Log::warning('Unable to update Recruiting conversation unread state.', [
-                'conversation_id' => $conversationId,
-                'unread_count' => max(0, $unreadCount),
-                'error' => $exception->getMessage(),
-            ]);
-
-            return ['success' => false, 'error' => 'Unable to update unread state.'];
-        }
-
-        if ($response->failed()) {
-            Log::warning('Recruiting conversation unread update failed.', [
-                'conversation_id' => $conversationId,
-                'unread_count' => max(0, $unreadCount),
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
-            return ['success' => false, 'error' => 'Unable to update unread state.', 'status' => $response->status()];
-        }
-
-        return ['success' => true, 'conversation' => $response->json() ?? []];
-    }
-
     public function getConversationMessagesForUser(User $user, string $conversationId, ?string $lastMessageId = null, int $limit = 50): array
     {
         $credentials = $this->credentialsForUser($user);
@@ -3217,17 +3107,16 @@ class GoHighLevelService
                 ->filter(fn ($item): bool => is_array($item))
                 ->values();
 
-            // The conversation-list endpoint returns a flattened preview. Each real
-            // email ID is stored in meta.email.messageIds[0]. Fetch those email objects
-            // concurrently so emailMessage.body (the complete HTML document) becomes
-            // the canonical Inbox body.
+            /*
+             * A single HighLevel conversation-message row may represent more than one
+             * real email. This commonly happens after a coach replies: the flattened
+             * row contains every email ID in meta.email.messageIds, while the previous
+             * implementation reconstructed only messageIds[0] (normally the sent
+             * email). Expand every email ID so inbound replies are rebuilt through the
+             * same individual-email endpoint used for outbound messages.
+             */
             $emailIds = $items
-                ->map(fn (array $item): string => trim((string) (
-                    data_get($item, 'meta.email.messageIds.0')
-                    ?? data_get($item, 'emailMessageId')
-                    ?? data_get($item, 'email_message_id')
-                    ?? ''
-                )))
+                ->flatMap(fn (array $item): array => $this->conversationEmailMessageIds($item))
                 ->filter(fn (string $id): bool => $id !== '' && ! str_contains($id, 'Over 9 levels deep'))
                 ->unique()
                 ->values();
@@ -3255,13 +3144,14 @@ class GoHighLevelService
                             continue;
                         }
 
-                        $emailMessage = data_get($detailResponse->json() ?? [], 'emailMessage');
+                        $detailData = $detailResponse->json() ?? [];
+                        $emailMessage = data_get($detailData, 'emailMessage');
+
                         if (! is_array($emailMessage)) {
-                            continue;
+                            $emailMessage = data_get($detailData, 'message');
                         }
 
-                        $html = trim((string) ($emailMessage['body'] ?? ''));
-                        if ($html === '') {
+                        if (! is_array($emailMessage)) {
                             continue;
                         }
 
@@ -3276,50 +3166,136 @@ class GoHighLevelService
             }
 
             $messages = $items
-                ->map(function (array $item) use ($detailsByEmailId): array {
-                    $emailId = trim((string) (
-                        data_get($item, 'meta.email.messageIds.0')
-                        ?? data_get($item, 'emailMessageId')
-                        ?? data_get($item, 'email_message_id')
-                        ?? ''
-                    ));
+                ->flatMap(function (array $item) use ($detailsByEmailId): array {
+                    $emailIdsForItem = $this->conversationEmailMessageIds($item);
 
-                    $detail = $emailId !== '' ? $detailsByEmailId->get($emailId) : null;
-
-                    if (is_array($detail)) {
-                        // Keep list-level metadata such as conversation message ID and
-                        // date, while using the email detail as the source of HTML.
-                        $item['emailMessage'] = $detail;
-                        $item['html_body'] = (string) ($detail['body'] ?? '');
-                        $item['email_message_id'] = $emailId;
-                        $item['subject'] = $detail['subject']
-                            ?? data_get($item, 'meta.email.subject')
-                            ?? ($item['subject'] ?? '');
-                        $item['status'] = $detail['status'] ?? ($item['status'] ?? '');
+                    if ($emailIdsForItem === []) {
+                        return [$this->transformConversationMessage($item)];
                     }
 
-                    return $this->transformConversationMessage($item);
+                    $expanded = [];
+
+                    foreach ($emailIdsForItem as $emailId) {
+                        $detail = $detailsByEmailId->get($emailId);
+
+                        if (! is_array($detail)) {
+                            continue;
+                        }
+
+                        // Retain list-level metadata while letting the authoritative
+                        // individual email object supply body, sender, recipients,
+                        // direction, subject, status, attachments, and timestamps.
+                        $reconstructed = $item;
+                        $reconstructed['id'] = $emailId;
+                        $reconstructed['messageId'] = $emailId;
+                        $reconstructed['email_message_id'] = $emailId;
+                        $reconstructed['emailMessage'] = $detail;
+                        $reconstructed['html_body'] = (string) (
+                            $detail['body']
+                            ?? $detail['htmlBody']
+                            ?? $detail['html']
+                            ?? ''
+                        );
+                        $reconstructed['body'] = $reconstructed['html_body'] !== ''
+                            ? $reconstructed['html_body']
+                            : ($detail['textBody'] ?? $detail['text'] ?? ($item['body'] ?? ''));
+                        $reconstructed['direction'] = $detail['direction']
+                            ?? data_get($detail, 'meta.direction')
+                            ?? data_get($item, 'meta.email.direction')
+                            ?? ($item['direction'] ?? '');
+                        $reconstructed['subject'] = $detail['subject']
+                            ?? data_get($item, 'meta.email.subject')
+                            ?? ($item['subject'] ?? '');
+                        $reconstructed['status'] = $detail['status'] ?? ($item['status'] ?? '');
+                        $reconstructed['from'] = $detail['from']
+                            ?? $detail['fromEmail']
+                            ?? data_get($detail, 'sender.email')
+                            ?? ($item['from'] ?? '');
+                        $reconstructed['fromName'] = $detail['fromName']
+                            ?? data_get($detail, 'sender.name')
+                            ?? ($item['fromName'] ?? '');
+                        $reconstructed['to'] = $detail['to']
+                            ?? $detail['toEmail']
+                            ?? data_get($detail, 'recipients')
+                            ?? ($item['to'] ?? '');
+                        $reconstructed['dateAdded'] = $detail['dateAdded']
+                            ?? $detail['createdAt']
+                            ?? $detail['timestamp']
+                            ?? ($item['dateAdded'] ?? $item['createdAt'] ?? null);
+                        $reconstructed['attachments'] = $detail['attachments']
+                            ?? ($item['attachments'] ?? []);
+
+                        $expanded[] = $this->transformConversationMessage($reconstructed);
+                    }
+
+                    // Keep the generic row only when no individual email detail could
+                    // be reconstructed. This preserves compatibility without creating
+                    // an outbound duplicate beside the expanded emails.
+                    return $expanded !== []
+                        ? $expanded
+                        : [$this->transformConversationMessage($item)];
                 })
-                ->filter(fn (array $item): bool => filled($item['id'] ?? null))
+                ->filter(fn ($item): bool => is_array($item) && filled($item['id'] ?? null))
+                ->unique(fn (array $item): string => (string) ($item['id'] ?? md5(json_encode($item) ?: '')))
+                ->sortBy(function (array $item): int {
+                    $value = $item['created_at'] ?? null;
+
+                    if (is_numeric($value)) {
+                        $number = (int) $value;
+                        return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                    }
+
+                    try {
+                        return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                })
                 ->values()
                 ->all();
-
-            // GHL returns conversation messages newest-first. Pagination must use
-            // the oldest raw conversation-message ID from this page, not an email
-            // detail ID and not a cursor reconstructed after chronological sorting.
-            $nextLastMessageId = trim((string) ($items->last()['id'] ?? ''));
-            $cursorAdvanced = $nextLastMessageId !== '' && $nextLastMessageId !== (string) $lastMessageId;
 
             return [
                 'success' => true,
                 'messages' => $messages,
-                'last_message_id' => $cursorAdvanced ? $nextLastMessageId : $lastMessageId,
-                'has_more' => count($items) >= $params['limit'] && $cursorAdvanced,
+                // Pagination must continue using the generic conversation-message
+                // cursor, not an individual email ID generated during expansion.
+                'last_message_id' => collect($items)->last()['id'] ?? $lastMessageId,
+                'has_more' => count($items) >= $params['limit'],
                 'error' => null,
             ];
         }
 
         return ['success' => false, 'messages' => [], 'error' => 'Unable to load messages.', 'status' => $lastStatus, 'raw' => $lastData];
+    }
+
+    /**
+     * Return every real email ID represented by a flattened conversation row.
+     * HighLevel may provide one ID, an array of IDs, or alternate scalar fields.
+     *
+     * @return array<int, string>
+     */
+    protected function conversationEmailMessageIds(array $item): array
+    {
+        $rawIds = data_get($item, 'meta.email.messageIds', []);
+
+        if (is_string($rawIds) || is_numeric($rawIds)) {
+            $rawIds = [$rawIds];
+        }
+
+        if (! is_array($rawIds)) {
+            $rawIds = [];
+        }
+
+        $rawIds[] = data_get($item, 'emailMessageId');
+        $rawIds[] = data_get($item, 'email_message_id');
+        $rawIds[] = data_get($item, 'emailMessage.id');
+
+        return collect($rawIds)
+            ->map(fn ($id): string => is_scalar($id) ? trim((string) $id) : '')
+            ->filter(fn (string $id): bool => $id !== '' && ! str_contains($id, 'Over 9 levels deep'))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
@@ -5195,10 +5171,46 @@ class GoHighLevelService
     {
         $htmlBody = $this->conversationMessageHtmlBody($item);
         $textBody = $this->conversationMessageTextBody($item, $htmlBody);
-        $direction = $this->conversationScalar($item['direction'] ?? $item['messageDirection'] ?? $item['directionType'] ?? $item['source'] ?? '');
-        $from = $this->conversationScalar($item['from'] ?? $item['emailFrom'] ?? $item['sender'] ?? data_get($item, 'sender.email') ?? data_get($item, 'from.email') ?? '');
-        $to = $this->conversationScalar($item['to'] ?? $item['emailTo'] ?? $item['receiver'] ?? data_get($item, 'to.email') ?? '');
-        $fromName = $this->conversationScalar($item['fromName'] ?? $item['senderName'] ?? data_get($item, 'sender.name') ?? data_get($item, 'from.name') ?? '');
+        $direction = $this->conversationScalar(
+            $item['direction']
+            ?? $item['messageDirection']
+            ?? $item['directionType']
+            ?? data_get($item, 'emailMessage.direction')
+            ?? data_get($item, 'meta.email.direction')
+            ?? data_get($item, 'email.direction')
+            ?? $item['source']
+            ?? ''
+        );
+        $from = $this->conversationScalar(
+            $item['from']
+            ?? $item['emailFrom']
+            ?? data_get($item, 'emailMessage.from')
+            ?? data_get($item, 'emailMessage.fromEmail')
+            ?? data_get($item, 'emailMessage.sender.email')
+            ?? $item['sender']
+            ?? data_get($item, 'sender.email')
+            ?? data_get($item, 'from.email')
+            ?? ''
+        );
+        $to = $this->conversationScalar(
+            $item['to']
+            ?? $item['emailTo']
+            ?? data_get($item, 'emailMessage.to')
+            ?? data_get($item, 'emailMessage.toEmail')
+            ?? data_get($item, 'emailMessage.recipients')
+            ?? $item['receiver']
+            ?? data_get($item, 'to.email')
+            ?? ''
+        );
+        $fromName = $this->conversationScalar(
+            $item['fromName']
+            ?? $item['senderName']
+            ?? data_get($item, 'emailMessage.fromName')
+            ?? data_get($item, 'emailMessage.sender.name')
+            ?? data_get($item, 'sender.name')
+            ?? data_get($item, 'from.name')
+            ?? ''
+        );
 
         return [
             'id' => (string) ($item['id'] ?? $item['_id'] ?? $item['messageId'] ?? ''),
@@ -5210,12 +5222,12 @@ class GoHighLevelService
             'body' => $htmlBody !== '' ? $htmlBody : $textBody,
             'html_body' => $htmlBody,
             'text_body' => $textBody,
-            'status' => $this->conversationScalar($item['status'] ?? ''),
+            'status' => $this->conversationScalar($item['status'] ?? data_get($item, 'emailMessage.status') ?? ''),
             'from' => $from,
             'from_name' => $fromName ?: $from,
             'to' => $to,
             'attachments' => $this->extractConversationAttachments($item),
-            'created_at' => $item['dateAdded'] ?? $item['createdAt'] ?? $item['created_at'] ?? null,
+            'created_at' => $item['dateAdded'] ?? $item['createdAt'] ?? $item['created_at'] ?? data_get($item, 'emailMessage.dateAdded') ?? data_get($item, 'emailMessage.createdAt') ?? data_get($item, 'emailMessage.timestamp') ?? null,
         ];
     }
 
@@ -6999,7 +7011,6 @@ class GoHighLevelService
     public function recruitingTrackingCustomFieldDefinitions(): array
     {
         return [
-            'starred' => ['name' => 'starred', 'dataType' => 'NUMERICAL'],
             'view_profile_total' => ['name' => 'view_profile_total', 'dataType' => 'NUMERICAL'],
             'view_profile_website' => ['name' => 'view_profile_website', 'dataType' => 'NUMERICAL'],
             'view_profile_instagram' => ['name' => 'view_profile_instagram', 'dataType' => 'NUMERICAL'],
