@@ -96,6 +96,10 @@ trait InteractsWithCoachDatabase
 
     public string $emailSubject = '';
     public string $emailBody = '';
+    public string $quickReplyBody = '';
+    public array $quickReplyAttachmentUploads = [];
+    public array $quickReplyAttachments = [];
+    public bool $isSendingQuickReply = false;
     public string $templateName = '';
     public string $templateSubject = '';
     public string $templateBody = '';
@@ -4638,6 +4642,388 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         if ($coach) {
             $first = trim(explode(' ', (string) ($coach['name'] ?? 'Coach'))[0]);
             $this->emailBody = "<p>Hi {$first},</p><p><br></p>";
+        }
+    }
+
+    public function updatedQuickReplyAttachmentUploads(): void
+    {
+        $this->addQuickReplyAttachments();
+    }
+
+    public function addQuickReplyAttachments(): void
+    {
+        if (empty($this->quickReplyAttachmentUploads)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            $this->quickReplyAttachmentUploads = [];
+            $this->dispatch('rc-quick-reply-attachment-upload-failed');
+            return;
+        }
+
+        $files = collect($this->quickReplyAttachmentUploads)
+            ->filter(fn ($file): bool => is_object($file) && method_exists($file, 'getRealPath'))
+            ->values();
+
+        if ($files->isEmpty()) {
+            $this->quickReplyAttachmentUploads = [];
+            $this->dispatch('rc-quick-reply-attachment-upload-failed');
+            return;
+        }
+
+        try {
+            $this->validate([
+                'quickReplyAttachmentUploads.*' => ['file', 'max:25600'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->quickReplyAttachmentUploads = [];
+            Notification::make()->title('Quick reply attachments')->body('Each attachment must be 25MB or smaller.')->danger()->send();
+            $this->dispatch('rc-quick-reply-attachment-upload-failed');
+            return;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $result = app(GoHighLevelService::class)->uploadMediaForUser($user, $file);
+                if (! ($result['success'] ?? false) || blank($result['url'] ?? null)) {
+                    Notification::make()
+                        ->title('Quick reply attachments')
+                        ->body((string) ($result['error'] ?? 'Unable to upload one attachment to HighLevel media storage.'))
+                        ->danger()
+                        ->send();
+                    continue;
+                }
+
+                $name = method_exists($file, 'getClientOriginalName')
+                    ? (string) $file->getClientOriginalName()
+                    : basename((string) $result['url']);
+
+                $this->quickReplyAttachments[] = [
+                    'id' => $result['id'] ?? null,
+                    'media_id' => $result['id'] ?? null,
+                    'name' => $name,
+                    'url' => trim((string) $result['url']),
+                    'media_url' => trim((string) $result['url']),
+                    'mime_type' => method_exists($file, 'getMimeType') ? (string) $file->getMimeType() : null,
+                    'size' => method_exists($file, 'getSize') ? (int) $file->getSize() : null,
+                ];
+            } catch (\Throwable $exception) {
+                Notification::make()
+                    ->title('Quick reply attachments')
+                    ->body('Unable to upload one attachment to HighLevel media storage.')
+                    ->danger()
+                    ->send();
+            }
+        }
+
+        $this->quickReplyAttachments = collect($this->quickReplyAttachments)
+            ->filter(fn ($attachment): bool => is_array($attachment) && filled($attachment['url'] ?? null))
+            ->unique('url')
+            ->values()
+            ->all();
+        $this->quickReplyAttachmentUploads = [];
+
+if (! empty($this->quickReplyAttachments)) {
+    $latestAttachment = collect($this->quickReplyAttachments)->last();
+
+    $this->dispatch(
+        'rc-quick-reply-attachment-uploaded',
+        attachment: is_array($latestAttachment)
+            ? $latestAttachment
+            : []
+    );
+} else {
+    $this->dispatch(
+        'rc-quick-reply-attachment-upload-failed',
+        message: 'The file could not be uploaded to HighLevel media storage.'
+    );
+}
+    }
+
+    public function removeQuickReplyAttachment(int $index): void
+{
+    if (! array_key_exists($index, $this->quickReplyAttachments)) {
+        return;
+    }
+
+    unset($this->quickReplyAttachments[$index]);
+
+    $this->quickReplyAttachments = array_values(
+        $this->quickReplyAttachments
+    );
+}
+
+public function removeQuickReplyAttachmentByUrl(string $url): void
+{
+    $url = trim(rawurldecode($url));
+
+    if ($url === '') {
+        return;
+    }
+
+    $this->quickReplyAttachments = collect(
+        $this->quickReplyAttachments
+    )
+        ->filter(fn ($attachment): bool => is_array($attachment))
+        ->reject(function (array $attachment) use ($url): bool {
+            $attachmentUrl = trim(rawurldecode(
+                (string) (
+                    $attachment['url']
+                    ?? $attachment['media_url']
+                    ?? ''
+                )
+            ));
+
+            return $attachmentUrl !== ''
+                && hash_equals($attachmentUrl, $url);
+        })
+        ->values()
+        ->all();
+}
+
+    public function sendQuickReply(): void
+    {
+        $user = Auth::user();
+
+        if (! $user || ! $this->selectedConversationId || $this->isSendingQuickReply) {
+            return;
+        }
+
+        $bodyHtmlInput = trim((string) $this->quickReplyBody);
+        $bodyText = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], ["\n", "\n", "\n", "\n", "\n", "\n"], $bodyHtmlInput)), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($bodyText === '') {
+            Notification::make()
+                ->title('Quick reply')
+                ->body('Type a message before sending.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $conversationId = trim((string) $this->selectedConversationId);
+        $conversation = collect($this->conversations ?? [])->firstWhere('id', $conversationId);
+        $conversation = is_array($conversation) ? $conversation : [];
+
+        $contactId = trim((string) (
+            $conversation['contact_id']
+            ?? $conversation['contactId']
+            ?? $conversation['coach_id']
+            ?? ''
+        ));
+        $to = trim((string) (
+            $conversation['email']
+            ?? $conversation['contact_email']
+            ?? $conversation['emailTo']
+            ?? ''
+        ));
+
+        if ($contactId === '' && $to === '') {
+            Notification::make()
+                ->title('Quick reply')
+                ->body('This conversation does not have a valid coach contact or email address.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        // Resolve the subject from the most recent loaded email that actually has
+        // a subject. Some GHL message rows omit it, so checking only the newest row
+        // can incorrectly fall back to a generic subject.
+        $latestMessageWithSubject = collect($this->messages ?? [])
+            ->filter(fn ($row): bool => is_array($row) && trim((string) ($row['subject'] ?? $row['subjectLine'] ?? '')) !== '')
+            ->sortByDesc(function (array $row): int {
+                $value = $row['created_at'] ?? $row['createdAt'] ?? $row['date'] ?? $row['messageDate'] ?? 0;
+                if (is_numeric($value)) {
+                    $number = (int) $value;
+                    return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                }
+
+                try {
+                    return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                } catch (\Throwable) {
+                    return 0;
+                }
+            })
+            ->first();
+
+        $subject = trim((string) (
+            $latestMessageWithSubject['subject']
+            ?? $latestMessageWithSubject['subjectLine']
+            ?? $conversation['subject']
+            ?? $conversation['last_message_subject']
+            ?? $conversation['lastMessageSubject']
+            ?? 'Recruiting conversation'
+        ));
+
+        if ($subject === '') {
+            $subject = 'Recruiting conversation';
+        }
+
+        // Keep exactly one reply prefix, even when the previous message already
+        // contains one or several Re: prefixes.
+        $subject = preg_replace('/^(?:\s*re\s*:\s*)+/i', '', $subject) ?: $subject;
+        $subject = 'Re: ' . trim($subject);
+
+        // Preserve real rich-text formatting from the contenteditable quick-reply
+        // composer. Remove executable/unsafe markup while keeping Word-like email
+        // formatting such as bold, italic, underline, lists, paragraphs, and links.
+        $replyHtml = preg_replace('#<(script|style|iframe|object|embed)[^>]*>.*?</\1>#is', '', $bodyHtmlInput) ?? '';
+        $replyHtml = strip_tags($replyHtml, '<p><div><br><strong><b><em><i><u><ul><ol><li><a><blockquote><span>');
+        $replyHtml = preg_replace('/\s+on[a-z]+\s*=\s*(["\']).*?\1/iu', '', $replyHtml) ?? $replyHtml;
+        $replyHtml = preg_replace('/\s+(style|class|id)\s*=\s*(["\']).*?\2/iu', '', $replyHtml) ?? $replyHtml;
+        $replyHtml = preg_replace('/href\s*=\s*(["\'])\s*javascript:[^"\']*\1/iu', 'href="#"', $replyHtml) ?? $replyHtml;
+        $replyHtml = '<div style="font-family:Arial,Helvetica,sans-serif">' . trim($replyHtml) . '</div>';
+
+        // Quick replies must use the same canonical athlete signature as normal
+        // Compose Email sends. The downstream merge/send pipeline resolves the
+        // athlete tokens and tracking links for the authenticated user.
+        $replyHtml = $this->appendAttachmentLinksToHtml($replyHtml, $this->quickReplyAttachments);
+
+        // Use the exact same send-time signature and token replacement pipeline as
+        // Compose Email. ensurePlyrcardEmailSignature() appends the canonical
+        // PLYRCARD signature template; replaceCampaignTokens() then fills the
+        // authenticated athlete's name, position, class year, GPA, phone, email,
+        // social links, and profile URL before the message reaches GHL.
+        $coachForTokens = $this->selectedConversationCoachRow() ?? [];
+        if (! is_array($coachForTokens)) {
+            $coachForTokens = [];
+        }
+
+        $coachForTokens = array_merge($conversation, $coachForTokens, [
+            'id' => $contactId !== '' ? $contactId : ($coachForTokens['id'] ?? null),
+            'contact_id' => $contactId !== '' ? $contactId : ($coachForTokens['contact_id'] ?? null),
+            'email' => $to !== '' ? $to : ($coachForTokens['email'] ?? null),
+            'school' => $conversation['school'] ?? $conversation['company_name'] ?? ($coachForTokens['school'] ?? null),
+            'name' => $conversation['contact_name'] ?? $conversation['name'] ?? ($coachForTokens['name'] ?? null),
+        ]);
+
+        $html = $this->ensurePlyrcardEmailSignature($replyHtml);
+        $html = $this->replaceCampaignTokens($html, $coachForTokens);
+
+        $payload = [
+            'contact_id' => $contactId,
+            'contactId' => $contactId,
+            'conversation_id' => $conversationId,
+            'conversationId' => $conversationId,
+            'subject' => $subject,
+            'body' => $html,
+            'html' => $html,
+            'text' => $bodyText,
+            'to' => $to,
+            'emailTo' => $to,
+            'fromName' => (string) ($user->name ?? 'PLYRCard'),
+            'source' => 'inbox_quick_reply',
+            'tracking_source' => 'inbox_quick_reply',
+            'attachments' => $this->quickReplyAttachments,
+            'tracking_context' => [
+                'athlete_id' => $user->id,
+                'athlete_email' => $user->email ?: $user->personal_email,
+                'athlete_ghl_contact_id' => $user->ghl_contact_id,
+                'athlete_ghl_location_id' => $user->ghl_location_id,
+                'contact_id' => $contactId,
+                'coach_contact_id' => $contactId,
+                'ghl_contact_id' => $contactId,
+                'coach_name' => $conversation['contact_name'] ?? $conversation['name'] ?? null,
+                'coach_email' => $to,
+                'school' => $conversation['school'] ?? $conversation['company_name'] ?? null,
+                'school_name' => $conversation['school'] ?? $conversation['company_name'] ?? null,
+                'email_subject' => $subject,
+                'source' => 'inbox_quick_reply',
+                'message_uuid' => (string) Str::uuid(),
+            ],
+        ];
+
+        $this->isSendingQuickReply = true;
+
+        try {
+            $result = app(CoachDatabaseService::class)->sendEmailMessageForUser($user, $payload);
+
+            if (! ($result['success'] ?? false)) {
+                Notification::make()
+                    ->title('Quick reply')
+                    ->body((string) ($result['error'] ?? 'Unable to send this reply.'))
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $messageId = trim((string) (
+                $result['message_id']
+                ?? $result['messageId']
+                ?? data_get($result, 'message.id')
+                ?? ('local-' . Str::uuid())
+            ));
+
+            $optimisticMessage = $this->compactConversationMessageForLivewire([
+                'id' => $messageId,
+                'conversation_id' => $conversationId,
+                'contact_id' => $contactId,
+                'direction' => 'outbound',
+                'type' => 'Email',
+                'subject' => $subject,
+                'html' => $html,
+                'body' => $html,
+                'text' => $bodyText,
+                'status' => 'sent',
+                'from_name' => (string) ($user->name ?? 'You'),
+                'to' => $to,
+                'created_at' => now()->toIso8601String(),
+            ]);
+
+            $this->messages = collect($this->messages ?? [])
+                ->push($optimisticMessage)
+                ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                ->sortBy(function (array $row): int {
+                    $value = $row['created_at'] ?? $row['createdAt'] ?? $row['date'] ?? $row['messageDate'] ?? 0;
+                    if (is_numeric($value)) {
+                        $number = (int) $value;
+                        return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                    }
+
+                    try {
+                        return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                })
+                ->values()
+                ->all();
+
+            Cache::put($this->deferredUiCacheKey('messages', $conversationId), [
+                'rows' => $this->messages,
+                'last_message_id' => $this->messageLastId,
+                'has_more' => $this->hasMoreMessages,
+                'cached_at' => now()->toIso8601String(),
+            ], now()->addMinutes(10));
+
+            $this->quickReplyBody = '';
+            $this->quickReplyAttachments = [];
+            $this->quickReplyAttachmentUploads = [];
+            $this->dispatch('rc-inbox-quick-reply-sent');
+
+            Notification::make()
+                ->title('Reply sent')
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to send inbox quick reply.', [
+                'user_id' => $user->id,
+                'conversation_id' => $conversationId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Quick reply')
+                ->body('Unable to send this reply right now.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isSendingQuickReply = false;
         }
     }
 

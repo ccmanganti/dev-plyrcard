@@ -11383,6 +11383,299 @@ CSS;
                                 @endif
 
                             </div>
+
+                            <form
+                                class="rc-inbox-quick-reply-v92"
+                                wire:submit.prevent="sendQuickReply"
+                                x-data="{
+                                    draftKey: 'rcQuickReplyDraft:' + @js((string) ($selectedConversationId ?? 'none')),
+                                    init() {
+                                        const saved = sessionStorage.getItem(this.draftKey);
+                                        if (saved && this.$refs.replyEditor) {
+                                            this.$refs.replyEditor.innerHTML = saved;
+                                            this.sync(false);
+                                        }
+                                    },
+                                    command(name) {
+                                        this.$refs.replyEditor?.focus();
+                                        document.execCommand(name, false, null);
+                                        this.sync();
+                                    },
+                                    sync(save = true) {
+                                        const html = this.$refs.replyEditor?.innerHTML || '';
+                                        this.$refs.replyValue.value = html;
+                                        this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
+                                        if (save) sessionStorage.setItem(this.draftKey, html);
+                                    },
+                                    uploadActive: false,
+                                    uploadProgress: 0,
+                                    uploadFileName: '',
+                                    beginUpload(event) {
+                                        const files = Array.from(event.target.files || []);
+                                        this.uploadFileName = files.length > 1
+                                            ? files.length + ' files'
+                                            : (files[0]?.name || 'Uploading file');
+                                        this.uploadProgress = 0;
+                                        this.uploadActive = files.length > 0;
+                                    },
+                                    finishUpload() {
+    this.uploadProgress = 100;
+
+    this.$nextTick(() => {
+        this.uploadActive = false;
+        this.uploadFileName = '';
+
+        if (this.$refs.quickReplyFileInput) {
+            this.$refs.quickReplyFileInput.value = '';
+        }
+    });
+},
+                                    clear() {
+                                        if (this.$refs.replyEditor) this.$refs.replyEditor.innerHTML = '';
+                                        sessionStorage.removeItem(this.draftKey);
+                                        this.sync(false);
+                                    }
+                                }"
+                                x-init="init()"
+                                x-on:keydown.ctrl.enter.prevent="sync(); $el.requestSubmit()"
+                                x-on:keydown.meta.enter.prevent="sync(); $el.requestSubmit()"
+                                x-on:rc-inbox-quick-reply-sent.window="clear()"
+                                x-on:rc-quick-reply-attachment-uploaded.window="finishUpload()"
+                                x-on:rc-quick-reply-attachment-upload-failed.window="finishUpload()"
+                            >
+                                <div class="rc-inbox-quick-reply-editor-v92">
+                                    <div class="rc-inbox-quick-reply-toolbar-v92" aria-label="Text formatting controls">
+                                        <button type="button" title="Bold" x-on:click="command('bold')"><strong>B</strong></button>
+                                        <button type="button" title="Italic" x-on:click="command('italic')"><em>I</em></button>
+                                        <button type="button" title="Underline" x-on:click="command('underline')"><span style="text-decoration:underline">U</span></button>
+                                        <span class="rc-inbox-quick-reply-divider-v92" aria-hidden="true"></span>
+                                        <button type="button" title="Bulleted list" x-on:click="command('insertUnorderedList')">•</button>
+                                        <button type="button" title="Numbered list" x-on:click="command('insertOrderedList')">1.</button>
+                                    </div>
+
+                                    <div wire:ignore>
+                                        <div
+                                            x-ref="replyEditor"
+                                            class="rc-inbox-quick-reply-contenteditable-v93"
+                                            contenteditable="true"
+                                            role="textbox"
+                                            aria-multiline="true"
+                                            aria-label="Quick reply message"
+                                            data-placeholder="Write your reply…"
+                                            x-on:input.debounce.150ms="sync()"
+                                            x-on:blur="sync()"
+                                        ></div>
+                                    </div>
+                                    <textarea
+                                        x-ref="replyValue"
+                                        wire:model.defer="quickReplyBody"
+                                        class="rc-inbox-quick-reply-hidden-v93"
+                                        tabindex="-1"
+                                        aria-hidden="true"
+                                    ></textarea>
+
+                                    <div
+    class="rc-inbox-quick-reply-uploading-v96"
+    x-show="uploadActive"
+    x-cloak
+    role="status"
+    aria-live="polite"
+>
+    <span
+        class="rc-inbox-quick-reply-upload-spinner-v96"
+        aria-hidden="true"
+    ></span>
+
+    <span
+        class="rc-inbox-quick-reply-upload-name-v96"
+        x-text="uploadFileName || 'Uploading file'"
+    ></span>
+
+    <span
+        class="rc-inbox-quick-reply-upload-percent-v96"
+        x-text="uploadProgress >= 100
+            ? 'Uploading…'
+            : (uploadProgress > 0
+                ? uploadProgress + '%'
+                : 'Uploading…')"
+    ></span>
+</div>
+
+@if(! empty($quickReplyAttachments))
+    <div
+        class="rc-inbox-quick-reply-attachments-v94"
+        aria-label="Attached files"
+    >
+        @foreach($quickReplyAttachments as $attachmentIndex => $attachment)
+            @php
+                $attachmentUrl = trim(
+                    (string) (
+                        $attachment['url']
+                        ?? $attachment['media_url']
+                        ?? ''
+                    )
+                );
+
+                $attachmentName = trim(
+                    (string) ($attachment['name'] ?? 'Attachment')
+                ) ?: 'Attachment';
+
+                $attachmentMime = strtolower(
+                    (string) ($attachment['mime_type'] ?? '')
+                );
+
+                $isImageAttachment =
+                    str_starts_with($attachmentMime, 'image/')
+                    || preg_match(
+                        '/\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i',
+                        $attachmentName
+                    );
+
+                $attachmentKey = sha1(
+                    $attachmentUrl !== ''
+                        ? $attachmentUrl
+                        : $attachmentName . ':' . $attachmentIndex
+                );
+            @endphp
+
+            <span
+                class="rc-inbox-quick-reply-attachment-chip-v96"
+                wire:key="quick-reply-attachment-{{ $attachmentKey }}"
+            >
+                <span
+                    class="rc-inbox-quick-reply-attachment-icon-v96"
+                    aria-hidden="true"
+                >
+                    @if($isImageAttachment)
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="13"
+                            height="13"
+                            fill="none"
+                        >
+                            <rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="16"
+                                rx="2"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+                            <circle
+                                cx="8.5"
+                                cy="9"
+                                r="1.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            />
+                            <path
+                                d="m5.5 17 4.2-4 3.1 2.7 2.3-2.2 3.4 3.5"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    @else
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="13"
+                            height="13"
+                            fill="none"
+                        >
+                            <path
+                                d="M3.5 6.5h6l1.8 2H20.5v9.75a1.75 1.75 0 0 1-1.75 1.75H5.25a1.75 1.75 0 0 1-1.75-1.75V6.5Z"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linejoin="round"
+                            />
+                            <path
+                                d="M3.5 9h17"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+                        </svg>
+                    @endif
+                </span>
+
+                <span
+                    class="rc-inbox-quick-reply-attachment-name-v96"
+                    title="{{ $attachmentName }}"
+                >
+                    {{ $attachmentName }}
+                </span>
+
+                <button
+                    type="button"
+                    wire:click="removeQuickReplyAttachmentByUrl(@js($attachmentUrl))"
+                    wire:loading.attr="disabled"
+                    wire:target="removeQuickReplyAttachmentByUrl"
+                    aria-label="Remove {{ $attachmentName }}"
+                    title="Remove attachment"
+                >
+                    <span
+                        wire:loading.remove
+                        wire:target="removeQuickReplyAttachmentByUrl"
+                    >
+                        ×
+                    </span>
+
+                    <span
+                        wire:loading
+                        wire:target="removeQuickReplyAttachmentByUrl"
+                        class="rc-inbox-quick-reply-upload-spinner-v96"
+                        aria-hidden="true"
+                    ></span>
+                </button>
+            </span>
+        @endforeach
+    </div>
+@endif
+
+                                    <div class="rc-inbox-quick-reply-footer-v92">
+                                        <div class="rc-inbox-quick-reply-tools-v92" aria-label="Reply attachment">
+                                            <label
+                                                title="Attach file"
+                                                aria-label="Attach file"
+                                                wire:loading.class="is-uploading"
+                                                wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments"
+                                            >
+                                                <input
+                                                    x-ref="quickReplyFileInput"
+                                                    type="file"
+                                                    multiple
+                                                    wire:model="quickReplyAttachmentUploads"
+                                                    x-on:change="beginUpload($event)"
+                                                    x-on:livewire-upload-start="uploadActive = true"
+                                                    x-on:livewire-upload-progress="uploadProgress = $event.detail.progress"
+                                                    x-on:livewire-upload-error="finishUpload()"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments"
+                                                    hidden
+                                                >
+                                                <span wire:loading.remove wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments">📎</span>
+                                                <span wire:loading wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments" class="rc-inbox-quick-reply-tool-spinner-v95" aria-hidden="true"></span>
+                                            </label>
+                                        </div>
+
+                                        <div class="rc-inbox-quick-reply-actions-v92">
+                                            <button
+                                                type="submit"
+                                                class="rc-inbox-quick-reply-send-v92"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendQuickReply,addQuickReplyAttachments"
+                                                x-on:click="sync()"
+                                                title="Send reply"
+                                            >
+                                                <svg wire:loading.remove wire:target="sendQuickReply" viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 12h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                                <span wire:loading wire:target="sendQuickReply" class="rc-inbox-quick-reply-spinner-v92" aria-hidden="true"></span>
+                                                <span>Send Reply</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
                         @else
                             <div class="rc-inbox-empty-v56"><div><strong>Select a conversation.</strong><br><span>Email messages will appear here.</span></div></div>
                         @endif
@@ -13301,4 +13594,364 @@ CSS;
         -webkit-backdrop-filter: none !important;
     }
 </style>
+
+<style id="rc-inbox-quick-reply-v92">
+    .rc-inbox-mid-v56 {
+        display:flex !important;
+        flex-direction:column !important;
+        min-height:0 !important;
+    }
+    .rc-inbox-mid-v56 > .rc-message-stream-v56 {
+        min-height:0 !important;
+        flex:1 1 auto !important;
+        padding-bottom:1rem !important;
+    }
+    .rc-inbox-quick-reply-v92 {
+        position:sticky;
+        bottom:0;
+        z-index:24;
+        flex:0 0 auto;
+        border-top:1px solid var(--rc-border);
+        background:var(--rc-surface);
+        box-shadow:0 -8px 22px rgba(15,23,42,.045);
+    }
+    .rc-inbox-quick-reply-suggestions-v92 {
+        display:flex;
+        align-items:center;
+        gap:.38rem;
+        padding:.55rem .72rem .42rem;
+        overflow-x:auto;
+        scrollbar-width:none;
+    }
+    .rc-inbox-quick-reply-suggestions-v92::-webkit-scrollbar { display:none; }
+    .rc-inbox-quick-reply-suggestions-v92 button {
+        flex:0 0 auto;
+        border:1px solid var(--rc-border);
+        border-radius:999px;
+        padding:.28rem .55rem;
+        background:var(--rc-surface);
+        color:var(--rc-muted);
+        font-size:.62rem;
+        line-height:1;
+        cursor:pointer;
+        transition:border-color .15s ease,color .15s ease,background .15s ease;
+    }
+    .rc-inbox-quick-reply-suggestions-v92 button:hover {
+        border-color:rgba(255,99,56,.38);
+        color:#ff6338;
+        background:rgba(255,99,56,.055);
+    }
+    .rc-inbox-quick-reply-tabs-v92 {
+        display:flex;
+        gap:.75rem;
+        padding:0 .72rem;
+        border-top:1px solid var(--rc-border);
+        border-bottom:1px solid var(--rc-border);
+    }
+    .rc-inbox-quick-reply-tabs-v92 span {
+        position:relative;
+        border:0;
+        background:transparent;
+        padding:.52rem 0 .46rem;
+        color:var(--rc-muted);
+        font-size:.68rem;
+        font-weight:700;
+    }
+    .rc-inbox-quick-reply-tabs-v92 span.is-active { color:#ff6338; }
+    .rc-inbox-quick-reply-tabs-v92 span.is-active::after {
+        content:'';
+        position:absolute;
+        left:0;
+        right:0;
+        bottom:-1px;
+        height:2px;
+        border-radius:999px;
+        background:#ff6338;
+    }
+    .rc-inbox-quick-reply-editor-v92 {
+        padding:.42rem .72rem .58rem;
+        transition:background .15s ease;
+    }
+    .rc-inbox-quick-reply-editor-v92.is-note { background:rgba(250,204,21,.045); }
+    .rc-inbox-quick-reply-toolbar-v92,
+    .rc-inbox-quick-reply-tools-v92 {
+        display:flex;
+        align-items:center;
+        gap:.12rem;
+    }
+    .rc-inbox-quick-reply-toolbar-v92 { padding:0 0 .28rem; }
+    .rc-inbox-quick-reply-toolbar-v92 button,
+    .rc-inbox-quick-reply-tools-v92 button {
+        width:1.55rem;
+        height:1.55rem;
+        border:0;
+        border-radius:.34rem;
+        display:grid;
+        place-items:center;
+        background:transparent;
+        color:var(--rc-muted);
+        font-size:.69rem;
+        cursor:pointer;
+    }
+    .rc-inbox-quick-reply-toolbar-v92 button:hover,
+    .rc-inbox-quick-reply-tools-v92 button:hover {
+        color:var(--rc-text);
+        background:var(--rc-soft);
+    }
+    .rc-inbox-quick-reply-divider-v92 {
+        width:1px;
+        height:1rem;
+        margin:0 .14rem;
+        background:var(--rc-border);
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 {
+        display:block;
+        width:100%;
+        min-height:3.15rem;
+        max-height:9rem;
+        resize:vertical;
+        overflow:auto;
+        border:1px solid var(--rc-border);
+        border-radius:.55rem;
+        outline:0;
+        padding:.58rem .66rem;
+        background:var(--rc-surface);
+        color:var(--rc-text);
+        font:inherit;
+        font-size:.75rem;
+        line-height:1.45;
+        transition:border-color .15s ease,box-shadow .15s ease;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93:focus {
+        border-color:#ff6338;
+        box-shadow:0 0 0 3px rgba(255,99,56,.10);
+    }
+    .rc-inbox-quick-reply-contenteditable-v93:empty::before {
+        content:attr(data-placeholder);
+        color:var(--rc-muted);
+        pointer-events:none;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 p { margin:.15rem 0; }
+    .rc-inbox-quick-reply-contenteditable-v93 ul,
+    .rc-inbox-quick-reply-contenteditable-v93 ol { margin:.2rem 0 .2rem 1.2rem; }
+    .rc-inbox-quick-reply-hidden-v93 { display:none !important; }
+    .rc-inbox-quick-reply-footer-v92 {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:.5rem;
+        padding-top:.38rem;
+    }
+    .rc-inbox-quick-reply-actions-v92 {
+        display:flex;
+        align-items:center;
+        gap:.35rem;
+    }
+    .rc-inbox-quick-reply-send-v92 {
+        min-height:1.95rem;
+        border-radius:.48rem;
+        padding:.36rem .58rem;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:.28rem;
+        font-size:.66rem;
+        font-weight:750;
+        cursor:pointer;
+        white-space:nowrap;
+    }
+    .rc-inbox-quick-reply-send-v92 {
+        border:1px solid #ff6338;
+        background:#ff6338;
+        color:#fff;
+        box-shadow:0 4px 10px rgba(255,99,56,.2);
+    }
+    .rc-inbox-quick-reply-send-v92:hover { background:#f0522b; border-color:#f0522b; }
+    .rc-inbox-quick-reply-send-v92:disabled { opacity:.52; cursor:not-allowed; box-shadow:none; }
+    .rc-inbox-quick-reply-spinner-v92 {
+        width:.78rem;
+        height:.78rem;
+        border:2px solid rgba(255,255,255,.5);
+        border-right-color:#fff;
+        border-radius:999px;
+        animation:rcInboxQuickReplySpinV92 .7s linear infinite;
+    }
+    @keyframes rcInboxQuickReplySpinV92 { to { transform:rotate(360deg); } }
+    @media (max-width:700px) {
+        .rc-inbox-quick-reply-suggestions-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-tabs-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-editor-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-tools-v92 button:nth-child(n+4) { display:none; }
+    }
+
+    .rc-inbox-quick-reply-tools-v92 label {
+        width:1.75rem;height:1.75rem;display:inline-flex;align-items:center;justify-content:center;
+        border:0;border-radius:.4rem;color:#64748b;cursor:pointer;font-size:.9rem;
+    }
+    .rc-inbox-quick-reply-tools-v92 label:hover { background:#f1f5f9;color:#ff6338; }
+    .rc-inbox-quick-reply-uploading-v95 {
+        display:none;
+        align-items:center;
+        gap:.45rem;
+        margin:.45rem 0 .15rem;
+        padding:.48rem .6rem;
+        border:1px solid rgba(255,99,56,.24);
+        border-radius:.55rem;
+        background:rgba(255,99,56,.07);
+        color:#c2410c;
+        font-size:.72rem;
+        font-weight:650;
+    }
+    .rc-inbox-quick-reply-upload-spinner-v95,
+    .rc-inbox-quick-reply-tool-spinner-v95 {
+        display:inline-block;
+        width:.85rem;
+        height:.85rem;
+        border:2px solid rgba(255,99,56,.28);
+        border-right-color:#ff6338;
+        border-radius:999px;
+        animation:rcInboxQuickReplySpinV92 .7s linear infinite;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-tool-spinner-v95 { width:.78rem;height:.78rem; }
+    .rc-inbox-quick-reply-tools-v92 label.is-uploading { pointer-events:none;opacity:.7; }
+    .rc-inbox-quick-reply-attachments-v94 { display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem 0 .15rem; }
+    .rc-inbox-quick-reply-attachment-chip-v95 {
+        display:inline-flex;
+        align-items:center;
+        min-width:0;
+        max-width:100%;
+        gap:.38rem;
+        padding:.36rem .46rem;
+        border:1px solid var(--rc-border);
+        border-radius:.55rem;
+        font-size:.72rem;
+        background:var(--rc-soft);
+        color:var(--rc-text);
+    }
+    .rc-inbox-quick-reply-attachment-icon-v95 { flex:0 0 auto;font-size:.8rem; }
+    .rc-inbox-quick-reply-attachment-name-v95 {
+        min-width:0;
+        max-width:15rem;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        font-weight:650;
+    }
+    .rc-inbox-quick-reply-attachment-ready-v95 {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:1rem;
+        height:1rem;
+        border-radius:999px;
+        background:#dcfce7;
+        color:#15803d;
+        font-size:.64rem;
+        font-weight:800;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-attachments-v94 button {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:1.15rem;
+        height:1.15rem;
+        border:0;
+        border-radius:999px;
+        background:transparent;
+        color:var(--rc-muted);
+        cursor:pointer;
+        font-size:1rem;
+        line-height:1;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-attachments-v94 button:hover { background:rgba(239,68,68,.1);color:#dc2626; }
+    .rc-inbox-quick-reply-attachments-v94 button:disabled { opacity:.45;cursor:not-allowed; }
+
+    .rc-inbox-quick-reply-contenteditable-v93 ul,
+    .rc-inbox-quick-reply-contenteditable-v93 ol {
+        display:block;
+        margin:.35rem 0 .35rem 1.4rem;
+        padding-left:1.15rem;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 ul { list-style:disc outside !important; }
+    .rc-inbox-quick-reply-contenteditable-v93 ol { list-style:decimal outside !important; }
+    .rc-inbox-quick-reply-contenteditable-v93 li {
+        display:list-item !important;
+        margin:.15rem 0;
+        padding-left:.15rem;
+    }
+    .rc-inbox-quick-reply-divider-v92 {
+        width:1px;
+        height:1.05rem;
+        background:var(--rc-border);
+        margin:0 .15rem;
+    }
+
+        .rc-inbox-quick-reply-uploading-v96,
+        .rc-inbox-quick-reply-attachment-chip-v96 {
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            width:max-content;
+            max-width:100%;
+            min-height:22px;
+            padding:3px 7px;
+            border:1px solid #d9dee7;
+            border-radius:6px;
+            background:#f3f4f6;
+            color:#596273;
+            font-size:11px;
+            line-height:1;
+        }
+        .rc-inbox-quick-reply-uploading-v96 { margin:7px 14px 0; }
+        .rc-inbox-quick-reply-attachment-chip-v96 button {
+            border:0;
+            background:transparent;
+            color:#7b8493;
+            padding:0;
+            width:14px;
+            height:14px;
+            line-height:12px;
+            cursor:pointer;
+            font-size:13px;
+        }
+        .rc-inbox-quick-reply-attachment-icon-v96 { font-size:8px; color:#7b8493; transform:rotate(45deg); }
+        .rc-inbox-quick-reply-attachment-name-v96,
+        .rc-inbox-quick-reply-upload-name-v96 {
+            max-width:220px;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .rc-inbox-quick-reply-upload-percent-v96 { color:#8b93a1; }
+        .rc-inbox-quick-reply-upload-spinner-v96 {
+            width:11px;
+            height:11px;
+            border:2px solid #c9ced8;
+            border-top-color:#ff5a43;
+            border-radius:999px;
+            animation:rcQuickReplySpinV96 .7s linear infinite;
+            flex:0 0 auto;
+        }
+        @keyframes rcQuickReplySpinV96 { to { transform:rotate(360deg); } }
+</style>
+<script id="rc-inbox-quick-reply-scroll-v91">
+(() => {
+    if (window.__rcInboxQuickReplyV91) return;
+    window.__rcInboxQuickReplyV91 = true;
+
+    const scrollToNewest = () => {
+        const stream = document.querySelector('[data-rc-inbox-message-stream]');
+        if (!stream) return;
+        requestAnimationFrame(() => {
+            stream.scrollTop = stream.scrollHeight;
+        });
+    };
+
+    document.addEventListener('rc-inbox-quick-reply-sent', scrollToNewest);
+    window.addEventListener('rc-inbox-quick-reply-sent', scrollToNewest);
+})();
+</script>
 </x-filament-panels::page>
