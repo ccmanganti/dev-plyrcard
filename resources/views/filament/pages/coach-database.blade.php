@@ -4520,6 +4520,20 @@
 
         .rc-radar-card-v2 small { color: #7d8798; font-size: .73rem; }
 
+        .rc-home-empty-v2 {
+            min-height: 10.5rem;
+            display: grid;
+            place-content: center;
+            gap: .35rem;
+            padding: 1.25rem;
+            border: 1px dashed rgba(148, 163, 184, .24);
+            border-radius: 1rem;
+            background: rgba(148, 163, 184, .045);
+            text-align: center;
+        }
+        .rc-home-empty-v2 strong { color: var(--rc-text); font-size: .9rem; }
+        .rc-home-empty-v2 span { max-width: 26rem; color: var(--rc-muted); font-size: .76rem; line-height: 1.5; }
+
         .rc-radar-card-v2 em {
             width: max-content;
             border-radius: 999px;
@@ -7731,11 +7745,18 @@
                     ->values()
                     ->all();
 
-                $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
-
-                if (empty($radarSchools)) {
-                    $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
-                }
+                // Only show schools backed by real, user-specific tracked activity.
+                // Do not populate On The Radar from the general school directory.
+                $radarSchools = collect($dashboardMostInterestedSchools)
+                    ->filter(fn ($school) => is_array($school))
+                    ->filter(fn (array $school): bool =>
+                        (int) ($school['profile_views'] ?? 0) > 0
+                        || (int) ($school['interest_clicks'] ?? 0) > 0
+                        || (int) ($school['coach_replies'] ?? $school['replies'] ?? 0) > 0
+                    )
+                    ->take(4)
+                    ->values()
+                    ->all();
 
                 $formatActivityTimeLabel = function ($time): string {
                     if (! $time) {
@@ -7812,13 +7833,13 @@
                     );
                 };
 
-                $maxRadarScore = max(1, collect($radarSchools)->map(fn ($school) => $radarScoreForSchool($school))->max() ?: 1);
-
-                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool, $maxRadarScore) {
+                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
                     $rawScore = $radarScoreForSchool($school);
-                    $match = $rawScore > 0 ? max(1, min(100, (int) round(($rawScore / $maxRadarScore) * 100))) : 0;
+                    // Absolute activity score: the strongest row is no longer
+                    // automatically normalized to a fake 100% match.
+                    $match = $rawScore > 0 ? min(99, $rawScore) : 0;
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                     $logoUrl = trim((string) (
                         $school['logo_url']
@@ -7841,14 +7862,6 @@
                     ];
                 })->values();
 
-                if ($radarSchoolRows->isEmpty()) {
-                    $radarSchoolRows = collect([
-                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU', 'logo_url' => ''],
-                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU', 'logo_url' => ''],
-                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU', 'logo_url' => ''],
-                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF', 'logo_url' => ''],
-                    ]);
-                }
 
                 $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
@@ -8014,21 +8027,28 @@
                             <a href="{{ $this->pageUrl('lists') }}">View All</a>
                         </div>
 
-                        <div class="rc-radar-schools-v2">
-                            @foreach($radarSchoolRows as $radarSchool)
-                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
-                                    <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
-                                        @if(! empty($radarSchool['logo_url']))
-                                            <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
-                                        @endif
-                                        <span class="rc-logo-fallback-text">{{ $radarSchool['initials'] }}</span>
-                                    </span>
-                                    <strong>{{ $radarSchool['name'] }}</strong>
-                                    <small>{{ $radarSchool['conference'] }}</small>
-                                    <em>{{ $radarSchool['match'] }}% Match</em>
-                                </button>
-                            @endforeach
-                        </div>
+                        @if($radarSchoolRows->isEmpty())
+                            <div class="rc-home-empty-v2">
+                                <strong>No schools on your radar yet</strong>
+                                <span>Schools will appear here after real profile views, tracked clicks, or coach replies are recorded.</span>
+                            </div>
+                        @else
+                            <div class="rc-radar-schools-v2">
+                                @foreach($radarSchoolRows as $radarSchool)
+                                    <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
+                                        <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
+                                            @if(! empty($radarSchool['logo_url']))
+                                                <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
+                                            @endif
+                                            <span class="rc-logo-fallback-text">{{ $radarSchool['initials'] }}</span>
+                                        </span>
+                                        <strong>{{ $radarSchool['name'] }}</strong>
+                                        <small>{{ $radarSchool['conference'] }}</small>
+                                        <em>{{ $radarSchool['match'] }}% Interest</em>
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
 
                         <div class="rc-home-dots-v2">
                             <span></span>
