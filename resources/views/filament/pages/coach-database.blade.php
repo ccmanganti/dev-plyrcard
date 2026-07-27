@@ -10994,7 +10994,7 @@ CSS;
                             return;
                         }
 
-                        if (!event.target?.closest?.('[data-rc-open="conversation"]')) return;
+                        if (!event.target?.closest?.('[data-rc-inbox-conversation-trigger]')) return;
                         loadingOlderMessages = false;
                         activeRun += 1;
 
@@ -11097,7 +11097,31 @@ CSS;
                             </div>
                         @endif
 
-                        <div class="rc-inbox-list-v56">
+                        <div
+                            class="rc-inbox-list-v56"
+                            x-data="{
+                                selectedConversationId: window.__rcInboxPendingConversationId || @js((string) ($selectedConversationId ?? '')),
+                                init() {
+                                    const serverConversationId = @js((string) ($selectedConversationId ?? ''));
+
+                                    if (window.__rcInboxPendingConversationId
+                                        && serverConversationId === window.__rcInboxPendingConversationId) {
+                                        window.__rcInboxPendingConversationId = null;
+                                    }
+
+                                    this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
+                                },
+                                selectConversation(conversationId) {
+                                    const id = String(conversationId || '');
+                                    if (! id) return;
+
+                                    window.__rcInboxPendingConversationId = id;
+                                    this.selectedConversationId = id;
+                                    this.$wire.selectConversation(id);
+                                },
+                            }"
+                            x-init="init()"
+                        >
                             @forelse($inboxConversations as $inboxConversation)
                                 @php
                                     $inboxConversationId = (string) ($inboxConversation['id'] ?? '');
@@ -11111,7 +11135,7 @@ CSS;
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" data-rc-open="conversation" data-rc-title="{{ $inboxContactName }}" data-rc-copy="Opening the conversation now. Messages will load inside the thread." wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -11141,7 +11165,25 @@ CSS;
                         </div>
                     </aside>
 
-                    <main class="rc-inbox-mid-v56">
+                    <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82">
+                        <div
+                            wire:loading.flex
+                            wire:target="selectConversation"
+                            class="rc-inbox-inline-conversation-loader-v82"
+                            aria-live="polite"
+                            aria-label="Loading conversation"
+                        >
+                            <div class="rc-inbox-inline-loader-head-v82">
+                                <span class="rc-inbox-inline-loader-avatar-v82"></span>
+                                <span class="rc-inbox-inline-loader-copy-v82">
+                                    <span></span>
+                                    <span></span>
+                                </span>
+                            </div>
+                            <div class="rc-inbox-inline-loader-message-v82 is-short"></div>
+                            <div class="rc-inbox-inline-loader-message-v82"></div>
+                            <div class="rc-inbox-inline-loader-message-v82 is-medium"></div>
+                        </div>
                         @if($selectedConversation)
                             <div class="rc-inbox-mid-head-v56">
                                 <div class="rc-inbox-coach-title-v56">
@@ -11165,23 +11207,6 @@ CSS;
                             </div>
 
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
-                                <div
-                                    class="rc-inbox-thread-loader-v63"
-                                    wire:loading.flex
-                                    wire:target="selectConversation,loadConversationMessages"
-                                    aria-live="polite"
-                                    aria-label="Loading conversation"
-                                >
-                                    <div class="rc-inbox-thread-loader-card-v63">
-                                        <span class="rc-spinner-mini"></span>
-                                        <span>Loading conversation…</span>
-                                    </div>
-                                </div>
-                                <div class="rc-thread-loading-skeleton {{ $isLoadingConversationMessages ? 'is-visible' : '' }}">
-                                    <span class="rc-skeleton"></span>
-                                    <span class="rc-skeleton"></span>
-                                    <span class="rc-skeleton"></span>
-                                </div>
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
@@ -13132,4 +13157,113 @@ CSS;
 }
 </style>
 
+
+
+
+<style id="rc-inbox-inline-conversation-loader-v82">
+    .rc-inbox-mid-loading-host-v82 {
+        position: relative !important;
+        isolation: isolate;
+    }
+
+    .rc-inbox-inline-conversation-loader-v82 {
+        position: absolute;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        flex-direction: column;
+        gap: .9rem;
+        padding: 1rem;
+        overflow: hidden;
+        background: var(--rc-surface, #fff);
+        color: var(--rc-text, #111827);
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .rc-inbox-inline-loader-head-v82 {
+        display: grid;
+        grid-template-columns: 2.8rem minmax(0, 1fr);
+        align-items: center;
+        gap: .75rem;
+        padding-bottom: .85rem;
+        border-bottom: 1px solid var(--rc-border, #e5e7eb);
+    }
+
+    .rc-inbox-inline-loader-avatar-v82,
+    .rc-inbox-inline-loader-copy-v82 span,
+    .rc-inbox-inline-loader-message-v82 {
+        display: block;
+        background: linear-gradient(90deg, rgba(148,163,184,.12), rgba(148,163,184,.28), rgba(148,163,184,.12));
+        background-size: 220% 100%;
+        animation: rcInboxInlineLoadingV82 1.05s ease-in-out infinite;
+    }
+
+    .rc-inbox-inline-loader-avatar-v82 {
+        width: 2.8rem;
+        height: 2.8rem;
+        border-radius: .8rem;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 {
+        display: grid;
+        gap: .45rem;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 span {
+        width: min(24rem, 72%);
+        height: .72rem;
+        border-radius: 999px;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 span:last-child {
+        width: min(15rem, 48%);
+        height: .58rem;
+    }
+
+    .rc-inbox-inline-loader-message-v82 {
+        width: 82%;
+        min-height: 6.5rem;
+        border: 1px solid var(--rc-border, #e5e7eb);
+        border-radius: .9rem;
+    }
+
+    .rc-inbox-inline-loader-message-v82.is-short {
+        width: 58%;
+        min-height: 4.75rem;
+        margin-left: auto;
+    }
+
+    .rc-inbox-inline-loader-message-v82.is-medium {
+        width: 70%;
+        min-height: 5.5rem;
+        margin-left: auto;
+    }
+
+    @keyframes rcInboxInlineLoadingV82 {
+        from { background-position: 120% 0; }
+        to { background-position: -120% 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rc-inbox-inline-loader-avatar-v82,
+        .rc-inbox-inline-loader-copy-v82 span,
+        .rc-inbox-inline-loader-message-v82 { animation: none; }
+    }
+</style>
+
+<style id="rc-disable-legacy-conversation-page-overlay-v83">
+    /* Conversation selection must never activate the page-wide opener/blur overlay. */
+    [data-rc-opening-overlay="conversation"],
+    .rc-conversation-opening-overlay,
+    .rc-conversation-loading-backdrop,
+    .rc-open-loading-overlay[data-rc-type="conversation"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+</style>
 </x-filament-panels::page>
