@@ -3100,35 +3100,265 @@ class GoHighLevelService
 
             if ($response->failed()) {
                 $lastStatus = $response->status();
-
-                Log::error('Recruiting conversation messages request failed.', [
-                    'conversation_id' => $conversationId,
-                    'version' => $version,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
                 continue;
             }
 
-            $items = $this->extractConversationMessagesFromResponse($data);
-            $messages = collect($items)
-                ->filter(fn ($item) => is_array($item))
-                ->map(fn (array $item): array => $this->transformConversationMessage($item))
+            $items = collect($this->extractConversationMessagesFromResponse($data))
+                ->filter(fn ($item): bool => is_array($item))
+                ->values();
+
+            // The conversation-list endpoint returns a flattened preview. Each real
+            // email ID is stored in meta.email.messageIds[0]. Fetch those email objects
+            // concurrently so emailMessage.body (the complete HTML document) becomes
+            // the canonical Inbox body.
+            $emailIds = $items
+                ->map(fn (array $item): string => trim((string) (
+                    data_get($item, 'meta.email.messageIds.0')
+                    ?? data_get($item, 'emailMessageId')
+                    ?? data_get($item, 'email_message_id')
+                    ?? ''
+                )))
+                ->filter(fn (string $id): bool => $id !== '' && ! str_contains($id, 'Over 9 levels deep'))
+                ->unique()
+                ->values();
+
+            $detailsByEmailId = collect();
+
+            if ($emailIds->isNotEmpty()) {
+                try {
+                    $detailResponses = Http::pool(function ($pool) use ($emailIds, $token, $version) {
+                        return $emailIds->mapWithKeys(function (string $emailId) use ($pool, $token, $version): array {
+                            return [
+                                $emailId => $pool
+                                    ->as($emailId)
+                                    ->withHeaders(['Version' => $version ?: '2021-04-15'])
+                                    ->withToken($token)
+                                    ->acceptJson()
+                                    ->timeout((int) config('ghl.message_detail_timeout', 20))
+                                    ->get($this->baseUrl . '/conversations/messages/email/' . rawurlencode($emailId)),
+                            ];
+                        })->all();
+                    });
+
+                    foreach ($detailResponses as $emailId => $detailResponse) {
+                        if (! $detailResponse instanceof \Illuminate\Http\Client\Response || $detailResponse->failed()) {
+                            continue;
+                        }
+
+                        $emailMessage = data_get($detailResponse->json() ?? [], 'emailMessage');
+                        if (! is_array($emailMessage)) {
+                            continue;
+                        }
+
+                        $html = trim((string) ($emailMessage['body'] ?? ''));
+                        if ($html === '') {
+                            continue;
+                        }
+
+                        $detailsByEmailId->put((string) $emailId, $emailMessage);
+                    }
+                } catch (\Throwable $exception) {
+                    Log::warning('Recruiting email HTML detail batch failed.', [
+                        'conversation_id' => $conversationId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+
+            $messages = $items
+                ->map(function (array $item) use ($detailsByEmailId): array {
+                    $emailId = trim((string) (
+                        data_get($item, 'meta.email.messageIds.0')
+                        ?? data_get($item, 'emailMessageId')
+                        ?? data_get($item, 'email_message_id')
+                        ?? ''
+                    ));
+
+                    $detail = $emailId !== '' ? $detailsByEmailId->get($emailId) : null;
+
+                    if (is_array($detail)) {
+                        // Keep list-level metadata such as conversation message ID and
+                        // date, while using the email detail as the source of HTML.
+                        $item['emailMessage'] = $detail;
+                        $item['html_body'] = (string) ($detail['body'] ?? '');
+                        $item['email_message_id'] = $emailId;
+                        $item['subject'] = $detail['subject']
+                            ?? data_get($item, 'meta.email.subject')
+                            ?? ($item['subject'] ?? '');
+                        $item['status'] = $detail['status'] ?? ($item['status'] ?? '');
+                    }
+
+                    return $this->transformConversationMessage($item);
+                })
                 ->filter(fn (array $item): bool => filled($item['id'] ?? null))
                 ->values()
                 ->all();
 
+            // GHL returns conversation messages newest-first. Pagination must use
+            // the oldest raw conversation-message ID from this page, not an email
+            // detail ID and not a cursor reconstructed after chronological sorting.
+            $nextLastMessageId = trim((string) ($items->last()['id'] ?? ''));
+            $cursorAdvanced = $nextLastMessageId !== '' && $nextLastMessageId !== (string) $lastMessageId;
+
             return [
                 'success' => true,
                 'messages' => $messages,
-                'last_message_id' => collect($messages)->last()['id'] ?? $lastMessageId,
-                'has_more' => count($messages) >= $params['limit'],
+                'last_message_id' => $cursorAdvanced ? $nextLastMessageId : $lastMessageId,
+                'has_more' => count($items) >= $params['limit'] && $cursorAdvanced,
                 'error' => null,
             ];
         }
 
         return ['success' => false, 'messages' => [], 'error' => 'Unable to load messages.', 'status' => $lastStatus, 'raw' => $lastData];
+    }
+
+    /**
+     * Log the untouched responses returned by GHL's individual email-message API.
+     *
+     * This method is intentionally diagnostic-only. It does not merge, normalize,
+     * sanitize, cache, or render the returned data. The bearer token is never logged.
+     * Set GHL_RAW_EMAIL_LOG_LIMIT in the environment to control how many unique
+     * email IDs are requested per conversation load (default: 20, maximum: 100).
+     */
+    protected function logRawConversationEmailDetails(
+        string $token,
+        string $conversationId,
+        array $conversationMessages,
+        string $version = '2021-04-15',
+    ): void {
+        $limit = min(max((int) env('GHL_RAW_EMAIL_LOG_LIMIT', 20), 0), 100);
+
+        if ($limit === 0 || $conversationMessages === []) {
+            return;
+        }
+
+        $seenEmailIds = [];
+        $logged = 0;
+
+        foreach ($conversationMessages as $message) {
+            if (! is_array($message) || $logged >= $limit) {
+                break;
+            }
+
+            $conversationMessageId = trim((string) ($message['id'] ?? ''));
+            $messageType = strtoupper(trim((string) ($message['messageType'] ?? $message['message_type'] ?? '')));
+            $contentType = strtolower(trim((string) ($message['contentType'] ?? $message['content_type'] ?? '')));
+
+            $rawEmailIds = data_get($message, 'meta.email.messageIds', []);
+            if (is_string($rawEmailIds)) {
+                $rawEmailIds = [$rawEmailIds];
+            }
+            if (! is_array($rawEmailIds)) {
+                $rawEmailIds = [];
+            }
+
+            $emailIds = collect($rawEmailIds)
+                ->flatten()
+                ->filter(fn ($value): bool => is_scalar($value))
+                ->map(fn ($value): string => trim((string) $value))
+                ->filter(fn (string $value): bool => $value !== '' && ! str_contains($value, 'Over 9 levels deep'))
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($emailIds === [] && $messageType !== 'TYPE_EMAIL' && ! str_contains($contentType, 'html')) {
+                continue;
+            }
+
+            foreach ($emailIds as $emailMessageId) {
+                if ($logged >= $limit || isset($seenEmailIds[$emailMessageId])) {
+                    continue;
+                }
+
+                $seenEmailIds[$emailMessageId] = true;
+                $logged++;
+
+                $url = "{$this->baseUrl}/conversations/messages/email/" . rawurlencode($emailMessageId);
+                $startedAt = microtime(true);
+
+                try {
+                    $response = Http::withHeaders(['Version' => $version ?: '2021-04-15'])
+                        ->timeout((int) config('ghl.timeout', 20))
+                        ->withToken($token)
+                        ->acceptJson()
+                        ->get($url);
+
+                    $rawBody = $response->body();
+
+                    Log::info('GHL RAW individual email message API response', [
+                        'diagnostic_marker' => 'GHL_RAW_EMAIL_MESSAGE_V1',
+                        'request' => [
+                            'method' => 'GET',
+                            'url' => $url,
+                            'conversation_id' => $conversationId,
+                            'conversation_message_id' => $conversationMessageId,
+                            'email_message_id' => $emailMessageId,
+                            'version' => $version,
+                        ],
+                        'response' => [
+                            'status' => $response->status(),
+                            'successful' => $response->successful(),
+                            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                            'content_type' => $response->header('Content-Type'),
+                            'raw_body_length' => strlen($rawBody),
+                            // This is the exact response body returned by GHL before
+                            // any application-side processing. Inspect this field first.
+                            'raw_body' => $rawBody,
+                        ],
+                    ]);
+
+                    // When the email-specific endpoint fails, log the untouched generic
+                    // message-detail endpoint too. This provides a direct comparison and
+                    // may reveal where GHL exposes the full body for this account/version.
+                    if ($response->failed() && $conversationMessageId !== '') {
+                        $fallbackUrl = "{$this->baseUrl}/conversations/messages/" . rawurlencode($conversationMessageId);
+                        $fallbackStartedAt = microtime(true);
+                        $fallback = Http::withHeaders(['Version' => $version ?: '2021-04-15'])
+                            ->timeout((int) config('ghl.timeout', 20))
+                            ->withToken($token)
+                            ->acceptJson()
+                            ->get($fallbackUrl);
+                        $fallbackRawBody = $fallback->body();
+
+                        Log::info('GHL RAW generic message detail API response', [
+                            'diagnostic_marker' => 'GHL_RAW_GENERIC_MESSAGE_DETAIL_V1',
+                            'request' => [
+                                'method' => 'GET',
+                                'url' => $fallbackUrl,
+                                'conversation_id' => $conversationId,
+                                'conversation_message_id' => $conversationMessageId,
+                                'email_message_id' => $emailMessageId,
+                                'version' => $version,
+                            ],
+                            'response' => [
+                                'status' => $fallback->status(),
+                                'successful' => $fallback->successful(),
+                                'duration_ms' => (int) round((microtime(true) - $fallbackStartedAt) * 1000),
+                                'content_type' => $fallback->header('Content-Type'),
+                                'raw_body_length' => strlen($fallbackRawBody),
+                                'raw_body' => $fallbackRawBody,
+                            ],
+                        ]);
+                    }
+                } catch (\Throwable $exception) {
+                    Log::error('GHL raw individual email message diagnostic failed', [
+                        'diagnostic_marker' => 'GHL_RAW_EMAIL_MESSAGE_V1',
+                        'conversation_id' => $conversationId,
+                        'conversation_message_id' => $conversationMessageId,
+                        'email_message_id' => $emailMessageId,
+                        'version' => $version,
+                        'exception' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        Log::info('GHL raw email message diagnostic completed', [
+            'diagnostic_marker' => 'GHL_RAW_EMAIL_MESSAGE_SUMMARY_V1',
+            'conversation_id' => $conversationId,
+            'requested_unique_email_count' => $logged,
+            'configured_limit' => $limit,
+        ]);
     }
 
     protected function trackedPlainTextFromHtml(string $html): string
@@ -4853,7 +5083,8 @@ class GoHighLevelService
 
     protected function transformConversationMessage(array $item): array
     {
-        $body = $this->conversationMessageBody($item);
+        $htmlBody = $this->conversationMessageHtmlBody($item);
+        $textBody = $this->conversationMessageTextBody($item, $htmlBody);
         $direction = $this->conversationScalar($item['direction'] ?? $item['messageDirection'] ?? $item['directionType'] ?? $item['source'] ?? '');
         $from = $this->conversationScalar($item['from'] ?? $item['emailFrom'] ?? $item['sender'] ?? data_get($item, 'sender.email') ?? data_get($item, 'from.email') ?? '');
         $to = $this->conversationScalar($item['to'] ?? $item['emailTo'] ?? $item['receiver'] ?? data_get($item, 'to.email') ?? '');
@@ -4863,8 +5094,12 @@ class GoHighLevelService
             'id' => (string) ($item['id'] ?? $item['_id'] ?? $item['messageId'] ?? ''),
             'direction' => $direction,
             'type' => $this->conversationScalar($item['type'] ?? $item['messageType'] ?? 'TYPE_EMAIL'),
-            'subject' => $this->conversationScalar($item['subject'] ?? $item['emailSubject'] ?? data_get($item, 'email.subject') ?? ''),
-            'body' => $body,
+            'subject' => $this->conversationScalar($item['subject'] ?? $item['emailSubject'] ?? data_get($item, 'meta.email.subject') ?? data_get($item, 'email.subject') ?? data_get($item, 'emailMessage.subject') ?? ''),
+            // Keep the historical body key for compatibility, but make it the
+            // canonical HTML body so Inbox never prefers a lossy plain-text copy.
+            'body' => $htmlBody !== '' ? $htmlBody : $textBody,
+            'html_body' => $htmlBody,
+            'text_body' => $textBody,
             'status' => $this->conversationScalar($item['status'] ?? ''),
             'from' => $from,
             'from_name' => $fromName ?: $from,
@@ -4874,34 +5109,104 @@ class GoHighLevelService
         ];
     }
 
-    protected function conversationMessageBody(array $item): string
+    protected function conversationMessageHtmlBody(array $item): string
     {
-        foreach ([
+        $candidates = [
+            $item['htmlBody'] ?? null,
+            $item['html_body'] ?? null,
+            $item['messageHtml'] ?? null,
+            $item['message_html'] ?? null,
             $item['html'] ?? null,
+            data_get($item, 'email.htmlBody'),
+            data_get($item, 'email.html_body'),
+            data_get($item, 'email.html'),
+            data_get($item, 'message.htmlBody'),
+            data_get($item, 'message.html_body'),
+            data_get($item, 'message.html'),
+            data_get($item, 'payload.htmlBody'),
+            data_get($item, 'payload.html'),
+            // Some HighLevel responses put the complete MIME HTML part in body.
             $item['body'] ?? null,
             $item['emailMessage'] ?? null,
             $item['messageBody'] ?? null,
             $item['content'] ?? null,
-            $item['bodyText'] ?? null,
-            $item['text'] ?? null,
-            data_get($item, 'email.html'),
             data_get($item, 'email.body'),
             data_get($item, 'email.content'),
-            data_get($item, 'message.html'),
             data_get($item, 'message.body'),
             data_get($item, 'message.content'),
-            $item['message'] ?? null,
-            data_get($item, 'message.text'),
             data_get($item, 'payload.body'),
-            data_get($item, 'payload.text'),
-        ] as $candidate) {
-            $value = $this->conversationHtmlValue($candidate);
-            if (trim(strip_tags($value)) !== '' || str_contains(strtolower($value), '<img')) {
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = $this->decodeConversationHtml($this->conversationHtmlValue($candidate));
+
+            if ($this->looksLikeEmailHtml($value)) {
                 return $value;
             }
         }
 
         return '';
+    }
+
+    protected function conversationMessageTextBody(array $item, string $htmlBody = ''): string
+    {
+        foreach ([
+            $item['textBody'] ?? null,
+            $item['text_body'] ?? null,
+            $item['bodyText'] ?? null,
+            $item['plainText'] ?? null,
+            $item['plain_text'] ?? null,
+            $item['text'] ?? null,
+            data_get($item, 'email.textBody'),
+            data_get($item, 'email.text'),
+            data_get($item, 'message.textBody'),
+            data_get($item, 'message.text'),
+            data_get($item, 'payload.text'),
+            $item['body'] ?? null,
+            $item['message'] ?? null,
+        ] as $candidate) {
+            $value = $this->conversationHtmlValue($candidate);
+            if ($value === '') {
+                continue;
+            }
+
+            $decoded = $this->decodeConversationHtml($value);
+            if (! $this->looksLikeEmailHtml($decoded) && trim($decoded) !== '') {
+                return trim($decoded);
+            }
+        }
+
+        return $htmlBody !== '' ? $this->trackedPlainTextFromHtml($htmlBody) : '';
+    }
+
+    protected function decodeConversationHtml(string $value): string
+    {
+        $value = trim($value);
+
+        for ($i = 0; $i < 3 && $value !== ''; $i++) {
+            $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $value) {
+                break;
+            }
+            $value = $decoded;
+        }
+
+        return trim($value);
+    }
+
+    protected function looksLikeEmailHtml(string $value): bool
+    {
+        return $value !== '' && (bool) preg_match(
+            '/<\s*(?:!doctype|html|head|body|meta|style|table|thead|tbody|tfoot|tr|td|th|p|div|br|a|img|ul|ol|li|span|strong|em|blockquote|h[1-6])\b/i',
+            $value,
+        );
+    }
+
+    protected function conversationMessageBody(array $item): string
+    {
+        $html = $this->conversationMessageHtmlBody($item);
+
+        return $html !== '' ? $html : $this->conversationMessageTextBody($item);
     }
 
     protected function conversationHtmlValue(mixed $value): string

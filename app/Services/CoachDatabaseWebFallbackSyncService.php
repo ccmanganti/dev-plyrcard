@@ -105,7 +105,7 @@ class CoachDatabaseWebFallbackSyncService
             // The incremental browser worker
             // processes a bounded burst while staying below the web request timeout.
             $maxPages = max(1, min(5, (int) config('coach-database-sync.incremental.pages_per_tick', 2)));
-            $timeBudget = max(4, min(20, (int) config('coach-database-sync.incremental.time_budget_seconds', 12)));
+            $timeBudget = max(4, min(25, (int) config('coach-database-sync.incremental.time_budget_seconds', 18)));
             $finalizeReserve = max(1, min(5, (int) config('coach-database-sync.incremental.finalize_reserve_seconds', 2)));
             $started = microtime(true);
             $processedThisTick = 0;
@@ -131,7 +131,7 @@ class CoachDatabaseWebFallbackSyncService
 
                 $processedThisTick++;
 
-                if (! ($checkpoint['business_has_more'] ?? false) && ! ($checkpoint['contacts_have_more'] ?? false)) {
+                if (! ($checkpoint['business_has_more'] ?? false) && ! ($checkpoint['contacts_have_more'] ?? false) && ($checkpoint['phase'] ?? '') === 'fetch') {
                     $checkpoint['phase'] = 'finalize';
                 }
 
@@ -367,6 +367,11 @@ class CoachDatabaseWebFallbackSyncService
         }
 
         Cache::put($cacheKey, $final, now()->addHours((int) config('ghl.coach_database.cache_hours', 12)));
+        app(\App\Services\LocalCoachDatabaseSchoolService::class)->syncFromSnapshot(
+            $user,
+            is_array($final['schools'] ?? null) ? $final['schools'] : [],
+            $finishedAt,
+        );
 
         $message = $warnings === []
             ? 'Full Coach Database reload completed. The refreshed read model is ready.'
@@ -408,9 +413,10 @@ class CoachDatabaseWebFallbackSyncService
         $pages = (int) ($checkpoint['business_pages'] ?? 0) + (int) ($checkpoint['contact_pages'] ?? 0);
         $phase = (string) ($checkpoint['phase'] ?? 'fetch');
         $lastBurst = max(0, (int) ($checkpoint['pages_processed_last_tick'] ?? 0));
-        $message = $phase === 'finalize'
-            ? 'All available pages are loaded. Building the final school and coach indexes.'
-            : "Background worker processed {$lastBurst} page(s) in the latest pass and {$pages} total ({$loadedSchools} schools, {$loadedContacts} coaches). Existing cached rows remain usable.";
+        $message = match ($phase) {
+            'finalize' => 'All available pages are loaded. Building and persisting the final school and coach indexes.',
+            default => "Background worker processed {$lastBurst} page(s) in the latest pass and {$pages} total ({$loadedSchools} schools, {$loadedContacts} coaches). Existing cached rows remain usable.",
+        };
 
         $status = array_merge($this->currentStatus($userId), [
             'status' => 'running',
@@ -461,6 +467,8 @@ class CoachDatabaseWebFallbackSyncService
             'remote_total_contacts' => null,
             'schools' => [],
             'coaches' => [],
+            'roster_school_keys' => [],
+            'roster_index' => 0,
             'warnings' => [],
         ];
     }
@@ -487,9 +495,8 @@ class CoachDatabaseWebFallbackSyncService
     protected function calculateProgress(array $checkpoint): int
     {
         if (($checkpoint['phase'] ?? '') === 'finalize') {
-            return 96;
+            return 98;
         }
-
         $loadedSchools = count($checkpoint['schools'] ?? []);
         $loadedContacts = count($checkpoint['coaches'] ?? []);
         $remoteSchools = $checkpoint['remote_total_schools'] ?? null;

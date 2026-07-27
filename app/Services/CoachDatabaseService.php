@@ -1685,6 +1685,113 @@ class CoachDatabaseService
         return $result;
     }
 
+    /**
+     * Load the complete coach roster for one school from both Recruiting Center sources:
+     * the official Business association endpoint and the already-loaded generic contact
+     * collection matched by Business/Company/School Name. The returned rows are safe to
+     * merge into the canonical snapshot coach collection used by Compose Email.
+     *
+     * @param array<string, mixed> $school
+     * @param array<int, array<string, mixed>> $knownCoaches
+     * @return array{school:array<string,mixed>,coaches:array<int,array<string,mixed>>,warnings:array<int,string>}
+     */
+    public function reconcileSchoolRosterForReload(User $user, array $school, array $knownCoaches = []): array
+    {
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
+        $schoolName = trim((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? $school['business_name'] ?? ''));
+        $normalizedName = $this->normalizeSchoolKey($schoolName);
+        $warnings = [];
+        $associated = collect();
+
+        if ($businessId !== '') {
+            $skip = 0;
+            $limit = max(10, min(100, (int) config('ghl.coach_database.business_contacts_page_limit', 50)));
+            $maxPages = max(1, (int) config('coach-database-sync.max_pages.business_rosters', 20));
+
+            for ($page = 0; $page < $maxPages; $page++) {
+                $result = $this->getContactsForBusinessForUser($user, $businessId, $skip, $limit, $school);
+                if (! ($result['success'] ?? false)) {
+                    $warnings[] = (string) ($result['error'] ?? "Unable to load the business roster for {$schoolName}.");
+                    break;
+                }
+
+                $rows = collect($result['coaches'] ?? $result['contacts'] ?? [])
+                    ->filter(fn ($coach): bool => is_array($coach));
+                $associated = $associated->merge($rows);
+
+                $returned = $rows->count();
+                $hasMore = (bool) ($result['has_more'] ?? false);
+                $nextSkip = $result['next_skip'] ?? null;
+                if (! $hasMore || $returned === 0) {
+                    break;
+                }
+
+                $newSkip = is_numeric($nextSkip) ? (int) $nextSkip : ($skip + $returned);
+                if ($newSkip <= $skip) {
+                    break;
+                }
+                $skip = $newSkip;
+            }
+        }
+
+        $nameMatched = collect($knownCoaches)
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->filter(function (array $coach) use ($businessId, $normalizedName): bool {
+                $candidateIds = collect([
+                    $coach['business_id'] ?? null,
+                    $coach['company_id'] ?? null,
+                    $coach['ghl_business_id'] ?? null,
+                    $coach['school_id'] ?? null,
+                ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter();
+
+                if ($businessId !== '' && $candidateIds->contains(strtolower($businessId))) {
+                    return true;
+                }
+
+                if ($normalizedName === '') {
+                    return false;
+                }
+
+                return collect([
+                    $coach['school'] ?? null,
+                    $coach['school_name'] ?? null,
+                    $coach['company_name'] ?? null,
+                    $coach['business_name'] ?? null,
+                    $coach['organization'] ?? null,
+                ])->contains(fn ($value): bool => $this->normalizeSchoolKey((string) $value) === $normalizedName);
+            });
+
+        $coaches = $associated
+            ->merge($nameMatched)
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(function (array $coach) use ($schoolName, $businessId, $school): array {
+                if ($schoolName !== '') {
+                    $coach['school'] = $coach['school'] ?? $schoolName;
+                    $coach['school_name'] = $coach['school_name'] ?? $schoolName;
+                    $coach['company_name'] = $coach['company_name'] ?? $schoolName;
+                    $coach['business_name'] = $coach['business_name'] ?? $schoolName;
+                }
+                if ($businessId !== '') {
+                    $coach['business_id'] = $coach['business_id'] ?? $businessId;
+                    $coach['company_id'] = $coach['company_id'] ?? $businessId;
+                    $coach['school_id'] = $coach['school_id'] ?? $businessId;
+                }
+                $coach['conference'] = $coach['conference'] ?? ($school['conference'] ?? null);
+                $coach['division'] = $coach['division'] ?? ($school['division'] ?? null);
+                $coach['school_logo_url'] = $coach['school_logo_url'] ?? ($school['logo_url'] ?? $school['school_logo_url'] ?? null);
+                return $this->slimCoach($coach);
+            })
+            ->unique(fn (array $coach): string => $this->coachUniqueKey($coach))
+            ->values();
+
+        $school['coach_count'] = max((int) ($school['coach_count'] ?? 0), $coaches->count());
+        $school['coaches_count'] = max((int) ($school['coaches_count'] ?? 0), $coaches->count());
+        $school['coach_ids'] = $coaches->pluck('id')->filter()->unique()->values()->all();
+        $school['coach_emails'] = $coaches->pluck('email')->filter()->unique(fn ($email): string => strtolower((string) $email))->values()->all();
+
+        return ['school' => $school, 'coaches' => $coaches->all(), 'warnings' => array_values(array_unique(array_filter($warnings)))];
+    }
+
     public function getBusinessContactCountsForUser(User $user, array $schools): array
     {
         $result = $this->goHighLevelService->getBusinessContactCountsForUser($user, $schools);

@@ -7118,6 +7118,14 @@
 
             const resetOne = function (el) {
                 if (! el) return;
+
+                // The Inbox message stream owns its own scroll position. Never let the
+                // dashboard-wide scroll reset push it back to the oldest message.
+                if (el.matches?.('[data-rc-inbox-message-stream]')
+                    || el.closest?.('[data-rc-inbox-message-stream]')) {
+                    return;
+                }
+
                 try { el.scrollTop = 0; } catch (error) {}
                 try { el.scrollLeft = 0; } catch (error) {}
             };
@@ -7139,6 +7147,11 @@
 
                 document.querySelectorAll('*').forEach(function (el) {
                     try {
+                        if (el.matches?.('[data-rc-inbox-message-stream]')
+                            || el.closest?.('[data-rc-inbox-message-stream]')) {
+                            return;
+                        }
+
                         if (el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== 'visible') {
                             el.scrollTop = 0;
                         }
@@ -10456,6 +10469,9 @@
                 }
 
                 .rc-inbox-history-trimmed{margin:.3rem 0 .7rem;padding:.5rem .7rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.72rem;text-align:center;}
+                .rc-message-stream-v56{padding:0 .9rem .9rem !important;}
+                .rc-inbox-load-older-top{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:center;height:2.65rem;margin:0 -.9rem .9rem;padding:0;background:var(--rc-surface);border-bottom:1px solid var(--rc-border);}
+                .rc-inbox-load-older-top .rc-inbox-open-composer-v56{background:var(--rc-surface);}
 
                 @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
                 @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
@@ -10531,138 +10547,435 @@
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
-                $renderInboxMessageBody = function ($body): string {
+                $prepareInboxEmailDocument = function ($body): string {
                     $raw = trim((string) $body);
 
                     if ($raw === '') {
-                        return '<p>No message body.</p>';
+                        return '<!doctype html><html><body style="margin:0;font:14px Arial,sans-serif;color:#64748b">No message body.</body></html>';
                     }
 
-                    $decoded = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    $hasHtml = preg_match('/<\s*(p|div|br|a|img|table|ul|ol|li|span|strong|em|blockquote|h[1-6])\b/i', $decoded);
-
-                    $shortUrlLabel = function (string $url): string {
-                        $path = parse_url($url, PHP_URL_PATH) ?: '';
-                        $host = parse_url($url, PHP_URL_HOST) ?: '';
-
-                        if (str_contains($path, '/track/profile/')) {
-                            return 'View My Player Profile';
+                    $decoded = $raw;
+                    for ($i = 0; $i < 3; $i++) {
+                        $next = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        if ($next === $decoded || trim($next) === '') {
+                            break;
                         }
+                        $decoded = $next;
+                    }
 
-                        if (str_contains($path, '/track/click/')) {
-                            return 'Open tracked link';
-                        }
-
-                        $label = trim($host . $path);
-                        $label = $label !== '' ? $label : $url;
-
-                        if (mb_strlen($label) > 58) {
-                            $label = mb_substr($label, 0, 32) . '...' . mb_substr($label, -16);
-                        }
-
-                        return $label;
-                    };
-
-                    $renderPlainWithLinks = function (string $text) use ($shortUrlLabel): string {
-                        $parts = preg_split('/(https?:\/\/[^\s<]+)/i', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-
-                        if (! is_array($parts) || $parts === []) {
-                            return nl2br(e($text));
-                        }
-
-                        $html = '';
-
-                        foreach ($parts as $part) {
-                            if (! preg_match('/^https?:\/\//i', $part)) {
-                                $html .= e($part);
-                                continue;
-                            }
-
-                            $url = rtrim($part, "\"'.,;:!?)]}");
-                            $suffix = substr($part, strlen($url));
-
-                            if (str_ends_with($html, '[') && str_starts_with($suffix, ']')) {
-                                $html = substr($html, 0, -1);
-                                $suffix = substr($suffix, 1);
-                            }
-
-                            $safeUrl = e($url);
-
-                            if (preg_match('/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i', $url)) {
-                                $html .= '<a class="rc-message-image-link" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'
-                                    . '<img src="'.$safeUrl.'" alt="Conversation image" loading="lazy" referrerpolicy="no-referrer">'
-                                    . '</a>';
-                            } else {
-                                $label = e($shortUrlLabel($url));
-                                $html .= '<a class="rc-message-link-short" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
-                            }
-
-                            if ($suffix !== '') {
-                                $html .= e($suffix);
-                            }
-                        }
-
-                        return nl2br($html);
-                    };
+                    $hasDocumentHtml = (bool) preg_match('/<!doctype\s+html|<html\b|<head\b|<body\b/i', $decoded);
+                    $hasHtml = (bool) preg_match('/<\s*(table|tbody|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|h[1-6])\b/i', $decoded);
 
                     if (! $hasHtml) {
-                        return $renderPlainWithLinks($decoded);
+                        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+                            . '<body style="margin:0;padding:0;font:14px/1.6 Arial,sans-serif;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere">'
+                            . e($decoded)
+                            . '</body></html>';
                     }
 
-                    $clean = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $decoded) ?? $decoded;
+                    // GHL's email detail endpoint returns the complete compiled email
+                    // document in emailMessage.body. Keep its head, style blocks,
+                    // media queries, tables, buttons, images, and signatures intact.
+                    // Scripts are removed because email clients do not execute them.
+                    $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $decoded) ?? $decoded;
+                    $clean = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $clean) ?? $clean;
                     $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
-                    $clean = preg_replace('/javascript\s*:/i', '', $clean) ?? $clean;
+                    $clean = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $clean) ?? $clean;
 
-                    if (class_exists(\DOMDocument::class)) {
-                        try {
-                            $document = new \DOMDocument('1.0', 'UTF-8');
-                            $previous = libxml_use_internal_errors(true);
-                            $document->loadHTML('<?xml encoding="utf-8" ?><div data-rc-message-root="1">' . $clean . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-                            libxml_clear_errors();
-                            libxml_use_internal_errors($previous);
+                    $responsiveEmailCss = <<<'CSS'
+<style id="rc-inbox-email-fit-v62">
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+    }
+    body {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body, body table, body td, body div, body p, body span,
+    body a, body li, body strong, body em {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    body table {
+        max-width: 100% !important;
+    }
+    body img {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+    }
+    body p, body li, body td, body div, body span, body a {
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+    }
+    body p, body li, body td, body div, body span {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body a {
+        font-size: 12px !important;
+        line-height: 1.35 !important;
+    }
+    body h1 { font-size: 20px !important; line-height: 1.2 !important; }
+    body h2 { font-size: 18px !important; line-height: 1.22 !important; }
+    body h3 { font-size: 16px !important; line-height: 1.25 !important; }
+    body h4, body h5, body h6 { font-size: 14px !important; line-height: 1.3 !important; }
+    .email-content,
+    body > div,
+    body > table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    @media (max-width: 640px) {
+        body table[width] { width: 100% !important; }
+        body td[width] { max-width: 100% !important; }
+    }
+</style>
+CSS;
 
-                            foreach ($document->getElementsByTagName('a') as $anchor) {
-                                $href = trim((string) $anchor->getAttribute('href'));
-                                $label = trim((string) $anchor->textContent);
+                    if ($hasDocumentHtml) {
+                        if (preg_match('/<\/head\s*>/i', $clean)) {
+                            return preg_replace('/<\/head\s*>/i', $responsiveEmailCss . '</head>', $clean, 1) ?? $clean;
+                        }
 
-                                if ($href === '' || $anchor->getElementsByTagName('img')->length > 0) {
-                                    continue;
+                        if (preg_match('/<body\b/i', $clean)) {
+                            return preg_replace('/<body\b/i', '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' . $responsiveEmailCss . '</head><body', $clean, 1) ?? $clean;
+                        }
+
+                        return $responsiveEmailCss . $clean;
+                    }
+
+                    return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                        . $responsiveEmailCss
+                        . '</head><body style="margin:0;padding:0">' . $clean . '</body></html>';
+                };
+            @endphp
+
+            <style>
+                .rc-msg-bubble-email-v61 {
+                    display:block;
+                    width:min(100%,42rem);
+                    max-width:100%;
+                    height:auto;
+                    min-height:0;
+                    background:#f1f5f9;
+                    padding:.55rem;
+                    overflow:visible;
+                }
+                rc-inbox-email-view.rc-email-document-v64 {
+                    display:block;
+                    width:100%;
+                    max-width:100%;
+                    height:auto;
+                    min-height:0;
+                    overflow:visible;
+                    contain:layout style;
+                }
+                rc-inbox-email-view.rc-email-document-v64::part(toggle) {
+                    position:absolute;
+                    right:.25rem;
+                    bottom:.2rem;
+                }
+                .rc-message-stream-v56 { position:relative; }
+                .rc-inbox-thread-loader-v63 {
+                    position:absolute;
+                    inset:0;
+                    z-index:40;
+                    align-items:center;
+                    justify-content:center;
+                    background:color-mix(in srgb, var(--rc-surface) 90%, transparent);
+                    backdrop-filter:blur(2px);
+                }
+                .rc-inbox-thread-loader-card-v63 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.55rem;
+                    min-height:2.6rem;
+                    padding:.65rem .9rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.8rem;
+                    background:var(--rc-surface);
+                    color:var(--rc-text);
+                    box-shadow:0 14px 34px rgba(15,23,42,.14);
+                    font-size:.78rem;
+                    font-weight:750;
+                }
+            </style>
+            <script>
+                (() => {
+                    if (customElements.get('rc-inbox-email-view')) return;
+
+                    class RcInboxEmailView extends HTMLElement {
+                        connectedCallback() {
+                            if (this.shadowRoot) return;
+
+                            const template = this.querySelector('template');
+                            if (!(template instanceof HTMLTemplateElement)) return;
+
+                            const parsed = new DOMParser().parseFromString(template.innerHTML, 'text/html');
+                            const shadow = this.attachShadow({ mode: 'open' });
+
+                            const base = document.createElement('style');
+                            base.textContent = `
+                                :host { display:block; width:100%; max-width:100%; height:auto; min-height:0; position:relative; }
+                                *, *::before, *::after { box-sizing:border-box; }
+                                .rc-email-viewport { display:block; width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; transition:max-height .18s ease; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px; overflow:hidden; padding-right:2rem; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2.75rem; z-index:2; pointer-events:none; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)); }
+                                .rc-email-root { display:block; width:100%; max-width:100%; min-width:0; margin:0; overflow:visible; font-size:12px; line-height:1.45; }
+                                .rc-email-root img { max-width:100% !important; height:auto !important; }
+                                .rc-email-root table { max-width:100% !important; }
+                                .rc-email-root td, .rc-email-root th { max-width:100% !important; }
+                                .rc-email-root a { overflow-wrap:anywhere; word-break:break-word; }
+                                .rc-email-toggle { display:none; position:absolute; right:.2rem; bottom:.18rem; z-index:4; width:1.75rem; height:1.75rem; padding:0; border:0; border-radius:0; background:transparent; color:#475569; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex; }
+                                .rc-email-toggle svg { width:.9rem; height:.9rem; transition:transform .18s ease; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg); }
+                            `;
+                            shadow.appendChild(base);
+
+                            parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                                const clone = node.cloneNode(true);
+                                if (clone instanceof HTMLStyleElement) {
+                                    clone.textContent = String(clone.textContent || '').replace(/\bbody\b/g, '.rc-email-root');
                                 }
+                                shadow.appendChild(clone);
+                            });
 
-                                $labelLooksLikeUrl = preg_match('/^https?:\/\//i', $label) || str_contains($label, '/track/profile/') || str_contains($label, '/track/click/');
-                                $shouldShortenAnchor = $label === '' || $label === $href || $labelLooksLikeUrl || mb_strlen($label) > 90;
+                            const viewport = document.createElement('div');
+                            viewport.className = 'rc-email-viewport';
 
-                                if ($shouldShortenAnchor) {
-                                    while ($anchor->firstChild) {
-                                        $anchor->removeChild($anchor->firstChild);
-                                    }
+                            const root = document.createElement('div');
+                            root.className = `rc-email-root ${parsed.body.className || ''}`.trim();
 
-                                    $anchor->appendChild($document->createTextNode($shortUrlLabel($href)));
-                                    $anchor->setAttribute('class', trim($anchor->getAttribute('class') . ' rc-message-link-short'));
+                            const bodyStyle = parsed.body.getAttribute('style');
+                            if (bodyStyle) root.setAttribute('style', bodyStyle);
+
+                            Array.from(parsed.body.childNodes).forEach((node) => {
+                                root.appendChild(document.importNode(node, true));
+                            });
+
+                            viewport.appendChild(root);
+                            shadow.appendChild(viewport);
+
+                            const toggle = document.createElement('button');
+                            toggle.type = 'button';
+                            toggle.className = 'rc-email-toggle';
+                            toggle.setAttribute('part', 'toggle');
+                            toggle.setAttribute('aria-label', 'Expand email');
+                            toggle.setAttribute('aria-expanded', 'false');
+                            toggle.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                            toggle.addEventListener('click', () => {
+                                const expanded = this.dataset.expanded === '1';
+                                if (expanded) {
+                                    delete this.dataset.expanded;
+                                    toggle.setAttribute('aria-expanded', 'false');
+                                    toggle.setAttribute('aria-label', 'Expand email');
+                                } else {
+                                    this.dataset.expanded = '1';
+                                    toggle.setAttribute('aria-expanded', 'true');
+                                    toggle.setAttribute('aria-label', 'Collapse email');
                                 }
+                            });
+                            shadow.appendChild(toggle);
 
-                                $anchor->setAttribute('target', '_blank');
-                                $anchor->setAttribute('rel', 'noopener noreferrer');
-                            }
+                            // Keep inbox controls authoritative even after delayed email
+                            // stylesheets finish loading. Email HTML can contain broad rules
+                            // such as div/button/* selectors, so this guard must be the final
+                            // stylesheet in the shadow root and use !important.
+                            const guard = document.createElement('style');
+                            guard.textContent = `
+                                :host { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; min-height:0 !important; position:relative !important; overflow:visible !important; }
+                                .rc-email-viewport { display:block !important; width:100% !important; max-width:100% !important; min-width:0 !important; max-height:none !important; height:auto !important; overflow:visible !important; position:relative !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px !important; overflow:hidden !important; padding-right:2rem !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:"" !important; display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; height:2.75rem !important; z-index:2147483645 !important; pointer-events:none !important; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)) !important; }
+                                .rc-email-toggle { display:none !important; position:absolute !important; right:.2rem !important; bottom:.18rem !important; z-index:2147483646 !important; width:1.75rem !important; height:1.75rem !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#475569 !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; box-shadow:none !important; appearance:none !important; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex !important; }
+                                .rc-email-toggle svg { display:block !important; width:.9rem !important; height:.9rem !important; min-width:.9rem !important; min-height:.9rem !important; transition:transform .18s ease !important; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg) !important; }
+                            `;
+                            shadow.appendChild(guard);
+                            template.remove();
 
-                            $root = $document->getElementsByTagName('div')->item(0);
-                            if ($root) {
-                                $next = '';
-                                foreach ($root->childNodes as $child) {
-                                    $next .= $document->saveHTML($child);
+                            const evaluateHeight = () => {
+                                const height = Math.ceil(root.getBoundingClientRect().height);
+                                if (height > 100) this.dataset.collapsible = '1';
+                            };
+
+                            requestAnimationFrame(() => requestAnimationFrame(evaluateHeight));
+                            root.querySelectorAll('img').forEach((image) => {
+                                if (!image.complete) {
+                                    image.addEventListener('load', evaluateHeight, { once:true });
+                                    image.addEventListener('error', evaluateHeight, { once:true });
                                 }
-                                if (trim($next) !== '') {
-                                    $clean = $next;
-                                }
-                            }
-                        } catch (\Throwable $exception) {
-                            // Keep sanitized HTML when DOM cleanup is unavailable.
+                            });
+                            if (document.fonts?.ready) document.fonts.ready.then(evaluateHeight).catch(() => {});
                         }
                     }
 
-                    return $clean;
-                };
-            @endphp
+                    customElements.define('rc-inbox-email-view', RcInboxEmailView);
+                })();
+
+                (() => {
+                    let activeRun = 0;
+                    let observer = null;
+                    let observedStream = null;
+                    let loadingOlderMessages = false;
+
+                    const getStream = () => document.querySelector('[data-rc-inbox-message-stream]');
+
+                    const moveToLatest = () => {
+                        if (loadingOlderMessages) return false;
+
+                        const stream = getStream();
+                        if (!stream) return false;
+
+                        // scrollTo is more reliable than assigning scrollTop while a
+                        // Livewire morph is still settling.
+                        stream.scrollTo({ top: stream.scrollHeight, behavior: 'auto' });
+                        return true;
+                    };
+
+                    const keepOlderMessagesAtTop = () => {
+                        const run = ++activeRun;
+                        const delays = [0, 16, 50, 120, 250, 500, 900];
+
+                        delays.forEach((delay, index) => {
+                            window.setTimeout(() => {
+                                if (run !== activeRun) return;
+
+                                const stream = getStream();
+                                if (stream) stream.scrollTo({ top: 0, behavior: 'auto' });
+
+                                if (index === delays.length - 1) {
+                                    loadingOlderMessages = false;
+                                }
+                            }, delay);
+                        });
+                    };
+
+                    const showLatestMessage = () => {
+                        if (loadingOlderMessages) return;
+
+                        const run = ++activeRun;
+                        const delays = [0, 16, 50, 120, 250, 500, 900, 1400];
+
+                        delays.forEach((delay) => {
+                            window.setTimeout(() => {
+                                if (run !== activeRun || loadingOlderMessages) return;
+                                moveToLatest();
+                            }, delay);
+                        });
+                    };
+
+                    const observeStream = () => {
+                        const stream = getStream();
+                        if (!stream) return;
+                        if (observedStream === stream) return;
+
+                        observer?.disconnect();
+                        observedStream = stream;
+                        observer = new MutationObserver(() => {
+                            if (loadingOlderMessages) {
+                                keepOlderMessagesAtTop();
+                                return;
+                            }
+
+                            showLatestMessage();
+                        });
+                        observer.observe(stream, { childList:true, subtree:true });
+
+                        // Shadow-root email content and images can increase the final
+                        // message height without mutating the outer Livewire tree.
+                        stream.addEventListener('load', () => {
+                            if (loadingOlderMessages) {
+                                const current = getStream();
+                                if (current) current.scrollTop = 0;
+                                return;
+                            }
+
+                            showLatestMessage();
+                        }, true);
+                        showLatestMessage();
+                    };
+
+                    document.addEventListener('click', (event) => {
+                        const clickedElement = event.target instanceof Element
+                            ? event.target.closest('[wire\\:click]')
+                            : null;
+                        const loadOlderButton = clickedElement?.getAttribute('wire:click') === 'loadOlderConversationMessages'
+                            ? clickedElement
+                            : null;
+                        if (loadOlderButton) {
+                            loadingOlderMessages = true;
+                            activeRun += 1;
+
+                            const stream = getStream();
+                            if (stream) stream.scrollTop = 0;
+                            return;
+                        }
+
+                        if (!event.target?.closest?.('[data-rc-open="conversation"]')) return;
+                        loadingOlderMessages = false;
+                        activeRun += 1;
+
+                        // Wait for the selected conversation request to finish, then place
+                        // the viewport at the newest message.
+                        window.setTimeout(() => {
+                            observeStream();
+                            showLatestMessage();
+                        }, 0);
+                    }, true);
+
+                    const boot = () => {
+                        observeStream();
+                        showLatestMessage();
+                    };
+
+                    document.addEventListener('DOMContentLoaded', boot, { once:true });
+                    document.addEventListener('livewire:navigated', boot);
+                    document.addEventListener('livewire:initialized', boot);
+
+                    if (window.Livewire?.hook) {
+                        window.Livewire.hook('morph.updated', ({ el }) => {
+                            if (el?.matches?.('[data-rc-inbox-message-stream]')
+                                || el?.querySelector?.('[data-rc-inbox-message-stream]')) {
+                                observeStream();
+
+                                if (loadingOlderMessages) {
+                                    keepOlderMessagesAtTop();
+                                } else {
+                                    showLatestMessage();
+                                }
+                            }
+                        });
+
+                        window.Livewire.hook('commit', ({ succeed }) => {
+                            succeed(() => {
+                                queueMicrotask(() => {
+                                    observeStream();
+
+                                    if (loadingOlderMessages) {
+                                        keepOlderMessagesAtTop();
+                                    } else {
+                                        showLatestMessage();
+                                    }
+                                });
+                            });
+                        });
+                    }
+
+                    if (document.readyState !== 'loading') boot();
+                })();
+            </script>
 
             <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
@@ -10767,6 +11080,18 @@
                             </div>
 
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
+                                <div
+                                    class="rc-inbox-thread-loader-v63"
+                                    wire:loading.flex
+                                    wire:target="selectConversation,loadConversationMessages"
+                                    aria-live="polite"
+                                    aria-label="Loading conversation"
+                                >
+                                    <div class="rc-inbox-thread-loader-card-v63">
+                                        <span class="rc-spinner-mini"></span>
+                                        <span>Loading conversation…</span>
+                                    </div>
+                                </div>
                                 <div class="rc-thread-loading-skeleton {{ $isLoadingConversationMessages ? 'is-visible' : '' }}">
                                     <span class="rc-skeleton"></span>
                                     <span class="rc-skeleton"></span>
@@ -10776,11 +11101,52 @@
                                     <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
                                     @php
-                                        $visibleThreadMessages = collect($threadMessages)->take(-30)->values();
-                                        $hiddenThreadMessageCount = max(0, count($threadMessages) - $visibleThreadMessages->count());
+                                        // GHL may return messages newest-first or oldest-first depending on
+                                        // the endpoint/page. Normalize them chronologically, then keep the
+                                        // newest 10 so a newly opened conversation always shows the latest emails.
+                                        $orderedThreadMessages = collect($threadMessages)
+                                            ->sortBy(function ($message) {
+                                                $message = is_array($message) ? $message : [];
+                                                $value = $message['created_at']
+                                                    ?? $message['createdAt']
+                                                    ?? $message['date']
+                                                    ?? $message['messageDate']
+                                                    ?? $message['timestamp']
+                                                    ?? $message['updated_at']
+                                                    ?? $message['updatedAt']
+                                                    ?? 0;
+
+                                                if (is_numeric($value)) {
+                                                    $number = (float) $value;
+                                                    return $number > 9999999999 ? $number / 1000 : $number;
+                                                }
+
+                                                try {
+                                                    return \Illuminate\Support\Carbon::parse($value)->getTimestamp();
+                                                } catch (\Throwable $exception) {
+                                                    return 0;
+                                                }
+                                            })
+                                            ->values();
+
+                                        // The Livewire method is responsible for loading the initial latest
+                                        // batch and prepending older batches. Render every message currently
+                                        // present instead of trimming back to ten after each request.
+                                        $visibleThreadMessages = $orderedThreadMessages;
                                     @endphp
-                                    @if($hiddenThreadMessageCount > 0)
-                                        <div class="rc-inbox-history-trimmed">Showing the latest {{ $visibleThreadMessages->count() }} messages. Use “Load older emails” to view earlier history.</div>
+                                    @if((bool) $hasMoreMessages)
+                                        <div class="rc-inbox-load-older-top">
+                                            <button
+                                                class="rc-inbox-open-composer-v56"
+                                                type="button"
+                                                wire:click="loadOlderConversationMessages"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadOlderConversationMessages"
+                                            >
+                                                <span wire:loading.remove wire:target="loadOlderConversationMessages">Load older emails</span>
+                                                <span wire:loading wire:target="loadOlderConversationMessages">Loading 10 older emails…</span>
+                                            </button>
+                                        </div>
                                     @endif
                                     @foreach($visibleThreadMessages as $message)
                                         @php
@@ -10791,15 +11157,48 @@
                                             if (is_array($toLabel)) {
                                                 $toLabel = collect($toLabel)->map(fn($item) => is_array($item) ? ($item['email'] ?? $item['name'] ?? $item['address'] ?? '') : (is_scalar($item) ? (string) $item : ''))->filter()->implode(', ');
                                             }
-                                            $messageBody = (string) ($message['body'] ?? $message['html'] ?? $message['text'] ?? '');
+                                            $compressedMessageBody = is_scalar($message['_livewire_body_gzip'] ?? null)
+                                                ? (string) $message['_livewire_body_gzip']
+                                                : '';
+                                            $decodedCompressedBody = '';
+                                            if ($compressedMessageBody !== '') {
+                                                try {
+                                                    $decodedCompressedBody = gzdecode(base64_decode($compressedMessageBody, true) ?: '') ?: '';
+                                                } catch (\Throwable $exception) {
+                                                    $decodedCompressedBody = '';
+                                                }
+                                            }
+                                            $messageBody = collect([
+                                                $decodedCompressedBody,
+                                                $message['html_body'] ?? null,
+                                                $message['htmlBody'] ?? null,
+                                                $message['message_html'] ?? null,
+                                                $message['html'] ?? null,
+                                                $message['body'] ?? null,
+                                                $message['text_body'] ?? null,
+                                                $message['textBody'] ?? null,
+                                                $message['text'] ?? null,
+                                                data_get($message, 'email.html'),
+                                                data_get($message, 'email.body'),
+                                                data_get($message, 'payload.html'),
+                                                data_get($message, 'payload.body'),
+                                            ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+                                            $messageBody = is_scalar($messageBody) ? (string) $messageBody : '';
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
                                         @endphp
-                                        <article class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
+                                        <article wire:key="inbox-message-{{ (string) ($message['id'] ?? $loop->index) }}" class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
                                             <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
-                                                <div class="rc-msg-bubble-v56">{!! $renderInboxMessageBody($messageBody) !!}</div>
+                                                @php
+                                                    $emailDocument = $prepareInboxEmailDocument($messageBody);
+                                                @endphp
+                                                <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
+                                                    <rc-inbox-email-view wire:ignore class="rc-email-document-v64" aria-label="Email message">
+                                                        <template>{!! $emailDocument !!}</template>
+                                                    </rc-inbox-email-view>
+                                                </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
                                                         @foreach($messageAttachments as $attachment)
@@ -10822,9 +11221,7 @@
                                         </article>
                                     @endforeach
                                 @endif
-                                @if($hasMoreMessages)
-                                    <button class="rc-inbox-open-composer-v56" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages">Load older emails</button>
-                                @endif
+
                             </div>
                         @else
                             <div class="rc-inbox-empty-v56"><div><strong>Select a conversation.</strong><br><span>Email messages will appear here.</span></div></div>
@@ -12576,5 +12973,65 @@
             </div>
         </div>
     @endif
+
+
+<style>
+/* Stable inline Inbox renderer: no iframe, no resize loop, natural content height. */
+.rc-msg-bubble-email-v59 {
+    display: block;
+    width: min(100%, 36rem);
+    max-width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: .78rem .88rem !important;
+    border-radius: 1rem !important;
+    background: #f1f5f9 !important;
+    color: #111827 !important;
+}
+.rc-email-html-v59,
+.rc-email-plain-v59 {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+    color: inherit;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.48;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+.rc-email-plain-v59 { white-space: normal; }
+.rc-email-html-v59 p,
+.rc-email-plain-v59 p { margin: .5em 0; }
+.rc-email-html-v59 table {
+    border-collapse: collapse;
+    max-width: 100% !important;
+}
+.rc-email-html-v59 td,
+.rc-email-html-v59 th { max-width: 100% !important; }
+.rc-email-html-v59 img {
+    display: block;
+    max-width: 100% !important;
+    height: auto !important;
+}
+.rc-email-html-v59 a,
+.rc-email-plain-v59 a {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.rc-email-raw-link-v59 {
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+.rc-email-empty-v59 { margin: 0; color: #64748b; }
+.dark .rc-msg-bubble-email-v59 {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+}
+</style>
 
 </x-filament-panels::page>

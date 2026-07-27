@@ -146,6 +146,7 @@ trait InteractsWithCoachDatabase
     public bool $isSendingCampaign = false;
     public ?string $messageLastId = null;
     public bool $hasMoreMessages = false;
+    public int $messagePageSize = 10;
     public bool $isSendingEmail = false;
     public bool $isSyncingTags = false;
     public bool $isRecruitingSyncRunning = false;
@@ -443,7 +444,11 @@ trait InteractsWithCoachDatabase
         if ($this->selectedConversationId) {
             $cached = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
             if (is_array($cached['rows'] ?? null)) {
-                $this->messages = collect($cached['rows'])->filter(fn ($row): bool => is_array($row))->values()->all();
+                $this->messages = collect($cached['rows'])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                    ->values()
+                    ->all();
                 $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
                 $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
             }
@@ -808,7 +813,7 @@ trait InteractsWithCoachDatabase
         $this->loadConversations();
 
         if ($this->selectedConversationId) {
-            $this->loadConversationMessages();
+            $this->loadConversationMessages(true);
         }
 
         $this->isLoadingConversations = false;
@@ -4241,14 +4246,87 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         $this->selectedConversationId = $conversationId;
+        $this->markConversationReadLocally($conversationId);
         $this->messageLastId = null;
         $this->hasMoreMessages = false;
         $this->messages = [];
 
-        $this->loadConversationMessages();
+        // Opening a conversation is a fresh browser action. Do not reuse a cached
+        // cursor or cached message bodies, because an older normalization pass may
+        // have stored empty bodies and would otherwise prevent those rows from being
+        // downloaded again.
+        $this->loadConversationMessages(true);
     }
 
-    public function loadConversationMessages(): void
+    protected function markConversationReadLocally(string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+        if ($conversationId === '') {
+            return;
+        }
+
+        $hadUnread = collect($this->conversations ?? [])->contains(function ($row) use ($conversationId): bool {
+            return is_array($row)
+                && (string) ($row['id'] ?? '') === $conversationId
+                && (int) ($row['unread_count'] ?? 0) > 0;
+        });
+
+        $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
+            if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                $row['unread_count'] = 0;
+                $row['status'] = 'Open';
+            }
+            return $row;
+        })->values()->all();
+
+        $this->cacheInboxConversations($this->conversations);
+
+        if ($hadUnread && ($user = Auth::user())) {
+            try {
+                app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+            } catch (\Throwable $exception) {
+                Log::debug('Conversation was marked read locally but GHL update failed.', [
+                    'conversation_id' => $conversationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    public function toggleSelectedConversationUnread(): void
+    {
+        $conversationId = trim((string) $this->selectedConversationId);
+        if ($conversationId === '') {
+            return;
+        }
+
+        $conversation = collect($this->conversations ?? [])->firstWhere('id', $conversationId) ?: [];
+        $markUnread = (int) ($conversation['unread_count'] ?? 0) === 0;
+        $newCount = $markUnread ? 1 : 0;
+
+        $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId, $newCount) {
+            if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                $row['unread_count'] = $newCount;
+                $row['status'] = $newCount > 0 ? 'Unread' : 'Open';
+            }
+            return $row;
+        })->values()->all();
+        $this->cacheInboxConversations($this->conversations);
+
+        if ($user = Auth::user()) {
+            $result = app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, $newCount);
+            if (! ($result['success'] ?? false)) {
+                Notification::make()->title('Inbox')->body((string) ($result['error'] ?? 'Unable to update unread state in HighLevel.'))->warning()->send();
+            }
+        }
+    }
+
+    public function loadOlderConversationMessages(): void
+    {
+        $this->loadConversationMessages(false);
+    }
+
+    public function loadConversationMessages(bool $fresh = false): void
     {
         $user = Auth::user();
 
@@ -4261,18 +4339,34 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $conversationId = (string) $this->selectedConversationId;
 
-        $this->hydrateCachedConversationMessages($conversationId);
+        if ($fresh) {
+            Cache::forget($this->deferredUiCacheKey('messages', $conversationId));
+            Cache::forget(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId));
+            Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
+            Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
 
+            $this->messages = [];
+            $this->messageLastId = null;
+            $this->hasMoreMessages = false;
+        } else {
+            $this->hydrateCachedConversationMessages($conversationId);
+
+            if (! $this->hasMoreMessages || blank($this->messageLastId)) {
+                return;
+            }
+        }
+
+        $requestedCursor = $this->messageLastId;
         $this->isLoadingConversationMessages = true;
         $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = 'Loading messages';
+        $this->activeUiOperation = $fresh ? 'Loading messages' : 'Loading older messages';
 
         try {
             $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
                 $user,
                 $conversationId,
-                $this->messageLastId,
-                30
+                $requestedCursor,
+                $this->messagePageSize
             );
 
             if (! ($result['success'] ?? false)) {
@@ -4287,6 +4381,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
             $rows = collect($result['messages'] ?? [])
                 ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
                 ->sortBy(function (array $row): int {
                     $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
 
@@ -4301,25 +4396,40 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         return 0;
                     }
                 })
+                ->values();
+
+            $beforeCount = count($this->messages);
+
+            $this->messages = collect($this->messages)
+                ->merge($rows)
+                ->filter(fn ($row): bool => is_array($row))
+                ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                ->sortBy(function (array $row): int {
+                    $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+                    if (is_numeric($value)) {
+                        $number = (int) $value;
+                        return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                    }
+                    try {
+                        return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                })
+                ->take(-200)
                 ->values()
                 ->all();
 
-            if ($this->messageLastId) {
-                $this->messages = collect($this->messages)
-                    ->merge($rows)
-                    ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
-                    ->take(-60)
-                    ->values()
-                    ->all();
-            } else {
-                $this->messages = collect($rows)
-                    ->take(-30)
-                    ->values()
-                    ->all();
-            }
+            $nextCursor = filled($result['last_message_id'] ?? null)
+                ? (string) $result['last_message_id']
+                : $requestedCursor;
+            $addedCount = max(0, count($this->messages) - $beforeCount);
+            $cursorAdvanced = filled($nextCursor) && $nextCursor !== $requestedCursor;
 
-            $this->messageLastId = $result['last_message_id'] ?? $this->messageLastId;
-            $this->hasMoreMessages = (bool) ($result['has_more'] ?? false);
+            $this->messageLastId = $nextCursor;
+            $this->hasMoreMessages = (bool) ($result['has_more'] ?? false)
+                && $cursorAdvanced
+                && ($fresh || $addedCount > 0);
 
             Cache::put($this->deferredUiCacheKey('messages', $conversationId), [
                 'rows' => $this->messages,
@@ -4327,10 +4437,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
+
+            // Keep the existing detached enrichment for the initial page only.
+            // Loading older pages must not launch a second sync that overwrites the
+            // accumulated paginated rows with the newest page again.
+            if ($fresh) {
+                $this->startDeferredUiSync('messages', $conversationId, true);
+            }
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversation messages for inbox.', [
                 'user_id' => $user->id,
                 'conversation_id' => $conversationId,
+                'cursor' => $requestedCursor,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -4344,6 +4462,68 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
         }
+    }
+
+    /**
+     * Keep full email rendering while preventing large HTML bodies from being
+     * serialized verbatim into every Livewire request snapshot.
+     */
+    protected function compactConversationMessageForLivewire(array $row): array
+    {
+        if (filled($row['_livewire_body_gzip'] ?? null)) {
+            return $row;
+        }
+
+        $bodyCandidates = [
+            $row['html_body'] ?? null,
+            $row['htmlBody'] ?? null,
+            $row['message_html'] ?? null,
+            $row['body'] ?? null,
+            $row['html'] ?? null,
+            $row['content'] ?? null,
+            $row['text_body'] ?? null,
+            $row['textBody'] ?? null,
+            is_scalar($row['message'] ?? null) ? $row['message'] : null,
+            $row['text'] ?? null,
+            data_get($row, 'emailMessage.body'),
+            data_get($row, 'email.body'),
+            data_get($row, 'meta.email.body'),
+            data_get($row, 'payload.html'),
+            data_get($row, 'payload.body'),
+        ];
+
+        $body = collect($bodyCandidates)
+            ->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+
+        if (is_scalar($body) && (string) $body !== '') {
+            $encoded = base64_encode(gzencode((string) $body, 6));
+            $row['_livewire_body_gzip'] = $encoded;
+        }
+
+        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text'] as $key) {
+            unset($row[$key]);
+        }
+
+        if (isset($row['message']) && is_scalar($row['message'])) {
+            unset($row['message']);
+        }
+
+        foreach ([
+            'emailMessage.body',
+            'email.body',
+            'meta.email.body',
+            'payload.html',
+            'payload.body',
+        ] as $path) {
+            data_forget($row, $path);
+        }
+
+        // Raw API payloads are not used by the inbox view and can be very large.
+        foreach (['raw', 'raw_body', 'response', 'debug'] as $key) {
+            unset($row[$key]);
+        }
+
+        return $row;
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
@@ -4362,6 +4542,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     $this->messages = collect($cached['rows'])
         ->filter(fn ($row): bool => is_array($row))
+        ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
         ->values()
         ->all();
 
@@ -10666,10 +10847,27 @@ HTML;
             ->map(function (array $school) use ($byBusiness, $byName): array {
                 $id = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
                 $name = trim((string) ($school['name'] ?? 'School')) ?: 'School';
-                $schoolCoaches = $byBusiness->get($id, collect());
-                if ($schoolCoaches->isEmpty()) {
-                    $schoolCoaches = $byName->get(strtolower($name), collect());
-                }
+                // Compose must use the same two-reference union as Discover Schools:
+                // official Business/Company association IDs plus contacts whose
+                // Business Name / Company Name / School Name matches this school.
+                // Do not use the name match only as a fallback; GHL can return one
+                // officially associated coach while leaving the remaining coaches
+                // discoverable only through their Business Name field.
+                $businessMatchedCoaches = $byBusiness->get($id, collect());
+                $nameMatchedCoaches = $byName->get(strtolower($name), collect());
+
+                $schoolCoaches = collect($businessMatchedCoaches)
+                    ->merge($nameMatchedCoaches)
+                    ->filter(fn ($coach): bool => is_array($coach))
+                    ->unique(fn (array $coach): string => strtolower(trim((string) (
+                        $coach['id']
+                        ?? $coach['contact_id']
+                        ?? $coach['ghl_contact_id']
+                        ?? $coach['email']
+                        ?? $coach['name']
+                        ?? md5(json_encode($coach) ?: '')
+                    ))))
+                    ->values();
 
                 return [
                     'id' => $id,

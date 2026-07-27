@@ -250,6 +250,10 @@ class CoachDatabaseDatasetSyncService
             $existingSchools = is_array($existing['schools'] ?? null) ? $existing['schools'] : [];
             $existingCoaches = is_array($existing['coaches'] ?? null) ? $existing['coaches'] : [];
 
+            // Rebuild once from the complete paginated contact dataset. The rebuild
+            // cross-references official Business/Company association IDs and normalized
+            // Business/Company/School Name values without issuing one extra API request
+            // per school.
             $rebuilt = $this->coachDatabaseService->rebuildFromSchoolCompanySnapshot(
                 schools: array_merge($existingSchools, array_values($schoolsByKey)),
                 coaches: array_merge($existingCoaches, array_values($coachesByKey)),
@@ -316,6 +320,11 @@ class CoachDatabaseDatasetSyncService
                 $cacheKey,
                 $final,
                 now()->addHours((int) config('ghl.coach_database.cache_hours', 12)),
+            );
+            app(\App\Services\LocalCoachDatabaseSchoolService::class)->syncFromSnapshot(
+                $user,
+                is_array($final['schools'] ?? null) ? $final['schools'] : [],
+                $finishedAt,
             );
 
             $status = [

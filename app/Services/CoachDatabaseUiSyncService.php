@@ -162,7 +162,61 @@ class CoachDatabaseUiSyncService
         $rows = collect($existing)
             ->merge(is_array($result['messages'] ?? null) ? $result['messages'] : [])
             ->filter(fn ($row): bool => is_array($row))
-            ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row))))
+            ->map(fn (array $row): array => $this->normalizeCachedEmailMessage($row))
+            ->groupBy(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row))))
+            ->map(function ($group): array {
+                return collect($group)->reduce(function (array $carry, array $row): array {
+                    foreach ($row as $key => $value) {
+                        if ($value === null || $value === '' || (is_array($value) && empty($value))) {
+                            continue;
+                        }
+                        $carry[$key] = $value;
+                    }
+                    return $carry;
+                }, []);
+            })
+            ->values();
+
+        $detailLimit = max(1, min(12, (int) config('coach-database-sync.ui.email_detail_batch_size', 6)));
+        $missingDetails = $rows
+            ->filter(function (array $row): bool {
+                $html = trim((string) ($row['html_body'] ?? ''));
+                $detailId = trim((string) ($row['email_message_id'] ?? data_get($row, 'meta.email.messageIds.0') ?? $row['id'] ?? ''));
+                return $html === '' && $detailId !== '';
+            })
+            ->take($detailLimit)
+            ->values();
+
+        $detailService = app(GoHighLevelService::class);
+        $detailsById = collect();
+
+        foreach ($missingDetails as $row) {
+            $rowId = (string) ($row['id'] ?? '');
+            $detailId = trim((string) ($row['email_message_id'] ?? data_get($row, 'meta.email.messageIds.0') ?? $rowId));
+            $detail = $detailService->getConversationEmailDetailForUser($user, $detailId);
+
+            if (($detail['success'] ?? false) && is_array($detail['message'] ?? null)) {
+                $detailsById->put($rowId !== '' ? $rowId : $detailId, $detail['message']);
+            }
+        }
+
+        if ($detailsById->isNotEmpty()) {
+            $rows = $rows->map(function (array $row) use ($detailsById): array {
+                $key = (string) ($row['id'] ?? '');
+                $detail = $detailsById->get($key);
+
+                if (! is_array($detail)) {
+                    return $row;
+                }
+
+                return $this->normalizeCachedEmailMessage(array_replace(
+                    $row,
+                    array_filter($detail, fn ($value): bool => $value !== null && $value !== '')
+                ));
+            });
+        }
+
+        $rows = $rows
             ->sortBy('created_at')
             ->take(-1 * max(25, (int) config('coach-database-sync.ui.message_row_cap', 100)))
             ->values()
@@ -245,4 +299,55 @@ class CoachDatabaseUiSyncService
 
         return ['count' => 1];
     }
+    protected function normalizeCachedEmailMessage(array $row): array
+    {
+        $html = trim((string) ($row['html_body'] ?? $row['htmlBody'] ?? $row['message_html'] ?? $row['html'] ?? ''));
+        $body = trim((string) ($row['body'] ?? ''));
+        $text = trim((string) ($row['text_body'] ?? $row['textBody'] ?? $row['bodyText'] ?? $row['text'] ?? ''));
+
+        foreach ([$html, $body] as $candidate) {
+            $candidate = $this->decodeCachedEmailHtml($candidate);
+            if ($this->cachedValueLooksLikeHtml($candidate)) {
+                $html = $candidate;
+                break;
+            }
+        }
+
+        if ($text === '' && $body !== '' && ! $this->cachedValueLooksLikeHtml($this->decodeCachedEmailHtml($body))) {
+            $text = trim($body);
+        }
+
+        if ($text === '' && $html !== '') {
+            $plain = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+            $plain = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $plain) ?? $plain;
+            $text = trim(html_entity_decode(strip_tags($plain), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+
+        $row['html_body'] = $html;
+        $row['text_body'] = $text;
+        $row['body'] = $html !== '' ? $html : $text;
+
+        return $row;
+    }
+
+    protected function decodeCachedEmailHtml(string $value): string
+    {
+        $value = trim($value);
+
+        for ($i = 0; $i < 3 && $value !== ''; $i++) {
+            $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $value) {
+                break;
+            }
+            $value = $decoded;
+        }
+
+        return trim($value);
+    }
+
+    protected function cachedValueLooksLikeHtml(string $value): bool
+    {
+        return $value !== '' && (bool) preg_match('/<\s*(?:!doctype|html|body|table|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|blockquote|h[1-6])\b/i', $value);
+    }
+
 }
