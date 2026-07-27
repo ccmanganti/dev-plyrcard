@@ -7440,19 +7440,22 @@
                     count($this->favoriteSchools ?? []),
                 );
 
-                $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
-                $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
-                $trackedYoutubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-                $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
-                $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
-                $trackedProfileTotal = max(
-                    $trackedProfileComponentTotal,
-                    (int) ($dashboardMetrics['view_profile_total'] ?? 0),
-                    (int) ($dashboardMetrics['profile_views'] ?? 0),
-                    (int) ($dashboardMetrics['unique_profile_views'] ?? 0),
-                );
-                $profileViews = $trackedProfileTotal;
+                // Use the exact same concrete tracking rows as the Profile Views drawer.
+                // Do not use cached/GHL aggregate counters here because those can retain
+                // the legacy default value of 12 even when the detail drawer has no rows.
+                $dashboardProfileViewRows = collect($this->profileViewRows ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+
+                $profileViews = $dashboardProfileViewRows->sum(function (array $row): int {
+                    foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
+                        if (isset($row[$key]) && is_numeric($row[$key])) {
+                            return max(0, (int) $row[$key]);
+                        }
+                    }
+
+                    return 1;
+                });
 
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
@@ -8107,11 +8110,18 @@
         @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $profileViewRows = collect($this->profileViewRows ?? [])->values();
-                $profileViewsTotal = max(
-                    (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0),
-                    (int) $profileViewRows->sum('views'),
-                );
+                $profileViewRows = collect($this->profileViewRows ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+                $profileViewsTotal = $profileViewRows->sum(function (array $row): int {
+                    foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
+                        if (isset($row[$key]) && is_numeric($row[$key])) {
+                            return max(0, (int) $row[$key]);
+                        }
+                    }
+
+                    return 1;
+                });
             @endphp
 
             <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
