@@ -56,6 +56,7 @@ trait InteractsWithCoachDatabase
 
     public bool $allowed = false;
     public bool $locked = false;
+    public bool $isRecruitingAccountReady = false;
     public ?string $reason = null;
     public ?string $error = null;
 
@@ -195,6 +196,55 @@ trait InteractsWithCoachDatabase
     public bool $showSaveTemplateNamePrompt = false;
     public string $composeTemplateSaveName = '';
 
+
+    protected function refreshRecruitingAccountReadiness($user = null): void
+    {
+        $user ??= Auth::user();
+
+        if (! $user) {
+            $this->isRecruitingAccountReady = false;
+
+            return;
+        }
+
+        // Always evaluate the actual database columns. This prevents a model
+        // accessor or application-level GHL fallback from making an account
+        // look activated while its own fields are still empty.
+        try {
+            $user->refresh();
+        } catch (\Throwable) {
+            // Continue with the currently hydrated model when refresh is unavailable.
+        }
+
+        $rawApiKey = method_exists($user, 'getRawOriginal')
+            ? $user->getRawOriginal('ghl_api_key')
+            : ($user->ghl_api_key ?? null);
+
+        $rawLocationId = method_exists($user, 'getRawOriginal')
+            ? $user->getRawOriginal('ghl_location_id')
+            : ($user->ghl_location_id ?? null);
+
+        $apiKey = trim((string) $rawApiKey);
+        $locationId = trim((string) $rawLocationId);
+
+        $missingValues = ['', 'null', 'none', 'pending', 'not set', 'n/a'];
+
+        $this->isRecruitingAccountReady =
+            ! in_array(strtolower($apiKey), $missingValues, true)
+            && ! in_array(strtolower($locationId), $missingValues, true);
+    }
+
+    public function checkRecruitingAccountReadiness(): void
+    {
+        $wasReady = $this->isRecruitingAccountReady;
+
+        $this->refreshRecruitingAccountReadiness();
+
+        if (! $wasReady && $this->isRecruitingAccountReady) {
+            $this->dispatch('rc-recruiting-account-ready');
+        }
+    }
+
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
@@ -203,7 +253,20 @@ trait InteractsWithCoachDatabase
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
 
+        $this->refreshRecruitingAccountReadiness($user);
+
         if (! $user) {
+            return;
+        }
+
+        // Do not initialize Recruiting Center services or cached account data
+        // until this user's own GHL credentials have been assigned.
+        if (! $this->isRecruitingAccountReady) {
+            $this->allowed = false;
+            $this->locked = true;
+            $this->reason = 'account_preparation';
+            $this->error = null;
+
             return;
         }
 
@@ -380,6 +443,12 @@ trait InteractsWithCoachDatabase
      */
     public function bootDeferredUiData(): void
     {
+        $this->refreshRecruitingAccountReadiness();
+
+        if (! $this->isRecruitingAccountReady) {
+            return;
+        }
+
         if ($this->isBootingRemoteSection || ! $this->allowed || $this->locked) {
             return;
         }

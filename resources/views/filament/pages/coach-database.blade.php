@@ -1,5 +1,14 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root" wire:init="bootDeferredUiData">
+    <div
+        class="rc-account-readiness-shell {{ $isRecruitingAccountReady ? 'is-ready' : 'is-preparing' }}"
+        @if(! $isRecruitingAccountReady)
+            wire:poll.10s="checkRecruitingAccountReadiness"
+        @endif
+    >
+        <div
+            class="rc-livewire-root rc-account-readiness-content"
+            wire:init="bootDeferredUiData"
+        >
         @include('filament.partials.coach-database-ui-shell')
 
         @if(($section ?? '') === 'schools')
@@ -12764,7 +12773,6 @@ CSS;
             </div>
         @endif
     </div>
-    </div>
 
     <style>
         /* v100: keep logo fallback initials from ever becoming a full-page overlay.
@@ -13936,6 +13944,420 @@ CSS;
             flex:0 0 auto;
         }
         @keyframes rcQuickReplySpinV96 { to { transform:rotate(360deg); } }
+
+    .rc-account-readiness-shell {
+    position: relative;
+    min-height: calc(100vh - 8rem);
+    isolation: isolate;
+}
+
+.rc-account-readiness-content {
+    transition:
+        filter 0.4s ease,
+        opacity 0.4s ease,
+        transform 0.4s ease;
+}
+
+.rc-account-readiness-shell.is-preparing
+.rc-account-readiness-content {
+    filter: blur(7px);
+    opacity: 0.38;
+    transform: scale(0.995);
+    pointer-events: none;
+    user-select: none;
+}
+
+html.rc-account-preparing,
+body.rc-account-preparing {
+    overflow: hidden !important;
+}
+
+body.rc-account-preparing .fi-sidebar,
+body.rc-account-preparing .fi-topbar,
+body.rc-account-preparing .fi-main-ctn,
+body.rc-account-preparing [data-rc-navigation] {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+/* Keep the admin impersonation banner and Leave control usable. */
+body.rc-account-preparing .rc-account-impersonation-bar,
+body.rc-account-preparing .rc-account-impersonation-bar * {
+    pointer-events: auto !important;
+    user-select: auto !important;
+}
+
+body.rc-account-preparing .rc-account-impersonation-bar {
+    position: relative;
+    z-index: 2147483647 !important;
+}
+
+.rc-account-preparation-overlay {
+    position: fixed;
+    inset: var(--rc-account-overlay-top, 0px) 0 0;
+    z-index: 2147483646;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+    touch-action: none;
+    padding: 1.25rem;
+    background:
+        radial-gradient(
+            circle at 50% 40%,
+            rgba(255, 99, 56, 0.1),
+            transparent 32rem
+        ),
+        rgba(3, 7, 18, 0.68);
+    backdrop-filter: blur(5px);
+}
+
+.rc-account-preparation-glow {
+    position: absolute;
+    width: 24rem;
+    height: 24rem;
+    border-radius: 999px;
+    filter: blur(80px);
+    pointer-events: none;
+    opacity: 0.24;
+    animation: rcAccountPreparationFloat 7s ease-in-out infinite;
+}
+
+.rc-account-preparation-glow-one {
+    top: 5%;
+    left: 12%;
+    background: #ff6338;
+}
+
+.rc-account-preparation-glow-two {
+    right: 9%;
+    bottom: 3%;
+    background: #3b82f6;
+    animation-delay: -3.5s;
+}
+
+.rc-account-preparation-card {
+    position: relative;
+    width: min(34rem, 100%);
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1.4rem;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(25, 31, 43, 0.96),
+            rgba(12, 17, 27, 0.96)
+        );
+    box-shadow:
+        0 30px 100px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 1.45rem;
+    color: #f8fafc;
+}
+
+.rc-account-preparation-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 3px;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            #ff6338,
+            #fb923c,
+            transparent
+        );
+    background-size: 220% 100%;
+    animation: rcAccountPreparationShimmer 2.1s linear infinite;
+}
+
+.rc-account-preparation-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rc-account-preparation-orbit {
+    position: relative;
+    width: 2.55rem;
+    height: 2.55rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.8rem;
+    background: rgba(255, 99, 56, 0.11);
+    color: #ff6338;
+}
+
+.rc-account-preparation-orbit > svg {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.rc-account-preparation-orbit-ring {
+    position: absolute;
+    inset: -0.3rem;
+    border: 1px solid rgba(255, 99, 56, 0.22);
+    border-radius: 999px;
+    animation: rcAccountPreparationRotate 3.8s linear infinite;
+}
+
+.rc-account-preparation-orbit-dot {
+    position: absolute;
+    top: -0.36rem;
+    left: 50%;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: #ff6338;
+    box-shadow: 0 0 14px rgba(255, 99, 56, 0.85);
+    transform: translateX(-50%);
+}
+
+.rc-account-preparation-copy {
+    margin-top: 1.3rem;
+}
+
+.rc-account-preparation-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.55rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid rgba(255, 99, 56, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 99, 56, 0.09);
+    color: #fb923c;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.rc-account-preparation-copy h2 {
+    margin: 0.8rem 0 0;
+    color: #ffffff;
+    font-size: clamp(1.45rem, 3vw, 2rem);
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+
+.rc-account-preparation-copy p {
+    margin: 0.7rem 0 0;
+    max-width: 29rem;
+    color: #94a3b8;
+    font-size: 0.86rem;
+    line-height: 1.6;
+}
+
+.rc-account-preparation-progress {
+    height: 0.43rem;
+    margin-top: 1.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.13);
+}
+
+.rc-account-preparation-progress span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            90deg,
+            #ff6338,
+            #fb923c,
+            #ff6338
+        );
+    box-shadow: 0 0 18px rgba(255, 99, 56, 0.35);
+    animation: rcAccountPreparationProgress 1.8s ease-in-out infinite;
+}
+
+.rc-account-preparation-statuses {
+    display: grid;
+    gap: 0.58rem;
+    margin-top: 1.1rem;
+}
+
+.rc-account-preparation-status {
+    display: grid;
+    grid-template-columns: 2.15rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 3.5rem;
+    padding: 0.65rem 0.72rem;
+    border: 1px solid rgba(148, 163, 184, 0.11);
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.025);
+    color: #64748b;
+}
+
+.rc-account-preparation-status.is-complete {
+    color: #10b981;
+}
+
+.rc-account-preparation-status.is-active {
+    border-color: rgba(255, 99, 56, 0.22);
+    background: rgba(255, 99, 56, 0.07);
+    color: #ff6338;
+    animation: rcAccountPreparationActive 1.8s ease-in-out infinite;
+}
+
+.rc-account-preparation-status-icon {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.62rem;
+    background: rgba(148, 163, 184, 0.09);
+}
+
+.rc-account-preparation-status-icon svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+
+.rc-account-preparation-status strong {
+    display: block;
+    color: #e2e8f0;
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+
+.rc-account-preparation-status small {
+    display: block;
+    margin-top: 0.18rem;
+    color: #64748b;
+    font-size: 0.67rem;
+    line-height: 1.35;
+}
+
+.rc-account-preparation-status.is-active small {
+    color: #94a3b8;
+}
+
+.rc-account-preparation-mini-spinner {
+    width: 0.88rem;
+    height: 0.88rem;
+    border: 2px solid rgba(255, 99, 56, 0.22);
+    border-top-color: #ff6338;
+    border-right-color: #ff6338;
+    border-radius: 999px;
+    animation: rcAccountPreparationRotate 0.7s linear infinite;
+}
+
+.rc-account-preparation-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 650;
+}
+
+.rc-account-preparation-pulse {
+    width: 0.46rem;
+    height: 0.46rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.42);
+    animation: rcAccountPreparationPulse 1.7s ease-out infinite;
+}
+
+@keyframes rcAccountPreparationRotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes rcAccountPreparationProgress {
+    0% {
+        transform: translateX(-115%);
+    }
+
+    55% {
+        transform: translateX(125%);
+    }
+
+    100% {
+        transform: translateX(285%);
+    }
+}
+
+@keyframes rcAccountPreparationShimmer {
+    from {
+        background-position: 130% 0;
+    }
+
+    to {
+        background-position: -130% 0;
+    }
+}
+
+@keyframes rcAccountPreparationFloat {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate3d(0, -1rem, 0) scale(1.08);
+    }
+}
+
+@keyframes rcAccountPreparationActive {
+    0%,
+    100% {
+        box-shadow: 0 0 0 rgba(255, 99, 56, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 24px rgba(255, 99, 56, 0.08);
+    }
+}
+
+@keyframes rcAccountPreparationPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.38);
+    }
+
+    70%,
+    100% {
+        box-shadow: 0 0 0 0.6rem rgba(16, 185, 129, 0);
+    }
+}
+
+@media (max-width: 640px) {
+    .rc-account-preparation-card {
+        padding: 1.05rem;
+        border-radius: 1.05rem;
+    }
+
+    .rc-account-preparation-overlay {
+        padding: 0.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rc-account-preparation-glow,
+    .rc-account-preparation-progress span,
+    .rc-account-preparation-orbit-ring,
+    .rc-account-preparation-mini-spinner,
+    .rc-account-preparation-status.is-active,
+    .rc-account-preparation-pulse {
+        animation: none;
+    }
+}
 </style>
 <script id="rc-inbox-quick-reply-scroll-v91">
 (() => {
@@ -13954,4 +14376,231 @@ CSS;
     window.addEventListener('rc-inbox-quick-reply-sent', scrollToNewest);
 })();
 </script>
+        </div>
+
+        @if(! $isRecruitingAccountReady)
+            @teleport('body')
+            <div
+                class="rc-account-preparation-overlay"
+                role="status"
+                aria-live="polite"
+                aria-label="Recruiting account preparation in progress"
+                x-data="{
+                    impersonationBar: null,
+                    resizeObserver: null,
+
+                    findImpersonationBar() {
+                        const nodes = Array.from(document.querySelectorAll('body *'));
+
+                        const leaveControl = nodes.find((node) => {
+                            if (!(node instanceof HTMLElement)) return false;
+                            if (!['A', 'BUTTON'].includes(node.tagName)) return false;
+
+                            return node.textContent?.trim().toLowerCase() === 'leave';
+                        });
+
+                        if (!leaveControl) return null;
+
+                        let current = leaveControl.parentElement;
+
+                        while (current && current !== document.body) {
+                            const text = current.textContent?.toLowerCase() || '';
+
+                            if (text.includes('impersonating user')) {
+                                return current;
+                            }
+
+                            current = current.parentElement;
+                        }
+
+                        return null;
+                    },
+
+                    syncImpersonationBar() {
+                        const bar = this.findImpersonationBar();
+
+                        if (this.impersonationBar && this.impersonationBar !== bar) {
+                            this.impersonationBar.classList.remove('rc-account-impersonation-bar');
+                        }
+
+                        this.impersonationBar = bar;
+
+                        if (!bar) {
+                            document.documentElement.style.setProperty('--rc-account-overlay-top', '0px');
+                            return;
+                        }
+
+                        bar.classList.add('rc-account-impersonation-bar');
+
+                        const rect = bar.getBoundingClientRect();
+                        const bottom = Math.max(0, Math.ceil(rect.bottom));
+
+                        document.documentElement.style.setProperty(
+                            '--rc-account-overlay-top',
+                            `${bottom}px`
+                        );
+                    },
+
+                    init() {
+                        document.documentElement.classList.add('rc-account-preparing');
+                        document.body.classList.add('rc-account-preparing');
+
+                        this.$nextTick(() => {
+                            this.syncImpersonationBar();
+
+                            this.resizeObserver = new ResizeObserver(() => {
+                                this.syncImpersonationBar();
+                            });
+
+                            this.resizeObserver.observe(document.body);
+                            window.addEventListener('resize', this.syncImpersonationBar.bind(this));
+                        });
+                    },
+
+                    destroy() {
+                        document.documentElement.classList.remove('rc-account-preparing');
+                        document.body.classList.remove('rc-account-preparing');
+                        document.documentElement.style.removeProperty('--rc-account-overlay-top');
+
+                        if (this.impersonationBar) {
+                            this.impersonationBar.classList.remove('rc-account-impersonation-bar');
+                        }
+
+                        this.resizeObserver?.disconnect();
+                    }
+                }"
+                x-init="init()"
+            >
+                <div class="rc-account-preparation-glow rc-account-preparation-glow-one"></div>
+                <div class="rc-account-preparation-glow rc-account-preparation-glow-two"></div>
+
+                <section class="rc-account-preparation-card">
+                    <div class="rc-account-preparation-brand">
+                        <span class="rc-account-preparation-orbit" aria-hidden="true">
+                            <span class="rc-account-preparation-orbit-ring"></span>
+                            <span class="rc-account-preparation-orbit-dot"></span>
+
+                            <svg viewBox="0 0 24 24" fill="none">
+                                <path
+                                    d="M4 18.5V7.25L12 3l8 4.25V18.5L12 22l-8-3.5Z"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linejoin="round"
+                                />
+                                <path
+                                    d="m4 7.25 8 4.25 8-4.25M12 11.5V22"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </span>
+
+                        <span>PLYRCARD Recruiting Center</span>
+                    </div>
+
+                    <div class="rc-account-preparation-copy">
+                        <span class="rc-account-preparation-kicker">
+                            Account setup in progress
+                        </span>
+
+                        <h2>We’re currently preparing your account</h2>
+
+                        <p>
+                            You’ll receive an email once your Recruiting Center
+                            account has been activated.
+                        </p>
+                    </div>
+
+                    <div class="rc-account-preparation-progress">
+                        <span></span>
+                    </div>
+
+                    <div class="rc-account-preparation-statuses">
+                        <div class="rc-account-preparation-status is-complete">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <path
+                                        d="m7 12 3 3 7-7"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Creating your workspace</strong>
+                                <small>Preparing your private Recruiting Center</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status is-active">
+                            <span class="rc-account-preparation-status-icon">
+                                <span class="rc-account-preparation-mini-spinner"></span>
+                            </span>
+
+                            <span>
+                                <strong>Discovering schools for you</strong>
+                                <small>Organizing schools, coaches and conferences</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <path
+                                        d="M5 7h14M5 12h14M5 17h9"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Constructing your templates</strong>
+                                <small>Preparing personalized recruiting emails</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <ellipse
+                                        cx="12"
+                                        cy="6"
+                                        rx="7"
+                                        ry="3"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+                                    <path
+                                        d="M5 6v6c0 1.65 3.13 3 7 3s7-1.35 7-3V6M5 12v6c0 1.65 3.13 3 7 3s7-1.35 7-3v-6"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Filling up your database</strong>
+                                <small>Connecting your recruiting tools and data</small>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="rc-account-preparation-note">
+                        <span class="rc-account-preparation-pulse"></span>
+
+                        <span>
+                            This page will unlock automatically once setup is complete.
+                        </span>
+                    </div>
+                </section>
+            </div>
+            @endteleport
+        @endif
+    </div>
 </x-filament-panels::page>
