@@ -285,19 +285,51 @@
                     return String(value || '').trim().toLowerCase();
                 },
 
+                normalizeDivision(value) {
+                    const raw = this.normalize(value)
+                        .replace(/&/g, ' and ')
+                        .replace(/[–—]/g, '-')
+                        .replace(/[^a-z0-9]+/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    if (!raw) return '';
+                    if (/\bnaia\b/.test(raw)) return 'NAIA';
+                    if (/\bnjcaa\b/.test(raw)) return 'NJCAA';
+
+                    const compact = raw.replace(/\s+/g, '');
+                    if (/(ncaa)?(division|div|d)?iii$/.test(compact) || /(ncaa)?(division|div|d)?3$/.test(compact)) return 'NCAA D-III';
+                    if (/(ncaa)?(division|div|d)?ii$/.test(compact) || /(ncaa)?(division|div|d)?2$/.test(compact)) return 'NCAA D-II';
+                    if (/(ncaa)?(division|div|d)?i$/.test(compact) || /(ncaa)?(division|div|d)?1$/.test(compact)) return 'NCAA D-I';
+
+                    if (/\b(division|div|d)\s*iii\b/.test(raw)) return 'NCAA D-III';
+                    if (/\b(division|div|d)\s*ii\b/.test(raw)) return 'NCAA D-II';
+                    if (/\b(division|div|d)\s*i\b/.test(raw)) return 'NCAA D-I';
+
+                    return raw.toUpperCase();
+                },
+
                 divisionMatches(value, filter) {
                     if (!filter) return true;
-                    const current = this.normalize(value).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
-                    const wanted = this.normalize(filter).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
-                    return current === wanted || current.includes(wanted) || wanted.includes(current);
+                    return this.normalizeDivision(value) === this.normalizeDivision(filter);
                 },
 
                 get conferenceOptions() {
-                    return [...new Set(this.schools
+                    const counts = new Map();
+
+                    this.schools
                         .filter((row) => this.divisionMatches(row.division, this.division))
-                        .map((row) => row.conference)
-                        .filter(Boolean))]
-                        .sort((a, b) => a.localeCompare(b));
+                        .forEach((row) => {
+                            const name = String(row?.conference || '').trim();
+                            if (!name) return;
+                            const key = this.normalize(name);
+                            const current = counts.get(key) || { name, count: 0 };
+                            current.count += 1;
+                            counts.set(key, current);
+                        });
+
+                    return Array.from(counts.values())
+                        .sort((a, b) => a.name.localeCompare(b.name));
                 },
 
                 initialsFor(name) {
@@ -9732,9 +9764,12 @@
                     </div>
 
                     <select class="rc-discover-select-v27" x-bind:value="conference" x-on:change="setConference($event.target.value)" aria-label="Conference filter">
-                        <option value="">All Conferences</option>
-                        <template x-for="conferenceName in conferenceOptions" :key="conferenceName">
-                            <option x-bind:value="conferenceName" x-text="conferenceName"></option>
+                        <option value="" x-text="`All Conferences (${conferenceOptions.length.toLocaleString()})`"></option>
+                        <template x-for="conferenceItem in conferenceOptions" :key="conferenceItem.name">
+                            <option
+                                x-bind:value="conferenceItem.name"
+                                x-text="`${conferenceItem.name} (${Number(conferenceItem.count || 0).toLocaleString()})`"
+                            ></option>
                         </template>
                     </select>
                 </div>
