@@ -7420,9 +7420,9 @@
         @if($section === 'dashboard' || $isStatDrawerOpen)
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
-                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(5)->values()->all();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
+                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->filter(fn ($row): bool => is_array($row))->take(5)->values()->all();
+                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->filter(fn ($row): bool => is_array($row))->take(5)->values()->all();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->filter(fn ($row): bool => is_array($row))->values()->all();
 
                 $authUser = auth()->user();
                 $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
@@ -7776,7 +7776,9 @@
                     }
                 };
 
-                $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) use ($formatActivityTimeLabel) {
+                $dashboardActivityRows = collect($dashboardRecentActivity)
+                    ->filter(fn ($activity): bool => is_array($activity))
+                    ->map(function (array $activity) use ($formatActivityTimeLabel) {
                     $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
                     $tone = 'blue';
                     $icon = '◉';
@@ -7833,7 +7835,9 @@
                     );
                 };
 
-                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool) {
+                $radarSchoolRows = collect($radarSchools)
+                    ->filter(fn ($school): bool => is_array($school))
+                    ->map(function (array $school) use ($radarScoreForSchool) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
                     $rawScore = $radarScoreForSchool($school);
@@ -7863,7 +7867,11 @@
                 })->values();
 
 
-                $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
+                $interestedSchoolRows = collect($dashboardMostInterestedSchools)
+                    ->filter(fn ($school): bool => is_array($school))
+                    ->take(4)
+                    ->values()
+                    ->map(function (array $school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $views = max(0, (int) ($school['profile_views'] ?? 0));
                     $engagementClicks = max(0, (int) ($school['interest_clicks'] ?? 0));

@@ -8085,12 +8085,68 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $this->stats['saved_schools'] = $savedSchools;
         $this->stats['favorite_schools'] = $favoriteSchools;
 
-        $profileRows = collect($this->profileViewRows);
-        $engagementRows = collect($this->coachEngagementRows);
+        $profileRows = collect($this->profileViewRows)
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+        $engagementRows = collect($this->coachEngagementRows)
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
 
-        $trackedProfileTotal = (int) ($stats['profile_views'] ?? $stats['view_profile_total'] ?? 0);
-        $uniqueProfileViews = (int) ($stats['unique_profile_views'] ?? $stats['unique_profile_view_count'] ?? 0);
-        $knownCoachProfileViews = (int) ($stats['known_coach_profile_views'] ?? 0);
+        // Do not trust snapshot/GHL aggregate profile counters here. The visible
+        // dashboard count must come from concrete user-specific tracking rows.
+        // This prevents the legacy default value of 12 from appearing for a new
+        // account when no actual profile-view rows exist.
+        $trackedProfileTotal = $profileRows->sum(function (array $row): int {
+            foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
+                if (isset($row[$key]) && is_numeric($row[$key])) {
+                    return max(0, (int) $row[$key]);
+                }
+            }
+
+            return 1;
+        });
+
+        $uniqueProfileViews = $profileRows
+            ->map(fn (array $row): string => trim((string) (
+                $row['visitor_hash']
+                ?? $row['coach_contact_id']
+                ?? $row['coach_id']
+                ?? $row['contact_id']
+                ?? $row['id']
+                ?? ''
+            )))
+            ->filter()
+            ->unique()
+            ->count();
+
+        $knownCoachProfileViews = $profileRows
+            ->filter(fn (array $row): bool => filled(
+                $row['coach_contact_id']
+                ?? $row['coach_id']
+                ?? $row['contact_id']
+                ?? null
+            ))
+            ->sum(function (array $row): int {
+                foreach (['views', 'view_count', 'profile_views', 'count', 'total', 'events_count'] as $key) {
+                    if (isset($row[$key]) && is_numeric($row[$key])) {
+                        return max(0, (int) $row[$key]);
+                    }
+                }
+
+                return 1;
+            });
+
+        $stats['profile_views'] = $trackedProfileTotal;
+        $stats['view_profile_total'] = $trackedProfileTotal;
+        $stats['unique_profile_views'] = $uniqueProfileViews;
+        $stats['unique_profile_view_count'] = $uniqueProfileViews;
+        $stats['known_coach_profile_views'] = $knownCoachProfileViews;
+
+        $this->stats['profile_views'] = $trackedProfileTotal;
+        $this->stats['view_profile_total'] = $trackedProfileTotal;
+        $this->stats['unique_profile_views'] = $uniqueProfileViews;
+        $this->stats['unique_profile_view_count'] = $uniqueProfileViews;
+        $this->stats['known_coach_profile_views'] = $knownCoachProfileViews;
 
         $trackedWebsiteViews = (int) ($stats['view_profile_website'] ?? 0);
         $trackedInstagramViews = (int) ($stats['view_profile_instagram'] ?? 0);
