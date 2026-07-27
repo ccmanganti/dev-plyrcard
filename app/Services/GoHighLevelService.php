@@ -2385,6 +2385,8 @@ class GoHighLevelService
             'state' => $getCustomField('school_state'),
             'city' => $getCustomField('school_city'),
             'tags' => $contact['tags'] ?? [],
+            'starred' => $this->numericCustomFieldFromContact($contact, ['starred'], $trackingFieldMap) > 0,
+            'is_starred' => $this->numericCustomFieldFromContact($contact, ['starred'], $trackingFieldMap) > 0,
             'is_saved_school' => $this->contactHasTag($contact, config('ghl.coach_database.tags.saved_school', 'saved school')),
             'is_favorite_school' => $this->contactHasTag($contact, config('ghl.coach_database.tags.favorite_school', 'favorite school')),
             'is_saved_coach' => $this->contactHasTag($contact, config('ghl.coach_database.tags.saved_coach', 'saved coach')),
@@ -2527,6 +2529,72 @@ class GoHighLevelService
         }
 
         return $contactId;
+    }
+
+    public function setContactStarredForUser(User $user, string $contactId, bool $starred): array
+    {
+        $contactId = trim($contactId);
+        $credentials = $this->credentialsForUser($user);
+        $locationId = trim((string) ($credentials['location_id'] ?? ''));
+        $token = $this->tokenForLocation($locationId, $credentials['token_override'] ?? null);
+
+        if ($contactId === '' || $locationId === '' || ! $token) {
+            return [
+                'success' => false,
+                'starred' => $starred,
+                'error' => 'Missing contact or Recruiting Center connection.',
+            ];
+        }
+
+        $fieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, false);
+        if (! isset($fieldMap['starred'])) {
+            $fieldMap = $this->ensureRecruitingTrackingFieldsForLocation($locationId, $token, true);
+        }
+
+        $field = $fieldMap['starred'] ?? [];
+        $customField = [
+            'key' => $field['fieldKey'] ?? $field['key'] ?? 'starred',
+            'field_value' => $starred ? 1 : 0,
+        ];
+
+        if (! empty($field['id'])) {
+            $customField['id'] = $field['id'];
+        }
+
+        $response = Http::withHeaders(['Version' => '2021-07-28'])
+            ->timeout((int) config('ghl.timeout', 20))
+            ->withToken($token)
+            ->acceptJson()
+            ->put("{$this->baseUrl}/contacts/{$contactId}", [
+                'customFields' => [$customField],
+            ]);
+
+        if ($response->failed()) {
+            Log::error('Recruiting contact starred custom field update failed.', [
+                'user_id' => $user->id,
+                'contact_id' => $contactId,
+                'location_id' => $locationId,
+                'starred' => $starred,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'custom_field' => $customField,
+            ]);
+
+            return [
+                'success' => false,
+                'starred' => $starred,
+                'error' => 'Unable to update the starred value in HighLevel.',
+                'status' => $response->status(),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'starred' => $starred,
+            'contact_id' => $contactId,
+            'custom_field' => $customField,
+            'error' => null,
+        ];
     }
 
     private function updateContactCustomFields(string $contactId, array $customFields, array $context = []): bool
@@ -3062,6 +3130,48 @@ class GoHighLevelService
             'raw' => $lastRaw,
             'last_error' => $lastError,
         ];
+    }
+
+    public function updateConversationUnreadForUser(User $user, string $conversationId, int $unreadCount): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $token = $this->tokenForLocation($credentials['location_id'], $credentials['token_override']);
+
+        if (! $token || trim($conversationId) === '') {
+            return ['success' => false, 'error' => 'Missing conversation connection.'];
+        }
+
+        try {
+            $response = Http::withHeaders(['Version' => '2021-04-15'])
+                ->timeout((int) config('ghl.timeout', 20))
+                ->withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->put("{$this->baseUrl}/conversations/{$conversationId}", [
+                    'unreadCount' => max(0, $unreadCount),
+                ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to update Recruiting conversation unread state.', [
+                'conversation_id' => $conversationId,
+                'unread_count' => max(0, $unreadCount),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return ['success' => false, 'error' => 'Unable to update unread state.'];
+        }
+
+        if ($response->failed()) {
+            Log::warning('Recruiting conversation unread update failed.', [
+                'conversation_id' => $conversationId,
+                'unread_count' => max(0, $unreadCount),
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return ['success' => false, 'error' => 'Unable to update unread state.', 'status' => $response->status()];
+        }
+
+        return ['success' => true, 'conversation' => $response->json() ?? []];
     }
 
     public function getConversationMessagesForUser(User $user, string $conversationId, ?string $lastMessageId = null, int $limit = 50): array
@@ -6889,6 +6999,7 @@ class GoHighLevelService
     public function recruitingTrackingCustomFieldDefinitions(): array
     {
         return [
+            'starred' => ['name' => 'starred', 'dataType' => 'NUMERICAL'],
             'view_profile_total' => ['name' => 'view_profile_total', 'dataType' => 'NUMERICAL'],
             'view_profile_website' => ['name' => 'view_profile_website', 'dataType' => 'NUMERICAL'],
             'view_profile_instagram' => ['name' => 'view_profile_instagram', 'dataType' => 'NUMERICAL'],

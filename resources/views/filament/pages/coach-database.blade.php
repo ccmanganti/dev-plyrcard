@@ -2729,6 +2729,77 @@
         .rc-inbox-head-actions-v56 { display:flex; align-items:center; gap:.4rem; }
         .rc-inbox-icon-btn-v56 { width:2.05rem; height:2.05rem; display:grid; place-items:center; border:0; border-radius:.65rem; background:transparent; color:var(--rc-muted); cursor:pointer; }
         .rc-inbox-icon-btn-v56:hover { background:var(--rc-soft); color:var(--rc-text); }
+        .rc-inbox-quick-filters-v56 {
+            display: flex;
+            align-items: center;
+            gap: .38rem;
+            padding: 0 .82rem .72rem;
+            overflow-x: auto;
+        }
+
+        .rc-inbox-quick-filters-v56 button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .3rem;
+            min-height: 1.9rem;
+            padding: .35rem .65rem;
+            border: 1px solid var(--rc-border);
+            border-radius: 999px;
+            background: var(--rc-surface);
+            color: var(--rc-muted);
+            font-size: .72rem;
+            font-weight: 750;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .rc-inbox-quick-filters-v56 button:hover,
+        .rc-inbox-quick-filters-v56 button.is-active {
+            border-color: rgba(255, 99, 56, .38);
+            background: var(--rc-accent-soft);
+            color: var(--rc-accent);
+        }
+
+        .rc-inbox-quick-filters-v56 button span {
+            min-width: 1.15rem;
+            height: 1.15rem;
+            padding: 0 .3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #ff6338;
+            color: #ffffff;
+            font-size: .62rem;
+            font-weight: 850;
+            line-height: 1;
+        }
+
+        .rc-thread-card-side-v56 {
+            min-height: 100%;
+            display: grid;
+            justify-items: end;
+            align-content: space-between;
+            gap: .3rem;
+        }
+
+        .rc-thread-star-v56 {
+            width: 1.15rem;
+            height: 1.15rem;
+            display: inline-grid;
+            place-items: center;
+            color: #f59e0b;
+            margin-top: auto;
+        }
+
+        .rc-thread-star-v56 svg {
+            width: 1rem;
+            height: 1rem;
+            fill: currentColor;
+            stroke: currentColor;
+        }
+
         .rc-inbox-search-v56 { padding:0 1.1rem .75rem; }
         .rc-inbox-search-v56 label { position:relative; display:block; }
         .rc-inbox-search-v56 svg { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); width:1rem; height:1rem; color:#94a3b8; }
@@ -10977,15 +11048,19 @@ CSS;
                 })();
             </script>
 
+
+            <style id="rc-inbox-unread-status-v73">
+                .rc-thread-unread-dot-v56{width:.62rem!important;height:.62rem!important;border-radius:999px!important;background:#ff6338!important;box-shadow:0 0 0 3px rgba(255,99,56,.14)!important;}
+                .rc-inbox-icon-btn-v56.is-unread{color:#ff6338!important;background:rgba(255,99,56,.11)!important;border-color:rgba(255,99,56,.28)!important;}
+                .rc-message-status-v56.is-opened{color:#16a34a!important;}
+                .rc-message-status-v56.is-error{color:#dc2626!important;}
+            </style>
             <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
                             <h2>Conversations</h2>
                             <div class="rc-inbox-head-actions-v56">
-                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                </button>
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime" title="Refresh conversations" aria-label="Refresh conversations">
                                 <span wire:loading.remove wire:target="refreshConversationsRealtime">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -11002,10 +11077,18 @@ CSS;
                             </label>
                         </div>
 
-                        <div class="rc-inbox-tabs-v56">
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">Unread ({{ collect($this->conversations)->sum(fn($row) => (int) ($row['unread_count'] ?? 0)) }})</button>
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
+                        <div class="rc-inbox-quick-filters-v56" role="group" aria-label="Conversation filters">
+                            <button type="button" class="{{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
+                            <button type="button" class="{{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">
+                                Unread
+                                @php $unreadConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (int) ($row['unread_count'] ?? 0) > 0)->count(); @endphp
+                                <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
+                            </button>
+                            <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
+                                Starred
+                                @php $starredConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count(); @endphp
+                                <span wire:key="starred-count-{{ $starredConversationCount }}">{{ $starredConversationCount }}</span>
+                            </button>
                         </div>
 
                         @if(empty($inboxConversations))
@@ -11024,6 +11107,7 @@ CSS;
                                     $inboxDate = $formatInboxDate($inboxConversation['last_message_at'] ?? $inboxConversation['updated_at'] ?? $inboxConversation['created_at'] ?? '');
                                     $isSelectedThread = $selectedConversationId === $inboxConversationId;
                                     $unreadCount = (int) ($inboxConversation['unread_count'] ?? 0);
+                                    $isStarredThread = (bool) ($inboxConversation['starred'] ?? $inboxConversation['is_starred'] ?? false);
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
@@ -11041,9 +11125,14 @@ CSS;
                                         <span class="rc-thread-preview-v56">{{ $inboxLastMessage }}</span>
                                         <span class="rc-thread-status-v56 {{ $statusLabel === 'Opened' ? 'is-opened' : '' }}">{{ $statusLabel }}</span>
                                     </span>
-                                    <span style="display:grid;justify-items:end;align-content:start;gap:.3rem">
+                                    <span class="rc-thread-card-side-v56">
                                         <span class="rc-thread-date-v56">{{ $inboxDate }}</span>
                                         @if($unreadCount > 0)<span class="rc-thread-unread-dot-v56"></span>@endif
+                                        @if($isStarredThread)
+                                            <span class="rc-thread-star-v56" title="Starred" aria-label="Starred">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                            </span>
+                                        @endif
                                     </span>
                                 </button>
                             @empty
@@ -11069,13 +11158,9 @@ CSS;
                                     </span>
                                 </div>
                                 <div class="rc-inbox-mid-actions-v56">
-                                    <button type="button" class="rc-inbox-open-composer-v56" wire:click="openSelectedConversationInComposer">
-                                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-                                        Open in Composer
-                                    </button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ $selectedStarred ? 'currentColor' : 'none' }}"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    @php $selectedUnread = (int) ($selectedConversation['unread_count'] ?? 0) > 0; @endphp
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedUnread ? 'is-unread' : '' }}" wire:click="toggleSelectedConversationUnread" title="{{ $selectedUnread ? 'Mark as read' : 'Mark as unread' }}" aria-pressed="{{ $selectedUnread ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M3.5 6.5h17v12h-17v-12Z" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
                                 </div>
                             </div>
 
@@ -11216,7 +11301,22 @@ CSS;
                                                         @endforeach
                                                     </div>
                                                 @endif
-                                                @if($isOut)<div class="rc-message-status-v56"><span>⊙</span> Opened · just now</div>@endif
+                                                @if($isOut)
+                                                    @php
+                                                        $rawDeliveryStatus = strtolower(trim((string) ($message['status'] ?? '')));
+                                                        $deliveryStatus = match (true) {
+                                                            str_contains($rawDeliveryStatus, 'click') => 'Clicked',
+                                                            str_contains($rawDeliveryStatus, 'open') => 'Opened',
+                                                            str_contains($rawDeliveryStatus, 'deliver') => 'Delivered',
+                                                            str_contains($rawDeliveryStatus, 'send') || str_contains($rawDeliveryStatus, 'queue') || str_contains($rawDeliveryStatus, 'pending') => 'Sent',
+                                                            str_contains($rawDeliveryStatus, 'bounce') => 'Bounced',
+                                                            str_contains($rawDeliveryStatus, 'fail') || str_contains($rawDeliveryStatus, 'error') => 'Failed',
+                                                            default => $rawDeliveryStatus !== '' ? ucfirst($rawDeliveryStatus) : 'Sent',
+                                                        };
+                                                        $deliveryTone = in_array($deliveryStatus, ['Failed', 'Bounced'], true) ? 'is-error' : (in_array($deliveryStatus, ['Opened', 'Clicked'], true) ? 'is-opened' : '');
+                                                    @endphp
+                                                    <div class="rc-message-status-v56 {{ $deliveryTone }}"><span>⊙</span> {{ $deliveryStatus }}</div>
+                                                @endif
                                             </div>
                                         </article>
                                     @endforeach
@@ -11249,8 +11349,6 @@ CSS;
                                 <!-- <div class="rc-profile-actions-v56">
                                     <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
                                 </div> -->
 
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>

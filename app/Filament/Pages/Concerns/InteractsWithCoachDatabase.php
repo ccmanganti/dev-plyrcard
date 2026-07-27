@@ -2858,6 +2858,11 @@ trait InteractsWithCoachDatabase
                     $row['logo_url'] = trim((string) ($row['logo_url'] ?? '')) ?: (string) ($row['school_logo_url'] ?? '');
                     $row['local_coach'] = $coach;
 
+                    $coachStarred = (bool) ($coach['starred'] ?? $coach['is_starred'] ?? false);
+                    $starOverride = $this->conversationStarOverride($contactId);
+                    $row['starred'] = $starOverride ?? $coachStarred;
+                    $row['is_starred'] = $row['starred'];
+
                     if (is_array($school)) {
                         $row['local_school'] = $school;
                         $row['business_id'] = $row['business_id'] ?? $school['business_id'] ?? $school['id'] ?? null;
@@ -3868,46 +3873,98 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return $html;
     }
 
+    protected function conversationStarOverrideCacheKey(): string
+    {
+        return 'coach-database:conversation-star-overrides:' . (Auth::id() ?: 'guest');
+    }
+
+    protected function conversationStarOverride(string $contactId): ?bool
+    {
+        $contactId = trim($contactId);
+        if ($contactId === '') {
+            return null;
+        }
+
+        $overrides = Cache::get($this->conversationStarOverrideCacheKey(), []);
+        if (! is_array($overrides) || ! array_key_exists($contactId, $overrides)) {
+            return null;
+        }
+
+        return (bool) $overrides[$contactId];
+    }
+
+    protected function rememberConversationStarOverride(string $contactId, bool $starred): void
+    {
+        $contactId = trim($contactId);
+        if ($contactId === '') {
+            return;
+        }
+
+        $key = $this->conversationStarOverrideCacheKey();
+        $overrides = Cache::get($key, []);
+        $overrides = is_array($overrides) ? $overrides : [];
+        $overrides[$contactId] = $starred ? 1 : 0;
+        Cache::put($key, $overrides, now()->addDays(30));
+    }
+
     public function starSelectedConversation(): void
     {
         $conversation = $this->selectedConversationRow();
         $coach = $this->selectedConversationCoachRow();
-        $contactId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? $conversation['contact_id'] ?? $conversation['contactId'] ?? $coach['email'] ?? $conversation['email'] ?? ''));
+        $contactId = trim((string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? $coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
 
-        if ($contactId === '') {
+        if (! is_array($conversation) || $contactId === '') {
             Notification::make()->title('Recruiting Center')->body('No matched coach contact found to star.')->warning()->send();
             return;
         }
 
-        $currentlyStarred = (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false);
+        $currentlyStarred = (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? $coach['starred'] ?? $coach['is_starred'] ?? false);
+        $nextStarred = ! $currentlyStarred;
+        $conversationId = (string) ($conversation['id'] ?? '');
+        $user = Auth::user();
 
-        if ($currentlyStarred) {
-            $this->unfavoriteCoach($contactId);
-        } else {
-            $this->favoriteCoach($contactId);
+        if (! $user) {
+            return;
         }
 
-        $this->conversations = collect($this->conversations ?? [])
-            ->map(function ($row) use ($conversation, $currentlyStarred) {
-                if (! is_array($row)) {
+        // Update the Livewire state first so the filter count and card star react immediately.
+        $applyStarState = function (bool $starred) use ($conversationId): void {
+            $this->conversations = collect($this->conversations ?? [])
+                ->map(function ($row) use ($conversationId, $starred) {
+                    if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                        $row['starred'] = $starred;
+                        $row['is_starred'] = $starred;
+                    }
+
                     return $row;
-                }
+                })
+                ->values()
+                ->all();
+        };
 
-                if ((string) ($row['id'] ?? '') === (string) ($conversation['id'] ?? '')) {
-                    $row['starred'] = ! $currentlyStarred;
-                    $row['is_starred'] = ! $currentlyStarred;
-                }
-
-                return $row;
-            })
-            ->values()
-            ->all();
-
+        $applyStarState($nextStarred);
+        $this->rememberConversationStarOverride($contactId, $nextStarred);
         $this->cacheInboxConversations($this->conversations);
+
+        $result = app(GoHighLevelService::class)->setContactStarredForUser($user, $contactId, $nextStarred);
+
+        if (! ($result['success'] ?? false)) {
+            // Roll back the optimistic update when GHL rejects the custom-field write.
+            $applyStarState($currentlyStarred);
+            $this->rememberConversationStarOverride($contactId, $currentlyStarred);
+            $this->cacheInboxConversations($this->conversations);
+
+            Notification::make()
+                ->title('Recruiting Center')
+                ->body((string) ($result['error'] ?? 'Unable to update the starred value.'))
+                ->danger()
+                ->send();
+            return;
+        }
 
         Notification::make()
             ->title('Recruiting Center')
-            ->body($currentlyStarred ? 'Coach removed from Starred.' : 'Coach starred.')
+            ->body($nextStarred ? 'Conversation starred.' : 'Conversation removed from Starred.')
             ->success()
             ->send();
     }
@@ -11406,11 +11463,7 @@ HTML;
         if ($statusFilter === 'unread') {
             $base = $base->filter(fn (array $conversation): bool => (int) ($conversation['unread_count'] ?? 0) > 0);
         } elseif ($statusFilter === 'starred') {
-            $base = $base->filter(function (array $conversation): bool {
-                $tags = collect($conversation['tags'] ?? [])->map(fn ($tag): string => strtolower(trim((string) $tag)));
-                return (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false)
-                    || $tags->contains(fn (string $tag): bool => str_contains($tag, 'favorite') || str_contains($tag, 'star'));
-            });
+            $base = $base->filter(fn (array $conversation): bool => (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false));
         }
 
         if ($schoolFilter !== '') {
