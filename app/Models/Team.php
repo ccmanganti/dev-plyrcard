@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
+
 class Team extends Model
 {
     use HasFactory;
@@ -46,20 +47,29 @@ class Team extends Model
         });
     }
 
-    public static function uniqueLandingPageSlug(string $name, ?Team $team = null): string
-    {
-        $base = Str::slug($name) ?: 'team';
-        $slug = $base;
+    public static function uniqueLandingPageSlug(
+        string $value,
+        ?self $ignore = null
+    ): string {
+        $baseSlug = Str::slug($value);
+
+        if (blank($baseSlug)) {
+            $baseSlug = 'team';
+        }
+
+        $slug = $baseSlug;
         $counter = 2;
 
         while (
             static::query()
-                ->where('club_id', $team?->club_id)
+                ->when(
+                    $ignore,
+                    fn ($query) => $query->whereKeyNot($ignore->getKey())
+                )
                 ->where('landing_page_slug', $slug)
-                ->when($team?->exists, fn ($query) => $query->whereKeyNot($team->getKey()))
                 ->exists()
         ) {
-            $slug = "{$base}-{$counter}";
+            $slug = "{$baseSlug}-{$counter}";
             $counter++;
         }
 

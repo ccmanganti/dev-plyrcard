@@ -37,23 +37,35 @@ class BackfillClubTeamLandingSlugs extends Command
             });
 
         Team::query()
-            ->where(function ($query) {
-                $query
-                    ->whereNull('landing_page_slug')
-                    ->orWhere('landing_page_slug', '');
-            })
-            ->orderBy('id')
-            ->get()
-            ->each(function (Team $team) use (&$teamsUpdated) {
-                if (blank($team->name)) {
-                    return;
-                }
+    ->with('club')
+    ->where(function ($query) {
+        $query
+            ->whereNull('landing_page_slug')
+            ->orWhere('landing_page_slug', '');
+    })
+    ->orderBy('id')
+    ->get()
+    ->each(function (Team $team) use (&$teamsUpdated) {
+        if (blank($team->name)) {
+            return;
+        }
 
-                $team->landing_page_slug = Team::uniqueLandingPageSlug($team->name, $team);
-                $team->save();
+        $slugSource = collect([
+            $team->club?->name,
+            $team->name,
+        ])
+            ->filter()
+            ->implode(' ');
 
-                $teamsUpdated++;
-            });
+        $team->landing_page_slug = Team::uniqueLandingPageSlug(
+            $slugSource,
+            $team
+        );
+
+        $team->save();
+
+        $teamsUpdated++;
+    });
 
         $this->info("Clubs updated: {$clubsUpdated}");
         $this->info("Teams updated: {$teamsUpdated}");
