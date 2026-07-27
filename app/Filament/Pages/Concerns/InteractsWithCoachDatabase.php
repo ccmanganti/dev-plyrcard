@@ -517,9 +517,29 @@ trait InteractsWithCoachDatabase
         if ($this->selectedConversationId) {
             $cached = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
             if (is_array($cached['rows'] ?? null)) {
-                $this->messages = collect($cached['rows'])
-                    ->filter(fn ($row): bool => is_array($row))
+                $cachedRows = collect($cached['rows'])
+                    ->filter(fn ($row): bool => is_array($row));
+
+                // Detached message sync can return only the sent rows. Re-apply the
+                // selected conversation preview every time cached rows replace Livewire
+                // state so a received reply does not disappear after the poll finishes.
+                $this->messages = $this->appendSelectedConversationPreviewMessage(
+                    $cachedRows,
+                    (string) $this->selectedConversationId
+                )
                     ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                    ->sortBy(function (array $row): int {
+                        $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+                        if (is_numeric($value)) {
+                            $number = (int) $value;
+                            return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                        }
+                        try {
+                            return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                        } catch (\Throwable) {
+                            return 0;
+                        }
+                    })
                     ->values()
                     ->all();
                 $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
@@ -4620,11 +4640,24 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return $rows;
         }
 
-        $direction = $this->normalizeCommunicationDirection($conversation);
+        $rawDirection = strtolower(trim((string) (
+            $conversation['last_message_direction']
+            ?? $conversation['lastMessageDirection']
+            ?? $conversation['message_direction']
+            ?? $conversation['messageDirection']
+            ?? $conversation['direction']
+            ?? $conversation['last_message_type']
+            ?? ''
+        )));
 
-        // This fallback is specifically for received replies. Outbound messages are
-        // already represented by the normal message-history request/send pipeline.
-        if ($direction !== 'inbound') {
+        $explicitlyOutbound = str_contains($rawDirection, 'outbound')
+            || str_contains($rawDirection, 'outgoing')
+            || in_array($rawDirection, ['out', 'sent'], true);
+
+        // An explicit outbound preview is already represented by the normal message
+        // history. When direction is missing, keep the preview: GHL commonly omits
+        // direction on received replies even though last_message contains the reply.
+        if ($explicitlyOutbound) {
             return $rows;
         }
 
@@ -4819,9 +4852,26 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return false;
     }
 
-    $this->messages = collect($cached['rows'])
-        ->filter(fn ($row): bool => is_array($row))
+    $cachedRows = collect($cached['rows'])
+        ->filter(fn ($row): bool => is_array($row));
+
+    $this->messages = $this->appendSelectedConversationPreviewMessage(
+        $cachedRows,
+        $conversationId
+    )
         ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+        ->sortBy(function (array $row): int {
+            $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+            if (is_numeric($value)) {
+                $number = (int) $value;
+                return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+            }
+            try {
+                return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+            } catch (\Throwable) {
+                return 0;
+            }
+        })
         ->values()
         ->all();
 
