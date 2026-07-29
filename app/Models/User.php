@@ -95,15 +95,17 @@ class User extends Authenticatable implements HasName, FilamentUser
         'max_speed',
         'profile_completion_percentage',
         'profile_completion_threshold_sent_at',
+
         'ghl_contact_id',
+        'ghl_location_id',
+        'ghl_api_key',
+        'total_emails_sent',
+
         'club_referral_id',
         'registration_source',
         'utm_club_id',
         'utm_league_id',
         'utm_team_name',
-        'ghl_contact_id',
-        'ghl_location_id',
-        'ghl_api_key',
 
         // First-login / onboarding fields
         'must_change_password',
@@ -144,10 +146,14 @@ class User extends Authenticatable implements HasName, FilamentUser
             'club_referral_id' => 'integer',
             'utm_club_id' => 'integer',
             'utm_league_id' => 'integer',
+            'total_emails_sent' => 'integer',
 
             // First-login / onboarding casts
             'must_change_password' => 'boolean',
             'onboarding_completed_at' => 'datetime',
+
+            // Enable after migrating existing plaintext values:
+            // 'ghl_api_key' => 'encrypted',
         ];
     }
 
@@ -231,8 +237,6 @@ class User extends Authenticatable implements HasName, FilamentUser
             ->orderBy('game_time');
     }
 
-
-
     public function clubReferrals(): HasMany
     {
         return $this->hasMany(ClubReferral::class, 'club_manager_id');
@@ -260,15 +264,12 @@ class User extends Authenticatable implements HasName, FilamentUser
 
     public function isSuperadminOrImpersonating(): bool
     {
-        // If current user is superadmin
         if ($this->hasRole('superadmin')) {
             return true;
         }
 
-        // If we are impersonating
         if (app('impersonate')->isImpersonating()) {
             $impersonatorId = app('impersonate')->getImpersonatorId();
-
             $impersonator = static::find($impersonatorId);
 
             return $impersonator?->hasRole('superadmin') ?? false;
@@ -295,11 +296,20 @@ class User extends Authenticatable implements HasName, FilamentUser
 
     public function hasGhlConnection(): bool
     {
-        return $this->hasGhlLocationId() || $this->hasGhlApiKey();
+        return $this->hasGhlLocationId() && $this->hasGhlApiKey();
+    }
+
+    public function hasCompleteGhlConnection(): bool
+    {
+        return $this->hasGhlConnection();
     }
 
     public function preferredGhlConnectionType(): ?string
     {
+        if ($this->hasGhlLocationId() && $this->hasGhlApiKey()) {
+            return 'location_id_and_api_key';
+        }
+
         if ($this->hasGhlLocationId()) {
             return 'location_id';
         }

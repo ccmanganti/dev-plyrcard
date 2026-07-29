@@ -54,6 +54,80 @@
             const stores = window.__rcDiscoverSelectionStores || new Map();
             window.__rcDiscoverSelectionStores = stores;
 
+            if (typeof window.rcCountUp !== 'function') {
+                window.rcCountUp = (target = 0, suffix = '', duration = 650) => ({
+                    display: `0${suffix}`,
+                    target: Math.max(0, Number(target) || 0),
+                    suffix: String(suffix || ''),
+                    duration: Math.max(180, Number(duration) || 650),
+                    animationFrame: null,
+
+                    init() {
+                        // A fresh Alpine component is created on every dashboard reload,
+                        // so the count-up always replays from zero.
+                        this.$nextTick(() => this.start());
+                    },
+
+                    start() {
+                        if (this.animationFrame) {
+                            cancelAnimationFrame(this.animationFrame);
+                        }
+
+                        this.display = `0${this.suffix}`;
+
+                        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+                        if (reduceMotion || this.target <= 0) {
+                            this.display = `${Math.round(this.target).toLocaleString()}${this.suffix}`;
+                            return;
+                        }
+
+                        const startedAt = performance.now();
+                        const animate = (now) => {
+                            const progress = Math.min(1, (now - startedAt) / this.duration);
+                            const eased = 1 - Math.pow(1 - progress, 3);
+                            const current = Math.max(1, Math.round(this.target * eased));
+                            this.display = `${current.toLocaleString()}${this.suffix}`;
+
+                            if (progress < 1) {
+                                this.animationFrame = requestAnimationFrame(animate);
+                            } else {
+                                this.animationFrame = null;
+                                this.display = `${Math.round(this.target).toLocaleString()}${this.suffix}`;
+                            }
+                        };
+
+                        this.animationFrame = requestAnimationFrame(animate);
+                    },
+                });
+            }
+
+            if (typeof window.rcProgressFill !== 'function') {
+                window.rcProgressFill = (target = 0, duration = 700) => ({
+                    width: 0,
+                    target: Math.min(100, Math.max(0, Number(target) || 0)),
+                    duration: Math.max(180, Number(duration) || 700),
+
+                    init() {
+                        // Reset to zero first so the bar visibly fills again on every reload.
+                        this.width = 0;
+
+                        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+                        if (reduceMotion) {
+                            this.width = this.target;
+                            return;
+                        }
+
+                        this.$nextTick(() => {
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    this.width = this.target;
+                                });
+                            });
+                        });
+                    },
+                });
+            }
+
             const key = () => window.location.pathname;
             const getStore = () => stores.get(key()) || null;
 
@@ -4186,9 +4260,64 @@
 
         .rc-home-progress-v2 span {
             display: block;
+            width: 0;
             height: 100%;
             border-radius: inherit;
             background: #ff6338;
+            transition: width .7s cubic-bezier(.22, 1, .36, 1);
+            will-change: width;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-home-progress-v2 span {
+                transition: none;
+            }
+        }
+
+
+        .rc-email-sync-badge-v2 {
+            align-items: center;
+            gap: .32rem;
+            margin-left: .4rem;
+            padding: .2rem .45rem;
+            border-radius: 999px;
+            background: rgba(99, 102, 241, .12);
+            color: #818cf8;
+            font-size: .64rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            vertical-align: middle;
+        }
+
+        .rc-email-sync-spinner-v2 {
+            width: .72rem;
+            height: .72rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 999px;
+            animation: rcEmailSyncSpin .7s linear infinite;
+        }
+
+        .rc-email-sync-value-skeleton-v2 {
+            width: 1.45rem;
+            height: 1.45rem;
+            margin-top: .2rem;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 999px;
+            color: #818cf8;
+            animation: rcEmailSyncSpin .7s linear infinite;
+        }
+
+        @keyframes rcEmailSyncSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-email-sync-spinner-v2,
+            .rc-email-sync-value-skeleton-v2 {
+                animation: none;
+            }
         }
 
         .rc-home-stat-sub-v2 {
@@ -7440,7 +7569,7 @@
                 );
                 $profileViews = $trackedProfileTotal;
 
-                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $emailSentCount = (int) ($authUser?->total_emails_sent ?? 0);
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $instagramClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
@@ -7675,6 +7804,8 @@
                     [
                         'label' => 'Profile Completion',
                         'value' => $profileCompletion . '%',
+                        'count' => $profileCompletion,
+                        'suffix' => '%',
                         'sub' => $profileCompletionSubtext,
                         'icon' => 'cap',
                         'tone' => 'coral',
@@ -7683,6 +7814,7 @@
                     [
                         'label' => 'Profile Views',
                         'value' => number_format($profileViews),
+                        'count' => $profileViews,
                         'sub' => 'Tracked profile activity',
                         'icon' => 'eye',
                         'tone' => 'blue',
@@ -7691,6 +7823,7 @@
                     [
                         'label' => 'Favorites',
                         'value' => number_format($favoriteSchools),
+                        'count' => $favoriteSchools,
                         'sub' => 'Schools saved',
                         'icon' => 'star',
                         'tone' => 'gold',
@@ -7699,6 +7832,7 @@
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
+                        'count' => $coachEngagementTotal,
                         'sub' => 'Tracked social clicks',
                         'icon' => 'mail',
                         'tone' => 'green',
@@ -7707,9 +7841,11 @@
                     [
                         'label' => 'Emails Sent',
                         'value' => number_format($emailsSent),
+                        'count' => $emailsSent,
                         'sub' => 'Tracked emails sent',
                         'icon' => 'chart',
                         'tone' => 'indigo',
+                        'is_email_sent' => true,
                     ],
                 ];
 
@@ -7907,13 +8043,42 @@
                             </div>
 
                             <div class="rc-home-stat-copy-v2">
-                                <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
-                                <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
+                                <div class="rc-home-stat-label-v2">
+                                    {{ $stat['label'] }}
+                                </div>
+
+                                @if(! empty($stat['is_email_sent']))
+                                    <div
+                                        class="rc-home-stat-value-v2"
+                                        wire:loading.remove
+                                        wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                        x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                        x-init="init()"
+                                        x-text="display"
+                                    >{{ $stat['value'] }}</div>
+                                    <div
+                                        class="rc-email-sync-value-skeleton-v2"
+                                        wire:loading.block
+                                        wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                        aria-label="Fetching sent email total"
+                                    ></div>
+                                @else
+                                    <div
+                                        class="rc-home-stat-value-v2"
+                                        x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                        x-init="init()"
+                                        x-text="display"
+                                    >{{ $stat['value'] }}</div>
+                                @endif
                             </div>
 
                             @if(isset($stat['progress']))
-                                <div class="rc-home-progress-v2">
-                                    <span style="width: {{ (int) $stat['progress'] }}%"></span>
+                                <div
+                                    class="rc-home-progress-v2"
+                                    x-data="window.rcProgressFill(@js((int) $stat['progress']))"
+                                    x-init="init()"
+                                >
+                                    <span x-bind:style="`width: ${width}%`"></span>
                                 </div>
                             @endif
 
@@ -7937,7 +8102,11 @@
                         <div class="rc-home-progress-layout-v2">
                             <div class="rc-readiness-ring-v2" style="--ready: {{ $readinessScore }};">
                                 <div>
-                                    <strong>{{ $profileCompletion }}%</strong>
+                                    <strong
+                                        x-data="window.rcCountUp(@js((int) $profileCompletion), '%')"
+                                        x-init="init()"
+                                        x-text="display"
+                                    >{{ $profileCompletion }}%</strong>
                                     <span>Profile Completion</span>
                                 </div>
                             </div>
@@ -8450,7 +8619,7 @@
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $emailSentCount = (int) ($authUser?->total_emails_sent ?? 0);
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);

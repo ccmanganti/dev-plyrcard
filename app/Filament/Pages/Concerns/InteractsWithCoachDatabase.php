@@ -351,6 +351,87 @@ trait InteractsWithCoachDatabase
         }
     }
 
+    /**
+     * Occasionally reconcile the local sent-email total against GHL.
+     *
+     * The dashboard mount calls this method. A cache marker prevents the
+     * expensive conversation/message scan from running more than once per day
+     * for the same user and GHL location. Failed scans release the marker so a
+     * later dashboard request can retry.
+     */
+    public function syncTotalEmailsSentFromGhlOccasionally($user = null): void
+    {
+        $user ??= Auth::user();
+
+        if (! $user || ! Schema::hasColumn('users', 'total_emails_sent')) {
+            return;
+        }
+
+        $locationId = trim((string) ($user->ghl_location_id ?? ''));
+        if ($locationId === '') {
+            return;
+        }
+
+        // A previous zero-result sync must not block the dashboard for an entire day.
+        // Retry zero totals every five minutes; established totals are reconciled hourly.
+        $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
+        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinute();
+        $syncKey = 'recruiting:total-emails-sent-sync:v3:'
+            . (int) $user->getKey()
+            . ':'
+            . strtolower($locationId);
+
+        if (! Cache::add($syncKey, true, $ttl)) {
+            return;
+        }
+
+        try {
+            $result = app(GoHighLevelService::class)
+                ->syncTotalEmailsSentFromGhl($user);
+
+            if (! ($result['success'] ?? false)) {
+                Cache::forget($syncKey);
+
+                Log::warning('Automatic GHL sent-email count sync failed.', [
+                    'user_id' => $user->getKey(),
+                    'location_id' => $locationId,
+                    'source' => $result['source'] ?? null,
+                    'pages_scanned' => $result['pages_scanned'] ?? 0,
+                    'conversations_scanned' => $result['conversations_scanned'] ?? 0,
+                    'messages_scanned' => $result['messages_scanned'] ?? 0,
+                    'error' => $result['error'] ?? 'Unknown sync error.',
+                ]);
+
+                return;
+            }
+
+            $count = max(0, (int) ($result['count'] ?? 0));
+            $user->refresh();
+            Auth::setUser($user);
+
+            $this->stats['emails_sent'] = $count;
+            $this->stats['email_sent_count'] = $count;
+
+            Log::info('Automatic GHL sent-email dashboard sync completed.', [
+                'user_id' => $user->getKey(),
+                'location_id' => $locationId,
+                'source' => $result['source'] ?? null,
+                'pages_scanned' => $result['pages_scanned'] ?? 0,
+                'conversations_scanned' => $result['conversations_scanned'] ?? 0,
+                'messages_scanned' => $result['messages_scanned'] ?? 0,
+                'outbound_emails_counted' => $count,
+            ]);
+        } catch (\Throwable $exception) {
+            Cache::forget($syncKey);
+
+            Log::warning('Automatic GHL sent-email count sync threw an exception.', [
+                'user_id' => $user->getKey(),
+                'location_id' => $locationId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     protected function coachDatabaseSection(): string
     {
         return 'dashboard';
@@ -456,6 +537,10 @@ trait InteractsWithCoachDatabase
         $this->isBootingRemoteSection = true;
 
         try {
+            if ($this->section === 'dashboard') {
+                $this->syncTotalEmailsSentFromGhlOccasionally();
+            }
+
             if ($this->section === 'conversations') {
                 $this->hydrateCachedInboxConversations();
 
@@ -3682,13 +3767,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->selectedCoachId = null;
         $this->messages = [];
         $this->messageLastId = null;
-        try {
-            app(GoHighLevelService::class)->incrementRecruitingMetricForUser(Auth::user(), 'emails_sent', 1);
-            $this->stats['emails_sent'] = (int) ($this->stats['emails_sent'] ?? 0) + 1;
-        } catch (\Throwable $exception) {
-            // Keep email sending successful even if the dashboard counter cannot be updated immediately.
-        }
-
         $this->emailSubject = '';
         $this->emailBody = '';
         $this->showNewConversationComposer = false;
@@ -8371,7 +8449,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $schoolsWithClicks = $engagementRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
         $ghlContactClicks = $trackedProfileTotal + $linkClicks;
 
-        $emailSentCount = max((int) ($stats['email_sent_count'] ?? 0), (int) ($stats['emails_sent'] ?? 0), (int) ($stats['campaigns_sent'] ?? 0) + (int) ($stats['personal_emails_sent'] ?? 0));
+        $emailSentCount = (int) (Auth::user()?->total_emails_sent ?? 0);
         $emailOpenCount = (int) ($stats['email_open_count'] ?? $stats['email_opens'] ?? 0);
         $coachReplies = (int) ($stats['coach_replies'] ?? $stats['replies'] ?? 0);
 
