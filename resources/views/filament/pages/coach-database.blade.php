@@ -8048,20 +8048,32 @@
                                 </div>
 
                                 @if(! empty($stat['is_email_sent']))
-                                    <div
-                                        class="rc-home-stat-value-v2"
-                                        wire:loading.remove
-                                        wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
-                                        x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
-                                        x-init="init()"
-                                        x-text="display"
-                                    >{{ $stat['value'] }}</div>
-                                    <div
-                                        class="rc-email-sync-value-skeleton-v2"
-                                        wire:loading.block
-                                        wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
-                                        aria-label="Fetching sent email total"
-                                    ></div>
+                                    @if((int) ($stat['count'] ?? 0) > 0)
+                                        {{-- A cached database value already exists: show it immediately.
+                                             The GHL reconciliation continues silently through wire:init. --}}
+                                        <div
+                                            class="rc-home-stat-value-v2"
+                                            x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                            x-init="init()"
+                                            x-text="display"
+                                        >{{ $stat['value'] }}</div>
+                                    @else
+                                        {{-- First synchronization only: there is no usable local value yet. --}}
+                                        <div
+                                            class="rc-home-stat-value-v2"
+                                            wire:loading.remove
+                                            wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                            x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                            x-init="init()"
+                                            x-text="display"
+                                        >{{ $stat['value'] }}</div>
+                                        <div
+                                            class="rc-email-sync-value-skeleton-v2"
+                                            wire:loading.block
+                                            wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                            aria-label="Loading sent email total"
+                                        ></div>
+                                    @endif
                                 @else
                                     <div
                                         class="rc-home-stat-value-v2"
