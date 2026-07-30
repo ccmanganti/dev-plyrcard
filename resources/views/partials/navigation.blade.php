@@ -2597,6 +2597,55 @@
         }
       }
 
+      /* Seamless navigation loader for Locker Room admin links. */
+      .plyrcard-page-loader {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483646 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(5, 5, 5, .76) !important;
+        backdrop-filter: blur(2px) !important;
+        -webkit-backdrop-filter: blur(2px) !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        transition: opacity .16s ease, visibility .16s ease !important;
+      }
+
+      .plyrcard-page-loader.is-visible {
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+      }
+
+      .plyrcard-page-loader-spinner {
+        width: 44px !important;
+        height: 44px !important;
+        border: 4px solid rgba(255, 255, 255, .24) !important;
+        border-top-color: var(--plyr-accent, #FF5C35) !important;
+        border-radius: 50% !important;
+        animation: plyrcardTailSpinner .68s linear infinite !important;
+        box-shadow: 0 0 24px rgba(0, 0, 0, .28) !important;
+      }
+
+      @keyframes plyrcardTailSpinner {
+        to { transform: rotate(360deg); }
+      }
+
+      .plyrcard-visually-hidden {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
       /* Registration route guard: never show pull-up / Locker Room access on /registration. */
       body.plyrcard-registration-page .plyrcard-action-drawer,
       body.plyrcard-registration-page #plyrcard-action-drawer,
@@ -2695,9 +2744,9 @@
             <div class="plyrcard-nav-group">
               <strong class="plyrcard-nav-group-title">Locker Room</strong>
               <div class="plyrcard-drawer-grid">
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="dashboard"><i class="plyrcard-menu-icon fa-solid fa-gauge-high" aria-hidden="true"></i><span>Dashboard</span></button>
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="profile"><i class="plyrcard-menu-icon fa-solid fa-user" aria-hidden="true"></i><span>Profile</span></button>
-                <button type="button" class="plyrcard-drawer-card" data-plyrcard-section="schedule"><i class="plyrcard-menu-icon fa-solid fa-calendar-days" aria-hidden="true"></i><span>My Schedule</span></button>
+                <a class="plyrcard-drawer-card" href="{{ url('/admin/coach-database') }}" data-plyrcard-loading-link><i class="plyrcard-menu-icon fa-solid fa-gauge-high" aria-hidden="true"></i><span>Dashboard</span></a>
+                <a class="plyrcard-drawer-card" href="{{ url('/admin/my-profile') }}" data-plyrcard-loading-link><i class="plyrcard-menu-icon fa-solid fa-user" aria-hidden="true"></i><span>Profile</span></a>
+                <a class="plyrcard-drawer-card" href="{{ url('/admin/coach-database/schedule') }}" data-plyrcard-loading-link><i class="plyrcard-menu-icon fa-solid fa-calendar-days" aria-hidden="true"></i><span>My Schedule</span></a>
                 <button type="button" class="plyrcard-drawer-card is-disabled" disabled aria-disabled="true" title="Settings coming soon"><i class="plyrcard-menu-icon fa-solid fa-gear" aria-hidden="true"></i><span>Settings</span></button>
               </div>
             </div>
@@ -3455,6 +3504,11 @@
       <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
       <span>{{ $plyrTabLabel }}</span>
     </button>
+  </div>
+
+  <div class="plyrcard-page-loader" data-plyrcard-page-loader aria-hidden="true">
+    <span class="plyrcard-page-loader-spinner" aria-hidden="true"></span>
+    <span class="plyrcard-visually-hidden" role="status" aria-live="polite">Loading page</span>
   </div>
 
   @once
@@ -4252,6 +4306,44 @@
       }
 
       function bindStaticHandlers() {
+        qa('[data-plyrcard-loading-link]').forEach(link => {
+          if (link.dataset.plyrLoadingLinkBound) return;
+          link.dataset.plyrLoadingLinkBound = '1';
+
+          link.addEventListener('click', event => {
+            if (
+              event.defaultPrevented
+              || event.button !== 0
+              || event.metaKey
+              || event.ctrlKey
+              || event.shiftKey
+              || event.altKey
+              || link.target === '_blank'
+            ) {
+              return;
+            }
+
+            const destination = link.href;
+            if (!destination) return;
+
+            event.preventDefault();
+
+            const loader = document.querySelector('[data-plyrcard-page-loader]');
+            if (loader) {
+              loader.classList.add('is-visible');
+              loader.setAttribute('aria-hidden', 'false');
+            }
+
+            document.documentElement.setAttribute('aria-busy', 'true');
+
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                window.location.assign(destination);
+              });
+            });
+          });
+        });
+
         document.querySelectorAll('[data-plyrcard-toggle-drawer], [data-plyrcard-open-drawer]').forEach(button => {
           if (button.dataset.plyrToggleBound) return;
           button.dataset.plyrToggleBound = '1';
@@ -4387,6 +4479,15 @@
 
   <script>
     (function () {
+      window.addEventListener('pageshow', function () {
+        const loader = document.querySelector('[data-plyrcard-page-loader]');
+        if (loader) {
+          loader.classList.remove('is-visible');
+          loader.setAttribute('aria-hidden', 'true');
+        }
+        document.documentElement.removeAttribute('aria-busy');
+      });
+
       document.addEventListener('DOMContentLoaded', function () {
         const drawer = document.getElementById('plyrcard-action-drawer');
         if (!drawer) return;

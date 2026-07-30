@@ -2832,6 +2832,29 @@
 
 
 
+
+        /* Support ticket form */
+        .rc-support-page-v1 { display:grid; gap:1rem; }
+        .rc-support-card-v1 {
+            overflow:hidden;
+            border:1px solid var(--rc-border);
+            border-radius:1rem;
+            background:var(--rc-surface);
+            box-shadow:0 12px 32px rgba(15,23,42,.06);
+        }
+        .rc-support-head-v1 { padding:1rem 1.1rem; border-bottom:1px solid var(--rc-border); }
+        .rc-support-kicker-v1 { display:block; margin-bottom:.28rem; color:var(--rc-accent); font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+        .rc-support-head-v1 h2 { margin:0; color:var(--rc-text); font-size:1.1rem; font-weight:800; letter-spacing:-.025em; }
+        .rc-support-head-v1 p { margin:.3rem 0 0; color:var(--rc-muted); font-size:.82rem; }
+        .rc-support-frame-wrap-v1 { position:relative; min-height:760px; background:var(--rc-surface); }
+        .rc-support-frame-v1 { display:block; width:100%; min-height:760px; border:0; background:transparent; }
+        .rc-support-frame-loader-v1 { position:absolute; inset:0; z-index:2; display:grid; place-items:center; background:var(--rc-surface); }
+        .rc-support-spinner-v1 { width:1.55rem; height:1.55rem; border:2px solid rgba(148,163,184,.28); border-top-color:var(--rc-accent); border-radius:999px; animation:rcSpin .72s linear infinite; }
+        @media (max-width:700px) {
+            .rc-support-frame-wrap-v1, .rc-support-frame-v1 { min-height:900px; }
+            .rc-support-head-v1 { padding:.9rem; }
+        }
+
         /* v56 Inbox redesign */
         .rc-inbox-page-v56 { display:grid; gap:1rem; }
         .rc-inbox-shell-v56 { display:grid; grid-template-columns: 23rem minmax(0,1fr) 22rem; min-height:42rem; border:1px solid var(--rc-border); border-radius:1.15rem; background:var(--rc-surface); box-shadow:0 16px 40px rgba(15,23,42,.07); overflow:hidden; }
@@ -7461,7 +7484,7 @@
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
 
-        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'support', 'schedule', 'settings'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -11936,6 +11959,63 @@ CSS;
             </div>
         @endif
 
+        @if($section === 'support')
+            @php
+                $supportUser = auth()->user();
+                $supportFirstName = trim((string) (
+                    $supportUser?->first_name
+                    ?? str($supportUser?->name ?? 'Athlete')->before(' ')
+                    ?? 'Athlete'
+                ));
+            @endphp
+
+            <div class="rc-support-page-v1">
+                @include('filament.partials.coach-database-header', [
+                    'firstName' => $supportFirstName !== '' ? $supportFirstName : 'Athlete',
+                    'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                    'showNewEmail' => true,
+                ])
+
+                <section class="rc-support-card-v1" x-data="{ loaded: false }">
+                    <header class="rc-support-head-v1">
+                        <div>
+                            <span class="rc-support-kicker-v1">PLYRCard Support</span>
+                            <h2>How can we help?</h2>
+                            <p>Submit a support ticket and our team will review it.</p>
+                        </div>
+                    </header>
+
+                    <div class="rc-support-frame-wrap-v1">
+                        <div class="rc-support-frame-loader-v1" x-show="! loaded" x-transition.opacity>
+                            <span class="rc-support-spinner-v1" aria-label="Loading support form"></span>
+                        </div>
+                        <iframe
+                            src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+                            id="inline-HDaBy0CDwdO7Fw54wi1K"
+                            data-layout="{'id':'INLINE'}"
+                            data-trigger-type="alwaysShow"
+                            data-trigger-value=""
+                            data-activation-type="alwaysActivated"
+                            data-activation-value=""
+                            data-deactivation-type="neverDeactivate"
+                            data-deactivation-value=""
+                            data-form-name="PLYRCard Support Ticket"
+                            data-height="760"
+                            data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+                            data-form-id="HDaBy0CDwdO7Fw54wi1K"
+                            title="PLYRCard support ticket form"
+                            class="rc-support-frame-v1"
+                            loading="eager"
+                            scrolling="no"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            x-on:load="loaded = true"
+                        ></iframe>
+                        <script src="https://link.msgsndr.com/js/form_embed.js" defer></script>
+                    </div>
+                </section>
+            </div>
+        @endif
+
         @if($section === 'schedule')
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
@@ -14813,4 +14893,123 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             @endteleport
         @endif
     </div>
+
+
+    <div
+        id="rc-navigation-loading-overlay"
+        class="rc-navigation-loading-overlay"
+        aria-hidden="true"
+    >
+        <span class="rc-navigation-loading-spinner" aria-label="Loading"></span>
+    </div>
+
+    <style>
+        .rc-navigation-loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483000;
+            display: grid;
+            place-items: center;
+            background: rgba(15, 23, 42, .18);
+            backdrop-filter: blur(1.5px);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .12s ease, visibility .12s ease;
+        }
+
+        .rc-navigation-loading-overlay.is-visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .rc-navigation-loading-spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid rgba(255, 255, 255, .34);
+            border-top-color: #ffffff;
+            border-radius: 999px;
+            animation: rcNavigationSpinner .68s linear infinite;
+            filter: drop-shadow(0 2px 6px rgba(15, 23, 42, .28));
+        }
+
+        @keyframes rcNavigationSpinner {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-navigation-loading-spinner {
+                animation-duration: 1.2s;
+            }
+        }
+    </style>
+
+    <script>
+        (() => {
+            if (window.__rcNavigationSpinnerInstalled) return;
+            window.__rcNavigationSpinnerInstalled = true;
+
+            const overlay = () => document.getElementById('rc-navigation-loading-overlay');
+            const show = () => overlay()?.classList.add('is-visible');
+            const hide = () => overlay()?.classList.remove('is-visible');
+
+            const isSupportedNavigation = (anchor) => {
+                if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return false;
+
+                const rawHref = String(anchor.getAttribute('href') || '').trim();
+                if (!rawHref || rawHref === '#' || rawHref.startsWith('#')) return false;
+                if (/^(mailto:|tel:|javascript:)/i.test(rawHref)) return false;
+
+                let url;
+                try {
+                    url = new URL(anchor.href, window.location.href);
+                } catch (_) {
+                    return false;
+                }
+
+                if (url.origin !== window.location.origin) return false;
+
+                const path = url.pathname.replace(/\/+$/, '') || '/';
+                return path === '/admin/coach-database'
+                    || path === '/admin/my-profile'
+                    || path === '/admin/coach-database/schedule'
+                    || path.startsWith('/admin/coach-database/');
+            };
+
+            document.addEventListener('click', (event) => {
+                if (event.defaultPrevented || event.button !== 0) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+                const anchor = event.target.closest?.('a[href]');
+                if (!isSupportedNavigation(anchor)) return;
+
+                show();
+            }, true);
+
+            window.addEventListener('pageshow', hide);
+            window.addEventListener('beforeunload', show);
+            document.addEventListener('livewire:navigated', hide);
+            document.addEventListener('livewire:navigate', (event) => {
+                const destination = event?.detail?.url;
+                if (!destination) return;
+
+                try {
+                    const url = new URL(destination, window.location.href);
+                    const path = url.pathname.replace(/\/+$/, '') || '/';
+                    if (
+                        path === '/admin/coach-database'
+                        || path === '/admin/my-profile'
+                        || path === '/admin/coach-database/schedule'
+                        || path.startsWith('/admin/coach-database/')
+                    ) {
+                        show();
+                    }
+                } catch (_) {}
+            });
+
+            window.setTimeout(hide, 12000);
+        })();
+    </script>
+
 </x-filament-panels::page>
