@@ -12,9 +12,7 @@ use Illuminate\Validation\Rules\Password;
 class ForcePasswordChange extends Page
 {
     protected string $view = 'filament.pages.force-password-change';
-
     protected static bool $shouldRegisterNavigation = false;
-
     protected static ?string $slug = 'force-password-change';
 
     public string $password = '';
@@ -24,7 +22,9 @@ class ForcePasswordChange extends Page
     {
         abort_unless(auth()->check(), 403);
 
-        if (\STS\FilamentImpersonate\Facades\Impersonation::isImpersonating()) {
+        $user = auth()->user();
+
+        if ($this->shouldBypassPasswordChange($user) || ! (bool) $user->must_change_password) {
             $this->redirect(filament()->getUrl(), navigate: false);
             return;
         }
@@ -32,68 +32,39 @@ class ForcePasswordChange extends Page
 
     protected function shouldBypassPasswordChange($user): bool
     {
-        if ($user->hasRole('superadmin')) {
-            return true;
+        if (method_exists($user, 'isSuperadminOrImpersonating')) {
+            return $user->isSuperadminOrImpersonating();
         }
 
-        if (app()->bound('impersonate')) {
-            $manager = app('impersonate');
-
-            if (method_exists($manager, 'isImpersonating') && $manager->isImpersonating()) {
-                $impersonatorId = method_exists($manager, 'getImpersonatorId')
-                    ? $manager->getImpersonatorId()
-                    : null;
-
-                if ($impersonatorId) {
-                    $impersonator = \App\Models\User::find($impersonatorId);
-
-                    return $impersonator?->hasRole('superadmin') ?? false;
-                }
-            }
-        }
-
-        $sessionKey = config('laravel-impersonate.session_key', 'impersonated_by');
-        $impersonatorId = session($sessionKey);
-
-        if ($impersonatorId) {
-            $impersonator = \App\Models\User::find($impersonatorId);
-
-            return $impersonator?->hasRole('superadmin') ?? false;
-        }
-
-        return false;
+        return method_exists($user, 'hasRole') && $user->hasRole('superadmin');
     }
 
     public function save(): void
     {
-        $this->validate([
-            'password' => ['required', Password::defaults()],
-            'password_confirmation' => ['required', 'same:password'],
+        $validated = $this->validate([
+            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()],
+        ], [
+            'password.confirmed' => 'The password confirmation does not match.',
         ]);
 
         $user = auth()->user();
+        abort_if($this->shouldBypassPasswordChange($user), 403);
 
-        $user->password = Hash::make($this->password);
-        $user->must_change_password = false;
-        $user->save();
+        $user->forceFill([
+            'password' => Hash::make($validated['password']),
+            'must_change_password' => false,
+        ])->save();
 
-        session()->put(
-            'password_hash_' . Auth::getDefaultDriver(),
-            $user->getAuthPassword()
-        );
+        session()->put('password_hash_' . Auth::getDefaultDriver(), $user->getAuthPassword());
+        $this->reset('password', 'password_confirmation');
 
-        Notification::make()
-            ->title('Password updated')
-            ->body('Your account is now secured.')
-            ->success()
-            ->send();
+        Notification::make()->title('Password updated')->body('Your account is now secured. Welcome to PLYRCARD.')->success()->send();
 
-        // Force a real page reload so onboarding hook runs reliably.
         $this->redirect(filament()->getUrl(), navigate: false);
     }
 
     public function getTitle(): string | Htmlable
     {
-        return 'Security';
+        return 'Set your password';
     }
 }

@@ -1272,7 +1272,9 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
-                fn (): string => Blade::render(<<<'BLADE'
+                fn (): string => request()->is('admin/force-password-change*')
+                    ? ''
+                    : Blade::render(<<<'BLADE'
                     <div class="plyr-sidebar-brand-wrap">
                         <a href="{{ url('/admin/coach-database') }}" class="plyr-sidebar-brand" aria-label="PLYRCARD Dashboard">
                             <img
@@ -1289,6 +1291,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_END,
                 function (): string {
+                    if (request()->is('admin/force-password-change*')) {
+                        return '';
+                    }
+
                     $user = auth()->user();
 
                     if (! $user) {
@@ -1899,6 +1905,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 function (): string {
+                    if (request()->is('admin/force-password-change*')) {
+                        return '';
+                    }
+
                     $user = auth()->user();
 
                     $html = Blade::render('@include("partials.navigation", ["activePage" => "admin"])');
