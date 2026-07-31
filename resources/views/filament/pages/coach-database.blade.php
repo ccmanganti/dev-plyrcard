@@ -1,7 +1,15 @@
 <x-filament-panels::page>
+    @php
+        // Settings must remain available even while a Recruiting Center account
+        // is still being provisioned (including users on the Free tier).
+        $bypassRecruitingReadinessGate = (($section ?? '') === 'settings');
+        $shouldBlockForRecruitingReadiness = ! $isRecruitingAccountReady
+            && ! $bypassRecruitingReadinessGate;
+    @endphp
+
     <div
-        class="rc-account-readiness-shell {{ $isRecruitingAccountReady ? 'is-ready' : 'is-preparing' }}"
-        @if(! $isRecruitingAccountReady)
+        class="rc-account-readiness-shell {{ $shouldBlockForRecruitingReadiness ? 'is-preparing' : 'is-ready' }}"
+        @if($shouldBlockForRecruitingReadiness)
             wire:poll.10s="checkRecruitingAccountReadiness"
         @endif
     >
@@ -14668,7 +14676,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 </script>
         </div>
 
-        @if(! $isRecruitingAccountReady)
+        @if($shouldBlockForRecruitingReadiness)
             @teleport('body')
             <div
                 class="rc-account-preparation-overlay"
