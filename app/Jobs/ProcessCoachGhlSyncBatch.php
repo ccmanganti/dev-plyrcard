@@ -19,14 +19,14 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 240;
+    public int $timeout = 300;
     public int $tries = 3;
     public array $backoff = [10, 30, 90];
 
     public function __construct(public int $runId)
     {
         $this->onConnection('database');
-        $this->onQueue('coach-ghl-sync');
+        $this->onQueue('default');
     }
 
     public function handle(CoachGhlGateway $gateway): void
@@ -45,7 +45,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
 
         $targets = CoachGhlSyncTarget::query()
             ->with(['coach.school', 'representativeUser'])
-            ->whereIn('status', ['pending', 'failed'])
+            ->where('status', 'pending')
             ->orderBy('location_id')
             ->orderBy(
                 Coach::query()
@@ -62,33 +62,18 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
             return;
         }
 
-        // Prime each unique school/location mapping once before processing its coaches.
-        // Subsequent coaches for the same school use the saved mapping and avoid another
-        // remote business-directory scan.
-        $targets
-            ->filter(fn ($target): bool => (bool) $target->coach?->school && (bool) $target->representativeUser)
-            ->unique(fn ($target): string => implode('|', [
-                $target->location_id,
-                $target->api_key_hash,
-                $target->coach->school_id,
-            ]))
-            ->each(function ($target) use ($gateway): void {
-                try {
-                    $gateway->syncSchool(
-                        $target->coach->school,
-                        $target->representativeUser,
-                        (string) $target->location_id,
-                        (string) $target->api_key_hash,
-                    );
-                } catch (Throwable $exception) {
-                    // The coach iteration below records the affected coach failure and
-                    // exposes the school error without stopping the rest of the batch.
-                    report($exception);
-                }
-            });
+        // Schools are synchronized inline with the first coach that needs them.
+        // This avoids a separate preflight pass and lets progress move immediately.
 
         $consecutiveFailureMessage = null;
         $consecutiveFailureCount = 0;
+        $checkpointProcessed = 0;
+        $checkpointCounts = [
+            'created_count' => 0,
+            'updated_count' => 0,
+            'unchanged_count' => 0,
+            'failed_count' => 0,
+        ];
 
         foreach ($targets as $target) {
             $run->refresh();
@@ -135,7 +120,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
                     'updated' => 'updated_count',
                     default => 'unchanged_count',
                 };
-                DB::table('coach_ghl_sync_runs')->where('id', $run->id)->increment($contactColumn);
+                $checkpointCounts[$contactColumn]++;
                 $consecutiveFailureMessage = null;
                 $consecutiveFailureCount = 0;
 
@@ -167,7 +152,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
                     'last_error' => $exception->getMessage(),
                     'checked_at' => now(),
                 ])->save();
-                DB::table('coach_ghl_sync_runs')->where('id', $run->id)->increment('failed_count');
+                $checkpointCounts['failed_count']++;
 
                 $message = trim($exception->getMessage());
                 if ($message !== '' && $message === $consecutiveFailureMessage) {
@@ -193,8 +178,20 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
                     break;
                 }
             } finally {
-                DB::table('coach_ghl_sync_runs')->where('id', $run->id)->increment('processed');
-                DB::table('coach_ghl_sync_runs')->where('id', $run->id)->update(['heartbeat_at' => now()]);
+                $checkpointProcessed++;
+
+                // Persist progress every ten contacts. This keeps the UI feeling live
+                // without doing several run-table writes for every API response.
+                if ($checkpointProcessed >= 10 || $target->is($targets->last())) {
+                    $this->flushCheckpoint($run->id, $checkpointProcessed, $checkpointCounts);
+                    $checkpointProcessed = 0;
+                    $checkpointCounts = [
+                        'created_count' => 0,
+                        'updated_count' => 0,
+                        'unchanged_count' => 0,
+                        'failed_count' => 0,
+                    ];
+                }
             }
         }
 
@@ -220,6 +217,23 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
             'finished_at' => now(),
             'heartbeat_at' => now(),
         ]);
+    }
+
+    protected function flushCheckpoint(int $runId, int $processed, array $counts): void
+    {
+        DB::transaction(function () use ($runId, $processed, $counts): void {
+            DB::table('coach_ghl_sync_runs')->where('id', $runId)->increment('processed', $processed);
+
+            foreach ($counts as $column => $amount) {
+                if ($amount > 0) {
+                    DB::table('coach_ghl_sync_runs')->where('id', $runId)->increment($column, $amount);
+                }
+            }
+
+            DB::table('coach_ghl_sync_runs')->where('id', $runId)->update([
+                'heartbeat_at' => now(),
+            ]);
+        });
     }
 
     protected function countSchoolActionOnce(int $runId, ?int $mappingId, string $action): void

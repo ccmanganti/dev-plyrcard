@@ -9,7 +9,6 @@ use App\Models\SchoolGhlSyncTarget;
 use App\Services\CoachGhlBackgroundLauncher;
 use App\Services\CoachGhlSyncPlanner;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class CoachGhlSyncPanel extends Component
@@ -21,8 +20,19 @@ class CoachGhlSyncPanel extends Component
         $this->activeRunId = CoachGhlSyncRun::query()->latest('id')->value('id');
     }
 
-    public function startSync(CoachGhlSyncPlanner $planner, CoachGhlBackgroundLauncher $launcher): void
+    public function pollStatus(): void
     {
+        // Polling only refreshes persisted run state. It never starts a system
+        // process or dispatches duplicate jobs.
+        if ($this->activeRunId && ! CoachGhlSyncRun::query()->whereKey($this->activeRunId)->exists()) {
+            $this->activeRunId = CoachGhlSyncRun::query()->latest('id')->value('id');
+        }
+    }
+
+    public function startSync(
+        CoachGhlSyncPlanner $planner,
+        CoachGhlBackgroundLauncher $launcher,
+    ): void {
         $existing = CoachGhlSyncRun::query()
             ->whereIn('status', ['queued', 'running'])
             ->latest('id')
@@ -30,23 +40,37 @@ class CoachGhlSyncPanel extends Component
 
         if ($existing) {
             $this->activeRunId = $existing->id;
-            Notification::make()->title('GHL synchronization is already running')->info()->send();
+
+            Notification::make()
+                ->title('GHL synchronization is already active')
+                ->body('Use Stop before starting a separate run.')
+                ->info()
+                ->send();
+
             return;
         }
 
         $planner->planForCoaches(
-            Coach::query()->whereNotNull('email')->where('email', '!=', '')->get()
+            Coach::query()
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->get(),
         );
 
-        $this->queueTargetsForRestart();
+        $this->resetInterruptedTargets();
         $this->launchNewRun($launcher, false);
     }
 
     public function stopSync(): void
     {
         $run = $this->run;
+
         if (! $run || ! in_array($run->status, ['queued', 'running'], true)) {
-            Notification::make()->title('No active synchronization to stop')->info()->send();
+            Notification::make()
+                ->title('No active synchronization to stop')
+                ->info()
+                ->send();
+
             return;
         }
 
@@ -59,19 +83,28 @@ class CoachGhlSyncPanel extends Component
             'heartbeat_at' => now(),
         ])->save();
 
-        CoachGhlSyncTarget::query()->where('status', 'processing')->update(['status' => 'pending']);
-        SchoolGhlSyncTarget::query()->where('status', 'processing')->update(['status' => 'pending']);
+        CoachGhlSyncTarget::query()
+            ->where('status', 'processing')
+            ->update(['status' => 'pending']);
+
+        SchoolGhlSyncTarget::query()
+            ->where('status', 'processing')
+            ->update(['status' => 'pending']);
 
         Notification::make()
             ->title('GHL synchronization stopped')
-            ->body('The current worker will exit safely. Unfinished records remain pending.')
+            ->body('The queued job will exit safely when the application worker receives it. Unfinished records remain pending.')
             ->warning()
             ->send();
     }
 
     public function restartSync(CoachGhlBackgroundLauncher $launcher): void
     {
-        $active = CoachGhlSyncRun::query()->whereIn('status', ['queued', 'running'])->latest('id')->first();
+        $active = CoachGhlSyncRun::query()
+            ->whereIn('status', ['queued', 'running'])
+            ->latest('id')
+            ->first();
+
         if ($active) {
             $active->forceFill([
                 'status' => 'cancelled',
@@ -83,31 +116,37 @@ class CoachGhlSyncPanel extends Component
             ])->save();
         }
 
-        $this->queueTargetsForRestart();
+        $this->resetInterruptedTargets();
         $this->launchNewRun($launcher, true);
     }
 
-    public function retryFailed(CoachGhlBackgroundLauncher $launcher): void
-    {
-        $this->restartSync($launcher);
-    }
-
-    protected function queueTargetsForRestart(): void
+    protected function resetInterruptedTargets(): void
     {
         CoachGhlSyncTarget::query()
             ->whereIn('status', ['failed', 'processing'])
-            ->update(['status' => 'pending', 'last_error' => null]);
+            ->update([
+                'status' => 'pending',
+                'last_error' => null,
+            ]);
 
         SchoolGhlSyncTarget::query()
             ->whereIn('status', ['failed', 'processing'])
-            ->update(['status' => 'pending', 'last_error' => null]);
+            ->update([
+                'status' => 'pending',
+                'last_error' => null,
+            ]);
     }
 
     protected function launchNewRun(CoachGhlBackgroundLauncher $launcher, bool $restart): void
     {
         $total = CoachGhlSyncTarget::query()->where('status', 'pending')->count();
+
         if ($total === 0) {
-            Notification::make()->title('Nothing to synchronize')->info()->send();
+            Notification::make()
+                ->title('Nothing to synchronize')
+                ->info()
+                ->send();
+
             return;
         }
 
@@ -120,41 +159,31 @@ class CoachGhlSyncPanel extends Component
                 ->distinct()
                 ->count('location_id'),
             'message' => $restart
-                ? 'Restarting pending school and coach synchronization…'
-                : 'Preparing school and coach synchronization…',
+                ? 'Restart queued for the application background worker.'
+                : 'Synchronization queued for the application background worker.',
             'heartbeat_at' => now(),
         ]);
 
-        $launch = $launcher->launch($run);
+        $launcher->launch($run);
         $this->activeRunId = $run->id;
 
         Notification::make()
-            ->title($restart ? 'GHL synchronization restarted' : 'GHL synchronization started')
-            ->body(($launch['started'] ?? false)
-                ? 'The process is running in the background and continues after page reloads.'
-                : 'The run was queued, but the detached worker could not start.')
+            ->title($restart ? 'GHL synchronization restarted' : 'GHL synchronization queued')
+            ->body('The application Laravel queue worker will process it in the background. Reloading the page does not cancel the run.')
             ->success()
             ->send();
     }
 
     public function getRunProperty(): ?CoachGhlSyncRun
     {
-        return $this->activeRunId ? CoachGhlSyncRun::query()->find($this->activeRunId) : null;
+        return $this->activeRunId
+            ? CoachGhlSyncRun::query()->find($this->activeRunId)
+            : null;
     }
 
     public function getPendingCountProperty(): int
     {
         return CoachGhlSyncTarget::query()->where('status', 'pending')->count();
-    }
-
-    public function getFailedCountProperty(): int
-    {
-        return CoachGhlSyncTarget::query()->where('status', 'failed')->count();
-    }
-
-    public function getFailedSchoolCountProperty(): int
-    {
-        return SchoolGhlSyncTarget::query()->where('status', 'failed')->count();
     }
 
     public function getErrorSummaryProperty(): array

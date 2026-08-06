@@ -516,7 +516,7 @@ class CoachGhlGateway
             [
                 'locationId' => $locationId,
                 'businessId' => $desired !== '' ? $desired : null,
-                'contactIds' => [$contactId],
+                'ids' => [(string) $contactId],
             ],
         );
 
@@ -628,9 +628,10 @@ class CoachGhlGateway
             ->withToken($token)
             ->acceptJson()
             ->asJson()
-            ->timeout(25)
+            ->connectTimeout(12)
+            ->timeout(35)
             ->retry(
-                [500, 1000, 2000],
+                [1000, 2000, 4000, 8000],
                 fn (Throwable $exception): bool => $exception instanceof ConnectionException
                     || ($exception instanceof RequestException
                         && (($exception->response?->status() ?? 0) === 429
@@ -645,9 +646,10 @@ class CoachGhlGateway
             ->withToken($token)
             ->acceptJson()
             ->asJson()
-            ->timeout(25)
+            ->connectTimeout(12)
+            ->timeout(35)
             ->retry(
-                [500, 1000, 2000],
+                [1000, 2000, 4000, 8000],
                 fn (Throwable $exception): bool => $exception instanceof ConnectionException
                     || ($exception instanceof RequestException
                         && (($exception->response?->status() ?? 0) === 429
