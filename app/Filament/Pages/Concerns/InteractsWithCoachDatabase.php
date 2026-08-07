@@ -9234,23 +9234,116 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     }
 
     /**
-     * Lightweight, cache-backed dataset consumed by the client-side Discover
-     * Schools controller. This is a computed Livewire property, so Blade can
-     * safely read `$this->discoverSchoolsClientDataset`.
+     * One lightweight payload for Discover Schools. Search, division,
+     * conference and grid/list switching are intentionally performed in Alpine
+     * so those controls never wait for a Livewire round-trip.
+     *
+     * Coach counts are rebuilt from the exact school/business index instead of
+     * trusting legacy cached aggregate counts. This keeps the client-side cards
+     * consistent with Compose Email's authoritative school membership rules.
      */
     public function getDiscoverSchoolsClientDatasetProperty(): array
     {
-        $user = Auth::user();
+        $index = $this->schoolCoachSearchIndex();
 
-        if (! $user) {
-            return [];
-        }
+        return collect($this->allSchools())
+            ->filter(fn ($school): bool => is_array($school) && filled($school['name'] ?? null))
+            ->map(function (array $school) use ($index): array {
+                $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+                $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
+                $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
 
-        $snapshot = $this->activeSnapshotRows();
-        $service = app(LocalCoachDatabaseSchoolService::class);
-        $service->ensureSeeded($user, $snapshot);
+                $coaches = [];
+                $keys = [];
 
-        return $service->discoverDataset($user);
+                if ($businessId !== '') {
+                    $keys[] = 'business:' . strtolower($businessId);
+                }
+                if ($normalizedSchoolName !== '') {
+                    $keys[] = 'school_key:' . $normalizedSchoolName;
+                }
+
+                foreach (array_unique($keys) as $key) {
+                    foreach (($index[$key] ?? []) as $coach) {
+                        if (! is_array($coach)) {
+                            continue;
+                        }
+
+                        if (! $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName)) {
+                            continue;
+                        }
+
+                        $coaches[$this->coachTrackingIdentity($coach)] = $coach;
+                    }
+                }
+
+                $headCoach = collect($coaches)->first(function (array $coach): bool {
+                    return $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''));
+                }) ?: collect($coaches)->first();
+
+                if (! is_array($headCoach)) {
+                    $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
+                }
+
+                $logo = trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''));
+                if ($logo === '') {
+                    foreach ($coaches as $coach) {
+                        $logo = trim((string) ($coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? ''));
+                        if ($logo !== '') {
+                            break;
+                        }
+                    }
+                }
+
+                $coachSearchTokens = collect($coaches)
+                    ->flatMap(fn (array $coach): array => [
+                        $coach['name'] ?? '',
+                        $coach['first_name'] ?? '',
+                        $coach['last_name'] ?? '',
+                        $coach['email'] ?? '',
+                        $coach['title'] ?? $coach['position'] ?? '',
+                    ])
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $id = $businessId !== ''
+                    ? $businessId
+                    : (string) ($school['id'] ?? md5(strtolower($schoolName)));
+
+                return [
+                    'id' => $id,
+                    'business_id' => $businessId,
+                    'name' => $schoolName !== '' ? $schoolName : 'School',
+                    'logo_url' => $logo,
+                    'conference' => (string) ($school['conference'] ?? ''),
+                    'division' => (string) ($school['division'] ?? ''),
+                    'city' => (string) ($school['city'] ?? ''),
+                    'state' => (string) ($school['state'] ?? ''),
+                    'coach_count' => count($coaches),
+                    'head_coach_name' => (string) ($headCoach['name'] ?? ''),
+                    'head_coach_title' => (string) ($headCoach['title'] ?? $headCoach['position'] ?? ''),
+                    'head_coach_email' => (string) ($headCoach['email'] ?? ''),
+                    'search_text' => $this->normalizeSearchText(array_merge([
+                        $schoolName,
+                        $school['conference'] ?? '',
+                        $this->conferenceSearchTokens($school['conference'] ?? ''),
+                        $school['division'] ?? '',
+                        $school['city'] ?? '',
+                        $school['state'] ?? '',
+                    ], $coachSearchTokens)),
+                ];
+            })
+            ->filter(fn (array $school): bool => $school['id'] !== '')
+            ->unique(function (array $school): string {
+                $businessId = strtolower(trim((string) ($school['business_id'] ?? '')));
+                return $businessId !== ''
+                    ? 'business:' . $businessId
+                    : 'name:' . $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+            })
+            ->sortBy(fn (array $school): string => strtolower($school['name']))
+            ->values()
+            ->all();
     }
 
     public function getFilteredSchoolsProperty(): array

@@ -8378,8 +8378,186 @@
                 }
 </style>
 
-            <div class="rc-discover-v29"
-                 x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 240); }">
+            <script>
+                window.plyrDiscoverSchoolsFast = function (config) {
+                    return {
+                        schools: Array.isArray(config.schools) ? config.schools : [],
+                        query: String(config.query || ''),
+                        division: String(config.division || ''),
+                        conference: String(config.conference || ''),
+                        viewMode: ['grid', 'list'].includes(config.viewMode) ? config.viewMode : 'grid',
+                        selectedSchoolIds: Array.isArray(config.selectedSchoolIds) ? config.selectedSchoolIds.map(String) : [],
+                        limit: 96,
+                        listsOpen: false,
+
+                        init() {
+                            this.$watch('query', () => { this.limit = 96; });
+                            this.$watch('division', () => { this.limit = 96; });
+                            this.$watch('conference', () => { this.limit = 96; });
+                        },
+
+                        normalize(value) {
+                            return String(value ?? '')
+                                .toLowerCase()
+                                .normalize('NFD')
+                                .replace(/[\u0300-\u036f]/g, '')
+                                .replace(/[^a-z0-9]+/g, ' ')
+                                .replace(/\s+/g, ' ')
+                                .trim();
+                        },
+
+                        divisionKey(value) {
+                            const raw = String(value ?? '').trim();
+                            const text = this.normalize(raw);
+
+                            if (!text) return '';
+                            if (text.includes('njcaa')) return 'NJCAA';
+                            if (text.includes('naia')) return 'NAIA';
+
+                            if (text.includes('ncaa')) {
+                                if (/\b(division 3|division iii|d iii|d 3|d3)\b/.test(text)) return 'NCAA D-III';
+                                if (/\b(division 2|division ii|d ii|d 2|d2)\b/.test(text)) return 'NCAA D-II';
+                                if (/\b(division 1|division i|d i|d 1|d1)\b/.test(text)) return 'NCAA D-I';
+                            }
+
+                            return raw.toUpperCase();
+                        },
+
+                        conferenceKey(value) {
+                            return this.normalize(value);
+                        },
+
+                        get filteredSchools() {
+                            const query = this.normalize(this.query);
+                            const division = this.divisionKey(this.division);
+                            const conference = this.conferenceKey(this.conference);
+
+                            return this.schools.filter((school) => {
+                                if (division && this.divisionKey(school.division) !== division) return false;
+                                if (conference && this.conferenceKey(school.conference) !== conference) return false;
+                                if (!query) return true;
+
+                                const haystack = this.normalize(
+                                    school.search_text || [
+                                        school.name,
+                                        school.conference,
+                                        school.division,
+                                        school.city,
+                                        school.state,
+                                        school.head_coach_name,
+                                        school.head_coach_title,
+                                        school.head_coach_email,
+                                    ].filter(Boolean).join(' ')
+                                );
+
+                                return haystack.includes(query);
+                            });
+                        },
+
+                        get visibleSchools() {
+                            return this.filteredSchools.slice(0, this.limit);
+                        },
+
+                        get conferenceOptions() {
+                            return [...new Set(this.schools.map(s => String(s.conference || '').trim()).filter(Boolean))]
+                                .sort((a, b) => a.localeCompare(b));
+                        },
+
+                        get canLoadMore() {
+                            return this.visibleSchools.length < this.filteredSchools.length;
+                        },
+
+                        setDivision(value) {
+                            const next = String(value || '');
+                            this.division = this.division === next ? '' : next;
+                            this.conference = '';
+                        },
+
+                        clearFilters() {
+                            this.query = '';
+                            this.division = '';
+                            this.conference = '';
+                            this.limit = 96;
+                        },
+
+                        initialsFor(name) {
+                            const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+                            return words.slice(0, 2).map(word => word.charAt(0)).join('').toUpperCase() || 'S';
+                        },
+
+                        shortDivision(value) {
+                            const key = this.divisionKey(value);
+                            return key || '—';
+                        },
+
+                        isSelected(id) {
+                            return this.selectedSchoolIds.includes(String(id ?? ''));
+                        },
+
+                        toggleSchool(id) {
+                            id = String(id ?? '');
+                            if (!id) return;
+
+                            if (this.isSelected(id)) {
+                                this.selectedSchoolIds = this.selectedSchoolIds.filter(item => item !== id);
+                            } else {
+                                this.selectedSchoolIds = [...this.selectedSchoolIds, id];
+                            }
+
+                            if (this.$wire && typeof this.$wire.toggleSchoolSelection === 'function') {
+                                this.$wire.toggleSchoolSelection(id);
+                            }
+                        },
+
+                        get allVisibleSelected() {
+                            const ids = this.visibleSchools.map(s => String(s.id || '')).filter(Boolean);
+                            return ids.length > 0 && ids.every(id => this.selectedSchoolIds.includes(id));
+                        },
+
+                        toggleVisibleSelection() {
+                            const ids = this.visibleSchools.map(s => String(s.id || '')).filter(Boolean);
+                            const next = new Set(this.selectedSchoolIds);
+                            const shouldRemove = ids.length > 0 && ids.every(id => next.has(id));
+
+                            ids.forEach(id => shouldRemove ? next.delete(id) : next.add(id));
+                            this.selectedSchoolIds = [...next];
+
+                            if (this.$wire && typeof this.$wire.setSelectedSchoolIds === 'function') {
+                                this.$wire.setSelectedSchoolIds(this.selectedSchoolIds);
+                            }
+                        },
+
+                        clearSelection() {
+                            this.selectedSchoolIds = [];
+                            if (this.$wire && typeof this.$wire.clearSelectedSchools === 'function') {
+                                this.$wire.clearSelectedSchools();
+                            }
+                        },
+
+                        openSchool(id) {
+                            id = String(id ?? '');
+                            if (!id) return;
+                            if (this.$wire && typeof this.$wire.selectSchoolById === 'function') {
+                                this.$wire.selectSchoolById(id);
+                            }
+                        },
+                    };
+                };
+            </script>
+
+            <div
+                class="rc-discover-v29"
+                wire:key="discover-schools-fast-v78"
+                x-data="plyrDiscoverSchoolsFast({
+                    schools: @js($this->discoverSchoolsClientDataset),
+                    query: @js((string) ($discoverSchoolSearch ?? '')),
+                    division: @js((string) ($divisionFilter ?? '')),
+                    conference: @js((string) ($conferenceFilter ?? '')),
+                    viewMode: @js((string) ($schoolViewMode ?? 'grid')),
+                    selectedSchoolIds: @js(array_values($selectedSchoolIds ?? [])),
+                })"
+                x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 160); }"
+            >
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -8388,104 +8566,164 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input wire:key="discover-school-search-input" placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="discoverSchoolSearch" autocomplete="off" />
-                    <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="discoverSchoolSearch" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
+                    <input
+                        placeholder="Search schools & coaches..."
+                        x-model="query"
+                        autocomplete="off"
+                        spellcheck="false"
+                    />
+                    <button
+                        x-cloak
+                        x-show="query.length > 0"
+                        type="button"
+                        class="rc-global-search-clear"
+                        x-on:click="query = ''"
+                        aria-label="Clear Discover Schools search"
+                        style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%)"
+                    >×</button>
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
                         @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))" wire:loading.attr="disabled" wire:target="setDivisionFilter">{{ $divisionLabel }}</button>
+                            <button
+                                type="button"
+                                class="rc-discover-tab-v27"
+                                x-bind:class="{ 'is-active': division === @js($divisionValue) }"
+                                x-on:click="setDivision(@js($divisionValue))"
+                            >{{ $divisionLabel }}</button>
                         @endforeach
                     </div>
 
-                    <select wire:key="discover-conference-filter" class="rc-discover-select-v27" wire:model.live="conferenceFilter" wire:loading.attr="disabled" wire:target="conferenceFilter" aria-label="Conference filter">
-                        <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
-                        @foreach($this->conferences as $conference)
-                            <option value="{{ $conference }}">{{ $conference }}</option>
-                        @endforeach
+                    <select class="rc-discover-select-v27" x-model="conference" aria-label="Conference filter">
+                        <option value="">All Conferences</option>
+                        <template x-for="option in conferenceOptions" :key="option">
+                            <option :value="option" x-text="option"></option>
+                        </template>
                     </select>
                 </div>
 
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
-                        <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection" wire:loading.attr="disabled" wire:target="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
+                        <span><strong x-text="filteredSchools.length.toLocaleString()"></strong> schools</span>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click="toggleVisibleSelection()">
+                            <input type="checkbox" x-bind:checked="allVisibleSelected" readonly tabindex="-1">
+                            <span>Select All (<span x-text="visibleSchools.length.toLocaleString()"></span>)</span>
+                        </button>
                     </div>
 
                     <div class="rc-discover-right-v27">
-                        <div wire:loading.flex wire:target="discoverSchoolSearch,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'grid' }" x-on:click="viewMode = 'grid'" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'list' }" x-on:click="viewMode = 'list'" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
 
-                @if($this->selectedSchoolCount > 0)
-                    <div class="rc-discover-bulk-v36" wire:key="discover-bulk-selection-bar">
-                        <div class="rc-discover-bulk-left-v36">
-                            <span class="rc-discover-bulk-count-v36">{{ number_format($this->selectedSchoolCount) }} {{ \Illuminate\Support\Str::plural('selected', $this->selectedSchoolCount) }}</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" wire:click="emailSelectedSchools" wire:loading.attr="disabled" wire:target="emailSelectedSchools">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                                <span>Email</span>
+                <div class="rc-discover-bulk-v36" x-cloak x-show="selectedSchoolIds.length > 0" x-transition.opacity>
+                    <div class="rc-discover-bulk-left-v36">
+                        <span class="rc-discover-bulk-count-v36"><span x-text="selectedSchoolIds.length.toLocaleString()"></span> selected</span>
+                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click="$wire.emailSelectedSchools()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                            <span>Email</span>
+                        </button>
+                        <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
+                            <button type="button" x-on:click="open = !open">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                <span>Add to List</span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </button>
-                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
-                                <button type="button" x-on:click="open = ! open">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                    <span>Add to List</span>
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                                <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
-                                    @forelse($this->lists as $list)
-                                        @php $listKey = (string) ($list['key'] ?? ''); @endphp
-                                        @if($listKey !== '')
-                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" x-on:click="open = false">
-                                                <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
-                                                <span>+</span>
-                                            </button>
-                                        @endif
-                                    @empty
-                                        <div class="rc-school-list-empty">No lists yet.</div>
-                                    @endforelse
-                                </div>
+                            <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
+                                @forelse($this->lists as $list)
+                                    @php $listKey = (string) ($list['key'] ?? ''); @endphp
+                                    @if($listKey !== '')
+                                        <button type="button" class="rc-discover-bulk-option-v36" x-on:click="open = false; $wire.addSelectedSchoolsToList(@js($listKey))">
+                                            <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
+                                            <span>+</span>
+                                        </button>
+                                    @endif
+                                @empty
+                                    <div class="rc-school-list-empty">No lists yet.</div>
+                                @endforelse
                             </div>
                         </div>
-                        <button type="button" class="rc-discover-bulk-clear-v36" wire:click="clearSelectedSchools">Clear</button>
                     </div>
-                @endif
-
-                @php
-                    // The school-grid partial owns an Alpine copy of the rows. Livewire can
-                    // correctly recompute filteredSchools while Alpine would otherwise keep
-                    // rendering the rows from its first mount. Change only this subtree's key
-                    // whenever the Discover result set/view changes so Alpine receives the
-                    // freshly filtered rows without remounting the rest of Coach Database.
-                    $discoverGridRenderKey = md5(json_encode([
-                        (string) ($discoverSchoolSearch ?? ''),
-                        (string) ($divisionFilter ?? ''),
-                        (string) ($conferenceFilter ?? ''),
-                        (string) ($sort ?? 'name'),
-                        (string) ($schoolViewMode ?? 'grid'),
-                        (int) $discoverSchoolCount,
-                        (int) $discoverShownCount,
-                        (string) ($cachedAt ?? ''),
-                    ]));
-                @endphp
-
-                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="discoverSchoolSearch,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
-                    <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
-                    <div wire:key="discover-school-grid-{{ $discoverGridRenderKey }}">
-                        @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
-                    </div>
+                    <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="clearSelection()">Clear</button>
                 </div>
 
-                @if($this->canLoadMoreSchools)
-                    <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
-                @endif
+                <div x-cloak x-show="filteredSchools.length === 0" class="rc-empty rc-discover-empty">
+                    <strong>No schools found.</strong>
+                    <span>Adjust your search or filters.</span>
+                </div>
+
+                <template x-if="viewMode === 'list' && filteredSchools.length > 0">
+                    <div class="rc-school-list-table rc-discover-school-list">
+                        <div class="rc-school-list-head rc-discover-school-list-head">
+                            <span>School</span><span>Head Coach</span><span>Title</span><span>Email</span><span>Div</span><span></span>
+                        </div>
+                        <template x-for="schoolItem in visibleSchools" :key="`list-${schoolItem.id}`">
+                            <div class="rc-school-list-row rc-discover-school-list-row" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
+                                <button class="rc-school-list-name rc-discover-school-list-school" type="button" x-on:click="openSchool(schoolItem.id)">
+                                    <span class="rc-school-list-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
+                                        <img x-show="schoolItem.logo_url" class="rc-school-list-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-list-logo-box')?.classList.add('is-missing-logo')">
+                                        <span class="rc-logo-fallback-text" x-text="initialsFor(schoolItem.name)"></span>
+                                    </span>
+                                    <span class="rc-discover-school-list-name-copy" x-text="schoolItem.name"></span>
+                                </button>
+                                <span class="rc-discover-list-coach">
+                                    <span x-text="schoolItem.head_coach_name || '—'"></span>
+                                    <span class="rc-head-coach-chip" x-show="String(schoolItem.head_coach_title || '').toLowerCase().includes('head')">HC</span>
+                                </span>
+                                <span class="rc-discover-list-muted" x-text="schoolItem.head_coach_title || 'Coach'"></span>
+                                <span class="rc-discover-list-email">
+                                    <a x-show="schoolItem.head_coach_email" x-bind:href="`mailto:${schoolItem.head_coach_email}`" x-text="schoolItem.head_coach_email"></a>
+                                    <span x-show="!schoolItem.head_coach_email">—</span>
+                                </span>
+                                <span class="rc-discover-list-division" x-text="shortDivision(schoolItem.division)"></span>
+                                <div class="rc-school-list-actions rc-discover-list-actions">
+                                    <button class="rc-discover-row-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
+                                        <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <template x-if="viewMode === 'grid' && filteredSchools.length > 0">
+                    <div class="rc-school-grid rc-discover-school-grid" style="display:grid">
+                        <template x-for="schoolItem in visibleSchools" :key="`grid-${schoolItem.id}`">
+                            <article class="rc-school-card rc-discover-school-card" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
+                                <div class="rc-discover-card-main">
+                                    <button class="rc-discover-card-title" type="button" x-on:click="openSchool(schoolItem.id)">
+                                        <span class="rc-school-card-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
+                                            <img x-show="schoolItem.logo_url" class="rc-school-card-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-card-logo-box')?.classList.add('is-missing-logo')">
+                                            <span class="rc-logo-fallback-text" x-text="initialsFor(schoolItem.name)"></span>
+                                        </span>
+                                        <span class="rc-discover-card-copy">
+                                            <strong x-text="schoolItem.name"></strong>
+                                            <small x-text="schoolItem.conference || 'Conference unavailable'"></small>
+                                        </span>
+                                    </button>
+                                    <button class="rc-discover-card-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
+                                        <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
+                                    </button>
+                                </div>
+                                <div class="rc-discover-card-rule"></div>
+                                <div class="rc-discover-card-footer">
+                                    <span class="rc-discover-division-pill" x-text="schoolItem.division || 'Unlisted'"></span>
+                                    <span class="rc-discover-coach-count" x-text="`${Number(schoolItem.coach_count || 0).toLocaleString()} ${Number(schoolItem.coach_count || 0) === 1 ? 'coach' : 'coaches'}`"></span>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </template>
+
+                <div x-cloak x-show="canLoadMore" style="margin-top:.5rem;text-align:center">
+                    <button class="rc-btn" type="button" x-on:click="limit += 96">Load more</button>
+                </div>
             </div>
         @endif
-
 
         @if($section === 'favorites')
             <style>
