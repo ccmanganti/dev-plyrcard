@@ -12267,6 +12267,9 @@ CSS;
                 .rc-compose-check-v45 { width:1rem; height:1rem; border-radius:.28rem; border:1px solid var(--rc-border); display:grid; place-items:center; flex:0 0 auto; font-size:.68rem; color:white; }
                 .rc-compose-coach-pill-v45.is-selected .rc-compose-check-v45 { background:#ff6338; border-color:#ff6338; }
                 .rc-compose-native-check-v89 { width:1rem; height:1rem; margin:0; flex:0 0 auto; accent-color:#ff6338; pointer-events:none; }
+                .rc-compose-native-check-v95 { width:1rem; height:1rem; flex:0 0 1rem; display:inline-grid; place-items:center; border:1.5px solid #cbd5e1; border-radius:.22rem; background:#fff; color:#fff; transition:background .08s ease,border-color .08s ease; }
+                .rc-compose-native-check-v95.is-checked { background:#ff6338; border-color:#ff6338; }
+                .rc-compose-native-check-v95 svg { width:.72rem; height:.72rem; display:block; }
                 .rc-compose-coach-title-v45 { color:var(--rc-muted); font-size:.68rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .rc-compose-field-row-v45 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.55rem; align-items:center; }
                 .rc-compose-template-wrap-v45 { position:relative; }
@@ -12312,6 +12315,26 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
+                    init() {
+                        const cached = window.__rcComposeRecipientStateV95;
+                        const currentSchoolId = String(this.selectedSchoolId || '');
+                        if (cached && String(cached.schoolId || '') === currentSchoolId) {
+                            this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds] : this.selectedCoachIds;
+                            this.targetMode = String(cached.targetMode || this.targetMode || 'school');
+                            this.headCoachOnly = Boolean(cached.headCoachOnly);
+                            this.chooserOpen = Boolean(cached.chooserOpen);
+                        }
+                        this.rememberRecipientState();
+                    },
+                    rememberRecipientState() {
+                        window.__rcComposeRecipientStateV95 = {
+                            schoolId: String(this.selectedSchoolId || ''),
+                            selectedCoachIds: [...this.selectedCoachIds],
+                            targetMode: String(this.targetMode || 'school'),
+                            headCoachOnly: Boolean(this.headCoachOnly),
+                            chooserOpen: Boolean(this.chooserOpen),
+                        };
+                    },
                     sendingFast: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
@@ -12353,6 +12376,7 @@ CSS;
                         return this.selectedCoachIds.includes(String(id || ''));
                     },
                     syncRecipientStateDeferred() {
+                        this.rememberRecipientState();
                         try {
                             this.$wire.set('campaignSchoolId', String(this.selectedSchoolId || ''), false);
                             this.$wire.set('campaignTargetMode', String(this.targetMode || 'school'), false);
@@ -12453,7 +12477,7 @@ CSS;
                             await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } finally { this.sendingFast = false; }
                     },
-                }">
+                }" x-init="init()">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -12535,7 +12559,7 @@ CSS;
                                         <template x-for="coach in visibleCoaches" :key="coach.id">
                                             <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{ 'is-selected': selectedCoachIds.includes(String(coach.id || '')) }" x-on:click.prevent="toggleCoach(coach.id)">
                                                 <span class="rc-compose-coach-name-v45">
-                                                    <input type="checkbox" class="rc-compose-native-check-v89" x-model="selectedCoachIds" x-bind:value="String(coach.id || '')" tabindex="-1" aria-hidden="true">
+                                                    <span class="rc-compose-native-check-v95" x-bind:class="{ 'is-checked': selectedCoachIds.includes(String(coach.id || '')) }" aria-hidden="true"><svg x-show="selectedCoachIds.includes(String(coach.id || ''))" viewBox="0 0 20 20" fill="none"><path d="m4.5 10 3.3 3.3 7.7-7.7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                                     <span x-text="coach.name"></span>
                                                     <span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>
                                                 </span>
