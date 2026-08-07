@@ -8596,7 +8596,7 @@
                     </div>
 
                     <select class="rc-discover-select-v27" x-model="conference" aria-label="Conference filter">
-                        <option value="">All Conferences</option>
+                        <option value="" x-text="`All Conferences (${conferenceOptions.length.toLocaleString()})`"></option>
                         <template x-for="option in conferenceOptions" :key="option">
                             <option :value="option" x-text="option"></option>
                         </template>
