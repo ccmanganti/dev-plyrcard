@@ -8340,17 +8340,11 @@
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
 
-                /* v73: Discover Schools uses its own program search. Hide the shared
-                   header search here so two inputs never mirror the same Livewire state. */
+                /* v74: Keep the shared/global header search visible on Discover Schools.
+                   The lower program search uses discoverSchoolSearch, so the two inputs
+                   are independent instead of mirroring the same Livewire property. */
                 .rc-discover-v29 .rc-home-header-v2 .rc-home-search-v2 {
-                    display: none !important;
-                }
-                .rc-discover-v29 .rc-home-header-v2 .rc-home-actions-v2 {
-                    grid-template-columns: 2.75rem 2.75rem !important;
-                    grid-template-areas: "refresh dark" !important;
-                    width: auto !important;
-                    max-width: none !important;
-                    justify-self: end !important;
+                    display: flex !important;
                 }
                 .rc-discover-v29 button {
                     transition: transform .1s ease, opacity .12s ease, border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
@@ -8394,8 +8388,8 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="search" autocomplete="off" />
-                    <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="search" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
+                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="discoverSchoolSearch" autocomplete="off" />
+                    <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="discoverSchoolSearch" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
                 </div>
 
                 <div class="rc-discover-filter-v27">
@@ -8420,7 +8414,7 @@
                     </div>
 
                     <div class="rc-discover-right-v27">
-                        <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
+                        <div wire:loading.flex wire:target="discoverSchoolSearch,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
                         <div class="rc-discover-toggle-v27" aria-label="School view">
                             <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
                             <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>

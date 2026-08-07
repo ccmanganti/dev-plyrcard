@@ -62,6 +62,7 @@ trait InteractsWithCoachDatabase
 
     public string $section = 'dashboard';
     public string $search = '';
+    public string $discoverSchoolSearch = '';
     public string $coachSearch = '';
     public string $conversationSearch = '';
     public string $conversationSchoolFilter = '';
@@ -12344,6 +12345,7 @@ HTML;
     public function clearSchoolFilters(): void
     {
         $this->search = '';
+        $this->discoverSchoolSearch = '';
         $this->divisionFilter = '';
         $this->conferenceFilter = '';
         $this->sort = 'name';
@@ -13422,7 +13424,12 @@ HTML;
 
     protected function filteredSchoolsQuery(): Collection
     {
-        $query = $this->normalizeSearchText($this->search);
+        // Discover Schools has its own grid-filter search. The shared header search
+        // remains global and is intentionally independent on every Recruiting Center tab.
+        $searchValue = $this->section === 'schools'
+            ? $this->discoverSchoolSearch
+            : $this->search;
+        $query = $this->normalizeSearchText($searchValue);
         $divisionFilter = trim((string) $this->divisionFilter);
         $conferenceFilter = trim((string) $this->conferenceFilter);
         $sort = (string) $this->sort;
