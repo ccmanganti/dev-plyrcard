@@ -11756,15 +11756,79 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        $selectedSchoolId = trim((string) $this->campaignSchoolId);
+        // Compose must feel instant after the page is loaded. Build one lightweight,
+        // exact school->coach dataset up front from the already memoized school coach
+        // index. No complete GHL payloads/raw contact blobs are exposed to Alpine.
+        $index = $this->schoolCoachSearchIndex();
+
+        $clientCoachesForSchool = function (array $school) use ($index): array {
+            $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
+            $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+            $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
+
+            $keys = [];
+            if ($businessId !== '') {
+                $keys[] = 'business:' . strtolower($businessId);
+            }
+            if ($schoolName !== '') {
+                $keys[] = 'school:' . strtolower($schoolName);
+            }
+            if ($normalizedSchoolName !== '') {
+                $keys[] = 'school_key:' . $normalizedSchoolName;
+            }
+
+            $candidates = [];
+            foreach (array_unique($keys) as $key) {
+                foreach (($index[$key] ?? []) as $coach) {
+                    if (is_array($coach)) {
+                        $candidates[$this->coachTrackingIdentity($coach)] = $coach;
+                    }
+                }
+            }
+
+            if (is_array($school['head_coach'] ?? null)) {
+                $headCoach = $school['head_coach'];
+                $candidates[$this->coachTrackingIdentity($headCoach)] = $headCoach;
+            }
+
+            $rows = collect($candidates)
+                ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
+                    return $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName);
+                })
+                ->map(function (array $coach): array {
+                    $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
+                    $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
+                    $email = trim((string) ($coach['email'] ?? ''));
+                    $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
+
+                    return [
+                        'id' => $coachId,
+                        'name' => $coachName,
+                        'email' => $email,
+                        'title' => $title,
+                        'is_head' => $this->isHeadCoachTitle($title),
+                        'search_text' => strtolower(trim(implode(' ', array_filter([$coachName, $email, $title])))),
+                    ];
+                })
+                ->filter(fn (array $coach): bool => $coach['id'] !== '' && $coach['email'] !== '')
+                ->unique(fn (array $coach): string => strtolower($coach['id'] !== '' ? $coach['id'] : $coach['email']))
+                ->sortBy(function (array $coach): string {
+                    return ($coach['is_head'] ? '0' : '1') . '|' . strtolower($coach['name']);
+                })
+                ->values()
+                ->all();
+
+            return $rows;
+        };
 
         return [
             'schools' => collect($this->composeSchoolOptions)
-                ->map(function (array $school) use ($selectedSchoolId): array {
+                ->map(function (array $school) use ($clientCoachesForSchool): array {
                     $id = trim((string) ($school['id'] ?? $school['business_id'] ?? ''));
                     $name = trim((string) ($school['name'] ?? 'School'));
+                    $coaches = $clientCoachesForSchool($school);
 
-                    $row = [
+                    return [
                         'id' => $id,
                         'name' => $name,
                         'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
@@ -11772,7 +11836,7 @@ HTML;
                         'division' => (string) ($school['division'] ?? ''),
                         'city' => (string) ($school['city'] ?? ''),
                         'state' => (string) ($school['state'] ?? ''),
-                        'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                        'coach_count' => count($coaches),
                         'search_text' => strtolower(trim(implode(' ', array_filter([
                             $name,
                             (string) ($school['conference'] ?? ''),
@@ -11782,41 +11846,8 @@ HTML;
                             (string) data_get($school, 'head_coach.name', ''),
                             (string) data_get($school, 'head_coach.email', ''),
                         ])))),
-                        'coaches' => [],
+                        'coaches' => $coaches,
                     ];
-
-                    // Keep the global payload small: only the currently selected
-                    // school carries coach rows. Search remains instant across every
-                    // school, while exact recipient hydration happens on selection.
-                    if ($selectedSchoolId !== '' && $id === $selectedSchoolId) {
-                        $coaches = $this->composeCoachesForSchool($school, true)
-                            ->map(function (array $coach): array {
-                                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
-                                $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
-                                $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
-
-                                return [
-                                    'id' => $coachId,
-                                    'name' => $coachName,
-                                    'email' => (string) ($coach['email'] ?? ''),
-                                    'title' => $title,
-                                    'is_head' => $this->isHeadCoachTitle($title),
-                                    'search_text' => strtolower(trim(implode(' ', array_filter([
-                                        $coachName,
-                                        (string) ($coach['email'] ?? ''),
-                                        $title,
-                                    ])))),
-                                ];
-                            })
-                            ->filter(fn (array $coach): bool => $coach['id'] !== '')
-                            ->values()
-                            ->all();
-
-                        $row['coaches'] = $coaches;
-                        $row['coach_count'] = count($coaches);
-                    }
-
-                    return $row;
                 })
                 ->filter(fn (array $school): bool => $school['id'] !== '')
                 ->values()
