@@ -12380,6 +12380,20 @@ CSS;
                             const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                             output = output.replace(new RegExp('\\{\\{\\s*' + escaped + '\\s*\\}\\}', 'gi'), String(replacement ?? ''));
                         });
+
+                        // Preview should look like the actual email, not the editor.
+                        // Merge/custom values are highlighted inside the contenteditable
+                        // with rc-merge-token-v48, so unwrap those editor-only spans after
+                        // token replacement and keep only their plain text value.
+                        if (output.includes('rc-merge-token-v48')) {
+                            const template = document.createElement('template');
+                            template.innerHTML = output;
+                            template.content.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+                                node.replaceWith(document.createTextNode(node.textContent || ''));
+                            });
+                            output = template.innerHTML;
+                        }
+
                         return output;
                     },
                     openPreview() {
