@@ -12324,18 +12324,32 @@ CSS;
                     toggleCoach(id) {
                         id = String(id || ''); if (!id) return;
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        this.selectedCoachIds.has(id) ? this.selectedCoachIds.delete(id) : this.selectedCoachIds.add(id);
+
+                        // Replace the Set instead of mutating it in place. Alpine tracks
+                        // the property assignment immediately, so coach pills, checkmarks,
+                        // recipient counts, and send state redraw without waiting for any
+                        // unrelated DOM update.
+                        const next = new Set(this.selectedCoachIds);
+                        next.has(id) ? next.delete(id) : next.add(id);
+                        this.selectedCoachIds = next;
                         this.coachRevision++;
                     },
                     selectAllCoaches() {
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.selectedCoachIds = new Set(
+                            this.schoolCoaches
+                                .map(row => String(row.id || ''))
+                                .filter(Boolean)
+                        );
                         this.coachRevision++;
                     },
-                    clearCoaches() { this.selectedCoachIds.clear(); this.coachRevision++; },
+                    clearCoaches() {
+                        this.selectedCoachIds = new Set();
+                        this.coachRevision++;
+                    },
                     clearRecipients() {
                         this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
-                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
+                        this.selectedCoachIds = new Set(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
                     },
                     async chooseSchool(school) {
                         const id = String(school?.id || ''); if (!id) return;
@@ -12344,7 +12358,7 @@ CSS;
                         // only this school's exact coach roster on the server.
                         this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
                         this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
-                        this.selectedCoachIds.clear(); this.rosterLoading = true; this.coachRevision++;
+                        this.selectedCoachIds = new Set(); this.rosterLoading = true; this.coachRevision++;
 
                         try {
                             const result = await this.$wire.call('selectComposeSchool', id);
@@ -12369,7 +12383,7 @@ CSS;
                                     : row),
                             };
 
-                            this.selectedCoachIds.clear();
+                            this.selectedCoachIds = new Set();
                             this.coachRevision++;
                         } catch (error) {
                             console.error(error);
@@ -12384,7 +12398,13 @@ CSS;
                     chooseSpecificCoaches() {
                         if (!this.selectedSchool) return;
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        if (!this.selectedCoachIds.size) this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        if (!this.selectedCoachIds.size) {
+                            this.selectedCoachIds = new Set(
+                                this.schoolCoaches
+                                    .map(row => String(row.id || ''))
+                                    .filter(Boolean)
+                            );
+                        }
                         this.coachRevision++;
                     },
                     async sendFast() {
