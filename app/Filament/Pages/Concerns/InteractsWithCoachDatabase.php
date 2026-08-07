@@ -7611,9 +7611,23 @@ protected function templateHtmlForNativeEditor(array $template): string
 
     protected function composeCoachesForSchool(array $school, bool $requireEmail = true): Collection
     {
-        $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
-        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
+        $schoolName = trim((string) (
+            $school['name']
+            ?? $school['school']
+            ?? $school['school_name']
+            ?? $school['company_name']
+            ?? ''
+        ));
 
+        $businessId = trim((string) (
+            $school['business_id']
+            ?? $school['company_id']
+            ?? $school['ghl_business_id']
+            ?? $school['id']
+            ?? ''
+        ));
+
+        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
         $embeddedCoaches = collect();
 
         foreach (['coaches', 'staff', 'coaching_staff', 'contacts'] as $field) {
@@ -7629,8 +7643,26 @@ protected function templateHtmlForNativeEditor(array $template): string
         return collect($this->coachesForSchoolSearch($school))
             ->merge($embeddedCoaches)
             ->filter(fn ($coach): bool => is_array($coach))
+            // Final recipient boundary: never allow a cached/embedded coach through
+            // unless its Business ID or exact normalized school/company name matches.
+            // This protects Compose from legacy live snapshots that may contain
+            // coach_ids/coach_emails created by older partial-name matching logic.
+            ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
+                return $this->coachBelongsToSchool(
+                    $coach,
+                    $businessId,
+                    $schoolName,
+                    $normalizedSchoolName
+                );
+            })
             ->map(function (array $coach) use ($schoolName, $businessId): array {
-                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
+                $coachId = trim((string) (
+                    $coach['id']
+                    ?? $coach['contact_id']
+                    ?? $coach['contactId']
+                    ?? $coach['ghl_contact_id']
+                    ?? ''
+                ));
 
                 if ($coachId !== '') {
                     $coach['id'] = $coachId;
@@ -7638,10 +7670,28 @@ protected function templateHtmlForNativeEditor(array $template): string
                     $coach['ghl_contact_id'] = $coach['ghl_contact_id'] ?? $coachId;
                 }
 
-                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $coach['business_name'] ?? $schoolName;
-                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['company_name'] = $coach['company_name'] ?? $coach['business_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
+                // Fill display fallbacks only after membership validation. Otherwise
+                // an unrelated coach with blank affiliation fields could be stamped
+                // with the selected school and incorrectly appear valid.
+                $coach['school'] = $coach['school']
+                    ?? $coach['school_name']
+                    ?? $coach['company_name']
+                    ?? $coach['business_name']
+                    ?? $schoolName;
+
+                $coach['school_name'] = $coach['school_name']
+                    ?? $coach['school']
+                    ?? $schoolName;
+
+                $coach['company_name'] = $coach['company_name']
+                    ?? $coach['business_name']
+                    ?? $coach['school']
+                    ?? $schoolName;
+
+                $coach['business_id'] = $coach['business_id']
+                    ?? $coach['company_id']
+                    ?? $coach['ghl_business_id']
+                    ?? $businessId;
 
                 return $coach;
             })
@@ -13063,31 +13113,42 @@ HTML;
         $allCoaches = collect($this->allCoaches())
             ->filter(fn ($coach): bool => is_array($coach))
             ->values();
+
         $coachesById = $allCoaches
             ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null))
             ->keyBy(fn (array $coach): string => trim((string) ($coach['id'] ?? $coach['contact_id'] ?? '')));
+
         $coachesByEmail = $allCoaches
             ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
             ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
 
         $coaches = [];
 
-        // First use the exact reconciled contact references saved on the school row.
+        $acceptCoach = function ($coach) use (&$coaches, $businessId, $schoolName, $normalizedSchoolName): void {
+            if (! is_array($coach)) {
+                return;
+            }
+
+            if (! $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName)) {
+                return;
+            }
+
+            $coaches[$this->coachTrackingIdentity($coach)] = $coach;
+        };
+
+        // Cached coach_ids / coach_emails are hints only. Production may still have
+        // rows written by an older partial-name matcher, so every referenced coach
+        // must pass the current exact membership check before it is accepted.
         foreach (collect($school['coach_ids'] ?? [])->map(fn ($id): string => trim((string) $id))->filter()->unique() as $coachId) {
-            $coach = $coachesById->get($coachId);
-            if (is_array($coach)) {
-                $coaches[$this->coachTrackingIdentity($coach)] = $coach;
-            }
-        }
-        foreach (collect($school['coach_emails'] ?? [])->map(fn ($email): string => strtolower(trim((string) $email)))->filter()->unique() as $email) {
-            $coach = $coachesByEmail->get($email);
-            if (is_array($coach)) {
-                $coaches[$this->coachTrackingIdentity($coach)] = $coach;
-            }
+            $acceptCoach($coachesById->get($coachId));
         }
 
-        // Then union the live index matches from official Business IDs and contact-side
-        // Business Name / Company Name / School Name values.
+        foreach (collect($school['coach_emails'] ?? [])->map(fn ($email): string => strtolower(trim((string) $email)))->filter()->unique() as $email) {
+            $acceptCoach($coachesByEmail->get($email));
+        }
+
+        // The search index itself uses exact keys, but validate again when consuming
+        // it so stale embedded rows can never become Compose recipients.
         $keys = [];
         if ($businessId !== '') {
             $keys[] = 'business:' . strtolower($businessId);
@@ -13101,16 +13162,13 @@ HTML;
 
         $index = $this->schoolCoachSearchIndex();
         foreach (array_unique($keys) as $key) {
-            foreach (($index[$key] ?? []) as $coachId => $coach) {
-                $coaches[$coachId] = $coach;
+            foreach (($index[$key] ?? []) as $coach) {
+                $acceptCoach($coach);
             }
         }
 
         foreach ($this->dashboardCoachesForSchoolRow($school) as $coach) {
-            if (! is_array($coach)) {
-                continue;
-            }
-            $coaches[$this->coachTrackingIdentity($coach)] = $coach;
+            $acceptCoach($coach);
         }
 
         return array_values($coaches);
