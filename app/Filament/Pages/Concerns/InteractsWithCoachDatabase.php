@@ -9637,11 +9637,13 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     {
         // Lightweight display hydration only. Do not attach the full coach roster
         // to every school card/list option because Livewire serializes the result.
-        $count = max(
-            (int) ($school['coach_count'] ?? 0),
-            (int) ($school['coaches_count'] ?? 0),
-            $this->coachCountForSchoolSearch($school)
-        );
+        // Never let a stale cached aggregate override the reconciled roster.
+        // Older production snapshots may still contain inflated counts from the
+        // legacy partial-name matcher (for example University of Virginia = 19).
+        // coachesForSchoolSearch() now validates every row by authoritative
+        // Business ID or exact normalized school/company name, so its count is
+        // the value Discover Schools should display.
+        $count = $this->coachCountForSchoolSearch($school);
 
         $school['coach_count'] = $count;
         $school['coaches_count'] = $count;
