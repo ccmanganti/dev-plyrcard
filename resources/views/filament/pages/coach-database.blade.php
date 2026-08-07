@@ -7533,7 +7533,7 @@
                                 </div>
                             @endif
                 </div>
-                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
+                <div class="rc-refresh-dropdown-v2" x-data="{ open: false, subject: '', body: '' }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
                     <button
                         type="button"
                         class="rc-home-refresh-v2"
@@ -12335,6 +12335,69 @@ CSS;
                             chooserOpen: Boolean(this.chooserOpen),
                         };
                     },
+                    previewStaticTokens: @js($this->composePreviewTokenValues),
+                    previewSignatureHtml: @js($this->composePreviewSignatureHtml),
+                    previewCoach() {
+                        const coaches = this.schoolCoaches;
+                        if (this.selectedSchool && coaches.length) {
+                            if (this.targetMode === 'coaches') {
+                                const selected = coaches.find(row => this.selectedCoachIds.includes(String(row.id || '')));
+                                if (selected) return selected;
+                            } else if (this.headCoachOnly) {
+                                return coaches.find(row => Boolean(row.is_head)) || coaches[0];
+                            } else {
+                                return coaches[0];
+                            }
+                        }
+                        return {
+                            name: 'Coach Name',
+                            first_name: 'Coach Name',
+                            last_name: '',
+                            title: 'Coach',
+                            email: '',
+                            school: this.selectedSchool?.name || 'School Name',
+                        };
+                    },
+                    previewTokenMap(coach) {
+                        const name = String(coach?.name || 'Coach Name').trim() || 'Coach Name';
+                        const parts = name.split(/\s+/).filter(Boolean);
+                        const firstName = String(coach?.first_name || '').trim() || (name === 'Coach Name' ? 'Coach Name' : (parts[0] || 'Coach Name'));
+                        const lastName = String(coach?.last_name || '').trim() || (name === 'Coach Name' ? '' : (parts.slice(1).join(' ') || ''));
+                        return {
+                            ...this.previewStaticTokens,
+                            CoachName: name,
+                            CoachFirstName: firstName,
+                            CoachLastName: lastName,
+                            CoachTitle: String(coach?.title || 'Coach'),
+                            CoachEmail: String(coach?.email || ''),
+                            SchoolName: String(this.selectedSchool?.name || coach?.school || 'School Name'),
+                        };
+                    },
+                    renderPreviewTokens(value, coach) {
+                        let output = String(value || '');
+                        const values = this.previewTokenMap(coach);
+                        Object.entries(values).forEach(([token, replacement]) => {
+                            const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            output = output.replace(new RegExp('\\{\\{\\s*' + escaped + '\\s*\\}\\}', 'gi'), String(replacement ?? ''));
+                        });
+                        return output;
+                    },
+                    openPreview() {
+                        const coach = this.previewCoach();
+                        const subjectInput = this.$root.querySelector('[data-rc-compose-subject]');
+                        const editor = this.$root.querySelector('[data-plyr-native-editor="campaign-body"]');
+                        const subjectRaw = String(subjectInput?.value || 'Subject preview');
+                        const bodyRaw = String(editor?.innerHTML || '').trim() || 'Choose a template or write your message.';
+                        const subject = this.renderPreviewTokens(subjectRaw, coach);
+                        const body = this.renderPreviewTokens(bodyRaw, coach);
+                        const signature = this.renderPreviewTokens(this.previewSignatureHtml || '', coach);
+                        window.dispatchEvent(new CustomEvent('rc-compose-preview-open', {
+                            detail: {
+                                subject,
+                                body: body + (signature ? '\n' + signature : ''),
+                            },
+                        }));
+                    },
                     sendingFast: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
@@ -12488,7 +12551,7 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" data-rc-local-action x-on:click.prevent.stop="$dispatch('rc-compose-preview-open')">
+                        <button class="rc-btn" type="button" data-rc-local-action x-on:click.prevent.stop="openPreview()">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
@@ -12579,7 +12642,7 @@ CSS;
                             <div>
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
-                                    <input class="rc-input" style="width:100%" placeholder="Subject line" wire:model.live.debounce.500ms="campaignSubject" />
+                                    <input class="rc-input" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model.live.debounce.500ms="campaignSubject" />
                                     <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'' }">
                                         <button class="rc-btn" type="button" x-on:click="open=!open">
                                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
@@ -12734,23 +12797,23 @@ CSS;
 
             @teleport('body')
             <div
-                x-data="{ open: false }"
+                x-data="{ open: false, subject: '', body: '' }"
                 x-cloak
                 x-show="open"
                 x-transition.opacity.duration.100ms
                 class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82"
-                x-on:rc-compose-preview-open.window="open = true"
+                x-on:rc-compose-preview-open.window="subject = String($event.detail?.subject || 'Subject preview'); body = String($event.detail?.body || ''); open = true"
                 x-on:click.self="open = false"
                 x-on:keydown.escape.window="open = false"
             >
                 <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
-                        <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
+                        <div><strong>Preview Email</strong><div class="rc-subtle" x-text="subject"></div></div>
                         <button type="button" class="rc-icon-button" data-rc-local-action x-on:click.prevent.stop="open = false">×</button>
                     </div>
                     <div style="padding:1rem;background:var(--rc-soft)">
                         <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
-                            {!! $this->composeRenderedBody !!}
+                            <div x-html="body"></div>
                         </div>
                     </div>
                 </div>

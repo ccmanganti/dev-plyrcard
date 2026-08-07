@@ -11711,17 +11711,60 @@ HTML;
 
     public function getComposePreviewCoachProperty(): array
     {
-        $coach = $this->campaignRecipientCoaches()->first()
-            ?: collect($this->allCoaches())->first(fn (array $coach): bool => filled($coach['email'] ?? null));
+        $coach = $this->campaignRecipientCoaches()->first();
 
-        return is_array($coach) ? $coach : [
-            'name' => 'Stephens Salas',
-            'first_name' => 'Stephens',
-            'last_name' => 'Salas',
-            'school' => 'Abilene Christian University',
-            'title' => 'Head Coach',
-            'email' => 'stephens.salas@example.com',
+        if (is_array($coach)) {
+            return $coach;
+        }
+
+        $schoolName = trim((string) ($this->composeSelectedSchool['name'] ?? ''));
+
+        return [
+            'name' => 'Coach Name',
+            'first_name' => 'Coach Name',
+            'last_name' => '',
+            'school' => $schoolName !== '' ? $schoolName : 'School Name',
+            'title' => 'Coach',
+            'email' => '',
         ];
+    }
+
+    public function getComposePreviewSignatureHtmlProperty(): string
+    {
+        return $this->replaceCampaignTokens(
+            $this->ensurePlyrcardEmailSignature(''),
+            $this->composePreviewCoach
+        );
+    }
+
+    public function getComposePreviewTokenValuesProperty(): array
+    {
+        $tokens = [
+            'CoachName',
+            'CoachFirstName',
+            'CoachLastName',
+            'CoachTitle',
+            'CoachEmail',
+            'SchoolName',
+            'AthleteName',
+            'GraduationYear',
+            'Position',
+            'ProfileLink',
+            'HighlightLink',
+            'AthleteEmail',
+            'AthletePhone',
+            'InstagramLink',
+            'TwitterLink',
+            'XLink',
+            'YoutubeLink',
+            'YouTubeLink',
+        ];
+
+        return collect($tokens)
+            ->mapWithKeys(fn (string $token): array => [
+                $token => $this->replaceCampaignTokens('{{'.$token.'}}', $this->composePreviewCoach),
+            ])
+            ->all();
     }
 
     public function getComposeRenderedSubjectProperty(): string
