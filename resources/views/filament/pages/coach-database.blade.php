@@ -6768,24 +6768,17 @@
                     'showNewEmail' => true,
                 ])
 
-                {{-- Keep background reloads silent whenever any existing school data is already usable. --}}
+                {{-- Show the first-load sync banner only when no usable Coach Database exists yet. --}}
                 @php
-                    $existingSchoolCountForSyncBanner = max(
-                        collect($this->filteredSchools ?? [])->count(),
-                        collect($dashboardTopSchools ?? [])->count(),
-                        (int) ($this->filteredSchoolsCount ?? 0),
-                        (int) ($dashboardMetrics['engaged_schools'] ?? 0),
-                    );
-
-                    $hasExistingCoachDatabase = $existingSchoolCountForSyncBanner > 0
-                        || filled($cachedAt)
-                        || (int) ($loadedSchoolsCount ?? 0) > 0
-                        || (int) ($loadedContactsCount ?? 0) > 0;
-
-                    $shouldShowDashboardSyncStatus = ($isLoadingDataset || $isRecruitingSyncRunning)
-                        && ! $hasExistingCoachDatabase;
+                    $shouldShowInitialSyncBanner =
+                        ($isLoadingDataset || $isRecruitingSyncRunning)
+                        && empty($this->filteredSchools ?? [])
+                        && (int) ($this->filteredSchoolsCount ?? 0) === 0
+                        && (int) ($loadedSchoolsCount ?? 0) === 0
+                        && blank($cachedAt ?? null);
                 @endphp
-                @if($shouldShowDashboardSyncStatus)
+
+                @if($shouldShowInitialSyncBanner)
                     @php
                         $reloadPercent = $isLoadingDataset
                             ? max(5, min(98, (int) ($remoteTotalSchools ? round(($loadedSchoolsCount / max(1, $remoteTotalSchools)) * 100) : min(96, max(1, $loadedPages) * 8))))
