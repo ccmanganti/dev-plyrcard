@@ -12313,7 +12313,6 @@ CSS;
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
                     sendingFast: false,
-                    previewOpen: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
                         const q = String(this.schoolQuery || '').trim().toLowerCase();
@@ -12465,7 +12464,7 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" data-rc-local-action x-on:click.prevent.stop="previewOpen = true">
+                        <button class="rc-btn" type="button" data-rc-local-action x-on:click.prevent.stop="$dispatch('rc-compose-preview-open')">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
@@ -12711,17 +12710,19 @@ CSS;
 
             @teleport('body')
             <div
+                x-data="{ open: false }"
                 x-cloak
-                x-show="previewOpen"
+                x-show="open"
                 x-transition.opacity.duration.100ms
                 class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82"
-                x-on:click.self="previewOpen = false"
-                x-on:keydown.escape.window="previewOpen = false"
+                x-on:rc-compose-preview-open.window="open = true"
+                x-on:click.self="open = false"
+                x-on:keydown.escape.window="open = false"
             >
                 <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
                         <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
-                        <button type="button" class="rc-icon-button" data-rc-local-action x-on:click.prevent.stop="previewOpen = false">×</button>
+                        <button type="button" class="rc-icon-button" data-rc-local-action x-on:click.prevent.stop="open = false">×</button>
                     </div>
                     <div style="padding:1rem;background:var(--rc-soft)">
                         <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
