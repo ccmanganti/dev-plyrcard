@@ -9322,7 +9322,7 @@
                                         data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
                                         x-on:input="queueSync()"
                                         x-on:blur="syncNow()"
-                                    ></div>
+                                    >{!! $campaignBody ?? '' !!}</div>
                                     <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model.live.debounce.800ms="campaignBody" />
                                     <div class="rc-compose-editor-foot-v45">
                                         <div class="rc-compose-icon-row-v45">
@@ -9973,8 +9973,7 @@
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
-                const iconReplacement = socialIcon(item);
-                const replacement = iconReplacement || ('<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>');
+                const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
                     source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
@@ -9998,6 +9997,7 @@
                 panelLinkUrl: '',
                 panelButtonLabel: '',
                 panelButtonUrl: '',
+                composeRefreshHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -10006,13 +10006,37 @@
                         setTimeout(() => this.bootEditor(true), 80);
                         setTimeout(() => this.bootEditor(true), 250);
                     });
-                    window.addEventListener('rc-compose-editor-refresh', (event) => {
-                        if (modelName !== 'campaignBody' || !this.$refs.editor) return;
-                        const encoded = event.detail?.body || '';
-                        const html = this.decodeInitialBody(encoded);
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
-                        this.syncNow();
-                    });
+                    if (modelName === 'campaignBody') {
+                        if (window.__plyrComposeEditorRefreshHandler) {
+                            window.removeEventListener('rc-compose-editor-refresh', window.__plyrComposeEditorRefreshHandler);
+                        }
+
+                        this.composeRefreshHandler = (event) => {
+                            const editor = this.$refs.editor;
+                            if (!editor || !editor.isConnected) return;
+
+                            const encoded = event.detail?.body || '';
+                            const html = this.decodeInitialBody(encoded);
+
+                            editor.dataset.initialBody = encoded;
+                            editor.innerHTML = this.highlightMergeTokens(html || '');
+
+                            // The body already came from Livewire/PHP. Do not immediately
+                            // sync it back to the server here: stale editor instances can
+                            // otherwise overwrite the newly selected template with blank HTML.
+                        };
+
+                        window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
+                        window.addEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
+                    }
+                },
+                destroy() {
+                    if (this.composeRefreshHandler) {
+                        window.removeEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
+                        if (window.__plyrComposeEditorRefreshHandler === this.composeRefreshHandler) {
+                            window.__plyrComposeEditorRefreshHandler = null;
+                        }
+                    }
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;

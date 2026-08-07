@@ -1,5 +1,714 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root">
+    <div class="rc-livewire-root" wire:init="bootDeferredUiData">
+        @include('filament.partials.coach-database-ui-shell')
+
+        @if(($section ?? '') === 'schools')
+            <div
+                wire:loading.flex
+                wire:target="selectSchoolById"
+                class="rc-discover-wire-school-loader"
+                aria-live="polite"
+                aria-label="Opening school profile"
+            >
+                <section class="rc-discover-wire-school-loader-panel" role="dialog" aria-modal="true">
+                    <header class="rc-discover-wire-school-loader-head">
+                        <div>
+                            <strong>Opening school profile</strong>
+                            <span>Loading local school data...</span>
+                        </div>
+                        <span class="rc-discover-wire-school-spinner" aria-hidden="true"></span>
+                    </header>
+
+                    <div class="rc-discover-wire-school-loader-body">
+                        <span class="rc-discover-wire-school-hero"></span>
+                        <span class="rc-discover-wire-school-grid">
+                            <span></span>
+                            <span></span>
+                        </span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                    </div>
+                </section>
+            </div>
+        @endif
+
+    <script>
+        /*
+         * Discover Schools Alpine bootstrap.
+         *
+         * This runs before Alpine parses the school markup, so production asset
+         * timing, CDN caching, or deferred JavaScript can never leave x-data with
+         * an incomplete fallback object.
+         */
+        (() => {
+            const stores = window.__rcDiscoverSelectionStores || new Map();
+            window.__rcDiscoverSelectionStores = stores;
+
+            const key = () => window.location.pathname;
+            const getStore = () => stores.get(key()) || null;
+
+            const announce = (store) => {
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-changed', {
+                    detail: {
+                        selected: Array.from(store?.selected || []),
+                        count: store?.selected?.size || 0,
+                        allFilteredSelected: Boolean(store?.allFilteredSelected),
+                        version: Number(store?.version || 0),
+                    },
+                }));
+
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: Number(store?.version || 0) },
+                }));
+            };
+
+            const toast = (message, type = 'error') => {
+                const text = String(message || '').trim();
+                if (!text) return;
+
+                const root = document.querySelector('.rc-livewire-root');
+                const owner = root?.closest('[wire\\:id]');
+                const id = owner?.getAttribute('wire:id');
+                const instance = id && window.Livewire?.find ? window.Livewire.find(id) : null;
+
+                if (instance?.call) {
+                    instance.call(
+                        'notifyRecruitingUi',
+                        text,
+                        type === 'error' ? 'danger' : type
+                    ).catch(() => {});
+                } else {
+                    console[type === 'error' ? 'error' : 'log'](text);
+                }
+            };
+
+            if (typeof window.rcDiscoverSelection !== 'function') {
+                window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false, initialFilteredIds = []) => {
+                    let store = stores.get(key());
+
+                    if (!store) {
+                        store = {
+                            selected: new Set((initialIds || []).map((id) => String(id))),
+                            allFilteredSelected: Boolean(initialAllFilteredSelected),
+                            dirty: false,
+                            inFlight: false,
+                            needsFlush: false,
+                            timer: null,
+                            version: 0,
+                            filteredIds: new Set((initialFilteredIds || []).map((id) => String(id))),
+                        };
+                        stores.set(key(), store);
+                    }
+
+                    store.filteredIds = new Set((initialFilteredIds || []).map((id) => String(id)));
+                    store.allFilteredSelected = store.filteredIds.size > 0
+                        && Array.from(store.filteredIds).every((id) => store.selected.has(id));
+
+                    return {
+                        revision: Number(store.version || 0),
+                        allFilteredSelected: Boolean(store.allFilteredSelected),
+                        selectionListener: null,
+
+                        init() {
+                            this.revision = Number(store.version || 0);
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+
+                            this.selectionListener = (event) => {
+                                this.revision = Number(
+                                    event?.detail?.version
+                                    ?? store.version
+                                    ?? (this.revision + 1)
+                                );
+                                this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            };
+
+                            window.addEventListener(
+                                'rc-discover-selection-refresh',
+                                this.selectionListener
+                            );
+
+                            this.$cleanup?.(() => {
+                                window.removeEventListener(
+                                    'rc-discover-selection-refresh',
+                                    this.selectionListener
+                                );
+                            });
+                        },
+
+                        count() {
+                            this.revision;
+                            return store.selected.size;
+                        },
+
+                        selectedIds() {
+                            this.revision;
+                            return Array.from(store.selected);
+                        },
+
+                        isSelected(id) {
+                            this.revision;
+                            return store.selected.has(String(id));
+                        },
+
+                        updateLocal(ids, allSelected = null) {
+                            store.selected = new Set((ids || []).map((id) => String(id)));
+
+                            if (allSelected !== null) {
+                                store.allFilteredSelected = Boolean(allSelected);
+                            }
+
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            announce(store);
+                        },
+
+                        toggle(id) {
+                            const normalized = String(id || '');
+                            if (!normalized) return;
+
+                            if (store.selected.has(normalized)) {
+                                store.selected.delete(normalized);
+                            } else {
+                                store.selected.add(normalized);
+                            }
+
+                            store.allFilteredSelected = false;
+                            store.dirty = true;
+                            store.needsFlush = true;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = false;
+                            announce(store);
+
+                            // Keep checkbox interactions entirely client-side.
+                            // Selection is sent only for Add to List or Email.
+                        },
+
+                        async flush() {
+                            // Selection is intentionally browser-local for speed.
+                            return true;
+                        },
+
+                        toggleAllFiltered() {
+                            const ids = Array.from(store.filteredIds || []);
+                            if (!ids.length) return;
+
+                            const allSelected = ids.every((id) => store.selected.has(id));
+
+                            if (allSelected) {
+                                ids.forEach((id) => store.selected.delete(id));
+                            } else {
+                                ids.forEach((id) => store.selected.add(id));
+                            }
+
+                            store.allFilteredSelected = !allSelected;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = store.allFilteredSelected;
+                            announce(store);
+                        },
+
+                        async clearAll() {
+                            this.updateLocal([], false);
+                            store.dirty = false;
+                            store.needsFlush = false;
+                        },
+
+                        async emailSelected() {
+                            await this.flush();
+
+                            try {
+                                await this.$wire.call(
+                                'emailSchoolIds',
+                                Array.from(store.selected)
+                            );
+                            } catch (error) {
+                                console.error(error);
+                                toast(
+                                    'Unable to open Compose Email for the selected schools.'
+                                );
+                            }
+                        },
+                    };
+                };
+            }
+
+            window.__rcDiscoverClientCacheVersion = '2026-07-15.7-grid-view-restored';
+            window.rcDiscoverClientCache = (initialSchools = [], initialLists = [], initialView = 'grid') => ({
+                schools: [],
+                lists: Array.isArray(initialLists) ? initialLists : [],
+                search: '',
+                division: '',
+                conference: '',
+                viewMode: initialView === 'list' ? 'list' : 'grid',
+                limit: 48,
+                selected: new Set(),
+                listMenuOpen: false,
+                creating: false,
+                newListName: '',
+                newListColor: '#ff6338',
+                pendingListKey: '',
+                revision: 0,
+
+                init() {
+                    const rows = Array.isArray(initialSchools) ? initialSchools : [];
+                    this.schools = rows.map((row) => ({
+                        ...row,
+                        id: String(row?.id || row?.business_id || ''),
+                        business_id: String(row?.business_id || row?.id || ''),
+                        name: String(row?.name || 'Unnamed School'),
+                        division: String(row?.division || ''),
+                        conference: String(row?.conference || ''),
+                        logo_url: String(row?.logo_url || ''),
+                        coach_count: Number(row?.coach_count || 0),
+                        head_coach_name: String(row?.head_coach_name || '—'),
+                        head_coach_title: String(row?.head_coach_title || 'Coach'),
+                        head_coach_email: String(row?.head_coach_email || ''),
+                        search_text: String(row?.search_text || '').toLowerCase(),
+                    })).filter((row) => row.id !== '');
+
+                    try {
+                        sessionStorage.setItem('rcDiscoverSchools:' + window.location.pathname, JSON.stringify({
+                            cachedAt: @js($cachedAt ?? null),
+                            rows: this.schools,
+                        }));
+                    } catch (_) {}
+                },
+
+                get divisionTabs() {
+                    return ['', 'NCAA D-I', 'NCAA D-II', 'NCAA D-III', 'NAIA', 'NJCAA'];
+                },
+
+                normalize(value) {
+                    return String(value || '').trim().toLowerCase();
+                },
+
+                divisionMatches(value, filter) {
+                    if (!filter) return true;
+                    const current = this.normalize(value).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
+                    const wanted = this.normalize(filter).replace(/division/g, '').replace(/ncaa/g, '').replace(/[^a-z0-9]+/g, '');
+                    return current === wanted || current.includes(wanted) || wanted.includes(current);
+                },
+
+                get conferenceOptions() {
+                    return [...new Set(this.schools
+                        .filter((row) => this.divisionMatches(row.division, this.division))
+                        .map((row) => row.conference)
+                        .filter(Boolean))]
+                        .sort((a, b) => a.localeCompare(b));
+                },
+
+                initialsFor(name) {
+                    return String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'S';
+                },
+                shortDivision(value) {
+                    const division = String(value || '').trim();
+                    if (!division) return '—';
+                    return division.replace('NCAA Division ', 'D').replace('NCAA D-', 'D').replace('Division ', 'D');
+                },
+                get filteredSchools() {
+                    const query = this.normalize(this.search);
+                    const conference = this.normalize(this.conference);
+                    return this.schools.filter((row) => {
+                        if (!this.divisionMatches(row.division, this.division)) return false;
+                        if (conference && this.normalize(row.conference) !== conference) return false;
+                        if (query && !row.search_text.includes(query)) return false;
+                        return true;
+                    });
+                },
+
+                get visibleSchools() {
+                    return this.filteredSchools.slice(0, this.limit);
+                },
+
+                get canLoadMore() {
+                    return this.limit < this.filteredSchools.length;
+                },
+
+                get selectedCount() {
+                    this.revision;
+                    return this.selected.size;
+                },
+
+                get allFilteredSelected() {
+                    this.revision;
+                    const rows = this.filteredSchools;
+                    return rows.length > 0 && rows.every((row) => this.selected.has(row.id));
+                },
+
+                setDivision(value) {
+                    this.division = this.division === value ? '' : value;
+                    this.conference = '';
+                    this.limit = 48;
+                },
+
+                setConference(value) {
+                    this.conference = value;
+                    this.limit = 48;
+                },
+
+                setViewMode(mode) {
+                    this.viewMode = mode === 'list' ? 'list' : 'grid';
+                    this.limit = Math.max(48, Number(this.limit || 48));
+                },
+
+                setSearch(value) {
+                    this.search = value;
+                    this.limit = 48;
+                },
+
+                toggleSchool(id) {
+                    id = String(id || '');
+                    if (!id) return;
+                    if (this.selected.has(id)) this.selected.delete(id);
+                    else this.selected.add(id);
+                    this.revision++;
+                },
+
+                isSelected(id) {
+                    this.revision;
+                    return this.selected.has(String(id || ''));
+                },
+
+                toggleAllFiltered() {
+                    const rows = this.filteredSchools;
+                    if (!rows.length) return;
+                    const remove = rows.every((row) => this.selected.has(row.id));
+                    rows.forEach((row) => remove ? this.selected.delete(row.id) : this.selected.add(row.id));
+                    this.revision++;
+                },
+
+                clearSelection() {
+                    this.selected.clear();
+                    this.revision++;
+                    this.listMenuOpen = false;
+                },
+
+                loadMore() {
+                    this.limit += 48;
+                },
+
+                openSchool(id) {
+                    const schoolId = String(id || '');
+
+                    if (!schoolId) return;
+
+                    // Let Livewire control the temporary loader through wire:loading.
+                    // This avoids the old blink where a JS-created ghost drawer closed
+                    // before the real school drawer finished morphing in.
+                    this.$wire.call('selectSchoolById', schoolId)
+                        .catch((error) => {
+                            console.error(error);
+                            toast('Unable to open this school.');
+                        });
+                },
+
+                async emailSelected() {
+                    if (!this.selected.size) return;
+                    try {
+                        await this.$wire.call('emailSchoolIds', Array.from(this.selected));
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to open Compose Email for the selected schools.');
+                    }
+                },
+
+                isPending(key) {
+                    return this.pendingListKey === String(key || '');
+                },
+
+                async addToList(listKey, listLabel) {
+                    if (!this.selected.size || this.pendingListKey) return;
+                    const ids = Array.from(this.selected);
+                    this.pendingListKey = String(listKey || '');
+                    try {
+                        const result = await this.$wire.call('queueSchoolIdsToList', ids, this.pendingListKey);
+                        if (!result || result.success === false) {
+                            toast(result?.error || 'Unable to save the selected schools.');
+                            return;
+                        }
+                        const row = this.lists.find((item) => String(item?.key || '') === this.pendingListKey);
+                        if (row) row.count = Number(row.count || 0) + Number(result.updated_schools || ids.length);
+                        this.clearSelection();
+                        toast(result.message || `${ids.length.toLocaleString()} school(s) added to ${listLabel}.`, 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to save the selected schools.');
+                    } finally {
+                        this.pendingListKey = '';
+                    }
+                },
+
+                async createQuickList() {
+                    const name = String(this.newListName || '').trim();
+                    if (!name || this.creating) return;
+                    this.creating = true;
+                    try {
+                        const result = await this.$wire.call('createCustomListQuick', name, this.newListColor);
+                        if (!result || result.success === false || !result.list) {
+                            toast(result?.error || 'Unable to create the list.');
+                            return;
+                        }
+                        this.lists.push({
+                            ...result.list,
+                            count: Number(result.list?.count || result.list?.schools_count || 0),
+                        });
+                        this.newListName = '';
+                        toast(result.message || 'List created.', 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to create the list.');
+                    } finally {
+                        this.creating = false;
+                    }
+                },
+            });
+
+            window.__rcLocalListControllerVersion = '2026-07-15.4-responsive';
+            window.rcBulkSchoolListLocalV2 = (initialLists = []) => ({
+                    open: false,
+                    creating: false,
+                    newListName: '',
+                    newListColor: '#ff6338',
+                    lists: Array.isArray(initialLists) ? [...initialLists] : [],
+                    pendingLists: {},
+                    pendingAdds: {},
+                    statusText: '',
+                    watchTimer: null,
+                    watching: false,
+                    selectedCount: getStore()?.selected?.size || 0,
+                    selectionListener: null,
+
+                    init() {
+                        this.selectedCount = getStore()?.selected?.size || 0;
+
+                        this.selectionListener = (event) => {
+                            this.selectedCount = Number(
+                                event?.detail?.count
+                                ?? getStore()?.selected?.size
+                                ?? 0
+                            );
+                        };
+
+                        window.addEventListener(
+                            'rc-discover-selection-changed',
+                            this.selectionListener
+                        );
+
+                        this.$cleanup?.(() => {
+                            window.removeEventListener(
+                                'rc-discover-selection-changed',
+                                this.selectionListener
+                            );
+                        });
+                    },
+
+                    count() {
+                        return Number(this.selectedCount || 0);
+                    },
+
+                    isPending(listKey) {
+                        return Boolean(this.pendingLists[String(listKey || '')]);
+                    },
+
+                    pendingCount() {
+                        return Object.keys(this.pendingLists).length;
+                    },
+
+                    async syncSelection() {
+                        const store = getStore();
+                        if (!store) return true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'setSelectedSchoolIds',
+                                Array.from(store.selected)
+                            );
+                            return Boolean(result?.success !== false);
+                        } catch (error) {
+                            console.error(error);
+                            return false;
+                        }
+                    },
+
+                    async clearAll() {
+                        const store = getStore();
+
+                        if (store) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
+
+                        this.selectedCount = 0;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'clearSelectedSchools'
+                            );
+
+                            if (!result || result.success === false) {
+                                toast(
+                                    result?.error
+                                    || 'Unable to clear selected schools.'
+                                );
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to clear selected schools.');
+                        }
+                    },
+
+                    async createQuickList() {
+                        const name = String(this.newListName || '').trim();
+                        if (!name || this.creating) return;
+
+                        this.creating = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'createCustomListQuick',
+                                name,
+                                this.newListColor
+                            );
+
+                            if (!result || result.success === false || !result.list) {
+                                toast(result?.error || 'Unable to create the list.');
+                                return;
+                            }
+
+                            const created = {
+                                ...result.list,
+                                count: Number(
+                                    result.list?.count
+                                    ?? result.list?.schools_count
+                                    ?? 0
+                                ),
+                            };
+
+                            if (!this.lists.some(
+                                (list) => String(list?.key || '')
+                                    === String(created.key || '')
+                            )) {
+                                this.lists.push(created);
+                            }
+
+                            this.newListName = '';
+                            this.newListColor = '#ff6338';
+                            toast(result.message || 'List created.', 'success');
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to create the list.');
+                        } finally {
+                            this.creating = false;
+                        }
+                    },
+
+                    async queue(listKey, listLabel, selectedCount) {
+                        const listKeyValue = String(listKey || '').trim();
+                        if (!listKeyValue) return;
+
+                        const actualCount = getStore()?.selected?.size
+                            || Number(selectedCount || 0);
+                        const label = String(listLabel || listKeyValue);
+
+                        this.pendingLists = {
+                            ...this.pendingLists,
+                            [listKeyValue]: label,
+                        };
+                        this.pendingAdds = {
+                            ...this.pendingAdds,
+                            [listKeyValue]: Number(actualCount || 0),
+                        };
+                        this.statusText = `Saving ${Number(actualCount).toLocaleString()} selected school(s) to ${label}...`;
+                        this.open = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'queueSchoolIdsToList',
+                                Array.from(getStore()?.selected || []),
+                                listKeyValue
+                            );
+
+                            if (!result || result.success === false) {
+                                const nextPending = { ...this.pendingLists };
+                                const nextAdds = { ...this.pendingAdds };
+                                delete nextPending[listKeyValue];
+                                delete nextAdds[listKeyValue];
+                                this.pendingLists = nextPending;
+                                this.pendingAdds = nextAdds;
+                                this.statusText = this.pendingCount()
+                                    ? this.statusText
+                                    : '';
+                                toast(
+                                    result?.error
+                                    || 'Unable to queue the selected schools.'
+                                );
+                                return;
+                            }
+
+                            const savedCount = Number(
+                                result.updated_schools
+                                || result.school_count
+                                || actualCount
+                                || 0
+                            );
+
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+
+                            const listRow = this.lists.find(
+                                (item) => String(item?.key || '') === listKeyValue
+                            );
+                            if (listRow) {
+                                listRow.count = Number(listRow.count || 0) + savedCount;
+                            }
+
+                            this.open = false;
+                            this.clearSelectionLocally();
+
+                            toast(
+                                result.message
+                                || `${savedCount.toLocaleString()} school(s) added to ${result.list_label || label}.`,
+                                'success'
+                            );
+                        } catch (error) {
+                            console.error(error);
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+                            toast('Unable to queue the selected schools.');
+                        }
+                    },
+
+                    clearSelectionLocally() {
+                        const store = getStore();
+                        if (store?.selected instanceof Set) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
+
+                        this.$dispatch('rc-discover-selection-cleared');
+                    },
+
+                });
+        })();
+    </script>
+
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -17,6 +726,93 @@
             --rc-surface: rgb(24 24 27);
             --rc-soft: rgb(39 39 42);
             --rc-text: rgb(244 244 245);
+        }
+
+
+        .rc-discover-wire-school-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 100900;
+            justify-content: flex-end;
+            background: rgba(15, 23, 42, .28);
+            backdrop-filter: blur(2px);
+        }
+
+        .rc-discover-wire-school-loader-panel {
+            width: min(560px, 100%);
+            height: 100%;
+            overflow: auto;
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            box-shadow: -20px 0 40px rgba(15, 23, 42, .16);
+            padding: .95rem;
+            display: grid;
+            align-content: start;
+            gap: .85rem;
+        }
+
+        .rc-discover-wire-school-loader-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding-bottom: .85rem;
+            border-bottom: 1px solid var(--rc-border);
+        }
+
+        .rc-discover-wire-school-loader-head strong {
+            display: block;
+            font-size: .98rem;
+            line-height: 1.2;
+        }
+
+        .rc-discover-wire-school-loader-head span {
+            display: block;
+            margin-top: .22rem;
+            color: var(--rc-muted);
+            font-size: .78rem;
+        }
+
+        .rc-discover-wire-school-spinner {
+            width: 1.05rem;
+            height: 1.05rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 999px;
+            color: var(--rc-accent);
+            animation: rcSpin .7s linear infinite;
+            flex: 0 0 auto;
+        }
+
+        .rc-discover-wire-school-loader-body {
+            display: grid;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-hero,
+        .rc-discover-wire-school-grid > span,
+        .rc-discover-wire-school-line {
+            display: block;
+            border-radius: .85rem;
+            background: linear-gradient(90deg, rgba(148,163,184,.14), rgba(148,163,184,.28), rgba(148,163,184,.14));
+            background-size: 220% 100%;
+            animation: rcDiscoverWireSchoolPulse 1.05s ease-in-out infinite;
+        }
+
+        .rc-discover-wire-school-hero { height: 7.5rem; }
+
+        .rc-discover-wire-school-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-grid > span { height: 4.75rem; }
+        .rc-discover-wire-school-line { height: 2.75rem; }
+
+        @keyframes rcDiscoverWireSchoolPulse {
+            0% { background-position: 120% 0; }
+            100% { background-position: -120% 0; }
         }
 
         [x-cloak] { display: none !important; }
@@ -482,6 +1278,215 @@
             height: 100%;
             background: var(--rc-accent);
             transition: width .35s ease;
+        }
+
+
+        .rc-sync-monitor {
+            --rc-sync-tone: #2563eb;
+            --rc-sync-soft: rgba(37, 99, 235, .10);
+            position: relative;
+            display: grid;
+            gap: .8rem;
+            margin-bottom: 1rem;
+            padding: 1rem 1.05rem;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--rc-sync-tone) 24%, var(--rc-border));
+            border-radius: 1rem;
+            background: color-mix(in srgb, var(--rc-sync-soft) 42%, var(--rc-card));
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+        }
+
+        .rc-sync-monitor--success { --rc-sync-tone: #059669; --rc-sync-soft: rgba(5, 150, 105, .10); }
+        .rc-sync-monitor--warning { --rc-sync-tone: #d97706; --rc-sync-soft: rgba(217, 119, 6, .10); }
+        .rc-sync-monitor--danger { --rc-sync-tone: #dc2626; --rc-sync-soft: rgba(220, 38, 38, .10); }
+        .rc-sync-monitor--neutral { --rc-sync-tone: #64748b; --rc-sync-soft: rgba(100, 116, 139, .10); }
+
+        .rc-sync-monitor__head {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: .8rem;
+            align-items: start;
+        }
+
+        .rc-sync-monitor__signal {
+            position: relative;
+            width: 2.35rem;
+            height: 2.35rem;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            border-radius: .75rem;
+            color: var(--rc-sync-tone);
+            background: var(--rc-sync-soft);
+        }
+
+        .rc-sync-monitor__signal::before {
+            content: '';
+            width: .65rem;
+            height: .65rem;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 28%, transparent);
+            animation: rcSyncHeartbeat 1.65s ease-out infinite;
+        }
+
+        .rc-sync-monitor--danger .rc-sync-monitor__signal::before {
+            animation: none;
+        }
+
+        .rc-sync-monitor__title-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .55rem;
+            margin-bottom: .2rem;
+        }
+
+        .rc-sync-monitor__title {
+            color: var(--rc-text);
+            font-size: .92rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .rc-sync-monitor__badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.45rem;
+            padding: .2rem .5rem;
+            border-radius: 999px;
+            background: var(--rc-sync-soft);
+            color: var(--rc-sync-tone);
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .01em;
+        }
+
+        .rc-sync-monitor__stage {
+            color: var(--rc-text);
+            font-size: .8rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__message {
+            margin-top: .15rem;
+            color: var(--rc-muted);
+            font-size: .75rem;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__percent {
+            min-width: 3.25rem;
+            color: var(--rc-sync-tone);
+            font-size: 1rem;
+            font-weight: 850;
+            text-align: right;
+        }
+
+        .rc-sync-monitor__bar {
+            position: relative;
+            height: .55rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--rc-sync-tone) 10%, var(--rc-soft));
+        }
+
+        .rc-sync-monitor__bar > span {
+            position: relative;
+            display: block;
+            height: 100%;
+            min-width: .5rem;
+            border-radius: inherit;
+            background: var(--rc-sync-tone);
+            transition: width .3s ease;
+        }
+
+        .rc-sync-monitor__bar.is-indeterminate > span {
+            width: 38% !important;
+            min-width: 6rem;
+            animation: rcSyncIndeterminate 1.2s ease-in-out infinite;
+        }
+
+        .rc-sync-monitor__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+        }
+
+        .rc-sync-monitor__meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            min-height: 1.75rem;
+            padding: .28rem .55rem;
+            border: 1px solid color-mix(in srgb, var(--rc-border) 85%, transparent);
+            border-radius: .55rem;
+            background: color-mix(in srgb, var(--rc-card) 80%, transparent);
+            color: var(--rc-muted);
+            font-size: .7rem;
+            font-weight: 650;
+        }
+
+        .rc-sync-monitor__meta-item strong {
+            color: var(--rc-text);
+            font-weight: 800;
+        }
+
+        .rc-sync-monitor__hint {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .65rem .75rem;
+            border-radius: .7rem;
+            background: var(--rc-sync-soft);
+            color: color-mix(in srgb, var(--rc-sync-tone) 82%, var(--rc-text));
+            font-size: .73rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__action {
+            flex: 0 0 auto;
+            border: 1px solid currentColor;
+            border-radius: .5rem;
+            background: transparent;
+            padding: .32rem .55rem;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        @keyframes rcSyncHeartbeat {
+            0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 30%, transparent); }
+            70%, 100% { box-shadow: 0 0 0 .65rem transparent; }
+        }
+
+        @keyframes rcSyncIndeterminate {
+            0% { transform: translateX(-115%); }
+            55% { transform: translateX(110%); }
+            100% { transform: translateX(285%); }
+        }
+
+        @media (max-width: 700px) {
+            .rc-sync-monitor__head {
+                grid-template-columns: auto minmax(0, 1fr);
+            }
+            .rc-sync-monitor__percent {
+                grid-column: 2;
+                text-align: left;
+            }
+            .rc-sync-monitor__hint {
+                flex-direction: column;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-sync-monitor__signal::before,
+            .rc-sync-monitor__bar.is-indeterminate > span {
+                animation: none;
+            }
         }
 
         .rc-pulse {
@@ -3284,10 +4289,17 @@
         }
 
         .rc-home-activity-v2 {
+            width: 100%;
             display: grid;
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
             gap: .6rem;
             align-items: center;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
             text-decoration: none;
             color: inherit;
         }
@@ -3903,6 +4915,31 @@
             color: #475569;
         }
 
+
+        .rc-engagement-filter-card {
+            width:100%;
+            border:1px solid transparent;
+            text-align:left;
+            cursor:pointer;
+            font:inherit;
+            position:relative;
+            transition:border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+        .rc-engagement-filter-card:hover { transform:translateY(-1px); }
+        .rc-engagement-filter-card.is-filter-active {
+            border-color:#ff6338 !important;
+            box-shadow:0 0 0 2px rgba(255,99,56,.08), 0 12px 30px rgba(15,23,42,.08);
+        }
+        .rc-engagement-filter-note {
+            grid-column:1 / -1;
+            width:100%;
+            margin-top:.65rem;
+            padding-top:.65rem;
+            border-top:1px solid rgba(148,163,184,.18);
+            color:#ff6338;
+            font-size:.72rem;
+            font-weight:750;
+        }
         .rc-detail-stats-v2 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3963,7 +5000,6 @@
         .rc-detail-stat-v2.is-blue > span { background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-detail-stat-v2.is-coral > span { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-detail-stat-v2.is-purple > span { background: rgba(139,92,246,.13); color: #8b5cf6; }
-        .rc-detail-stat-v2.is-green > span { background: rgba(16,185,129,.13); color: #10b981; }
         .rc-detail-stat-v2.is-neutral > span { background: #eceef3; color: #111827; }
         .rc-detail-stat-v2.is-pink > span { background: rgba(236,72,153,.14); color: #ec4899; }
         .rc-detail-stat-v2.is-red > span { background: rgba(239,68,68,.13); color: #ef4444; }
@@ -5927,6 +6963,30 @@
         /* v94: keep dashboard first visit pinned to the top and avoid stale loading panels covering content. */
         .rc-wrap { min-height: 0 !important; }
         .rc-livewire-root [data-stale-school-loader],
+
+        .rc-brand-icon-img {
+            width: 1.2rem;
+            height: 1.2rem;
+            display: block;
+            object-fit: contain;
+        }
+
+        .rc-detail-platform-icon-v2 .rc-brand-icon-img {
+            width: 1.35rem;
+            height: 1.35rem;
+        }
+
+        @media (min-width: 981px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: 1fr !important;
+            }
+        }
         .rc-livewire-root .rc-school-loader-backdrop,
         .rc-livewire-root .rc-school-loading-backdrop,
         .rc-livewire-root .rc-opening-school-backdrop {
@@ -5945,110 +7005,29 @@
         }
 
 
+        .rc-discover-select-v27.is-updating { opacity:.72; cursor:progress; }
+        .rc-discover-tab-v27 { transition: background-color .12s ease, color .12s ease, border-color .12s ease; }
 
-        /* v102 non-overlay Recruiting Center sync status */
-        .rc-reload-status-v101 {
-            position: static !important;
-            top: auto !important;
-            z-index: auto !important;
-            display: grid;
-            gap: .55rem;
-            margin: 0 0 1rem 0;
-            border: 1px solid rgba(255, 99, 56, .22);
-            background: linear-gradient(135deg, rgba(255, 99, 56, .08), rgba(255, 255, 255, .95));
-            border-radius: .9rem;
-            padding: .75rem .9rem;
-            box-shadow: 0 8px 22px rgba(15, 23, 42, .06);
-            backdrop-filter: none;
-        }
-
-        .dark .rc-reload-status-v101 {
-            background: linear-gradient(135deg, rgba(255, 99, 56, .12), rgba(24, 24, 27, .92));
-            box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
-        }
-
-        .rc-reload-main-v101 {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-        }
-
-        .rc-reload-copy-v101 {
-            display: grid;
-            gap: .18rem;
-            min-width: 0;
-        }
-
-        .rc-reload-copy-v101 strong {
-            color: var(--rc-text);
-            font-size: .92rem;
-            font-weight: 850;
-            letter-spacing: -.02em;
-        }
-
-        .rc-reload-copy-v101 span,
-        .rc-reload-meta-v101 {
-            color: var(--rc-muted);
-            font-size: .78rem;
-            line-height: 1.35;
-        }
-
-        .rc-reload-pill-v101 {
+        /* v96 inbox message readability: no huge tracking URLs, no forced bottom scroll */
+        .rc-message-stream-v56 { scroll-behavior: auto !important; }
+        .rc-msg-bubble-v56 { overflow-wrap: break-word !important; word-break: normal !important; }
+        .rc-msg-bubble-v56 a { word-break: normal !important; overflow-wrap: break-word !important; }
+        .rc-msg-bubble-v56 .rc-message-link-short {
             display: inline-flex;
             align-items: center;
-            gap: .45rem;
-            border-radius: 999px;
-            padding: .42rem .7rem;
-            background: var(--rc-accent-soft);
-            color: var(--rc-accent);
-            font-size: .76rem;
-            font-weight: 850;
-            white-space: nowrap;
-        }
-
-        .rc-reload-pulse-v101 {
-            width: .52rem;
-            height: .52rem;
-            border-radius: 999px;
-            background: currentColor;
-            box-shadow: 0 0 0 rgba(255, 99, 56, .4);
-            animation: rcReloadPulse 1.4s infinite;
-        }
-
-        @keyframes rcReloadPulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 99, 56, .34); }
-            70% { box-shadow: 0 0 0 .55rem rgba(255, 99, 56, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 99, 56, 0); }
-        }
-
-        .rc-reload-stats-v101 {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .45rem .85rem;
-        }
-
-        .rc-reload-stats-v101 span {
-            color: var(--rc-muted);
-            font-size: .74rem;
+            max-width: 100%;
+            border-radius: .45rem;
+            padding: .1rem .38rem;
+            background: rgba(37,99,235,.08);
+            color: #2563eb;
             font-weight: 700;
+            text-decoration: none;
+            vertical-align: baseline;
         }
+        .rc-msg-bubble-v56 .rc-message-link-short:hover { text-decoration: underline; }
+        .rc-msg-bubble-v56 .rc-message-image-link { display:block; max-width:100%; margin:.45rem 0; }
+        .rc-msg-bubble-v56 .rc-message-image-link img { max-width:min(100%, 24rem); height:auto; border-radius:.7rem; display:block; }
 
-        .rc-reload-stats-v101 b { color: var(--rc-text); }
-
-        .rc-reload-copy-v101 strong { font-size: .86rem; }
-        .rc-reload-copy-v101 span,
-        .rc-reload-stats-v101 span { font-size: .72rem; }
-        .rc-reload-pill-v101 { padding: .35rem .6rem; font-size: .72rem; }
-
-        @media (max-width: 900px) {
-            .rc-reload-main-v101 {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .rc-reload-status-v101 { padding: .7rem; }
-        }
 </style>
 
     @php
@@ -6066,6 +7045,24 @@
 
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
         $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
+
+
+        // Public PNG icons from Icons8's CDN. These replace missing local files
+        // under /images/recruiting-center/icons and avoid SVG-only brand marks.
+        $publicIconUrls = [
+            'cap' => 'https://img.icons8.com/fluency/48/graduation-cap.png',
+            'eye' => 'https://img.icons8.com/fluency/48/visible.png',
+            'star' => 'https://img.icons8.com/fluency/48/star.png',
+            'mail' => 'https://img.icons8.com/fluency/48/secured-letter.png',
+            'chart' => 'https://img.icons8.com/fluency/48/sent.png',
+            'profile' => 'https://img.icons8.com/fluency/48/user-male-circle.png',
+            'website' => 'https://img.icons8.com/fluency/48/domain.png',
+            'email' => 'https://img.icons8.com/fluency/48/new-post.png',
+            'instagram' => 'https://img.icons8.com/fluency/48/instagram-new.png',
+            'youtube' => 'https://img.icons8.com/color/48/youtube-play.png',
+            'x' => 'https://img.icons8.com/ios-filled/50/x.png',
+            'link' => 'https://img.icons8.com/fluency/48/link.png',
+        ];
 
         $formatActivityTimeLabel = function ($time): string {
             if (! $time) {
@@ -6203,8 +7200,9 @@
         class="rc-wrap"
         x-data
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
-        wire:poll.5s.visible="pollRealtime"
     >
+        @include('filament.partials.coach-database-sync-status')
+
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
@@ -6259,18 +7257,17 @@
                         wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
                         aria-label="Open refresh options"
                         title="Refresh options"
-                        @disabled($isRecruitingSyncRunning ?? false)
                     >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
                     <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Refresh email activity, profile views, and social clicks.</small></span>
                         </button>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>{{ ($isRecruitingSyncRunning ?? false) ? 'Reload running' : 'Reload whole Coach Database' }}</strong><small>{{ ($isRecruitingSyncRunning ?? false) ? 'A locked background sync is already running; existing rows stay visible.' : 'Reload schools, coaches, logos, tags, filters, and stats from GHL without blanking current data.' }}</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Reload schools, coaches, logos, tags, filters, and dashboard stats.</small></span>
                         </button>
                     </div>
                 </div>
@@ -6285,6 +7282,7 @@
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(5)->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
@@ -6309,34 +7307,30 @@
                 $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
                 $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
-                $trackedProfileTotal = max((int) ($dashboardMetrics['view_profile_total'] ?? 0), (int) ($dashboardMetrics['profile_views'] ?? 0), $trackedProfileComponentTotal);
+                $trackedProfileTotal = max(
+                    $trackedProfileComponentTotal,
+                    (int) ($dashboardMetrics['view_profile_total'] ?? 0),
+                    (int) ($dashboardMetrics['profile_views'] ?? 0),
+                    (int) ($dashboardMetrics['unique_profile_views'] ?? 0),
+                );
                 $profileViews = $trackedProfileTotal;
-                $profileUniqueContacts = max((int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0), $trackedProfileTotal > 0 ? 1 : 0);
-                $profileUniqueSchools = max((int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0));
-                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $trackedProfileTotal);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), $profileUniqueContacts);
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), $profileSchoolClicks + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
 
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
-                $socialClickCount = (int) ($dashboardMetrics['website_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['x_click_count'] ?? 0);
-                $emailsSent = $emailSentCount;
+                $instagramClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $youtubeClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
 
+                // Coach Engagement must match the drawer:
+                // Instagram + YouTube + X social clicks only.
+                // Do not include profile views, website clicks, email opens, email clicks, or replies.
+                $socialClickCount = $instagramClicks + $youtubeClicks + $xClicks;
+                $coachEngagementTotal = $socialClickCount;
+
+                $emailsSent = $emailSentCount;
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
-                $coachEngagementTotal = $trackedWebsiteViews
-                    + $trackedInstagramViews
-                    + $trackedYoutubeViews
-                    + $trackedXViews
-                    + $trackedEmailLinkViews
-                    + $emailClickCount
-                    + $socialClickCount
-                    + $emailOpenCount
-                    + $coachReplies;
 
                 $profileCompletion = 0;
                 $profileUrl = '#';
@@ -6564,7 +7558,7 @@
                     [
                         'label' => 'Profile Views',
                         'value' => number_format($profileViews),
-                        'sub' => number_format($profileUniqueContacts) . ' unique contacts · ' . number_format($profileUniqueSchools) . ' schools',
+                        'sub' => 'Tracked profile activity',
                         'icon' => 'eye',
                         'tone' => 'blue',
                         'target' => 'profile-views',
@@ -6575,12 +7569,12 @@
                         'sub' => 'Schools saved',
                         'icon' => 'star',
                         'tone' => 'gold',
-                        'target' => 'favorites',
+                        'url' => $this->pageUrl('favorites'),
                     ],
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
-                        'sub' => number_format($uniqueClicks) . ' unique clicks · ' . number_format($schoolClicks) . ' school total',
+                        'sub' => 'Tracked social clicks',
                         'icon' => 'mail',
                         'tone' => 'green',
                         'target' => 'coach-engagement',
@@ -6644,12 +7638,6 @@
                     if (str_contains($activityType, 'reply')) {
                         $tone = 'green';
                         $icon = '↩';
-                    } elseif (str_contains($activityType, 'profile') || str_contains($activityType, 'view')) {
-                        $tone = 'blue';
-                        $icon = '◎';
-                    } elseif (str_contains($activityType, 'instagram') || str_contains($activityType, 'youtube') || str_contains($activityType, 'social')) {
-                        $tone = 'purple';
-                        $icon = '↗';
                     } elseif (str_contains($activityType, 'email')) {
                         $tone = 'coral';
                         $icon = '✉';
@@ -6679,6 +7667,7 @@
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
                         'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
                         'url' => $activity['url'] ?? '#',
+                        'school_id' => (string) ($activity['school_id'] ?? ''),
                         'tone' => $tone,
                         'icon' => $icon,
                         'time_label' => $timeLabel,
@@ -6736,29 +7725,22 @@
                     ]);
                 }
 
-                $interestedSchoolRows = collect($dashboardTopSchools)->take(4)->values()->map(function ($school, $rank) {
+                $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
-                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
-                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                    $views = max(0, (int) ($school['profile_views'] ?? 0));
+                    $engagementClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
 
                     return [
                         'rank' => $rank + 1,
+                        'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($schoolName)))),
                         'name' => $schoolName,
-                        'score' => $score,
+                        'score' => $views,
+                        'engagement_clicks' => $engagementClicks,
                         'initials' => strtoupper($initials ?: 'S'),
                         'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
                     ];
-                })->values();
-
-                if ($interestedSchoolRows->isEmpty()) {
-                    $interestedSchoolRows = collect([
-                        ['rank' => 1, 'name' => 'Virginia Commonwealth', 'score' => 14, 'initials' => 'VCU'],
-                        ['rank' => 2, 'name' => 'University of Maryland', 'score' => 9, 'initials' => 'M'],
-                        ['rank' => 3, 'name' => 'Florida State', 'score' => 7, 'initials' => 'FS'],
-                        ['rank' => 4, 'name' => 'Indiana University', 'score' => 6, 'initials' => 'IU'],
-                    ]);
-                }
+                })->filter(fn (array $row): bool => (int) ($row['score'] ?? 0) > 0 || (int) ($row['engagement_clicks'] ?? 0) > 0)->values();
             @endphp
 
             <div class="rc-home-dashboard-v2">
@@ -6768,91 +7750,35 @@
                     'showNewEmail' => true,
                 ])
 
-                {{-- Show the first-load sync banner only when no usable Coach Database exists yet. --}}
-                @php
-                    $shouldShowInitialSyncBanner =
-                        ($isLoadingDataset || $isRecruitingSyncRunning)
-                        && empty($this->filteredSchools ?? [])
-                        && (int) ($this->filteredSchoolsCount ?? 0) === 0
-                        && (int) ($loadedSchoolsCount ?? 0) === 0
-                        && blank($cachedAt ?? null);
-                @endphp
-
-                @if($shouldShowInitialSyncBanner)
-                    @php
-                        $reloadPercent = $isLoadingDataset
-                            ? max(5, min(98, (int) ($remoteTotalSchools ? round(($loadedSchoolsCount / max(1, $remoteTotalSchools)) * 100) : min(96, max(1, $loadedPages) * 8))))
-                            : ($isRecruitingSyncRunning ? 35 : 100);
-                        $reloadStatusLabel = match ($recruitingSyncStatus) {
-                            'completed' => 'Synced',
-                            'failed_to_start' => 'Needs attention',
-                            'already_running' => 'Already syncing',
-                            default => 'Syncing',
-                        };
-                    @endphp
-                    <div class="rc-reload-status-v101" role="status" aria-live="polite">
-                        <div class="rc-reload-main-v101">
-                            <div class="rc-reload-copy-v101">
-                                <strong>Recruiting Center is updating</strong>
-                                <span>{{ $recruitingSyncMessage ?: 'Loading schools, coaches, and tracking stats from GHL. Existing data stays visible while this runs.' }}</span>
-                            </div>
-                            <span class="rc-reload-pill-v101"><i class="rc-reload-pulse-v101"></i>{{ $reloadStatusLabel }}</span>
-                        </div>
-                        <div class="rc-progress" aria-label="Coach Database loading progress"><span style="width:{{ $reloadPercent }}%"></span></div>
-                        <div class="rc-reload-stats-v101">
-                            <span><b>{{ number_format($loadedSchoolsCount) }}</b> schools cached</span>
-                            <span><b>{{ number_format($loadedContactsCount) }}</b> coaches cached</span>
-                            <span><b>{{ number_format($loadedPages) }}</b> pages processed</span>
-                            @if($cachedAt)<span>Last cache {{ $cachedAt }}</span>@endif
-                        </div>
-                    </div>
-                @endif
-
-
                 <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
                         @if(! empty($stat['target']))
                             <button
                                 type="button"
                                 class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
-                                wire:click="$set('section', @js($stat['target']))"
+                                x-on:click="$dispatch('rc-open-{{ $stat['target'] }}')"
+                                data-rc-stat-open="{{ $stat['target'] }}"
+                                data-rc-no-pending
+                            >
+                        @elseif(! empty($stat['url']))
+                            <a
+                                class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
+                                href="{{ $stat['url'] }}"
+                                wire:navigate
                             >
                         @else
-                            <button
-                                type="button"
-                                class="rc-home-stat-v2 is-{{ $stat['tone'] }}"
-                            >
+                            <div class="rc-home-stat-v2 is-{{ $stat['tone'] }}">
                         @endif
                             <div class="rc-home-stat-icon-v2">
-                                @switch($stat['icon'])
-                                    @case('cap')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="M7 11v4.2c0 1.6 2.2 3 5 3s5-1.4 5-3V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                        </svg>
-                                        @break
-                                    @case('eye')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/>
-                                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
-                                        </svg>
-                                        @break
-                                    @case('star')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="m12 3 2.7 5.5 6 .9-4.35 4.2 1.05 6-5.4-2.85-5.4 2.85 1.05-6L3.3 9.4l6-.9L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @case('mail')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @default
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                @endswitch
+                                <img
+                                    class="rc-public-png-icon"
+                                    src="{{ $publicIconUrls[$stat['icon']] ?? $publicIconUrls['link'] }}"
+                                    alt=""
+                                    width="48"
+                                    height="48"
+                                    loading="eager"
+                                    referrerpolicy="no-referrer"
+                                >
                             </div>
 
                             <div class="rc-home-stat-copy-v2">
@@ -6867,7 +7793,13 @@
                             @endif
 
                             <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
-                        </button>
+                        @if(! empty($stat['target']))
+                            </button>
+                        @elseif(! empty($stat['url']))
+                            </a>
+                        @else
+                            </div>
+                        @endif
                     @endforeach
                 </div>
 
@@ -6914,12 +7846,21 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Recent Activity</h2>
-                            <a href="#">View All</a>
+                            <a
+                                href="#"
+                                x-on:click.prevent="$dispatch('rc-open-profile-views')"
+                                data-rc-stat-open="profile-views"
+                                data-rc-no-pending
+                            >View All</a>
                         </div>
 
                         <div class="rc-home-activity-list-v2">
-                            @forelse($dashboardActivityRows as $activityRow)
-                                <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                            @foreach($dashboardActivityRows as $activityRow)
+                                @if(! empty($activityRow['school_id']))
+                                    <button type="button" class="rc-home-activity-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $activityRow['school_id']) }})">
+                                @else
+                                    <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                                @endif
                                     <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
 
                                     <span class="rc-home-activity-copy-v2">
@@ -6928,10 +7869,12 @@
                                     </span>
 
                                     <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
-                                </a>
-                            @empty
-                                <div class="rc-home-empty-v2">Recent coach views, social clicks, email sends, and replies will appear here after the next sync.</div>
-                            @endforelse
+                                @if(! empty($activityRow['school_id']))
+                                    </button>
+                                @else
+                                    </a>
+                                @endif
+                            @endforeach
                         </div>
                     </section>
                 </div>
@@ -6943,7 +7886,7 @@
                                 <h2>On The Radar</h2>
                                 <p>Based on your profile and preferences</p>
                             </div>
-                            <a href="#">View All</a>
+                            <a href="{{ $this->pageUrl('lists') }}">View All</a>
                         </div>
 
                         <div class="rc-radar-schools-v2">
@@ -6972,12 +7915,12 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Schools Most Interested</h2>
-                            <span>Last 30 days</span>
+                            <span>Total tracked profile views</span>
                         </div>
 
                         <div class="rc-interested-list-v2">
-                            @foreach($interestedSchoolRows as $interestedSchool)
-                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
+                            @forelse($interestedSchoolRows as $interestedSchool)
+                                <button type="button" class="rc-interested-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $interestedSchool['id']) }})">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
                                     <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($interestedSchool['logo_url']))
@@ -6987,92 +7930,55 @@
                                     </span>
                                     <span>
                                         <strong>{{ $interestedSchool['name'] }}</strong>
-                                        <small>Profile views</small>
+                                        <small>Profile views from this school</small>
                                     </span>
-                                    <b>{{ $interestedSchool['score'] }}</b>
+                                    <b>{{ number_format((int) $interestedSchool['score']) }}</b>
                                 </button>
-                            @endforeach
+                            @empty
+                                <div class="rc-home-empty-v2">School interest will appear after identified coach contacts view your profile or interact with your recruiting links.</div>
+                            @endforelse
                         </div>
 
-                        <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
+                        <button
+                            type="button"
+                            class="rc-home-outline-btn-v2"
+                            x-on:click="$dispatch('rc-open-coach-engagement')"
+                            data-rc-stat-open="coach-engagement"
+                            data-rc-no-pending
+                        >View Full Analytics</button>
                     </section>
                 </div>
             </div>
         @endif
 
-        @if($section === 'profile-views')
+        @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
-
-                $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
-                $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
-                $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-                $xViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
-                $emailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $profileViewsTotal = max((int) ($dashboardMetrics['view_profile_total'] ?? 0), (int) ($dashboardMetrics['profile_views'] ?? 0), $websiteViews + $instagramViews + $youtubeViews + $xViews + $emailLinkViews);
-                $uniqueProfileViews = max((int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_views'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0), $profileViewsTotal > 0 ? 1 : 0);
-                $ghlContactClicks = max((int) ($dashboardMetrics['ghl_contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_link_clicks'] ?? 0), $profileViewsTotal + (int) ($dashboardMetrics['link_clicks'] ?? 0));
-                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $profileViewsTotal);
-                $profilePrograms = max(0, (int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0), (int) ($dashboardMetrics['schools_with_clicks'] ?? 0));
-
-                $profileBreakdownRows = collect([
-                    ['title' => 'Website profile link', 'copy' => 'Website profile clicks', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Updated'],
-                    ['title' => 'Instagram profile link', 'copy' => 'Instagram profile clicks', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Updated'],
-                    ['title' => 'YouTube highlight link', 'copy' => 'YouTube profile clicks', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Updated'],
-                    ['title' => 'X profile link', 'copy' => 'X profile clicks', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Updated'],
-                    ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
-                ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
-
-                $activityProfileRows = $dashboardRecentActivity
-                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
-                    ->take(8)
-                    ->values()
-                    ->map(function ($activity, $index) use ($formatActivityTimeLabel) {
-                        $title = (string) ($activity['title'] ?? 'Coach viewed profile');
-                        $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                        $time = $activity['time'] ?? null;
-
-                        return [
-                            'title' => $title,
-                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity',
-                            'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
-                            'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
-                            'logo' => $activity['logo'] ?? null,
-                            'initials' => strtoupper($initials ?: 'PV'),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    });
-
-                $profileViewRows = $activityProfileRows->merge($profileBreakdownRows)->values()->map(function ($row, $index) {
-                    return array_merge($row, ['rank' => $index + 1]);
-                });
+                $profileViewRows = collect($this->profileViewRows ?? [])->values();
+                $profileViewsTotal = max(
+                    (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0),
+                    (int) $profileViewRows->sum('views'),
+                );
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-profile-views"
+                data-rc-modal="stats"
+                data-rc-modal-id="profile-views"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('profile-views', @js($section === 'profile-views'), @js($section !== 'dashboard')) : { open: @js($section === 'profile-views'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-profile-views.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7081,7 +7987,7 @@
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
+                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.180ms="search">
 
                             @if($search !== '')
                                 <div class="rc-global-suggestions">
@@ -7117,18 +8023,16 @@
                     </form>
                 </div>
 
-                <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Player website/profile views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Unique Contacts</small><strong>{{ number_format(max($uniqueProfileViews, $profileViewRows->count())) }}</strong><em>Distinct GHL coach contacts</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Schools Reached</small><strong>{{ number_format($profilePrograms) }}</strong><em>Schools with tracked coach views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>School Clicks</small><strong>{{ number_format($profileSchoolClicks) }}</strong><em>All profile clicks rolled up by school</em></div></div>
+                <div class="rc-detail-stats-v2 is-two">
+                    <div class="rc-detail-stat-v2 is-blue"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['profile'] }}" alt=""></span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>{{ number_format(max(0, $profileViewsTotal)) }} tracked views</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['website'] }}" alt=""></span><div><small>Coach Contacts</small><strong>{{ number_format(max(0, $profileViewRows->count())) }}</strong><em>Viewed your profile</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
                     <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
-                            <button type="button" class="rc-detail-row-v2">
+                            <button type="button" class="rc-detail-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($profileRow['school_id'] ?? '')) }})">
                                 <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
                                 <span class="rc-detail-avatar-v2">
                                     @if(! empty($profileRow['logo']))
@@ -7153,7 +8057,47 @@
             </div>
         @endif
 
-        @if($section === 'coach-engagement')
+        <script>
+            window.rcFilterCoachEngagement = function (source, platform) {
+                const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
+                    ? String(platform).toLowerCase()
+                    : '';
+                const drawer = source?.closest?.('[data-rc-modal-id="coach-engagement"]')
+                    || document.querySelector('[data-rc-modal-id="coach-engagement"]');
+
+                if (!drawer) return;
+
+                drawer.dataset.engagementPlatform = normalized;
+
+                drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
+                    const active = card.dataset.engagementFilter === normalized;
+                    card.classList.toggle('is-filter-active', active);
+                    card.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+
+                drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
+                    const rowPlatform = String(row.dataset.platform || '').toLowerCase();
+                    row.hidden = normalized !== '' && rowPlatform !== normalized;
+                });
+
+                const title = drawer.querySelector('[data-engagement-table-title]');
+                if (title) {
+                    const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
+                    title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
+                }
+
+                const clear = drawer.querySelector('[data-engagement-clear]');
+                if (clear) clear.hidden = normalized === '';
+            };
+        </script>
+
+        <style>
+            [data-rc-modal-id="coach-engagement"] [data-engagement-row][hidden] {
+                display: none !important;
+            }
+        </style>
+
+        @if(in_array($section, ['dashboard', 'coach-engagement'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
@@ -7166,56 +8110,118 @@
                 $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? $dashboardMetrics['Click count'] ?? 0);
                 $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? $dashboardMetrics['Open count'] ?? 0);
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_views'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0));
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0) + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
 
-                $coachEngagementRows = collect($this->coachEngagementRows ?? []);
+                $normalizeSocialPlatform = static function (array $row): string {
+                    $raw = strtolower(trim((string) (
+                        $row['platform_icon_key']
+                        ?? $row['platform']
+                        ?? $row['source']
+                        ?? $row['channel']
+                        ?? $row['type']
+                        ?? ''
+                    )));
+
+                    return match (true) {
+                        str_contains($raw, 'instagram'),
+                        $raw === 'ig' => 'instagram',
+
+                        str_contains($raw, 'youtube'),
+                        str_contains($raw, 'you_tube'),
+                        $raw === 'yt' => 'youtube',
+
+                        $raw === 'x',
+                        str_contains($raw, 'twitter'),
+                        str_contains($raw, 'x.com') => 'x',
+
+                        default => '',
+                    };
+                };
+
+                // Coach Engagement must contain social click activity only.
+                // Website clicks, email clicks/opens, profile-link clicks, and
+                // unknown activity types are removed before rendering.
+                $coachEngagementRows = collect($this->coachEngagementRows ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(function (array $row) use ($normalizeSocialPlatform) {
+                        $canonical = $normalizeSocialPlatform($row);
+
+                        if ($canonical === '') {
+                            return null;
+                        }
+
+                        return array_merge($row, [
+                            'platform' => match ($canonical) {
+                                'instagram' => 'Instagram',
+                                'youtube' => 'YouTube',
+                                'x' => 'X (Twitter)',
+                            },
+                            'platform_icon_key' => $canonical,
+                            'platform_class' => match ($canonical) {
+                                'instagram' => 'is-pink',
+                                'youtube' => 'is-red',
+                                'x' => 'is-neutral',
+                            },
+                        ]);
+                    })
+                    ->filter()
+                    ->values();
 
                 if ($coachEngagementRows->isEmpty()) {
-                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) use ($formatActivityTimeLabel) {
-                        $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
-                        $platformLower = strtolower($platform);
-                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : (str_contains($platformLower, 'website') ? 'is-blue' : 'is-neutral'));
-                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : (str_contains($platformLower, 'website') ? '⌁' : '𝕏'));
-                        $time = $row['time'] ?? null;
+                    $coachEngagementRows = $dashboardRecentActivity
+                        ->filter(fn ($row): bool => is_array($row))
+                        ->map(function (array $row) use ($normalizeSocialPlatform, $formatActivityTimeLabel) {
+                            $canonical = $normalizeSocialPlatform($row);
 
-                        return [
-                            'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
-                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked activity'))) ?: 'Tracked activity',
-                            'platform' => $platform,
-                            'platform_class' => $platformClass,
-                            'platform_icon' => $platformIcon,
-                            'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    })->values();
+                            if ($canonical === '') {
+                                return null;
+                            }
+
+                            $time = $row['time'] ?? $row['created_at'] ?? null;
+
+                            return [
+                                'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
+                                'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Social click activity'))) ?: 'Social click activity',
+                                'school_id' => (string) ($row['school_id'] ?? ''),
+                                'platform' => match ($canonical) {
+                                    'instagram' => 'Instagram',
+                                    'youtube' => 'YouTube',
+                                    'x' => 'X (Twitter)',
+                                },
+                                'platform_class' => match ($canonical) {
+                                    'instagram' => 'is-pink',
+                                    'youtube' => 'is-red',
+                                    'x' => 'is-neutral',
+                                },
+                                'platform_icon_key' => $canonical,
+                                'clicks' => max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1)),
+                                'time_label' => $formatActivityTimeLabel($time),
+                            ];
+                        })
+                        ->filter()
+                        ->take(20)
+                        ->values();
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-coach-engagement"
+                data-rc-modal="stats"
+                data-rc-modal-id="coach-engagement"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('coach-engagement', @js($section === 'coach-engagement'), @js($section !== 'dashboard')) : { open: @js($section === 'coach-engagement'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-coach-engagement.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
-                    <div class="rc-detail-page-v2">
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
+                    <div class="rc-detail-page-v2" data-engagement-platform="">
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Coach Engagement</h1>
@@ -7228,25 +8234,84 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Unique Clicks</small><strong>{{ number_format($uniqueClicks) }}</strong><em>deduped coach/profile clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>School Clicks</small><strong>{{ number_format($schoolClicks) }}</strong><em>combined clicks from coaches at schools</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>Social Clicks</small><strong>{{ number_format($igClicks + $ytClicks + $xClicks + $websiteClicks) }}</strong><em>website/social clicks</em></div></div>
+                    <button type="button" class="rc-detail-stat-v2 is-neutral rc-engagement-filter-card" data-engagement-filter="x" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'x')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['x'] }}" alt="X"></span>
+                        <div><small>X (Twitter)</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div>
+                    </button>
+                    <button type="button" class="rc-detail-stat-v2 is-pink rc-engagement-filter-card" data-engagement-filter="instagram" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'instagram')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['instagram'] }}" alt="Instagram"></span>
+                        <div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div>
+                    </button>
+                    <button type="button" class="rc-detail-stat-v2 is-red rc-engagement-filter-card" data-engagement-filter="youtube" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'youtube')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['youtube'] }}" alt="YouTube"></span>
+                        <div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div>
+                    </button>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>Who's Clicking</h2><span>● Synced</span></header>
+                    <header>
+                        <h2 data-engagement-table-title>Who's Clicking</h2>
+                        <span style="display:inline-flex;align-items:center;gap:.65rem">
+                            <button
+                                type="button"
+                                class="rc-btn rc-btn-compact"
+                                data-engagement-clear
+                                hidden
+                                onclick="window.rcFilterCoachEngagement(this, '')"
+                            >
+                                Show All
+                            </button>
+                            <span>● Synced</span>
+                        </span>
+                    </header>
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
-                            <button type="button" class="rc-detail-row-v2 is-engagement">
-                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
+                            @php
+                                $engagementPlatformRaw = strtolower(trim((string) (
+                                    $engagementRow['platform_icon_key']
+                                    ?? $engagementRow['platform']
+                                    ?? ''
+                                )));
+
+                                $engagementPlatformCanonical = match (true) {
+                                    str_contains($engagementPlatformRaw, 'instagram'),
+                                    $engagementPlatformRaw === 'ig' => 'instagram',
+
+                                    str_contains($engagementPlatformRaw, 'youtube'),
+                                    str_contains($engagementPlatformRaw, 'you_tube'),
+                                    $engagementPlatformRaw === 'yt' => 'youtube',
+
+                                    $engagementPlatformRaw === 'x',
+                                    str_contains($engagementPlatformRaw, 'twitter'),
+                                    str_contains($engagementPlatformRaw, 'x.com') => 'x',
+
+                                    default => '',
+                                };
+
+                                $engagementIconKey = match ($engagementPlatformCanonical) {
+                                    'instagram' => 'instagram',
+                                    'youtube' => 'youtube',
+                                    'x' => 'x',
+                                    default => 'link',
+                                };
+                            @endphp
+
+                            <button
+                                type="button"
+                                class="rc-detail-row-v2 is-engagement"
+                                data-engagement-row
+                                data-platform="{{ $engagementPlatformCanonical }}"
+                                wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($engagementRow['school_id'] ?? '')) }})"
+                            >
+                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}"><img class="rc-brand-icon-img" src="{{ $publicIconUrls[$engagementIconKey] }}" alt="{{ $engagementRow['platform'] }}" referrerpolicy="no-referrer"></span>
                                 <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
                                 <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
-                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $engagementRow['clicks']) }}</small></span>
+                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('click', $engagementRow['clicks']) }}</small></span>
                                 <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] }}</span>
-                                <span class="rc-detail-chevron-v2">›</span>
+                                <span class="rc-detail-chevron-v2" aria-hidden="true">›</span>
                             </button>
                         @empty
-                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked links or open emails.</div>
+                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked Instagram, YouTube, or X links.</div>
                         @endforelse
                     </div>
                 </section>
@@ -7295,29 +8360,23 @@
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-emails-sent"
+                data-rc-modal="stats"
+                data-rc-modal-id="emails-sent"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('emails-sent', true, true) : { open: true, openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -8248,14 +9307,322 @@
                     box-shadow:0 8px 18px rgba(255,99,56,.18);
                 }
 
+                .rc-discover-bulk-status-v92 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.5rem;
+                    min-height:2rem;
+                    padding:.42rem .68rem;
+                    border-radius:.72rem;
+                    border:1px solid rgba(255,99,56,.2);
+                    background:rgba(255,99,56,.08);
+                    color:var(--rc-text);
+                    font-size:.76rem;
+                    font-weight:750;
+                    line-height:1.25;
+                }
+                .rc-discover-bulk-option-v36 .rc-spinner-mini,
+                .rc-discover-bulk-list-v36 > button .rc-spinner-mini {
+                    width:.88rem;
+                    height:.88rem;
+                    border-width:2px;
+                    flex:0 0 auto;
+                }
+
                 @media (max-width: 1100px) {
                     .rc-discover-top-v29 { grid-template-columns: 1fr !important; }
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
+
+                .rc-discover-quick-list-v97 {
+                    display:grid;
+                    gap:.5rem;
+                    padding:.65rem;
+                    margin-top:.35rem;
+                    border-top:1px solid var(--rc-border);
+                    background:var(--rc-soft);
+                }
+                .rc-discover-quick-list-title-v97 {
+                    font-size:.72rem;
+                    font-weight:800;
+                    color:var(--rc-muted);
+                    text-transform:uppercase;
+                    letter-spacing:.05em;
+                }
+                .rc-discover-quick-list-v97 .rc-input { width:100%; }
+                .rc-discover-quick-list-actions-v97 {
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.5rem;
+                }
+                .rc-discover-quick-list-actions-v97 input[type="color"] {
+                    width:2.4rem;
+                    height:2.1rem;
+                    padding:.15rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.55rem;
+                    background:var(--rc-surface);
+                }
+
+                /* Add-to-list dropdown — compact reference layout */
+                .rc-list-popover-v105 {
+                    left:auto !important;
+                    right:0 !important;
+                    top:calc(100% + .55rem) !important;
+                    width:21.75rem !important;
+                    min-width:21.75rem !important;
+                    max-width:min(21.75rem, calc(100vw - 2rem)) !important;
+                    max-height:none !important;
+                    overflow:visible !important;
+                    padding:0 !important;
+                    border:1px solid #e5e7eb !important;
+                    border-radius:1rem !important;
+                    background:#fff !important;
+                    color:#111827 !important;
+                    box-shadow:0 24px 60px rgba(15,23,42,.22) !important;
+                }
+
+                .rc-list-popover-title-v105 {
+                    padding:1rem 1.15rem .72rem;
+                    color:#8791a4;
+                    font-size:.72rem;
+                    font-weight:850;
+                    line-height:1.2;
+                    letter-spacing:.075em;
+                    text-transform:uppercase;
+                }
+
+                .rc-list-popover-options-v105 {
+                    display:grid;
+                    gap:.12rem;
+                    padding:0 .72rem .65rem;
+                    max-height:15.5rem;
+                    overflow:auto;
+                }
+
+                .rc-list-popover-row-v105 {
+                    min-height:2.75rem;
+                    padding:.58rem .58rem !important;
+                    border-radius:.65rem !important;
+                    font-size:.85rem !important;
+                    font-weight:700 !important;
+                }
+
+                .rc-list-popover-row-v105:hover {
+                    background:#f8fafc !important;
+                    color:#111827 !important;
+                }
+
+                .rc-list-popover-row-v105:disabled {
+                    cursor:wait;
+                    opacity:.78;
+                }
+
+                .rc-list-popover-row-main-v105,
+                .rc-list-popover-row-side-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.68rem;
+                    min-width:0;
+                }
+
+                .rc-list-popover-dot-v105 {
+                    width:.72rem;
+                    height:.72rem;
+                    flex:0 0 auto;
+                    border-radius:999px;
+                    box-shadow:0 0 0 3px rgba(15,23,42,.025);
+                }
+
+                .rc-list-popover-label-v105 {
+                    overflow:hidden;
+                    color:#111827;
+                    text-overflow:ellipsis;
+                    white-space:nowrap;
+                }
+
+                .rc-list-popover-count-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    min-width:1.75rem;
+                    height:1.75rem;
+                    padding:0 .48rem;
+                    border-radius:999px;
+                    background:#f2f4f7;
+                    color:#9aa3b2;
+                    font-size:.75rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.38rem;
+                    color:#ff6338;
+                    font-size:.72rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 .rc-spinner-mini {
+                    width:.82rem;
+                    height:.82rem;
+                    border-width:2px;
+                }
+
+                .rc-list-quick-create-v105 {
+                    display:grid !important;
+                    grid-template-columns:minmax(0,1fr) 3rem;
+                    gap:.55rem !important;
+                    padding:.8rem .9rem .9rem !important;
+                    margin:0 !important;
+                    border-top:1px solid #edf0f4 !important;
+                    background:#fff !important;
+                }
+
+                .rc-list-new-input-v105 {
+                    width:100%;
+                    min-width:0;
+                    height:2.8rem;
+                    padding:0 .9rem;
+                    border:1px solid #dfe4ea;
+                    border-radius:.72rem;
+                    background:#fff;
+                    color:#111827;
+                    font-size:.86rem;
+                    outline:none;
+                    transition:border-color .15s ease, box-shadow .15s ease;
+                }
+
+                .rc-list-new-input-v105::placeholder {
+                    color:#98a2b3;
+                }
+
+                .rc-list-new-input-v105:focus {
+                    border-color:#ff8f73;
+                    box-shadow:0 0 0 3px rgba(255,99,56,.12);
+                }
+
+                .rc-list-new-button-v105 {
+                    width:3rem;
+                    height:2.8rem;
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    border:0;
+                    border-radius:.72rem;
+                    background:#ff9a84;
+                    color:#fff;
+                    cursor:pointer;
+                    transition:background .15s ease, transform .15s ease, opacity .15s ease;
+                }
+
+                .rc-list-new-button-v105:hover:not(:disabled) {
+                    background:#ff6338;
+                    transform:translateY(-1px);
+                }
+
+                .rc-list-new-button-v105:disabled {
+                    cursor:not-allowed;
+                    opacity:.58;
+                }
+
+                .rc-list-new-button-v105 .rc-spinner-mini {
+                    width:1rem;
+                    height:1rem;
+                    border-width:2px;
+                }
+
+                .rc-list-popover-progress-v105 {
+                    display:grid;
+                    gap:.42rem;
+                    padding:.72rem .9rem .82rem;
+                    border-top:1px solid #edf0f4;
+                    color:#667085;
+                    font-size:.72rem;
+                    font-weight:750;
+                    line-height:1.35;
+                }
+
+                .rc-list-progress-bar-v105 {
+                    position:relative;
+                    height:.28rem;
+                    overflow:hidden;
+                    border-radius:999px;
+                    background:#ffe4dd;
+                }
+
+                .rc-list-progress-bar-v105 > span {
+                    position:absolute;
+                    top:0;
+                    bottom:0;
+                    left:-38%;
+                    width:38%;
+                    border-radius:inherit;
+                    background:#ff6338;
+                    animation:rcListSavingBarV105 1.05s ease-in-out infinite;
+                }
+
+                @keyframes rcListSavingBarV105 {
+                    0% { transform:translateX(0); }
+                    100% { transform:translateX(365%); }
+                }
+
+                .dark .rc-list-popover-v105,
+                .dark .rc-list-quick-create-v105 {
+                    border-color:#34343b !important;
+                    background:#18181b !important;
+                    color:#f4f4f5 !important;
+                }
+
+                .dark .rc-list-popover-title-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-popover-row-v105:hover {
+                    background:#27272a !important;
+                }
+
+                .dark .rc-list-popover-label-v105 {
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-popover-count-v105 {
+                    background:#27272a;
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-new-input-v105 {
+                    border-color:#3f3f46;
+                    background:#202024;
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-quick-create-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    border-top-color:#34343b !important;
+                }
+
 </style>
 
-            <div class="rc-discover-v29">
+            <div
+                class="rc-discover-v29"
+                wire:ignore
+                x-data="window.rcDiscoverClientCache(
+                    @js($this->discoverSchoolsClientDataset),
+                    @js(collect($this->lists)->map(fn ($list) => [
+                        'key' => (string) ($list['key'] ?? ''),
+                        'label' => (string) ($list['label'] ?? ''),
+                        'color' => (string) ($list['color'] ?? '#ff6338'),
+                        'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? [])),
+                    ])->filter(fn ($list) => $list['key'] !== '')->values()->all()),
+                    @js($schoolViewMode)
+                )"
+                x-init="init()"
+            >
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -8264,80 +9631,101 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
+                    <input placeholder="Search women's soccer programs & coaches..." x-model.debounce.80ms="search" x-on:input="limit = 48" />
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
-                        @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">{{ $divisionLabel }}</button>
-                        @endforeach
+                        <template x-for="divisionValue in divisionTabs" :key="divisionValue || 'all'">
+                            <button
+                                type="button"
+                                class="rc-discover-tab-v27"
+                                x-bind:class="{ 'is-active': division === divisionValue }"
+                                x-on:click="setDivision(divisionValue)"
+                                x-text="divisionValue || 'All Divisions'"
+                            ></button>
+                        </template>
                     </div>
 
-                    <select class="rc-discover-select-v27" wire:model.live="conferenceFilter" aria-label="Conference filter">
-                        <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
-                        @foreach($this->conferences as $conference)
-                            <option value="{{ $conference }}">{{ $conference }}</option>
-                        @endforeach
+                    <select class="rc-discover-select-v27" x-bind:value="conference" x-on:change="setConference($event.target.value)" aria-label="Conference filter">
+                        <option value="">All Conferences</option>
+                        <template x-for="conferenceName in conferenceOptions" :key="conferenceName">
+                            <option x-bind:value="conferenceName" x-text="conferenceName"></option>
+                        </template>
                     </select>
                 </div>
 
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
-                        <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
+                        <span><strong x-text="filteredSchools.length.toLocaleString()"></strong> schools</span>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click.stop="toggleAllFiltered()">
+                            <input type="checkbox" x-bind:checked="allFilteredSelected" readonly tabindex="-1">
+                            <span>Select All (<span x-text="filteredSchools.length.toLocaleString()"></span>)</span>
+                        </button>
                     </div>
 
                     <div class="rc-discover-right-v27">
-                        <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'grid' }" x-on:click.stop="setViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'list' }" x-on:click.stop="setViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
 
-                @if($this->selectedSchoolCount > 0)
-                    <div class="rc-discover-bulk-v36" wire:key="discover-bulk-selection-bar">
-                        <div class="rc-discover-bulk-left-v36">
-                            <span class="rc-discover-bulk-count-v36">{{ number_format($this->selectedSchoolCount) }} {{ \Illuminate\Support\Str::plural('selected', $this->selectedSchoolCount) }}</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" wire:click="emailSelectedSchools" wire:loading.attr="disabled" wire:target="emailSelectedSchools">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                                <span>Email</span>
+                <div class="rc-discover-bulk-v36" x-show="selectedCount > 0" x-cloak>
+                    <div class="rc-discover-bulk-left-v36">
+                        <span class="rc-discover-bulk-count-v36"><span x-text="selectedCount.toLocaleString()"></span> selected</span>
+                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                            <span>Email</span>
+                        </button>
+                        <div class="rc-discover-bulk-list-v36" x-on:click.outside="listMenuOpen = false">
+                            <button type="button" x-on:click.stop="listMenuOpen = !listMenuOpen">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                <span>Add to List</span>
+                                <span x-show="Boolean(pendingListKey)" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </button>
-                            <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
-                                <button type="button" x-on:click="open = ! open">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                    <span>Add to List</span>
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                                <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
-                                    @forelse($this->lists as $list)
-                                        @php $listKey = (string) ($list['key'] ?? ''); @endphp
-                                        @if($listKey !== '')
-                                            <button type="button" class="rc-discover-bulk-option-v36" wire:click="addSelectedSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" x-on:click="open = false">
-                                                <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
-                                                <span>+</span>
-                                            </button>
-                                        @endif
-                                    @empty
-                                        <div class="rc-school-list-empty">No lists yet.</div>
-                                    @endforelse
+                            <div class="rc-discover-bulk-menu-v36 rc-list-popover-v105" x-cloak x-show="listMenuOpen" x-transition.origin.top.left>
+                                <div class="rc-list-popover-title-v105">ADD <span x-text="selectedCount.toLocaleString()"></span> TO A LIST</div>
+                                <div class="rc-list-popover-options-v105">
+                                    <template x-for="listItem in lists" :key="listItem.key">
+                                        <button type="button" class="rc-discover-bulk-option-v36 rc-list-popover-row-v105" x-on:click.stop="addToList(listItem.key, listItem.label)" x-bind:disabled="Boolean(pendingListKey)">
+                                            <span class="rc-list-popover-row-main-v105">
+                                                <span class="rc-list-popover-dot-v105" x-bind:style="`background:${listItem.color || '#ff6338'}`"></span>
+                                                <span class="rc-list-popover-label-v105" x-text="listItem.label"></span>
+                                            </span>
+                                            <span class="rc-list-popover-row-side-v105">
+                                                <span class="rc-list-popover-count-v105" x-show="!isPending(listItem.key)" x-text="Number(listItem.count || 0).toLocaleString()"></span>
+                                                <span x-show="isPending(listItem.key)" x-cloak class="rc-list-saving-v105" aria-label="Saving selected schools"><span class="rc-spinner-mini"></span></span>
+                                            </span>
+                                        </button>
+                                    </template>
+                                </div>
+                                <div class="rc-list-quick-create-v105" x-on:click.stop>
+                                    <div class="rc-list-popover-title-v105">CREATE NEW LIST</div>
+                                    <div class="rc-list-new-row-v105">
+                                        <input type="text" class="rc-list-new-input-v105" placeholder="New list name..." x-model="newListName" x-on:keydown.enter.prevent="createQuickList()" x-bind:disabled="creating">
+                                        <button type="button" class="rc-list-new-button-v105" x-on:click="createQuickList()" x-bind:disabled="creating || !newListName.trim()"><span x-show="!creating">+</span><span x-show="creating" x-cloak class="rc-spinner-mini"></span></button>
+                                    </div>
+                                </div>
+                                <div class="rc-list-popover-progress-v105" x-show="Boolean(pendingListKey) || creating" x-cloak role="status" aria-live="polite">
+                                    <span class="rc-list-progress-bar-v105"><span></span></span>
+                                    <span x-text="creating ? 'Creating new list.' : 'Saving selected schools.'"></span>
                                 </div>
                             </div>
                         </div>
-                        <button type="button" class="rc-discover-bulk-clear-v36" wire:click="clearSelectedSchools">Clear</button>
                     </div>
-                @endif
-
-                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
-                    <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                    <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="clearSelection()">Clear</button>
                 </div>
 
-                @if($this->canLoadMoreSchools)
-                    <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
-                @endif
+                <div class="rc-discover-loading-v27">
+                    @include('filament.partials.coach-database-school-grid')
+                </div>
+
+                <div x-show="canLoadMore" style="margin-top:.35rem;text-align:center" x-cloak>
+                    <button class="rc-btn" type="button" x-on:click="loadMore()">Load more</button>
+                </div>
             </div>
         @endif
 
@@ -8615,7 +10003,101 @@
                         ->values()
                         ->all();
                 };
+                $allListSchoolOptions = collect($this->allSchools())
+                    ->filter(fn ($school): bool => is_array($school))
+                    ->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                        $name = (string) ($school['name'] ?? 'School');
+                        return [
+                            'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                            'name' => $name,
+                            'logo' => $listLogoUrlFor($school),
+                            'initials' => $listInitials($name),
+                        ];
+                    })
+                    ->filter(fn (array $school): bool => $school['id'] !== '')
+                    ->unique('id')
+                    ->values()
+                    ->all();
             @endphp
+
+            <style>
+                .rc-list-card-v120{background:#fff;border:1px solid #e7e9ee;border-radius:1rem;padding:1rem 1.15rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+                .rc-list-card-head-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+                .rc-list-card-title-v120{display:flex;align-items:center;gap:.72rem;min-width:0}
+                .rc-list-card-title-v120 strong{font-size:1rem;color:#111827}
+                .rc-list-card-actions-v120{display:flex;align-items:center;gap:.45rem;margin-left:auto}
+                .rc-list-action-v120{width:2.35rem;height:2.35rem;border:0;border-radius:.72rem;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s ease}
+                .rc-list-action-v120:hover,.rc-list-action-v120.is-active{background:#fff0ec;color:#ff6338}
+                .rc-list-email-v120{width:auto;padding:0 .9rem;gap:.45rem;background:#ff6338;color:#fff;font-weight:750;box-shadow:0 8px 20px rgba(255,99,56,.22)}
+                .rc-list-email-v120:hover{background:#ef5530;color:#fff}
+                .rc-list-panel-v120{margin-top:.85rem;display:grid;gap:.72rem}
+                .rc-list-confirm-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 1rem;border-radius:.8rem;background:#fee7e4;color:#b42318;font-weight:650}
+                .rc-list-confirm-actions-v120{display:flex;gap:.55rem}
+                .rc-list-confirm-actions-v120 button{border:0;border-radius:.65rem;padding:.62rem 1rem;font-weight:750;cursor:pointer}
+                .rc-list-confirm-cancel-v120{background:#fff;color:#344054}
+                .rc-list-confirm-delete-v120{background:#e94e43;color:#fff}
+                .rc-list-tools-v120{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}
+                .rc-list-search-v120{flex:1 1 20rem;position:relative}
+                .rc-list-search-v120 input{width:100%;height:2.75rem;border:1px solid #e1e5eb;border-radius:.72rem;padding:0 .9rem;background:#f8f9fb;color:#111827;outline:none}
+                .rc-list-search-v120 input:focus{border-color:#ff8b70;box-shadow:0 0 0 3px rgba(255,99,56,.1);background:#fff}
+                .rc-list-add-results-v120{position:absolute;z-index:40;top:calc(100% + .35rem);left:0;right:0;max-height:17rem;overflow:auto;background:#fff;border:1px solid #e2e6ec;border-radius:.75rem;box-shadow:0 18px 40px rgba(15,23,42,.18);padding:.35rem}
+                .rc-list-add-result-v120{width:100%;border:0;background:#fff;padding:.62rem .7rem;border-radius:.55rem;display:flex;align-items:center;gap:.65rem;text-align:left;cursor:pointer;color:#111827}
+                .rc-list-add-result-v120:hover{background:#fff3ef}
+                .rc-list-selection-bar-v120{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.72rem .85rem;border-radius:.72rem;background:#f7f8fa;flex-wrap:wrap}
+                .rc-list-selection-meta-v120{display:flex;gap:.8rem;align-items:center;color:#667085;font-size:.78rem}
+                .rc-list-selection-meta-v120 strong{color:#1d2939}
+                .rc-list-selection-meta-v120 button{border:0;background:transparent;color:#667085;cursor:pointer;padding:0}
+                .rc-list-selection-email-v120{border:0;border-radius:.65rem;background:#ff6338;color:#fff;padding:.62rem .9rem;font-weight:750;cursor:pointer}
+                .rc-list-chip-wrap-v120{display:flex;flex-wrap:wrap;gap:.55rem}
+                .rc-list-school-chip-v120{display:inline-flex;align-items:center;gap:.5rem;min-height:2.65rem;padding:.38rem .65rem;border:1px solid #e4e7ec;border-radius:.72rem;background:#f7f8fa;color:#111827;transition:.15s ease}
+                .rc-list-school-chip-v120.is-selected{border-color:#ff6338;background:#fff1ed}
+                .rc-list-chip-logo-v120{width:2rem;height:2rem;border-radius:.52rem;background:#fff;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;font-size:.72rem;flex:0 0 auto}
+                .rc-list-chip-logo-v120 img{width:100%;height:100%;object-fit:contain}
+                .rc-list-chip-name-v120{border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.35rem;height:1.35rem;border:0;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+                .rc-list-chip-check-v120{border:1px solid #d9dee7;border-radius:.35rem;background:#fff}
+                .rc-list-chip-check-v120.is-checked{background:#ff6338;border-color:#ff6338;color:#fff}
+                .rc-list-expand-v120{justify-self:start;border:1px solid #e2e6ec;border-radius:.65rem;background:#fff;color:#344054;padding:.62rem .9rem;font-weight:700;cursor:pointer}
+                .rc-list-rename-v120{display:flex;align-items:center;gap:.55rem}
+                .rc-list-rename-v120 input{height:2.55rem;min-width:14rem;border:1px solid #ff6338;border-radius:.65rem;padding:0 .75rem;outline:none}
+                .rc-list-rename-v120 button{height:2.55rem;border:0;border-radius:.65rem;padding:0 .8rem;font-weight:700;cursor:pointer}
+                .rc-list-empty-v120{color:#667085;font-size:.85rem;padding:.8rem 0}
+                .dark .rc-list-card-v120,.dark .rc-list-add-results-v120{background:#18181b;border-color:#34343b}
+
+                /* Compact My Lists controls and chips. */
+                .rc-list-card-v120{padding:1rem 1.05rem;border-radius:1rem}
+                .rc-list-card-head-v120{gap:.65rem;margin-bottom:.7rem}
+                .rc-list-card-title-v120{gap:.48rem}
+                .rc-list-card-title-v120 strong{font-size:1rem;font-weight:700}
+                .rc-list-count-pill-v41{min-height:1.7rem;padding:.15rem .58rem;font-size:.72rem;font-weight:500}
+                .rc-list-card-actions-v120{gap:.3rem}
+                .rc-list-action-v120{min-width:2.15rem;height:2.15rem;padding:0 .52rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-email-v120{padding:0 .7rem;gap:.35rem}
+                .rc-list-tools-v120{margin:.45rem 0}
+                .rc-list-search-v120{margin:.45rem 0}
+                .rc-list-search-v120 input{height:2.35rem;padding:0 .72rem;font-size:.8rem;border-radius:.58rem}
+                .rc-list-add-results-v120{max-height:14rem;border-radius:.65rem}
+                .rc-list-add-result-v120{min-height:2.25rem;padding:.38rem .55rem;font-size:.78rem;font-weight:500}
+                .rc-list-selection-bar-v120{min-height:3rem;padding:.55rem .7rem;border-radius:.65rem}
+                .rc-list-selection-meta-v120{gap:.55rem;font-size:.75rem}
+                .rc-list-selection-meta-v120 strong{font-size:.76rem;font-weight:650}
+                .rc-list-selection-email-v120{min-height:2.15rem;padding:0 .72rem;border-radius:.58rem;font-size:.75rem;font-weight:650}
+                .rc-list-chip-wrap-v120{gap:.42rem}
+                .rc-list-school-chip-v120{gap:.36rem;min-height:2.15rem;padding:.24rem .48rem;border-radius:.58rem;font-size:.78rem}
+                .rc-list-chip-logo-v120{width:1.65rem;height:1.65rem;border-radius:.45rem;font-size:.72rem}
+                .rc-list-chip-name-v120{font-size:.78rem;font-weight:550}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.45rem;height:1.45rem}
+                .rc-list-expand-v120{min-height:2.15rem;padding:0 .68rem;margin-top:.65rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-rename-v120{gap:.35rem;flex-wrap:wrap}
+                .rc-list-rename-v120 input{height:2.2rem;min-width:11rem;padding:0 .62rem;border-radius:.55rem;font-size:.8rem}
+                .rc-list-rename-v120 button{height:2.2rem;padding:0 .62rem;border-radius:.55rem;font-size:.74rem;font-weight:600}
+                .rc-list-rename-v120 .is-save{background:#ff6338;color:#fff}
+                .rc-list-rename-v120 .is-cancel{background:#f2f4f7;color:#344054}
+                .rc-list-inline-error-v121{flex-basis:100%;color:#d92d20;font-size:.7rem;font-weight:500}
+
+                .dark .rc-list-card-title-v120 strong,.dark .rc-list-add-result-v120,.dark .rc-list-school-chip-v120{color:#f4f4f5}
+                .dark .rc-list-school-chip-v120,.dark .rc-list-selection-bar-v120,.dark .rc-list-search-v120 input{background:#222226;border-color:#3f3f46}
+            </style>
 
             <div class="rc-my-lists-v41">
                 <div class="rc-my-lists-head-v41">
@@ -8623,7 +10105,7 @@
                         <h2>My Lists</h2>
                         <p>Organize schools into your own lists — Dream Schools, On the Radar, by conference, however you want.</p>
                     </div>
-                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)">
+                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)" data-rc-local-action>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                         New List
                     </button>
@@ -8634,22 +10116,10 @@
                         <input class="rc-input" placeholder="List name (e.g. Dream Schools)" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
                         <div class="rc-list-color-picker-v42" aria-label="Choose list color">
                             @foreach(['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'] as $colorOption)
-                                <button
-                                    type="button"
-                                    class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}"
-                                    style="color: {{ $colorOption }};"
-                                    wire:click="$set('newListColor', '{{ $colorOption }}')"
-                                    title="Use {{ $colorOption }}"
-                                    aria-label="Use list color {{ $colorOption }}"
-                                >
-                                    <span style="background: {{ $colorOption }};"></span>
-                                </button>
+                                <button type="button" class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}" style="color: {{ $colorOption }};" wire:click="$set('newListColor', '{{ $colorOption }}')"><span style="background: {{ $colorOption }};"></span></button>
                             @endforeach
                         </div>
-                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
-                            <span wire:loading.remove wire:target="createCustomList">Create</span>
-                            <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
-                        </button>
+                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList"><span wire:loading.remove wire:target="createCustomList">Create</span><span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span></button>
                         <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
                     </div>
                 @endif
@@ -8660,61 +10130,275 @@
                             $listKey = (string) ($list['key'] ?? '');
                             $listLabel = (string) ($list['label'] ?? 'List');
                             $listSchools = $schoolsForListKey($list);
-                            $schoolCount = count($listSchools);
-                            $isSelectedList = $selectedListKey === $listKey;
+                            $listSchoolsLight = collect($listSchools)->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                                $name = (string) ($school['name'] ?? 'School');
+                                return [
+                                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                                    'name' => $name,
+                                    'logo' => $listLogoUrlFor($school),
+                                    'initials' => $listInitials($name),
+                                ];
+                            })->values()->all();
                             $listColor = $safeListColor($list['color'] ?? null, $listIndex);
                         @endphp
-                        <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
-                            <div class="rc-list-card-head-v41">
-                                <div class="rc-list-card-title-v41">
+                        <article
+                            class="rc-list-card-v120"
+                            x-show="!deleted"
+                            x-cloak
+                            wire:key="list-card-{{ md5($listKey) }}"
+                            wire:ignore
+                            x-data="{
+                                key: @js($listKey),
+                                label: @js($listLabel),
+                                items: @js($listSchoolsLight),
+                                allSchools: @js($allListSchoolOptions),
+                                expanded: false,
+                                addOpen: false,
+                                selectMode: false,
+                                renameOpen: false,
+                                confirmDelete: false,
+                                deleted: false,
+                                deleting: false,
+                                deleteError: '',
+                                addQuery: '',
+                                listQuery: '',
+                                renameValue: @js($listLabel),
+                                selected: [],
+                                removing: {},
+                                adding: {},
+                                savingRename: false,
+                                renameError: '',
+                                get visibleItems() {
+                                    const q = this.listQuery.trim().toLowerCase();
+                                    const filtered = q === '' ? this.items : this.items.filter(s => String(s.name || '').toLowerCase().includes(q));
+                                    return this.expanded || q !== '' ? filtered : filtered.slice(0, 10);
+                                },
+                                get addResults() {
+                                    const q = this.addQuery.trim().toLowerCase();
+                                    if (q.length < 2) return [];
+                                    const current = new Set(this.items.map(s => String(s.id)));
+                                    return this.allSchools.filter(s => !current.has(String(s.id)) && String(s.name || '').toLowerCase().includes(q)).slice(0, 12);
+                                },
+                                isSelected(id) { return this.selected.includes(String(id)); },
+                                toggleSelected(id) {
+                                    id = String(id);
+                                    this.selected = this.isSelected(id) ? this.selected.filter(v => v !== id) : [...this.selected, id];
+                                },
+                                selectAllVisible() { this.selected = this.items.map(s => String(s.id)); },
+                                clearSelection() { this.selected = []; },
+                                async removeSchool(school) {
+                                    const id = String(school.id);
+                                    if (this.removing[id]) return;
+                                    const index = this.items.findIndex(s => String(s.id) === id);
+                                    if (index < 0) return;
+                                    this.renameError = '';
+                                    this.removing = { ...this.removing, [id]: true };
+                                    const removed = this.items[index];
+                                    this.items = this.items.filter(s => String(s.id) !== id);
+                                    this.selected = this.selected.filter(v => v !== id);
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: false });
+                                        if (!result || result.success === false) throw new Error(result?.error || 'Unable to remove school');
+                                    } catch (error) {
+                                        const copy = [...this.items];
+                                        copy.splice(Math.min(index, copy.length), 0, removed);
+                                        this.items = copy;
+                                        this.renameError = error?.message || 'Unable to remove this school.';
+                                        window.console.error(error);
+                                    } finally {
+                                        const next = { ...this.removing }; delete next[id]; this.removing = next;
+                                    }
+                                },
+                                async addSchool(schoolItem) {
+                                    const normalized = {
+                                        id: String(schoolItem?.id || ''),
+                                        name: String(schoolItem?.name || 'School'),
+                                        logo: String(schoolItem?.logo || ''),
+                                        initials: String(schoolItem?.initials || ''),
+                                    };
+                                    const id = normalized.id;
+                                    if (!id || this.adding[id] || this.items.some(item => String(item.id) === id)) return;
+
+                                    // Add to the visible list immediately. The remote GHL action
+                                    // is queued afterward and does not block the interface.
+                                    this.renameError = '';
+                                    this.items = [...this.items, normalized];
+                                    this.addQuery = '';
+                                    this.expanded = true;
+                                    this.adding = { ...this.adding, [id]: true };
+
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: true });
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to add school');
+                                        }
+                                    } catch (error) {
+                                        this.items = this.items.filter(item => String(item.id) !== id);
+                                        this.renameError = error?.message || 'Unable to add school.';
+                                        window.console.error(error);
+                                    } finally {
+                                        const nextAdding = { ...this.adding };
+                                        delete nextAdding[id];
+                                        this.adding = nextAdding;
+                                    }
+                                },
+                                async emailAll() { await $wire.call('emailSchoolsInList', this.key); },
+                                async emailSelected() {
+                                    if (this.selected.length === 0) return;
+                                    await $wire.call('emailSchoolIdsFromList', this.selected, this.key);
+                                },
+                                async saveRename() {
+                                    const nextLabel = String(this.renameValue || '').trim();
+                                    if (!nextLabel || this.savingRename) return;
+
+                                    this.savingRename = true;
+                                    this.renameError = '';
+
+                                    try {
+                                        const result = await $wire.call('renameRecruitingList', this.key, nextLabel);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to rename this list.');
+                                        }
+
+                                        this.label = String(result.label || nextLabel);
+                                        this.renameValue = this.label;
+                                        this.renameOpen = false;
+                                    } catch (error) {
+                                        this.renameError = error?.message || 'Unable to rename this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.savingRename = false;
+                                    }
+                                },
+                                async deleteList() {
+                                    if (this.deleting) return;
+
+                                    this.deleting = true;
+                                    this.deleteError = '';
+
+                                    try {
+                                        const result = await $wire.call('deleteCustomList', this.key);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to delete this list.');
+                                        }
+
+                                        // The card is wire:ignore, so remove it optimistically
+                                        // instead of waiting for a Livewire DOM morph.
+                                        this.confirmDelete = false;
+                                        this.deleted = true;
+                                        this.items = [];
+                                        this.selected = [];
+                                    } catch (error) {
+                                        this.deleteError = error?.message || 'Unable to delete this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.deleting = false;
+                                    }
+                                }
+                            }"
+                        >
+                            <div class="rc-list-card-head-v120">
+                                <div class="rc-list-card-title-v120">
                                     <span class="rc-list-dot-v41" style="--list-color: {{ $listColor }};"></span>
-                                    <strong>{{ $listLabel }}</strong>
-                                    <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
+                                    <template x-if="!renameOpen"><strong x-text="label"></strong></template>
+                                    <template x-if="renameOpen">
+                                        <span class="rc-list-rename-v120">
+                                            <input type="text" x-model="renameValue" x-on:keydown.enter.prevent="saveRename()" x-on:keydown.escape.prevent="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">
+                                            <button type="button" class="is-save" x-on:click="saveRename()" x-bind:disabled="savingRename || !renameValue.trim()">
+                                                <span x-show="!savingRename">Save</span>
+                                                <span x-show="savingRename" x-cloak>Saving…</span>
+                                            </button>
+                                            <button type="button" class="is-cancel" x-on:click="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">Cancel</button>
+                                            <small class="rc-list-inline-error-v121" x-show="renameError" x-text="renameError"></small>
+                                        </span>
+                                    </template>
+                                    <span class="rc-list-count-pill-v41"><span x-text="items.length.toLocaleString()"></span> <span x-text="items.length === 1 ? 'school' : 'schools'"></span></span>
                                 </div>
-                                <div class="rc-list-card-actions-v41">
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="startAddingSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" title="Add schools to {{ $listLabel }}" aria-label="Add schools to {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+
+                                <div class="rc-list-card-actions-v120">
+                                    <!-- <button type="button" class="rc-list-action-v120 rc-list-email-v120" x-on:click="emailAll()" title="Email all schools in this list">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
+                                        Email Schools
+                                    </button> -->
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="selectMode ? 'is-active' : ''" x-on:click="selectMode=!selectMode" title="Select specific schools to email">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41 {{ $isSelectedList ? 'is-active' : '' }}" wire:click="selectList({{ \Illuminate\Support\Js::from($listKey) }})" title="Open {{ $listLabel }}" aria-label="Open {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="addOpen ? 'is-active' : ''" x-on:click="addOpen=!addOpen" title="Add a school">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="deleteCustomList({{ \Illuminate\Support\Js::from($listKey) }})" wire:confirm="Remove this list? This does not delete schools or coaches." title="Delete {{ $listLabel }}" aria-label="Delete {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="renameOpen ? 'is-active' : ''" x-on:click="renameOpen=!renameOpen;renameValue=label;renameError=''" title="Rename list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-action-v120" x-on:click="confirmDelete=true" title="Delete list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="rc-list-chip-wrap-v41">
-                                @forelse($listSchools as $school)
-                                    @php
-                                        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? '');
-                                        $schoolName = (string) ($school['name'] ?? 'School');
-                                        $logoUrl = $listLogoUrlFor($school);
-                                        $initials = $listInitials($schoolName);
-                                    @endphp
-                                    <span class="rc-list-school-chip-v41" wire:key="list-chip-{{ md5($listKey.'-'.$schoolId) }}">
-                                        <span class="rc-list-chip-logo-v41">
-                                            @if($logoUrl !== '')
-                                                <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
-                                            @else
-                                                {{ $initials }}
-                                            @endif
-                                        </span>
-                                        <button type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">{{ $schoolName }}</button>
-                                        <button type="button" class="rc-list-chip-remove-v41" wire:click="removeSchoolFromListById({{ \Illuminate\Support\Js::from($schoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" title="Remove {{ $schoolName }} from {{ $listLabel }}" aria-label="Remove {{ $schoolName }} from {{ $listLabel }}">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                            <div class="rc-list-panel-v120">
+                                <div class="rc-list-confirm-v120" x-show="confirmDelete" x-cloak>
+                                    <span>Delete “<span x-text="label"></span>” and its schools?</span>
+                                    <span class="rc-list-confirm-actions-v120">
+                                        <button type="button" class="rc-list-confirm-cancel-v120" x-on:click="confirmDelete=false;deleteError=''" x-bind:disabled="deleting">Cancel</button>
+                                        <button type="button" class="rc-list-confirm-delete-v120" x-on:click="deleteList()" x-bind:disabled="deleting">
+                                            <span x-show="!deleting">Delete</span>
+                                            <span x-show="deleting" x-cloak>Deleting…</span>
                                         </button>
                                     </span>
-                                @empty
-                                    <div class="rc-subtle">No schools in this list yet. Use the plus button to add schools from Discover Schools.</div>
-                                @endforelse
+                                    <small class="rc-list-inline-error-v121" x-show="deleteError" x-text="deleteError"></small>
+                                </div>
+
+                                <div class="rc-list-tools-v120" x-show="addOpen" x-cloak>
+                                    <div class="rc-list-search-v120">
+                                        <input type="search" placeholder="Search a school to add..." x-model.debounce.150ms="addQuery">
+                                        <div class="rc-list-add-results-v120" x-show="addResults.length > 0" x-cloak>
+                                            <template x-for="schoolItem in addResults" :key="`add-${key}-${schoolItem.id}`">
+                                                <button type="button" class="rc-list-add-result-v120" x-on:click.prevent.stop="addSchool(schoolItem)" x-bind:disabled="Boolean(adding[String(schoolItem.id)])">
+                                                    <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                                    <span x-text="schoolItem.name"></span>
+                                                    <span class="rc-spinner-mini" x-show="Boolean(adding[String(schoolItem.id)])" x-cloak></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rc-list-selection-bar-v120" x-show="selectMode" x-cloak>
+                                    <div class="rc-list-selection-meta-v120">
+                                        <strong><span x-text="selected.length"></span> of <span x-text="items.length"></span> selected</strong>
+                                        <button type="button" x-on:click="selectAllVisible()">Select all</button>
+                                        <button type="button" x-on:click="clearSelection()">Clear</button>
+                                    </div>
+                                    <button type="button" class="rc-list-selection-email-v120" x-bind:disabled="selected.length === 0" x-on:click="emailSelected()">Email Selected (<span x-text="selected.length"></span>)</button>
+                                </div>
+
+                                <div class="rc-list-search-v120" x-show="items.length > 10 || listQuery !== ''" x-cloak>
+                                    <input type="search" placeholder="Search in this list..." x-model.debounce.120ms="listQuery">
+                                </div>
+
+                                <div class="rc-list-chip-wrap-v120">
+                                    <template x-for="schoolItem in visibleItems" :key="`list-${key}-${schoolItem.id}`">
+                                        <span class="rc-list-school-chip-v120" x-bind:class="isSelected(schoolItem.id) ? 'is-selected' : ''">
+                                            <button type="button" class="rc-list-chip-check-v120" x-show="selectMode" x-bind:class="isSelected(schoolItem.id) ? 'is-checked' : ''" x-on:click.prevent.stop="toggleSelected(schoolItem.id)">
+                                                <svg x-show="isSelected(schoolItem.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg>
+                                            </button>
+                                            <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                            <button type="button" class="rc-list-chip-name-v120" x-text="schoolItem.name" x-on:click.prevent.stop="$wire.call('openSchoolDashboardModal', schoolItem.id)"></button>
+                                            <button type="button" class="rc-list-chip-remove-v120" x-show="!selectMode" x-on:click.prevent.stop="removeSchool(schoolItem)" title="Remove school">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                            </button>
+                                        </span>
+                                    </template>
+                                    <div class="rc-list-empty-v120" x-show="items.length === 0">No schools in this list yet. Use the plus button to add one.</div>
+                                </div>
+
+                                <button type="button" class="rc-list-expand-v120" x-show="items.length > 10 && listQuery === ''" x-on:click="expanded=!expanded">
+                                    <span x-text="expanded ? 'Show fewer schools' : `See All ${items.length.toLocaleString()} Schools`"></span>
+                                </button>
                             </div>
                         </article>
                     @empty
-                        <div class="rc-list-empty-card-v41">
-                            <strong>No lists yet.</strong>
-                            <div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div>
-                        </div>
+                        <div class="rc-list-empty-card-v41"><strong>No lists yet.</strong><div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div></div>
                     @endforelse
                 </div>
             </div>
@@ -8739,6 +10423,48 @@
                 'showNewEmail' => false,
             ])
 
+
+
+            <style>
+                .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
+                .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
+
+                .rc-inbox-shell-v56,
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    scroll-behavior: auto !important;
+                    overscroll-behavior: contain;
+                    contain: layout paint style;
+                }
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    transform: translateZ(0);
+                    will-change: auto;
+                }
+                .rc-inbox-message-v56 {
+                    content-visibility: auto;
+                    contain-intrinsic-size: 9rem;
+                    contain: layout paint style;
+                }
+                .rc-msg-bubble-v56,
+                .rc-msg-bubble-v56 * {
+                    max-width: 100%;
+                }
+                .rc-msg-bubble-v56 a {
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                }
+
+                .rc-inbox-history-trimmed{margin:.3rem 0 .7rem;padding:.5rem .7rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.72rem;text-align:center;}
+
+                @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
+                @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
+            </style>
+
+            <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
+                Loading conversations. Use the refresh button to update the inbox.
+            </div>
+
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
@@ -8761,6 +10487,7 @@
                 $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
                 $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
+                $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = $conversationStatusFilter ?? 'all';
                 $threadInitials = function (string $name): string {
@@ -8804,9 +10531,147 @@
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
+                $renderInboxMessageBody = function ($body): string {
+                    $raw = trim((string) $body);
+
+                    if ($raw === '') {
+                        return '<p>No message body.</p>';
+                    }
+
+                    $decoded = $raw;
+                    for ($decodePass = 0; $decodePass < 3; $decodePass++) {
+                        $nextDecoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        if ($nextDecoded === $decoded) {
+                            break;
+                        }
+                        $decoded = $nextDecoded;
+                    }
+                    $hasHtml = preg_match('/<\s*(?:!doctype|html|head|body|meta|style|p|div|br|a|img|table|thead|tbody|tfoot|tr|td|th|ul|ol|li|span|strong|em|blockquote|h[1-6])\b/i', $decoded);
+
+                    $shortUrlLabel = function (string $url): string {
+                        $path = parse_url($url, PHP_URL_PATH) ?: '';
+                        $host = parse_url($url, PHP_URL_HOST) ?: '';
+
+                        if (str_contains($path, '/track/profile/')) {
+                            return 'View My Player Profile';
+                        }
+
+                        if (str_contains($path, '/track/click/')) {
+                            return 'Open tracked link';
+                        }
+
+                        $label = trim($host . $path);
+                        $label = $label !== '' ? $label : $url;
+
+                        if (mb_strlen($label) > 58) {
+                            $label = mb_substr($label, 0, 32) . '...' . mb_substr($label, -16);
+                        }
+
+                        return $label;
+                    };
+
+                    $renderPlainWithLinks = function (string $text) use ($shortUrlLabel): string {
+                        $parts = preg_split('/(https?:\/\/[^\s<]+)/i', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+
+                        if (! is_array($parts) || $parts === []) {
+                            return nl2br(e($text));
+                        }
+
+                        $html = '';
+
+                        foreach ($parts as $part) {
+                            if (! preg_match('/^https?:\/\//i', $part)) {
+                                $html .= e($part);
+                                continue;
+                            }
+
+                            $url = rtrim($part, "\"'.,;:!?)]}");
+                            $suffix = substr($part, strlen($url));
+
+                            if (str_ends_with($html, '[') && str_starts_with($suffix, ']')) {
+                                $html = substr($html, 0, -1);
+                                $suffix = substr($suffix, 1);
+                            }
+
+                            $safeUrl = e($url);
+
+                            if (preg_match('/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i', $url)) {
+                                $html .= '<a class="rc-message-image-link" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'
+                                    . '<img src="'.$safeUrl.'" alt="Conversation image" loading="lazy" referrerpolicy="no-referrer">'
+                                    . '</a>';
+                            } else {
+                                $label = e($shortUrlLabel($url));
+                                $html .= '<a class="rc-message-link-short" href="'.$safeUrl.'" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
+                            }
+
+                            if ($suffix !== '') {
+                                $html .= e($suffix);
+                            }
+                        }
+
+                        return nl2br($html);
+                    };
+
+                    if (! $hasHtml) {
+                        return $renderPlainWithLinks($decoded);
+                    }
+
+                    $clean = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $decoded) ?? $decoded;
+                    $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+                    $clean = preg_replace('/javascript\s*:/i', '', $clean) ?? $clean;
+
+                    if (class_exists(\DOMDocument::class)) {
+                        try {
+                            $document = new \DOMDocument('1.0', 'UTF-8');
+                            $previous = libxml_use_internal_errors(true);
+                            $document->loadHTML('<?xml encoding="utf-8" ?><div data-rc-message-root="1">' . $clean . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+                            libxml_clear_errors();
+                            libxml_use_internal_errors($previous);
+
+                            foreach ($document->getElementsByTagName('a') as $anchor) {
+                                $href = trim((string) $anchor->getAttribute('href'));
+                                $label = trim((string) $anchor->textContent);
+
+                                if ($href === '' || $anchor->getElementsByTagName('img')->length > 0) {
+                                    continue;
+                                }
+
+                                $labelLooksLikeUrl = preg_match('/^https?:\/\//i', $label) || str_contains($label, '/track/profile/') || str_contains($label, '/track/click/');
+                                $shouldShortenAnchor = $label === '' || $label === $href || $labelLooksLikeUrl || mb_strlen($label) > 90;
+
+                                if ($shouldShortenAnchor) {
+                                    while ($anchor->firstChild) {
+                                        $anchor->removeChild($anchor->firstChild);
+                                    }
+
+                                    $anchor->appendChild($document->createTextNode($shortUrlLabel($href)));
+                                    $anchor->setAttribute('class', trim($anchor->getAttribute('class') . ' rc-message-link-short'));
+                                }
+
+                                $anchor->setAttribute('target', '_blank');
+                                $anchor->setAttribute('rel', 'noopener noreferrer');
+                            }
+
+                            $root = $document->getElementsByTagName('div')->item(0);
+                            if ($root) {
+                                $next = '';
+                                foreach ($root->childNodes as $child) {
+                                    $next .= $document->saveHTML($child);
+                                }
+                                if (trim($next) !== '') {
+                                    $clean = $next;
+                                }
+                            }
+                        } catch (\Throwable $exception) {
+                            // Keep sanitized HTML when DOM cleanup is unavailable.
+                        }
+                    }
+
+                    return $clean;
+                };
             @endphp
 
-            <div class="rc-inbox-page-v56" wire:poll.12s.visible="pollConversationUpdates">
+            <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
@@ -8815,8 +10680,11 @@
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 </button>
-                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="loadConversations" title="Refresh conversations" aria-label="Refresh conversations">
+                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime" title="Refresh conversations" aria-label="Refresh conversations">
+                                <span wire:loading.remove wire:target="refreshConversationsRealtime">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </span>
+                                <span wire:loading.flex wire:target="refreshConversationsRealtime" class="rc-spinner-mini"></span>
                                 </button>
                             </div>
                         </div>
@@ -8834,7 +10702,11 @@
                             <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
                         </div>
 
-                        <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+                        @if(empty($inboxConversations))
+                            <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
+                                <span class="rc-spinner-mini"></span> Loading inbox
+                            </div>
+                        @endif
 
                         <div class="rc-inbox-list-v56">
                             @forelse($inboxConversations as $inboxConversation)
@@ -8849,10 +10721,10 @@
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" data-rc-open="conversation" data-rc-title="{{ $inboxContactName }}" data-rc-copy="Opening the conversation now. Messages will load inside the thread." wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
-                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ $threadInitials($inboxContactName) }}
                                         @endif
@@ -8880,7 +10752,7 @@
                                 <div class="rc-inbox-coach-title-v56">
                                     <span class="rc-inbox-school-logo-v56">
                                         @if($selectedSchoolLogo !== '')
-                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ strtoupper(substr($selectedSchool, 0, 2)) }}
                                         @endif
@@ -8895,17 +10767,29 @@
                                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
                                         Open in Composer
                                     </button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
                                     <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                     <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
                                 </div>
                             </div>
 
-                            <div class="rc-message-stream-v56">
+                            <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
+                                <div class="rc-thread-loading-skeleton {{ $isLoadingConversationMessages ? 'is-visible' : '' }}">
+                                    <span class="rc-skeleton"></span>
+                                    <span class="rc-skeleton"></span>
+                                    <span class="rc-skeleton"></span>
+                                </div>
                                 @if(empty($threadMessages))
-                                    <div class="rc-inbox-empty-v56"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
+                                    <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
-                                    @foreach($threadMessages as $message)
+                                    @php
+                                        $visibleThreadMessages = collect($threadMessages)->take(-30)->values();
+                                        $hiddenThreadMessageCount = max(0, count($threadMessages) - $visibleThreadMessages->count());
+                                    @endphp
+                                    @if($hiddenThreadMessageCount > 0)
+                                        <div class="rc-inbox-history-trimmed">Showing the latest {{ $visibleThreadMessages->count() }} messages. Use “Load older emails” to view earlier history.</div>
+                                    @endif
+                                    @foreach($visibleThreadMessages as $message)
                                         @php
                                             $message = is_array($message) ? $message : [];
                                             $isOut = str_contains(strtolower((string) ($message['direction'] ?? $message['type'] ?? '')), 'out');
@@ -8914,7 +10798,18 @@
                                             if (is_array($toLabel)) {
                                                 $toLabel = collect($toLabel)->map(fn($item) => is_array($item) ? ($item['email'] ?? $item['name'] ?? $item['address'] ?? '') : (is_scalar($item) ? (string) $item : ''))->filter()->implode(', ');
                                             }
-                                            $messageBody = (string) ($message['body'] ?? $message['html'] ?? $message['text'] ?? '');
+                                            // Email is HTML-first. Only use the plain-text part when the
+                                            // API did not return a usable HTML body.
+                                            $messageBody = (string) (
+                                                $message['html_body']
+                                                ?? $message['htmlBody']
+                                                ?? $message['message_html']
+                                                ?? $message['html']
+                                                ?? $message['body']
+                                                ?? $message['text_body']
+                                                ?? $message['text']
+                                                ?? ''
+                                            );
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
                                         @endphp
@@ -8922,7 +10817,7 @@
                                             <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
-                                                <div class="rc-msg-bubble-v56">{!! $messageBody !== '' ? $messageBody : '<p>No message body.</p>' !!}</div>
+                                                <div class="rc-msg-bubble-v56">{!! $renderInboxMessageBody($messageBody) !!}</div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
                                                         @foreach($messageAttachments as $attachment)
@@ -8933,7 +10828,7 @@
                                                                 $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
                                                             @endphp
                                                             @if($isImageAttachment)
-                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}">
+                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}" loading="lazy" decoding="async">
                                                             @else
                                                                 <a class="rc-message-attachment-link" href="{{ $attachmentUrl }}" target="_blank" rel="noopener">Open {{ $attachmentName }}</a>
                                                             @endif
@@ -8968,16 +10863,16 @@
 
                                 <div class="rc-contact-lines-v56">
                                     <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6Zm0 0 8 7 8-7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>{{ data_get($selectedCoach, 'email') ?? $selectedConversation['email'] ?? 'Email unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div>
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div> -->
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
 
-                                <div class="rc-profile-actions-v56">
+                                <!-- <div class="rc-profile-actions-v56">
                                     <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
-                                </div>
+                                </div> -->
 
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
@@ -9077,6 +10972,10 @@
                 'showNewEmail' => false,
             ])
 
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Preparing templates and recipient data. You can keep editing while it refreshes.
+            </div>
+
             <style>
                 .rc-compose-page-v45 { display:grid; gap:1rem; }
                 .rc-compose-titlebar-v45 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
@@ -9131,7 +11030,90 @@
                 @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
             </style>
 
-            <div class="rc-compose-page-v45">
+            <div class="rc-compose-page-v45"
+                x-data="{
+                    dataset: @js($this->composeClientDataset),
+                    schoolQuery: '',
+                    coachQuery: '',
+                    selectedSchoolId: @js((string) ($campaignSchoolId ?? '')),
+                    targetMode: @js((string) ($campaignTargetMode ?? 'school')),
+                    headCoachOnly: @js((bool) ($campaignHeadCoachOnly ?? true)),
+                    chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
+                    selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
+                    coachRevision: 0,
+                    sendingFast: false,
+                    get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
+                    get schoolResults() {
+                        const q = String(this.schoolQuery || '').trim().toLowerCase();
+                        if (!q) return [];
+                        return this.schools.filter(row => String(row.search_text || '').includes(q)).slice(0, 15);
+                    },
+                    get selectedSchool() {
+                        return this.schools.find(row => String(row.id) === String(this.selectedSchoolId)) || null;
+                    },
+                    get schoolCoaches() {
+                        return Array.isArray(this.selectedSchool?.coaches) ? this.selectedSchool.coaches : [];
+                    },
+                    get visibleCoaches() {
+                        const q = String(this.coachQuery || '').trim().toLowerCase();
+                        if (!q) return this.schoolCoaches;
+                        return this.schoolCoaches.filter(row => String(row.search_text || '').includes(q));
+                    },
+                    get activeCoachIds() {
+                        if (!this.selectedSchool) return [];
+                        if (this.targetMode === 'coaches') return Array.from(this.selectedCoachIds);
+                        if (this.headCoachOnly) {
+                            const head = this.schoolCoaches.find(row => row.is_head) || this.schoolCoaches[0];
+                            return head ? [String(head.id)] : [];
+                        }
+                        return this.schoolCoaches.map(row => String(row.id));
+                    },
+                    get recipientCount() { this.coachRevision; return this.activeCoachIds.length; },
+                    get sendingDescription() {
+                        if (!this.selectedSchool) return 'No school selected — search to add one below';
+                        if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
+                        return `Sending to ${this.headCoachOnly ? 'head coach only' : 'all coaches'} at ${this.selectedSchool.name}`;
+                    },
+                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.has(String(id || '')); },
+                    toggleCoach(id) {
+                        id = String(id || ''); if (!id) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.selectedCoachIds.has(id) ? this.selectedCoachIds.delete(id) : this.selectedCoachIds.add(id);
+                        this.coachRevision++;
+                    },
+                    selectAllCoaches() {
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    clearCoaches() { this.selectedCoachIds.clear(); this.coachRevision++; },
+                    clearRecipients() {
+                        this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
+                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++;
+                    },
+                    chooseSchool(school) {
+                        const id = String(school?.id || ''); if (!id) return;
+                        this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
+                        this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
+                        this.selectedCoachIds.clear(); this.coachRevision++;
+                    },
+                    chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
+                    chooseAllCoaches() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = false; this.chooserOpen = false; this.coachRevision++; },
+                    chooseSpecificCoaches() {
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        if (!this.selectedCoachIds.size) this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    async sendFast() {
+                        if (this.sendingFast) return;
+                        if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
+                        this.sendingFast = true;
+                        try {
+                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, Array.from(this.selectedCoachIds));
+                        } finally { this.sendingFast = false; }
+                    },
+                }">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -9146,15 +11128,15 @@
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
-                        <button class="rc-btn" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
+                        <button class="rc-btn" type="button" wire:click="openSaveComposeTemplatePrompt" wire:loading.attr="disabled" wire:target="openSaveComposeTemplatePrompt">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-                            <span wire:loading.remove wire:target="saveTemplate">Save as Template</span>
-                            <span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                            <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
+                            <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
-                        <button class="rc-btn rc-btn-primary" type="button" wire:click="sendComposedEmail" wire:loading.attr="disabled" wire:target="sendComposedEmail">
+                        <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
-                            <span wire:loading.remove wire:target="sendComposedEmail">{{ $this->composeTargetLabel }}</span>
-                            <span wire:loading.flex wire:target="sendComposedEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                            <span x-show="!sendingFast" x-text="recipientCount > 0 ? `Send to ${recipientCount.toLocaleString()} coach${recipientCount === 1 ? '' : 'es'}` : 'Add a school'"></span>
+                            <span x-cloak x-show="sendingFast" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
                         </button>
                     </div>
                 </div>
@@ -9165,97 +11147,62 @@
                             <div>
                                 <div class="rc-compose-label-v45">Recipients</div>
                                 <div class="rc-compose-recipient-bar-v45">
-                                    @if(is_array($this->composeSelectedSchool))
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients">×</button></span>
-                                    @elseif($campaignTargetMode === 'list' && $campaignListKey)
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedList['label'] ?? 'Selected List' }} ({{ number_format($this->campaignRecipientCount) }} coaches) <button type="button" wire:click="$set('campaignListKey','')">×</button></span>
-                                    @elseif($campaignTargetMode === 'coaches' && count($campaignCoachIds))
-                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection">×</button></span>
-                                    @else
-                                        <em class="rc-subtle">No school selected — search to add one below</em>
-                                    @endif
+                                    <template x-if="selectedSchool">
+                                        <span class="rc-compose-chip-v45"><span x-text="`${selectedSchool.name} (${schoolCoaches.length.toLocaleString()} coaches)`"></span> <button type="button" x-on:click="clearRecipients()">×</button></span>
+                                    </template>
+                                    <template x-if="!selectedSchool"><em class="rc-subtle">No school selected — search to add one below</em></template>
 
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches">All Coaches</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser">Choose Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && headCoachOnly}" x-on:click="chooseHeadCoach()">Head Coach Only</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && !headCoachOnly}" x-on:click="chooseAllCoaches()">All Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='coaches'}" x-on:click="chooseSpecificCoaches()">Choose Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
                                 </div>
 
                                 <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
                                     <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
                                         <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
-                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.300ms="composeSchoolSearch" />
-                                        @if(trim($composeSchoolSearch) !== '')
-                                            <button type="button" class="rc-global-search-clear" wire:click="$set('composeSchoolSearch','')" aria-label="Clear school search">×</button>
-                                        @endif
+                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." x-model="schoolQuery" />
+                                        <button x-cloak x-show="schoolQuery.length" type="button" class="rc-global-search-clear" x-on:click="schoolQuery=''" aria-label="Clear school search">×</button>
                                     </div>
-
-                                    @if(trim($composeSchoolSearch) !== '')
-                                        <div class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
-                                            @forelse($this->composeSchoolResults as $school)
-                                                <?php
-                                                    $sid = (string) ($school['id'] ?? '');
-                                                    $schoolName = (string) ($school['name'] ?? 'School');
-                                                    $schoolLogo = (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '');
-                                                    $coachCount = (int) ($school['coach_count'] ?? 0);
-                                                    $detail = trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • '));
-                                                ?>
-                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))">
-                                                    <span class="rc-global-suggestion-icon">
-                                                        @if($schoolLogo !== '')
-                                                            <img src="{{ $schoolLogo }}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($schoolName) }}';">
-                                                        @else
-                                                            {{ $globalSearchInitials($schoolName) }}
-                                                        @endif
-                                                    </span>
-                                                    <span class="rc-global-suggestion-copy">
-                                                        <strong>{{ $schoolName }}</strong>
-                                                        <small>{{ $detail !== '' ? $detail : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ $coachCount === 1 ? 'coach' : 'coaches' }}</small>
-                                                    </span>
-                                                    <span class="rc-global-suggestion-category">School</span>
-                                                </button>
-                                            @empty
-                                                <div class="rc-empty-state" style="padding:.8rem">No schools found for “{{ $composeSchoolSearch }}”.</div>
-                                            @endforelse
-                                        </div>
-                                    @endif
+                                    <div x-cloak x-show="schoolQuery.length" class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
+                                        <template x-for="school in schoolResults" :key="school.id">
+                                            <button type="button" class="rc-global-suggestion-item" x-on:pointerdown.prevent.stop x-on:click.prevent.stop="chooseSchool(school)">
+                                                <span class="rc-global-suggestion-icon">
+                                                    <template x-if="school.logo_url"><img :src="school.logo_url" alt="" referrerpolicy="no-referrer"></template>
+                                                    <template x-if="!school.logo_url"><span x-text="String(school.name).split(/\s+/).slice(0,2).map(v=>v[0]).join('').toUpperCase()"></span></template>
+                                                </span>
+                                                <span class="rc-global-suggestion-copy"><strong x-text="school.name"></strong><small><span x-text="[school.conference,school.division].filter(Boolean).join(' • ') || 'Conference unavailable'"></span> · <span x-text="Number(school.coach_count||0).toLocaleString()"></span> coaches</small></span>
+                                                <span class="rc-global-suggestion-category">School</span>
+                                            </button>
+                                        </template>
+                                        <div x-show="schoolResults.length===0" class="rc-empty-state" style="padding:.8rem">No schools found.</div>
+                                    </div>
                                 </div>
 
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
-                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.500ms="campaignCc" />
-                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.500ms="campaignBcc" />
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
                                     </div>
                                 @endif
 
-                                @if($composeChooseCoachesOpen || ($campaignTargetMode === 'coaches' && is_array($this->composeSelectedSchool)))
+                                <div x-cloak x-show="selectedSchool && chooserOpen" style="margin-top:.65rem">
+                                    <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
-                                        @foreach($this->composeSchoolCoaches as $coach)
-                                            <?php $cid = (string) ($coach['id'] ?? ''); $selectedCoach = in_array($cid, $campaignCoachIds, true); ?>
-                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))">
-                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45">{{ $selectedCoach ? '✓' : '' }}</span><span>{{ $coach['name'] ?? 'Coach' }}</span>@if(str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'))<span style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>@endif</span>
-                                                <span class="rc-compose-coach-title-v45">{{ $coach['title'] ?? 'Coach' }}</span>
+                                        <template x-for="coach in visibleCoaches" :key="coach.id">
+                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{'is-selected':coachSelected(coach.id)}" x-on:click="toggleCoach(coach.id)">
+                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="coachSelected(coach.id) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
+                                                <span class="rc-compose-coach-title-v45" x-text="coach.title"></span>
                                             </button>
-                                        @endforeach
+                                        </template>
                                     </div>
                                     <div style="display:flex;gap:.45rem;margin-top:.55rem">
-                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches">Select all</button>
-                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection">Clear coaches</button>
+                                        <button type="button" class="rc-btn" x-on:click="selectAllCoaches()">Select all</button>
+                                        <button type="button" class="rc-btn" x-on:click="clearCoaches()">Clear coaches</button>
                                     </div>
-                                @elseif($campaignTargetMode === 'list')
-                                    <div style="margin-top:.65rem;max-width:28rem">
-                                        <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
-                                            <option value="">Select a list</option>
-                                            @foreach($lists as $list)
-                                                <option value="{{ $list['key'] ?? '' }}">{{ $list['label'] ?? 'List' }} ({{ number_format($list['coaches_count'] ?? $list['count'] ?? 0) }})</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                @endif
-
-                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem">
-                                    {{ $this->composeSendingDescription }}
                                 </div>
+
+                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem" x-text="sendingDescription"></div>
                             </div>
 
                             <div>
@@ -9322,7 +11269,7 @@
                                         data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
                                         x-on:input="queueSync()"
                                         x-on:blur="syncNow()"
-                                    >{!! $campaignBody ?? '' !!}</div>
+                                    ></div>
                                     <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model.live.debounce.800ms="campaignBody" />
                                     <div class="rc-compose-editor-foot-v45">
                                         <div class="rc-compose-icon-row-v45">
@@ -9414,6 +11361,10 @@
 
         @if($section === 'campaigns')
             @include('filament.partials.coach-database-header')
+
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Refreshing templates. Cached and built-in templates remain available.
+            </div>
 
             @php
                 $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));
@@ -9537,7 +11488,7 @@
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -9782,12 +11733,17 @@
                 }
                 $slideInitials = strtoupper(collect(preg_split('/\s+/', trim($slideSchoolName)) ?: [])->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
                 $listRows = collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values();
-                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->values();
+                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->filter()->unique()->values();
+                $initialListMemberships = $listRows->mapWithKeys(function ($listRow) use ($schoolListKeys) {
+                    $key = (string) ($listRow['key'] ?? '');
+                    return $key === '' ? [] : [$key => $schoolListKeys->contains(strtolower($key))];
+                })->all();
+                $slideCommunicationRows = collect($this->schoolCommunicationHistories[$slideSchoolId] ?? [])->values();
             @endphp
 
-            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel" x-data="{ tab: 'coaches', listsOpen: false }" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
-                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
+            <div class="rc-drawer rc-school-modal-backdrop rc-ui-stable-modal" wire:key="school-drawer-{{ $slideSchoolId }}" x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcRequestSchoolClose($el); }" data-rc-modal="school" data-rc-modal-id="school-{{ $slideSchoolId }}" data-rc-school-id="{{ $slideSchoolId }}" data-rc-drawer-backdrop>
+                <div class="rc-drawer-panel rc-school-modal-panel rc-ui-stable-panel" wire:ignore.self x-data="window.rcSchoolDrawer ? window.rcSchoolDrawer({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($initialListMemberships) }}, @js((bool) ($slideSchool['is_favorite'] ?? false))) : { tab: 'coaches', listsOpen: false, optimisticLists: {{ \Illuminate\Support\Js::from($initialListMemberships) }}, isInList(key, value) { return Object.prototype.hasOwnProperty.call(this.optimisticLists || {}, String(key || '')) ? Boolean(this.optimisticLists[String(key || '')]) : Boolean(value) }, hasAnyList() { return Object.entries(this.optimisticLists || {}).some(([key, value]) => this.isInList(key, value)) }, isListPending() { return false }, toggleList() {} }" x-init="init && init()" x-on:click.stop x-on:pointerdown.stop x-on:mousedown.stop x-on:touchstart.stop data-rc-interaction-boundary role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                    <button class="rc-school-modal-close" type="button" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcRequestSchoolClose($el)" x-on:click.prevent.stop aria-label="Close school details">×</button>
 
                     <div class="rc-school-modal-hero-v72">
                         <div class="rc-school-logo-large-v72">
@@ -9814,7 +11770,7 @@
                     </div>
 
                     <div class="rc-school-modal-actions-v72">
-                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="composeEmailSchool">
+                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailSchool">
                             <span wire:loading.remove wire:target="composeEmailSchool">
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </span>
@@ -9822,27 +11778,34 @@
                             <span>Email Coaches</span>
                         </button>
 
-                        @if($slideSchool['is_favorite'] ?? false)
-                            <button class="rc-school-action is-favorited" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="unfavoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById">Favorited</span><span wire:loading wire:target="unfavoriteSchoolById">Updating</span>
-                            </button>
-                        @else
-                            <button class="rc-school-action" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
-                                <span wire:loading.remove wire:target="favoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="favoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="favoriteSchoolById">Favorite</span><span wire:loading wire:target="favoriteSchoolById">Updating</span>
-                            </button>
-                        @endif
+                        <button
+                            class="rc-school-action"
+                            type="button"
+                            data-rc-local-action
+                            data-rc-drawer-action
+                            x-on:click.stop="toggleFavorite()"
+                            x-bind:class="{ 'is-favorited': favorite }"
+                            x-bind:aria-pressed="favorite ? 'true' : 'false'"
+                        >
+                            <span x-show="!favoritePending"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+                            <span class="rc-action-spinner-v81" x-cloak x-show="favoritePending"></span>
+                            <span x-text="favorite ? 'Favorited' : 'Favorite'"></span>
+                        </button>
 
-                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
-                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click="listsOpen=!listsOpen">
+                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false" x-on:click.stop data-rc-dropdown-boundary>
+                            <button
+                                class="rc-school-action"
+                                type="button"
+                                x-on:click.stop="listsOpen=!listsOpen"
+                                x-bind:class="{ 'is-in-list': Object.values(optimisticLists || {}).some(value => Boolean(value)) }"
+                                x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
+                                aria-haspopup="menu"
+                            >
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-                                <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
+                                <span x-text="Object.values(optimisticLists || {}).some(value => Boolean(value)) ? 'In List' : 'Add to List'"></span>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
-                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left>
+                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-on:click.stop role="menu">
                                 <h4>Add to a list</h4>
                                 @forelse($listRows as $listRow)
                                     @php
@@ -9860,13 +11823,13 @@
                                         $inList = $schoolListKeys->contains(strtolower($listKey));
                                         $count = (int) ($listRow['schools_count'] ?? count($listRow['schools'] ?? []));
                                     @endphp
-                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" wire:loading.attr="disabled" wire:target="addSchoolToListById,removeSchoolFromListById">
+                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" data-rc-local-action data-rc-drawer-action x-on:click.stop="toggleList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)); listsOpen = true" x-bind:class="{ 'is-active': isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)), 'is-saving': isListPending({{ \Illuminate\Support\Js::from($listKey) }}) }" x-bind:data-list-pending="isListPending({{ \Illuminate\Support\Js::from($listKey) }}) ? 'true' : 'false'" wire:key="school-drawer-list-{{ $slideSchoolId }}-{{ $listKey }}" role="menuitemcheckbox" x-bind:aria-checked="isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)) ? 'true' : 'false'">
                                         <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                         <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot: {{ $listColor }}"></span><span>{{ $listLabel }}</span></span>
                                         <small class="rc-list-count-v81">{{ $count }}</small>
                                     </button>
                                 @empty
-                                    <button type="button" wire:click="$set('showNewListComposer', true)">Create a list first</button>
+                                    <button type="button" wire:click="$set('showNewListComposer', true)" data-rc-local-action data-rc-drawer-action x-on:click.stop="listsOpen = true">Create a list first</button>
                                 @endforelse
                             </div>
                         </div>
@@ -9877,10 +11840,10 @@
                     <div class="rc-school-tabbar-v72">
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'coaches' ? 'is-active' : ''" x-on:click="tab='coaches'">Coaching Staff</button>
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'roster' ? 'is-active' : ''" x-on:click="tab='roster'">Roster & Stats</button>
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'" wire:click="loadSchoolCommunicationHistory({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="loadSchoolCommunicationHistory">Communications</button>
                     </div>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'">
                         <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
                             @forelse($slideCoaches as $coach)
                                 @php
@@ -9897,7 +11860,7 @@
                                         <span>{{ $coachTitle }}</span>
                                         @if($coachEmail !== '')<a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>@endif
                                     </div>
-                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
+                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
                                 </div>
                             @empty
                                 <div class="rc-empty">No coaches loaded for this school yet.</div>
@@ -9905,16 +11868,66 @@
                         </div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'">
                         <div class="rc-coming-soon-v72"><div><strong>Coming Soon</strong><span>Roster and advanced school stats will be available here soon.</span></div></div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'" x-transition.opacity>
-                        <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 10 4 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 0 1-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'">
+                        <style>
+                            .rc-school-comms-history-v1{display:grid;gap:.72rem;padding:.15rem 0 .4rem;}
+                            .rc-school-comms-loading-v1{display:flex;align-items:center;gap:.45rem;color:var(--rc-muted);font-size:.78rem;padding:.65rem .2rem;}
+                            .rc-school-comms-item-v1{display:grid;grid-template-columns:2.35rem minmax(0,1fr) auto;gap:.7rem;align-items:start;padding:.7rem 0;border-bottom:1px solid var(--rc-border);}
+                            .rc-school-comms-item-v1:last-child{border-bottom:0;}
+                            .rc-school-comms-icon-v1{width:2.15rem;height:2.15rem;border-radius:.7rem;display:grid;place-items:center;background:rgba(255,99,56,.12);color:#ff6338;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-icon-v1{background:rgba(16,185,129,.14);color:#10b981;}
+                            .rc-school-comms-copy-v1{min-width:0;display:grid;gap:.22rem;}
+                            .rc-school-comms-title-v1{font-size:.86rem;font-weight:850;color:var(--rc-text);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-title-v1{color:#10b981;}
+                            .rc-school-comms-preview-v1{color:var(--rc-muted);font-size:.8rem;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+                            .rc-school-comms-badges-v1{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.18rem;}
+                            .rc-school-comms-badge-v1{display:inline-flex;align-items:center;border-radius:.45rem;padding:.16rem .45rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.66rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;}
+                            .rc-school-comms-badge-v1.is-opened{background:rgba(59,130,246,.14);color:#3b82f6;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-badge-v1.is-reply{background:rgba(16,185,129,.14);color:#10b981;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-date-v1{color:var(--rc-muted);font-size:.74rem;white-space:nowrap;padding-top:.08rem;}
+                            .rc-school-comms-empty-v1{border:1px dashed var(--rc-border);border-radius:.85rem;padding:.9rem;color:var(--rc-muted);font-size:.8rem;line-height:1.45;}
+                        </style>
+
+                        <div wire:loading.flex wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-loading-v1">
+                            <span class="rc-spinner-mini"></span>
+                            Loading communication history...
+                        </div>
+
+                        <div wire:loading.remove wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-history-v1">
+                            @forelse($slideCommunicationRows as $historyRow)
+                                @php
+                                    $historyDirection = strtolower((string) ($historyRow['direction'] ?? 'outbound'));
+                                    $historyInbound = $historyDirection === 'inbound';
+                                    $historyTitle = (string) ($historyRow['title'] ?? ($historyInbound ? 'Received from coach' : 'Sent to coach'));
+                                    $historyPreview = trim((string) ($historyRow['preview'] ?? 'No preview available.'));
+                                    $historyDate = (string) ($historyRow['date_label'] ?? '');
+                                    $historyOpened = (bool) ($historyRow['opened'] ?? false);
+                                    $historyReply = (bool) ($historyRow['reply'] ?? $historyInbound);
+                                @endphp
+                                <article class="rc-school-comms-item-v1 {{ $historyInbound ? 'is-inbound' : 'is-outbound' }}">
+                                    <span class="rc-school-comms-icon-v1" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
+                                    <span class="rc-school-comms-copy-v1">
+                                        <strong class="rc-school-comms-title-v1">{{ $historyTitle }}</strong>
+                                        <span class="rc-school-comms-preview-v1">{{ $historyPreview }}</span>
+                                        <span class="rc-school-comms-badges-v1">
+                                            <span class="rc-school-comms-badge-v1">EMAIL</span>
+                                            @if($historyOpened)<span class="rc-school-comms-badge-v1 is-opened">Opened</span>@endif
+                                            @if($historyReply)<span class="rc-school-comms-badge-v1 is-reply">Reply</span>@endif
+                                        </span>
+                                    </span>
+                                    <time class="rc-school-comms-date-v1">{{ $historyDate }}</time>
+                                </article>
+                            @empty
+                                <div class="rc-school-comms-empty-v1">
+                                    No communication history loaded yet. Open this tab to pull the latest conversations from HighLevel for coaches at this school.
+                                </div>
+                            @endforelse
                         </div>
                     </section>
                 </div>
@@ -9973,6 +11986,7 @@
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
+                const iconReplacement = '';
                 const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
@@ -9997,7 +12011,6 @@
                 panelLinkUrl: '',
                 panelButtonLabel: '',
                 panelButtonUrl: '',
-                composeRefreshHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -10006,41 +12019,24 @@
                         setTimeout(() => this.bootEditor(true), 80);
                         setTimeout(() => this.bootEditor(true), 250);
                     });
-                    if (modelName === 'campaignBody') {
-                        if (window.__plyrComposeEditorRefreshHandler) {
-                            window.removeEventListener('rc-compose-editor-refresh', window.__plyrComposeEditorRefreshHandler);
-                        }
-
-                        this.composeRefreshHandler = (event) => {
-                            const editor = this.$refs.editor;
-                            if (!editor || !editor.isConnected) return;
-
-                            const encoded = event.detail?.body || '';
-                            const html = this.decodeInitialBody(encoded);
-
-                            editor.dataset.initialBody = encoded;
-                            editor.innerHTML = this.highlightMergeTokens(html || '');
-
-                            // The body already came from Livewire/PHP. Do not immediately
-                            // sync it back to the server here: stale editor instances can
-                            // otherwise overwrite the newly selected template with blank HTML.
-                        };
-
-                        window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
-                        window.addEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
-                    }
-                },
-                destroy() {
-                    if (this.composeRefreshHandler) {
-                        window.removeEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
-                        if (window.__plyrComposeEditorRefreshHandler === this.composeRefreshHandler) {
-                            window.__plyrComposeEditorRefreshHandler = null;
-                        }
-                    }
+                    const applyRefresh = (event) => {
+                        if (modelName !== 'campaignBody') return;
+                        const detail = Array.isArray(event.detail) ? (event.detail[0] || {}) : (event.detail || {});
+                        const encoded = detail.body || '';
+                        if (!encoded) return;
+                        window.__rcPendingComposeEditorBody = encoded;
+                        const html = this.decodeInitialBody(encoded);
+                        if (!this.$refs.editor) return;
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
+                        this.syncNow();
+                    };
+                    window.addEventListener('rc-compose-editor-refresh', applyRefresh);
+                    window.addEventListener('rc-compose-template-applied', applyRefresh);
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
-                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
+                    const pending = modelName === 'campaignBody' ? (window.__rcPendingComposeEditorBody || '') : '';
+                    const html = this.decodeInitialBody(pending || initialBody || this.$refs.editor.dataset.initialBody || '');
                     if (html && this.$refs.editor.innerHTML.trim() === '') {
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
                     } else {
@@ -10562,6 +12558,41 @@
                 }
             };
         };
-    </script>
+    
+
+        window.rcScrollInboxToLatest = function () { return; };
+</script>
+
+    @if($showSaveTemplateNamePrompt)
+        <div class="rc-preview-modal-backdrop" wire:key="compose-save-template-name-modal">
+            <div class="rc-preview-modal" style="max-width:34rem">
+                <div class="rc-preview-modal-head">
+                    <div>
+                        <strong>Save Compose Email as Template</strong>
+                        <div class="rc-subtle" style="margin-top:.2rem">Name this template so it appears in the Compose Email template picker.</div>
+                    </div>
+                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="closeSaveComposeTemplatePrompt" aria-label="Close">×</button>
+                </div>
+                <div class="rc-preview-modal-body">
+                    <label class="rc-template-field-label" style="color:#475569">Template name</label>
+                    <input
+                        type="text"
+                        class="rc-input"
+                        style="width:100%"
+                        placeholder="Example: First Touch Email"
+                        wire:model.live.debounce.300ms="composeTemplateSaveName"
+                        wire:keydown.enter="confirmSaveComposeAsTemplate"
+                    >
+                    <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem">
+                        <button type="button" class="rc-btn" wire:click="closeSaveComposeTemplatePrompt">Cancel</button>
+                        <button type="button" class="rc-btn rc-btn-primary" wire:click="confirmSaveComposeAsTemplate" wire:loading.attr="disabled" wire:target="confirmSaveComposeAsTemplate">
+                            <span wire:loading.remove wire:target="confirmSaveComposeAsTemplate">Save Template</span>
+                            <span wire:loading.flex wire:target="confirmSaveComposeAsTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
 </x-filament-panels::page>
