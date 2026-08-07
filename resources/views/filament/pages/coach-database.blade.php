@@ -10025,10 +10025,6 @@
                 <div class="rc-discover-bulk-v36" x-show="selectedCount > 0" x-cloak>
                     <div class="rc-discover-bulk-left-v36">
                         <span class="rc-discover-bulk-count-v36"><span x-text="selectedCount.toLocaleString()"></span> selected</span>
-                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                            <span>Email</span>
-                        </button>
                         <div class="rc-discover-bulk-list-v36" x-on:click.outside="listMenuOpen = false">
                             <button type="button" x-on:click.stop="listMenuOpen = !listMenuOpen">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -10785,7 +10781,6 @@
                                         <button type="button" x-on:click="selectAllVisible()">Select all</button>
                                         <button type="button" x-on:click="clearSelection()">Clear</button>
                                     </div>
-                                    <button type="button" class="rc-list-selection-email-v120" x-bind:disabled="selected.length === 0" x-on:click="emailSelected()">Email Selected (<span x-text="selected.length"></span>)</button>
                                 </div>
 
                                 <div class="rc-list-search-v120" x-show="items.length > 10 || listQuery !== ''" x-cloak>
@@ -12318,6 +12313,7 @@ CSS;
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
                     sendingFast: false,
+                    previewOpen: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
                         const q = String(this.schoolQuery || '').trim().toLowerCase();
@@ -12469,7 +12465,7 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openComposePreview">
+                        <button class="rc-btn" type="button" data-rc-local-action x-on:click.prevent.stop="previewOpen = true">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
@@ -12713,23 +12709,28 @@ CSS;
                 </div>
             </div>
 
-            @if($showComposePreview)
-                @teleport('body')
-                <div class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82" wire:click.self="closeComposePreview">
-                    <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
-                            <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
-                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview">×</button>
-                        </div>
-                        <div style="padding:1rem;background:var(--rc-soft)">
-                            <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
-                                {!! $this->composeRenderedBody !!}
-                            </div>
+            @teleport('body')
+            <div
+                x-cloak
+                x-show="previewOpen"
+                x-transition.opacity.duration.100ms
+                class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82"
+                x-on:click.self="previewOpen = false"
+                x-on:keydown.escape.window="previewOpen = false"
+            >
+                <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
+                        <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
+                        <button type="button" class="rc-icon-button" data-rc-local-action x-on:click.prevent.stop="previewOpen = false">×</button>
+                    </div>
+                    <div style="padding:1rem;background:var(--rc-soft)">
+                        <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
+                            {!! $this->composeRenderedBody !!}
                         </div>
                     </div>
                 </div>
-                @endteleport
-            @endif
+            </div>
+            @endteleport
         @endif
 
         @if($section === 'campaigns')
