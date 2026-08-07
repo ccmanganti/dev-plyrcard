@@ -248,7 +248,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -375,8 +375,8 @@ trait InteractsWithCoachDatabase
         // A previous zero-result sync must not block the dashboard for an entire day.
         // Retry zero totals every five minutes; established totals are reconciled hourly.
         $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinute();
-        $syncKey = 'recruiting:total-emails-sent-sync:v3:'
+        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinutes(5);
+        $syncKey = 'recruiting:total-emails-sent-sync:'
             . (int) $user->getKey()
             . ':'
             . strtolower($locationId);
@@ -395,8 +395,6 @@ trait InteractsWithCoachDatabase
                 Log::warning('Automatic GHL sent-email count sync failed.', [
                     'user_id' => $user->getKey(),
                     'location_id' => $locationId,
-                    'source' => $result['source'] ?? null,
-                    'pages_scanned' => $result['pages_scanned'] ?? 0,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
                     'error' => $result['error'] ?? 'Unknown sync error.',
@@ -415,8 +413,6 @@ trait InteractsWithCoachDatabase
             Log::info('Automatic GHL sent-email dashboard sync completed.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
-                'source' => $result['source'] ?? null,
-                'pages_scanned' => $result['pages_scanned'] ?? 0,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
                 'outbound_emails_counted' => $count,
@@ -510,7 +506,6 @@ trait InteractsWithCoachDatabase
             'conversations' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
             'campaigns' => \App\Filament\Pages\CoachDatabaseCampaigns::getUrl(),
             'compose' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
-            'support' => \App\Filament\Pages\CoachDatabaseSupport::getUrl(),
             'schedule' => class_exists(\App\Filament\Pages\CoachDatabaseSchedule::class) ? \App\Filament\Pages\CoachDatabaseSchedule::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'schedule']),
             'settings' => class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'settings']),
             'profile' => $this->freeRoleDefaultProfileUrl(),
@@ -11590,8 +11585,18 @@ HTML;
 
     public function getComposeRenderedBodyProperty(): string
     {
-        $body = trim($this->campaignBody) !== '' ? $this->campaignBody : 'Choose a template or write your message.';
-        return $this->replaceCampaignTokens($this->buildComposeHtml($body), $this->composePreviewCoach);
+        $body = trim($this->campaignBody) !== ''
+            ? $this->campaignBody
+            : 'Choose a template or write your message.';
+
+        // Preview the exact final email structure that will be sent. The signature
+        // remains hidden from the Compose editor itself, but Preview Email always
+        // includes the canonical PLYRCARD footer/signature and personalized tokens.
+        $html = $this->buildComposeHtml($body);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($html);
+        $html = $this->ensurePlyrcardEmailSignature($html);
+
+        return $this->replaceCampaignTokens($html, $this->composePreviewCoach);
     }
 
 

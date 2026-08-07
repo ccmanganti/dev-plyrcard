@@ -1311,6 +1311,84 @@
             line-height:1.7;
         }
 
+
+        /* Compose Email preview: emulate a real email canvas instead of inheriting
+           Filament's global/reset spacing rules. */
+        .rc-compose-preview-shell-v46 {
+            width:min(62rem,94vw);
+            max-height:88vh;
+            overflow:auto;
+            border:1px solid var(--rc-border);
+            border-radius:1.15rem;
+            background:#f3f4f6;
+            box-shadow:0 28px 90px rgba(0,0,0,.34);
+        }
+        .rc-compose-preview-head-v46 {
+            position:sticky;
+            top:0;
+            z-index:3;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:1rem;
+            padding:1rem 1.15rem;
+            border-bottom:1px solid #e5e7eb;
+            background:rgba(255,255,255,.98);
+            color:#111827;
+        }
+        .rc-compose-preview-subject-v46 {
+            margin-top:.22rem;
+            color:#64748b;
+            font-size:.8rem;
+            line-height:1.35;
+        }
+        .rc-compose-preview-stage-v46 {
+            padding:1.4rem;
+            background:#f3f4f6;
+        }
+        .rc-compose-preview-email-v46 {
+            width:min(100%,46rem);
+            margin:0 auto;
+            box-sizing:border-box;
+            border:1px solid #e5e7eb;
+            border-radius:1rem;
+            background:#fff;
+            color:#111827;
+            padding:2rem 2.15rem;
+            font-family:Arial,Helvetica,sans-serif;
+            font-size:16px;
+            line-height:1.65;
+            box-shadow:0 12px 36px rgba(15,23,42,.07);
+            overflow-wrap:anywhere;
+        }
+        .rc-compose-preview-email-v46 p { margin:0 0 1rem !important; }
+        .rc-compose-preview-email-v46 p:last-child { margin-bottom:0 !important; }
+        .rc-compose-preview-email-v46 h1,
+        .rc-compose-preview-email-v46 h2,
+        .rc-compose-preview-email-v46 h3,
+        .rc-compose-preview-email-v46 h4 {
+            margin:1.35rem 0 .75rem !important;
+            line-height:1.25;
+        }
+        .rc-compose-preview-email-v46 ul,
+        .rc-compose-preview-email-v46 ol {
+            margin:.45rem 0 1rem 1.3rem !important;
+            padding:0 !important;
+        }
+        .rc-compose-preview-email-v46 li { margin:.3rem 0 !important; }
+        .rc-compose-preview-email-v46 img { max-width:100%; height:auto; }
+        .rc-compose-preview-email-v46 table { max-width:100%; }
+        .rc-compose-preview-email-v46 a { text-underline-offset:2px; }
+        .rc-compose-preview-email-v46 .plyrcard-email-signature {
+            margin-top:1.75rem !important;
+            padding-top:1.4rem;
+            border-top:1px solid #e5e7eb;
+        }
+        @media (max-width:640px) {
+            .rc-compose-preview-stage-v46 { padding:.75rem; }
+            .rc-compose-preview-email-v46 { padding:1.25rem; border-radius:.8rem; }
+        }
+
         .rc-campaign-toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -9397,13 +9475,17 @@
 
             @if($showComposePreview)
                 <div class="rc-compose-modal-v45" wire:click.self="closeComposePreview">
-                    <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
-                            <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
-                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview">×</button>
+                    <div class="rc-compose-preview-shell-v46">
+                        <div class="rc-compose-preview-head-v46">
+                            <div style="min-width:0">
+                                <strong style="display:block;font-size:1rem;line-height:1.2">Preview Email</strong>
+                                <div class="rc-compose-preview-subject-v46">{{ $this->composeRenderedSubject }}</div>
+                            </div>
+                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview" aria-label="Close preview">×</button>
                         </div>
-                        <div style="padding:1rem;background:var(--rc-soft)">
-                            <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
+
+                        <div class="rc-compose-preview-stage-v46">
+                            <div class="rc-compose-preview-email-v46">
                                 {!! $this->composeRenderedBody !!}
                             </div>
                         </div>
