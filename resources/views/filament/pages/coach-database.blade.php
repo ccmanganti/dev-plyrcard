@@ -15311,8 +15311,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         }, true);
     })();
     </script>
-
-</x-filament-panels::page>
 {{-- v90: Inbox viewport-height layout. Keep quick reply/send visible on short screens. --}}
 <style id="rc-inbox-viewport-fit-v90">
     @if($section === 'conversations')
@@ -15480,3 +15478,4 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 })();
 </script>
 @endif
+</x-filament-panels::page>
