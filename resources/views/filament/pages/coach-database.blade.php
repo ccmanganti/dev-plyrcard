@@ -1,5 +1,837 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root">
+    @php
+        // Settings must remain available even while a Recruiting Center account
+        // is still being provisioned (including users on the Free tier).
+        $bypassRecruitingReadinessGate = (($section ?? '') === 'settings');
+        $shouldBlockForRecruitingReadiness = ! $isRecruitingAccountReady
+            && ! $bypassRecruitingReadinessGate;
+    @endphp
+
+    <div
+        class="rc-account-readiness-shell {{ $shouldBlockForRecruitingReadiness ? 'is-preparing' : 'is-ready' }}"
+        @if($shouldBlockForRecruitingReadiness)
+            wire:poll.10s="checkRecruitingAccountReadiness"
+        @endif
+    >
+        <div
+            class="rc-livewire-root rc-account-readiness-content"
+            wire:init="bootDeferredUiData"
+        >
+        @include('filament.partials.coach-database-ui-shell')
+
+        @if(($section ?? '') === 'schools')
+            <div
+                wire:loading.flex
+                wire:target="selectSchoolById"
+                class="rc-discover-wire-school-loader"
+                aria-live="polite"
+                aria-label="Opening school profile"
+            >
+                <section class="rc-discover-wire-school-loader-panel" role="dialog" aria-modal="true">
+                    <header class="rc-discover-wire-school-loader-head">
+                        <div>
+                            <strong>Opening school profile</strong>
+                            <span>Loading local school data...</span>
+                        </div>
+                        <span class="rc-discover-wire-school-spinner" aria-hidden="true"></span>
+                    </header>
+
+                    <div class="rc-discover-wire-school-loader-body">
+                        <span class="rc-discover-wire-school-hero"></span>
+                        <span class="rc-discover-wire-school-grid">
+                            <span></span>
+                            <span></span>
+                        </span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                        <span class="rc-discover-wire-school-line"></span>
+                    </div>
+                </section>
+            </div>
+        @endif
+
+    <script>
+        /*
+         * Discover Schools Alpine bootstrap.
+         *
+         * This runs before Alpine parses the school markup, so production asset
+         * timing, CDN caching, or deferred JavaScript can never leave x-data with
+         * an incomplete fallback object.
+         */
+        (() => {
+            const stores = window.__rcDiscoverSelectionStores || new Map();
+            window.__rcDiscoverSelectionStores = stores;
+
+            if (typeof window.rcCountUp !== 'function') {
+                window.rcCountUp = (target = 0, suffix = '', duration = 650) => ({
+                    display: `0${suffix}`,
+                    target: Math.max(0, Number(target) || 0),
+                    suffix: String(suffix || ''),
+                    duration: Math.max(180, Number(duration) || 650),
+                    animationFrame: null,
+
+                    init() {
+                        // A fresh Alpine component is created on every dashboard reload,
+                        // so the count-up always replays from zero.
+                        this.$nextTick(() => this.start());
+                    },
+
+                    start() {
+                        if (this.animationFrame) {
+                            cancelAnimationFrame(this.animationFrame);
+                        }
+
+                        this.display = `0${this.suffix}`;
+
+                        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+                        if (reduceMotion || this.target <= 0) {
+                            this.display = `${Math.round(this.target).toLocaleString()}${this.suffix}`;
+                            return;
+                        }
+
+                        const startedAt = performance.now();
+                        const animate = (now) => {
+                            const progress = Math.min(1, (now - startedAt) / this.duration);
+                            const eased = 1 - Math.pow(1 - progress, 3);
+                            const current = Math.max(1, Math.round(this.target * eased));
+                            this.display = `${current.toLocaleString()}${this.suffix}`;
+
+                            if (progress < 1) {
+                                this.animationFrame = requestAnimationFrame(animate);
+                            } else {
+                                this.animationFrame = null;
+                                this.display = `${Math.round(this.target).toLocaleString()}${this.suffix}`;
+                            }
+                        };
+
+                        this.animationFrame = requestAnimationFrame(animate);
+                    },
+                });
+            }
+
+            if (typeof window.rcProgressFill !== 'function') {
+                window.rcProgressFill = (target = 0, duration = 700) => ({
+                    width: 0,
+                    target: Math.min(100, Math.max(0, Number(target) || 0)),
+                    duration: Math.max(180, Number(duration) || 700),
+
+                    init() {
+                        // Reset to zero first so the bar visibly fills again on every reload.
+                        this.width = 0;
+
+                        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+                        if (reduceMotion) {
+                            this.width = this.target;
+                            return;
+                        }
+
+                        this.$nextTick(() => {
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    this.width = this.target;
+                                });
+                            });
+                        });
+                    },
+                });
+            }
+
+            const key = () => window.location.pathname;
+            const getStore = () => stores.get(key()) || null;
+
+            const announce = (store) => {
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-changed', {
+                    detail: {
+                        selected: Array.from(store?.selected || []),
+                        count: store?.selected?.size || 0,
+                        allFilteredSelected: Boolean(store?.allFilteredSelected),
+                        version: Number(store?.version || 0),
+                    },
+                }));
+
+                window.dispatchEvent(new CustomEvent('rc-discover-selection-refresh', {
+                    detail: { version: Number(store?.version || 0) },
+                }));
+            };
+
+            const toast = (message, type = 'error') => {
+                const text = String(message || '').trim();
+                if (!text) return;
+
+                const root = document.querySelector('.rc-livewire-root');
+                const owner = root?.closest('[wire\\:id]');
+                const id = owner?.getAttribute('wire:id');
+                const instance = id && window.Livewire?.find ? window.Livewire.find(id) : null;
+
+                if (instance?.call) {
+                    instance.call(
+                        'notifyRecruitingUi',
+                        text,
+                        type === 'error' ? 'danger' : type
+                    ).catch(() => {});
+                } else {
+                    console[type === 'error' ? 'error' : 'log'](text);
+                }
+            };
+
+            if (typeof window.rcDiscoverSelection !== 'function') {
+                window.rcDiscoverSelection = (initialIds = [], initialAllFilteredSelected = false, initialFilteredIds = []) => {
+                    let store = stores.get(key());
+
+                    if (!store) {
+                        store = {
+                            selected: new Set((initialIds || []).map((id) => String(id))),
+                            allFilteredSelected: Boolean(initialAllFilteredSelected),
+                            dirty: false,
+                            inFlight: false,
+                            needsFlush: false,
+                            timer: null,
+                            version: 0,
+                            filteredIds: new Set((initialFilteredIds || []).map((id) => String(id))),
+                        };
+                        stores.set(key(), store);
+                    }
+
+                    store.filteredIds = new Set((initialFilteredIds || []).map((id) => String(id)));
+                    store.allFilteredSelected = store.filteredIds.size > 0
+                        && Array.from(store.filteredIds).every((id) => store.selected.has(id));
+
+                    return {
+                        revision: Number(store.version || 0),
+                        allFilteredSelected: Boolean(store.allFilteredSelected),
+                        selectionListener: null,
+
+                        init() {
+                            this.revision = Number(store.version || 0);
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+
+                            this.selectionListener = (event) => {
+                                this.revision = Number(
+                                    event?.detail?.version
+                                    ?? store.version
+                                    ?? (this.revision + 1)
+                                );
+                                this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            };
+
+                            window.addEventListener(
+                                'rc-discover-selection-refresh',
+                                this.selectionListener
+                            );
+
+                            this.$cleanup?.(() => {
+                                window.removeEventListener(
+                                    'rc-discover-selection-refresh',
+                                    this.selectionListener
+                                );
+                            });
+                        },
+
+                        count() {
+                            this.revision;
+                            return store.selected.size;
+                        },
+
+                        selectedIds() {
+                            this.revision;
+                            return Array.from(store.selected);
+                        },
+
+                        isSelected(id) {
+                            this.revision;
+                            return store.selected.has(String(id));
+                        },
+
+                        updateLocal(ids, allSelected = null) {
+                            store.selected = new Set((ids || []).map((id) => String(id)));
+
+                            if (allSelected !== null) {
+                                store.allFilteredSelected = Boolean(allSelected);
+                            }
+
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = Boolean(store.allFilteredSelected);
+                            announce(store);
+                        },
+
+                        toggle(id) {
+                            const normalized = String(id || '');
+                            if (!normalized) return;
+
+                            if (store.selected.has(normalized)) {
+                                store.selected.delete(normalized);
+                            } else {
+                                store.selected.add(normalized);
+                            }
+
+                            store.allFilteredSelected = false;
+                            store.dirty = true;
+                            store.needsFlush = true;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = false;
+                            announce(store);
+
+                            // Keep checkbox interactions entirely client-side.
+                            // Selection is sent only for Add to List or Email.
+                        },
+
+                        async flush() {
+                            // Selection is intentionally browser-local for speed.
+                            return true;
+                        },
+
+                        toggleAllFiltered() {
+                            const ids = Array.from(store.filteredIds || []);
+                            if (!ids.length) return;
+
+                            const allSelected = ids.every((id) => store.selected.has(id));
+
+                            if (allSelected) {
+                                ids.forEach((id) => store.selected.delete(id));
+                            } else {
+                                ids.forEach((id) => store.selected.add(id));
+                            }
+
+                            store.allFilteredSelected = !allSelected;
+                            store.version = Number(store.version || 0) + 1;
+                            this.revision = store.version;
+                            this.allFilteredSelected = store.allFilteredSelected;
+                            announce(store);
+                        },
+
+                        async clearAll() {
+                            this.updateLocal([], false);
+                            store.dirty = false;
+                            store.needsFlush = false;
+                        },
+
+                        async emailSelected() {
+                            await this.flush();
+
+                            try {
+                                await this.$wire.call(
+                                'emailSchoolIds',
+                                Array.from(store.selected)
+                            );
+                            } catch (error) {
+                                console.error(error);
+                                toast(
+                                    'Unable to open Compose Email for the selected schools.'
+                                );
+                            }
+                        },
+                    };
+                };
+            }
+
+            window.__rcDiscoverClientCacheVersion = '2026-07-15.7-grid-view-restored';
+            window.rcDiscoverClientCache = (initialSchools = [], initialLists = [], initialView = 'grid') => ({
+                schools: [],
+                lists: Array.isArray(initialLists) ? initialLists : [],
+                search: '',
+                division: '',
+                conference: '',
+                viewMode: initialView === 'list' ? 'list' : 'grid',
+                limit: 48,
+                selected: new Set(),
+                listMenuOpen: false,
+                creating: false,
+                newListName: '',
+                newListColor: '#ff6338',
+                pendingListKey: '',
+                revision: 0,
+
+                init() {
+                    const rows = Array.isArray(initialSchools) ? initialSchools : [];
+                    this.schools = rows.map((row) => ({
+                        ...row,
+                        id: String(row?.id || row?.business_id || ''),
+                        business_id: String(row?.business_id || row?.id || ''),
+                        name: String(row?.name || 'Unnamed School'),
+                        division: String(row?.division || ''),
+                        conference: String(row?.conference || ''),
+                        logo_url: String(row?.logo_url || ''),
+                        coach_count: Number(row?.coach_count || 0),
+                        head_coach_name: String(row?.head_coach_name || '—'),
+                        head_coach_title: String(row?.head_coach_title || 'Coach'),
+                        head_coach_email: String(row?.head_coach_email || ''),
+                        search_text: String(row?.search_text || '').toLowerCase(),
+                    })).filter((row) => row.id !== '');
+
+                    try {
+                        sessionStorage.setItem('rcDiscoverSchools:' + window.location.pathname, JSON.stringify({
+                            cachedAt: @js($cachedAt ?? null),
+                            rows: this.schools,
+                        }));
+                    } catch (_) {}
+                },
+
+                get divisionTabs() {
+                    return ['', 'NCAA D-I', 'NCAA D-II', 'NCAA D-III', 'NAIA', 'NJCAA'];
+                },
+
+                normalize(value) {
+                    return String(value || '').trim().toLowerCase();
+                },
+
+                normalizeDivision(value) {
+                    const raw = this.normalize(value)
+                        .replace(/&/g, ' and ')
+                        .replace(/[–—]/g, '-')
+                        .replace(/[^a-z0-9]+/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    if (!raw) return '';
+                    if (/\bnaia\b/.test(raw)) return 'NAIA';
+                    if (/\bnjcaa\b/.test(raw)) return 'NJCAA';
+
+                    const compact = raw.replace(/\s+/g, '');
+                    if (/(ncaa)?(division|div|d)?iii$/.test(compact) || /(ncaa)?(division|div|d)?3$/.test(compact)) return 'NCAA D-III';
+                    if (/(ncaa)?(division|div|d)?ii$/.test(compact) || /(ncaa)?(division|div|d)?2$/.test(compact)) return 'NCAA D-II';
+                    if (/(ncaa)?(division|div|d)?i$/.test(compact) || /(ncaa)?(division|div|d)?1$/.test(compact)) return 'NCAA D-I';
+
+                    if (/\b(division|div|d)\s*iii\b/.test(raw)) return 'NCAA D-III';
+                    if (/\b(division|div|d)\s*ii\b/.test(raw)) return 'NCAA D-II';
+                    if (/\b(division|div|d)\s*i\b/.test(raw)) return 'NCAA D-I';
+
+                    return raw.toUpperCase();
+                },
+
+                divisionMatches(value, filter) {
+                    if (!filter) return true;
+                    return this.normalizeDivision(value) === this.normalizeDivision(filter);
+                },
+
+                get conferenceOptions() {
+                    const counts = new Map();
+
+                    this.schools
+                        .filter((row) => this.divisionMatches(row.division, this.division))
+                        .forEach((row) => {
+                            const name = String(row?.conference || '').trim();
+                            if (!name) return;
+                            const key = this.normalize(name);
+                            const current = counts.get(key) || { name, count: 0 };
+                            current.count += 1;
+                            counts.set(key, current);
+                        });
+
+                    return Array.from(counts.values())
+                        .sort((a, b) => a.name.localeCompare(b.name));
+                },
+
+                initialsFor(name) {
+                    return String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'S';
+                },
+                shortDivision(value) {
+                    const division = String(value || '').trim();
+                    if (!division) return '—';
+                    return division.replace('NCAA Division ', 'D').replace('NCAA D-', 'D').replace('Division ', 'D');
+                },
+                get filteredSchools() {
+                    const query = this.normalize(this.search);
+                    const conference = this.normalize(this.conference);
+                    return this.schools.filter((row) => {
+                        if (!this.divisionMatches(row.division, this.division)) return false;
+                        if (conference && this.normalize(row.conference) !== conference) return false;
+                        if (query && !row.search_text.includes(query)) return false;
+                        return true;
+                    });
+                },
+
+                get visibleSchools() {
+                    return this.filteredSchools.slice(0, this.limit);
+                },
+
+                get canLoadMore() {
+                    return this.limit < this.filteredSchools.length;
+                },
+
+                get selectedCount() {
+                    this.revision;
+                    return this.selected.size;
+                },
+
+                get allFilteredSelected() {
+                    this.revision;
+                    const rows = this.filteredSchools;
+                    return rows.length > 0 && rows.every((row) => this.selected.has(row.id));
+                },
+
+                setDivision(value) {
+                    this.division = this.division === value ? '' : value;
+                    this.conference = '';
+                    this.limit = 48;
+                },
+
+                setConference(value) {
+                    this.conference = value;
+                    this.limit = 48;
+                },
+
+                setViewMode(mode) {
+                    this.viewMode = mode === 'list' ? 'list' : 'grid';
+                    this.limit = Math.max(48, Number(this.limit || 48));
+                },
+
+                setSearch(value) {
+                    this.search = value;
+                    this.limit = 48;
+                },
+
+                toggleSchool(id) {
+                    id = String(id || '');
+                    if (!id) return;
+                    if (this.selected.has(id)) this.selected.delete(id);
+                    else this.selected.add(id);
+                    this.revision++;
+                },
+
+                isSelected(id) {
+                    this.revision;
+                    return this.selected.has(String(id || ''));
+                },
+
+                toggleAllFiltered() {
+                    const rows = this.filteredSchools;
+                    if (!rows.length) return;
+                    const remove = rows.every((row) => this.selected.has(row.id));
+                    rows.forEach((row) => remove ? this.selected.delete(row.id) : this.selected.add(row.id));
+                    this.revision++;
+                },
+
+                clearSelection() {
+                    this.selected.clear();
+                    this.revision++;
+                    this.listMenuOpen = false;
+                },
+
+                loadMore() {
+                    this.limit += 48;
+                },
+
+                openSchool(id) {
+                    const schoolId = String(id || '');
+
+                    if (!schoolId) return;
+
+                    // Let Livewire control the temporary loader through wire:loading.
+                    // This avoids the old blink where a JS-created ghost drawer closed
+                    // before the real school drawer finished morphing in.
+                    this.$wire.call('selectSchoolById', schoolId)
+                        .catch((error) => {
+                            console.error(error);
+                            toast('Unable to open this school.');
+                        });
+                },
+
+                async emailSelected() {
+                    if (!this.selected.size) return;
+                    try {
+                        await this.$wire.call('emailSchoolIds', Array.from(this.selected));
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to open Compose Email for the selected schools.');
+                    }
+                },
+
+                isPending(key) {
+                    return this.pendingListKey === String(key || '');
+                },
+
+                async addToList(listKey, listLabel) {
+                    if (!this.selected.size || this.pendingListKey) return;
+                    const ids = Array.from(this.selected);
+                    this.pendingListKey = String(listKey || '');
+                    try {
+                        const result = await this.$wire.call('queueSchoolIdsToList', ids, this.pendingListKey);
+                        if (!result || result.success === false) {
+                            toast(result?.error || 'Unable to save the selected schools.');
+                            return;
+                        }
+                        const row = this.lists.find((item) => String(item?.key || '') === this.pendingListKey);
+                        if (row) row.count = Number(row.count || 0) + Number(result.updated_schools || ids.length);
+                        this.clearSelection();
+                        toast(result.message || `${ids.length.toLocaleString()} school(s) added to ${listLabel}.`, 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to save the selected schools.');
+                    } finally {
+                        this.pendingListKey = '';
+                    }
+                },
+
+                async createQuickList() {
+                    const name = String(this.newListName || '').trim();
+                    if (!name || this.creating) return;
+                    this.creating = true;
+                    try {
+                        const result = await this.$wire.call('createCustomListQuick', name, this.newListColor);
+                        if (!result || result.success === false || !result.list) {
+                            toast(result?.error || 'Unable to create the list.');
+                            return;
+                        }
+                        this.lists.push({
+                            ...result.list,
+                            count: Number(result.list?.count || result.list?.schools_count || 0),
+                        });
+                        this.newListName = '';
+                        toast(result.message || 'List created.', 'success');
+                    } catch (error) {
+                        console.error(error);
+                        toast('Unable to create the list.');
+                    } finally {
+                        this.creating = false;
+                    }
+                },
+            });
+
+            window.__rcLocalListControllerVersion = '2026-07-15.4-responsive';
+            window.rcBulkSchoolListLocalV2 = (initialLists = []) => ({
+                    open: false,
+                    creating: false,
+                    newListName: '',
+                    newListColor: '#ff6338',
+                    lists: Array.isArray(initialLists) ? [...initialLists] : [],
+                    pendingLists: {},
+                    pendingAdds: {},
+                    statusText: '',
+                    watchTimer: null,
+                    watching: false,
+                    selectedCount: getStore()?.selected?.size || 0,
+                    selectionListener: null,
+
+                    init() {
+                        this.selectedCount = getStore()?.selected?.size || 0;
+
+                        this.selectionListener = (event) => {
+                            this.selectedCount = Number(
+                                event?.detail?.count
+                                ?? getStore()?.selected?.size
+                                ?? 0
+                            );
+                        };
+
+                        window.addEventListener(
+                            'rc-discover-selection-changed',
+                            this.selectionListener
+                        );
+
+                        this.$cleanup?.(() => {
+                            window.removeEventListener(
+                                'rc-discover-selection-changed',
+                                this.selectionListener
+                            );
+                        });
+                    },
+
+                    count() {
+                        return Number(this.selectedCount || 0);
+                    },
+
+                    isPending(listKey) {
+                        return Boolean(this.pendingLists[String(listKey || '')]);
+                    },
+
+                    pendingCount() {
+                        return Object.keys(this.pendingLists).length;
+                    },
+
+                    async syncSelection() {
+                        const store = getStore();
+                        if (!store) return true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'setSelectedSchoolIds',
+                                Array.from(store.selected)
+                            );
+                            return Boolean(result?.success !== false);
+                        } catch (error) {
+                            console.error(error);
+                            return false;
+                        }
+                    },
+
+                    async clearAll() {
+                        const store = getStore();
+
+                        if (store) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
+
+                        this.selectedCount = 0;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'clearSelectedSchools'
+                            );
+
+                            if (!result || result.success === false) {
+                                toast(
+                                    result?.error
+                                    || 'Unable to clear selected schools.'
+                                );
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to clear selected schools.');
+                        }
+                    },
+
+                    async createQuickList() {
+                        const name = String(this.newListName || '').trim();
+                        if (!name || this.creating) return;
+
+                        this.creating = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'createCustomListQuick',
+                                name,
+                                this.newListColor
+                            );
+
+                            if (!result || result.success === false || !result.list) {
+                                toast(result?.error || 'Unable to create the list.');
+                                return;
+                            }
+
+                            const created = {
+                                ...result.list,
+                                count: Number(
+                                    result.list?.count
+                                    ?? result.list?.schools_count
+                                    ?? 0
+                                ),
+                            };
+
+                            if (!this.lists.some(
+                                (list) => String(list?.key || '')
+                                    === String(created.key || '')
+                            )) {
+                                this.lists.push(created);
+                            }
+
+                            this.newListName = '';
+                            this.newListColor = '#ff6338';
+                            toast(result.message || 'List created.', 'success');
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to create the list.');
+                        } finally {
+                            this.creating = false;
+                        }
+                    },
+
+                    async queue(listKey, listLabel, selectedCount) {
+                        const listKeyValue = String(listKey || '').trim();
+                        if (!listKeyValue) return;
+
+                        const actualCount = getStore()?.selected?.size
+                            || Number(selectedCount || 0);
+                        const label = String(listLabel || listKeyValue);
+
+                        this.pendingLists = {
+                            ...this.pendingLists,
+                            [listKeyValue]: label,
+                        };
+                        this.pendingAdds = {
+                            ...this.pendingAdds,
+                            [listKeyValue]: Number(actualCount || 0),
+                        };
+                        this.statusText = `Saving ${Number(actualCount).toLocaleString()} selected school(s) to ${label}...`;
+                        this.open = true;
+
+                        try {
+                            const result = await this.$wire.call(
+                                'queueSchoolIdsToList',
+                                Array.from(getStore()?.selected || []),
+                                listKeyValue
+                            );
+
+                            if (!result || result.success === false) {
+                                const nextPending = { ...this.pendingLists };
+                                const nextAdds = { ...this.pendingAdds };
+                                delete nextPending[listKeyValue];
+                                delete nextAdds[listKeyValue];
+                                this.pendingLists = nextPending;
+                                this.pendingAdds = nextAdds;
+                                this.statusText = this.pendingCount()
+                                    ? this.statusText
+                                    : '';
+                                toast(
+                                    result?.error
+                                    || 'Unable to queue the selected schools.'
+                                );
+                                return;
+                            }
+
+                            const savedCount = Number(
+                                result.updated_schools
+                                || result.school_count
+                                || actualCount
+                                || 0
+                            );
+
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+
+                            const listRow = this.lists.find(
+                                (item) => String(item?.key || '') === listKeyValue
+                            );
+                            if (listRow) {
+                                listRow.count = Number(listRow.count || 0) + savedCount;
+                            }
+
+                            this.open = false;
+                            this.clearSelectionLocally();
+
+                            toast(
+                                result.message
+                                || `${savedCount.toLocaleString()} school(s) added to ${result.list_label || label}.`,
+                                'success'
+                            );
+                        } catch (error) {
+                            console.error(error);
+                            const nextPending = { ...this.pendingLists };
+                            const nextAdds = { ...this.pendingAdds };
+                            delete nextPending[listKeyValue];
+                            delete nextAdds[listKeyValue];
+                            this.pendingLists = nextPending;
+                            this.pendingAdds = nextAdds;
+                            this.statusText = '';
+                            toast('Unable to queue the selected schools.');
+                        }
+                    },
+
+                    clearSelectionLocally() {
+                        const store = getStore();
+                        if (store?.selected instanceof Set) {
+                            store.selected.clear();
+                            store.allFilteredSelected = false;
+                            store.version = Number(store.version || 0) + 1;
+                            announce(store);
+                        }
+
+                        this.$dispatch('rc-discover-selection-cleared');
+                    },
+
+                });
+        })();
+    </script>
+
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -17,6 +849,93 @@
             --rc-surface: rgb(24 24 27);
             --rc-soft: rgb(39 39 42);
             --rc-text: rgb(244 244 245);
+        }
+
+
+        .rc-discover-wire-school-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 100900;
+            justify-content: flex-end;
+            background: rgba(15, 23, 42, .28);
+            backdrop-filter: blur(2px);
+        }
+
+        .rc-discover-wire-school-loader-panel {
+            width: min(560px, 100%);
+            height: 100%;
+            overflow: auto;
+            background: var(--rc-surface);
+            color: var(--rc-text);
+            box-shadow: -20px 0 40px rgba(15, 23, 42, .16);
+            padding: .95rem;
+            display: grid;
+            align-content: start;
+            gap: .85rem;
+        }
+
+        .rc-discover-wire-school-loader-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding-bottom: .85rem;
+            border-bottom: 1px solid var(--rc-border);
+        }
+
+        .rc-discover-wire-school-loader-head strong {
+            display: block;
+            font-size: .98rem;
+            line-height: 1.2;
+        }
+
+        .rc-discover-wire-school-loader-head span {
+            display: block;
+            margin-top: .22rem;
+            color: var(--rc-muted);
+            font-size: .78rem;
+        }
+
+        .rc-discover-wire-school-spinner {
+            width: 1.05rem;
+            height: 1.05rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 999px;
+            color: var(--rc-accent);
+            animation: rcSpin .7s linear infinite;
+            flex: 0 0 auto;
+        }
+
+        .rc-discover-wire-school-loader-body {
+            display: grid;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-hero,
+        .rc-discover-wire-school-grid > span,
+        .rc-discover-wire-school-line {
+            display: block;
+            border-radius: .85rem;
+            background: linear-gradient(90deg, rgba(148,163,184,.14), rgba(148,163,184,.28), rgba(148,163,184,.14));
+            background-size: 220% 100%;
+            animation: rcDiscoverWireSchoolPulse 1.05s ease-in-out infinite;
+        }
+
+        .rc-discover-wire-school-hero { height: 7.5rem; }
+
+        .rc-discover-wire-school-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .75rem;
+        }
+
+        .rc-discover-wire-school-grid > span { height: 4.75rem; }
+        .rc-discover-wire-school-line { height: 2.75rem; }
+
+        @keyframes rcDiscoverWireSchoolPulse {
+            0% { background-position: 120% 0; }
+            100% { background-position: -120% 0; }
         }
 
         [x-cloak] { display: none !important; }
@@ -482,6 +1401,215 @@
             height: 100%;
             background: var(--rc-accent);
             transition: width .35s ease;
+        }
+
+
+        .rc-sync-monitor {
+            --rc-sync-tone: #2563eb;
+            --rc-sync-soft: rgba(37, 99, 235, .10);
+            position: relative;
+            display: grid;
+            gap: .8rem;
+            margin-bottom: 1rem;
+            padding: 1rem 1.05rem;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--rc-sync-tone) 24%, var(--rc-border));
+            border-radius: 1rem;
+            background: color-mix(in srgb, var(--rc-sync-soft) 42%, var(--rc-card));
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+        }
+
+        .rc-sync-monitor--success { --rc-sync-tone: #059669; --rc-sync-soft: rgba(5, 150, 105, .10); }
+        .rc-sync-monitor--warning { --rc-sync-tone: #d97706; --rc-sync-soft: rgba(217, 119, 6, .10); }
+        .rc-sync-monitor--danger { --rc-sync-tone: #dc2626; --rc-sync-soft: rgba(220, 38, 38, .10); }
+        .rc-sync-monitor--neutral { --rc-sync-tone: #64748b; --rc-sync-soft: rgba(100, 116, 139, .10); }
+
+        .rc-sync-monitor__head {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: .8rem;
+            align-items: start;
+        }
+
+        .rc-sync-monitor__signal {
+            position: relative;
+            width: 2.35rem;
+            height: 2.35rem;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            border-radius: .75rem;
+            color: var(--rc-sync-tone);
+            background: var(--rc-sync-soft);
+        }
+
+        .rc-sync-monitor__signal::before {
+            content: '';
+            width: .65rem;
+            height: .65rem;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 28%, transparent);
+            animation: rcSyncHeartbeat 1.65s ease-out infinite;
+        }
+
+        .rc-sync-monitor--danger .rc-sync-monitor__signal::before {
+            animation: none;
+        }
+
+        .rc-sync-monitor__title-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .55rem;
+            margin-bottom: .2rem;
+        }
+
+        .rc-sync-monitor__title {
+            color: var(--rc-text);
+            font-size: .92rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .rc-sync-monitor__badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.45rem;
+            padding: .2rem .5rem;
+            border-radius: 999px;
+            background: var(--rc-sync-soft);
+            color: var(--rc-sync-tone);
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .01em;
+        }
+
+        .rc-sync-monitor__stage {
+            color: var(--rc-text);
+            font-size: .8rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__message {
+            margin-top: .15rem;
+            color: var(--rc-muted);
+            font-size: .75rem;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__percent {
+            min-width: 3.25rem;
+            color: var(--rc-sync-tone);
+            font-size: 1rem;
+            font-weight: 850;
+            text-align: right;
+        }
+
+        .rc-sync-monitor__bar {
+            position: relative;
+            height: .55rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--rc-sync-tone) 10%, var(--rc-soft));
+        }
+
+        .rc-sync-monitor__bar > span {
+            position: relative;
+            display: block;
+            height: 100%;
+            min-width: .5rem;
+            border-radius: inherit;
+            background: var(--rc-sync-tone);
+            transition: width .3s ease;
+        }
+
+        .rc-sync-monitor__bar.is-indeterminate > span {
+            width: 38% !important;
+            min-width: 6rem;
+            animation: rcSyncIndeterminate 1.2s ease-in-out infinite;
+        }
+
+        .rc-sync-monitor__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+        }
+
+        .rc-sync-monitor__meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            min-height: 1.75rem;
+            padding: .28rem .55rem;
+            border: 1px solid color-mix(in srgb, var(--rc-border) 85%, transparent);
+            border-radius: .55rem;
+            background: color-mix(in srgb, var(--rc-card) 80%, transparent);
+            color: var(--rc-muted);
+            font-size: .7rem;
+            font-weight: 650;
+        }
+
+        .rc-sync-monitor__meta-item strong {
+            color: var(--rc-text);
+            font-weight: 800;
+        }
+
+        .rc-sync-monitor__hint {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .65rem .75rem;
+            border-radius: .7rem;
+            background: var(--rc-sync-soft);
+            color: color-mix(in srgb, var(--rc-sync-tone) 82%, var(--rc-text));
+            font-size: .73rem;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .rc-sync-monitor__action {
+            flex: 0 0 auto;
+            border: 1px solid currentColor;
+            border-radius: .5rem;
+            background: transparent;
+            padding: .32rem .55rem;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        @keyframes rcSyncHeartbeat {
+            0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 30%, transparent); }
+            70%, 100% { box-shadow: 0 0 0 .65rem transparent; }
+        }
+
+        @keyframes rcSyncIndeterminate {
+            0% { transform: translateX(-115%); }
+            55% { transform: translateX(110%); }
+            100% { transform: translateX(285%); }
+        }
+
+        @media (max-width: 700px) {
+            .rc-sync-monitor__head {
+                grid-template-columns: auto minmax(0, 1fr);
+            }
+            .rc-sync-monitor__percent {
+                grid-column: 2;
+                text-align: left;
+            }
+            .rc-sync-monitor__hint {
+                flex-direction: column;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-sync-monitor__signal::before,
+            .rc-sync-monitor__bar.is-indeterminate > span {
+                animation: none;
+            }
         }
 
         .rc-pulse {
@@ -1311,84 +2439,6 @@
             line-height:1.7;
         }
 
-
-        /* Compose Email preview: emulate a real email canvas instead of inheriting
-           Filament's global/reset spacing rules. */
-        .rc-compose-preview-shell-v46 {
-            width:min(62rem,94vw);
-            max-height:88vh;
-            overflow:auto;
-            border:1px solid var(--rc-border);
-            border-radius:1.15rem;
-            background:#f3f4f6;
-            box-shadow:0 28px 90px rgba(0,0,0,.34);
-        }
-        .rc-compose-preview-head-v46 {
-            position:sticky;
-            top:0;
-            z-index:3;
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:1rem;
-            padding:1rem 1.15rem;
-            border-bottom:1px solid #e5e7eb;
-            background:rgba(255,255,255,.98);
-            color:#111827;
-        }
-        .rc-compose-preview-subject-v46 {
-            margin-top:.22rem;
-            color:#64748b;
-            font-size:.8rem;
-            line-height:1.35;
-        }
-        .rc-compose-preview-stage-v46 {
-            padding:1.4rem;
-            background:#f3f4f6;
-        }
-        .rc-compose-preview-email-v46 {
-            width:min(100%,46rem);
-            margin:0 auto;
-            box-sizing:border-box;
-            border:1px solid #e5e7eb;
-            border-radius:1rem;
-            background:#fff;
-            color:#111827;
-            padding:2rem 2.15rem;
-            font-family:Arial,Helvetica,sans-serif;
-            font-size:16px;
-            line-height:1.65;
-            box-shadow:0 12px 36px rgba(15,23,42,.07);
-            overflow-wrap:anywhere;
-        }
-        .rc-compose-preview-email-v46 p { margin:0 0 1rem !important; }
-        .rc-compose-preview-email-v46 p:last-child { margin-bottom:0 !important; }
-        .rc-compose-preview-email-v46 h1,
-        .rc-compose-preview-email-v46 h2,
-        .rc-compose-preview-email-v46 h3,
-        .rc-compose-preview-email-v46 h4 {
-            margin:1.35rem 0 .75rem !important;
-            line-height:1.25;
-        }
-        .rc-compose-preview-email-v46 ul,
-        .rc-compose-preview-email-v46 ol {
-            margin:.45rem 0 1rem 1.3rem !important;
-            padding:0 !important;
-        }
-        .rc-compose-preview-email-v46 li { margin:.3rem 0 !important; }
-        .rc-compose-preview-email-v46 img { max-width:100%; height:auto; }
-        .rc-compose-preview-email-v46 table { max-width:100%; }
-        .rc-compose-preview-email-v46 a { text-underline-offset:2px; }
-        .rc-compose-preview-email-v46 .plyrcard-email-signature {
-            margin-top:1.75rem !important;
-            padding-top:1.4rem;
-            border-top:1px solid #e5e7eb;
-        }
-        @media (max-width:640px) {
-            .rc-compose-preview-stage-v46 { padding:.75rem; }
-            .rc-compose-preview-email-v46 { padding:1.25rem; border-radius:.8rem; }
-        }
-
         .rc-campaign-toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -1790,6 +2840,29 @@
 
 
 
+
+        /* Support ticket form */
+        .rc-support-page-v1 { display:grid; gap:1rem; }
+        .rc-support-card-v1 {
+            overflow:hidden;
+            border:1px solid var(--rc-border);
+            border-radius:1rem;
+            background:var(--rc-surface);
+            box-shadow:0 12px 32px rgba(15,23,42,.06);
+        }
+        .rc-support-head-v1 { padding:1rem 1.1rem; border-bottom:1px solid var(--rc-border); }
+        .rc-support-kicker-v1 { display:block; margin-bottom:.28rem; color:var(--rc-accent); font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+        .rc-support-head-v1 h2 { margin:0; color:var(--rc-text); font-size:1.1rem; font-weight:800; letter-spacing:-.025em; }
+        .rc-support-head-v1 p { margin:.3rem 0 0; color:var(--rc-muted); font-size:.82rem; }
+        .rc-support-frame-wrap-v1 { position:relative; min-height:760px; background:var(--rc-surface); }
+        .rc-support-frame-v1 { display:block; width:100%; min-height:760px; border:0; background:transparent; }
+        .rc-support-frame-loader-v1 { position:absolute; inset:0; z-index:2; display:grid; place-items:center; background:var(--rc-surface); }
+        .rc-support-spinner-v1 { width:1.55rem; height:1.55rem; border:2px solid rgba(148,163,184,.28); border-top-color:var(--rc-accent); border-radius:999px; animation:rcSpin .72s linear infinite; }
+        @media (max-width:700px) {
+            .rc-support-frame-wrap-v1, .rc-support-frame-v1 { min-height:900px; }
+            .rc-support-head-v1 { padding:.9rem; }
+        }
+
         /* v56 Inbox redesign */
         .rc-inbox-page-v56 { display:grid; gap:1rem; }
         .rc-inbox-shell-v56 { display:grid; grid-template-columns: 23rem minmax(0,1fr) 22rem; min-height:42rem; border:1px solid var(--rc-border); border-radius:1.15rem; background:var(--rc-surface); box-shadow:0 16px 40px rgba(15,23,42,.07); overflow:hidden; }
@@ -1802,6 +2875,77 @@
         .rc-inbox-head-actions-v56 { display:flex; align-items:center; gap:.4rem; }
         .rc-inbox-icon-btn-v56 { width:2.05rem; height:2.05rem; display:grid; place-items:center; border:0; border-radius:.65rem; background:transparent; color:var(--rc-muted); cursor:pointer; }
         .rc-inbox-icon-btn-v56:hover { background:var(--rc-soft); color:var(--rc-text); }
+        .rc-inbox-quick-filters-v56 {
+            display: flex;
+            align-items: center;
+            gap: .38rem;
+            padding: 0 .82rem .72rem;
+            overflow-x: auto;
+        }
+
+        .rc-inbox-quick-filters-v56 button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .3rem;
+            min-height: 1.9rem;
+            padding: .35rem .65rem;
+            border: 1px solid var(--rc-border);
+            border-radius: 999px;
+            background: var(--rc-surface);
+            color: var(--rc-muted);
+            font-size: .72rem;
+            font-weight: 750;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .rc-inbox-quick-filters-v56 button:hover,
+        .rc-inbox-quick-filters-v56 button.is-active {
+            border-color: rgba(255, 99, 56, .38);
+            background: var(--rc-accent-soft);
+            color: var(--rc-accent);
+        }
+
+        .rc-inbox-quick-filters-v56 button span {
+            min-width: 1.15rem;
+            height: 1.15rem;
+            padding: 0 .3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #ff6338;
+            color: #ffffff;
+            font-size: .62rem;
+            font-weight: 850;
+            line-height: 1;
+        }
+
+        .rc-thread-card-side-v56 {
+            min-height: 100%;
+            display: grid;
+            justify-items: end;
+            align-content: space-between;
+            gap: .3rem;
+        }
+
+        .rc-thread-star-v56 {
+            width: 1.15rem;
+            height: 1.15rem;
+            display: inline-grid;
+            place-items: center;
+            color: #f59e0b;
+            margin-top: auto;
+        }
+
+        .rc-thread-star-v56 svg {
+            width: 1rem;
+            height: 1rem;
+            fill: currentColor;
+            stroke: currentColor;
+        }
+
         .rc-inbox-search-v56 { padding:0 1.1rem .75rem; }
         .rc-inbox-search-v56 label { position:relative; display:block; }
         .rc-inbox-search-v56 svg { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); width:1rem; height:1rem; color:#94a3b8; }
@@ -3147,9 +4291,64 @@
 
         .rc-home-progress-v2 span {
             display: block;
+            width: 0;
             height: 100%;
             border-radius: inherit;
             background: #ff6338;
+            transition: width .7s cubic-bezier(.22, 1, .36, 1);
+            will-change: width;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-home-progress-v2 span {
+                transition: none;
+            }
+        }
+
+
+        .rc-email-sync-badge-v2 {
+            align-items: center;
+            gap: .32rem;
+            margin-left: .4rem;
+            padding: .2rem .45rem;
+            border-radius: 999px;
+            background: rgba(99, 102, 241, .12);
+            color: #818cf8;
+            font-size: .64rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            vertical-align: middle;
+        }
+
+        .rc-email-sync-spinner-v2 {
+            width: .72rem;
+            height: .72rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 999px;
+            animation: rcEmailSyncSpin .7s linear infinite;
+        }
+
+        .rc-email-sync-value-skeleton-v2 {
+            width: 1.45rem;
+            height: 1.45rem;
+            margin-top: .2rem;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 999px;
+            color: #818cf8;
+            animation: rcEmailSyncSpin .7s linear infinite;
+        }
+
+        @keyframes rcEmailSyncSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-email-sync-spinner-v2,
+            .rc-email-sync-value-skeleton-v2 {
+                animation: none;
+            }
         }
 
         .rc-home-stat-sub-v2 {
@@ -3362,10 +4561,17 @@
         }
 
         .rc-home-activity-v2 {
+            width: 100%;
             display: grid;
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
             gap: .6rem;
             align-items: center;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
             text-decoration: none;
             color: inherit;
         }
@@ -3981,6 +5187,31 @@
             color: #475569;
         }
 
+
+        .rc-engagement-filter-card {
+            width:100%;
+            border:1px solid transparent;
+            text-align:left;
+            cursor:pointer;
+            font:inherit;
+            position:relative;
+            transition:border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+        .rc-engagement-filter-card:hover { transform:translateY(-1px); }
+        .rc-engagement-filter-card.is-filter-active {
+            border-color:#ff6338 !important;
+            box-shadow:0 0 0 2px rgba(255,99,56,.08), 0 12px 30px rgba(15,23,42,.08);
+        }
+        .rc-engagement-filter-note {
+            grid-column:1 / -1;
+            width:100%;
+            margin-top:.65rem;
+            padding-top:.65rem;
+            border-top:1px solid rgba(148,163,184,.18);
+            color:#ff6338;
+            font-size:.72rem;
+            font-weight:750;
+        }
         .rc-detail-stats-v2 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4041,7 +5272,6 @@
         .rc-detail-stat-v2.is-blue > span { background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-detail-stat-v2.is-coral > span { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-detail-stat-v2.is-purple > span { background: rgba(139,92,246,.13); color: #8b5cf6; }
-        .rc-detail-stat-v2.is-green > span { background: rgba(16,185,129,.13); color: #10b981; }
         .rc-detail-stat-v2.is-neutral > span { background: #eceef3; color: #111827; }
         .rc-detail-stat-v2.is-pink > span { background: rgba(236,72,153,.14); color: #ec4899; }
         .rc-detail-stat-v2.is-red > span { background: rgba(239,68,68,.13); color: #ef4444; }
@@ -6005,6 +7235,30 @@
         /* v94: keep dashboard first visit pinned to the top and avoid stale loading panels covering content. */
         .rc-wrap { min-height: 0 !important; }
         .rc-livewire-root [data-stale-school-loader],
+
+        .rc-brand-icon-img {
+            width: 1.2rem;
+            height: 1.2rem;
+            display: block;
+            object-fit: contain;
+        }
+
+        .rc-detail-platform-icon-v2 .rc-brand-icon-img {
+            width: 1.35rem;
+            height: 1.35rem;
+        }
+
+        @media (min-width: 981px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .rc-stats-drawer-panel .rc-detail-stats-v2.is-two {
+                grid-template-columns: 1fr !important;
+            }
+        }
         .rc-livewire-root .rc-school-loader-backdrop,
         .rc-livewire-root .rc-school-loading-backdrop,
         .rc-livewire-root .rc-opening-school-backdrop {
@@ -6023,110 +7277,29 @@
         }
 
 
+        .rc-discover-select-v27.is-updating { opacity:.72; cursor:progress; }
+        .rc-discover-tab-v27 { transition: background-color .12s ease, color .12s ease, border-color .12s ease; }
 
-        /* v102 non-overlay Recruiting Center sync status */
-        .rc-reload-status-v101 {
-            position: static !important;
-            top: auto !important;
-            z-index: auto !important;
-            display: grid;
-            gap: .55rem;
-            margin: 0 0 1rem 0;
-            border: 1px solid rgba(255, 99, 56, .22);
-            background: linear-gradient(135deg, rgba(255, 99, 56, .08), rgba(255, 255, 255, .95));
-            border-radius: .9rem;
-            padding: .75rem .9rem;
-            box-shadow: 0 8px 22px rgba(15, 23, 42, .06);
-            backdrop-filter: none;
-        }
-
-        .dark .rc-reload-status-v101 {
-            background: linear-gradient(135deg, rgba(255, 99, 56, .12), rgba(24, 24, 27, .92));
-            box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
-        }
-
-        .rc-reload-main-v101 {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-        }
-
-        .rc-reload-copy-v101 {
-            display: grid;
-            gap: .18rem;
-            min-width: 0;
-        }
-
-        .rc-reload-copy-v101 strong {
-            color: var(--rc-text);
-            font-size: .92rem;
-            font-weight: 850;
-            letter-spacing: -.02em;
-        }
-
-        .rc-reload-copy-v101 span,
-        .rc-reload-meta-v101 {
-            color: var(--rc-muted);
-            font-size: .78rem;
-            line-height: 1.35;
-        }
-
-        .rc-reload-pill-v101 {
+        /* v96 inbox message readability: no huge tracking URLs, no forced bottom scroll */
+        .rc-message-stream-v56 { scroll-behavior: auto !important; }
+        .rc-msg-bubble-v56 { overflow-wrap: break-word !important; word-break: normal !important; }
+        .rc-msg-bubble-v56 a { word-break: normal !important; overflow-wrap: break-word !important; }
+        .rc-msg-bubble-v56 .rc-message-link-short {
             display: inline-flex;
             align-items: center;
-            gap: .45rem;
-            border-radius: 999px;
-            padding: .42rem .7rem;
-            background: var(--rc-accent-soft);
-            color: var(--rc-accent);
-            font-size: .76rem;
-            font-weight: 850;
-            white-space: nowrap;
-        }
-
-        .rc-reload-pulse-v101 {
-            width: .52rem;
-            height: .52rem;
-            border-radius: 999px;
-            background: currentColor;
-            box-shadow: 0 0 0 rgba(255, 99, 56, .4);
-            animation: rcReloadPulse 1.4s infinite;
-        }
-
-        @keyframes rcReloadPulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 99, 56, .34); }
-            70% { box-shadow: 0 0 0 .55rem rgba(255, 99, 56, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 99, 56, 0); }
-        }
-
-        .rc-reload-stats-v101 {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .45rem .85rem;
-        }
-
-        .rc-reload-stats-v101 span {
-            color: var(--rc-muted);
-            font-size: .74rem;
+            max-width: 100%;
+            border-radius: .45rem;
+            padding: .1rem .38rem;
+            background: rgba(37,99,235,.08);
+            color: #2563eb;
             font-weight: 700;
+            text-decoration: none;
+            vertical-align: baseline;
         }
+        .rc-msg-bubble-v56 .rc-message-link-short:hover { text-decoration: underline; }
+        .rc-msg-bubble-v56 .rc-message-image-link { display:block; max-width:100%; margin:.45rem 0; }
+        .rc-msg-bubble-v56 .rc-message-image-link img { max-width:min(100%, 24rem); height:auto; border-radius:.7rem; display:block; }
 
-        .rc-reload-stats-v101 b { color: var(--rc-text); }
-
-        .rc-reload-copy-v101 strong { font-size: .86rem; }
-        .rc-reload-copy-v101 span,
-        .rc-reload-stats-v101 span { font-size: .72rem; }
-        .rc-reload-pill-v101 { padding: .35rem .6rem; font-size: .72rem; }
-
-        @media (max-width: 900px) {
-            .rc-reload-main-v101 {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .rc-reload-status-v101 { padding: .7rem; }
-        }
 </style>
 
     @php
@@ -6144,6 +7317,24 @@
 
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
         $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
+
+
+        // Public PNG icons from Icons8's CDN. These replace missing local files
+        // under /images/recruiting-center/icons and avoid SVG-only brand marks.
+        $publicIconUrls = [
+            'cap' => 'https://img.icons8.com/fluency/48/graduation-cap.png',
+            'eye' => 'https://img.icons8.com/fluency/48/visible.png',
+            'star' => 'https://img.icons8.com/fluency/48/star.png',
+            'mail' => 'https://img.icons8.com/fluency/48/secured-letter.png',
+            'chart' => 'https://img.icons8.com/fluency/48/sent.png',
+            'profile' => 'https://img.icons8.com/fluency/48/user-male-circle.png',
+            'website' => 'https://img.icons8.com/fluency/48/domain.png',
+            'email' => 'https://img.icons8.com/fluency/48/new-post.png',
+            'instagram' => 'https://img.icons8.com/fluency/48/instagram-new.png',
+            'youtube' => 'https://img.icons8.com/color/48/youtube-play.png',
+            'x' => 'https://img.icons8.com/ios-filled/50/x.png',
+            'link' => 'https://img.icons8.com/fluency/48/link.png',
+        ];
 
         $formatActivityTimeLabel = function ($time): string {
             if (! $time) {
@@ -6199,6 +7390,14 @@
 
             const resetOne = function (el) {
                 if (! el) return;
+
+                // The Inbox message stream owns its own scroll position. Never let the
+                // dashboard-wide scroll reset push it back to the oldest message.
+                if (el.matches?.('[data-rc-inbox-message-stream]')
+                    || el.closest?.('[data-rc-inbox-message-stream]')) {
+                    return;
+                }
+
                 try { el.scrollTop = 0; } catch (error) {}
                 try { el.scrollLeft = 0; } catch (error) {}
             };
@@ -6220,6 +7419,11 @@
 
                 document.querySelectorAll('*').forEach(function (el) {
                     try {
+                        if (el.matches?.('[data-rc-inbox-message-stream]')
+                            || el.closest?.('[data-rc-inbox-message-stream]')) {
+                            return;
+                        }
+
                         if (el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== 'visible') {
                             el.scrollTop = 0;
                         }
@@ -6281,13 +7485,14 @@
         class="rc-wrap"
         x-data
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
-        wire:poll.5s.visible="pollRealtime"
     >
+        @include('filament.partials.coach-database-sync-status')
+
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
 
-        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'support', 'schedule', 'settings'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -6337,18 +7542,17 @@
                         wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
                         aria-label="Open refresh options"
                         title="Refresh options"
-                        @disabled($isRecruitingSyncRunning ?? false)
                     >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
                     <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Refresh email activity, profile views, and social clicks.</small></span>
                         </button>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
+                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false">
                             <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>{{ ($isRecruitingSyncRunning ?? false) ? 'Reload running' : 'Reload whole Coach Database' }}</strong><small>{{ ($isRecruitingSyncRunning ?? false) ? 'A locked background sync is already running; existing rows stay visible.' : 'Reload schools, coaches, logos, tags, filters, and stats from GHL without blanking current data.' }}</small></span>
+                            <span class="rc-refresh-menu-copy-v2"><strong>Reload whole Coach Database</strong><small>Reload schools, coaches, logos, tags, filters, and dashboard stats.</small></span>
                         </button>
                     </div>
                 </div>
@@ -6363,6 +7567,7 @@
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                $dashboardMostInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(5)->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
@@ -6387,34 +7592,30 @@
                 $trackedXViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $trackedEmailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
                 $trackedProfileComponentTotal = $trackedWebsiteViews + $trackedInstagramViews + $trackedYoutubeViews + $trackedXViews + $trackedEmailLinkViews;
-                $trackedProfileTotal = max((int) ($dashboardMetrics['view_profile_total'] ?? 0), (int) ($dashboardMetrics['profile_views'] ?? 0), $trackedProfileComponentTotal);
+                $trackedProfileTotal = max(
+                    $trackedProfileComponentTotal,
+                    (int) ($dashboardMetrics['view_profile_total'] ?? 0),
+                    (int) ($dashboardMetrics['profile_views'] ?? 0),
+                    (int) ($dashboardMetrics['unique_profile_views'] ?? 0),
+                );
                 $profileViews = $trackedProfileTotal;
-                $profileUniqueContacts = max((int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0), $trackedProfileTotal > 0 ? 1 : 0);
-                $profileUniqueSchools = max((int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0));
-                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $trackedProfileTotal);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), $profileUniqueContacts);
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), $profileSchoolClicks + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
 
-                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $emailSentCount = (int) ($authUser?->total_emails_sent ?? 0);
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
-                $socialClickCount = (int) ($dashboardMetrics['website_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['x_click_count'] ?? 0);
-                $emailsSent = $emailSentCount;
+                $instagramClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
+                $youtubeClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
+                $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
 
+                // Coach Engagement must match the drawer:
+                // Instagram + YouTube + X social clicks only.
+                // Do not include profile views, website clicks, email opens, email clicks, or replies.
+                $socialClickCount = $instagramClicks + $youtubeClicks + $xClicks;
+                $coachEngagementTotal = $socialClickCount;
+
+                $emailsSent = $emailSentCount;
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
-                $coachEngagementTotal = $trackedWebsiteViews
-                    + $trackedInstagramViews
-                    + $trackedYoutubeViews
-                    + $trackedXViews
-                    + $trackedEmailLinkViews
-                    + $emailClickCount
-                    + $socialClickCount
-                    + $emailOpenCount
-                    + $coachReplies;
 
                 $profileCompletion = 0;
                 $profileUrl = '#';
@@ -6634,6 +7835,8 @@
                     [
                         'label' => 'Profile Completion',
                         'value' => $profileCompletion . '%',
+                        'count' => $profileCompletion,
+                        'suffix' => '%',
                         'sub' => $profileCompletionSubtext,
                         'icon' => 'cap',
                         'tone' => 'coral',
@@ -6642,7 +7845,8 @@
                     [
                         'label' => 'Profile Views',
                         'value' => number_format($profileViews),
-                        'sub' => number_format($profileUniqueContacts) . ' unique contacts · ' . number_format($profileUniqueSchools) . ' schools',
+                        'count' => $profileViews,
+                        'sub' => 'Tracked profile activity',
                         'icon' => 'eye',
                         'tone' => 'blue',
                         'target' => 'profile-views',
@@ -6650,15 +7854,17 @@
                     [
                         'label' => 'Favorites',
                         'value' => number_format($favoriteSchools),
+                        'count' => $favoriteSchools,
                         'sub' => 'Schools saved',
                         'icon' => 'star',
                         'tone' => 'gold',
-                        'target' => 'favorites',
+                        'url' => $this->pageUrl('favorites'),
                     ],
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
-                        'sub' => number_format($uniqueClicks) . ' unique clicks · ' . number_format($schoolClicks) . ' school total',
+                        'count' => $coachEngagementTotal,
+                        'sub' => 'Tracked social clicks',
                         'icon' => 'mail',
                         'tone' => 'green',
                         'target' => 'coach-engagement',
@@ -6666,9 +7872,11 @@
                     [
                         'label' => 'Emails Sent',
                         'value' => number_format($emailsSent),
+                        'count' => $emailsSent,
                         'sub' => 'Tracked emails sent',
                         'icon' => 'chart',
                         'tone' => 'indigo',
+                        'is_email_sent' => true,
                     ],
                 ];
 
@@ -6722,12 +7930,6 @@
                     if (str_contains($activityType, 'reply')) {
                         $tone = 'green';
                         $icon = '↩';
-                    } elseif (str_contains($activityType, 'profile') || str_contains($activityType, 'view')) {
-                        $tone = 'blue';
-                        $icon = '◎';
-                    } elseif (str_contains($activityType, 'instagram') || str_contains($activityType, 'youtube') || str_contains($activityType, 'social')) {
-                        $tone = 'purple';
-                        $icon = '↗';
                     } elseif (str_contains($activityType, 'email')) {
                         $tone = 'coral';
                         $icon = '✉';
@@ -6757,6 +7959,7 @@
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
                         'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
                         'url' => $activity['url'] ?? '#',
+                        'school_id' => (string) ($activity['school_id'] ?? ''),
                         'tone' => $tone,
                         'icon' => $icon,
                         'time_label' => $timeLabel,
@@ -6814,29 +8017,22 @@
                     ]);
                 }
 
-                $interestedSchoolRows = collect($dashboardTopSchools)->take(4)->values()->map(function ($school, $rank) {
+                $interestedSchoolRows = collect($dashboardMostInterestedSchools)->take(4)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
-                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
-                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                    $views = max(0, (int) ($school['profile_views'] ?? 0));
+                    $engagementClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
 
                     return [
                         'rank' => $rank + 1,
+                        'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($schoolName)))),
                         'name' => $schoolName,
-                        'score' => $score,
+                        'score' => $views,
+                        'engagement_clicks' => $engagementClicks,
                         'initials' => strtoupper($initials ?: 'S'),
                         'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
                     ];
-                })->values();
-
-                if ($interestedSchoolRows->isEmpty()) {
-                    $interestedSchoolRows = collect([
-                        ['rank' => 1, 'name' => 'Virginia Commonwealth', 'score' => 14, 'initials' => 'VCU'],
-                        ['rank' => 2, 'name' => 'University of Maryland', 'score' => 9, 'initials' => 'M'],
-                        ['rank' => 3, 'name' => 'Florida State', 'score' => 7, 'initials' => 'FS'],
-                        ['rank' => 4, 'name' => 'Indiana University', 'score' => 6, 'initials' => 'IU'],
-                    ]);
-                }
+                })->filter(fn (array $row): bool => (int) ($row['score'] ?? 0) > 0 || (int) ($row['engagement_clicks'] ?? 0) > 0)->values();
             @endphp
 
             <div class="rc-home-dashboard-v2">
@@ -6846,114 +8042,97 @@
                     'showNewEmail' => true,
                 ])
 
-                {{-- When there are zero usable schools, always expose the sync state so the user can tell whether the database is loading, completed empty, or needs attention. Once schools exist, background refreshes remain silent. --}}
-                @php
-                    $hasUsableSchoolDatabase =
-                        ! empty($this->filteredSchools ?? [])
-                        || (int) ($this->filteredSchoolsCount ?? 0) > 0
-                        || (int) ($loadedSchoolsCount ?? 0) > 0;
-
-                    $hasRecruitingSyncState =
-                        ($isLoadingDataset ?? false)
-                        || ($isRecruitingSyncRunning ?? false)
-                        || filled($recruitingSyncStatus ?? null)
-                        || filled($recruitingSyncMessage ?? null)
-                        || filled($cachedAt ?? null);
-
-                    $shouldShowInitialSyncBanner = ! $hasUsableSchoolDatabase && $hasRecruitingSyncState;
-                @endphp
-
-                @if($shouldShowInitialSyncBanner)
-                    @php
-                        $reloadPercent = $isLoadingDataset
-                            ? max(5, min(98, (int) ($remoteTotalSchools ? round(($loadedSchoolsCount / max(1, $remoteTotalSchools)) * 100) : min(96, max(1, $loadedPages) * 8))))
-                            : ($isRecruitingSyncRunning ? 35 : (($recruitingSyncStatus ?? '') === 'completed' ? 100 : 10));
-                        $reloadStatusLabel = match ($recruitingSyncStatus) {
-                            'completed' => 'Synced',
-                            'failed', 'failed_to_start' => 'Needs attention',
-                            'already_running' => 'Already syncing',
-                            'queued' => 'Queued',
-                            default => ($isRecruitingSyncRunning ? 'Syncing' : 'Waiting'),
-                        };
-                    @endphp
-                    <div class="rc-reload-status-v101" role="status" aria-live="polite">
-                        <div class="rc-reload-main-v101">
-                            <div class="rc-reload-copy-v101">
-                                <strong>Recruiting Center is updating</strong>
-                                <span>{{ $recruitingSyncMessage ?: 'Loading schools, coaches, and tracking stats from GHL. Existing data stays visible while this runs.' }}</span>
-                            </div>
-                            <span class="rc-reload-pill-v101"><i class="rc-reload-pulse-v101"></i>{{ $reloadStatusLabel }}</span>
-                        </div>
-                        <div class="rc-progress" aria-label="Coach Database loading progress"><span style="width:{{ $reloadPercent }}%"></span></div>
-                        <div class="rc-reload-stats-v101">
-                            <span><b>{{ number_format($loadedSchoolsCount) }}</b> schools cached</span>
-                            <span><b>{{ number_format($loadedContactsCount) }}</b> coaches cached</span>
-                            <span><b>{{ number_format($loadedPages) }}</b> pages processed</span>
-                            @if($cachedAt)<span>Last cache {{ $cachedAt }}</span>@endif
-                        </div>
-                    </div>
-                @endif
-
-
                 <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
                         @if(! empty($stat['target']))
                             <button
                                 type="button"
                                 class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
-                                wire:click="$set('section', @js($stat['target']))"
+                                x-on:click="$dispatch('rc-open-{{ $stat['target'] }}')"
+                                data-rc-stat-open="{{ $stat['target'] }}"
+                                data-rc-no-pending
+                            >
+                        @elseif(! empty($stat['url']))
+                            <a
+                                class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
+                                href="{{ $stat['url'] }}"
+                                wire:navigate
                             >
                         @else
-                            <button
-                                type="button"
-                                class="rc-home-stat-v2 is-{{ $stat['tone'] }}"
-                            >
+                            <div class="rc-home-stat-v2 is-{{ $stat['tone'] }}">
                         @endif
                             <div class="rc-home-stat-icon-v2">
-                                @switch($stat['icon'])
-                                    @case('cap')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="M7 11v4.2c0 1.6 2.2 3 5 3s5-1.4 5-3V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                        </svg>
-                                        @break
-                                    @case('eye')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/>
-                                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
-                                        </svg>
-                                        @break
-                                    @case('star')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="m12 3 2.7 5.5 6 .9-4.35 4.2 1.05 6-5.4-2.85-5.4 2.85 1.05-6L3.3 9.4l6-.9L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @case('mail')
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                            <path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                        @break
-                                    @default
-                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                            <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                @endswitch
+                                <img
+                                    class="rc-public-png-icon"
+                                    src="{{ $publicIconUrls[$stat['icon']] ?? $publicIconUrls['link'] }}"
+                                    alt=""
+                                    width="48"
+                                    height="48"
+                                    loading="eager"
+                                    referrerpolicy="no-referrer"
+                                >
                             </div>
 
                             <div class="rc-home-stat-copy-v2">
-                                <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
-                                <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
+                                <div class="rc-home-stat-label-v2">
+                                    {{ $stat['label'] }}
+                                </div>
+
+                                @if(! empty($stat['is_email_sent']))
+                                    @if((int) ($stat['count'] ?? 0) > 0)
+                                        {{-- A cached database value already exists: show it immediately.
+                                             The GHL reconciliation continues silently through wire:init. --}}
+                                        <div
+                                            class="rc-home-stat-value-v2"
+                                            x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                            x-init="init()"
+                                            x-text="display"
+                                        >{{ $stat['value'] }}</div>
+                                    @else
+                                        {{-- First synchronization only: there is no usable local value yet. --}}
+                                        <div
+                                            class="rc-home-stat-value-v2"
+                                            wire:loading.remove
+                                            wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                            x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                            x-init="init()"
+                                            x-text="display"
+                                        >{{ $stat['value'] }}</div>
+                                        <div
+                                            class="rc-email-sync-value-skeleton-v2"
+                                            wire:loading.block
+                                            wire:target="bootDeferredUiData,syncTotalEmailsSentFromGhlOccasionally"
+                                            aria-label="Loading sent email total"
+                                        ></div>
+                                    @endif
+                                @else
+                                    <div
+                                        class="rc-home-stat-value-v2"
+                                        x-data="window.rcCountUp(@js((int) ($stat['count'] ?? 0)), @js((string) ($stat['suffix'] ?? '')))"
+                                        x-init="init()"
+                                        x-text="display"
+                                    >{{ $stat['value'] }}</div>
+                                @endif
                             </div>
 
                             @if(isset($stat['progress']))
-                                <div class="rc-home-progress-v2">
-                                    <span style="width: {{ (int) $stat['progress'] }}%"></span>
+                                <div
+                                    class="rc-home-progress-v2"
+                                    x-data="window.rcProgressFill(@js((int) $stat['progress']))"
+                                    x-init="init()"
+                                >
+                                    <span x-bind:style="`width: ${width}%`"></span>
                                 </div>
                             @endif
 
                             <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
-                        </button>
+                        @if(! empty($stat['target']))
+                            </button>
+                        @elseif(! empty($stat['url']))
+                            </a>
+                        @else
+                            </div>
+                        @endif
                     @endforeach
                 </div>
 
@@ -6966,7 +8145,11 @@
                         <div class="rc-home-progress-layout-v2">
                             <div class="rc-readiness-ring-v2" style="--ready: {{ $readinessScore }};">
                                 <div>
-                                    <strong>{{ $profileCompletion }}%</strong>
+                                    <strong
+                                        x-data="window.rcCountUp(@js((int) $profileCompletion), '%')"
+                                        x-init="init()"
+                                        x-text="display"
+                                    >{{ $profileCompletion }}%</strong>
                                     <span>Profile Completion</span>
                                 </div>
                             </div>
@@ -7000,12 +8183,21 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Recent Activity</h2>
-                            <a href="#">View All</a>
+                            <a
+                                href="#"
+                                x-on:click.prevent="$dispatch('rc-open-profile-views')"
+                                data-rc-stat-open="profile-views"
+                                data-rc-no-pending
+                            >View All</a>
                         </div>
 
                         <div class="rc-home-activity-list-v2">
-                            @forelse($dashboardActivityRows as $activityRow)
-                                <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                            @foreach($dashboardActivityRows as $activityRow)
+                                @if(! empty($activityRow['school_id']))
+                                    <button type="button" class="rc-home-activity-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $activityRow['school_id']) }})">
+                                @else
+                                    <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
+                                @endif
                                     <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
 
                                     <span class="rc-home-activity-copy-v2">
@@ -7014,10 +8206,12 @@
                                     </span>
 
                                     <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
-                                </a>
-                            @empty
-                                <div class="rc-home-empty-v2">Recent coach views, social clicks, email sends, and replies will appear here after the next sync.</div>
-                            @endforelse
+                                @if(! empty($activityRow['school_id']))
+                                    </button>
+                                @else
+                                    </a>
+                                @endif
+                            @endforeach
                         </div>
                     </section>
                 </div>
@@ -7029,7 +8223,7 @@
                                 <h2>On The Radar</h2>
                                 <p>Based on your profile and preferences</p>
                             </div>
-                            <a href="#">View All</a>
+                            <a href="{{ $this->pageUrl('lists') }}">View All</a>
                         </div>
 
                         <div class="rc-radar-schools-v2">
@@ -7058,12 +8252,12 @@
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Schools Most Interested</h2>
-                            <span>Last 30 days</span>
+                            <span>Total tracked profile views</span>
                         </div>
 
                         <div class="rc-interested-list-v2">
-                            @foreach($interestedSchoolRows as $interestedSchool)
-                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
+                            @forelse($interestedSchoolRows as $interestedSchool)
+                                <button type="button" class="rc-interested-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) $interestedSchool['id']) }})">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
                                     <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($interestedSchool['logo_url']))
@@ -7073,92 +8267,55 @@
                                     </span>
                                     <span>
                                         <strong>{{ $interestedSchool['name'] }}</strong>
-                                        <small>Profile views</small>
+                                        <small>Profile views from this school</small>
                                     </span>
-                                    <b>{{ $interestedSchool['score'] }}</b>
+                                    <b>{{ number_format((int) $interestedSchool['score']) }}</b>
                                 </button>
-                            @endforeach
+                            @empty
+                                <div class="rc-home-empty-v2">School interest will appear after identified coach contacts view your profile or interact with your recruiting links.</div>
+                            @endforelse
                         </div>
 
-                        <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
+                        <button
+                            type="button"
+                            class="rc-home-outline-btn-v2"
+                            x-on:click="$dispatch('rc-open-coach-engagement')"
+                            data-rc-stat-open="coach-engagement"
+                            data-rc-no-pending
+                        >View Full Analytics</button>
                     </section>
                 </div>
             </div>
         @endif
 
-        @if($section === 'profile-views')
+        @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
-
-                $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
-                $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
-                $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-                $xViews = (int) ($dashboardMetrics['view_profile_x'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
-                $emailLinkViews = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $profileViewsTotal = max((int) ($dashboardMetrics['view_profile_total'] ?? 0), (int) ($dashboardMetrics['profile_views'] ?? 0), $websiteViews + $instagramViews + $youtubeViews + $xViews + $emailLinkViews);
-                $uniqueProfileViews = max((int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_views'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0), $profileViewsTotal > 0 ? 1 : 0);
-                $ghlContactClicks = max((int) ($dashboardMetrics['ghl_contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_link_clicks'] ?? 0), $profileViewsTotal + (int) ($dashboardMetrics['link_clicks'] ?? 0));
-                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $profileViewsTotal);
-                $profilePrograms = max(0, (int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0), (int) ($dashboardMetrics['schools_with_clicks'] ?? 0));
-
-                $profileBreakdownRows = collect([
-                    ['title' => 'Website profile link', 'copy' => 'Website profile clicks', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Updated'],
-                    ['title' => 'Instagram profile link', 'copy' => 'Instagram profile clicks', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Updated'],
-                    ['title' => 'YouTube highlight link', 'copy' => 'YouTube profile clicks', 'views' => $youtubeViews, 'type' => 'YouTube', 'initials' => 'YT', 'time_label' => 'Updated'],
-                    ['title' => 'X profile link', 'copy' => 'X profile clicks', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Updated'],
-                    ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
-                ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
-
-                $activityProfileRows = $dashboardRecentActivity
-                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
-                    ->take(8)
-                    ->values()
-                    ->map(function ($activity, $index) use ($formatActivityTimeLabel) {
-                        $title = (string) ($activity['title'] ?? 'Coach viewed profile');
-                        $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                        $time = $activity['time'] ?? null;
-
-                        return [
-                            'title' => $title,
-                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity',
-                            'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
-                            'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
-                            'logo' => $activity['logo'] ?? null,
-                            'initials' => strtoupper($initials ?: 'PV'),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    });
-
-                $profileViewRows = $activityProfileRows->merge($profileBreakdownRows)->values()->map(function ($row, $index) {
-                    return array_merge($row, ['rank' => $index + 1]);
-                });
+                $profileViewRows = collect($this->profileViewRows ?? [])->values();
+                $profileViewsTotal = max(
+                    (int) ($dashboardMetrics['view_profile_total'] ?? $dashboardMetrics['profile_views'] ?? 0),
+                    (int) $profileViewRows->sum('views'),
+                );
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-profile-views"
+                data-rc-modal="stats"
+                data-rc-modal-id="profile-views"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('profile-views', @js($section === 'profile-views'), @js($section !== 'dashboard')) : { open: @js($section === 'profile-views'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-profile-views.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7167,7 +8324,7 @@
                     </div>
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
+                        <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.180ms="search">
 
                             @if($search !== '')
                                 <div class="rc-global-suggestions">
@@ -7203,18 +8360,16 @@
                     </form>
                 </div>
 
-                <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Player website/profile views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Unique Contacts</small><strong>{{ number_format(max($uniqueProfileViews, $profileViewRows->count())) }}</strong><em>Distinct GHL coach contacts</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Schools Reached</small><strong>{{ number_format($profilePrograms) }}</strong><em>Schools with tracked coach views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>School Clicks</small><strong>{{ number_format($profileSchoolClicks) }}</strong><em>All profile clicks rolled up by school</em></div></div>
+                <div class="rc-detail-stats-v2 is-two">
+                    <div class="rc-detail-stat-v2 is-blue"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['profile'] }}" alt=""></span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>{{ number_format(max(0, $profileViewsTotal)) }} tracked views</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['website'] }}" alt=""></span><div><small>Coach Contacts</small><strong>{{ number_format(max(0, $profileViewRows->count())) }}</strong><em>Viewed your profile</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
                     <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
-                            <button type="button" class="rc-detail-row-v2">
+                            <button type="button" class="rc-detail-row-v2" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($profileRow['school_id'] ?? '')) }})">
                                 <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
                                 <span class="rc-detail-avatar-v2">
                                     @if(! empty($profileRow['logo']))
@@ -7239,7 +8394,47 @@
             </div>
         @endif
 
-        @if($section === 'coach-engagement')
+        <script>
+            window.rcFilterCoachEngagement = function (source, platform) {
+                const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
+                    ? String(platform).toLowerCase()
+                    : '';
+                const drawer = source?.closest?.('[data-rc-modal-id="coach-engagement"]')
+                    || document.querySelector('[data-rc-modal-id="coach-engagement"]');
+
+                if (!drawer) return;
+
+                drawer.dataset.engagementPlatform = normalized;
+
+                drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
+                    const active = card.dataset.engagementFilter === normalized;
+                    card.classList.toggle('is-filter-active', active);
+                    card.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+
+                drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
+                    const rowPlatform = String(row.dataset.platform || '').toLowerCase();
+                    row.hidden = normalized !== '' && rowPlatform !== normalized;
+                });
+
+                const title = drawer.querySelector('[data-engagement-table-title]');
+                if (title) {
+                    const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
+                    title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
+                }
+
+                const clear = drawer.querySelector('[data-engagement-clear]');
+                if (clear) clear.hidden = normalized === '';
+            };
+        </script>
+
+        <style>
+            [data-rc-modal-id="coach-engagement"] [data-engagement-row][hidden] {
+                display: none !important;
+            }
+        </style>
+
+        @if(in_array($section, ['dashboard', 'coach-engagement'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
@@ -7252,56 +8447,118 @@
                 $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? $dashboardMetrics['Click count'] ?? 0);
                 $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? $dashboardMetrics['Open count'] ?? 0);
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_views'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0));
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0) + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
 
-                $coachEngagementRows = collect($this->coachEngagementRows ?? []);
+                $normalizeSocialPlatform = static function (array $row): string {
+                    $raw = strtolower(trim((string) (
+                        $row['platform_icon_key']
+                        ?? $row['platform']
+                        ?? $row['source']
+                        ?? $row['channel']
+                        ?? $row['type']
+                        ?? ''
+                    )));
+
+                    return match (true) {
+                        str_contains($raw, 'instagram'),
+                        $raw === 'ig' => 'instagram',
+
+                        str_contains($raw, 'youtube'),
+                        str_contains($raw, 'you_tube'),
+                        $raw === 'yt' => 'youtube',
+
+                        $raw === 'x',
+                        str_contains($raw, 'twitter'),
+                        str_contains($raw, 'x.com') => 'x',
+
+                        default => '',
+                    };
+                };
+
+                // Coach Engagement must contain social click activity only.
+                // Website clicks, email clicks/opens, profile-link clicks, and
+                // unknown activity types are removed before rendering.
+                $coachEngagementRows = collect($this->coachEngagementRows ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(function (array $row) use ($normalizeSocialPlatform) {
+                        $canonical = $normalizeSocialPlatform($row);
+
+                        if ($canonical === '') {
+                            return null;
+                        }
+
+                        return array_merge($row, [
+                            'platform' => match ($canonical) {
+                                'instagram' => 'Instagram',
+                                'youtube' => 'YouTube',
+                                'x' => 'X (Twitter)',
+                            },
+                            'platform_icon_key' => $canonical,
+                            'platform_class' => match ($canonical) {
+                                'instagram' => 'is-pink',
+                                'youtube' => 'is-red',
+                                'x' => 'is-neutral',
+                            },
+                        ]);
+                    })
+                    ->filter()
+                    ->values();
 
                 if ($coachEngagementRows->isEmpty()) {
-                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) use ($formatActivityTimeLabel) {
-                        $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
-                        $platformLower = strtolower($platform);
-                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : (str_contains($platformLower, 'website') ? 'is-blue' : 'is-neutral'));
-                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : (str_contains($platformLower, 'website') ? '⌁' : '𝕏'));
-                        $time = $row['time'] ?? null;
+                    $coachEngagementRows = $dashboardRecentActivity
+                        ->filter(fn ($row): bool => is_array($row))
+                        ->map(function (array $row) use ($normalizeSocialPlatform, $formatActivityTimeLabel) {
+                            $canonical = $normalizeSocialPlatform($row);
 
-                        return [
-                            'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
-                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked activity'))) ?: 'Tracked activity',
-                            'platform' => $platform,
-                            'platform_class' => $platformClass,
-                            'platform_icon' => $platformIcon,
-                            'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    })->values();
+                            if ($canonical === '') {
+                                return null;
+                            }
+
+                            $time = $row['time'] ?? $row['created_at'] ?? null;
+
+                            return [
+                                'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
+                                'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Social click activity'))) ?: 'Social click activity',
+                                'school_id' => (string) ($row['school_id'] ?? ''),
+                                'platform' => match ($canonical) {
+                                    'instagram' => 'Instagram',
+                                    'youtube' => 'YouTube',
+                                    'x' => 'X (Twitter)',
+                                },
+                                'platform_class' => match ($canonical) {
+                                    'instagram' => 'is-pink',
+                                    'youtube' => 'is-red',
+                                    'x' => 'is-neutral',
+                                },
+                                'platform_icon_key' => $canonical,
+                                'clicks' => max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1)),
+                                'time_label' => $formatActivityTimeLabel($time),
+                            ];
+                        })
+                        ->filter()
+                        ->take(20)
+                        ->values();
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-coach-engagement"
+                data-rc-modal="stats"
+                data-rc-modal-id="coach-engagement"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('coach-engagement', @js($section === 'coach-engagement'), @js($section !== 'dashboard')) : { open: @js($section === 'coach-engagement'), openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
+                x-on:rc-open-coach-engagement.window="openDrawer()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
-                    <div class="rc-detail-page-v2">
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
+                    <div class="rc-detail-page-v2" data-engagement-platform="">
                 <div class="rc-detail-header-v2">
                     <div>
                         <h1>Coach Engagement</h1>
@@ -7314,25 +8571,84 @@
                 </div>
 
                 <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Unique Clicks</small><strong>{{ number_format($uniqueClicks) }}</strong><em>deduped coach/profile clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>School Clicks</small><strong>{{ number_format($schoolClicks) }}</strong><em>combined clicks from coaches at schools</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>Social Clicks</small><strong>{{ number_format($igClicks + $ytClicks + $xClicks + $websiteClicks) }}</strong><em>website/social clicks</em></div></div>
+                    <button type="button" class="rc-detail-stat-v2 is-neutral rc-engagement-filter-card" data-engagement-filter="x" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'x')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['x'] }}" alt="X"></span>
+                        <div><small>X (Twitter)</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div>
+                    </button>
+                    <button type="button" class="rc-detail-stat-v2 is-pink rc-engagement-filter-card" data-engagement-filter="instagram" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'instagram')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['instagram'] }}" alt="Instagram"></span>
+                        <div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div>
+                    </button>
+                    <button type="button" class="rc-detail-stat-v2 is-red rc-engagement-filter-card" data-engagement-filter="youtube" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'youtube')">
+                        <span><img class="rc-brand-icon-img" src="{{ $publicIconUrls['youtube'] }}" alt="YouTube"></span>
+                        <div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div>
+                    </button>
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>Who's Clicking</h2><span>● Synced</span></header>
+                    <header>
+                        <h2 data-engagement-table-title>Who's Clicking</h2>
+                        <span style="display:inline-flex;align-items:center;gap:.65rem">
+                            <button
+                                type="button"
+                                class="rc-btn rc-btn-compact"
+                                data-engagement-clear
+                                hidden
+                                onclick="window.rcFilterCoachEngagement(this, '')"
+                            >
+                                Show All
+                            </button>
+                            <span>● Synced</span>
+                        </span>
+                    </header>
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
-                            <button type="button" class="rc-detail-row-v2 is-engagement">
-                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
+                            @php
+                                $engagementPlatformRaw = strtolower(trim((string) (
+                                    $engagementRow['platform_icon_key']
+                                    ?? $engagementRow['platform']
+                                    ?? ''
+                                )));
+
+                                $engagementPlatformCanonical = match (true) {
+                                    str_contains($engagementPlatformRaw, 'instagram'),
+                                    $engagementPlatformRaw === 'ig' => 'instagram',
+
+                                    str_contains($engagementPlatformRaw, 'youtube'),
+                                    str_contains($engagementPlatformRaw, 'you_tube'),
+                                    $engagementPlatformRaw === 'yt' => 'youtube',
+
+                                    $engagementPlatformRaw === 'x',
+                                    str_contains($engagementPlatformRaw, 'twitter'),
+                                    str_contains($engagementPlatformRaw, 'x.com') => 'x',
+
+                                    default => '',
+                                };
+
+                                $engagementIconKey = match ($engagementPlatformCanonical) {
+                                    'instagram' => 'instagram',
+                                    'youtube' => 'youtube',
+                                    'x' => 'x',
+                                    default => 'link',
+                                };
+                            @endphp
+
+                            <button
+                                type="button"
+                                class="rc-detail-row-v2 is-engagement"
+                                data-engagement-row
+                                data-platform="{{ $engagementPlatformCanonical }}"
+                                wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from((string) ($engagementRow['school_id'] ?? '')) }})"
+                            >
+                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}"><img class="rc-brand-icon-img" src="{{ $publicIconUrls[$engagementIconKey] }}" alt="{{ $engagementRow['platform'] }}" referrerpolicy="no-referrer"></span>
                                 <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
                                 <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
-                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $engagementRow['clicks']) }}</small></span>
+                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('click', $engagementRow['clicks']) }}</small></span>
                                 <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] }}</span>
-                                <span class="rc-detail-chevron-v2">›</span>
+                                <span class="rc-detail-chevron-v2" aria-hidden="true">›</span>
                             </button>
                         @empty
-                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked links or open emails.</div>
+                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked Instagram, YouTube, or X links.</div>
                         @endforelse
                     </div>
                 </section>
@@ -7346,7 +8662,7 @@
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $emailSentCount = (int) ($authUser?->total_emails_sent ?? 0);
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
@@ -7381,29 +8697,23 @@
                 }
             @endphp
 
-            <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
+            <div class="rc-stats-drawer-backdrop rc-ui-stable-modal"
+                wire:key="stats-drawer-emails-sent"
+                data-rc-modal="stats"
+                data-rc-modal-id="emails-sent"
+                x-data="window.rcStatsDrawer ? window.rcStatsDrawer('emails-sent', true, true) : { open: true, openDrawer() { this.open = true }, close() { this.open = false } }"
+                x-init="init && init()"
                 x-show="open"
                 x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
-                <aside class="rc-stats-drawer-panel"
+                x-on:keydown.escape.window="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }"
+                x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcCloseOverlayNow($el); close(); }">
+                <aside class="rc-stats-drawer-panel rc-ui-stable-panel"
+                    data-rc-interaction-boundary
                     role="dialog"
                     aria-modal="true"
                     x-show="open"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="translate-x-full opacity-80"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    x-transition:leave="transition ease-in duration-120"
-                    x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    x-on:click.stop>
+                    <button type="button" class="rc-stats-drawer-close" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcCloseOverlayNow($el); close()" x-on:click.prevent.stop aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -8334,237 +9644,321 @@
                     box-shadow:0 8px 18px rgba(255,99,56,.18);
                 }
 
+                .rc-discover-bulk-status-v92 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.5rem;
+                    min-height:2rem;
+                    padding:.42rem .68rem;
+                    border-radius:.72rem;
+                    border:1px solid rgba(255,99,56,.2);
+                    background:rgba(255,99,56,.08);
+                    color:var(--rc-text);
+                    font-size:.76rem;
+                    font-weight:750;
+                    line-height:1.25;
+                }
+                .rc-discover-bulk-option-v36 .rc-spinner-mini,
+                .rc-discover-bulk-list-v36 > button .rc-spinner-mini {
+                    width:.88rem;
+                    height:.88rem;
+                    border-width:2px;
+                    flex:0 0 auto;
+                }
+
                 @media (max-width: 1100px) {
                     .rc-discover-top-v29 { grid-template-columns: 1fr !important; }
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
 
-                /* v74: Keep the shared/global header search visible on Discover Schools.
-                   The lower program search uses discoverSchoolSearch, so the two inputs
-                   are independent instead of mirroring the same Livewire property. */
-                .rc-discover-v29 .rc-home-header-v2 .rc-home-search-v2 {
-                    display: flex !important;
+                .rc-discover-quick-list-v97 {
+                    display:grid;
+                    gap:.5rem;
+                    padding:.65rem;
+                    margin-top:.35rem;
+                    border-top:1px solid var(--rc-border);
+                    background:var(--rc-soft);
                 }
-                .rc-discover-v29 button {
-                    transition: transform .1s ease, opacity .12s ease, border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
-                    touch-action: manipulation;
+                .rc-discover-quick-list-title-v97 {
+                    font-size:.72rem;
+                    font-weight:800;
+                    color:var(--rc-muted);
+                    text-transform:uppercase;
+                    letter-spacing:.05em;
                 }
-                .rc-discover-v29 button:active,
-                .rc-discover-v29 button.rc-click-feedback-v73 {
-                    transform: scale(.975);
-                    opacity: .82;
+                .rc-discover-quick-list-v97 .rc-input { width:100%; }
+                .rc-discover-quick-list-actions-v97 {
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:.5rem;
                 }
-                .rc-discover-v29 button[disabled] {
-                    cursor: wait !important;
-                    opacity: .62;
+                .rc-discover-quick-list-actions-v97 input[type="color"] {
+                    width:2.4rem;
+                    height:2.1rem;
+                    padding:.15rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.55rem;
+                    background:var(--rc-surface);
                 }
-                .rc-discover-program-search-v27 input { padding-right: 3rem !important; }
-                .rc-discover-search-busy-v73 {
-                    position: absolute;
-                    right: .9rem;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    align-items: center;
-                    justify-content: center;
-                    color: var(--rc-accent);
-                    pointer-events: none;
+
+                /* Add-to-list dropdown — compact reference layout */
+                .rc-list-popover-v105 {
+                    left:auto !important;
+                    right:0 !important;
+                    top:calc(100% + .55rem) !important;
+                    width:21.75rem !important;
+                    min-width:21.75rem !important;
+                    max-width:min(21.75rem, calc(100vw - 2rem)) !important;
+                    max-height:none !important;
+                    overflow:visible !important;
+                    padding:0 !important;
+                    border:1px solid #e5e7eb !important;
+                    border-radius:1rem !important;
+                    background:#fff !important;
+                    color:#111827 !important;
+                    box-shadow:0 24px 60px rgba(15,23,42,.22) !important;
                 }
-                @media (max-width: 1100px) {
-                    .rc-discover-v29 .rc-home-header-v2 .rc-home-actions-v2 {
-                        justify-self: end !important;
-                        width: auto !important;
-                    }
+
+                .rc-list-popover-title-v105 {
+                    padding:1rem 1.15rem .72rem;
+                    color:#8791a4;
+                    font-size:.72rem;
+                    font-weight:850;
+                    line-height:1.2;
+                    letter-spacing:.075em;
+                    text-transform:uppercase;
                 }
+
+                .rc-list-popover-options-v105 {
+                    display:grid;
+                    gap:.12rem;
+                    padding:0 .72rem .65rem;
+                    max-height:15.5rem;
+                    overflow:auto;
+                }
+
+                .rc-list-popover-row-v105 {
+                    min-height:2.75rem;
+                    padding:.58rem .58rem !important;
+                    border-radius:.65rem !important;
+                    font-size:.85rem !important;
+                    font-weight:700 !important;
+                }
+
+                .rc-list-popover-row-v105:hover {
+                    background:#f8fafc !important;
+                    color:#111827 !important;
+                }
+
+                .rc-list-popover-row-v105:disabled {
+                    cursor:wait;
+                    opacity:.78;
+                }
+
+                .rc-list-popover-row-main-v105,
+                .rc-list-popover-row-side-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.68rem;
+                    min-width:0;
+                }
+
+                .rc-list-popover-dot-v105 {
+                    width:.72rem;
+                    height:.72rem;
+                    flex:0 0 auto;
+                    border-radius:999px;
+                    box-shadow:0 0 0 3px rgba(15,23,42,.025);
+                }
+
+                .rc-list-popover-label-v105 {
+                    overflow:hidden;
+                    color:#111827;
+                    text-overflow:ellipsis;
+                    white-space:nowrap;
+                }
+
+                .rc-list-popover-count-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    min-width:1.75rem;
+                    height:1.75rem;
+                    padding:0 .48rem;
+                    border-radius:999px;
+                    background:#f2f4f7;
+                    color:#9aa3b2;
+                    font-size:.75rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.38rem;
+                    color:#ff6338;
+                    font-size:.72rem;
+                    font-weight:800;
+                }
+
+                .rc-list-saving-v105 .rc-spinner-mini {
+                    width:.82rem;
+                    height:.82rem;
+                    border-width:2px;
+                }
+
+                .rc-list-quick-create-v105 {
+                    display:grid !important;
+                    grid-template-columns:minmax(0,1fr) 3rem;
+                    gap:.55rem !important;
+                    padding:.8rem .9rem .9rem !important;
+                    margin:0 !important;
+                    border-top:1px solid #edf0f4 !important;
+                    background:#fff !important;
+                }
+
+                .rc-list-new-input-v105 {
+                    width:100%;
+                    min-width:0;
+                    height:2.8rem;
+                    padding:0 .9rem;
+                    border:1px solid #dfe4ea;
+                    border-radius:.72rem;
+                    background:#fff;
+                    color:#111827;
+                    font-size:.86rem;
+                    outline:none;
+                    transition:border-color .15s ease, box-shadow .15s ease;
+                }
+
+                .rc-list-new-input-v105::placeholder {
+                    color:#98a2b3;
+                }
+
+                .rc-list-new-input-v105:focus {
+                    border-color:#ff8f73;
+                    box-shadow:0 0 0 3px rgba(255,99,56,.12);
+                }
+
+                .rc-list-new-button-v105 {
+                    width:3rem;
+                    height:2.8rem;
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    border:0;
+                    border-radius:.72rem;
+                    background:#ff9a84;
+                    color:#fff;
+                    cursor:pointer;
+                    transition:background .15s ease, transform .15s ease, opacity .15s ease;
+                }
+
+                .rc-list-new-button-v105:hover:not(:disabled) {
+                    background:#ff6338;
+                    transform:translateY(-1px);
+                }
+
+                .rc-list-new-button-v105:disabled {
+                    cursor:not-allowed;
+                    opacity:.58;
+                }
+
+                .rc-list-new-button-v105 .rc-spinner-mini {
+                    width:1rem;
+                    height:1rem;
+                    border-width:2px;
+                }
+
+                .rc-list-popover-progress-v105 {
+                    display:grid;
+                    gap:.42rem;
+                    padding:.72rem .9rem .82rem;
+                    border-top:1px solid #edf0f4;
+                    color:#667085;
+                    font-size:.72rem;
+                    font-weight:750;
+                    line-height:1.35;
+                }
+
+                .rc-list-progress-bar-v105 {
+                    position:relative;
+                    height:.28rem;
+                    overflow:hidden;
+                    border-radius:999px;
+                    background:#ffe4dd;
+                }
+
+                .rc-list-progress-bar-v105 > span {
+                    position:absolute;
+                    top:0;
+                    bottom:0;
+                    left:-38%;
+                    width:38%;
+                    border-radius:inherit;
+                    background:#ff6338;
+                    animation:rcListSavingBarV105 1.05s ease-in-out infinite;
+                }
+
+                @keyframes rcListSavingBarV105 {
+                    0% { transform:translateX(0); }
+                    100% { transform:translateX(365%); }
+                }
+
+                .dark .rc-list-popover-v105,
+                .dark .rc-list-quick-create-v105 {
+                    border-color:#34343b !important;
+                    background:#18181b !important;
+                    color:#f4f4f5 !important;
+                }
+
+                .dark .rc-list-popover-title-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-popover-row-v105:hover {
+                    background:#27272a !important;
+                }
+
+                .dark .rc-list-popover-label-v105 {
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-popover-count-v105 {
+                    background:#27272a;
+                    color:#a1a1aa;
+                }
+
+                .dark .rc-list-new-input-v105 {
+                    border-color:#3f3f46;
+                    background:#202024;
+                    color:#f4f4f5;
+                }
+
+                .dark .rc-list-quick-create-v105,
+                .dark .rc-list-popover-progress-v105 {
+                    border-top-color:#34343b !important;
+                }
+
 </style>
-
-            <script>
-                window.plyrDiscoverSchoolsFast = function (config) {
-                    return {
-                        schools: Array.isArray(config.schools) ? config.schools : [],
-                        query: String(config.query || ''),
-                        division: String(config.division || ''),
-                        conference: String(config.conference || ''),
-                        viewMode: ['grid', 'list'].includes(config.viewMode) ? config.viewMode : 'grid',
-                        selectedSchoolIds: Array.isArray(config.selectedSchoolIds) ? config.selectedSchoolIds.map(String) : [],
-                        limit: 96,
-                        listsOpen: false,
-
-                        init() {
-                            this.$watch('query', () => { this.limit = 96; });
-                            this.$watch('division', () => { this.limit = 96; });
-                            this.$watch('conference', () => { this.limit = 96; });
-                        },
-
-                        normalize(value) {
-                            return String(value ?? '')
-                                .toLowerCase()
-                                .normalize('NFD')
-                                .replace(/[\u0300-\u036f]/g, '')
-                                .replace(/[^a-z0-9]+/g, ' ')
-                                .replace(/\s+/g, ' ')
-                                .trim();
-                        },
-
-                        divisionKey(value) {
-                            const raw = String(value ?? '').trim();
-                            const text = this.normalize(raw);
-
-                            if (!text) return '';
-                            if (text.includes('njcaa')) return 'NJCAA';
-                            if (text.includes('naia')) return 'NAIA';
-
-                            if (text.includes('ncaa')) {
-                                if (/\b(division 3|division iii|d iii|d 3|d3)\b/.test(text)) return 'NCAA D-III';
-                                if (/\b(division 2|division ii|d ii|d 2|d2)\b/.test(text)) return 'NCAA D-II';
-                                if (/\b(division 1|division i|d i|d 1|d1)\b/.test(text)) return 'NCAA D-I';
-                            }
-
-                            return raw.toUpperCase();
-                        },
-
-                        conferenceKey(value) {
-                            return this.normalize(value);
-                        },
-
-                        get filteredSchools() {
-                            const query = this.normalize(this.query);
-                            const division = this.divisionKey(this.division);
-                            const conference = this.conferenceKey(this.conference);
-
-                            return this.schools.filter((school) => {
-                                if (division && this.divisionKey(school.division) !== division) return false;
-                                if (conference && this.conferenceKey(school.conference) !== conference) return false;
-                                if (!query) return true;
-
-                                const haystack = this.normalize(
-                                    school.search_text || [
-                                        school.name,
-                                        school.conference,
-                                        school.division,
-                                        school.city,
-                                        school.state,
-                                        school.head_coach_name,
-                                        school.head_coach_title,
-                                        school.head_coach_email,
-                                    ].filter(Boolean).join(' ')
-                                );
-
-                                return haystack.includes(query);
-                            });
-                        },
-
-                        get visibleSchools() {
-                            return this.filteredSchools.slice(0, this.limit);
-                        },
-
-                        get conferenceOptions() {
-                            const division = this.divisionKey(this.division);
-                            const schools = division
-                                ? this.schools.filter((school) => this.divisionKey(school.division) === division)
-                                : this.schools;
-
-                            return [...new Set(
-                                schools
-                                    .map((school) => String(school.conference || '').trim())
-                                    .filter(Boolean)
-                            )].sort((a, b) => a.localeCompare(b));
-                        },
-
-                        get canLoadMore() {
-                            return this.visibleSchools.length < this.filteredSchools.length;
-                        },
-
-                        setDivision(value) {
-                            const next = String(value || '');
-                            this.division = this.division === next ? '' : next;
-                            this.conference = '';
-                        },
-
-                        clearFilters() {
-                            this.query = '';
-                            this.division = '';
-                            this.conference = '';
-                            this.limit = 96;
-                        },
-
-                        initialsFor(name) {
-                            const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
-                            return words.slice(0, 2).map(word => word.charAt(0)).join('').toUpperCase() || 'S';
-                        },
-
-                        shortDivision(value) {
-                            const key = this.divisionKey(value);
-                            return key || '—';
-                        },
-
-                        isSelected(id) {
-                            return this.selectedSchoolIds.includes(String(id ?? ''));
-                        },
-
-                        toggleSchool(id) {
-                            id = String(id ?? '');
-                            if (!id) return;
-
-                            if (this.isSelected(id)) {
-                                this.selectedSchoolIds = this.selectedSchoolIds.filter(item => item !== id);
-                            } else {
-                                this.selectedSchoolIds = [...this.selectedSchoolIds, id];
-                            }
-
-                            if (this.$wire && typeof this.$wire.toggleSchoolSelection === 'function') {
-                                this.$wire.toggleSchoolSelection(id);
-                            }
-                        },
-
-                        get allVisibleSelected() {
-                            const ids = this.visibleSchools.map(s => String(s.id || '')).filter(Boolean);
-                            return ids.length > 0 && ids.every(id => this.selectedSchoolIds.includes(id));
-                        },
-
-                        toggleVisibleSelection() {
-                            const ids = this.visibleSchools.map(s => String(s.id || '')).filter(Boolean);
-                            const next = new Set(this.selectedSchoolIds);
-                            const shouldRemove = ids.length > 0 && ids.every(id => next.has(id));
-
-                            ids.forEach(id => shouldRemove ? next.delete(id) : next.add(id));
-                            this.selectedSchoolIds = [...next];
-
-                            if (this.$wire && typeof this.$wire.setSelectedSchoolIds === 'function') {
-                                this.$wire.setSelectedSchoolIds(this.selectedSchoolIds);
-                            }
-                        },
-
-                        clearSelection() {
-                            this.selectedSchoolIds = [];
-                            if (this.$wire && typeof this.$wire.clearSelectedSchools === 'function') {
-                                this.$wire.clearSelectedSchools();
-                            }
-                        },
-
-                        openSchool(id) {
-                            id = String(id ?? '');
-                            if (!id) return;
-                            if (this.$wire && typeof this.$wire.selectSchoolById === 'function') {
-                                this.$wire.selectSchoolById(id);
-                            }
-                        },
-                    };
-                };
-            </script>
 
             <div
                 class="rc-discover-v29"
-                wire:key="discover-schools-fast-v78"
-                x-data="plyrDiscoverSchoolsFast({
-                    schools: @js($this->discoverSchoolsClientDataset),
-                    query: @js((string) ($discoverSchoolSearch ?? '')),
-                    division: @js((string) ($divisionFilter ?? '')),
-                    conference: @js((string) ($conferenceFilter ?? '')),
-                    viewMode: @js((string) ($schoolViewMode ?? 'grid')),
-                    selectedSchoolIds: @js(array_values($selectedSchoolIds ?? [])),
-                })"
-                x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 160); }"
+                wire:ignore
+                x-data="window.rcDiscoverClientCache(
+                    @js($this->discoverSchoolsClientDataset),
+                    @js(collect($this->lists)->map(fn ($list) => [
+                        'key' => (string) ($list['key'] ?? ''),
+                        'label' => (string) ($list['label'] ?? ''),
+                        'color' => (string) ($list['color'] ?? '#ff6338'),
+                        'count' => (int) ($list['schools_count'] ?? count($list['schools'] ?? [])),
+                    ])->filter(fn ($list) => $list['key'] !== '')->values()->all()),
+                    @js($schoolViewMode)
+                )"
+                x-init="init()"
             >
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
@@ -8574,39 +9968,29 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input
-                        placeholder="Search schools & coaches..."
-                        x-model="query"
-                        autocomplete="off"
-                        spellcheck="false"
-                    />
-                    <button
-                        x-cloak
-                        x-show="query.length > 0"
-                        type="button"
-                        class="rc-global-search-clear"
-                        x-on:click="query = ''"
-                        aria-label="Clear Discover Schools search"
-                        style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%)"
-                    >×</button>
+                    <input placeholder="Search women's soccer programs & coaches..." x-model.debounce.80ms="search" x-on:input="limit = 48" />
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
-                        @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
+                        <template x-for="divisionValue in divisionTabs" :key="divisionValue || 'all'">
                             <button
                                 type="button"
                                 class="rc-discover-tab-v27"
-                                x-bind:class="{ 'is-active': division === @js($divisionValue) }"
-                                x-on:click="setDivision(@js($divisionValue))"
-                            >{{ $divisionLabel }}</button>
-                        @endforeach
+                                x-bind:class="{ 'is-active': division === divisionValue }"
+                                x-on:click="setDivision(divisionValue)"
+                                x-text="divisionValue || 'All Divisions'"
+                            ></button>
+                        </template>
                     </div>
 
-                    <select class="rc-discover-select-v27" x-model="conference" aria-label="Conference filter">
+                    <select class="rc-discover-select-v27" x-bind:value="conference" x-on:change="setConference($event.target.value)" aria-label="Conference filter">
                         <option value="" x-text="`All Conferences (${conferenceOptions.length.toLocaleString()})`"></option>
-                        <template x-for="option in conferenceOptions" :key="option">
-                            <option :value="option" x-text="option"></option>
+                        <template x-for="conferenceItem in conferenceOptions" :key="conferenceItem.name">
+                            <option
+                                x-bind:value="conferenceItem.name"
+                                x-text="`${conferenceItem.name} (${Number(conferenceItem.count || 0).toLocaleString()})`"
+                            ></option>
                         </template>
                     </select>
                 </div>
@@ -8614,124 +9998,143 @@
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
                         <span><strong x-text="filteredSchools.length.toLocaleString()"></strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click="toggleVisibleSelection()">
-                            <input type="checkbox" x-bind:checked="allVisibleSelected" readonly tabindex="-1">
-                            <span>Select All (<span x-text="visibleSchools.length.toLocaleString()"></span>)</span>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click.stop="toggleAllFiltered()">
+                            <input type="checkbox" x-bind:checked="allFilteredSelected" readonly tabindex="-1">
+                            <span>Select All (<span x-text="filteredSchools.length.toLocaleString()"></span>)</span>
                         </button>
                     </div>
 
                     <div class="rc-discover-right-v27">
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'grid' }" x-on:click="viewMode = 'grid'" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'list' }" x-on:click="viewMode = 'list'" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'grid' }" x-on:click.stop="setViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" x-bind:class="{ 'is-active': viewMode === 'list' }" x-on:click.stop="setViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
 
-                <div class="rc-discover-bulk-v36" x-cloak x-show="selectedSchoolIds.length > 0" x-transition.opacity>
+                <div class="rc-discover-bulk-v36" x-show="selectedCount > 0" x-cloak>
                     <div class="rc-discover-bulk-left-v36">
-                        <span class="rc-discover-bulk-count-v36"><span x-text="selectedSchoolIds.length.toLocaleString()"></span> selected</span>
-                        <!-- <button type="button" class="rc-discover-bulk-email-v36" x-on:click="$wire.emailSelectedSchools()">
+                        <span class="rc-discover-bulk-count-v36"><span x-text="selectedCount.toLocaleString()"></span> selected</span>
+                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                             <span>Email</span>
-                        </button> -->
-                        <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
-                            <button type="button" x-on:click="open = !open">
+                        </button>
+                        <div class="rc-discover-bulk-list-v36" x-on:click.outside="listMenuOpen = false">
+                            <button type="button" x-on:click.stop="listMenuOpen = !listMenuOpen">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                                 <span>Add to List</span>
+                                <span x-show="Boolean(pendingListKey)" x-cloak class="rc-spinner-mini" aria-hidden="true"></span>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </button>
-                            <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
-                                @forelse($this->lists as $list)
-                                    @php $listKey = (string) ($list['key'] ?? ''); @endphp
-                                    @if($listKey !== '')
-                                        <button type="button" class="rc-discover-bulk-option-v36" x-on:click="open = false; $wire.addSelectedSchoolsToList(@js($listKey))">
-                                            <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
-                                            <span>+</span>
+                            <div class="rc-discover-bulk-menu-v36 rc-list-popover-v105" x-cloak x-show="listMenuOpen" x-transition.origin.top.left>
+                                <div class="rc-list-popover-title-v105">ADD <span x-text="selectedCount.toLocaleString()"></span> TO A LIST</div>
+                                <div class="rc-list-popover-options-v105">
+                                    <template x-for="listItem in lists" :key="listItem.key">
+                                        <button type="button" class="rc-discover-bulk-option-v36 rc-list-popover-row-v105" x-on:click.stop="addToList(listItem.key, listItem.label)" x-bind:disabled="Boolean(pendingListKey)">
+                                            <span class="rc-list-popover-row-main-v105">
+                                                <span class="rc-list-popover-dot-v105" x-bind:style="`background:${listItem.color || '#ff6338'}`"></span>
+                                                <span class="rc-list-popover-label-v105" x-text="listItem.label"></span>
+                                            </span>
+                                            <span class="rc-list-popover-row-side-v105">
+                                                <span class="rc-list-popover-count-v105" x-show="!isPending(listItem.key)" x-text="Number(listItem.count || 0).toLocaleString()"></span>
+                                                <span x-show="isPending(listItem.key)" x-cloak class="rc-list-saving-v105" aria-label="Saving selected schools"><span class="rc-spinner-mini"></span></span>
+                                            </span>
                                         </button>
-                                    @endif
-                                @empty
-                                    <div class="rc-school-list-empty">No lists yet.</div>
-                                @endforelse
+                                    </template>
+                                </div>
+                                <div class="rc-list-quick-create-v105" x-on:click.stop>
+                                    <div class="rc-list-popover-title-v105">CREATE NEW LIST</div>
+                                    <div class="rc-list-new-row-v105">
+                                        <input type="text" class="rc-list-new-input-v105" placeholder="New list name..." x-model="newListName" x-on:keydown.enter.prevent="createQuickList()" x-bind:disabled="creating">
+                                        <button type="button" class="rc-list-new-button-v105" x-on:click="createQuickList()" x-bind:disabled="creating || !newListName.trim()"><span x-show="!creating">+</span><span x-show="creating" x-cloak class="rc-spinner-mini"></span></button>
+                                    </div>
+                                </div>
+                                <div class="rc-list-popover-progress-v105" x-show="Boolean(pendingListKey) || creating" x-cloak role="status" aria-live="polite">
+                                    <span class="rc-list-progress-bar-v105"><span></span></span>
+                                    <span x-text="creating ? 'Creating new list.' : 'Saving selected schools.'"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="clearSelection()">Clear</button>
                 </div>
 
-                <div x-cloak x-show="filteredSchools.length === 0" class="rc-empty rc-discover-empty">
-                    <strong>No schools found.</strong>
-                    <span>Adjust your search or filters.</span>
-                </div>
-
-                <template x-if="viewMode === 'list' && filteredSchools.length > 0">
-                    <div class="rc-school-list-table rc-discover-school-list">
-                        <div class="rc-school-list-head rc-discover-school-list-head">
-                            <span>School</span><span>Head Coach</span><span>Title</span><span>Email</span><span>Div</span><span></span>
-                        </div>
-                        <template x-for="schoolItem in visibleSchools" :key="`list-${schoolItem.id}`">
-                            <div class="rc-school-list-row rc-discover-school-list-row" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
-                                <button class="rc-school-list-name rc-discover-school-list-school" type="button" x-on:click="openSchool(schoolItem.id)">
-                                    <span class="rc-school-list-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
-                                        <img x-show="schoolItem.logo_url" class="rc-school-list-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-list-logo-box')?.classList.add('is-missing-logo')">
-                                        <span class="rc-logo-fallback-text" x-text="initialsFor(schoolItem.name)"></span>
-                                    </span>
-                                    <span class="rc-discover-school-list-name-copy" x-text="schoolItem.name"></span>
-                                </button>
-                                <span class="rc-discover-list-coach">
-                                    <span x-text="schoolItem.head_coach_name || '—'"></span>
-                                    <span class="rc-head-coach-chip" x-show="String(schoolItem.head_coach_title || '').toLowerCase().includes('head')">HC</span>
-                                </span>
-                                <span class="rc-discover-list-muted" x-text="schoolItem.head_coach_title || 'Coach'"></span>
-                                <span class="rc-discover-list-email">
-                                    <a x-show="schoolItem.head_coach_email" x-bind:href="`mailto:${schoolItem.head_coach_email}`" x-text="schoolItem.head_coach_email"></a>
-                                    <span x-show="!schoolItem.head_coach_email">—</span>
-                                </span>
-                                <span class="rc-discover-list-division" x-text="shortDivision(schoolItem.division)"></span>
-                                <div class="rc-school-list-actions rc-discover-list-actions">
-                                    <button class="rc-discover-row-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
-                                        <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
-                                    </button>
-                                </div>
-                            </div>
-                        </template>
+                <div class="rc-discover-loading-v27">
+                    <div x-cloak x-show="filteredSchools.length === 0" class="rc-empty rc-discover-empty">
+                        <strong>No schools found.</strong>
+                        <span>Adjust your search or filters.</span>
                     </div>
-                </template>
 
-                <template x-if="viewMode === 'grid' && filteredSchools.length > 0">
-                    <div class="rc-school-grid rc-discover-school-grid" style="display:grid">
-                        <template x-for="schoolItem in visibleSchools" :key="`grid-${schoolItem.id}`">
-                            <article class="rc-school-card rc-discover-school-card" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
-                                <div class="rc-discover-card-main">
-                                    <button class="rc-discover-card-title" type="button" x-on:click="openSchool(schoolItem.id)">
-                                        <span class="rc-school-card-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
-                                            <img x-show="schoolItem.logo_url" class="rc-school-card-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-card-logo-box')?.classList.add('is-missing-logo')">
+                    <template x-if="viewMode === 'list' && filteredSchools.length > 0">
+                        <div class="rc-school-list-table rc-discover-school-list">
+                            <div class="rc-school-list-head rc-discover-school-list-head">
+                                <span>School</span><span>Head Coach</span><span>Title</span><span>Email</span><span>Div</span><span></span>
+                            </div>
+                            <template x-for="schoolItem in visibleSchools" :key="`list-${schoolItem.id}`">
+                                <div class="rc-school-list-row rc-discover-school-list-row" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
+                                    <button class="rc-school-list-name rc-discover-school-list-school" type="button" x-on:click="openSchool(schoolItem.id)">
+                                        <span class="rc-school-list-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
+                                            <img x-show="schoolItem.logo_url" class="rc-school-list-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-list-logo-box')?.classList.add('is-missing-logo')">
                                             <span class="rc-logo-fallback-text" x-text="initialsFor(schoolItem.name)"></span>
                                         </span>
-                                        <span class="rc-discover-card-copy">
-                                            <strong x-text="schoolItem.name"></strong>
-                                            <small x-text="schoolItem.conference || 'Conference unavailable'"></small>
-                                        </span>
+                                        <span class="rc-discover-school-list-name-copy" x-text="schoolItem.name"></span>
                                     </button>
-                                    <button class="rc-discover-card-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
-                                        <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
-                                    </button>
+                                    <span class="rc-discover-list-coach">
+                                        <span x-text="schoolItem.head_coach_name || '—'"></span>
+                                        <span class="rc-head-coach-chip" x-show="String(schoolItem.head_coach_title || '').toLowerCase().includes('head')">HC</span>
+                                    </span>
+                                    <span class="rc-discover-list-muted" x-text="schoolItem.head_coach_title || 'Coach'"></span>
+                                    <span class="rc-discover-list-email">
+                                        <a x-show="schoolItem.head_coach_email" x-bind:href="`mailto:${schoolItem.head_coach_email}`" x-text="schoolItem.head_coach_email"></a>
+                                        <span x-show="!schoolItem.head_coach_email">—</span>
+                                    </span>
+                                    <span class="rc-discover-list-division" x-text="shortDivision(schoolItem.division)"></span>
+                                    <div class="rc-school-list-actions rc-discover-list-actions">
+                                        <button class="rc-discover-row-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
+                                            <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="rc-discover-card-rule"></div>
-                                <div class="rc-discover-card-footer">
-                                    <span class="rc-discover-division-pill" x-text="schoolItem.division || 'Unlisted'"></span>
-                                    <span class="rc-discover-coach-count" x-text="`${Number(schoolItem.coach_count || 0).toLocaleString()} ${Number(schoolItem.coach_count || 0) === 1 ? 'coach' : 'coaches'}`"></span>
-                                </div>
-                            </article>
-                        </template>
-                    </div>
-                </template>
+                            </template>
+                        </div>
+                    </template>
 
-                <div x-cloak x-show="canLoadMore" style="margin-top:.5rem;text-align:center">
-                    <button class="rc-btn" type="button" x-on:click="limit += 96">Load more</button>
+                    <template x-if="viewMode === 'grid' && filteredSchools.length > 0">
+                        <div class="rc-school-grid rc-discover-school-grid" style="display:grid">
+                            <template x-for="schoolItem in visibleSchools" :key="`grid-${schoolItem.id}`">
+                                <article class="rc-school-card rc-discover-school-card" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }">
+                                    <div class="rc-discover-card-main">
+                                        <button class="rc-discover-card-title" type="button" x-on:click="openSchool(schoolItem.id)">
+                                            <span class="rc-school-card-logo-box rc-school-logo-placeholder" x-bind:class="{ 'is-missing-logo': !schoolItem.logo_url }">
+                                                <img x-show="schoolItem.logo_url" class="rc-school-card-logo" x-bind:src="schoolItem.logo_url" x-bind:alt="`${schoolItem.name} logo`" loading="lazy" referrerpolicy="no-referrer" x-on:error="$el.style.display='none'; $el.closest('.rc-school-card-logo-box')?.classList.add('is-missing-logo')">
+                                                <span class="rc-logo-fallback-text" x-text="initialsFor(schoolItem.name)"></span>
+                                            </span>
+                                            <span class="rc-discover-card-copy">
+                                                <strong x-text="schoolItem.name"></strong>
+                                                <small x-text="schoolItem.conference || 'Conference unavailable'"></small>
+                                            </span>
+                                        </button>
+                                        <button class="rc-discover-card-check" type="button" x-on:click.stop="toggleSchool(schoolItem.id)" x-bind:class="{ 'is-selected': isSelected(schoolItem.id) }" x-bind:aria-pressed="isSelected(schoolItem.id) ? 'true' : 'false'" x-bind:aria-label="`Select ${schoolItem.name}`">
+                                            <span x-text="isSelected(schoolItem.id) ? '✓' : ''"></span>
+                                        </button>
+                                    </div>
+                                    <div class="rc-discover-card-rule"></div>
+                                    <div class="rc-discover-card-footer">
+                                        <span class="rc-discover-division-pill" x-text="schoolItem.division || 'Unlisted'"></span>
+                                        <span class="rc-discover-coach-count" x-text="`${Number(schoolItem.coach_count || 0).toLocaleString()} ${Number(schoolItem.coach_count || 0) === 1 ? 'coach' : 'coaches'}`"></span>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <div x-show="canLoadMore" style="margin-top:.35rem;text-align:center" x-cloak>
+                    <button class="rc-btn" type="button" x-on:click="loadMore()">Load more</button>
                 </div>
             </div>
         @endif
+
 
         @if($section === 'favorites')
             <style>
@@ -9006,7 +10409,101 @@
                         ->values()
                         ->all();
                 };
+                $allListSchoolOptions = collect($this->allSchools())
+                    ->filter(fn ($school): bool => is_array($school))
+                    ->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                        $name = (string) ($school['name'] ?? 'School');
+                        return [
+                            'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                            'name' => $name,
+                            'logo' => $listLogoUrlFor($school),
+                            'initials' => $listInitials($name),
+                        ];
+                    })
+                    ->filter(fn (array $school): bool => $school['id'] !== '')
+                    ->unique('id')
+                    ->values()
+                    ->all();
             @endphp
+
+            <style>
+                .rc-list-card-v120{background:#fff;border:1px solid #e7e9ee;border-radius:1rem;padding:1rem 1.15rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+                .rc-list-card-head-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+                .rc-list-card-title-v120{display:flex;align-items:center;gap:.72rem;min-width:0}
+                .rc-list-card-title-v120 strong{font-size:1rem;color:#111827}
+                .rc-list-card-actions-v120{display:flex;align-items:center;gap:.45rem;margin-left:auto}
+                .rc-list-action-v120{width:2.35rem;height:2.35rem;border:0;border-radius:.72rem;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s ease}
+                .rc-list-action-v120:hover,.rc-list-action-v120.is-active{background:#fff0ec;color:#ff6338}
+                .rc-list-email-v120{width:auto;padding:0 .9rem;gap:.45rem;background:#ff6338;color:#fff;font-weight:750;box-shadow:0 8px 20px rgba(255,99,56,.22)}
+                .rc-list-email-v120:hover{background:#ef5530;color:#fff}
+                .rc-list-panel-v120{margin-top:.85rem;display:grid;gap:.72rem}
+                .rc-list-confirm-v120{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 1rem;border-radius:.8rem;background:#fee7e4;color:#b42318;font-weight:650}
+                .rc-list-confirm-actions-v120{display:flex;gap:.55rem}
+                .rc-list-confirm-actions-v120 button{border:0;border-radius:.65rem;padding:.62rem 1rem;font-weight:750;cursor:pointer}
+                .rc-list-confirm-cancel-v120{background:#fff;color:#344054}
+                .rc-list-confirm-delete-v120{background:#e94e43;color:#fff}
+                .rc-list-tools-v120{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}
+                .rc-list-search-v120{flex:1 1 20rem;position:relative}
+                .rc-list-search-v120 input{width:100%;height:2.75rem;border:1px solid #e1e5eb;border-radius:.72rem;padding:0 .9rem;background:#f8f9fb;color:#111827;outline:none}
+                .rc-list-search-v120 input:focus{border-color:#ff8b70;box-shadow:0 0 0 3px rgba(255,99,56,.1);background:#fff}
+                .rc-list-add-results-v120{position:absolute;z-index:40;top:calc(100% + .35rem);left:0;right:0;max-height:17rem;overflow:auto;background:#fff;border:1px solid #e2e6ec;border-radius:.75rem;box-shadow:0 18px 40px rgba(15,23,42,.18);padding:.35rem}
+                .rc-list-add-result-v120{width:100%;border:0;background:#fff;padding:.62rem .7rem;border-radius:.55rem;display:flex;align-items:center;gap:.65rem;text-align:left;cursor:pointer;color:#111827}
+                .rc-list-add-result-v120:hover{background:#fff3ef}
+                .rc-list-selection-bar-v120{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.72rem .85rem;border-radius:.72rem;background:#f7f8fa;flex-wrap:wrap}
+                .rc-list-selection-meta-v120{display:flex;gap:.8rem;align-items:center;color:#667085;font-size:.78rem}
+                .rc-list-selection-meta-v120 strong{color:#1d2939}
+                .rc-list-selection-meta-v120 button{border:0;background:transparent;color:#667085;cursor:pointer;padding:0}
+                .rc-list-selection-email-v120{border:0;border-radius:.65rem;background:#ff6338;color:#fff;padding:.62rem .9rem;font-weight:750;cursor:pointer}
+                .rc-list-chip-wrap-v120{display:flex;flex-wrap:wrap;gap:.55rem}
+                .rc-list-school-chip-v120{display:inline-flex;align-items:center;gap:.5rem;min-height:2.65rem;padding:.38rem .65rem;border:1px solid #e4e7ec;border-radius:.72rem;background:#f7f8fa;color:#111827;transition:.15s ease}
+                .rc-list-school-chip-v120.is-selected{border-color:#ff6338;background:#fff1ed}
+                .rc-list-chip-logo-v120{width:2rem;height:2rem;border-radius:.52rem;background:#fff;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;font-size:.72rem;flex:0 0 auto}
+                .rc-list-chip-logo-v120 img{width:100%;height:100%;object-fit:contain}
+                .rc-list-chip-name-v120{border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.35rem;height:1.35rem;border:0;background:transparent;color:#8b95a7;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+                .rc-list-chip-check-v120{border:1px solid #d9dee7;border-radius:.35rem;background:#fff}
+                .rc-list-chip-check-v120.is-checked{background:#ff6338;border-color:#ff6338;color:#fff}
+                .rc-list-expand-v120{justify-self:start;border:1px solid #e2e6ec;border-radius:.65rem;background:#fff;color:#344054;padding:.62rem .9rem;font-weight:700;cursor:pointer}
+                .rc-list-rename-v120{display:flex;align-items:center;gap:.55rem}
+                .rc-list-rename-v120 input{height:2.55rem;min-width:14rem;border:1px solid #ff6338;border-radius:.65rem;padding:0 .75rem;outline:none}
+                .rc-list-rename-v120 button{height:2.55rem;border:0;border-radius:.65rem;padding:0 .8rem;font-weight:700;cursor:pointer}
+                .rc-list-empty-v120{color:#667085;font-size:.85rem;padding:.8rem 0}
+                .dark .rc-list-card-v120,.dark .rc-list-add-results-v120{background:#18181b;border-color:#34343b}
+
+                /* Compact My Lists controls and chips. */
+                .rc-list-card-v120{padding:1rem 1.05rem;border-radius:1rem}
+                .rc-list-card-head-v120{gap:.65rem;margin-bottom:.7rem}
+                .rc-list-card-title-v120{gap:.48rem}
+                .rc-list-card-title-v120 strong{font-size:1rem;font-weight:700}
+                .rc-list-count-pill-v41{min-height:1.7rem;padding:.15rem .58rem;font-size:.72rem;font-weight:500}
+                .rc-list-card-actions-v120{gap:.3rem}
+                .rc-list-action-v120{min-width:2.15rem;height:2.15rem;padding:0 .52rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-email-v120{padding:0 .7rem;gap:.35rem}
+                .rc-list-tools-v120{margin:.45rem 0}
+                .rc-list-search-v120{margin:.45rem 0}
+                .rc-list-search-v120 input{height:2.35rem;padding:0 .72rem;font-size:.8rem;border-radius:.58rem}
+                .rc-list-add-results-v120{max-height:14rem;border-radius:.65rem}
+                .rc-list-add-result-v120{min-height:2.25rem;padding:.38rem .55rem;font-size:.78rem;font-weight:500}
+                .rc-list-selection-bar-v120{min-height:3rem;padding:.55rem .7rem;border-radius:.65rem}
+                .rc-list-selection-meta-v120{gap:.55rem;font-size:.75rem}
+                .rc-list-selection-meta-v120 strong{font-size:.76rem;font-weight:650}
+                .rc-list-selection-email-v120{min-height:2.15rem;padding:0 .72rem;border-radius:.58rem;font-size:.75rem;font-weight:650}
+                .rc-list-chip-wrap-v120{gap:.42rem}
+                .rc-list-school-chip-v120{gap:.36rem;min-height:2.15rem;padding:.24rem .48rem;border-radius:.58rem;font-size:.78rem}
+                .rc-list-chip-logo-v120{width:1.65rem;height:1.65rem;border-radius:.45rem;font-size:.72rem}
+                .rc-list-chip-name-v120{font-size:.78rem;font-weight:550}
+                .rc-list-chip-remove-v120,.rc-list-chip-check-v120{width:1.45rem;height:1.45rem}
+                .rc-list-expand-v120{min-height:2.15rem;padding:0 .68rem;margin-top:.65rem;border-radius:.58rem;font-size:.75rem;font-weight:600}
+                .rc-list-rename-v120{gap:.35rem;flex-wrap:wrap}
+                .rc-list-rename-v120 input{height:2.2rem;min-width:11rem;padding:0 .62rem;border-radius:.55rem;font-size:.8rem}
+                .rc-list-rename-v120 button{height:2.2rem;padding:0 .62rem;border-radius:.55rem;font-size:.74rem;font-weight:600}
+                .rc-list-rename-v120 .is-save{background:#ff6338;color:#fff}
+                .rc-list-rename-v120 .is-cancel{background:#f2f4f7;color:#344054}
+                .rc-list-inline-error-v121{flex-basis:100%;color:#d92d20;font-size:.7rem;font-weight:500}
+
+                .dark .rc-list-card-title-v120 strong,.dark .rc-list-add-result-v120,.dark .rc-list-school-chip-v120{color:#f4f4f5}
+                .dark .rc-list-school-chip-v120,.dark .rc-list-selection-bar-v120,.dark .rc-list-search-v120 input{background:#222226;border-color:#3f3f46}
+            </style>
 
             <div class="rc-my-lists-v41">
                 <div class="rc-my-lists-head-v41">
@@ -9014,7 +10511,7 @@
                         <h2>My Lists</h2>
                         <p>Organize schools into your own lists — Dream Schools, On the Radar, by conference, however you want.</p>
                     </div>
-                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)">
+                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)" data-rc-local-action>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                         New List
                     </button>
@@ -9025,22 +10522,10 @@
                         <input class="rc-input" placeholder="List name (e.g. Dream Schools)" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
                         <div class="rc-list-color-picker-v42" aria-label="Choose list color">
                             @foreach(['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'] as $colorOption)
-                                <button
-                                    type="button"
-                                    class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}"
-                                    style="color: {{ $colorOption }};"
-                                    wire:click="$set('newListColor', '{{ $colorOption }}')"
-                                    title="Use {{ $colorOption }}"
-                                    aria-label="Use list color {{ $colorOption }}"
-                                >
-                                    <span style="background: {{ $colorOption }};"></span>
-                                </button>
+                                <button type="button" class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}" style="color: {{ $colorOption }};" wire:click="$set('newListColor', '{{ $colorOption }}')"><span style="background: {{ $colorOption }};"></span></button>
                             @endforeach
                         </div>
-                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
-                            <span wire:loading.remove wire:target="createCustomList">Create</span>
-                            <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
-                        </button>
+                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList"><span wire:loading.remove wire:target="createCustomList">Create</span><span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span></button>
                         <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
                     </div>
                 @endif
@@ -9051,61 +10536,275 @@
                             $listKey = (string) ($list['key'] ?? '');
                             $listLabel = (string) ($list['label'] ?? 'List');
                             $listSchools = $schoolsForListKey($list);
-                            $schoolCount = count($listSchools);
-                            $isSelectedList = $selectedListKey === $listKey;
+                            $listSchoolsLight = collect($listSchools)->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                                $name = (string) ($school['name'] ?? 'School');
+                                return [
+                                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                                    'name' => $name,
+                                    'logo' => $listLogoUrlFor($school),
+                                    'initials' => $listInitials($name),
+                                ];
+                            })->values()->all();
                             $listColor = $safeListColor($list['color'] ?? null, $listIndex);
                         @endphp
-                        <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
-                            <div class="rc-list-card-head-v41">
-                                <div class="rc-list-card-title-v41">
+                        <article
+                            class="rc-list-card-v120"
+                            x-show="!deleted"
+                            x-cloak
+                            wire:key="list-card-{{ md5($listKey) }}"
+                            wire:ignore
+                            x-data="{
+                                key: @js($listKey),
+                                label: @js($listLabel),
+                                items: @js($listSchoolsLight),
+                                allSchools: @js($allListSchoolOptions),
+                                expanded: false,
+                                addOpen: false,
+                                selectMode: false,
+                                renameOpen: false,
+                                confirmDelete: false,
+                                deleted: false,
+                                deleting: false,
+                                deleteError: '',
+                                addQuery: '',
+                                listQuery: '',
+                                renameValue: @js($listLabel),
+                                selected: [],
+                                removing: {},
+                                adding: {},
+                                savingRename: false,
+                                renameError: '',
+                                get visibleItems() {
+                                    const q = this.listQuery.trim().toLowerCase();
+                                    const filtered = q === '' ? this.items : this.items.filter(s => String(s.name || '').toLowerCase().includes(q));
+                                    return this.expanded || q !== '' ? filtered : filtered.slice(0, 10);
+                                },
+                                get addResults() {
+                                    const q = this.addQuery.trim().toLowerCase();
+                                    if (q.length < 2) return [];
+                                    const current = new Set(this.items.map(s => String(s.id)));
+                                    return this.allSchools.filter(s => !current.has(String(s.id)) && String(s.name || '').toLowerCase().includes(q)).slice(0, 12);
+                                },
+                                isSelected(id) { return this.selected.includes(String(id)); },
+                                toggleSelected(id) {
+                                    id = String(id);
+                                    this.selected = this.isSelected(id) ? this.selected.filter(v => v !== id) : [...this.selected, id];
+                                },
+                                selectAllVisible() { this.selected = this.items.map(s => String(s.id)); },
+                                clearSelection() { this.selected = []; },
+                                async removeSchool(school) {
+                                    const id = String(school.id);
+                                    if (this.removing[id]) return;
+                                    const index = this.items.findIndex(s => String(s.id) === id);
+                                    if (index < 0) return;
+                                    this.renameError = '';
+                                    this.removing = { ...this.removing, [id]: true };
+                                    const removed = this.items[index];
+                                    this.items = this.items.filter(s => String(s.id) !== id);
+                                    this.selected = this.selected.filter(v => v !== id);
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: false });
+                                        if (!result || result.success === false) throw new Error(result?.error || 'Unable to remove school');
+                                    } catch (error) {
+                                        const copy = [...this.items];
+                                        copy.splice(Math.min(index, copy.length), 0, removed);
+                                        this.items = copy;
+                                        this.renameError = error?.message || 'Unable to remove this school.';
+                                        window.console.error(error);
+                                    } finally {
+                                        const next = { ...this.removing }; delete next[id]; this.removing = next;
+                                    }
+                                },
+                                async addSchool(schoolItem) {
+                                    const normalized = {
+                                        id: String(schoolItem?.id || ''),
+                                        name: String(schoolItem?.name || 'School'),
+                                        logo: String(schoolItem?.logo || ''),
+                                        initials: String(schoolItem?.initials || ''),
+                                    };
+                                    const id = normalized.id;
+                                    if (!id || this.adding[id] || this.items.some(item => String(item.id) === id)) return;
+
+                                    // Add to the visible list immediately. The remote GHL action
+                                    // is queued afterward and does not block the interface.
+                                    this.renameError = '';
+                                    this.items = [...this.items, normalized];
+                                    this.addQuery = '';
+                                    this.expanded = true;
+                                    this.adding = { ...this.adding, [id]: true };
+
+                                    try {
+                                        const result = await $wire.call('queueSchoolListMemberships', id, { [this.key]: true });
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to add school');
+                                        }
+                                    } catch (error) {
+                                        this.items = this.items.filter(item => String(item.id) !== id);
+                                        this.renameError = error?.message || 'Unable to add school.';
+                                        window.console.error(error);
+                                    } finally {
+                                        const nextAdding = { ...this.adding };
+                                        delete nextAdding[id];
+                                        this.adding = nextAdding;
+                                    }
+                                },
+                                async emailAll() { await $wire.call('emailSchoolsInList', this.key); },
+                                async emailSelected() {
+                                    if (this.selected.length === 0) return;
+                                    await $wire.call('emailSchoolIdsFromList', this.selected, this.key);
+                                },
+                                async saveRename() {
+                                    const nextLabel = String(this.renameValue || '').trim();
+                                    if (!nextLabel || this.savingRename) return;
+
+                                    this.savingRename = true;
+                                    this.renameError = '';
+
+                                    try {
+                                        const result = await $wire.call('renameRecruitingList', this.key, nextLabel);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to rename this list.');
+                                        }
+
+                                        this.label = String(result.label || nextLabel);
+                                        this.renameValue = this.label;
+                                        this.renameOpen = false;
+                                    } catch (error) {
+                                        this.renameError = error?.message || 'Unable to rename this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.savingRename = false;
+                                    }
+                                },
+                                async deleteList() {
+                                    if (this.deleting) return;
+
+                                    this.deleting = true;
+                                    this.deleteError = '';
+
+                                    try {
+                                        const result = await $wire.call('deleteCustomList', this.key);
+                                        if (!result || result.success === false) {
+                                            throw new Error(result?.error || 'Unable to delete this list.');
+                                        }
+
+                                        // The card is wire:ignore, so remove it optimistically
+                                        // instead of waiting for a Livewire DOM morph.
+                                        this.confirmDelete = false;
+                                        this.deleted = true;
+                                        this.items = [];
+                                        this.selected = [];
+                                    } catch (error) {
+                                        this.deleteError = error?.message || 'Unable to delete this list.';
+                                        window.console.error(error);
+                                    } finally {
+                                        this.deleting = false;
+                                    }
+                                }
+                            }"
+                        >
+                            <div class="rc-list-card-head-v120">
+                                <div class="rc-list-card-title-v120">
                                     <span class="rc-list-dot-v41" style="--list-color: {{ $listColor }};"></span>
-                                    <strong>{{ $listLabel }}</strong>
-                                    <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
+                                    <template x-if="!renameOpen"><strong x-text="label"></strong></template>
+                                    <template x-if="renameOpen">
+                                        <span class="rc-list-rename-v120">
+                                            <input type="text" x-model="renameValue" x-on:keydown.enter.prevent="saveRename()" x-on:keydown.escape.prevent="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">
+                                            <button type="button" class="is-save" x-on:click="saveRename()" x-bind:disabled="savingRename || !renameValue.trim()">
+                                                <span x-show="!savingRename">Save</span>
+                                                <span x-show="savingRename" x-cloak>Saving…</span>
+                                            </button>
+                                            <button type="button" class="is-cancel" x-on:click="renameOpen=false;renameValue=label;renameError=''" x-bind:disabled="savingRename">Cancel</button>
+                                            <small class="rc-list-inline-error-v121" x-show="renameError" x-text="renameError"></small>
+                                        </span>
+                                    </template>
+                                    <span class="rc-list-count-pill-v41"><span x-text="items.length.toLocaleString()"></span> <span x-text="items.length === 1 ? 'school' : 'schools'"></span></span>
                                 </div>
-                                <div class="rc-list-card-actions-v41">
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="startAddingSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" title="Add schools to {{ $listLabel }}" aria-label="Add schools to {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+
+                                <div class="rc-list-card-actions-v120">
+                                    <!-- <button type="button" class="rc-list-action-v120 rc-list-email-v120" x-on:click="emailAll()" title="Email all schools in this list">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
+                                        Email Schools
+                                    </button> -->
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="selectMode ? 'is-active' : ''" x-on:click="selectMode=!selectMode" title="Select specific schools to email">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41 {{ $isSelectedList ? 'is-active' : '' }}" wire:click="selectList({{ \Illuminate\Support\Js::from($listKey) }})" title="Open {{ $listLabel }}" aria-label="Open {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="addOpen ? 'is-active' : ''" x-on:click="addOpen=!addOpen" title="Add a school">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="deleteCustomList({{ \Illuminate\Support\Js::from($listKey) }})" wire:confirm="Remove this list? This does not delete schools or coaches." title="Delete {{ $listLabel }}" aria-label="Delete {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    <button type="button" class="rc-list-action-v120" x-bind:class="renameOpen ? 'is-active' : ''" x-on:click="renameOpen=!renameOpen;renameValue=label;renameError=''" title="Rename list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-action-v120" x-on:click="confirmDelete=true" title="Delete list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="rc-list-chip-wrap-v41">
-                                @forelse($listSchools as $school)
-                                    @php
-                                        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? '');
-                                        $schoolName = (string) ($school['name'] ?? 'School');
-                                        $logoUrl = $listLogoUrlFor($school);
-                                        $initials = $listInitials($schoolName);
-                                    @endphp
-                                    <span class="rc-list-school-chip-v41" wire:key="list-chip-{{ md5($listKey.'-'.$schoolId) }}">
-                                        <span class="rc-list-chip-logo-v41">
-                                            @if($logoUrl !== '')
-                                                <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
-                                            @else
-                                                {{ $initials }}
-                                            @endif
-                                        </span>
-                                        <button type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">{{ $schoolName }}</button>
-                                        <button type="button" class="rc-list-chip-remove-v41" wire:click="removeSchoolFromListById({{ \Illuminate\Support\Js::from($schoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" title="Remove {{ $schoolName }} from {{ $listLabel }}" aria-label="Remove {{ $schoolName }} from {{ $listLabel }}">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                            <div class="rc-list-panel-v120">
+                                <div class="rc-list-confirm-v120" x-show="confirmDelete" x-cloak>
+                                    <span>Delete “<span x-text="label"></span>” and its schools?</span>
+                                    <span class="rc-list-confirm-actions-v120">
+                                        <button type="button" class="rc-list-confirm-cancel-v120" x-on:click="confirmDelete=false;deleteError=''" x-bind:disabled="deleting">Cancel</button>
+                                        <button type="button" class="rc-list-confirm-delete-v120" x-on:click="deleteList()" x-bind:disabled="deleting">
+                                            <span x-show="!deleting">Delete</span>
+                                            <span x-show="deleting" x-cloak>Deleting…</span>
                                         </button>
                                     </span>
-                                @empty
-                                    <div class="rc-subtle">No schools in this list yet. Use the plus button to add schools from Discover Schools.</div>
-                                @endforelse
+                                    <small class="rc-list-inline-error-v121" x-show="deleteError" x-text="deleteError"></small>
+                                </div>
+
+                                <div class="rc-list-tools-v120" x-show="addOpen" x-cloak>
+                                    <div class="rc-list-search-v120">
+                                        <input type="search" placeholder="Search a school to add..." x-model.debounce.150ms="addQuery">
+                                        <div class="rc-list-add-results-v120" x-show="addResults.length > 0" x-cloak>
+                                            <template x-for="schoolItem in addResults" :key="`add-${key}-${schoolItem.id}`">
+                                                <button type="button" class="rc-list-add-result-v120" x-on:click.prevent.stop="addSchool(schoolItem)" x-bind:disabled="Boolean(adding[String(schoolItem.id)])">
+                                                    <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                                    <span x-text="schoolItem.name"></span>
+                                                    <span class="rc-spinner-mini" x-show="Boolean(adding[String(schoolItem.id)])" x-cloak></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rc-list-selection-bar-v120" x-show="selectMode" x-cloak>
+                                    <div class="rc-list-selection-meta-v120">
+                                        <strong><span x-text="selected.length"></span> of <span x-text="items.length"></span> selected</strong>
+                                        <button type="button" x-on:click="selectAllVisible()">Select all</button>
+                                        <button type="button" x-on:click="clearSelection()">Clear</button>
+                                    </div>
+                                    <button type="button" class="rc-list-selection-email-v120" x-bind:disabled="selected.length === 0" x-on:click="emailSelected()">Email Selected (<span x-text="selected.length"></span>)</button>
+                                </div>
+
+                                <div class="rc-list-search-v120" x-show="items.length > 10 || listQuery !== ''" x-cloak>
+                                    <input type="search" placeholder="Search in this list..." x-model.debounce.120ms="listQuery">
+                                </div>
+
+                                <div class="rc-list-chip-wrap-v120">
+                                    <template x-for="schoolItem in visibleItems" :key="`list-${key}-${schoolItem.id}`">
+                                        <span class="rc-list-school-chip-v120" x-bind:class="isSelected(schoolItem.id) ? 'is-selected' : ''">
+                                            <button type="button" class="rc-list-chip-check-v120" x-show="selectMode" x-bind:class="isSelected(schoolItem.id) ? 'is-checked' : ''" x-on:click.prevent.stop="toggleSelected(schoolItem.id)">
+                                                <svg x-show="isSelected(schoolItem.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg>
+                                            </button>
+                                            <span class="rc-list-chip-logo-v120"><img x-show="schoolItem.logo" x-bind:src="schoolItem.logo" alt=""><span x-show="!schoolItem.logo" x-text="schoolItem.initials"></span></span>
+                                            <button type="button" class="rc-list-chip-name-v120" x-text="schoolItem.name" x-on:click.prevent.stop="$wire.call('openSchoolDashboardModal', schoolItem.id)"></button>
+                                            <button type="button" class="rc-list-chip-remove-v120" x-show="!selectMode" x-on:click.prevent.stop="removeSchool(schoolItem)" title="Remove school">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                            </button>
+                                        </span>
+                                    </template>
+                                    <div class="rc-list-empty-v120" x-show="items.length === 0">No schools in this list yet. Use the plus button to add one.</div>
+                                </div>
+
+                                <button type="button" class="rc-list-expand-v120" x-show="items.length > 10 && listQuery === ''" x-on:click="expanded=!expanded">
+                                    <span x-text="expanded ? 'Show fewer schools' : `See All ${items.length.toLocaleString()} Schools`"></span>
+                                </button>
                             </div>
                         </article>
                     @empty
-                        <div class="rc-list-empty-card-v41">
-                            <strong>No lists yet.</strong>
-                            <div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div>
-                        </div>
+                        <div class="rc-list-empty-card-v41"><strong>No lists yet.</strong><div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div></div>
                     @endforelse
                 </div>
             </div>
@@ -9130,6 +10829,51 @@
                 'showNewEmail' => false,
             ])
 
+
+
+            <style>
+                .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
+                .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
+
+                .rc-inbox-shell-v56,
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    scroll-behavior: auto !important;
+                    overscroll-behavior: contain;
+                    contain: layout paint style;
+                }
+                .rc-inbox-list-v56,
+                .rc-message-stream-v56 {
+                    transform: translateZ(0);
+                    will-change: auto;
+                }
+                .rc-inbox-message-v56 {
+                    content-visibility: auto;
+                    contain-intrinsic-size: 9rem;
+                    contain: layout paint style;
+                }
+                .rc-msg-bubble-v56,
+                .rc-msg-bubble-v56 * {
+                    max-width: 100%;
+                }
+                .rc-msg-bubble-v56 a {
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                }
+
+                .rc-inbox-history-trimmed{margin:.3rem 0 .7rem;padding:.5rem .7rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.72rem;text-align:center;}
+                .rc-message-stream-v56{padding:0 .9rem .9rem !important;}
+                .rc-inbox-load-older-top{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:center;height:2.65rem;margin:0 -.9rem .9rem;padding:0;background:var(--rc-surface);border-bottom:1px solid var(--rc-border);}
+                .rc-inbox-load-older-top .rc-inbox-open-composer-v56{background:var(--rc-surface);}
+
+                @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
+                @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
+            </style>
+
+            <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
+                Loading conversations. Use the refresh button to update the inbox.
+            </div>
+
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
@@ -9152,6 +10896,7 @@
                 $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
                 $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
+                $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = $conversationStatusFilter ?? 'all';
                 $threadInitials = function (string $name): string {
@@ -9195,19 +10940,454 @@
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
+                $prepareInboxEmailDocument = function ($body): string {
+                    $raw = trim((string) $body);
+
+                    if ($raw === '') {
+                        return '<!doctype html><html><body style="margin:0;font:14px Arial,sans-serif;color:#64748b">No message body.</body></html>';
+                    }
+
+                    $decoded = $raw;
+                    for ($i = 0; $i < 3; $i++) {
+                        $next = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        if ($next === $decoded || trim($next) === '') {
+                            break;
+                        }
+                        $decoded = $next;
+                    }
+
+                    $hasDocumentHtml = (bool) preg_match('/<!doctype\s+html|<html\b|<head\b|<body\b/i', $decoded);
+                    $hasHtml = (bool) preg_match('/<\s*(table|tbody|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|h[1-6])\b/i', $decoded);
+
+                    if (! $hasHtml) {
+                        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+                            . '<body style="margin:0;padding:0;font:14px/1.6 Arial,sans-serif;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere">'
+                            . e($decoded)
+                            . '</body></html>';
+                    }
+
+                    // GHL's email detail endpoint returns the complete compiled email
+                    // document in emailMessage.body. Keep its head, style blocks,
+                    // media queries, tables, buttons, images, and signatures intact.
+                    // Scripts are removed because email clients do not execute them.
+                    $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $decoded) ?? $decoded;
+                    $clean = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $clean) ?? $clean;
+                    $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+                    $clean = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $clean) ?? $clean;
+
+                    $responsiveEmailCss = <<<'CSS'
+<style id="rc-inbox-email-fit-v62">
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+    }
+    body {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body, body table, body td, body div, body p, body span,
+    body a, body li, body strong, body em {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    body table {
+        max-width: 100% !important;
+    }
+    body img {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+    }
+    body p, body li, body td, body div, body span, body a {
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+    }
+    body p, body li, body td, body div, body span {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body a {
+        font-size: 12px !important;
+        line-height: 1.35 !important;
+    }
+    body h1 { font-size: 20px !important; line-height: 1.2 !important; }
+    body h2 { font-size: 18px !important; line-height: 1.22 !important; }
+    body h3 { font-size: 16px !important; line-height: 1.25 !important; }
+    body h4, body h5, body h6 { font-size: 14px !important; line-height: 1.3 !important; }
+    .email-content,
+    body > div,
+    body > table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    @media (max-width: 640px) {
+        body table[width] { width: 100% !important; }
+        body td[width] { max-width: 100% !important; }
+    }
+</style>
+CSS;
+
+                    if ($hasDocumentHtml) {
+                        if (preg_match('/<\/head\s*>/i', $clean)) {
+                            return preg_replace('/<\/head\s*>/i', $responsiveEmailCss . '</head>', $clean, 1) ?? $clean;
+                        }
+
+                        if (preg_match('/<body\b/i', $clean)) {
+                            return preg_replace('/<body\b/i', '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' . $responsiveEmailCss . '</head><body', $clean, 1) ?? $clean;
+                        }
+
+                        return $responsiveEmailCss . $clean;
+                    }
+
+                    return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                        . $responsiveEmailCss
+                        . '</head><body style="margin:0;padding:0">' . $clean . '</body></html>';
+                };
             @endphp
 
-            <div class="rc-inbox-page-v56" wire:poll.12s.visible="pollConversationUpdates">
+            <style>
+                .rc-msg-bubble-email-v61 {
+                    display:block;
+                    width:min(100%,42rem);
+                    max-width:100%;
+                    height:auto;
+                    min-height:0;
+                    background:#f1f5f9;
+                    padding:.55rem;
+                    overflow:visible;
+                }
+                rc-inbox-email-view.rc-email-document-v64 {
+                    display:block;
+                    width:100%;
+                    max-width:100%;
+                    height:auto;
+                    min-height:0;
+                    overflow:visible;
+                    contain:layout style;
+                }
+                rc-inbox-email-view.rc-email-document-v64::part(toggle) {
+                    position:absolute;
+                    right:.25rem;
+                    bottom:.2rem;
+                }
+                .rc-message-stream-v56 { position:relative; }
+                .rc-inbox-thread-loader-v63 {
+                    position:absolute;
+                    inset:0;
+                    z-index:40;
+                    align-items:center;
+                    justify-content:center;
+                    background:color-mix(in srgb, var(--rc-surface) 90%, transparent);
+                    backdrop-filter:blur(2px);
+                }
+                .rc-inbox-thread-loader-card-v63 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.55rem;
+                    min-height:2.6rem;
+                    padding:.65rem .9rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.8rem;
+                    background:var(--rc-surface);
+                    color:var(--rc-text);
+                    box-shadow:0 14px 34px rgba(15,23,42,.14);
+                    font-size:.78rem;
+                    font-weight:750;
+                }
+            </style>
+            <script>
+                (() => {
+                    if (customElements.get('rc-inbox-email-view')) return;
+
+                    class RcInboxEmailView extends HTMLElement {
+                        connectedCallback() {
+                            if (this.shadowRoot) return;
+
+                            const template = this.querySelector('template');
+                            if (!(template instanceof HTMLTemplateElement)) return;
+
+                            const parsed = new DOMParser().parseFromString(template.innerHTML, 'text/html');
+                            const shadow = this.attachShadow({ mode: 'open' });
+
+                            const base = document.createElement('style');
+                            base.textContent = `
+                                :host { display:block; width:100%; max-width:100%; height:auto; min-height:0; position:relative; }
+                                *, *::before, *::after { box-sizing:border-box; }
+                                .rc-email-viewport { display:block; width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; transition:max-height .18s ease; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px; overflow:hidden; padding-right:2rem; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2.75rem; z-index:2; pointer-events:none; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)); }
+                                .rc-email-root { display:block; width:100%; max-width:100%; min-width:0; margin:0; overflow:visible; font-size:12px; line-height:1.45; }
+                                .rc-email-root img { max-width:100% !important; height:auto !important; }
+                                .rc-email-root table { max-width:100% !important; }
+                                .rc-email-root td, .rc-email-root th { max-width:100% !important; }
+                                .rc-email-root a { overflow-wrap:anywhere; word-break:break-word; }
+                                .rc-email-toggle { display:none; position:absolute; right:.2rem; bottom:.18rem; z-index:4; width:1.75rem; height:1.75rem; padding:0; border:0; border-radius:0; background:transparent; color:#475569; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex; }
+                                .rc-email-toggle svg { width:.9rem; height:.9rem; transition:transform .18s ease; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg); }
+                            `;
+                            shadow.appendChild(base);
+
+                            parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                                const clone = node.cloneNode(true);
+                                if (clone instanceof HTMLStyleElement) {
+                                    clone.textContent = String(clone.textContent || '').replace(/\bbody\b/g, '.rc-email-root');
+                                }
+                                shadow.appendChild(clone);
+                            });
+
+                            const viewport = document.createElement('div');
+                            viewport.className = 'rc-email-viewport';
+
+                            const root = document.createElement('div');
+                            root.className = `rc-email-root ${parsed.body.className || ''}`.trim();
+
+                            const bodyStyle = parsed.body.getAttribute('style');
+                            if (bodyStyle) root.setAttribute('style', bodyStyle);
+
+                            Array.from(parsed.body.childNodes).forEach((node) => {
+                                root.appendChild(document.importNode(node, true));
+                            });
+
+                            viewport.appendChild(root);
+                            shadow.appendChild(viewport);
+
+                            const toggle = document.createElement('button');
+                            toggle.type = 'button';
+                            toggle.className = 'rc-email-toggle';
+                            toggle.setAttribute('part', 'toggle');
+                            toggle.setAttribute('aria-label', 'Expand email');
+                            toggle.setAttribute('aria-expanded', 'false');
+                            toggle.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                            toggle.addEventListener('click', () => {
+                                const expanded = this.dataset.expanded === '1';
+                                if (expanded) {
+                                    delete this.dataset.expanded;
+                                    toggle.setAttribute('aria-expanded', 'false');
+                                    toggle.setAttribute('aria-label', 'Expand email');
+                                } else {
+                                    this.dataset.expanded = '1';
+                                    toggle.setAttribute('aria-expanded', 'true');
+                                    toggle.setAttribute('aria-label', 'Collapse email');
+                                }
+                            });
+                            shadow.appendChild(toggle);
+
+                            // Keep inbox controls authoritative even after delayed email
+                            // stylesheets finish loading. Email HTML can contain broad rules
+                            // such as div/button/* selectors, so this guard must be the final
+                            // stylesheet in the shadow root and use !important.
+                            const guard = document.createElement('style');
+                            guard.textContent = `
+                                :host { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; min-height:0 !important; position:relative !important; overflow:visible !important; }
+                                .rc-email-viewport { display:block !important; width:100% !important; max-width:100% !important; min-width:0 !important; max-height:none !important; height:auto !important; overflow:visible !important; position:relative !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px !important; overflow:hidden !important; padding-right:2rem !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:"" !important; display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; height:2.75rem !important; z-index:2147483645 !important; pointer-events:none !important; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)) !important; }
+                                .rc-email-toggle { display:none !important; position:absolute !important; right:.2rem !important; bottom:.18rem !important; z-index:2147483646 !important; width:1.75rem !important; height:1.75rem !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#475569 !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; box-shadow:none !important; appearance:none !important; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex !important; }
+                                .rc-email-toggle svg { display:block !important; width:.9rem !important; height:.9rem !important; min-width:.9rem !important; min-height:.9rem !important; transition:transform .18s ease !important; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg) !important; }
+                            `;
+                            shadow.appendChild(guard);
+                            template.remove();
+
+                            const evaluateHeight = () => {
+                                const height = Math.ceil(root.getBoundingClientRect().height);
+                                if (height > 100) this.dataset.collapsible = '1';
+                            };
+
+                            requestAnimationFrame(() => requestAnimationFrame(evaluateHeight));
+                            root.querySelectorAll('img').forEach((image) => {
+                                if (!image.complete) {
+                                    image.addEventListener('load', evaluateHeight, { once:true });
+                                    image.addEventListener('error', evaluateHeight, { once:true });
+                                }
+                            });
+                            if (document.fonts?.ready) document.fonts.ready.then(evaluateHeight).catch(() => {});
+                        }
+                    }
+
+                    customElements.define('rc-inbox-email-view', RcInboxEmailView);
+                })();
+
+                (() => {
+                    let activeRun = 0;
+                    let observer = null;
+                    let observedStream = null;
+                    let loadingOlderMessages = false;
+
+                    const getStream = () => document.querySelector('[data-rc-inbox-message-stream]');
+
+                    const moveToLatest = () => {
+                        if (loadingOlderMessages) return false;
+
+                        const stream = getStream();
+                        if (!stream) return false;
+
+                        // scrollTo is more reliable than assigning scrollTop while a
+                        // Livewire morph is still settling.
+                        stream.scrollTo({ top: stream.scrollHeight, behavior: 'auto' });
+                        return true;
+                    };
+
+                    const keepOlderMessagesAtTop = () => {
+                        const run = ++activeRun;
+                        const delays = [0, 16, 50, 120, 250, 500, 900];
+
+                        delays.forEach((delay, index) => {
+                            window.setTimeout(() => {
+                                if (run !== activeRun) return;
+
+                                const stream = getStream();
+                                if (stream) stream.scrollTo({ top: 0, behavior: 'auto' });
+
+                                if (index === delays.length - 1) {
+                                    loadingOlderMessages = false;
+                                }
+                            }, delay);
+                        });
+                    };
+
+                    const showLatestMessage = () => {
+                        if (loadingOlderMessages) return;
+
+                        const run = ++activeRun;
+                        const delays = [0, 16, 50, 120, 250, 500, 900, 1400];
+
+                        delays.forEach((delay) => {
+                            window.setTimeout(() => {
+                                if (run !== activeRun || loadingOlderMessages) return;
+                                moveToLatest();
+                            }, delay);
+                        });
+                    };
+
+                    const observeStream = () => {
+                        const stream = getStream();
+                        if (!stream) return;
+                        if (observedStream === stream) return;
+
+                        observer?.disconnect();
+                        observedStream = stream;
+                        observer = new MutationObserver(() => {
+                            if (loadingOlderMessages) {
+                                keepOlderMessagesAtTop();
+                                return;
+                            }
+
+                            showLatestMessage();
+                        });
+                        observer.observe(stream, { childList:true, subtree:true });
+
+                        // Shadow-root email content and images can increase the final
+                        // message height without mutating the outer Livewire tree.
+                        stream.addEventListener('load', () => {
+                            if (loadingOlderMessages) {
+                                const current = getStream();
+                                if (current) current.scrollTop = 0;
+                                return;
+                            }
+
+                            showLatestMessage();
+                        }, true);
+                        showLatestMessage();
+                    };
+
+                    document.addEventListener('click', (event) => {
+                        const clickedElement = event.target instanceof Element
+                            ? event.target.closest('[wire\\:click]')
+                            : null;
+                        const loadOlderButton = clickedElement?.getAttribute('wire:click') === 'loadOlderConversationMessages'
+                            ? clickedElement
+                            : null;
+                        if (loadOlderButton) {
+                            loadingOlderMessages = true;
+                            activeRun += 1;
+
+                            const stream = getStream();
+                            if (stream) stream.scrollTop = 0;
+                            return;
+                        }
+
+                        if (!event.target?.closest?.('[data-rc-inbox-conversation-trigger]')) return;
+                        loadingOlderMessages = false;
+                        activeRun += 1;
+
+                        // Wait for the selected conversation request to finish, then place
+                        // the viewport at the newest message.
+                        window.setTimeout(() => {
+                            observeStream();
+                            showLatestMessage();
+                        }, 0);
+                    }, true);
+
+                    const boot = () => {
+                        observeStream();
+                        showLatestMessage();
+                    };
+
+                    document.addEventListener('DOMContentLoaded', boot, { once:true });
+                    document.addEventListener('livewire:navigated', boot);
+                    document.addEventListener('livewire:initialized', boot);
+
+                    if (window.Livewire?.hook) {
+                        window.Livewire.hook('morph.updated', ({ el }) => {
+                            if (el?.matches?.('[data-rc-inbox-message-stream]')
+                                || el?.querySelector?.('[data-rc-inbox-message-stream]')) {
+                                observeStream();
+
+                                if (loadingOlderMessages) {
+                                    keepOlderMessagesAtTop();
+                                } else {
+                                    showLatestMessage();
+                                }
+                            }
+                        });
+
+                        window.Livewire.hook('commit', ({ succeed }) => {
+                            succeed(() => {
+                                queueMicrotask(() => {
+                                    observeStream();
+
+                                    if (loadingOlderMessages) {
+                                        keepOlderMessagesAtTop();
+                                    } else {
+                                        showLatestMessage();
+                                    }
+                                });
+                            });
+                        });
+                    }
+
+                    if (document.readyState !== 'loading') boot();
+                })();
+            </script>
+
+
+            <style id="rc-inbox-unread-status-v73">
+                .rc-thread-unread-dot-v56{width:.62rem!important;height:.62rem!important;border-radius:999px!important;background:#ff6338!important;box-shadow:0 0 0 3px rgba(255,99,56,.14)!important;}
+                .rc-inbox-icon-btn-v56.is-unread{color:#ff6338!important;background:rgba(255,99,56,.11)!important;border-color:rgba(255,99,56,.28)!important;}
+                .rc-message-status-v56.is-opened{color:#16a34a!important;}
+                .rc-message-status-v56.is-error{color:#dc2626!important;}
+            </style>
+            <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
                             <h2>Conversations</h2>
                             <div class="rc-inbox-head-actions-v56">
-                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="startNewConversation" title="New message" aria-label="New message">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 3h9l3 3v15H6V3Z" stroke="currentColor" stroke-width="1.8"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                </button>
-                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="loadConversations" title="Refresh conversations" aria-label="Refresh conversations">
+                                <button type="button" class="rc-inbox-icon-btn-v56" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime" title="Refresh conversations" aria-label="Refresh conversations">
+                                <span wire:loading.remove wire:target="refreshConversationsRealtime">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </span>
+                                <span wire:loading.flex wire:target="refreshConversationsRealtime" class="rc-spinner-mini"></span>
                                 </button>
                             </div>
                         </div>
@@ -9219,15 +11399,51 @@
                             </label>
                         </div>
 
-                        <div class="rc-inbox-tabs-v56">
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">Unread ({{ collect($this->conversations)->sum(fn($row) => (int) ($row['unread_count'] ?? 0)) }})</button>
-                            <button type="button" class="rc-inbox-tab-v56 {{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">Starred</button>
+                        <div class="rc-inbox-quick-filters-v56" role="group" aria-label="Conversation filters">
+                            <button type="button" class="{{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
+                            <button type="button" class="{{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">
+                                Unread
+                                @php $unreadConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (int) ($row['unread_count'] ?? 0) > 0)->count(); @endphp
+                                <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
+                            </button>
+                            <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
+                                Starred
+                                @php $starredConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count(); @endphp
+                                <span wire:key="starred-count-{{ $starredConversationCount }}">{{ $starredConversationCount }}</span>
+                            </button>
                         </div>
 
-                        <div wire:loading.flex wire:target="loadConversations,pollConversationUpdates,conversationSearch,conversationStatusFilter" class="rc-loading-inline" style="padding:.65rem 1.1rem"><span class="rc-spinner-mini"></span> Updating inbox</div>
+                        @if(empty($inboxConversations))
+                            <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
+                                <span class="rc-spinner-mini"></span> Loading inbox
+                            </div>
+                        @endif
 
-                        <div class="rc-inbox-list-v56">
+                        <div
+                            class="rc-inbox-list-v56"
+                            x-data="{
+                                selectedConversationId: window.__rcInboxPendingConversationId || @js((string) ($selectedConversationId ?? '')),
+                                init() {
+                                    const serverConversationId = @js((string) ($selectedConversationId ?? ''));
+
+                                    if (window.__rcInboxPendingConversationId
+                                        && serverConversationId === window.__rcInboxPendingConversationId) {
+                                        window.__rcInboxPendingConversationId = null;
+                                    }
+
+                                    this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
+                                },
+                                selectConversation(conversationId) {
+                                    const id = String(conversationId || '');
+                                    if (! id) return;
+
+                                    window.__rcInboxPendingConversationId = id;
+                                    this.selectedConversationId = id;
+                                    this.$wire.selectConversation(id);
+                                },
+                            }"
+                            x-init="init()"
+                        >
                             @forelse($inboxConversations as $inboxConversation)
                                 @php
                                     $inboxConversationId = (string) ($inboxConversation['id'] ?? '');
@@ -9237,13 +11453,14 @@
                                     $inboxDate = $formatInboxDate($inboxConversation['last_message_at'] ?? $inboxConversation['updated_at'] ?? $inboxConversation['created_at'] ?? '');
                                     $isSelectedThread = $selectedConversationId === $inboxConversationId;
                                     $unreadCount = (int) ($inboxConversation['unread_count'] ?? 0);
+                                    $isStarredThread = (bool) ($inboxConversation['starred'] ?? $inboxConversation['is_starred'] ?? false);
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" wire:click="selectConversation(@js($inboxConversationId))" wire:loading.attr="disabled" wire:target="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
-                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ $threadInitials($inboxContactName) }}
                                         @endif
@@ -9254,9 +11471,14 @@
                                         <span class="rc-thread-preview-v56">{{ $inboxLastMessage }}</span>
                                         <span class="rc-thread-status-v56 {{ $statusLabel === 'Opened' ? 'is-opened' : '' }}">{{ $statusLabel }}</span>
                                     </span>
-                                    <span style="display:grid;justify-items:end;align-content:start;gap:.3rem">
+                                    <span class="rc-thread-card-side-v56">
                                         <span class="rc-thread-date-v56">{{ $inboxDate }}</span>
                                         @if($unreadCount > 0)<span class="rc-thread-unread-dot-v56"></span>@endif
+                                        @if($isStarredThread)
+                                            <span class="rc-thread-star-v56" title="Starred" aria-label="Starred">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                            </span>
+                                        @endif
                                     </span>
                                 </button>
                             @empty
@@ -9265,13 +11487,31 @@
                         </div>
                     </aside>
 
-                    <main class="rc-inbox-mid-v56">
+                    <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82">
+                        <div
+                            wire:loading.flex
+                            wire:target="selectConversation"
+                            class="rc-inbox-inline-conversation-loader-v82"
+                            aria-live="polite"
+                            aria-label="Loading conversation"
+                        >
+                            <div class="rc-inbox-inline-loader-head-v82">
+                                <span class="rc-inbox-inline-loader-avatar-v82"></span>
+                                <span class="rc-inbox-inline-loader-copy-v82">
+                                    <span></span>
+                                    <span></span>
+                                </span>
+                            </div>
+                            <div class="rc-inbox-inline-loader-message-v82 is-short"></div>
+                            <div class="rc-inbox-inline-loader-message-v82"></div>
+                            <div class="rc-inbox-inline-loader-message-v82 is-medium"></div>
+                        </div>
                         @if($selectedConversation)
                             <div class="rc-inbox-mid-head-v56">
                                 <div class="rc-inbox-coach-title-v56">
                                     <span class="rc-inbox-school-logo-v56">
                                         @if($selectedSchoolLogo !== '')
-                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
+                                            <img src="{{ $selectedSchoolLogo }}" alt="{{ $selectedSchool }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
                                         @else
                                             {{ strtoupper(substr($selectedSchool, 0, 2)) }}
                                         @endif
@@ -9282,38 +11522,144 @@
                                     </span>
                                 </div>
                                 <div class="rc-inbox-mid-actions-v56">
-                                    <button type="button" class="rc-inbox-open-composer-v56" wire:click="openSelectedConversationInComposer">
-                                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-                                        Open in Composer
-                                    </button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="starSelectedConversation" title="Star coach"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="scheduleSelectedConversation" title="Schedule"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="moreSelectedConversation" title="More"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ $selectedStarred ? 'currentColor' : 'none' }}"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    @php $selectedUnread = (int) ($selectedConversation['unread_count'] ?? 0) > 0; @endphp
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedUnread ? 'is-unread' : '' }}" wire:click="toggleSelectedConversationUnread" title="{{ $selectedUnread ? 'Mark as read' : 'Mark as unread' }}" aria-pressed="{{ $selectedUnread ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M3.5 6.5h17v12h-17v-12Z" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
                                 </div>
                             </div>
 
-                            <div class="rc-message-stream-v56">
+                            <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
                                 @if(empty($threadMessages))
-                                    <div class="rc-inbox-empty-v56"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
+                                    <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
                                 @else
-                                    @foreach($threadMessages as $message)
+                                    @php
+                                        // GHL may return messages newest-first or oldest-first depending on
+                                        // the endpoint/page. Normalize them chronologically, then keep the
+                                        // newest 10 so a newly opened conversation always shows the latest emails.
+                                        $orderedThreadMessages = collect($threadMessages)
+                                            ->sortBy(function ($message) {
+                                                $message = is_array($message) ? $message : [];
+                                                $value = $message['created_at']
+                                                    ?? $message['createdAt']
+                                                    ?? $message['date']
+                                                    ?? $message['messageDate']
+                                                    ?? $message['timestamp']
+                                                    ?? $message['updated_at']
+                                                    ?? $message['updatedAt']
+                                                    ?? 0;
+
+                                                if (is_numeric($value)) {
+                                                    $number = (float) $value;
+                                                    return $number > 9999999999 ? $number / 1000 : $number;
+                                                }
+
+                                                try {
+                                                    return \Illuminate\Support\Carbon::parse($value)->getTimestamp();
+                                                } catch (\Throwable $exception) {
+                                                    return 0;
+                                                }
+                                            })
+                                            ->values();
+
+                                        // The Livewire method is responsible for loading the initial latest
+                                        // batch and prepending older batches. Render every message currently
+                                        // present instead of trimming back to ten after each request.
+                                        $visibleThreadMessages = $orderedThreadMessages;
+                                    @endphp
+                                    @if((bool) $hasMoreMessages)
+                                        <div class="rc-inbox-load-older-top">
+                                            <button
+                                                class="rc-inbox-open-composer-v56"
+                                                type="button"
+                                                wire:click="loadOlderConversationMessages"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadOlderConversationMessages"
+                                            >
+                                                <span wire:loading.remove wire:target="loadOlderConversationMessages">Load older emails</span>
+                                                <span wire:loading wire:target="loadOlderConversationMessages">Loading 10 older emails…</span>
+                                            </button>
+                                        </div>
+                                    @endif
+                                    @foreach($visibleThreadMessages as $message)
                                         @php
                                             $message = is_array($message) ? $message : [];
-                                            $isOut = str_contains(strtolower((string) ($message['direction'] ?? $message['type'] ?? '')), 'out');
+                                            $normalizedDirection = strtolower(trim((string) (
+                                                $message['direction']
+                                                ?? $message['message_direction']
+                                                ?? $message['messageDirection']
+                                                ?? data_get($message, 'meta.email.direction')
+                                                ?? data_get($message, 'email.direction')
+                                                ?? data_get($message, 'message.direction')
+                                                ?? ''
+                                            )));
+                                            $isOut = str_contains($normalizedDirection, 'out')
+                                                || in_array($normalizedDirection, ['sent', 'send', 'outgoing', 'out'], true);
                                             $fromLabel = $isOut ? 'You' : ($message['from_name'] ?? $selectedName);
                                             $toLabel = $message['to'] ?? ($isOut ? $selectedName : 'You');
                                             if (is_array($toLabel)) {
                                                 $toLabel = collect($toLabel)->map(fn($item) => is_array($item) ? ($item['email'] ?? $item['name'] ?? $item['address'] ?? '') : (is_scalar($item) ? (string) $item : ''))->filter()->implode(', ');
                                             }
-                                            $messageBody = (string) ($message['body'] ?? $message['html'] ?? $message['text'] ?? '');
+                                            $compressedMessageBody = is_scalar($message['_livewire_body_gzip'] ?? null)
+                                                ? (string) $message['_livewire_body_gzip']
+                                                : '';
+                                            $decodedCompressedBody = '';
+                                            if ($compressedMessageBody !== '') {
+                                                try {
+                                                    $decodedCompressedBody = gzdecode(base64_decode($compressedMessageBody, true) ?: '') ?: '';
+                                                } catch (\Throwable $exception) {
+                                                    $decodedCompressedBody = '';
+                                                }
+                                            }
+                                            $messageBody = collect([
+                                                $decodedCompressedBody,
+                                                $message['html_body'] ?? null,
+                                                $message['htmlBody'] ?? null,
+                                                $message['message_html'] ?? null,
+                                                $message['html'] ?? null,
+                                                $message['body'] ?? null,
+                                                $message['text_body'] ?? null,
+                                                $message['textBody'] ?? null,
+                                                $message['text'] ?? null,
+                                                $message['content'] ?? null,
+                                                $message['snippet'] ?? null,
+                                                is_scalar($message['message'] ?? null) ? $message['message'] : null,
+                                                data_get($message, 'message.html'),
+                                                data_get($message, 'message.body'),
+                                                data_get($message, 'message.content'),
+                                                data_get($message, 'message.text'),
+                                                data_get($message, 'emailMessage.html'),
+                                                data_get($message, 'emailMessage.body'),
+                                                data_get($message, 'emailMessage.content'),
+                                                data_get($message, 'email.html'),
+                                                data_get($message, 'email.body'),
+                                                data_get($message, 'email.content'),
+                                                data_get($message, 'meta.email.html'),
+                                                data_get($message, 'meta.email.body'),
+                                                data_get($message, 'meta.email.content'),
+                                                data_get($message, 'payload.html'),
+                                                data_get($message, 'payload.body'),
+                                                data_get($message, 'payload.content'),
+                                                data_get($message, 'payload.text'),
+                                            ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+                                            $messageBody = is_scalar($messageBody) ? (string) $messageBody : '';
+                                            if (trim($messageBody) === '') {
+                                                $messageBody = '<p><em>This email was received, but HighLevel did not include its body in the message payload.</em></p>';
+                                            }
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
                                         @endphp
-                                        <article class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
+                                        <article wire:key="inbox-message-{{ (string) ($message['id'] ?? $loop->index) }}" class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
                                             <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
-                                                <div class="rc-msg-bubble-v56">{!! $messageBody !== '' ? $messageBody : '<p>No message body.</p>' !!}</div>
+                                                @php
+                                                    $emailDocument = $prepareInboxEmailDocument($messageBody);
+                                                @endphp
+                                                <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
+                                                    <rc-inbox-email-view wire:ignore class="rc-email-document-v64" aria-label="Email message">
+                                                        <template>{!! $emailDocument !!}</template>
+                                                    </rc-inbox-email-view>
+                                                </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
                                                         @foreach($messageAttachments as $attachment)
@@ -9324,22 +11670,328 @@
                                                                 $isImageAttachment = str_starts_with($attachmentType, 'image/') || preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $attachmentUrl);
                                                             @endphp
                                                             @if($isImageAttachment)
-                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}">
+                                                                <img class="rc-message-attachment-image" src="{{ $attachmentUrl }}" alt="{{ $attachmentName }}" loading="lazy" decoding="async">
                                                             @else
                                                                 <a class="rc-message-attachment-link" href="{{ $attachmentUrl }}" target="_blank" rel="noopener">Open {{ $attachmentName }}</a>
                                                             @endif
                                                         @endforeach
                                                     </div>
                                                 @endif
-                                                @if($isOut)<div class="rc-message-status-v56"><span>⊙</span> Opened · just now</div>@endif
+                                                @if($isOut)
+                                                    @php
+                                                        $rawDeliveryStatus = strtolower(trim((string) ($message['status'] ?? '')));
+                                                        $deliveryStatus = match (true) {
+                                                            str_contains($rawDeliveryStatus, 'click') => 'Clicked',
+                                                            str_contains($rawDeliveryStatus, 'open') => 'Opened',
+                                                            str_contains($rawDeliveryStatus, 'deliver') => 'Delivered',
+                                                            str_contains($rawDeliveryStatus, 'send') || str_contains($rawDeliveryStatus, 'queue') || str_contains($rawDeliveryStatus, 'pending') => 'Sent',
+                                                            str_contains($rawDeliveryStatus, 'bounce') => 'Bounced',
+                                                            str_contains($rawDeliveryStatus, 'fail') || str_contains($rawDeliveryStatus, 'error') => 'Failed',
+                                                            default => $rawDeliveryStatus !== '' ? ucfirst($rawDeliveryStatus) : 'Sent',
+                                                        };
+                                                        $deliveryTone = in_array($deliveryStatus, ['Failed', 'Bounced'], true) ? 'is-error' : (in_array($deliveryStatus, ['Opened', 'Clicked'], true) ? 'is-opened' : '');
+                                                    @endphp
+                                                    <div class="rc-message-status-v56 {{ $deliveryTone }}"><span>⊙</span> {{ $deliveryStatus }}</div>
+                                                @endif
                                             </div>
                                         </article>
                                     @endforeach
                                 @endif
-                                @if($hasMoreMessages)
-                                    <button class="rc-inbox-open-composer-v56" type="button" wire:click="loadConversationMessages" wire:loading.attr="disabled" wire:target="loadConversationMessages">Load older emails</button>
-                                @endif
+
                             </div>
+
+                            <form
+                                class="rc-inbox-quick-reply-v92"
+                                wire:submit.prevent="sendQuickReply"
+                                x-data="{
+                                    draftKey: 'rcQuickReplyDraft:' + @js((string) ($selectedConversationId ?? 'none')),
+                                    init() {
+                                        const saved = sessionStorage.getItem(this.draftKey);
+                                        if (saved && this.$refs.replyEditor) {
+                                            this.$refs.replyEditor.innerHTML = saved;
+                                            this.sync(false);
+                                        }
+                                    },
+                                    command(name) {
+                                        this.$refs.replyEditor?.focus();
+                                        document.execCommand(name, false, null);
+                                        this.sync();
+                                    },
+                                    sync(save = true) {
+                                        const html = this.$refs.replyEditor?.innerHTML || '';
+                                        this.$refs.replyValue.value = html;
+                                        this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
+                                        if (save) sessionStorage.setItem(this.draftKey, html);
+                                    },
+                                    uploadActive: false,
+                                    uploadProgress: 0,
+                                    uploadFileName: '',
+                                    beginUpload(event) {
+                                        const files = Array.from(event.target.files || []);
+                                        this.uploadFileName = files.length > 1
+                                            ? files.length + ' files'
+                                            : (files[0]?.name || 'Uploading file');
+                                        this.uploadProgress = 0;
+                                        this.uploadActive = files.length > 0;
+                                    },
+                                    finishUpload() {
+    this.uploadProgress = 100;
+
+    this.$nextTick(() => {
+        this.uploadActive = false;
+        this.uploadFileName = '';
+
+        if (this.$refs.quickReplyFileInput) {
+            this.$refs.quickReplyFileInput.value = '';
+        }
+    });
+},
+                                    clear() {
+                                        if (this.$refs.replyEditor) this.$refs.replyEditor.innerHTML = '';
+                                        sessionStorage.removeItem(this.draftKey);
+                                        this.sync(false);
+                                    }
+                                }"
+                                x-init="init()"
+                                x-on:keydown.ctrl.enter.prevent="sync(); $el.requestSubmit()"
+                                x-on:keydown.meta.enter.prevent="sync(); $el.requestSubmit()"
+                                x-on:rc-inbox-quick-reply-sent.window="clear()"
+                                x-on:rc-quick-reply-attachment-uploaded.window="finishUpload()"
+                                x-on:rc-quick-reply-attachment-upload-failed.window="finishUpload()"
+                            >
+                                <div class="rc-inbox-quick-reply-editor-v92">
+                                    <div class="rc-inbox-quick-reply-toolbar-v92" aria-label="Text formatting controls">
+                                        <button type="button" title="Bold" x-on:click="command('bold')"><strong>B</strong></button>
+                                        <button type="button" title="Italic" x-on:click="command('italic')"><em>I</em></button>
+                                        <button type="button" title="Underline" x-on:click="command('underline')"><span style="text-decoration:underline">U</span></button>
+                                        <span class="rc-inbox-quick-reply-divider-v92" aria-hidden="true"></span>
+                                        <button type="button" title="Bulleted list" x-on:click="command('insertUnorderedList')">•</button>
+                                        <button type="button" title="Numbered list" x-on:click="command('insertOrderedList')">1.</button>
+                                    </div>
+
+                                    <div wire:ignore>
+                                        <div
+                                            x-ref="replyEditor"
+                                            class="rc-inbox-quick-reply-contenteditable-v93"
+                                            contenteditable="true"
+                                            role="textbox"
+                                            aria-multiline="true"
+                                            aria-label="Quick reply message"
+                                            data-placeholder="Write your reply…"
+                                            x-on:input.debounce.150ms="sync()"
+                                            x-on:blur="sync()"
+                                        ></div>
+                                    </div>
+                                    <textarea
+                                        x-ref="replyValue"
+                                        wire:model.defer="quickReplyBody"
+                                        class="rc-inbox-quick-reply-hidden-v93"
+                                        tabindex="-1"
+                                        aria-hidden="true"
+                                    ></textarea>
+
+                                    <div
+    class="rc-inbox-quick-reply-uploading-v96"
+    x-show="uploadActive"
+    x-cloak
+    role="status"
+    aria-live="polite"
+>
+    <span
+        class="rc-inbox-quick-reply-upload-spinner-v96"
+        aria-hidden="true"
+    ></span>
+
+    <span
+        class="rc-inbox-quick-reply-upload-name-v96"
+        x-text="uploadFileName || 'Uploading file'"
+    ></span>
+
+    <span
+        class="rc-inbox-quick-reply-upload-percent-v96"
+        x-text="uploadProgress >= 100
+            ? 'Uploading…'
+            : (uploadProgress > 0
+                ? uploadProgress + '%'
+                : 'Uploading…')"
+    ></span>
+</div>
+
+@if(! empty($quickReplyAttachments))
+    <div
+        class="rc-inbox-quick-reply-attachments-v94"
+        aria-label="Attached files"
+    >
+        @foreach($quickReplyAttachments as $attachmentIndex => $attachment)
+            @php
+                $attachmentUrl = trim(
+                    (string) (
+                        $attachment['url']
+                        ?? $attachment['media_url']
+                        ?? ''
+                    )
+                );
+
+                $attachmentName = trim(
+                    (string) ($attachment['name'] ?? 'Attachment')
+                ) ?: 'Attachment';
+
+                $attachmentMime = strtolower(
+                    (string) ($attachment['mime_type'] ?? '')
+                );
+
+                $isImageAttachment =
+                    str_starts_with($attachmentMime, 'image/')
+                    || preg_match(
+                        '/\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i',
+                        $attachmentName
+                    );
+
+                $attachmentKey = sha1(
+                    $attachmentUrl !== ''
+                        ? $attachmentUrl
+                        : $attachmentName . ':' . $attachmentIndex
+                );
+            @endphp
+
+            <span
+                class="rc-inbox-quick-reply-attachment-chip-v96"
+                wire:key="quick-reply-attachment-{{ $attachmentKey }}"
+            >
+                <span
+                    class="rc-inbox-quick-reply-attachment-icon-v96"
+                    aria-hidden="true"
+                >
+                    @if($isImageAttachment)
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="13"
+                            height="13"
+                            fill="none"
+                        >
+                            <rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="16"
+                                rx="2"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+                            <circle
+                                cx="8.5"
+                                cy="9"
+                                r="1.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            />
+                            <path
+                                d="m5.5 17 4.2-4 3.1 2.7 2.3-2.2 3.4 3.5"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    @else
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="13"
+                            height="13"
+                            fill="none"
+                        >
+                            <path
+                                d="M3.5 6.5h6l1.8 2H20.5v9.75a1.75 1.75 0 0 1-1.75 1.75H5.25a1.75 1.75 0 0 1-1.75-1.75V6.5Z"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linejoin="round"
+                            />
+                            <path
+                                d="M3.5 9h17"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+                        </svg>
+                    @endif
+                </span>
+
+                <span
+                    class="rc-inbox-quick-reply-attachment-name-v96"
+                    title="{{ $attachmentName }}"
+                >
+                    {{ $attachmentName }}
+                </span>
+
+                <button
+                    type="button"
+                    wire:click="removeQuickReplyAttachmentByUrl(@js($attachmentUrl))"
+                    wire:loading.attr="disabled"
+                    wire:target="removeQuickReplyAttachmentByUrl"
+                    aria-label="Remove {{ $attachmentName }}"
+                    title="Remove attachment"
+                >
+                    <span
+                        wire:loading.remove
+                        wire:target="removeQuickReplyAttachmentByUrl"
+                    >
+                        ×
+                    </span>
+
+                    <span
+                        wire:loading
+                        wire:target="removeQuickReplyAttachmentByUrl"
+                        class="rc-inbox-quick-reply-upload-spinner-v96"
+                        aria-hidden="true"
+                    ></span>
+                </button>
+            </span>
+        @endforeach
+    </div>
+@endif
+
+                                    <div class="rc-inbox-quick-reply-footer-v92">
+                                        <div class="rc-inbox-quick-reply-tools-v92" aria-label="Reply attachment">
+                                            <label
+                                                title="Attach file"
+                                                aria-label="Attach file"
+                                                wire:loading.class="is-uploading"
+                                                wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments"
+                                            >
+                                                <input
+                                                    x-ref="quickReplyFileInput"
+                                                    type="file"
+                                                    multiple
+                                                    wire:model="quickReplyAttachmentUploads"
+                                                    x-on:change="beginUpload($event)"
+                                                    x-on:livewire-upload-start="uploadActive = true"
+                                                    x-on:livewire-upload-progress="uploadProgress = $event.detail.progress"
+                                                    x-on:livewire-upload-error="finishUpload()"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments"
+                                                    hidden
+                                                >
+                                                <span wire:loading.remove wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments">📎</span>
+                                                <span wire:loading wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments" class="rc-inbox-quick-reply-tool-spinner-v95" aria-hidden="true"></span>
+                                            </label>
+                                        </div>
+
+                                        <div class="rc-inbox-quick-reply-actions-v92">
+                                            <button
+                                                type="submit"
+                                                class="rc-inbox-quick-reply-send-v92"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendQuickReply,addQuickReplyAttachments"
+                                                x-on:click="sync()"
+                                                title="Send reply"
+                                            >
+                                                <svg wire:loading.remove wire:target="sendQuickReply" viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 12h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                                <span wire:loading wire:target="sendQuickReply" class="rc-inbox-quick-reply-spinner-v92" aria-hidden="true"></span>
+                                                <span>Send Reply</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
                         @else
                             <div class="rc-inbox-empty-v56"><div><strong>Select a conversation.</strong><br><span>Email messages will appear here.</span></div></div>
                         @endif
@@ -9359,16 +12011,14 @@
 
                                 <div class="rc-contact-lines-v56">
                                     <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6Zm0 0 8 7 8-7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>{{ data_get($selectedCoach, 'email') ?? $selectedConversation['email'] ?? 'Email unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div>
-                                    <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div>
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div> -->
+                                    <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
 
-                                <div class="rc-profile-actions-v56">
+                                <!-- <div class="rc-profile-actions-v56">
                                     <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
                                     <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="scheduleSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5V5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Schedule</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="moreSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>More</span></button>
-                                </div>
+                                </div> -->
 
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
@@ -9380,6 +12030,63 @@
                         </div>
                     </aside>
                 </div>
+            </div>
+        @endif
+
+        @if($section === 'support')
+            @php
+                $supportUser = auth()->user();
+                $supportFirstName = trim((string) (
+                    $supportUser?->first_name
+                    ?? str($supportUser?->name ?? 'Athlete')->before(' ')
+                    ?? 'Athlete'
+                ));
+            @endphp
+
+            <div class="rc-support-page-v1">
+                @include('filament.partials.coach-database-header', [
+                    'firstName' => $supportFirstName !== '' ? $supportFirstName : 'Athlete',
+                    'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                    'showNewEmail' => true,
+                ])
+
+                <section class="rc-support-card-v1" x-data="{ loaded: false }">
+                    <header class="rc-support-head-v1">
+                        <div>
+                            <span class="rc-support-kicker-v1">PLYRCard Support</span>
+                            <h2>How can we help?</h2>
+                            <p>Submit a support ticket and our team will review it.</p>
+                        </div>
+                    </header>
+
+                    <div class="rc-support-frame-wrap-v1">
+                        <div class="rc-support-frame-loader-v1" x-show="! loaded" x-transition.opacity>
+                            <span class="rc-support-spinner-v1" aria-label="Loading support form"></span>
+                        </div>
+                        <iframe
+                            src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
+                            id="inline-HDaBy0CDwdO7Fw54wi1K"
+                            data-layout="{'id':'INLINE'}"
+                            data-trigger-type="alwaysShow"
+                            data-trigger-value=""
+                            data-activation-type="alwaysActivated"
+                            data-activation-value=""
+                            data-deactivation-type="neverDeactivate"
+                            data-deactivation-value=""
+                            data-form-name="PLYRCard Support Ticket"
+                            data-height="760"
+                            data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
+                            data-form-id="HDaBy0CDwdO7Fw54wi1K"
+                            title="PLYRCard support ticket form"
+                            class="rc-support-frame-v1"
+                            loading="eager"
+                            scrolling="no"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            x-on:load="loaded = true"
+                        ></iframe>
+                        <script src="https://link.msgsndr.com/js/form_embed.js" defer></script>
+                    </div>
+                </section>
             </div>
         @endif
 
@@ -9463,10 +12170,38 @@
         @endif
 
         @if($section === 'compose')
+            <script>
+                (() => {
+                    if (window.__rcComposeLegacyOpenerGuardV82) return;
+                    window.__rcComposeLegacyOpenerGuardV82 = true;
+
+                    const hideLegacyComposeOpeners = (root = document) => {
+                        root.querySelectorAll?.('[data-rc-opening-overlay], .rc-open-loading-overlay, .rc-compose-opening-overlay, .rc-compose-loading-backdrop').forEach((node) => {
+                            const text = String(node.textContent || '').toLowerCase();
+                            const type = String(node.getAttribute?.('data-rc-type') || node.getAttribute?.('data-rc-opening-overlay') || '').toLowerCase();
+                            if (type.includes('compose') || text.includes('opening the composer') || text.includes('preparing recipient data')) {
+                                node.style.setProperty('display', 'none', 'important');
+                                node.style.setProperty('visibility', 'hidden', 'important');
+                                node.style.setProperty('pointer-events', 'none', 'important');
+                            }
+                        });
+                    };
+
+                    hideLegacyComposeOpeners();
+                    const observer = new MutationObserver(() => hideLegacyComposeOpeners());
+                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                    document.addEventListener('livewire:navigated', () => hideLegacyComposeOpeners());
+                })();
+            </script>
+
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'showNewEmail' => false,
             ])
+
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Preparing templates and recipient data. You can keep editing while it refreshes.
+            </div>
 
             <style>
                 .rc-compose-page-v45 { display:grid; gap:1rem; }
@@ -9519,47 +12254,102 @@
                 .rc-attachment-icon-v45.is-file { background:#3b82f6; }
                 .rc-attachment-drop-v45 { border:1px dashed rgba(148,163,184,.55); border-radius:.8rem; display:grid; place-items:center; min-height:4.6rem; color:var(--rc-muted); text-align:center; cursor:pointer; background:var(--rc-soft); }
                 .rc-compose-modal-v45 { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(2,6,23,.62); backdrop-filter:blur(5px); }
-
-                /* v73: immediate tactile feedback while Livewire completes the request. */
-                .rc-compose-page-v45 button,
-                .rc-compose-page-v45 label,
-                .rc-compose-page-v45 .rc-global-suggestion-item {
-                    transition: transform .1s ease, opacity .12s ease, border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
-                    touch-action: manipulation;
-                }
-                .rc-compose-page-v45 button:active,
-                .rc-compose-page-v45 button.rc-click-feedback-v73 {
-                    transform: scale(.975);
-                    opacity: .82;
-                }
-                .rc-compose-page-v45 button[disabled] {
-                    cursor: wait !important;
-                    opacity: .62;
-                }
-                .rc-compose-tab-v45.rc-livewire-pending-v73,
-                .rc-compose-coach-pill-v45.rc-livewire-pending-v73,
-                .rc-global-suggestion-item.rc-livewire-pending-v73 {
-                    border-color: rgba(255,99,56,.48) !important;
-                    box-shadow: 0 0 0 3px rgba(255,99,56,.08);
-                }
-                .rc-compose-school-search-v45 .rc-global-search-shell { position: relative; }
-                .rc-compose-search-busy-v73 {
-                    position:absolute;
-                    right:2.55rem;
-                    top:50%;
-                    transform:translateY(-50%);
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    color:var(--rc-accent);
-                    pointer-events:none;
-                }
-                .rc-compose-school-search-v45 .rc-global-search-input { padding-right: 4.7rem !important; }
                 @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
             </style>
 
             <div class="rc-compose-page-v45"
-                 x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 240); }">
+                x-data="{
+                    dataset: @js($this->composeClientDataset),
+                    schoolQuery: '',
+                    coachQuery: '',
+                    selectedSchoolId: @js((string) ($campaignSchoolId ?? '')),
+                    targetMode: @js((string) ($campaignTargetMode ?? 'school')),
+                    headCoachOnly: @js((bool) ($campaignHeadCoachOnly ?? true)),
+                    chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
+                    selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
+                    coachRevision: 0,
+                    sendingFast: false,
+                    get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
+                    get schoolResults() {
+                        const q = String(this.schoolQuery || '').trim().toLowerCase();
+                        if (!q) return [];
+                        return this.schools.filter(row => String(row.search_text || '').includes(q)).slice(0, 15);
+                    },
+                    get selectedSchool() {
+                        return this.schools.find(row => String(row.id) === String(this.selectedSchoolId)) || null;
+                    },
+                    get schoolCoaches() {
+                        return Array.isArray(this.selectedSchool?.coaches) ? this.selectedSchool.coaches : [];
+                    },
+                    get visibleCoaches() {
+                        const q = String(this.coachQuery || '').trim().toLowerCase();
+                        if (!q) return this.schoolCoaches;
+                        return this.schoolCoaches.filter(row => String(row.search_text || '').includes(q));
+                    },
+                    get activeCoachIds() {
+                        if (!this.selectedSchool) return [];
+                        if (this.targetMode === 'coaches') return Array.from(this.selectedCoachIds);
+                        if (this.headCoachOnly) {
+                            const head = this.schoolCoaches.find(row => row.is_head) || this.schoolCoaches[0];
+                            return head ? [String(head.id)] : [];
+                        }
+                        return this.schoolCoaches.map(row => String(row.id));
+                    },
+                    get recipientCount() { this.coachRevision; return this.activeCoachIds.length; },
+                    get sendingDescription() {
+                        if (!this.selectedSchool) return 'No school selected — search to add one below';
+                        if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
+                        return `Sending to ${this.headCoachOnly ? 'head coach only' : 'all coaches'} at ${this.selectedSchool.name}`;
+                    },
+                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.has(String(id || '')); },
+                    toggleCoach(id) {
+                        id = String(id || ''); if (!id) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.selectedCoachIds.has(id) ? this.selectedCoachIds.delete(id) : this.selectedCoachIds.add(id);
+                        this.coachRevision++;
+                    },
+                    selectAllCoaches() {
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    clearCoaches() { this.selectedCoachIds.clear(); this.coachRevision++; },
+                    clearRecipients() {
+                        this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
+                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++;
+                    },
+                    async chooseSchool(school) {
+                        const id = String(school?.id || ''); if (!id) return;
+
+                        // Update the UI first so selection feels immediate, then hydrate
+                        // only this school's exact coach roster on the server.
+                        this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
+                        this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
+                        this.selectedCoachIds.clear(); this.coachRevision++;
+
+                        try {
+                            await this.$wire.call('selectComposeSchool', id);
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    },
+                    chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
+                    chooseAllCoaches() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = false; this.chooserOpen = false; this.coachRevision++; },
+                    chooseSpecificCoaches() {
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+                        if (!this.selectedCoachIds.size) this.schoolCoaches.forEach(row => this.selectedCoachIds.add(String(row.id)));
+                        this.coachRevision++;
+                    },
+                    async sendFast() {
+                        if (this.sendingFast) return;
+                        if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
+                        this.sendingFast = true;
+                        try {
+                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, Array.from(this.selectedCoachIds));
+                        } finally { this.sendingFast = false; }
+                    },
+                }">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -9570,20 +12360,19 @@
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openComposePreview" wire:loading.attr="disabled" wire:target="openComposePreview">
+                        <button class="rc-btn" type="button" wire:click="openComposePreview">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                            <span wire:loading.remove wire:target="openComposePreview">Preview</span>
-                            <span wire:loading.flex wire:target="openComposePreview" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
+                            Preview
                         </button>
-                        <button class="rc-btn" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
+                        <button class="rc-btn" type="button" wire:click="openSaveComposeTemplatePrompt" wire:loading.attr="disabled" wire:target="openSaveComposeTemplatePrompt">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-                            <span wire:loading.remove wire:target="saveTemplate">Save as Template</span>
-                            <span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                            <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
+                            <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
-                        <button class="rc-btn rc-btn-primary" type="button" wire:click="sendComposedEmail" wire:loading.attr="disabled" wire:target="sendComposedEmail">
+                        <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
-                            <span wire:loading.remove wire:target="sendComposedEmail">{{ $this->composeTargetLabel }}</span>
-                            <span wire:loading.flex wire:target="sendComposedEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                            <span x-show="!sendingFast" x-text="recipientCount > 0 ? `Send to ${recipientCount.toLocaleString()} coach${recipientCount === 1 ? '' : 'es'}` : 'Add a school'"></span>
+                            <span x-cloak x-show="sendingFast" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
                         </button>
                     </div>
                 </div>
@@ -9594,98 +12383,62 @@
                             <div>
                                 <div class="rc-compose-label-v45">Recipients</div>
                                 <div class="rc-compose-recipient-bar-v45">
-                                    @if(is_array($this->composeSelectedSchool))
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients" wire:loading.attr="disabled" wire:target="clearComposeRecipients" aria-label="Clear recipients">×</button></span>
-                                    @elseif($campaignTargetMode === 'list' && $campaignListKey)
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedList['label'] ?? 'Selected List' }} ({{ number_format($this->campaignRecipientCount) }} coaches) <button type="button" wire:click="$set('campaignListKey','')">×</button></span>
-                                    @elseif($campaignTargetMode === 'coaches' && count($campaignCoachIds))
-                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection" wire:loading.attr="disabled" wire:target="clearComposeCoachSelection" aria-label="Clear selected coaches">×</button></span>
-                                    @else
-                                        <em class="rc-subtle">No school selected — search to add one below</em>
-                                    @endif
+                                    <template x-if="selectedSchool">
+                                        <span class="rc-compose-chip-v45"><span x-text="`${selectedSchool.name} (${schoolCoaches.length.toLocaleString()} coaches)`"></span> <button type="button" x-on:click="clearRecipients()">×</button></span>
+                                    </template>
+                                    <template x-if="!selectedSchool"><em class="rc-subtle">No school selected — search to add one below</em></template>
 
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="setComposeSchoolAllCoaches">All Coaches</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="openComposeCoachChooser">Choose Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && headCoachOnly}" x-on:click="chooseHeadCoach()">Head Coach Only</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && !headCoachOnly}" x-on:click="chooseAllCoaches()">All Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='coaches'}" x-on:click="chooseSpecificCoaches()">Choose Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
                                 </div>
 
                                 <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
                                     <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
                                         <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
-                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.220ms="composeSchoolSearch" autocomplete="off" />
-                                        <span class="rc-compose-search-busy-v73" wire:loading.flex wire:target="composeSchoolSearch,selectComposeSchool" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
-                                        @if(trim($composeSchoolSearch) !== '')
-                                            <button type="button" class="rc-global-search-clear" wire:click="$set('composeSchoolSearch','')" aria-label="Clear school search">×</button>
-                                        @endif
+                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." x-model="schoolQuery" />
+                                        <button x-cloak x-show="schoolQuery.length" type="button" class="rc-global-search-clear" x-on:click="schoolQuery=''" aria-label="Clear school search">×</button>
                                     </div>
-
-                                    @if(trim($composeSchoolSearch) !== '')
-                                        <div class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
-                                            @forelse($this->composeSchoolResults as $school)
-                                                <?php
-                                                    $sid = (string) ($school['id'] ?? '');
-                                                    $schoolName = (string) ($school['name'] ?? 'School');
-                                                    $schoolLogo = (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '');
-                                                    $coachCount = (int) ($school['coach_count'] ?? 0);
-                                                    $detail = trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • '));
-                                                ?>
-                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="selectComposeSchool">
-                                                    <span class="rc-global-suggestion-icon">
-                                                        @if($schoolLogo !== '')
-                                                            <img src="{{ $schoolLogo }}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($schoolName) }}';">
-                                                        @else
-                                                            {{ $globalSearchInitials($schoolName) }}
-                                                        @endif
-                                                    </span>
-                                                    <span class="rc-global-suggestion-copy">
-                                                        <strong>{{ $schoolName }}</strong>
-                                                        <small>{{ $detail !== '' ? $detail : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ $coachCount === 1 ? 'coach' : 'coaches' }}</small>
-                                                    </span>
-                                                    <span class="rc-global-suggestion-category">School</span>
-                                                </button>
-                                            @empty
-                                                <div class="rc-empty-state" style="padding:.8rem">No schools found for “{{ $composeSchoolSearch }}”.</div>
-                                            @endforelse
-                                        </div>
-                                    @endif
+                                    <div x-cloak x-show="schoolQuery.length" class="rc-global-suggestions" style="z-index:95;min-width:100%;max-height:18rem">
+                                        <template x-for="school in schoolResults" :key="school.id">
+                                            <button type="button" class="rc-global-suggestion-item" x-on:pointerdown.prevent.stop x-on:click.prevent.stop="chooseSchool(school)">
+                                                <span class="rc-global-suggestion-icon">
+                                                    <template x-if="school.logo_url"><img :src="school.logo_url" alt="" referrerpolicy="no-referrer"></template>
+                                                    <template x-if="!school.logo_url"><span x-text="String(school.name).split(/\s+/).slice(0,2).map(v=>v[0]).join('').toUpperCase()"></span></template>
+                                                </span>
+                                                <span class="rc-global-suggestion-copy"><strong x-text="school.name"></strong><small><span x-text="[school.conference,school.division].filter(Boolean).join(' • ') || 'Conference unavailable'"></span> · <span x-text="Number(school.coach_count||0).toLocaleString()"></span> coaches</small></span>
+                                                <span class="rc-global-suggestion-category">School</span>
+                                            </button>
+                                        </template>
+                                        <div x-show="schoolResults.length===0" class="rc-empty-state" style="padding:.8rem">No schools found.</div>
+                                    </div>
                                 </div>
 
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
-                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.live.debounce.500ms="campaignCc" />
-                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.live.debounce.500ms="campaignBcc" />
+                                        <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
+                                        <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
                                     </div>
                                 @endif
 
-                                @if($composeChooseCoachesOpen || ($campaignTargetMode === 'coaches' && is_array($this->composeSelectedSchool)))
+                                <div x-cloak x-show="selectedSchool && chooserOpen" style="margin-top:.65rem">
+                                    <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
-                                        @foreach($this->composeSchoolCoaches as $coach)
-                                            <?php $cid = (string) ($coach['id'] ?? ''); $selectedCoach = in_array($cid, $campaignCoachIds, true); ?>
-                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="toggleCampaignCoach">
-                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45">{{ $selectedCoach ? '✓' : '' }}</span><span>{{ $coach['name'] ?? 'Coach' }}</span>@if(str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'))<span style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>@endif</span>
-                                                <span class="rc-compose-coach-title-v45">{{ $coach['title'] ?? 'Coach' }}</span>
+                                        <template x-for="coach in visibleCoaches" :key="coach.id">
+                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{'is-selected':coachSelected(coach.id)}" x-on:click="toggleCoach(coach.id)">
+                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="coachSelected(coach.id) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
+                                                <span class="rc-compose-coach-title-v45" x-text="coach.title"></span>
                                             </button>
-                                        @endforeach
+                                        </template>
                                     </div>
                                     <div style="display:flex;gap:.45rem;margin-top:.55rem">
-                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches" wire:loading.attr="disabled" wire:target="selectAllComposeSchoolCoaches">Select all</button>
-                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection" wire:loading.attr="disabled" wire:target="clearComposeCoachSelection">Clear coaches</button>
+                                        <button type="button" class="rc-btn" x-on:click="selectAllCoaches()">Select all</button>
+                                        <button type="button" class="rc-btn" x-on:click="clearCoaches()">Clear coaches</button>
                                     </div>
-                                @elseif($campaignTargetMode === 'list')
-                                    <div style="margin-top:.65rem;max-width:28rem">
-                                        <select class="rc-select" style="width:100%" wire:model.live="campaignListKey">
-                                            <option value="">Select a list</option>
-                                            @foreach($lists as $list)
-                                                <option value="{{ $list['key'] ?? '' }}">{{ $list['label'] ?? 'List' }} ({{ number_format($list['coaches_count'] ?? $list['count'] ?? 0) }})</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                @endif
-
-                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem">
-                                    {{ $this->composeSendingDescription }}
                                 </div>
+
+                                <div class="rc-compose-send-line-v45" style="margin-top:.7rem" x-text="sendingDescription"></div>
                             </div>
 
                             <div>
@@ -9752,7 +12505,7 @@
                                         data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
                                         x-on:input="queueSync()"
                                         x-on:blur="syncNow()"
-                                    >{!! $campaignBody ?? '' !!}</div>
+                                    ></div>
                                     <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model.live.debounce.800ms="campaignBody" />
                                     <div class="rc-compose-editor-foot-v45">
                                         <div class="rc-compose-icon-row-v45">
@@ -9826,28 +12579,30 @@
             </div>
 
             @if($showComposePreview)
-                <div class="rc-compose-modal-v45" wire:click.self="closeComposePreview">
-                    <div class="rc-compose-preview-shell-v46">
-                        <div class="rc-compose-preview-head-v46">
-                            <div style="min-width:0">
-                                <strong style="display:block;font-size:1rem;line-height:1.2">Preview Email</strong>
-                                <div class="rc-compose-preview-subject-v46">{{ $this->composeRenderedSubject }}</div>
-                            </div>
-                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview" aria-label="Close preview">×</button>
+                @teleport('body')
+                <div class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82" wire:click.self="closeComposePreview">
+                    <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
+                            <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
+                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview">×</button>
                         </div>
-
-                        <div class="rc-compose-preview-stage-v46">
-                            <div class="rc-compose-preview-email-v46">
+                        <div style="padding:1rem;background:var(--rc-soft)">
+                            <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
                                 {!! $this->composeRenderedBody !!}
                             </div>
                         </div>
                     </div>
                 </div>
+                @endteleport
             @endif
         @endif
 
         @if($section === 'campaigns')
             @include('filament.partials.coach-database-header')
+
+            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
+                Refreshing templates. Cached and built-in templates remain available.
+            </div>
 
             @php
                 $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));
@@ -9971,7 +12726,7 @@
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -10193,88 +12948,6 @@
             </div>
         @endif
 
-        <style>
-            /* v76: Discover-only instant school drawer feedback.
-               This shell intentionally does not reuse .rc-school-modal-backdrop because
-               that class forces display:flex !important and can defeat wire:loading. */
-            .rc-school-opening-backdrop-v76 {
-                position: fixed;
-                inset: 0;
-                z-index: 89;
-                justify-content: flex-end;
-                align-items: stretch;
-                background: rgba(15, 23, 42, .34);
-                backdrop-filter: blur(3px);
-                -webkit-backdrop-filter: blur(3px);
-            }
-            .rc-school-opening-panel-v76 {
-                display: grid;
-                align-content: start;
-                gap: 1rem;
-                animation: rcSchoolOpeningSlideV76 .16s ease-out both;
-                pointer-events: none;
-            }
-            @keyframes rcSchoolOpeningSlideV76 {
-                from { transform: translateX(22px); opacity: .72; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            .rc-school-opening-hero-v76 {
-                display: grid;
-                grid-template-columns: 4.2rem minmax(0, 1fr);
-                gap: .9rem;
-                align-items: center;
-                margin-top: .35rem;
-            }
-            .rc-school-opening-logo-v76 { width:4.2rem; height:4.2rem; display:block; border-radius:1rem; }
-            .rc-school-opening-copy-v76 { display:grid; gap:.48rem; }
-            .rc-school-opening-line-v76 { width:70%; height:.72rem; display:block; }
-            .rc-school-opening-line-v76.is-short { width:28%; height:.6rem; }
-            .rc-school-opening-line-v76.is-title { width:55%; height:1.25rem; }
-            .rc-school-opening-status-v76 {
-                display:flex; align-items:center; gap:.5rem; color:var(--rc-muted);
-                font-size:.8rem; font-weight:700; padding:.2rem 0;
-            }
-            .rc-school-opening-actions-v76 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
-            .rc-school-opening-action-v76 { height:2.65rem; display:block; border-radius:.72rem; }
-            .rc-school-opening-body-v76 { display:grid; gap:.65rem; padding-top:.4rem; }
-            .rc-school-opening-row-v76 { height:4.25rem; display:block; border-radius:.85rem; }
-        </style>
-
-        {{-- v76: instant school-opening feedback only on Discover Schools. --}}
-        @if($section === 'schools')
-            <div
-                class="rc-school-opening-backdrop-v76"
-                wire:loading.flex
-                wire:target="selectSchoolById"
-                aria-hidden="true"
-            >
-                <div class="rc-drawer-panel rc-school-modal-panel rc-school-opening-panel-v76">
-                    <div class="rc-school-opening-hero-v76">
-                        <span class="rc-school-opening-logo-v76 rc-skeleton"></span>
-                        <div class="rc-school-opening-copy-v76">
-                            <span class="rc-school-opening-line-v76 is-short rc-skeleton"></span>
-                            <span class="rc-school-opening-line-v76 is-title rc-skeleton"></span>
-                            <span class="rc-school-opening-line-v76 rc-skeleton"></span>
-                        </div>
-                    </div>
-                    <div class="rc-school-opening-status-v76">
-                        <span class="rc-spinner-mini"></span>
-                        <span>Opening school</span>
-                    </div>
-                    <div class="rc-school-opening-actions-v76">
-                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
-                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
-                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
-                    </div>
-                    <div class="rc-school-opening-body-v76">
-                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
-                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
-                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
-                    </div>
-                </div>
-            </div>
-        @endif
-
         @if($this->selectedSchool)
             @php
                 $slideSchool = $this->selectedSchool;
@@ -10298,12 +12971,17 @@
                 }
                 $slideInitials = strtoupper(collect(preg_split('/\s+/', trim($slideSchoolName)) ?: [])->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
                 $listRows = collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values();
-                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->values();
+                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->filter()->unique()->values();
+                $initialListMemberships = $listRows->mapWithKeys(function ($listRow) use ($schoolListKeys) {
+                    $key = (string) ($listRow['key'] ?? '');
+                    return $key === '' ? [] : [$key => $schoolListKeys->contains(strtolower($key))];
+                })->all();
+                $slideCommunicationRows = collect($this->schoolCommunicationHistories[$slideSchoolId] ?? [])->values();
             @endphp
 
-            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel" x-data="{ tab: 'coaches', listsOpen: false }" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
-                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
+            <div class="rc-drawer rc-school-modal-backdrop rc-ui-stable-modal" wire:key="school-drawer-{{ $slideSchoolId }}" x-on:click.self="if ($el.classList.contains('rc-stack-top')) { window.rcRequestSchoolClose($el); }" data-rc-modal="school" data-rc-modal-id="school-{{ $slideSchoolId }}" data-rc-school-id="{{ $slideSchoolId }}" data-rc-drawer-backdrop>
+                <div class="rc-drawer-panel rc-school-modal-panel rc-ui-stable-panel" wire:ignore.self x-data="window.rcSchoolDrawer ? window.rcSchoolDrawer({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($initialListMemberships) }}, @js((bool) ($slideSchool['is_favorite'] ?? false))) : { tab: 'coaches', listsOpen: false, optimisticLists: {{ \Illuminate\Support\Js::from($initialListMemberships) }}, isInList(key, value) { return Object.prototype.hasOwnProperty.call(this.optimisticLists || {}, String(key || '')) ? Boolean(this.optimisticLists[String(key || '')]) : Boolean(value) }, hasAnyList() { return Object.entries(this.optimisticLists || {}).some(([key, value]) => this.isInList(key, value)) }, isListPending() { return false }, toggleList() {} }" x-init="init && init()" x-on:click.stop x-on:pointerdown.stop x-on:mousedown.stop x-on:touchstart.stop data-rc-interaction-boundary role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
+                    <button class="rc-school-modal-close" type="button" data-rc-instant-close x-on:pointerdown.prevent.stop="window.rcRequestSchoolClose($el)" x-on:click.prevent.stop aria-label="Close school details">×</button>
 
                     <div class="rc-school-modal-hero-v72">
                         <div class="rc-school-logo-large-v72">
@@ -10330,7 +13008,7 @@
                     </div>
 
                     <div class="rc-school-modal-actions-v72">
-                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="composeEmailSchool">
+                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailSchool">
                             <span wire:loading.remove wire:target="composeEmailSchool">
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </span>
@@ -10338,27 +13016,34 @@
                             <span>Email Coaches</span>
                         </button>
 
-                        @if($slideSchool['is_favorite'] ?? false)
-                            <button class="rc-school-action is-favorited" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="unfavoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById">Favorited</span><span wire:loading wire:target="unfavoriteSchoolById">Updating</span>
-                            </button>
-                        @else
-                            <button class="rc-school-action" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
-                                <span wire:loading.remove wire:target="favoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="favoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="favoriteSchoolById">Favorite</span><span wire:loading wire:target="favoriteSchoolById">Updating</span>
-                            </button>
-                        @endif
+                        <button
+                            class="rc-school-action"
+                            type="button"
+                            data-rc-local-action
+                            data-rc-drawer-action
+                            x-on:click.stop="toggleFavorite()"
+                            x-bind:class="{ 'is-favorited': favorite }"
+                            x-bind:aria-pressed="favorite ? 'true' : 'false'"
+                        >
+                            <span x-show="!favoritePending"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+                            <span class="rc-action-spinner-v81" x-cloak x-show="favoritePending"></span>
+                            <span x-text="favorite ? 'Favorited' : 'Favorite'"></span>
+                        </button>
 
-                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
-                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click="listsOpen=!listsOpen">
+                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false" x-on:click.stop data-rc-dropdown-boundary>
+                            <button
+                                class="rc-school-action"
+                                type="button"
+                                x-on:click.stop="listsOpen=!listsOpen"
+                                x-bind:class="{ 'is-in-list': Object.values(optimisticLists || {}).some(value => Boolean(value)) }"
+                                x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
+                                aria-haspopup="menu"
+                            >
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-                                <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
+                                <span x-text="Object.values(optimisticLists || {}).some(value => Boolean(value)) ? 'In List' : 'Add to List'"></span>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
-                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left>
+                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-on:click.stop role="menu">
                                 <h4>Add to a list</h4>
                                 @forelse($listRows as $listRow)
                                     @php
@@ -10376,13 +13061,13 @@
                                         $inList = $schoolListKeys->contains(strtolower($listKey));
                                         $count = (int) ($listRow['schools_count'] ?? count($listRow['schools'] ?? []));
                                     @endphp
-                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" wire:loading.attr="disabled" wire:target="addSchoolToListById,removeSchoolFromListById">
+                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" data-rc-local-action data-rc-drawer-action x-on:click.stop="toggleList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)); listsOpen = true" x-bind:class="{ 'is-active': isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)), 'is-saving': isListPending({{ \Illuminate\Support\Js::from($listKey) }}) }" x-bind:data-list-pending="isListPending({{ \Illuminate\Support\Js::from($listKey) }}) ? 'true' : 'false'" wire:key="school-drawer-list-{{ $slideSchoolId }}-{{ $listKey }}" role="menuitemcheckbox" x-bind:aria-checked="isInList({{ \Illuminate\Support\Js::from($listKey) }}, @js($inList)) ? 'true' : 'false'">
                                         <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                         <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot: {{ $listColor }}"></span><span>{{ $listLabel }}</span></span>
                                         <small class="rc-list-count-v81">{{ $count }}</small>
                                     </button>
                                 @empty
-                                    <button type="button" wire:click="$set('showNewListComposer', true)">Create a list first</button>
+                                    <button type="button" wire:click="$set('showNewListComposer', true)" data-rc-local-action data-rc-drawer-action x-on:click.stop="listsOpen = true">Create a list first</button>
                                 @endforelse
                             </div>
                         </div>
@@ -10393,10 +13078,10 @@
                     <div class="rc-school-tabbar-v72">
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'coaches' ? 'is-active' : ''" x-on:click="tab='coaches'">Coaching Staff</button>
                         <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'roster' ? 'is-active' : ''" x-on:click="tab='roster'">Roster & Stats</button>
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
+                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'" wire:click="loadSchoolCommunicationHistory({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="loadSchoolCommunicationHistory">Communications</button>
                     </div>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'">
                         <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
                             @forelse($slideCoaches as $coach)
                                 @php
@@ -10413,7 +13098,7 @@
                                         <span>{{ $coachTitle }}</span>
                                         @if($coachEmail !== '')<a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>@endif
                                     </div>
-                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
+                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" data-rc-local-action wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
                                 </div>
                             @empty
                                 <div class="rc-empty">No coaches loaded for this school yet.</div>
@@ -10421,22 +13106,71 @@
                         </div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'" x-transition.opacity>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'">
                         <div class="rc-coming-soon-v72"><div><strong>Coming Soon</strong><span>Roster and advanced school stats will be available here soon.</span></div></div>
                     </section>
 
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'" x-transition.opacity>
-                        <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 10 4 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 0 1-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
+                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'">
+                        <style>
+                            .rc-school-comms-history-v1{display:grid;gap:.72rem;padding:.15rem 0 .4rem;}
+                            .rc-school-comms-loading-v1{display:flex;align-items:center;gap:.45rem;color:var(--rc-muted);font-size:.78rem;padding:.65rem .2rem;}
+                            .rc-school-comms-item-v1{display:grid;grid-template-columns:2.35rem minmax(0,1fr) auto;gap:.7rem;align-items:start;padding:.7rem 0;border-bottom:1px solid var(--rc-border);}
+                            .rc-school-comms-item-v1:last-child{border-bottom:0;}
+                            .rc-school-comms-icon-v1{width:2.15rem;height:2.15rem;border-radius:.7rem;display:grid;place-items:center;background:rgba(255,99,56,.12);color:#ff6338;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-icon-v1{background:rgba(16,185,129,.14);color:#10b981;}
+                            .rc-school-comms-copy-v1{min-width:0;display:grid;gap:.22rem;}
+                            .rc-school-comms-title-v1{font-size:.86rem;font-weight:850;color:var(--rc-text);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+                            .rc-school-comms-item-v1.is-inbound .rc-school-comms-title-v1{color:#10b981;}
+                            .rc-school-comms-preview-v1{color:var(--rc-muted);font-size:.8rem;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+                            .rc-school-comms-badges-v1{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.18rem;}
+                            .rc-school-comms-badge-v1{display:inline-flex;align-items:center;border-radius:.45rem;padding:.16rem .45rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.66rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;}
+                            .rc-school-comms-badge-v1.is-opened{background:rgba(59,130,246,.14);color:#3b82f6;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-badge-v1.is-reply{background:rgba(16,185,129,.14);color:#10b981;text-transform:none;letter-spacing:0;}
+                            .rc-school-comms-date-v1{color:var(--rc-muted);font-size:.74rem;white-space:nowrap;padding-top:.08rem;}
+                            .rc-school-comms-empty-v1{border:1px dashed var(--rc-border);border-radius:.85rem;padding:.9rem;color:var(--rc-muted);font-size:.8rem;line-height:1.45;}
+                        </style>
+
+                        <div wire:loading.flex wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-loading-v1">
+                            <span class="rc-spinner-mini"></span>
+                            Loading communication history...
+                        </div>
+
+                        <div wire:loading.remove wire:target="loadSchoolCommunicationHistory" class="rc-school-comms-history-v1">
+                            @forelse($slideCommunicationRows as $historyRow)
+                                @php
+                                    $historyDirection = strtolower((string) ($historyRow['direction'] ?? 'outbound'));
+                                    $historyInbound = $historyDirection === 'inbound';
+                                    $historyTitle = (string) ($historyRow['title'] ?? ($historyInbound ? 'Received from coach' : 'Sent to coach'));
+                                    $historyPreview = trim((string) ($historyRow['preview'] ?? 'No preview available.'));
+                                    $historyDate = (string) ($historyRow['date_label'] ?? '');
+                                    $historyOpened = (bool) ($historyRow['opened'] ?? false);
+                                    $historyReply = (bool) ($historyRow['reply'] ?? $historyInbound);
+                                @endphp
+                                <article class="rc-school-comms-item-v1 {{ $historyInbound ? 'is-inbound' : 'is-outbound' }}">
+                                    <span class="rc-school-comms-icon-v1" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
+                                    <span class="rc-school-comms-copy-v1">
+                                        <strong class="rc-school-comms-title-v1">{{ $historyTitle }}</strong>
+                                        <span class="rc-school-comms-preview-v1">{{ $historyPreview }}</span>
+                                        <span class="rc-school-comms-badges-v1">
+                                            <span class="rc-school-comms-badge-v1">EMAIL</span>
+                                            @if($historyOpened)<span class="rc-school-comms-badge-v1 is-opened">Opened</span>@endif
+                                            @if($historyReply)<span class="rc-school-comms-badge-v1 is-reply">Reply</span>@endif
+                                        </span>
+                                    </span>
+                                    <time class="rc-school-comms-date-v1">{{ $historyDate }}</time>
+                                </article>
+                            @empty
+                                <div class="rc-school-comms-empty-v1">
+                                    No communication history loaded yet. Open this tab to pull the latest conversations from HighLevel for coaches at this school.
+                                </div>
+                            @endforelse
                         </div>
                     </section>
                 </div>
             </div>
         @endif
-    </div>
     </div>
 
     <style>
@@ -10489,6 +13223,7 @@
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
+                const iconReplacement = '';
                 const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
@@ -10513,7 +13248,6 @@
                 panelLinkUrl: '',
                 panelButtonLabel: '',
                 panelButtonUrl: '',
-                composeRefreshHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -10522,41 +13256,24 @@
                         setTimeout(() => this.bootEditor(true), 80);
                         setTimeout(() => this.bootEditor(true), 250);
                     });
-                    if (modelName === 'campaignBody') {
-                        if (window.__plyrComposeEditorRefreshHandler) {
-                            window.removeEventListener('rc-compose-editor-refresh', window.__plyrComposeEditorRefreshHandler);
-                        }
-
-                        this.composeRefreshHandler = (event) => {
-                            const editor = this.$refs.editor;
-                            if (!editor || !editor.isConnected) return;
-
-                            const encoded = event.detail?.body || '';
-                            const html = this.decodeInitialBody(encoded);
-
-                            editor.dataset.initialBody = encoded;
-                            editor.innerHTML = this.highlightMergeTokens(html || '');
-
-                            // The body already came from Livewire/PHP. Do not immediately
-                            // sync it back to the server here: stale editor instances can
-                            // otherwise overwrite the newly selected template with blank HTML.
-                        };
-
-                        window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
-                        window.addEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
-                    }
-                },
-                destroy() {
-                    if (this.composeRefreshHandler) {
-                        window.removeEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
-                        if (window.__plyrComposeEditorRefreshHandler === this.composeRefreshHandler) {
-                            window.__plyrComposeEditorRefreshHandler = null;
-                        }
-                    }
+                    const applyRefresh = (event) => {
+                        if (modelName !== 'campaignBody') return;
+                        const detail = Array.isArray(event.detail) ? (event.detail[0] || {}) : (event.detail || {});
+                        const encoded = detail.body || '';
+                        if (!encoded) return;
+                        window.__rcPendingComposeEditorBody = encoded;
+                        const html = this.decodeInitialBody(encoded);
+                        if (!this.$refs.editor) return;
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
+                        this.syncNow();
+                    };
+                    window.addEventListener('rc-compose-editor-refresh', applyRefresh);
+                    window.addEventListener('rc-compose-template-applied', applyRefresh);
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
-                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
+                    const pending = modelName === 'campaignBody' ? (window.__rcPendingComposeEditorBody || '') : '';
+                    const html = this.decodeInitialBody(pending || initialBody || this.$refs.editor.dataset.initialBody || '');
                     if (html && this.$refs.editor.innerHTML.trim() === '') {
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
                     } else {
@@ -11078,6 +13795,1354 @@
                 }
             };
         };
+    
+
+        window.rcScrollInboxToLatest = function () { return; };
+</script>
+
+    @if($showSaveTemplateNamePrompt)
+        <div class="rc-preview-modal-backdrop" wire:key="compose-save-template-name-modal">
+            <div class="rc-preview-modal" style="max-width:34rem">
+                <div class="rc-preview-modal-head">
+                    <div>
+                        <strong>Save Compose Email as Template</strong>
+                        <div class="rc-subtle" style="margin-top:.2rem">Name this template so it appears in the Compose Email template picker.</div>
+                    </div>
+                    <button type="button" class="rc-inbox-icon-btn-v56" wire:click="closeSaveComposeTemplatePrompt" aria-label="Close">×</button>
+                </div>
+                <div class="rc-preview-modal-body">
+                    <label class="rc-template-field-label" style="color:#475569">Template name</label>
+                    <input
+                        type="text"
+                        class="rc-input"
+                        style="width:100%"
+                        placeholder="Example: First Touch Email"
+                        wire:model.live.debounce.300ms="composeTemplateSaveName"
+                        wire:keydown.enter="confirmSaveComposeAsTemplate"
+                    >
+                    <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem">
+                        <button type="button" class="rc-btn" wire:click="closeSaveComposeTemplatePrompt">Cancel</button>
+                        <button type="button" class="rc-btn rc-btn-primary" wire:click="confirmSaveComposeAsTemplate" wire:loading.attr="disabled" wire:target="confirmSaveComposeAsTemplate">
+                            <span wire:loading.remove wire:target="confirmSaveComposeAsTemplate">Save Template</span>
+                            <span wire:loading.flex wire:target="confirmSaveComposeAsTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+
+<style>
+/* Stable inline Inbox renderer: no iframe, no resize loop, natural content height. */
+.rc-msg-bubble-email-v59 {
+    display: block;
+    width: min(100%, 36rem);
+    max-width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: .78rem .88rem !important;
+    border-radius: 1rem !important;
+    background: #f1f5f9 !important;
+    color: #111827 !important;
+}
+.rc-email-html-v59,
+.rc-email-plain-v59 {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+    color: inherit;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.48;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+.rc-email-plain-v59 { white-space: normal; }
+.rc-email-html-v59 p,
+.rc-email-plain-v59 p { margin: .5em 0; }
+.rc-email-html-v59 table {
+    border-collapse: collapse;
+    max-width: 100% !important;
+}
+.rc-email-html-v59 td,
+.rc-email-html-v59 th { max-width: 100% !important; }
+.rc-email-html-v59 img {
+    display: block;
+    max-width: 100% !important;
+    height: auto !important;
+}
+.rc-email-html-v59 a,
+.rc-email-plain-v59 a {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.rc-email-raw-link-v59 {
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+.rc-email-empty-v59 { margin: 0; color: #64748b; }
+.dark .rc-msg-bubble-email-v59 {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+}
+</style>
+
+
+
+
+<style id="rc-inbox-inline-conversation-loader-v82">
+    .rc-inbox-mid-loading-host-v82 {
+        position: relative !important;
+        isolation: isolate;
+    }
+
+    .rc-inbox-inline-conversation-loader-v82 {
+        position: absolute;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        flex-direction: column;
+        gap: .9rem;
+        padding: 1rem;
+        overflow: hidden;
+        background: var(--rc-surface, #fff);
+        color: var(--rc-text, #111827);
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .rc-inbox-inline-loader-head-v82 {
+        display: grid;
+        grid-template-columns: 2.8rem minmax(0, 1fr);
+        align-items: center;
+        gap: .75rem;
+        padding-bottom: .85rem;
+        border-bottom: 1px solid var(--rc-border, #e5e7eb);
+    }
+
+    .rc-inbox-inline-loader-avatar-v82,
+    .rc-inbox-inline-loader-copy-v82 span,
+    .rc-inbox-inline-loader-message-v82 {
+        display: block;
+        background: linear-gradient(90deg, rgba(148,163,184,.12), rgba(148,163,184,.28), rgba(148,163,184,.12));
+        background-size: 220% 100%;
+        animation: rcInboxInlineLoadingV82 1.05s ease-in-out infinite;
+    }
+
+    .rc-inbox-inline-loader-avatar-v82 {
+        width: 2.8rem;
+        height: 2.8rem;
+        border-radius: .8rem;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 {
+        display: grid;
+        gap: .45rem;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 span {
+        width: min(24rem, 72%);
+        height: .72rem;
+        border-radius: 999px;
+    }
+
+    .rc-inbox-inline-loader-copy-v82 span:last-child {
+        width: min(15rem, 48%);
+        height: .58rem;
+    }
+
+    .rc-inbox-inline-loader-message-v82 {
+        width: 82%;
+        min-height: 6.5rem;
+        border: 1px solid var(--rc-border, #e5e7eb);
+        border-radius: .9rem;
+    }
+
+    .rc-inbox-inline-loader-message-v82.is-short {
+        width: 58%;
+        min-height: 4.75rem;
+        margin-left: auto;
+    }
+
+    .rc-inbox-inline-loader-message-v82.is-medium {
+        width: 70%;
+        min-height: 5.5rem;
+        margin-left: auto;
+    }
+
+    @keyframes rcInboxInlineLoadingV82 {
+        from { background-position: 120% 0; }
+        to { background-position: -120% 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rc-inbox-inline-loader-avatar-v82,
+        .rc-inbox-inline-loader-copy-v82 span,
+        .rc-inbox-inline-loader-message-v82 { animation: none; }
+    }
+</style>
+
+<style id="rc-compose-overlay-fixes-v82">
+    /* Template selection inside Compose must update in-place, never show the legacy page-wide opening skeleton. */
+    [data-rc-opening-overlay="compose"],
+    [data-rc-opening-overlay="compose-email"],
+    .rc-compose-opening-overlay,
+    .rc-compose-loading-backdrop,
+    .rc-open-loading-overlay[data-rc-type="compose"],
+    .rc-open-loading-overlay[data-rc-type="compose-email"] {
+        display:none !important;
+        visibility:hidden !important;
+        pointer-events:none !important;
+        opacity:0 !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+    }
+
+    .rc-compose-preview-backdrop-v82 {
+        z-index:2147483200 !important;
+        background:rgba(2,6,23,.62) !important;
+        backdrop-filter:blur(5px) !important;
+        -webkit-backdrop-filter:blur(5px) !important;
+    }
+</style>
+
+<style id="rc-disable-legacy-conversation-page-overlay-v83">
+    /* Conversation selection must never activate the page-wide opener/blur overlay. */
+    [data-rc-opening-overlay="conversation"],
+    .rc-conversation-opening-overlay,
+    .rc-conversation-loading-backdrop,
+    .rc-open-loading-overlay[data-rc-type="conversation"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+</style>
+
+<style id="rc-inbox-quick-reply-v92">
+    .rc-inbox-mid-v56 {
+        display:flex !important;
+        flex-direction:column !important;
+        min-height:0 !important;
+    }
+    .rc-inbox-mid-v56 > .rc-message-stream-v56 {
+        min-height:0 !important;
+        flex:1 1 auto !important;
+        padding-bottom:1rem !important;
+    }
+    .rc-inbox-quick-reply-v92 {
+        position:sticky;
+        bottom:0;
+        z-index:24;
+        flex:0 0 auto;
+        border-top:1px solid var(--rc-border);
+        background:var(--rc-surface);
+        box-shadow:0 -8px 22px rgba(15,23,42,.045);
+    }
+    .rc-inbox-quick-reply-suggestions-v92 {
+        display:flex;
+        align-items:center;
+        gap:.38rem;
+        padding:.55rem .72rem .42rem;
+        overflow-x:auto;
+        scrollbar-width:none;
+    }
+    .rc-inbox-quick-reply-suggestions-v92::-webkit-scrollbar { display:none; }
+    .rc-inbox-quick-reply-suggestions-v92 button {
+        flex:0 0 auto;
+        border:1px solid var(--rc-border);
+        border-radius:999px;
+        padding:.28rem .55rem;
+        background:var(--rc-surface);
+        color:var(--rc-muted);
+        font-size:.62rem;
+        line-height:1;
+        cursor:pointer;
+        transition:border-color .15s ease,color .15s ease,background .15s ease;
+    }
+    .rc-inbox-quick-reply-suggestions-v92 button:hover {
+        border-color:rgba(255,99,56,.38);
+        color:#ff6338;
+        background:rgba(255,99,56,.055);
+    }
+    .rc-inbox-quick-reply-tabs-v92 {
+        display:flex;
+        gap:.75rem;
+        padding:0 .72rem;
+        border-top:1px solid var(--rc-border);
+        border-bottom:1px solid var(--rc-border);
+    }
+    .rc-inbox-quick-reply-tabs-v92 span {
+        position:relative;
+        border:0;
+        background:transparent;
+        padding:.52rem 0 .46rem;
+        color:var(--rc-muted);
+        font-size:.68rem;
+        font-weight:700;
+    }
+    .rc-inbox-quick-reply-tabs-v92 span.is-active { color:#ff6338; }
+    .rc-inbox-quick-reply-tabs-v92 span.is-active::after {
+        content:'';
+        position:absolute;
+        left:0;
+        right:0;
+        bottom:-1px;
+        height:2px;
+        border-radius:999px;
+        background:#ff6338;
+    }
+    .rc-inbox-quick-reply-editor-v92 {
+        padding:.42rem .72rem .58rem;
+        transition:background .15s ease;
+    }
+    .rc-inbox-quick-reply-editor-v92.is-note { background:rgba(250,204,21,.045); }
+    .rc-inbox-quick-reply-toolbar-v92,
+    .rc-inbox-quick-reply-tools-v92 {
+        display:flex;
+        align-items:center;
+        gap:.12rem;
+    }
+    .rc-inbox-quick-reply-toolbar-v92 { padding:0 0 .28rem; }
+    .rc-inbox-quick-reply-toolbar-v92 button,
+    .rc-inbox-quick-reply-tools-v92 button {
+        width:1.55rem;
+        height:1.55rem;
+        border:0;
+        border-radius:.34rem;
+        display:grid;
+        place-items:center;
+        background:transparent;
+        color:var(--rc-muted);
+        font-size:.69rem;
+        cursor:pointer;
+    }
+    .rc-inbox-quick-reply-toolbar-v92 button:hover,
+    .rc-inbox-quick-reply-tools-v92 button:hover {
+        color:var(--rc-text);
+        background:var(--rc-soft);
+    }
+    .rc-inbox-quick-reply-divider-v92 {
+        width:1px;
+        height:1rem;
+        margin:0 .14rem;
+        background:var(--rc-border);
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 {
+        display:block;
+        width:100%;
+        min-height:3.15rem;
+        max-height:9rem;
+        resize:vertical;
+        overflow:auto;
+        border:1px solid var(--rc-border);
+        border-radius:.55rem;
+        outline:0;
+        padding:.58rem .66rem;
+        background:var(--rc-surface);
+        color:var(--rc-text);
+        font:inherit;
+        font-size:.75rem;
+        line-height:1.45;
+        transition:border-color .15s ease,box-shadow .15s ease;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93:focus {
+        border-color:#ff6338;
+        box-shadow:0 0 0 3px rgba(255,99,56,.10);
+    }
+    .rc-inbox-quick-reply-contenteditable-v93:empty::before {
+        content:attr(data-placeholder);
+        color:var(--rc-muted);
+        pointer-events:none;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 p { margin:.15rem 0; }
+    .rc-inbox-quick-reply-contenteditable-v93 ul,
+    .rc-inbox-quick-reply-contenteditable-v93 ol { margin:.2rem 0 .2rem 1.2rem; }
+    .rc-inbox-quick-reply-hidden-v93 { display:none !important; }
+    .rc-inbox-quick-reply-footer-v92 {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:.5rem;
+        padding-top:.38rem;
+    }
+    .rc-inbox-quick-reply-actions-v92 {
+        display:flex;
+        align-items:center;
+        gap:.35rem;
+    }
+    .rc-inbox-quick-reply-send-v92 {
+        min-height:1.95rem;
+        border-radius:.48rem;
+        padding:.36rem .58rem;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:.28rem;
+        font-size:.66rem;
+        font-weight:750;
+        cursor:pointer;
+        white-space:nowrap;
+    }
+    .rc-inbox-quick-reply-send-v92 {
+        border:1px solid #ff6338;
+        background:#ff6338;
+        color:#fff;
+        box-shadow:0 4px 10px rgba(255,99,56,.2);
+    }
+    .rc-inbox-quick-reply-send-v92:hover { background:#f0522b; border-color:#f0522b; }
+    .rc-inbox-quick-reply-send-v92:disabled { opacity:.52; cursor:not-allowed; box-shadow:none; }
+    .rc-inbox-quick-reply-spinner-v92 {
+        width:.78rem;
+        height:.78rem;
+        border:2px solid rgba(255,255,255,.5);
+        border-right-color:#fff;
+        border-radius:999px;
+        animation:rcInboxQuickReplySpinV92 .7s linear infinite;
+    }
+    @keyframes rcInboxQuickReplySpinV92 { to { transform:rotate(360deg); } }
+    @media (max-width:700px) {
+        .rc-inbox-quick-reply-suggestions-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-tabs-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-editor-v92 { padding-inline:.55rem; }
+        .rc-inbox-quick-reply-tools-v92 button:nth-child(n+4) { display:none; }
+    }
+
+    .rc-inbox-quick-reply-tools-v92 label {
+        width:1.75rem;height:1.75rem;display:inline-flex;align-items:center;justify-content:center;
+        border:0;border-radius:.4rem;color:#64748b;cursor:pointer;font-size:.9rem;
+    }
+    .rc-inbox-quick-reply-tools-v92 label:hover { background:#f1f5f9;color:#ff6338; }
+    .rc-inbox-quick-reply-uploading-v95 {
+        display:none;
+        align-items:center;
+        gap:.45rem;
+        margin:.45rem 0 .15rem;
+        padding:.48rem .6rem;
+        border:1px solid rgba(255,99,56,.24);
+        border-radius:.55rem;
+        background:rgba(255,99,56,.07);
+        color:#c2410c;
+        font-size:.72rem;
+        font-weight:650;
+    }
+    .rc-inbox-quick-reply-upload-spinner-v95,
+    .rc-inbox-quick-reply-tool-spinner-v95 {
+        display:inline-block;
+        width:.85rem;
+        height:.85rem;
+        border:2px solid rgba(255,99,56,.28);
+        border-right-color:#ff6338;
+        border-radius:999px;
+        animation:rcInboxQuickReplySpinV92 .7s linear infinite;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-tool-spinner-v95 { width:.78rem;height:.78rem; }
+    .rc-inbox-quick-reply-tools-v92 label.is-uploading { pointer-events:none;opacity:.7; }
+    .rc-inbox-quick-reply-attachments-v94 { display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem 0 .15rem; }
+    .rc-inbox-quick-reply-attachment-chip-v95 {
+        display:inline-flex;
+        align-items:center;
+        min-width:0;
+        max-width:100%;
+        gap:.38rem;
+        padding:.36rem .46rem;
+        border:1px solid var(--rc-border);
+        border-radius:.55rem;
+        font-size:.72rem;
+        background:var(--rc-soft);
+        color:var(--rc-text);
+    }
+    .rc-inbox-quick-reply-attachment-icon-v95 { flex:0 0 auto;font-size:.8rem; }
+    .rc-inbox-quick-reply-attachment-name-v95 {
+        min-width:0;
+        max-width:15rem;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        font-weight:650;
+    }
+    .rc-inbox-quick-reply-attachment-ready-v95 {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:1rem;
+        height:1rem;
+        border-radius:999px;
+        background:#dcfce7;
+        color:#15803d;
+        font-size:.64rem;
+        font-weight:800;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-attachments-v94 button {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:1.15rem;
+        height:1.15rem;
+        border:0;
+        border-radius:999px;
+        background:transparent;
+        color:var(--rc-muted);
+        cursor:pointer;
+        font-size:1rem;
+        line-height:1;
+        flex:0 0 auto;
+    }
+    .rc-inbox-quick-reply-attachments-v94 button:hover { background:rgba(239,68,68,.1);color:#dc2626; }
+    .rc-inbox-quick-reply-attachments-v94 button:disabled { opacity:.45;cursor:not-allowed; }
+
+    .rc-inbox-quick-reply-contenteditable-v93 ul,
+    .rc-inbox-quick-reply-contenteditable-v93 ol {
+        display:block;
+        margin:.35rem 0 .35rem 1.4rem;
+        padding-left:1.15rem;
+    }
+    .rc-inbox-quick-reply-contenteditable-v93 ul { list-style:disc outside !important; }
+    .rc-inbox-quick-reply-contenteditable-v93 ol { list-style:decimal outside !important; }
+    .rc-inbox-quick-reply-contenteditable-v93 li {
+        display:list-item !important;
+        margin:.15rem 0;
+        padding-left:.15rem;
+    }
+    .rc-inbox-quick-reply-divider-v92 {
+        width:1px;
+        height:1.05rem;
+        background:var(--rc-border);
+        margin:0 .15rem;
+    }
+
+        .rc-inbox-quick-reply-uploading-v96,
+        .rc-inbox-quick-reply-attachment-chip-v96 {
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            width:max-content;
+            max-width:100%;
+            min-height:22px;
+            padding:3px 7px;
+            border:1px solid #d9dee7;
+            border-radius:6px;
+            background:#f3f4f6;
+            color:#596273;
+            font-size:11px;
+            line-height:1;
+        }
+        .rc-inbox-quick-reply-uploading-v96 { margin:7px 14px 0; }
+        .rc-inbox-quick-reply-attachment-chip-v96 button {
+            border:0;
+            background:transparent;
+            color:#7b8493;
+            padding:0;
+            width:14px;
+            height:14px;
+            line-height:12px;
+            cursor:pointer;
+            font-size:13px;
+        }
+        .rc-inbox-quick-reply-attachment-icon-v96 { font-size:8px; color:#7b8493; transform:rotate(45deg); }
+        .rc-inbox-quick-reply-attachment-name-v96,
+        .rc-inbox-quick-reply-upload-name-v96 {
+            max-width:220px;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .rc-inbox-quick-reply-upload-percent-v96 { color:#8b93a1; }
+        .rc-inbox-quick-reply-upload-spinner-v96 {
+            width:11px;
+            height:11px;
+            border:2px solid #c9ced8;
+            border-top-color:#ff5a43;
+            border-radius:999px;
+            animation:rcQuickReplySpinV96 .7s linear infinite;
+            flex:0 0 auto;
+        }
+        @keyframes rcQuickReplySpinV96 { to { transform:rotate(360deg); } }
+
+    .rc-account-readiness-shell {
+    position: relative;
+    min-height: calc(100vh - 8rem);
+    isolation: isolate;
+}
+
+.rc-account-readiness-content {
+    transition:
+        filter 0.4s ease,
+        opacity 0.4s ease,
+        transform 0.4s ease;
+}
+
+.rc-account-readiness-shell.is-preparing
+.rc-account-readiness-content {
+    filter: blur(7px);
+    opacity: 0.38;
+    transform: scale(0.995);
+    pointer-events: none;
+    user-select: none;
+}
+
+html.rc-account-preparing,
+body.rc-account-preparing {
+    overflow: hidden !important;
+}
+
+body.rc-account-preparing .fi-sidebar,
+body.rc-account-preparing .fi-topbar,
+body.rc-account-preparing .fi-main-ctn,
+body.rc-account-preparing [data-rc-navigation] {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+/* Keep the admin impersonation banner and Leave control usable. */
+body.rc-account-preparing .rc-account-impersonation-bar,
+body.rc-account-preparing .rc-account-impersonation-bar * {
+    pointer-events: auto !important;
+    user-select: auto !important;
+}
+
+body.rc-account-preparing .rc-account-impersonation-bar {
+    position: relative;
+    z-index: 2147483647 !important;
+}
+
+.rc-account-preparation-overlay {
+    position: fixed;
+    inset: var(--rc-account-overlay-top, 0px) 0 0;
+    z-index: 2147483646;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+    touch-action: none;
+    padding: 1.25rem;
+    background:
+        radial-gradient(
+            circle at 50% 40%,
+            rgba(255, 99, 56, 0.1),
+            transparent 32rem
+        ),
+        rgba(3, 7, 18, 0.68);
+    backdrop-filter: blur(5px);
+}
+
+.rc-account-preparation-glow {
+    position: absolute;
+    width: 24rem;
+    height: 24rem;
+    border-radius: 999px;
+    filter: blur(80px);
+    pointer-events: none;
+    opacity: 0.24;
+    animation: rcAccountPreparationFloat 7s ease-in-out infinite;
+}
+
+.rc-account-preparation-glow-one {
+    top: 5%;
+    left: 12%;
+    background: #ff6338;
+}
+
+.rc-account-preparation-glow-two {
+    right: 9%;
+    bottom: 3%;
+    background: #3b82f6;
+    animation-delay: -3.5s;
+}
+
+.rc-account-preparation-card {
+    position: relative;
+    width: min(34rem, 100%);
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1.4rem;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(25, 31, 43, 0.96),
+            rgba(12, 17, 27, 0.96)
+        );
+    box-shadow:
+        0 30px 100px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 1.45rem;
+    color: #f8fafc;
+}
+
+.rc-account-preparation-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 3px;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            #ff6338,
+            #fb923c,
+            transparent
+        );
+    background-size: 220% 100%;
+    animation: rcAccountPreparationShimmer 2.1s linear infinite;
+}
+
+.rc-account-preparation-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rc-account-preparation-orbit {
+    position: relative;
+    width: 2.55rem;
+    height: 2.55rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.8rem;
+    background: rgba(255, 99, 56, 0.11);
+    color: #ff6338;
+}
+
+.rc-account-preparation-orbit > svg {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.rc-account-preparation-orbit-ring {
+    position: absolute;
+    inset: -0.3rem;
+    border: 1px solid rgba(255, 99, 56, 0.22);
+    border-radius: 999px;
+    animation: rcAccountPreparationRotate 3.8s linear infinite;
+}
+
+.rc-account-preparation-orbit-dot {
+    position: absolute;
+    top: -0.36rem;
+    left: 50%;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: #ff6338;
+    box-shadow: 0 0 14px rgba(255, 99, 56, 0.85);
+    transform: translateX(-50%);
+}
+
+.rc-account-preparation-copy {
+    margin-top: 1.3rem;
+}
+
+.rc-account-preparation-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.55rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid rgba(255, 99, 56, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 99, 56, 0.09);
+    color: #fb923c;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.rc-account-preparation-copy h2 {
+    margin: 0.8rem 0 0;
+    color: #ffffff;
+    font-size: clamp(1.45rem, 3vw, 2rem);
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+
+.rc-account-preparation-copy p {
+    margin: 0.7rem 0 0;
+    max-width: 29rem;
+    color: #94a3b8;
+    font-size: 0.86rem;
+    line-height: 1.6;
+}
+
+.rc-account-preparation-progress {
+    height: 0.43rem;
+    margin-top: 1.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.13);
+}
+
+.rc-account-preparation-progress span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            90deg,
+            #ff6338,
+            #fb923c,
+            #ff6338
+        );
+    box-shadow: 0 0 18px rgba(255, 99, 56, 0.35);
+    animation: rcAccountPreparationProgress 1.8s ease-in-out infinite;
+}
+
+.rc-account-preparation-statuses {
+    display: grid;
+    gap: 0.58rem;
+    margin-top: 1.1rem;
+}
+
+.rc-account-preparation-status {
+    display: grid;
+    grid-template-columns: 2.15rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 3.5rem;
+    padding: 0.65rem 0.72rem;
+    border: 1px solid rgba(148, 163, 184, 0.11);
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.025);
+    color: #64748b;
+}
+
+.rc-account-preparation-status.is-complete {
+    color: #10b981;
+}
+
+.rc-account-preparation-status.is-active {
+    border-color: rgba(255, 99, 56, 0.22);
+    background: rgba(255, 99, 56, 0.07);
+    color: #ff6338;
+    animation: rcAccountPreparationActive 1.8s ease-in-out infinite;
+}
+
+.rc-account-preparation-status-icon {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.62rem;
+    background: rgba(148, 163, 184, 0.09);
+}
+
+.rc-account-preparation-status-icon svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+
+.rc-account-preparation-status strong {
+    display: block;
+    color: #e2e8f0;
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+
+.rc-account-preparation-status small {
+    display: block;
+    margin-top: 0.18rem;
+    color: #64748b;
+    font-size: 0.67rem;
+    line-height: 1.35;
+}
+
+.rc-account-preparation-status.is-active small {
+    color: #94a3b8;
+}
+
+.rc-account-preparation-mini-spinner {
+    width: 0.88rem;
+    height: 0.88rem;
+    border: 2px solid rgba(255, 99, 56, 0.22);
+    border-top-color: #ff6338;
+    border-right-color: #ff6338;
+    border-radius: 999px;
+    animation: rcAccountPreparationRotate 0.7s linear infinite;
+}
+
+.rc-account-preparation-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 650;
+}
+
+.rc-account-preparation-pulse {
+    width: 0.46rem;
+    height: 0.46rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.42);
+    animation: rcAccountPreparationPulse 1.7s ease-out infinite;
+}
+
+@keyframes rcAccountPreparationRotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes rcAccountPreparationProgress {
+    0% {
+        transform: translateX(-115%);
+    }
+
+    55% {
+        transform: translateX(125%);
+    }
+
+    100% {
+        transform: translateX(285%);
+    }
+}
+
+@keyframes rcAccountPreparationShimmer {
+    from {
+        background-position: 130% 0;
+    }
+
+    to {
+        background-position: -130% 0;
+    }
+}
+
+@keyframes rcAccountPreparationFloat {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate3d(0, -1rem, 0) scale(1.08);
+    }
+}
+
+@keyframes rcAccountPreparationActive {
+    0%,
+    100% {
+        box-shadow: 0 0 0 rgba(255, 99, 56, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 24px rgba(255, 99, 56, 0.08);
+    }
+}
+
+@keyframes rcAccountPreparationPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.38);
+    }
+
+    70%,
+    100% {
+        box-shadow: 0 0 0 0.6rem rgba(16, 185, 129, 0);
+    }
+}
+
+@media (max-width: 640px) {
+    .rc-account-preparation-card {
+        padding: 1.05rem;
+        border-radius: 1.05rem;
+    }
+
+    .rc-account-preparation-overlay {
+        padding: 0.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rc-account-preparation-glow,
+    .rc-account-preparation-progress span,
+    .rc-account-preparation-orbit-ring,
+    .rc-account-preparation-mini-spinner,
+    .rc-account-preparation-status.is-active,
+    .rc-account-preparation-pulse {
+        animation: none;
+    }
+}
+</style>
+<script id="rc-inbox-quick-reply-scroll-v91">
+(() => {
+    if (window.__rcInboxQuickReplyV91) return;
+    window.__rcInboxQuickReplyV91 = true;
+
+    const scrollToNewest = () => {
+        const stream = document.querySelector('[data-rc-inbox-message-stream]');
+        if (!stream) return;
+        requestAnimationFrame(() => {
+            stream.scrollTop = stream.scrollHeight;
+        });
+    };
+
+    document.addEventListener('rc-inbox-quick-reply-sent', scrollToNewest);
+    window.addEventListener('rc-inbox-quick-reply-sent', scrollToNewest);
+})();
+</script>
+        </div>
+
+        @if($shouldBlockForRecruitingReadiness)
+            @teleport('body')
+            <div
+                class="rc-account-preparation-overlay"
+                role="status"
+                aria-live="polite"
+                aria-label="Recruiting account preparation in progress"
+                x-data="{
+                    impersonationBar: null,
+                    resizeObserver: null,
+
+                    findImpersonationBar() {
+                        const nodes = Array.from(document.querySelectorAll('body *'));
+
+                        const leaveControl = nodes.find((node) => {
+                            if (!(node instanceof HTMLElement)) return false;
+                            if (!['A', 'BUTTON'].includes(node.tagName)) return false;
+
+                            return node.textContent?.trim().toLowerCase() === 'leave';
+                        });
+
+                        if (!leaveControl) return null;
+
+                        let current = leaveControl.parentElement;
+
+                        while (current && current !== document.body) {
+                            const text = current.textContent?.toLowerCase() || '';
+
+                            if (text.includes('impersonating user')) {
+                                return current;
+                            }
+
+                            current = current.parentElement;
+                        }
+
+                        return null;
+                    },
+
+                    syncImpersonationBar() {
+                        const bar = this.findImpersonationBar();
+
+                        if (this.impersonationBar && this.impersonationBar !== bar) {
+                            this.impersonationBar.classList.remove('rc-account-impersonation-bar');
+                        }
+
+                        this.impersonationBar = bar;
+
+                        if (!bar) {
+                            document.documentElement.style.setProperty('--rc-account-overlay-top', '0px');
+                            return;
+                        }
+
+                        bar.classList.add('rc-account-impersonation-bar');
+
+                        const rect = bar.getBoundingClientRect();
+                        const bottom = Math.max(0, Math.ceil(rect.bottom));
+
+                        document.documentElement.style.setProperty(
+                            '--rc-account-overlay-top',
+                            `${bottom}px`
+                        );
+                    },
+
+                    init() {
+                        document.documentElement.classList.add('rc-account-preparing');
+                        document.body.classList.add('rc-account-preparing');
+
+                        this.$nextTick(() => {
+                            this.syncImpersonationBar();
+
+                            this.resizeObserver = new ResizeObserver(() => {
+                                this.syncImpersonationBar();
+                            });
+
+                            this.resizeObserver.observe(document.body);
+                            window.addEventListener('resize', this.syncImpersonationBar.bind(this));
+                        });
+                    },
+
+                    destroy() {
+                        document.documentElement.classList.remove('rc-account-preparing');
+                        document.body.classList.remove('rc-account-preparing');
+                        document.documentElement.style.removeProperty('--rc-account-overlay-top');
+
+                        if (this.impersonationBar) {
+                            this.impersonationBar.classList.remove('rc-account-impersonation-bar');
+                        }
+
+                        this.resizeObserver?.disconnect();
+                    }
+                }"
+                x-init="init()"
+            >
+                <div class="rc-account-preparation-glow rc-account-preparation-glow-one"></div>
+                <div class="rc-account-preparation-glow rc-account-preparation-glow-two"></div>
+
+                <section class="rc-account-preparation-card">
+                    <div class="rc-account-preparation-brand">
+                        <span class="rc-account-preparation-orbit" aria-hidden="true">
+                            <span class="rc-account-preparation-orbit-ring"></span>
+                            <span class="rc-account-preparation-orbit-dot"></span>
+
+                            <svg viewBox="0 0 24 24" fill="none">
+                                <path
+                                    d="M4 18.5V7.25L12 3l8 4.25V18.5L12 22l-8-3.5Z"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linejoin="round"
+                                />
+                                <path
+                                    d="m4 7.25 8 4.25 8-4.25M12 11.5V22"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </span>
+
+                        <span>PLYRCARD Recruiting Center</span>
+                    </div>
+
+                    <div class="rc-account-preparation-copy">
+                        <span class="rc-account-preparation-kicker">
+                            Account setup in progress
+                        </span>
+
+                        <h2>We’re currently preparing your account</h2>
+
+                        <p>
+                            You’ll receive an email once your Recruiting Center
+                            account has been activated.
+                        </p>
+                    </div>
+
+                    <div class="rc-account-preparation-progress">
+                        <span></span>
+                    </div>
+
+                    <div class="rc-account-preparation-statuses">
+                        <div class="rc-account-preparation-status is-complete">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <path
+                                        d="m7 12 3 3 7-7"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Creating your workspace</strong>
+                                <small>Preparing your private Recruiting Center</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status is-active">
+                            <span class="rc-account-preparation-status-icon">
+                                <span class="rc-account-preparation-mini-spinner"></span>
+                            </span>
+
+                            <span>
+                                <strong>Discovering schools for you</strong>
+                                <small>Organizing schools, coaches and conferences</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <path
+                                        d="M5 7h14M5 12h14M5 17h9"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Constructing your templates</strong>
+                                <small>Preparing personalized recruiting emails</small>
+                            </span>
+                        </div>
+
+                        <div class="rc-account-preparation-status">
+                            <span class="rc-account-preparation-status-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <ellipse
+                                        cx="12"
+                                        cy="6"
+                                        rx="7"
+                                        ry="3"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+                                    <path
+                                        d="M5 6v6c0 1.65 3.13 3 7 3s7-1.35 7-3V6M5 12v6c0 1.65 3.13 3 7 3s7-1.35 7-3v-6"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+                                </svg>
+                            </span>
+
+                            <span>
+                                <strong>Filling up your database</strong>
+                                <small>Connecting your recruiting tools and data</small>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="rc-account-preparation-note">
+                        <span class="rc-account-preparation-pulse"></span>
+
+                        <span>
+                            This page will unlock automatically once setup is complete.
+                        </span>
+                    </div>
+                </section>
+            </div>
+            @endteleport
+        @endif
+    </div>
+
+
+    <div
+        id="rc-navigation-loading-overlay"
+        class="rc-navigation-loading-overlay"
+        aria-hidden="true"
+    >
+        <span class="rc-navigation-loading-spinner" aria-label="Loading"></span>
+    </div>
+
+    <style>
+        .rc-navigation-loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483000;
+            display: grid;
+            place-items: center;
+            background: rgba(15, 23, 42, .18);
+            backdrop-filter: blur(1.5px);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .12s ease, visibility .12s ease;
+        }
+
+        .rc-navigation-loading-overlay.is-visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .rc-navigation-loading-spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid rgba(255, 255, 255, .34);
+            border-top-color: #ffffff;
+            border-radius: 999px;
+            animation: rcNavigationSpinner .68s linear infinite;
+            filter: drop-shadow(0 2px 6px rgba(15, 23, 42, .28));
+        }
+
+        @keyframes rcNavigationSpinner {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rc-navigation-loading-spinner {
+                animation-duration: 1.2s;
+            }
+        }
+    </style>
+
+    <script>
+        (() => {
+            if (window.__rcNavigationSpinnerInstalled) return;
+            window.__rcNavigationSpinnerInstalled = true;
+
+            const overlay = () => document.getElementById('rc-navigation-loading-overlay');
+            const show = () => overlay()?.classList.add('is-visible');
+            const hide = () => overlay()?.classList.remove('is-visible');
+
+            const isSupportedNavigation = (anchor) => {
+                if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return false;
+
+                const rawHref = String(anchor.getAttribute('href') || '').trim();
+                if (!rawHref || rawHref === '#' || rawHref.startsWith('#')) return false;
+                if (/^(mailto:|tel:|javascript:)/i.test(rawHref)) return false;
+
+                let url;
+                try {
+                    url = new URL(anchor.href, window.location.href);
+                } catch (_) {
+                    return false;
+                }
+
+                if (url.origin !== window.location.origin) return false;
+
+                const path = url.pathname.replace(/\/+$/, '') || '/';
+                return path === '/admin/coach-database'
+                    || path === '/admin/my-profile'
+                    || path === '/admin/coach-database/schedule'
+                    || path.startsWith('/admin/coach-database/');
+            };
+
+            document.addEventListener('click', (event) => {
+                if (event.defaultPrevented || event.button !== 0) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+                const anchor = event.target.closest?.('a[href]');
+                if (!isSupportedNavigation(anchor)) return;
+
+                show();
+            }, true);
+
+            window.addEventListener('pageshow', hide);
+            window.addEventListener('beforeunload', show);
+            document.addEventListener('livewire:navigated', hide);
+            document.addEventListener('livewire:navigate', (event) => {
+                const destination = event?.detail?.url;
+                if (!destination) return;
+
+                try {
+                    const url = new URL(destination, window.location.href);
+                    const path = url.pathname.replace(/\/+$/, '') || '/';
+                    if (
+                        path === '/admin/coach-database'
+                        || path === '/admin/my-profile'
+                        || path === '/admin/coach-database/schedule'
+                        || path.startsWith('/admin/coach-database/')
+                    ) {
+                        show();
+                    }
+                } catch (_) {}
+            });
+
+            window.setTimeout(hide, 12000);
+        })();
     </script>
 
 </x-filament-panels::page>

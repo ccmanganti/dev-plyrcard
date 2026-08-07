@@ -62,7 +62,6 @@ trait InteractsWithCoachDatabase
 
     public string $section = 'dashboard';
     public string $search = '';
-    public string $discoverSchoolSearch = '';
     public string $coachSearch = '';
     public string $conversationSearch = '';
     public string $conversationSchoolFilter = '';
@@ -249,7 +248,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -376,8 +375,8 @@ trait InteractsWithCoachDatabase
         // A previous zero-result sync must not block the dashboard for an entire day.
         // Retry zero totals every five minutes; established totals are reconciled hourly.
         $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinutes(5);
-        $syncKey = 'recruiting:total-emails-sent-sync:'
+        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinute();
+        $syncKey = 'recruiting:total-emails-sent-sync:v3:'
             . (int) $user->getKey()
             . ':'
             . strtolower($locationId);
@@ -396,6 +395,8 @@ trait InteractsWithCoachDatabase
                 Log::warning('Automatic GHL sent-email count sync failed.', [
                     'user_id' => $user->getKey(),
                     'location_id' => $locationId,
+                    'source' => $result['source'] ?? null,
+                    'pages_scanned' => $result['pages_scanned'] ?? 0,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
                     'error' => $result['error'] ?? 'Unknown sync error.',
@@ -414,6 +415,8 @@ trait InteractsWithCoachDatabase
             Log::info('Automatic GHL sent-email dashboard sync completed.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
+                'source' => $result['source'] ?? null,
+                'pages_scanned' => $result['pages_scanned'] ?? 0,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
                 'outbound_emails_counted' => $count,
@@ -507,6 +510,7 @@ trait InteractsWithCoachDatabase
             'conversations' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
             'campaigns' => \App\Filament\Pages\CoachDatabaseCampaigns::getUrl(),
             'compose' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
+            'support' => \App\Filament\Pages\CoachDatabaseSupport::getUrl(),
             'schedule' => class_exists(\App\Filament\Pages\CoachDatabaseSchedule::class) ? \App\Filament\Pages\CoachDatabaseSchedule::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'schedule']),
             'settings' => class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'settings']),
             'profile' => $this->freeRoleDefaultProfileUrl(),
@@ -3470,35 +3474,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     public function updatedComposeSchoolSearch(): void
     {
         $this->composeSchoolPickerOpen = trim($this->composeSchoolSearch) !== '';
-    }
-
-    /**
-     * Discover Schools owns a separate search box from the shared/global header.
-     * Keep its paging and request-local query memo in sync without mutating the
-     * global `$search` property used by the header on every Recruiting Center tab.
-     */
-    public function updatedDiscoverSchoolSearch(): void
-    {
-        if ($this->section !== 'schools') {
-            return;
-        }
-
-        $this->schoolDisplayLimit = 24;
-        $this->filteredSchoolsQueryMemo = [];
-    }
-
-    /**
-     * Conference is bound directly with wire:model.live on Discover Schools.
-     * Reset only the Discover result window/memo when it changes.
-     */
-    public function updatedConferenceFilter(): void
-    {
-        if ($this->section !== 'schools') {
-            return;
-        }
-
-        $this->schoolDisplayLimit = 24;
-        $this->filteredSchoolsQueryMemo = [];
     }
 
     public function pollConversationUpdates(): void
@@ -9234,13 +9209,9 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     }
 
     /**
-     * One lightweight payload for Discover Schools. Search, division,
-     * conference and grid/list switching are intentionally performed in Alpine
-     * so those controls never wait for a Livewire round-trip.
-     *
-     * Coach counts are rebuilt from the exact school/business index instead of
-     * trusting legacy cached aggregate counts. This keeps the client-side cards
-     * consistent with Compose Email's authoritative school membership rules.
+     * Lightweight, cache-backed dataset consumed by the client-side Discover
+     * Schools controller. This is a computed Livewire property, so Blade can
+     * safely read `$this->discoverSchoolsClientDataset`.
      */
     public function getDiscoverSchoolsClientDatasetProperty(): array
     {
@@ -11764,12 +11735,15 @@ HTML;
             ? $this->campaignBody
             : 'Choose a template or write your message.';
 
-        // Preview the exact final email structure that will be sent. The signature
-        // remains hidden from the Compose editor itself, but Preview Email always
-        // includes the canonical PLYRCARD footer/signature and personalized tokens.
-        $html = $this->buildComposeHtml($body);
-        $html = $this->normalizeTemplateLinksForCurrentTracking($html);
-        $html = $this->ensurePlyrcardEmailSignature($html);
+        // Preview the same canonical body that is used at send time, including
+        // exactly one PLYRCARD athlete signature/footer. This keeps Preview
+        // faithful to what coaches actually receive without saving the signature
+        // back into the editable template body.
+        $html = $this->ensurePlyrcardEmailSignature(
+            $this->normalizeTemplateLinksForCurrentTracking(
+                $this->buildComposeHtml($body)
+            )
+        );
 
         return $this->replaceCampaignTokens($html, $this->composePreviewCoach);
     }
@@ -11782,21 +11756,69 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        // Keep this payload intentionally tiny. Older versions duplicated every coach
-        // inside every school, which made Livewire/Blade JSON serialization explode in
-        // memory on accounts with thousands of coaches.
+        $selectedSchoolId = trim((string) $this->campaignSchoolId);
+
         return [
             'schools' => collect($this->composeSchoolOptions)
-                ->map(fn (array $school): array => [
-                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
-                    'name' => (string) ($school['name'] ?? 'School'),
-                    'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
-                    'conference' => (string) ($school['conference'] ?? ''),
-                    'division' => (string) ($school['division'] ?? ''),
-                    'city' => (string) ($school['city'] ?? ''),
-                    'state' => (string) ($school['state'] ?? ''),
-                    'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
-                ])
+                ->map(function (array $school) use ($selectedSchoolId): array {
+                    $id = trim((string) ($school['id'] ?? $school['business_id'] ?? ''));
+                    $name = trim((string) ($school['name'] ?? 'School'));
+
+                    $row = [
+                        'id' => $id,
+                        'name' => $name,
+                        'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
+                        'conference' => (string) ($school['conference'] ?? ''),
+                        'division' => (string) ($school['division'] ?? ''),
+                        'city' => (string) ($school['city'] ?? ''),
+                        'state' => (string) ($school['state'] ?? ''),
+                        'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                        'search_text' => strtolower(trim(implode(' ', array_filter([
+                            $name,
+                            (string) ($school['conference'] ?? ''),
+                            (string) ($school['division'] ?? ''),
+                            (string) ($school['city'] ?? ''),
+                            (string) ($school['state'] ?? ''),
+                            (string) data_get($school, 'head_coach.name', ''),
+                            (string) data_get($school, 'head_coach.email', ''),
+                        ])))),
+                        'coaches' => [],
+                    ];
+
+                    // Keep the global payload small: only the currently selected
+                    // school carries coach rows. Search remains instant across every
+                    // school, while exact recipient hydration happens on selection.
+                    if ($selectedSchoolId !== '' && $id === $selectedSchoolId) {
+                        $coaches = $this->composeCoachesForSchool($school, true)
+                            ->map(function (array $coach): array {
+                                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
+                                $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
+                                $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
+
+                                return [
+                                    'id' => $coachId,
+                                    'name' => $coachName,
+                                    'email' => (string) ($coach['email'] ?? ''),
+                                    'title' => $title,
+                                    'is_head' => $this->isHeadCoachTitle($title),
+                                    'search_text' => strtolower(trim(implode(' ', array_filter([
+                                        $coachName,
+                                        (string) ($coach['email'] ?? ''),
+                                        $title,
+                                    ])))),
+                                ];
+                            })
+                            ->filter(fn (array $coach): bool => $coach['id'] !== '')
+                            ->values()
+                            ->all();
+
+                        $row['coaches'] = $coaches;
+                        $row['coach_count'] = count($coaches);
+                    }
+
+                    return $row;
+                })
+                ->filter(fn (array $school): bool => $school['id'] !== '')
                 ->values()
                 ->all(),
         ];
@@ -12469,7 +12491,6 @@ HTML;
     public function clearSchoolFilters(): void
     {
         $this->search = '';
-        $this->discoverSchoolSearch = '';
         $this->divisionFilter = '';
         $this->conferenceFilter = '';
         $this->sort = 'name';
@@ -13548,12 +13569,7 @@ HTML;
 
     protected function filteredSchoolsQuery(): Collection
     {
-        // Discover Schools has its own grid-filter search. The shared header search
-        // remains global and is intentionally independent on every Recruiting Center tab.
-        $searchValue = $this->section === 'schools'
-            ? $this->discoverSchoolSearch
-            : $this->search;
-        $query = $this->normalizeSearchText($searchValue);
+        $query = $this->normalizeSearchText($this->search);
         $divisionFilter = trim((string) $this->divisionFilter);
         $conferenceFilter = trim((string) $this->conferenceFilter);
         $sort = (string) $this->sort;
