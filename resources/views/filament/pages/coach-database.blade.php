@@ -12316,20 +12316,33 @@ CSS;
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
                     init() {
-                        const cached = window.__rcComposeRecipientStateV95;
-                        const currentSchoolId = String(this.selectedSchoolId || '');
-                        if (cached && String(cached.schoolId || '') === currentSchoolId) {
-                            this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds] : this.selectedCoachIds;
-                            this.targetMode = String(cached.targetMode || this.targetMode || 'school');
-                            this.headCoachOnly = Boolean(cached.headCoachOnly);
-                            this.chooserOpen = Boolean(cached.chooserOpen);
+                        const cached = window.__rcComposeRecipientStateV101;
+                        const currentPath = String(window.location?.pathname || '');
+
+                        // v101: the browser-side Compose recipient state is authoritative
+                        // across Livewire morphs on this same page. The server-rendered
+                        // campaignSchoolId may still be empty/older because school/coach
+                        // selection is intentionally local-only for instant interaction.
+                        if (cached && String(cached.path || '') === currentPath) {
+                            const cachedSchoolId = String(cached.schoolId || '');
+                            const schoolExists = cachedSchoolId === '' || this.schools.some(row => String(row.id || '') === cachedSchoolId);
+
+                            if (schoolExists) {
+                                this.selectedSchoolId = cachedSchoolId;
+                                this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds].map(String) : [];
+                                this.targetMode = String(cached.targetMode || 'school');
+                                this.headCoachOnly = Boolean(cached.headCoachOnly);
+                                this.chooserOpen = Boolean(cached.chooserOpen);
+                            }
                         }
+
                         this.rememberRecipientState();
                     },
                     rememberRecipientState() {
-                        window.__rcComposeRecipientStateV95 = {
+                        window.__rcComposeRecipientStateV101 = {
+                            path: String(window.location?.pathname || ''),
                             schoolId: String(this.selectedSchoolId || ''),
-                            selectedCoachIds: [...this.selectedCoachIds],
+                            selectedCoachIds: [...this.selectedCoachIds].map(String),
                             targetMode: String(this.targetMode || 'school'),
                             headCoachOnly: Boolean(this.headCoachOnly),
                             chooserOpen: Boolean(this.chooserOpen),
@@ -12704,7 +12717,7 @@ CSS;
                                 </div>
                             </div>
 
-                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="mount(); window.addEventListener('plyr-editor-insert-token', e => insertMerge(e.detail.token))" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
+                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="mount()" x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
                                 <div class="rc-compose-editor-shell-v45">
                                     <div class="rc-compose-toolbar-v45">
                                         <select class="rc-select" x-on:change="formatBlock($event.target.value); $event.target.value='p'">
