@@ -9998,6 +9998,7 @@
                 panelLinkUrl: '',
                 panelButtonLabel: '',
                 panelButtonUrl: '',
+                composeRefreshHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -10006,20 +10007,37 @@
                         setTimeout(() => this.bootEditor(true), 80);
                         setTimeout(() => this.bootEditor(true), 250);
                     });
-                    window.addEventListener('rc-compose-editor-refresh', (event) => {
-                        if (modelName !== 'campaignBody') return;
-                        const encoded = event.detail?.body || '';
-                        const applyBody = () => {
-                            if (!this.$refs.editor) return;
+                    if (modelName === 'campaignBody') {
+                        if (window.__plyrComposeEditorRefreshHandler) {
+                            window.removeEventListener('rc-compose-editor-refresh', window.__plyrComposeEditorRefreshHandler);
+                        }
+
+                        this.composeRefreshHandler = (event) => {
+                            const editor = this.$refs.editor;
+                            if (!editor || !editor.isConnected) return;
+
+                            const encoded = event.detail?.body || '';
                             const html = this.decodeInitialBody(encoded);
-                            this.$refs.editor.dataset.initialBody = encoded;
-                            this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
-                            this.syncNow();
+
+                            editor.dataset.initialBody = encoded;
+                            editor.innerHTML = this.highlightMergeTokens(html || '');
+
+                            // The body already came from Livewire/PHP. Do not immediately
+                            // sync it back to the server here: stale editor instances can
+                            // otherwise overwrite the newly selected template with blank HTML.
                         };
-                        this.$nextTick(applyBody);
-                        setTimeout(applyBody, 40);
-                        setTimeout(applyBody, 160);
-                    });
+
+                        window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
+                        window.addEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
+                    }
+                },
+                destroy() {
+                    if (this.composeRefreshHandler) {
+                        window.removeEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
+                        if (window.__plyrComposeEditorRefreshHandler === this.composeRefreshHandler) {
+                            window.__plyrComposeEditorRefreshHandler = null;
+                        }
+                    }
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
