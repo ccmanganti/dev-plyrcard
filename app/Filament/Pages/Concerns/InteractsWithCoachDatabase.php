@@ -11836,7 +11836,18 @@ HTML;
 
                 return str_contains($haystack, $query);
             })
+            // Keep the full school option list cheap. Only the small set that is
+            // actually visible in the Compose dropdown gets an exact recipient
+            // recount, so stale production coach_count values cannot leak into UI.
             ->take($query === '' ? 8 : 12)
+            ->map(function (array $school): array {
+                $validatedCoachCount = $this->composeCoachesForSchool($school, true)->count();
+
+                $school['coach_count'] = $validatedCoachCount;
+                $school['coaches_count'] = $validatedCoachCount;
+
+                return $school;
+            })
             ->values()
             ->all();
     }
