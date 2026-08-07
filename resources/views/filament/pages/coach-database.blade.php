@@ -7533,7 +7533,7 @@
                                 </div>
                             @endif
                 </div>
-                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
+                <div class="rc-refresh-dropdown-v2" x-data="{ open: false, subject: '', body: '' }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
                     <button
                         type="button"
                         class="rc-home-refresh-v2"
@@ -10025,10 +10025,6 @@
                 <div class="rc-discover-bulk-v36" x-show="selectedCount > 0" x-cloak>
                     <div class="rc-discover-bulk-left-v36">
                         <span class="rc-discover-bulk-count-v36"><span x-text="selectedCount.toLocaleString()"></span> selected</span>
-                        <button type="button" class="rc-discover-bulk-email-v36" x-on:click.prevent.stop="emailSelected()">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                            <span>Email</span>
-                        </button>
                         <div class="rc-discover-bulk-list-v36" x-on:click.outside="listMenuOpen = false">
                             <button type="button" x-on:click.stop="listMenuOpen = !listMenuOpen">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -10785,7 +10781,6 @@
                                         <button type="button" x-on:click="selectAllVisible()">Select all</button>
                                         <button type="button" x-on:click="clearSelection()">Clear</button>
                                     </div>
-                                    <button type="button" class="rc-list-selection-email-v120" x-bind:disabled="selected.length === 0" x-on:click="emailSelected()">Email Selected (<span x-text="selected.length"></span>)</button>
                                 </div>
 
                                 <div class="rc-list-search-v120" x-show="items.length > 10 || listQuery !== ''" x-cloak>
@@ -11714,13 +11709,39 @@ CSS;
                                 class="rc-inbox-quick-reply-v92"
                                 wire:submit.prevent="sendQuickReply"
                                 x-data="{
-                                    draftKey: 'rcQuickReplyDraft:' + @js((string) ($selectedConversationId ?? 'none')),
+                                    conversationKey: String(@js((string) ($selectedConversationId ?? 'none'))),
+                                    initialBody: @js((string) ($quickReplyBody ?? '')),
+                                    lastAppliedServerBody: '',
                                     init() {
-                                        const saved = sessionStorage.getItem(this.draftKey);
-                                        if (saved && this.$refs.replyEditor) {
-                                            this.$refs.replyEditor.innerHTML = saved;
+                                        window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+
+                                        this.$nextTick(() => {
+                                            if (!this.$refs.replyEditor) return;
+
+                                            // Server/template content wins only when it is explicitly present.
+                                            // Otherwise preserve the current browser draft for this conversation.
+                                            const serverBody = String(this.initialBody || '');
+                                            const localBody = String(window.__rcInboxReplyDrafts[this.conversationKey] || '');
+                                            const body = serverBody !== '' ? serverBody : localBody;
+
+                                            if (body !== '') {
+                                                this.$refs.replyEditor.innerHTML = body;
+                                                this.lastAppliedServerBody = serverBody;
+                                            }
+
                                             this.sync(false);
-                                        }
+                                        });
+                                    },
+                                    applyServerBody(value) {
+                                        const html = String(value || '');
+                                        if (!this.$refs.replyEditor || html === '' || html === this.lastAppliedServerBody) return;
+
+                                        // A template/body change from Livewire should populate the editor once.
+                                        // Never re-apply the same server value over a user's subsequent edits.
+                                        this.lastAppliedServerBody = html;
+                                        this.$refs.replyEditor.innerHTML = html;
+                                        window.__rcInboxReplyDrafts[this.conversationKey] = html;
+                                        this.sync(false);
                                     },
                                     command(name) {
                                         this.$refs.replyEditor?.focus();
@@ -11729,9 +11750,15 @@ CSS;
                                     },
                                     sync(save = true) {
                                         const html = this.$refs.replyEditor?.innerHTML || '';
-                                        this.$refs.replyValue.value = html;
-                                        this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
-                                        if (save) sessionStorage.setItem(this.draftKey, html);
+                                        if (this.$refs.replyValue) {
+                                            this.$refs.replyValue.value = html;
+                                            this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
+                                        }
+                                        if (save) {
+                                            window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+                                            window.__rcInboxReplyDrafts[this.conversationKey] = html;
+                                            this.lastAppliedServerBody = html;
+                                        }
                                     },
                                     uploadActive: false,
                                     uploadProgress: 0,
@@ -11758,11 +11785,14 @@ CSS;
 },
                                     clear() {
                                         if (this.$refs.replyEditor) this.$refs.replyEditor.innerHTML = '';
-                                        sessionStorage.removeItem(this.draftKey);
+                                        window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+                                        delete window.__rcInboxReplyDrafts[this.conversationKey];
+                                        this.lastAppliedServerBody = '';
                                         this.sync(false);
                                     }
                                 }"
                                 x-init="init()"
+                                x-effect="applyServerBody($wire.quickReplyBody)"
                                 x-on:keydown.ctrl.enter.prevent="sync(); $el.requestSubmit()"
                                 x-on:keydown.meta.enter.prevent="sync(); $el.requestSubmit()"
                                 x-on:rc-inbox-quick-reply-sent.window="clear()"
@@ -11788,7 +11818,7 @@ CSS;
                                             aria-multiline="true"
                                             aria-label="Quick reply message"
                                             data-placeholder="Write your reply…"
-                                            x-on:input.debounce.150ms="sync()"
+                                            x-on:input="sync()"
                                             x-on:blur="sync()"
                                         ></div>
                                     </div>
@@ -12236,6 +12266,10 @@ CSS;
                 .rc-compose-coach-name-v45 { display:flex; align-items:center; gap:.42rem; min-width:0; font-size:.76rem; font-weight:650; }
                 .rc-compose-check-v45 { width:1rem; height:1rem; border-radius:.28rem; border:1px solid var(--rc-border); display:grid; place-items:center; flex:0 0 auto; font-size:.68rem; color:white; }
                 .rc-compose-coach-pill-v45.is-selected .rc-compose-check-v45 { background:#ff6338; border-color:#ff6338; }
+                .rc-compose-native-check-v89 { width:1rem; height:1rem; margin:0; flex:0 0 auto; accent-color:#ff6338; pointer-events:none; }
+                .rc-compose-native-check-v95 { width:1rem; height:1rem; flex:0 0 1rem; display:inline-grid; place-items:center; border:1.5px solid #cbd5e1; border-radius:.22rem; background:#fff; color:#fff; transition:background .08s ease,border-color .08s ease; }
+                .rc-compose-native-check-v95.is-checked { background:#ff6338; border-color:#ff6338; }
+                .rc-compose-native-check-v95 svg { width:.72rem; height:.72rem; display:block; }
                 .rc-compose-coach-title-v45 { color:var(--rc-muted); font-size:.68rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .rc-compose-field-row-v45 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.55rem; align-items:center; }
                 .rc-compose-template-wrap-v45 { position:relative; }
@@ -12279,9 +12313,91 @@ CSS;
                     targetMode: @js((string) ($campaignTargetMode ?? 'school')),
                     headCoachOnly: @js((bool) ($campaignHeadCoachOnly ?? true)),
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
-                    selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
+                    selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
-                    rosterLoading: false,
+                    init() {
+                        const cached = window.__rcComposeRecipientStateV95;
+                        const currentSchoolId = String(this.selectedSchoolId || '');
+                        if (cached && String(cached.schoolId || '') === currentSchoolId) {
+                            this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds] : this.selectedCoachIds;
+                            this.targetMode = String(cached.targetMode || this.targetMode || 'school');
+                            this.headCoachOnly = Boolean(cached.headCoachOnly);
+                            this.chooserOpen = Boolean(cached.chooserOpen);
+                        }
+                        this.rememberRecipientState();
+                    },
+                    rememberRecipientState() {
+                        window.__rcComposeRecipientStateV95 = {
+                            schoolId: String(this.selectedSchoolId || ''),
+                            selectedCoachIds: [...this.selectedCoachIds],
+                            targetMode: String(this.targetMode || 'school'),
+                            headCoachOnly: Boolean(this.headCoachOnly),
+                            chooserOpen: Boolean(this.chooserOpen),
+                        };
+                    },
+                    previewStaticTokens: @js($this->composePreviewTokenValues),
+                    previewSignatureHtml: @js($this->composePreviewSignatureHtml),
+                    previewCoach() {
+                        const coaches = this.schoolCoaches;
+                        if (this.selectedSchool && coaches.length) {
+                            if (this.targetMode === 'coaches') {
+                                const selected = coaches.find(row => this.selectedCoachIds.includes(String(row.id || '')));
+                                if (selected) return selected;
+                            } else if (this.headCoachOnly) {
+                                return coaches.find(row => Boolean(row.is_head)) || coaches[0];
+                            } else {
+                                return coaches[0];
+                            }
+                        }
+                        return {
+                            name: 'Coach Name',
+                            first_name: 'Coach Name',
+                            last_name: '',
+                            title: 'Coach',
+                            email: '',
+                            school: this.selectedSchool?.name || 'School Name',
+                        };
+                    },
+                    previewTokenMap(coach) {
+                        const name = String(coach?.name || 'Coach Name').trim() || 'Coach Name';
+                        const parts = name.split(/\s+/).filter(Boolean);
+                        const firstName = String(coach?.first_name || '').trim() || (name === 'Coach Name' ? 'Coach Name' : (parts[0] || 'Coach Name'));
+                        const lastName = String(coach?.last_name || '').trim() || (name === 'Coach Name' ? '' : (parts.slice(1).join(' ') || ''));
+                        return {
+                            ...this.previewStaticTokens,
+                            CoachName: name,
+                            CoachFirstName: firstName,
+                            CoachLastName: lastName,
+                            CoachTitle: String(coach?.title || 'Coach'),
+                            CoachEmail: String(coach?.email || ''),
+                            SchoolName: String(this.selectedSchool?.name || coach?.school || 'School Name'),
+                        };
+                    },
+                    renderPreviewTokens(value, coach) {
+                        let output = String(value || '');
+                        const values = this.previewTokenMap(coach);
+                        Object.entries(values).forEach(([token, replacement]) => {
+                            const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            output = output.replace(new RegExp('\\{\\{\\s*' + escaped + '\\s*\\}\\}', 'gi'), String(replacement ?? ''));
+                        });
+                        return output;
+                    },
+                    openPreview() {
+                        const coach = this.previewCoach();
+                        const subjectInput = this.$root.querySelector('[data-rc-compose-subject]');
+                        const editor = this.$root.querySelector('[data-plyr-native-editor=campaign-body]');
+                        const subjectRaw = String(subjectInput?.value || 'Subject preview');
+                        const bodyRaw = String(editor?.innerHTML || '').trim() || 'Choose a template or write your message.';
+                        const subject = this.renderPreviewTokens(subjectRaw, coach);
+                        const body = this.renderPreviewTokens(bodyRaw, coach);
+                        const signature = this.renderPreviewTokens(this.previewSignatureHtml || '', coach);
+                        window.dispatchEvent(new CustomEvent('rc-compose-preview-open', {
+                            detail: {
+                                subject,
+                                body: body + (signature ? '\n' + signature : ''),
+                            },
+                        }));
+                    },
                     sendingFast: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
@@ -12297,8 +12413,7 @@ CSS;
                     },
                     get selectedSchoolCoachCount() {
                         if (!this.selectedSchool) return 0;
-                        if (!this.rosterLoading && this.schoolCoaches.length) return this.schoolCoaches.length;
-                        return Number(this.selectedSchool?.coach_count || this.schoolCoaches.length || 0);
+                        return this.schoolCoaches.length || Number(this.selectedSchool?.coach_count || 0);
                     },
                     get visibleCoaches() {
                         const q = String(this.coachQuery || '').trim().toLowerCase();
@@ -12307,7 +12422,7 @@ CSS;
                     },
                     get activeCoachIds() {
                         if (!this.selectedSchool) return [];
-                        if (this.targetMode === 'coaches') return Array.from(this.selectedCoachIds);
+                        if (this.targetMode === 'coaches') return [...this.selectedCoachIds];
                         if (this.headCoachOnly) {
                             const head = this.schoolCoaches.find(row => row.is_head) || this.schoolCoaches[0];
                             return head ? [String(head.id)] : [];
@@ -12320,102 +12435,107 @@ CSS;
                         if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
                         return `Sending to ${this.headCoachOnly ? 'head coach only' : 'all coaches'} at ${this.selectedSchool.name}`;
                     },
-                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.has(String(id || '')); },
+                    coachSelected(id) {
+                        return this.selectedCoachIds.includes(String(id || ''));
+                    },
+                    syncRecipientStateDeferred() {
+                        // v99: local-only recipient state. Do not start a Livewire request
+                        // for school/coach selection; sendFast passes the exact state explicitly.
+                        this.rememberRecipientState();
+                    },
                     toggleCoach(id) {
-                        id = String(id || ''); if (!id) return;
-                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-
-                        // Replace the Set instead of mutating it in place. Alpine tracks
-                        // the property assignment immediately, so coach pills, checkmarks,
-                        // recipient counts, and send state redraw without waiting for any
-                        // unrelated DOM update.
-                        const next = new Set(this.selectedCoachIds);
-                        next.has(id) ? next.delete(id) : next.add(id);
-                        this.selectedCoachIds = next;
+                        id = String(id || '');
+                        if (!id) return;
+                        this.targetMode = 'coaches';
+                        this.headCoachOnly = false;
+                        this.chooserOpen = true;
+                        this.selectedCoachIds = this.selectedCoachIds.includes(id)
+                            ? this.selectedCoachIds.filter(value => value !== id)
+                            : [...this.selectedCoachIds, id];
                         this.coachRevision++;
+                        this.rememberRecipientState();
                     },
                     selectAllCoaches() {
-                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        this.selectedCoachIds = new Set(
-                            this.schoolCoaches
-                                .map(row => String(row.id || ''))
-                                .filter(Boolean)
-                        );
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'coaches';
+                        this.headCoachOnly = false;
+                        this.chooserOpen = true;
+                        this.selectedCoachIds = this.schoolCoaches
+                            .map(row => String(row.id || ''))
+                            .filter(Boolean);
                         this.coachRevision++;
+                        this.rememberRecipientState();
                     },
                     clearCoaches() {
-                        this.selectedCoachIds = new Set();
+                        this.targetMode = 'coaches';
+                        this.headCoachOnly = false;
+                        this.chooserOpen = true;
+                        this.selectedCoachIds = [];
                         this.coachRevision++;
+                        this.rememberRecipientState();
                     },
                     clearRecipients() {
-                        this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
-                        this.selectedCoachIds = new Set(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
+                        this.selectedSchoolId = '';
+                        this.schoolQuery = '';
+                        this.coachQuery = '';
+                        this.selectedCoachIds = [];
+                        this.targetMode = 'school';
+                        this.headCoachOnly = true;
+                        this.chooserOpen = false;
+                        this.coachRevision++;
+                        this.rememberRecipientState();
                     },
-                    async chooseSchool(school) {
-                        const id = String(school?.id || ''); if (!id) return;
-
-                        // Update the UI first so selection feels immediate, then hydrate
-                        // only this school's exact coach roster on the server.
-                        this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
-                        this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
-                        this.selectedCoachIds = new Set(); this.rosterLoading = true; this.coachRevision++;
-
-                        try {
-                            const result = await this.$wire.call('selectComposeSchool', id);
-
-                            if (!result || result.success === false) {
-                                throw new Error(result?.error || 'Unable to load coaches for this school.');
-                            }
-
-                            const coaches = Array.isArray(result.coaches) ? result.coaches : [];
-
-                            // Replace only the selected school row in Alpine's local
-                            // dataset. This preserves instant school search while making
-                            // the validated roster available immediately after selection.
-                            this.dataset = {
-                                ...this.dataset,
-                                schools: this.schools.map(row => String(row.id) === id
-                                    ? {
-                                        ...row,
-                                        coaches,
-                                        coach_count: Number(result.coach_count ?? coaches.length ?? 0),
-                                    }
-                                    : row),
-                            };
-
-                            this.selectedCoachIds = new Set();
-                            this.coachRevision++;
-                        } catch (error) {
-                            console.error(error);
-                            toast(error?.message || 'Unable to load coaches for this school.');
-                        } finally {
-                            this.rosterLoading = false;
-                            this.coachRevision++;
-                        }
+                    chooseSchool(school) {
+                        const id = String(school?.id || '');
+                        if (!id) return;
+                        this.selectedSchoolId = id;
+                        this.schoolQuery = '';
+                        this.coachQuery = '';
+                        this.selectedCoachIds = [];
+                        this.targetMode = 'school';
+                        this.headCoachOnly = true;
+                        this.chooserOpen = false;
+                        this.coachRevision++;
+                        this.rememberRecipientState();
                     },
-                    chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
-                    chooseAllCoaches() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = false; this.chooserOpen = false; this.coachRevision++; },
+                    chooseHeadCoach() {
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'school';
+                        this.headCoachOnly = true;
+                        this.chooserOpen = false;
+                        this.coachRevision++;
+                        this.rememberRecipientState();
+                    },
+                    chooseAllCoaches() {
+                        if (!this.selectedSchool) return;
+                        this.targetMode = 'school';
+                        this.headCoachOnly = false;
+                        this.chooserOpen = false;
+                        this.coachRevision++;
+                        this.rememberRecipientState();
+                    },
                     chooseSpecificCoaches() {
                         if (!this.selectedSchool) return;
-                        this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        if (!this.selectedCoachIds.size) {
-                            this.selectedCoachIds = new Set(
-                                this.schoolCoaches
-                                    .map(row => String(row.id || ''))
-                                    .filter(Boolean)
-                            );
+                        this.targetMode = 'coaches';
+                        this.headCoachOnly = false;
+                        this.chooserOpen = true;
+                        if (!this.selectedCoachIds.length) {
+                            this.selectedCoachIds = this.schoolCoaches
+                                .map(row => String(row.id || ''))
+                                .filter(Boolean);
                         }
                         this.coachRevision++;
+                        this.rememberRecipientState();
                     },
                     async sendFast() {
                         if (this.sendingFast) return;
                         if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
                         this.sendingFast = true;
                         try {
-                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, Array.from(this.selectedCoachIds));
+                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } finally { this.sendingFast = false; }
                     },
-                }">
+                }" x-init="init()">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -12426,7 +12546,7 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openComposePreview">
+                        <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
                         </button>
@@ -12452,7 +12572,6 @@ CSS;
                                     <template x-if="selectedSchool">
                                         <span class="rc-compose-chip-v45">
                                             <span x-text="`${selectedSchool.name} (${selectedSchoolCoachCount.toLocaleString()} coaches)`"></span>
-                                            <span x-cloak x-show="rosterLoading" class="rc-spinner-mini" style="margin-left:.35rem;vertical-align:middle" aria-label="Loading coach roster"></span>
                                             <button type="button" x-on:click="clearRecipients()">×</button>
                                         </span>
                                     </template>
@@ -12496,8 +12615,12 @@ CSS;
                                     <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
                                         <template x-for="coach in visibleCoaches" :key="coach.id">
-                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{'is-selected':coachSelected(coach.id)}" x-on:click="toggleCoach(coach.id)">
-                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="coachSelected(coach.id) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
+                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{ 'is-selected': selectedCoachIds.includes(String(coach.id || '')) }" x-on:click.prevent="toggleCoach(coach.id)">
+                                                <span class="rc-compose-coach-name-v45">
+                                                    <span class="rc-compose-native-check-v95" x-bind:class="{ 'is-checked': selectedCoachIds.includes(String(coach.id || '')) }" aria-hidden="true"><svg x-show="selectedCoachIds.includes(String(coach.id || ''))" viewBox="0 0 20 20" fill="none"><path d="m4.5 10 3.3 3.3 7.7-7.7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                                    <span x-text="coach.name"></span>
+                                                    <span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>
+                                                </span>
                                                 <span class="rc-compose-coach-title-v45" x-text="coach.title"></span>
                                             </button>
                                         </template>
@@ -12514,7 +12637,7 @@ CSS;
                             <div>
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
-                                    <input class="rc-input" style="width:100%" placeholder="Subject line" wire:model.live.debounce.500ms="campaignSubject" />
+                                    <input class="rc-input" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model="campaignSubject" />
                                     <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'' }">
                                         <button class="rc-btn" type="button" x-on:click="open=!open">
                                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
@@ -12595,7 +12718,7 @@ CSS;
                                         x-on:input="queueSync()"
                                         x-on:blur="syncNow()"
                                     ></div>
-                                    <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model.live.debounce.800ms="campaignBody" />
+                                    <input x-ref="campaignBodyHidden" type="hidden" data-plyr-native-editor-hidden="campaign-body" wire:model="campaignBody" />
                                     <div class="rc-compose-editor-foot-v45">
                                         <div class="rc-compose-icon-row-v45">
                                             <button type="button" title="Clear" wire:click="clearComposeTemplate">🗑</button>
@@ -12667,23 +12790,29 @@ CSS;
                 </div>
             </div>
 
-            @if($showComposePreview)
-                @teleport('body')
-                <div class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82" wire:click.self="closeComposePreview">
-                    <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
-                            <div><strong>Preview Email</strong><div class="rc-subtle">{{ $this->composeRenderedSubject }}</div></div>
-                            <button type="button" class="rc-icon-button" wire:click="closeComposePreview">×</button>
-                        </div>
-                        <div style="padding:1rem;background:var(--rc-soft)">
-                            <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
-                                {!! $this->composeRenderedBody !!}
-                            </div>
+            @teleport('body')
+            <div
+                x-data="{ open: false, subject: '', body: '' }"
+                x-cloak
+                x-show="open"
+                class="rc-compose-modal-v45 rc-compose-preview-backdrop-v82"
+                x-on:rc-compose-preview-open.window="subject = String($event.detail?.subject || 'Subject preview'); body = String($event.detail?.body || ''); open = true"
+                x-on:click.self="open = false"
+                x-on:keydown.escape.window="open = false"
+            >
+                <div style="width:min(56rem,94vw);max-height:86vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 24px 80px rgba(0,0,0,.30);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--rc-border)">
+                        <div><strong>Preview Email</strong><div class="rc-subtle" x-text="subject"></div></div>
+                        <button type="button" class="rc-icon-button" data-rc-local-action x-on:click.prevent.stop="open = false">×</button>
+                    </div>
+                    <div style="padding:1rem;background:var(--rc-soft)">
+                        <div style="background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:.85rem;padding:1.25rem;line-height:1.6">
+                            <div x-html="body"></div>
                         </div>
                     </div>
                 </div>
-                @endteleport
-            @endif
+            </div>
+            @endteleport
         @endif
 
         @if($section === 'campaigns')
@@ -13330,6 +13459,8 @@ CSS;
             return {
                 syncTimer: null,
                 mounted: false,
+                dirty: false,
+                refreshApplied: false,
                 uploadingImages: false,
                 editorNotice: '',
                 activePanel: '',
@@ -13340,34 +13471,52 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
-                    this.$nextTick(() => {
-                        this.bootEditor();
-                        setTimeout(() => this.bootEditor(true), 80);
-                        setTimeout(() => this.bootEditor(true), 250);
-                    });
+
+                    // v97: hydrate the editor exactly once. Re-running bootEditor after
+                    // 80/250ms was able to restore the original template after the user
+                    // had already started editing it.
+                    this.$nextTick(() => this.bootEditor());
+
                     const applyRefresh = (event) => {
                         if (modelName !== 'campaignBody') return;
+                        if (this.dirty || this.refreshApplied) return;
+
                         const detail = Array.isArray(event.detail) ? (event.detail[0] || {}) : (event.detail || {});
                         const encoded = detail.body || '';
-                        if (!encoded) return;
-                        window.__rcPendingComposeEditorBody = encoded;
+                        if (!encoded || !this.$refs.editor) return;
+
+                        // A server refresh may seed a newly mounted/empty editor once,
+                        // but it must never replace content the user has begun editing.
+                        const current = String(this.$refs.editor.innerHTML || '').trim();
+                        if (current !== '' && current !== '<br>') return;
+
                         const html = this.decodeInitialBody(encoded);
-                        if (!this.$refs.editor) return;
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html || '');
+                        if (!html) return;
+
+                        this.refreshApplied = true;
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
                         this.syncNow();
                     };
+
                     window.addEventListener('rc-compose-editor-refresh', applyRefresh);
-                    window.addEventListener('rc-compose-template-applied', applyRefresh);
+                    // Do not listen to rc-compose-template-applied here. The template
+                    // changes the editor wire:key and is hydrated from data-initial-body
+                    // on the fresh editor instance. Re-listening caused stale template
+                    // HTML to be injected again after edits.
                 },
                 bootEditor() {
                     if (!this.$refs.editor) return;
-                    const pending = modelName === 'campaignBody' ? (window.__rcPendingComposeEditorBody || '') : '';
-                    const html = this.decodeInitialBody(pending || initialBody || this.$refs.editor.dataset.initialBody || '');
-                    if (html && this.$refs.editor.innerHTML.trim() === '') {
+
+                    const current = String(this.$refs.editor.innerHTML || '').trim();
+                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
+
+                    if ((current === '' || current === '<br>') && html) {
                         this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
-                    } else {
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
+                    } else if (current && !current.includes('rc-merge-token-v48')) {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(current);
                     }
+
+                    this.refreshApplied = true;
                     this.syncNow();
                 },
                 decodeInitialBody(initial) {
@@ -13376,8 +13525,9 @@ CSS;
                     catch (error) { try { return window.atob(initial); } catch (_) { return ''; } }
                 },
                 queueSync() {
+                    this.dirty = true;
                     clearTimeout(this.syncTimer);
-                    this.syncTimer = setTimeout(() => this.syncNow(), 700);
+                    this.syncTimer = setTimeout(() => this.syncNow(), 180);
                 },
                 syncNow() {
                     if (!this.$refs.editor) return;
@@ -15179,6 +15329,20 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             const isSupportedNavigation = (anchor) => {
                 if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return false;
 
+                // Links rendered inside email/template/editor content are content, not
+                // Recruiting Center navigation. Never trigger the page-wide spinner for
+                // them, especially while editing a loaded template in Inbox.
+                if (anchor.closest?.([
+                    '[contenteditable=\"true\"]',
+                    '.rc-inbox-quick-reply-v92',
+                    '.rc-inbox-message-v56',
+                    '.rc-email-document-v64',
+                    'rc-inbox-email-view',
+                    '.rc-rich-editor',
+                    '.rc-native-editor',
+                    '.rc-template-editor-v50'
+                ].join(','))) return false;
+
                 const rawHref = String(anchor.getAttribute('href') || '').trim();
                 if (!rawHref || rawHref === '#' || rawHref.startsWith('#')) return false;
                 if (/^(mailto:|tel:|javascript:)/i.test(rawHref)) return false;
@@ -15234,4 +15398,188 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         })();
     </script>
 
+    <script id="rc-inbox-editor-link-guard-v91">
+    (() => {
+        if (window.__rcInboxEditorLinkGuardV91) return;
+        window.__rcInboxEditorLinkGuardV91 = true;
+
+        document.addEventListener('click', (event) => {
+            const anchor = event.target.closest?.('[contenteditable="true"] a[href]');
+            if (!anchor) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+            // In an editor, a normal click selects/edits the link instead of leaving
+            // the page. Ctrl/Cmd-click is still available when the user wants to open it.
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
+    })();
+    </script>
+{{-- v90: Inbox viewport-height layout. Keep quick reply/send visible on short screens. --}}
+<style id="rc-inbox-viewport-fit-v90">
+    @if($section === 'conversations')
+    .rc-inbox-page-v56 {
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-shell-v56 {
+        height: var(--rc-inbox-fit-height, calc(100dvh - 10rem)) !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-shell-v56 > *,
+    .rc-inbox-left-v56,
+    .rc-inbox-mid-v56,
+    .rc-inbox-right-v56 {
+        min-height: 0 !important;
+        max-height: 100% !important;
+    }
+
+    .rc-inbox-left-v56 {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-left-v56 > .rc-inbox-list-v56,
+    .rc-inbox-list-v56 {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+    }
+
+    .rc-inbox-mid-v56 {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-mid-head-v56 {
+        flex: 0 0 auto !important;
+    }
+
+    .rc-inbox-mid-v56 > .rc-message-stream-v56,
+    .rc-message-stream-v56 {
+        flex: 1 1 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+    }
+
+    .rc-inbox-quick-reply-v92 {
+        position: relative !important;
+        inset: auto !important;
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
+        max-height: min(18rem, 42vh) !important;
+        overflow-y: auto !important;
+        z-index: 24 !important;
+        background: var(--rc-surface) !important;
+        border-top: 1px solid var(--rc-border) !important;
+        box-shadow: 0 -8px 22px rgba(15,23,42,.045) !important;
+    }
+
+    .rc-inbox-quick-reply-contenteditable-v93 {
+        min-height: 2.75rem !important;
+        max-height: min(7rem, 18vh) !important;
+    }
+
+    .rc-inbox-quick-reply-footer-v92 {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        background: var(--rc-surface);
+        padding-bottom: .05rem;
+    }
+
+    .rc-inbox-right-v56,
+    .rc-coach-profile-v56 {
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+    }
+
+    @media (max-height: 760px) and (min-width: 901px) {
+        .rc-inbox-panel-head-v56 { padding-top: .55rem !important; padding-bottom: .4rem !important; }
+        .rc-inbox-search-v56 { padding-bottom: .4rem !important; }
+        .rc-inbox-tabs-v56 { padding-bottom: .45rem !important; }
+        .rc-inbox-mid-head-v56 { min-height: 3.7rem !important; padding-block: .45rem !important; }
+        .rc-inbox-quick-reply-toolbar-v92 { padding-bottom: .18rem !important; }
+        .rc-inbox-quick-reply-editor-v92 { padding-top: .32rem !important; padding-bottom: .4rem !important; }
+        .rc-inbox-quick-reply-contenteditable-v93 { min-height: 2.35rem !important; max-height: 4.5rem !important; }
+    }
+
+    @media (max-width: 900px) {
+        .rc-inbox-page-v56,
+        .rc-inbox-shell-v56 {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        .rc-inbox-mid-v56 { overflow: visible !important; }
+        .rc-message-stream-v56 { max-height: 42rem !important; }
+        .rc-inbox-quick-reply-v92 { max-height: none !important; overflow: visible !important; }
+    }
+    @endif
+</style>
+
+@if($section === 'conversations')
+<script id="rc-inbox-viewport-fit-script-v90">
+(() => {
+    if (window.__rcInboxViewportFitV90) {
+        window.__rcInboxViewportFitV90();
+        return;
+    }
+
+    let frame = null;
+
+    const fit = () => {
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+            const shell = document.querySelector('.rc-inbox-shell-v56');
+            if (!shell) return;
+
+            if (window.innerWidth <= 900) {
+                shell.style.removeProperty('--rc-inbox-fit-height');
+                return;
+            }
+
+            const top = Math.max(0, shell.getBoundingClientRect().top);
+            const bottomGap = 14;
+            const available = Math.max(320, Math.floor(window.innerHeight - top - bottomGap));
+            shell.style.setProperty('--rc-inbox-fit-height', `${available}px`);
+        });
+    };
+
+    window.__rcInboxViewportFitV90 = fit;
+    window.addEventListener('resize', fit, { passive: true });
+    window.addEventListener('orientationchange', fit, { passive: true });
+    document.addEventListener('livewire:navigated', fit);
+    document.addEventListener('livewire:initialized', fit);
+
+    if (window.Livewire?.hook) {
+        window.Livewire.hook('morph.updated', ({ el }) => {
+            if (el?.matches?.('.rc-inbox-page-v56, .rc-inbox-shell-v56') || el?.querySelector?.('.rc-inbox-shell-v56')) {
+                fit();
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fit, { once: true });
+    } else {
+        fit();
+    }
+})();
+</script>
+@endif
 </x-filament-panels::page>
