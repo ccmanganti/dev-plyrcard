@@ -12281,6 +12281,7 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
                     coachRevision: 0,
+                    rosterLoading: false,
                     sendingFast: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
@@ -12293,6 +12294,11 @@ CSS;
                     },
                     get schoolCoaches() {
                         return Array.isArray(this.selectedSchool?.coaches) ? this.selectedSchool.coaches : [];
+                    },
+                    get selectedSchoolCoachCount() {
+                        if (!this.selectedSchool) return 0;
+                        if (!this.rosterLoading && this.schoolCoaches.length) return this.schoolCoaches.length;
+                        return Number(this.selectedSchool?.coach_count || this.schoolCoaches.length || 0);
                     },
                     get visibleCoaches() {
                         const q = String(this.coachQuery || '').trim().toLowerCase();
@@ -12329,7 +12335,7 @@ CSS;
                     clearCoaches() { this.selectedCoachIds.clear(); this.coachRevision++; },
                     clearRecipients() {
                         this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
-                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++;
+                        this.selectedCoachIds.clear(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
                     },
                     async chooseSchool(school) {
                         const id = String(school?.id || ''); if (!id) return;
@@ -12338,7 +12344,7 @@ CSS;
                         // only this school's exact coach roster on the server.
                         this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
                         this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
-                        this.selectedCoachIds.clear(); this.coachRevision++;
+                        this.selectedCoachIds.clear(); this.rosterLoading = true; this.coachRevision++;
 
                         try {
                             const result = await this.$wire.call('selectComposeSchool', id);
@@ -12368,6 +12374,9 @@ CSS;
                         } catch (error) {
                             console.error(error);
                             toast(error?.message || 'Unable to load coaches for this school.');
+                        } finally {
+                            this.rosterLoading = false;
+                            this.coachRevision++;
                         }
                     },
                     chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
@@ -12421,7 +12430,11 @@ CSS;
                                 <div class="rc-compose-label-v45">Recipients</div>
                                 <div class="rc-compose-recipient-bar-v45">
                                     <template x-if="selectedSchool">
-                                        <span class="rc-compose-chip-v45"><span x-text="`${selectedSchool.name} (${schoolCoaches.length.toLocaleString()} coaches)`"></span> <button type="button" x-on:click="clearRecipients()">×</button></span>
+                                        <span class="rc-compose-chip-v45">
+                                            <span x-text="`${selectedSchool.name} (${selectedSchoolCoachCount.toLocaleString()} coaches)`"></span>
+                                            <span x-cloak x-show="rosterLoading" class="rc-spinner-mini" style="margin-left:.35rem;vertical-align:middle" aria-label="Loading coach roster"></span>
+                                            <button type="button" x-on:click="clearRecipients()">×</button>
+                                        </span>
                                     </template>
                                     <template x-if="!selectedSchool"><em class="rc-subtle">No school selected — search to add one below</em></template>
 
