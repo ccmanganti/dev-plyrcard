@@ -8339,9 +8339,53 @@
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
+
+                /* v73: Discover Schools uses its own program search. Hide the shared
+                   header search here so two inputs never mirror the same Livewire state. */
+                .rc-discover-v29 .rc-home-header-v2 .rc-home-search-v2 {
+                    display: none !important;
+                }
+                .rc-discover-v29 .rc-home-header-v2 .rc-home-actions-v2 {
+                    grid-template-columns: 2.75rem 2.75rem !important;
+                    grid-template-areas: "refresh dark" !important;
+                    width: auto !important;
+                    max-width: none !important;
+                    justify-self: end !important;
+                }
+                .rc-discover-v29 button {
+                    transition: transform .1s ease, opacity .12s ease, border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
+                    touch-action: manipulation;
+                }
+                .rc-discover-v29 button:active,
+                .rc-discover-v29 button.rc-click-feedback-v73 {
+                    transform: scale(.975);
+                    opacity: .82;
+                }
+                .rc-discover-v29 button[disabled] {
+                    cursor: wait !important;
+                    opacity: .62;
+                }
+                .rc-discover-program-search-v27 input { padding-right: 3rem !important; }
+                .rc-discover-search-busy-v73 {
+                    position: absolute;
+                    right: .9rem;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--rc-accent);
+                    pointer-events: none;
+                }
+                @media (max-width: 1100px) {
+                    .rc-discover-v29 .rc-home-header-v2 .rc-home-actions-v2 {
+                        justify-self: end !important;
+                        width: auto !important;
+                    }
+                }
 </style>
 
-            <div class="rc-discover-v29">
+            <div class="rc-discover-v29"
+                 x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 240); }">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -8350,13 +8394,14 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.350ms="search" />
+                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="search" autocomplete="off" />
+                    <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="search" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
                         @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))">{{ $divisionLabel }}</button>
+                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))" wire:loading.attr="disabled" wire:target="setDivisionFilter">{{ $divisionLabel }}</button>
                         @endforeach
                     </div>
 
@@ -8371,14 +8416,14 @@
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
                         <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" wire:click="toggleVisibleSchoolsSelection" wire:loading.attr="disabled" wire:target="toggleVisibleSchoolsSelection"><input type="checkbox" @checked($this->visibleSchoolsSelected) readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
                     </div>
 
                     <div class="rc-discover-right-v27">
                         <div wire:loading.flex wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</div>
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
@@ -9214,10 +9259,47 @@
                 .rc-attachment-icon-v45.is-file { background:#3b82f6; }
                 .rc-attachment-drop-v45 { border:1px dashed rgba(148,163,184,.55); border-radius:.8rem; display:grid; place-items:center; min-height:4.6rem; color:var(--rc-muted); text-align:center; cursor:pointer; background:var(--rc-soft); }
                 .rc-compose-modal-v45 { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(2,6,23,.62); backdrop-filter:blur(5px); }
+
+                /* v73: immediate tactile feedback while Livewire completes the request. */
+                .rc-compose-page-v45 button,
+                .rc-compose-page-v45 label,
+                .rc-compose-page-v45 .rc-global-suggestion-item {
+                    transition: transform .1s ease, opacity .12s ease, border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
+                    touch-action: manipulation;
+                }
+                .rc-compose-page-v45 button:active,
+                .rc-compose-page-v45 button.rc-click-feedback-v73 {
+                    transform: scale(.975);
+                    opacity: .82;
+                }
+                .rc-compose-page-v45 button[disabled] {
+                    cursor: wait !important;
+                    opacity: .62;
+                }
+                .rc-compose-tab-v45.rc-livewire-pending-v73,
+                .rc-compose-coach-pill-v45.rc-livewire-pending-v73,
+                .rc-global-suggestion-item.rc-livewire-pending-v73 {
+                    border-color: rgba(255,99,56,.48) !important;
+                    box-shadow: 0 0 0 3px rgba(255,99,56,.08);
+                }
+                .rc-compose-school-search-v45 .rc-global-search-shell { position: relative; }
+                .rc-compose-search-busy-v73 {
+                    position:absolute;
+                    right:2.55rem;
+                    top:50%;
+                    transform:translateY(-50%);
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    color:var(--rc-accent);
+                    pointer-events:none;
+                }
+                .rc-compose-school-search-v45 .rc-global-search-input { padding-right: 4.7rem !important; }
                 @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
             </style>
 
-            <div class="rc-compose-page-v45">
+            <div class="rc-compose-page-v45"
+                 x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 240); }">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -9228,9 +9310,10 @@
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openComposePreview">
+                        <button class="rc-btn" type="button" wire:click="openComposePreview" wire:loading.attr="disabled" wire:target="openComposePreview">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                            Preview
+                            <span wire:loading.remove wire:target="openComposePreview">Preview</span>
+                            <span wire:loading.flex wire:target="openComposePreview" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
                         <button class="rc-btn" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
@@ -9252,25 +9335,26 @@
                                 <div class="rc-compose-label-v45">Recipients</div>
                                 <div class="rc-compose-recipient-bar-v45">
                                     @if(is_array($this->composeSelectedSchool))
-                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients">×</button></span>
+                                        <span class="rc-compose-chip-v45">{{ $this->composeSelectedSchool['name'] ?? 'Selected School' }} ({{ number_format(count($this->composeSchoolCoaches)) }} coaches) <button type="button" wire:click="clearComposeRecipients" wire:loading.attr="disabled" wire:target="clearComposeRecipients" aria-label="Clear recipients">×</button></span>
                                     @elseif($campaignTargetMode === 'list' && $campaignListKey)
                                         <span class="rc-compose-chip-v45">{{ $this->composeSelectedList['label'] ?? 'Selected List' }} ({{ number_format($this->campaignRecipientCount) }} coaches) <button type="button" wire:click="$set('campaignListKey','')">×</button></span>
                                     @elseif($campaignTargetMode === 'coaches' && count($campaignCoachIds))
-                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection">×</button></span>
+                                        <span class="rc-compose-chip-v45">{{ number_format(count($campaignCoachIds)) }} selected coaches <button type="button" wire:click="clearComposeCoachSelection" wire:loading.attr="disabled" wire:target="clearComposeCoachSelection" aria-label="Clear selected coaches">×</button></span>
                                     @else
                                         <em class="rc-subtle">No school selected — search to add one below</em>
                                     @endif
 
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches">All Coaches</button>
-                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser">Choose Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolHeadCoachOnly" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="setComposeSchoolHeadCoachOnly">Head Coach Only</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'school' && ! $campaignHeadCoachOnly ? 'is-active' : '' }}" wire:click="setComposeSchoolAllCoaches" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="setComposeSchoolAllCoaches">All Coaches</button>
+                                    <button type="button" class="rc-compose-tab-v45 {{ $campaignTargetMode === 'coaches' ? 'is-active' : '' }}" wire:click="openComposeCoachChooser" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="openComposeCoachChooser">Choose Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
                                 </div>
 
                                 <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
                                     <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
                                         <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
-                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.300ms="composeSchoolSearch" />
+                                        <input class="rc-global-search-input" style="font-size:.88rem" placeholder="Search for a school..." wire:model.live.debounce.220ms="composeSchoolSearch" autocomplete="off" />
+                                        <span class="rc-compose-search-busy-v73" wire:loading.flex wire:target="composeSchoolSearch,selectComposeSchool" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
                                         @if(trim($composeSchoolSearch) !== '')
                                             <button type="button" class="rc-global-search-clear" wire:click="$set('composeSchoolSearch','')" aria-label="Clear school search">×</button>
                                         @endif
@@ -9286,7 +9370,7 @@
                                                     $coachCount = (int) ($school['coach_count'] ?? 0);
                                                     $detail = trim(collect([$school['conference'] ?? null, $school['division'] ?? null])->filter()->implode(' • '));
                                                 ?>
-                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))">
+                                                <button type="button" class="rc-global-suggestion-item {{ $campaignSchoolId === $sid ? 'is-selected' : '' }}" wire:click="selectComposeSchool(@js($sid))" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="selectComposeSchool">
                                                     <span class="rc-global-suggestion-icon">
                                                         @if($schoolLogo !== '')
                                                             <img src="{{ $schoolLogo }}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($schoolName) }}';">
@@ -9318,15 +9402,15 @@
                                     <div class="rc-compose-coach-grid-v45">
                                         @foreach($this->composeSchoolCoaches as $coach)
                                             <?php $cid = (string) ($coach['id'] ?? ''); $selectedCoach = in_array($cid, $campaignCoachIds, true); ?>
-                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))">
+                                            <button type="button" class="rc-compose-coach-pill-v45 {{ $selectedCoach ? 'is-selected' : '' }}" wire:click="toggleCampaignCoach(@js($cid))" wire:loading.attr="disabled" wire:loading.class="rc-livewire-pending-v73" wire:target="toggleCampaignCoach">
                                                 <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45">{{ $selectedCoach ? '✓' : '' }}</span><span>{{ $coach['name'] ?? 'Coach' }}</span>@if(str_contains(strtolower((string) ($coach['title'] ?? '')), 'head'))<span style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span>@endif</span>
                                                 <span class="rc-compose-coach-title-v45">{{ $coach['title'] ?? 'Coach' }}</span>
                                             </button>
                                         @endforeach
                                     </div>
                                     <div style="display:flex;gap:.45rem;margin-top:.55rem">
-                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches">Select all</button>
-                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection">Clear coaches</button>
+                                        <button type="button" class="rc-btn" wire:click="selectAllComposeSchoolCoaches" wire:loading.attr="disabled" wire:target="selectAllComposeSchoolCoaches">Select all</button>
+                                        <button type="button" class="rc-btn" wire:click="clearComposeCoachSelection" wire:loading.attr="disabled" wire:target="clearComposeCoachSelection">Clear coaches</button>
                                     </div>
                                 @elseif($campaignTargetMode === 'list')
                                     <div style="margin-top:.65rem;max-width:28rem">
