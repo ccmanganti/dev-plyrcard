@@ -11607,98 +11607,24 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return ['schools' => []];
-        }
-
-        try {
-            $schools = app(LocalCoachDatabaseSchoolService::class)->discoverDataset($user);
-        } catch (\Throwable $exception) {
-            Log::warning('Unable to build local Compose school dataset.', [
-                'user_id' => $user->id,
-                'error' => $exception->getMessage(),
-            ]);
-            $schools = $this->composeSchoolOptions;
-        }
-
-        $coaches = collect($this->allCoaches())
-            ->filter(fn ($coach): bool => is_array($coach))
-            ->filter(fn (array $coach): bool => filled($coach['id'] ?? $coach['contact_id'] ?? null) && filled($coach['email'] ?? null))
-            ->map(function (array $coach): array {
-                $id = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
-                $businessId = trim((string) ($coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? ''));
-                $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
-                $title = trim((string) ($coach['title'] ?? $coach['job_title'] ?? 'Coach'));
-
-                return [
-                    'id' => $id,
-                    'business_id' => $businessId,
-                    'school_key' => strtolower($schoolName),
-                    'name' => trim((string) ($coach['name'] ?? 'Coach')) ?: 'Coach',
-                    'title' => $title !== '' ? $title : 'Coach',
-                    'email' => trim((string) ($coach['email'] ?? '')),
-                    'is_head' => str_contains(strtolower($title), 'head'),
-                    'search_text' => strtolower(trim(implode(' ', array_filter([
-                        $coach['name'] ?? '', $title, $coach['email'] ?? '', $schoolName,
-                    ])))),
-                ];
-            })
-            ->filter(fn (array $coach): bool => $coach['id'] !== '')
-            ->unique('id')
-            ->values();
-
-        $byBusiness = $coaches->filter(fn (array $coach): bool => $coach['business_id'] !== '')->groupBy('business_id');
-        $byName = $coaches->filter(fn (array $coach): bool => $coach['school_key'] !== '')->groupBy('school_key');
-
-        $rows = collect($schools)
-            ->filter(fn ($school): bool => is_array($school) && filled($school['id'] ?? $school['business_id'] ?? null))
-            ->map(function (array $school) use ($byBusiness, $byName): array {
-                $id = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-                $name = trim((string) ($school['name'] ?? 'School')) ?: 'School';
-                // Compose must use the same two-reference union as Discover Schools:
-                // official Business/Company association IDs plus contacts whose
-                // Business Name / Company Name / School Name matches this school.
-                // Do not use the name match only as a fallback; GHL can return one
-                // officially associated coach while leaving the remaining coaches
-                // discoverable only through their Business Name field.
-                $businessMatchedCoaches = $byBusiness->get($id, collect());
-                $nameMatchedCoaches = $byName->get(strtolower($name), collect());
-
-                $schoolCoaches = collect($businessMatchedCoaches)
-                    ->merge($nameMatchedCoaches)
-                    ->filter(fn ($coach): bool => is_array($coach))
-                    ->unique(fn (array $coach): string => strtolower(trim((string) (
-                        $coach['id']
-                        ?? $coach['contact_id']
-                        ?? $coach['ghl_contact_id']
-                        ?? $coach['email']
-                        ?? $coach['name']
-                        ?? md5(json_encode($coach) ?: '')
-                    ))))
-                    ->values();
-
-                return [
-                    'id' => $id,
-                    'name' => $name,
-                    'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
-                    'conference' => trim((string) ($school['conference'] ?? '')),
-                    'division' => trim((string) ($school['division'] ?? '')),
-                    'city' => trim((string) ($school['city'] ?? '')),
-                    'state' => trim((string) ($school['state'] ?? '')),
-                    'search_text' => strtolower(trim(implode(' ', array_filter([
-                        $name, $school['conference'] ?? '', $school['division'] ?? '',
-                        $school['city'] ?? '', $school['state'] ?? '',
-                    ])))),
-                    'coaches' => $schoolCoaches->values()->all(),
-                    'coach_count' => $schoolCoaches->count(),
-                ];
-            })
-            ->sortBy(fn (array $school): string => strtolower($school['name']))
-            ->values()
-            ->all();
-
-        return ['schools' => $rows];
+        // Keep this payload intentionally tiny. Older versions duplicated every coach
+        // inside every school, which made Livewire/Blade JSON serialization explode in
+        // memory on accounts with thousands of coaches.
+        return [
+            'schools' => collect($this->composeSchoolOptions)
+                ->map(fn (array $school): array => [
+                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
+                    'name' => (string) ($school['name'] ?? 'School'),
+                    'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
+                    'conference' => (string) ($school['conference'] ?? ''),
+                    'division' => (string) ($school['division'] ?? ''),
+                    'city' => (string) ($school['city'] ?? ''),
+                    'state' => (string) ($school['state'] ?? ''),
+                    'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
         public function getComposeSelectedSchoolProperty(): ?array
@@ -11786,68 +11712,54 @@ HTML;
         return collect($this->lists)->firstWhere('key', $this->campaignListKey);
     }
 
-        public function getComposeSchoolOptionsProperty(): array
+    public function getComposeSchoolOptionsProperty(): array
     {
+        // Search must stay lightweight. Do not resolve coach rosters for every school
+        // while the user is typing; use the reconciled counts already stored on each
+        // school row and only resolve the selected school's roster on demand.
         return collect($this->allSchools())
-            ->filter(fn (array $school): bool => filled($school['id'] ?? $school['business_id'] ?? null) && filled($school['name'] ?? null))
-            ->map(fn (array $school): array => $this->enrichSchoolForDisplay($school))
+            ->filter(fn ($school): bool => is_array($school)
+                && filled($school['id'] ?? $school['business_id'] ?? null)
+                && filled($school['name'] ?? null))
             ->groupBy(function (array $school): string {
-                $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? ''));
+                $businessId = strtolower(trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? '')));
 
-                if ($businessId !== '') {
-                    return 'business:' . strtolower($businessId);
-                }
-
-                return 'name:' . $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+                return $businessId !== ''
+                    ? 'business:' . $businessId
+                    : 'name:' . $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
             })
             ->map(function ($group): array {
                 $rows = collect($group)->values();
-
                 $primary = $rows->sortByDesc(function (array $school): int {
-                    return (filled($school['logo_url'] ?? null) ? 100 : 0)
+                    return (filled($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null) ? 100 : 0)
                         + (filled($school['business_id'] ?? null) ? 20 : 0)
-                        + (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0);
+                        + min(9999, (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0));
                 })->first() ?: [];
 
-                $allMatchedCoaches = $rows
-                    ->flatMap(fn (array $school): array => $this->composeCoachesForSchool($school, true)->all())
-                    ->unique(function (array $coach): string {
-                        return strtolower(trim((string) (
-                            $coach['id']
-                            ?? $coach['contact_id']
-                            ?? $coach['ghl_contact_id']
-                            ?? $coach['email']
-                            ?? $coach['name']
-                            ?? md5(json_encode($coach) ?: '')
-                        )));
-                    })
-                    ->values();
+                $coachCount = (int) ($rows->max(
+                    fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? count($school['coach_ids'] ?? []))
+                ) ?: 0);
 
-                $coachCount = max(
-                    (int) ($primary['coach_count'] ?? 0),
-                    (int) ($primary['coaches_count'] ?? 0),
-                    $rows->max(fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0)) ?: 0,
-                    $allMatchedCoaches->count(),
-                );
+                $logo = trim((string) ($primary['logo_url'] ?? $primary['school_logo_url'] ?? $primary['business_logo_url'] ?? ''));
 
-                $primary['coach_count'] = $coachCount;
-                $primary['coaches_count'] = $coachCount;
-
-                if (blank($primary['logo_url'] ?? null)) {
-                    $logo = $rows
-                        ->map(fn (array $school): string => $this->logoUrlForSchoolRow($school))
-                        ->first(fn (string $url): bool => $url !== '');
-
-                    if ($logo) {
-                        $primary['logo_url'] = $logo;
-                        $primary['school_logo_url'] = $primary['school_logo_url'] ?? $logo;
-                        $primary['business_logo_url'] = $primary['business_logo_url'] ?? $logo;
-                    }
-                }
-
-                return $primary;
+                return [
+                    'id' => (string) ($primary['business_id'] ?? $primary['id'] ?? ''),
+                    'business_id' => (string) ($primary['business_id'] ?? $primary['id'] ?? ''),
+                    'name' => (string) ($primary['name'] ?? 'School'),
+                    'logo_url' => $logo,
+                    'school_logo_url' => $logo,
+                    'business_logo_url' => $logo,
+                    'conference' => (string) ($primary['conference'] ?? ''),
+                    'division' => (string) ($primary['division'] ?? ''),
+                    'city' => (string) ($primary['city'] ?? ''),
+                    'state' => (string) ($primary['state'] ?? ''),
+                    'head_coach' => is_array($primary['head_coach'] ?? null) ? $primary['head_coach'] : null,
+                    'coach_count' => $coachCount,
+                    'coaches_count' => $coachCount,
+                ];
             })
-            ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
+            ->filter(fn (array $school): bool => $school['id'] !== '')
+            ->sortBy(fn (array $school): string => strtolower($school['name']))
             ->values()
             ->all();
     }
@@ -11949,9 +11861,9 @@ HTML;
             return ['success' => false, 'error' => 'The selected school could not be found.'];
         }
 
-        // Repair this selected school on demand so Compose does not rely on a
-        // stale local-school row with only the officially associated contacts.
-        $school = $this->hydrateComposeSchoolCoachesForSelection($school);
+        // Compose is a read path. Do not trigger a remote school/contact hydration
+        // request here; the background database worker owns synchronization. This keeps
+        // school selection immediate and avoids rewriting the full snapshot per click.
 
         $resolvedSchoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? $schoolId);
 
@@ -13269,13 +13181,9 @@ HTML;
                 return true;
             }
 
-            // Conservative loose match for common Recruiting Center mismatch cases, e.g.
-            // business row includes "University" but contact row uses the shorter
-            // school/company name. Require one side to be reasonably specific.
-            if ((strlen($coachSchoolKey) >= 8 || strlen($normalizedSchoolName) >= 8)
-                && (str_contains($coachSchoolKey, $normalizedSchoolName) || str_contains($normalizedSchoolName, $coachSchoolKey))) {
-                return true;
-            }
+            // Do not use substring matching here. "University of Virginia" must not
+            // inherit coaches from Virginia Tech, Virginia State, West Virginia, etc.
+            // Business ID is authoritative; otherwise require an exact normalized name.
         }
 
         return false;

@@ -6846,26 +6846,34 @@
                     'showNewEmail' => true,
                 ])
 
-                {{-- Show the first-load sync banner only when no usable Coach Database exists yet. --}}
+                {{-- When there are zero usable schools, always expose the sync state so the user can tell whether the database is loading, completed empty, or needs attention. Once schools exist, background refreshes remain silent. --}}
                 @php
-                    $shouldShowInitialSyncBanner =
-                        ($isLoadingDataset || $isRecruitingSyncRunning)
-                        && empty($this->filteredSchools ?? [])
-                        && (int) ($this->filteredSchoolsCount ?? 0) === 0
-                        && (int) ($loadedSchoolsCount ?? 0) === 0
-                        && blank($cachedAt ?? null);
+                    $hasUsableSchoolDatabase =
+                        ! empty($this->filteredSchools ?? [])
+                        || (int) ($this->filteredSchoolsCount ?? 0) > 0
+                        || (int) ($loadedSchoolsCount ?? 0) > 0;
+
+                    $hasRecruitingSyncState =
+                        ($isLoadingDataset ?? false)
+                        || ($isRecruitingSyncRunning ?? false)
+                        || filled($recruitingSyncStatus ?? null)
+                        || filled($recruitingSyncMessage ?? null)
+                        || filled($cachedAt ?? null);
+
+                    $shouldShowInitialSyncBanner = ! $hasUsableSchoolDatabase && $hasRecruitingSyncState;
                 @endphp
 
                 @if($shouldShowInitialSyncBanner)
                     @php
                         $reloadPercent = $isLoadingDataset
                             ? max(5, min(98, (int) ($remoteTotalSchools ? round(($loadedSchoolsCount / max(1, $remoteTotalSchools)) * 100) : min(96, max(1, $loadedPages) * 8))))
-                            : ($isRecruitingSyncRunning ? 35 : 100);
+                            : ($isRecruitingSyncRunning ? 35 : (($recruitingSyncStatus ?? '') === 'completed' ? 100 : 10));
                         $reloadStatusLabel = match ($recruitingSyncStatus) {
                             'completed' => 'Synced',
-                            'failed_to_start' => 'Needs attention',
+                            'failed', 'failed_to_start' => 'Needs attention',
                             'already_running' => 'Already syncing',
-                            default => 'Syncing',
+                            'queued' => 'Queued',
+                            default => ($isRecruitingSyncRunning ? 'Syncing' : 'Waiting'),
                         };
                     @endphp
                     <div class="rc-reload-status-v101" role="status" aria-live="polite">
