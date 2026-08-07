@@ -9810,13 +9810,23 @@
                 }
 
                 .rc-list-quick-create-v105 {
-                    display:grid !important;
-                    grid-template-columns:minmax(0,1fr) 3rem;
-                    gap:.55rem !important;
+                    display:block !important;
                     padding:.8rem .9rem .9rem !important;
                     margin:0 !important;
                     border-top:1px solid #edf0f4 !important;
                     background:#fff !important;
+                }
+
+                .rc-list-quick-create-v105 .rc-list-popover-title-v105 {
+                    padding:0 0 .58rem !important;
+                }
+
+                .rc-list-new-row-v105 {
+                    display:grid;
+                    grid-template-columns:minmax(0,1fr) 3rem;
+                    align-items:center;
+                    gap:.55rem;
+                    width:100%;
                 }
 
                 .rc-list-new-input-v105 {
@@ -12232,7 +12242,10 @@ CSS;
                 .rc-compose-template-menu-v45 { position:absolute; z-index:55; right:0; top:calc(100% + .45rem); width:min(23rem,88vw); border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); box-shadow:0 18px 45px rgba(15,23,42,.15); padding:.7rem; display:grid; gap:.25rem; }
                 .rc-compose-template-menu-v45 button { width:100%; border:0; background:transparent; color:var(--rc-text); border-radius:.55rem; padding:.65rem .7rem; text-align:left; cursor:pointer; }
                 .rc-compose-template-menu-v45 button:hover, .rc-compose-template-menu-v45 button.is-active { background:rgba(255,99,56,.12); }
+                .rc-compose-template-menu-v45 button:disabled { cursor:wait; opacity:.72; }
                 .rc-compose-template-menu-v45 strong { display:block; font-size:.8rem; }
+                .rc-compose-template-loading-v83 { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:1.35rem; height:1.35rem; color:#ff6338; }
+                .rc-compose-template-loading-v83 .rc-spinner-mini { width:.9rem; height:.9rem; border-width:2px; }
                 .rc-compose-template-menu-v45 span { display:block; color:var(--rc-muted); font-size:.72rem; margin-top:.12rem; }
                 .rc-compose-template-preview-v45 { color:var(--rc-muted); font-size:.7rem; margin-top:.2rem; line-height:1.35; }
                 .rc-compose-vars-v45 { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
@@ -12328,9 +12341,33 @@ CSS;
                         this.selectedCoachIds.clear(); this.coachRevision++;
 
                         try {
-                            await this.$wire.call('selectComposeSchool', id);
+                            const result = await this.$wire.call('selectComposeSchool', id);
+
+                            if (!result || result.success === false) {
+                                throw new Error(result?.error || 'Unable to load coaches for this school.');
+                            }
+
+                            const coaches = Array.isArray(result.coaches) ? result.coaches : [];
+
+                            // Replace only the selected school row in Alpine's local
+                            // dataset. This preserves instant school search while making
+                            // the validated roster available immediately after selection.
+                            this.dataset = {
+                                ...this.dataset,
+                                schools: this.schools.map(row => String(row.id) === id
+                                    ? {
+                                        ...row,
+                                        coaches,
+                                        coach_count: Number(result.coach_count ?? coaches.length ?? 0),
+                                    }
+                                    : row),
+                            };
+
+                            this.selectedCoachIds.clear();
+                            this.coachRevision++;
                         } catch (error) {
                             console.error(error);
+                            toast(error?.message || 'Unable to load coaches for this school.');
                         }
                     },
                     chooseHeadCoach() { if (!this.selectedSchool) return; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.coachRevision++; },
@@ -12445,7 +12482,7 @@ CSS;
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
                                     <input class="rc-input" style="width:100%" placeholder="Subject line" wire:model.live.debounce.500ms="campaignSubject" />
-                                    <div class="rc-compose-template-wrap-v45" x-data="{open:false}">
+                                    <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'' }">
                                         <button class="rc-btn" type="button" x-on:click="open=!open">
                                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
                                             Templates
@@ -12453,9 +12490,28 @@ CSS;
                                         <div x-cloak x-show="open" x-on:click.outside="open=false" class="rc-compose-template-menu-v45">
                                             <div class="rc-subtle" style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.25rem .4rem">Choose a template</div>
                                             @forelse($this->composeTemplateOptions as $template)
-                                                <button type="button" class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}" wire:click="useTemplateForCompose(@js((string) ($template['id'] ?? '')))" wire:loading.attr="disabled" wire:target="useTemplateForCompose" x-on:click="open=false">
-                                                    <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
-                                                    <span>{{ $template['compose_subject_preview'] ?? 'Recruiting email' }}</span>
+                                                <button
+                                                    type="button"
+                                                    class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}"
+                                                    data-rc-local-action
+                                                    x-bind:disabled="loadingTemplateId !== ''"
+                                                    x-on:click.prevent.stop="
+                                                        const id = @js((string) ($template['id'] ?? ''));
+                                                        if (!id || loadingTemplateId) return;
+                                                        loadingTemplateId = id;
+                                                        open = false;
+                                                        $wire.call('useTemplateForCompose', id)
+                                                            .catch((error) => console.error(error))
+                                                            .finally(() => { loadingTemplateId = ''; });
+                                                    "
+                                                >
+                                                    <span style="display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;">
+                                                        <span style="min-width:0;display:block;">
+                                                            <strong>{{ $template['name'] ?? 'Untitled Template' }}</strong>
+                                                            <span>{{ $template['compose_subject_preview'] ?? 'Recruiting email' }}</span>
+                                                        </span>
+                                                        <span x-show="loadingTemplateId === @js((string) ($template['id'] ?? ''))" x-cloak class="rc-compose-template-loading-v83"><span class="rc-spinner-mini"></span></span>
+                                                    </span>
                                                     <div class="rc-compose-template-preview-v45">{{ $template['compose_body_preview'] ?? 'Personalized message preview' }}</div>
                                                 </button>
                                             @empty
@@ -12722,7 +12778,7 @@ CSS;
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-use-v52" type="button" data-rc-local-action wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>

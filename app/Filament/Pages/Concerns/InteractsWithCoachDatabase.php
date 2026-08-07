@@ -12083,13 +12083,39 @@ HTML;
         $this->composeChooseCoachesOpen = false;
         $this->composeSchoolSearch = '';
 
-        $coachCount = $this->composeCoachesForSchool($school, true)->count();
+        // Return the exact validated roster to the Alpine Compose controller.
+        // The initial client dataset intentionally omits coach arrays for all
+        // unselected schools to keep the page lightweight, so selection must
+        // hydrate the chosen row explicitly instead of waiting for a DOM morph.
+        $coaches = $this->composeCoachesForSchool($school, true)
+            ->map(function (array $coach): array {
+                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
+                $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
+                $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
+
+                return [
+                    'id' => $coachId,
+                    'name' => $coachName,
+                    'email' => (string) ($coach['email'] ?? ''),
+                    'title' => $title,
+                    'is_head' => $this->isHeadCoachTitle($title),
+                    'search_text' => strtolower(trim(implode(' ', array_filter([
+                        $coachName,
+                        (string) ($coach['email'] ?? ''),
+                        $title,
+                    ])))),
+                ];
+            })
+            ->filter(fn (array $coach): bool => $coach['id'] !== '')
+            ->values()
+            ->all();
 
         return [
             'success' => true,
             'school_id' => $resolvedSchoolId,
             'school_name' => (string) ($school['name'] ?? 'School'),
-            'coach_count' => $coachCount,
+            'coach_count' => count($coaches),
+            'coaches' => $coaches,
         ];
     }
 
