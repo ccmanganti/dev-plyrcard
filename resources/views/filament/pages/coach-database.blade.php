@@ -8459,8 +8459,16 @@
                         },
 
                         get conferenceOptions() {
-                            return [...new Set(this.schools.map(s => String(s.conference || '').trim()).filter(Boolean))]
-                                .sort((a, b) => a.localeCompare(b));
+                            const division = this.divisionKey(this.division);
+                            const schools = division
+                                ? this.schools.filter((school) => this.divisionKey(school.division) === division)
+                                : this.schools;
+
+                            return [...new Set(
+                                schools
+                                    .map((school) => String(school.conference || '').trim())
+                                    .filter(Boolean)
+                            )].sort((a, b) => a.localeCompare(b));
                         },
 
                         get canLoadMore() {
