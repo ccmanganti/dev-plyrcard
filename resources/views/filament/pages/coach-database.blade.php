@@ -12281,6 +12281,7 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
+                    selectAllPending: false,
                     rosterLoading: false,
                     sendingFast: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
@@ -12335,18 +12336,29 @@ CSS;
                     },
                     selectAllCoaches() {
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
+
+                        // If the exact roster is still hydrating, remember the user's
+                        // intent and apply Select All the instant those rows arrive.
+                        if (this.rosterLoading || !this.schoolCoaches.length) {
+                            this.selectAllPending = true;
+                            this.coachRevision++;
+                            return;
+                        }
+
+                        this.selectAllPending = false;
                         this.selectedCoachIds = this.schoolCoaches
                             .map(row => String(row.id || ''))
                             .filter(Boolean);
                         this.coachRevision++;
                     },
                     clearCoaches() {
+                        this.selectAllPending = false;
                         this.selectedCoachIds = [];
                         this.coachRevision++;
                     },
                     clearRecipients() {
                         this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
-                        this.selectedCoachIds = []; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
+                        this.selectAllPending = false; this.selectedCoachIds = []; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
                     },
                     async chooseSchool(school) {
                         const id = String(school?.id || ''); if (!id) return;
@@ -12355,7 +12367,7 @@ CSS;
                         // only this school's exact coach roster on the server.
                         this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
                         this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
-                        this.selectedCoachIds = []; this.rosterLoading = true; this.coachRevision++;
+                        this.selectAllPending = false; this.selectedCoachIds = []; this.rosterLoading = true; this.coachRevision++;
 
                         try {
                             const result = await this.$wire.call('selectComposeSchool', id);
@@ -12380,7 +12392,14 @@ CSS;
                                     : row),
                             };
 
-                            this.selectedCoachIds = [];
+                            if (this.selectAllPending) {
+                                this.selectedCoachIds = coaches
+                                    .map(row => String(row.id || ''))
+                                    .filter(Boolean);
+                                this.selectAllPending = false;
+                            } else {
+                                this.selectedCoachIds = [];
+                            }
                             this.coachRevision++;
                         } catch (error) {
                             console.error(error);
@@ -12490,9 +12509,9 @@ CSS;
                                 <div x-cloak x-show="selectedSchool && chooserOpen" style="margin-top:.65rem">
                                     <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
-                                        <template x-for="coach in visibleCoaches" :key="coach.id">
-                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="{'is-selected':coachSelected(coach.id)}" x-on:click="toggleCoach(coach.id)">
-                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="coachSelected(coach.id) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
+                                        <template x-for="coach in visibleCoaches" :key="`${coach.id}-${coachRevision}`">
+                                            <button type="button" class="rc-compose-coach-pill-v45" x-bind:class="selectedCoachIds.includes(String(coach.id || '')) ? 'is-selected' : ''" x-on:click="toggleCoach(coach.id)">
+                                                <span class="rc-compose-coach-name-v45"><span class="rc-compose-check-v45" x-text="selectedCoachIds.includes(String(coach.id || '')) ? '✓' : ''"></span><span x-text="coach.name"></span><span x-show="coach.is_head" style="color:#ff6338;font-size:.62rem;font-weight:800">HC</span></span>
                                                 <span class="rc-compose-coach-title-v45" x-text="coach.title"></span>
                                             </button>
                                         </template>
