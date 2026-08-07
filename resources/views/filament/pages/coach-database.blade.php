@@ -12279,7 +12279,7 @@ CSS;
                     targetMode: @js((string) ($campaignTargetMode ?? 'school')),
                     headCoachOnly: @js((bool) ($campaignHeadCoachOnly ?? true)),
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
-                    selectedCoachIds: new Set(@js(array_values(array_map('strval', $campaignCoachIds ?? [])))),
+                    selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
                     rosterLoading: false,
                     sendingFast: false,
@@ -12307,7 +12307,7 @@ CSS;
                     },
                     get activeCoachIds() {
                         if (!this.selectedSchool) return [];
-                        if (this.targetMode === 'coaches') return Array.from(this.selectedCoachIds);
+                        if (this.targetMode === 'coaches') return [...this.selectedCoachIds];
                         if (this.headCoachOnly) {
                             const head = this.schoolCoaches.find(row => row.is_head) || this.schoolCoaches[0];
                             return head ? [String(head.id)] : [];
@@ -12320,36 +12320,33 @@ CSS;
                         if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
                         return `Sending to ${this.headCoachOnly ? 'head coach only' : 'all coaches'} at ${this.selectedSchool.name}`;
                     },
-                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.has(String(id || '')); },
+                    coachSelected(id) { this.coachRevision; return this.selectedCoachIds.includes(String(id || '')); },
                     toggleCoach(id) {
                         id = String(id || ''); if (!id) return;
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
 
-                        // Replace the Set instead of mutating it in place. Alpine tracks
-                        // the property assignment immediately, so coach pills, checkmarks,
-                        // recipient counts, and send state redraw without waiting for any
-                        // unrelated DOM update.
-                        const next = new Set(this.selectedCoachIds);
-                        next.has(id) ? next.delete(id) : next.add(id);
-                        this.selectedCoachIds = next;
+                        // Keep selected coach IDs as a plain reactive array. Alpine's
+                        // x-for row bindings reliably observe array replacement, so each
+                        // coach card/checkmark redraws immediately on toggle/select/clear.
+                        this.selectedCoachIds = this.selectedCoachIds.includes(id)
+                            ? this.selectedCoachIds.filter(value => value !== id)
+                            : [...this.selectedCoachIds, id];
                         this.coachRevision++;
                     },
                     selectAllCoaches() {
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        this.selectedCoachIds = new Set(
-                            this.schoolCoaches
-                                .map(row => String(row.id || ''))
-                                .filter(Boolean)
-                        );
+                        this.selectedCoachIds = this.schoolCoaches
+                            .map(row => String(row.id || ''))
+                            .filter(Boolean);
                         this.coachRevision++;
                     },
                     clearCoaches() {
-                        this.selectedCoachIds = new Set();
+                        this.selectedCoachIds = [];
                         this.coachRevision++;
                     },
                     clearRecipients() {
                         this.selectedSchoolId = ''; this.schoolQuery = ''; this.coachQuery = '';
-                        this.selectedCoachIds = new Set(); this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
+                        this.selectedCoachIds = []; this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false; this.rosterLoading = false; this.coachRevision++;
                     },
                     async chooseSchool(school) {
                         const id = String(school?.id || ''); if (!id) return;
@@ -12358,7 +12355,7 @@ CSS;
                         // only this school's exact coach roster on the server.
                         this.selectedSchoolId = id; this.schoolQuery = ''; this.coachQuery = '';
                         this.targetMode = 'school'; this.headCoachOnly = true; this.chooserOpen = false;
-                        this.selectedCoachIds = new Set(); this.rosterLoading = true; this.coachRevision++;
+                        this.selectedCoachIds = []; this.rosterLoading = true; this.coachRevision++;
 
                         try {
                             const result = await this.$wire.call('selectComposeSchool', id);
@@ -12383,7 +12380,7 @@ CSS;
                                     : row),
                             };
 
-                            this.selectedCoachIds = new Set();
+                            this.selectedCoachIds = [];
                             this.coachRevision++;
                         } catch (error) {
                             console.error(error);
@@ -12398,12 +12395,10 @@ CSS;
                     chooseSpecificCoaches() {
                         if (!this.selectedSchool) return;
                         this.targetMode = 'coaches'; this.headCoachOnly = false; this.chooserOpen = true;
-                        if (!this.selectedCoachIds.size) {
-                            this.selectedCoachIds = new Set(
-                                this.schoolCoaches
-                                    .map(row => String(row.id || ''))
-                                    .filter(Boolean)
-                            );
+                        if (!this.selectedCoachIds.length) {
+                            this.selectedCoachIds = this.schoolCoaches
+                                .map(row => String(row.id || ''))
+                                .filter(Boolean);
                         }
                         this.coachRevision++;
                     },
@@ -12412,7 +12407,7 @@ CSS;
                         if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
                         this.sendingFast = true;
                         try {
-                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, Array.from(this.selectedCoachIds));
+                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } finally { this.sendingFast = false; }
                     },
                 }">
