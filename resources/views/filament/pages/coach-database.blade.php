@@ -8388,7 +8388,7 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="discoverSchoolSearch" autocomplete="off" />
+                    <input wire:key="discover-school-search-input" placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="discoverSchoolSearch" autocomplete="off" />
                     <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="discoverSchoolSearch" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
                 </div>
 
@@ -8399,7 +8399,7 @@
                         @endforeach
                     </div>
 
-                    <select class="rc-discover-select-v27" wire:model.live="conferenceFilter" aria-label="Conference filter">
+                    <select wire:key="discover-conference-filter" class="rc-discover-select-v27" wire:model.live="conferenceFilter" wire:loading.attr="disabled" wire:target="conferenceFilter" aria-label="Conference filter">
                         <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
                         @foreach($this->conferences as $conference)
                             <option value="{{ $conference }}">{{ $conference }}</option>
@@ -8455,9 +8455,29 @@
                     </div>
                 @endif
 
-                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="search,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
+                @php
+                    // The school-grid partial owns an Alpine copy of the rows. Livewire can
+                    // correctly recompute filteredSchools while Alpine would otherwise keep
+                    // rendering the rows from its first mount. Change only this subtree's key
+                    // whenever the Discover result set/view changes so Alpine receives the
+                    // freshly filtered rows without remounting the rest of Coach Database.
+                    $discoverGridRenderKey = md5(json_encode([
+                        (string) ($discoverSchoolSearch ?? ''),
+                        (string) ($divisionFilter ?? ''),
+                        (string) ($conferenceFilter ?? ''),
+                        (string) ($sort ?? 'name'),
+                        (string) ($schoolViewMode ?? 'grid'),
+                        (int) $discoverSchoolCount,
+                        (int) $discoverShownCount,
+                        (string) ($cachedAt ?? ''),
+                    ]));
+                @endphp
+
+                <div class="rc-discover-loading-v27" wire:loading.class="is-loading" wire:target="discoverSchoolSearch,divisionFilter,conferenceFilter,sort,setDivisionFilter,clearSchoolFilters,setSchoolViewMode,loadMoreSchools,refreshCoachDatabase,startBackgroundLoad,loadNextBatch,toggleSchoolSelection,toggleVisibleSchoolsSelection,clearSelectedSchools">
                     <div class="rc-discover-loading-overlay-v27"><div class="rc-loading-card-v26"><span class="rc-spinner-mini"></span> Updating schools</div></div>
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                    <div wire:key="discover-school-grid-{{ $discoverGridRenderKey }}">
+                        @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                    </div>
                 </div>
 
                 @if($this->canLoadMoreSchools)
@@ -9924,6 +9944,88 @@
                                 </div>
                             </div>
                         </div>
+            </div>
+        @endif
+
+        <style>
+            /* v76: Discover-only instant school drawer feedback.
+               This shell intentionally does not reuse .rc-school-modal-backdrop because
+               that class forces display:flex !important and can defeat wire:loading. */
+            .rc-school-opening-backdrop-v76 {
+                position: fixed;
+                inset: 0;
+                z-index: 89;
+                justify-content: flex-end;
+                align-items: stretch;
+                background: rgba(15, 23, 42, .34);
+                backdrop-filter: blur(3px);
+                -webkit-backdrop-filter: blur(3px);
+            }
+            .rc-school-opening-panel-v76 {
+                display: grid;
+                align-content: start;
+                gap: 1rem;
+                animation: rcSchoolOpeningSlideV76 .16s ease-out both;
+                pointer-events: none;
+            }
+            @keyframes rcSchoolOpeningSlideV76 {
+                from { transform: translateX(22px); opacity: .72; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            .rc-school-opening-hero-v76 {
+                display: grid;
+                grid-template-columns: 4.2rem minmax(0, 1fr);
+                gap: .9rem;
+                align-items: center;
+                margin-top: .35rem;
+            }
+            .rc-school-opening-logo-v76 { width:4.2rem; height:4.2rem; display:block; border-radius:1rem; }
+            .rc-school-opening-copy-v76 { display:grid; gap:.48rem; }
+            .rc-school-opening-line-v76 { width:70%; height:.72rem; display:block; }
+            .rc-school-opening-line-v76.is-short { width:28%; height:.6rem; }
+            .rc-school-opening-line-v76.is-title { width:55%; height:1.25rem; }
+            .rc-school-opening-status-v76 {
+                display:flex; align-items:center; gap:.5rem; color:var(--rc-muted);
+                font-size:.8rem; font-weight:700; padding:.2rem 0;
+            }
+            .rc-school-opening-actions-v76 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
+            .rc-school-opening-action-v76 { height:2.65rem; display:block; border-radius:.72rem; }
+            .rc-school-opening-body-v76 { display:grid; gap:.65rem; padding-top:.4rem; }
+            .rc-school-opening-row-v76 { height:4.25rem; display:block; border-radius:.85rem; }
+        </style>
+
+        {{-- v76: instant school-opening feedback only on Discover Schools. --}}
+        @if($section === 'schools')
+            <div
+                class="rc-school-opening-backdrop-v76"
+                wire:loading.flex
+                wire:target="selectSchoolById"
+                aria-hidden="true"
+            >
+                <div class="rc-drawer-panel rc-school-modal-panel rc-school-opening-panel-v76">
+                    <div class="rc-school-opening-hero-v76">
+                        <span class="rc-school-opening-logo-v76 rc-skeleton"></span>
+                        <div class="rc-school-opening-copy-v76">
+                            <span class="rc-school-opening-line-v76 is-short rc-skeleton"></span>
+                            <span class="rc-school-opening-line-v76 is-title rc-skeleton"></span>
+                            <span class="rc-school-opening-line-v76 rc-skeleton"></span>
+                        </div>
+                    </div>
+                    <div class="rc-school-opening-status-v76">
+                        <span class="rc-spinner-mini"></span>
+                        <span>Opening school</span>
+                    </div>
+                    <div class="rc-school-opening-actions-v76">
+                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
+                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
+                        <span class="rc-school-opening-action-v76 rc-skeleton"></span>
+                    </div>
+                    <div class="rc-school-opening-body-v76">
+                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
+                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
+                        <span class="rc-school-opening-row-v76 rc-skeleton"></span>
+                    </div>
+                </div>
             </div>
         @endif
 
