@@ -11714,13 +11714,39 @@ CSS;
                                 class="rc-inbox-quick-reply-v92"
                                 wire:submit.prevent="sendQuickReply"
                                 x-data="{
-                                    draftKey: 'rcQuickReplyDraft:' + @js((string) ($selectedConversationId ?? 'none')),
+                                    conversationKey: String(@js((string) ($selectedConversationId ?? 'none'))),
+                                    initialBody: @js((string) ($quickReplyBody ?? '')),
+                                    lastAppliedServerBody: '',
                                     init() {
-                                        const saved = sessionStorage.getItem(this.draftKey);
-                                        if (saved && this.$refs.replyEditor) {
-                                            this.$refs.replyEditor.innerHTML = saved;
+                                        window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+
+                                        this.$nextTick(() => {
+                                            if (!this.$refs.replyEditor) return;
+
+                                            // Server/template content wins only when it is explicitly present.
+                                            // Otherwise preserve the current browser draft for this conversation.
+                                            const serverBody = String(this.initialBody || '');
+                                            const localBody = String(window.__rcInboxReplyDrafts[this.conversationKey] || '');
+                                            const body = serverBody !== '' ? serverBody : localBody;
+
+                                            if (body !== '') {
+                                                this.$refs.replyEditor.innerHTML = body;
+                                                this.lastAppliedServerBody = serverBody;
+                                            }
+
                                             this.sync(false);
-                                        }
+                                        });
+                                    },
+                                    applyServerBody(value) {
+                                        const html = String(value || '');
+                                        if (!this.$refs.replyEditor || html === '' || html === this.lastAppliedServerBody) return;
+
+                                        // A template/body change from Livewire should populate the editor once.
+                                        // Never re-apply the same server value over a user's subsequent edits.
+                                        this.lastAppliedServerBody = html;
+                                        this.$refs.replyEditor.innerHTML = html;
+                                        window.__rcInboxReplyDrafts[this.conversationKey] = html;
+                                        this.sync(false);
                                     },
                                     command(name) {
                                         this.$refs.replyEditor?.focus();
@@ -11729,9 +11755,15 @@ CSS;
                                     },
                                     sync(save = true) {
                                         const html = this.$refs.replyEditor?.innerHTML || '';
-                                        this.$refs.replyValue.value = html;
-                                        this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
-                                        if (save) sessionStorage.setItem(this.draftKey, html);
+                                        if (this.$refs.replyValue) {
+                                            this.$refs.replyValue.value = html;
+                                            this.$refs.replyValue.dispatchEvent(new Event('input', { bubbles: true }));
+                                        }
+                                        if (save) {
+                                            window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+                                            window.__rcInboxReplyDrafts[this.conversationKey] = html;
+                                            this.lastAppliedServerBody = html;
+                                        }
                                     },
                                     uploadActive: false,
                                     uploadProgress: 0,
@@ -11758,11 +11790,14 @@ CSS;
 },
                                     clear() {
                                         if (this.$refs.replyEditor) this.$refs.replyEditor.innerHTML = '';
-                                        sessionStorage.removeItem(this.draftKey);
+                                        window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
+                                        delete window.__rcInboxReplyDrafts[this.conversationKey];
+                                        this.lastAppliedServerBody = '';
                                         this.sync(false);
                                     }
                                 }"
                                 x-init="init()"
+                                x-effect="applyServerBody($wire.quickReplyBody)"
                                 x-on:keydown.ctrl.enter.prevent="sync(); $el.requestSubmit()"
                                 x-on:keydown.meta.enter.prevent="sync(); $el.requestSubmit()"
                                 x-on:rc-inbox-quick-reply-sent.window="clear()"
@@ -11788,7 +11823,7 @@ CSS;
                                             aria-multiline="true"
                                             aria-label="Quick reply message"
                                             data-placeholder="Write your reply…"
-                                            x-on:input.debounce.150ms="sync()"
+                                            x-on:input="sync()"
                                             x-on:blur="sync()"
                                         ></div>
                                     </div>
@@ -15190,6 +15225,20 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             const isSupportedNavigation = (anchor) => {
                 if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return false;
 
+                // Links rendered inside email/template/editor content are content, not
+                // Recruiting Center navigation. Never trigger the page-wide spinner for
+                // them, especially while editing a loaded template in Inbox.
+                if (anchor.closest?.([
+                    '[contenteditable=\"true\"]',
+                    '.rc-inbox-quick-reply-v92',
+                    '.rc-inbox-message-v56',
+                    '.rc-email-document-v64',
+                    'rc-inbox-email-view',
+                    '.rc-rich-editor',
+                    '.rc-native-editor',
+                    '.rc-template-editor-v50'
+                ].join(','))) return false;
+
                 const rawHref = String(anchor.getAttribute('href') || '').trim();
                 if (!rawHref || rawHref === '#' || rawHref.startsWith('#')) return false;
                 if (/^(mailto:|tel:|javascript:)/i.test(rawHref)) return false;
@@ -15245,4 +15294,189 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         })();
     </script>
 
+    <script id="rc-inbox-editor-link-guard-v91">
+    (() => {
+        if (window.__rcInboxEditorLinkGuardV91) return;
+        window.__rcInboxEditorLinkGuardV91 = true;
+
+        document.addEventListener('click', (event) => {
+            const anchor = event.target.closest?.('[contenteditable="true"] a[href]');
+            if (!anchor) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+            // In an editor, a normal click selects/edits the link instead of leaving
+            // the page. Ctrl/Cmd-click is still available when the user wants to open it.
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
+    })();
+    </script>
+
 </x-filament-panels::page>
+{{-- v90: Inbox viewport-height layout. Keep quick reply/send visible on short screens. --}}
+<style id="rc-inbox-viewport-fit-v90">
+    @if($section === 'conversations')
+    .rc-inbox-page-v56 {
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-shell-v56 {
+        height: var(--rc-inbox-fit-height, calc(100dvh - 10rem)) !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-shell-v56 > *,
+    .rc-inbox-left-v56,
+    .rc-inbox-mid-v56,
+    .rc-inbox-right-v56 {
+        min-height: 0 !important;
+        max-height: 100% !important;
+    }
+
+    .rc-inbox-left-v56 {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-left-v56 > .rc-inbox-list-v56,
+    .rc-inbox-list-v56 {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+    }
+
+    .rc-inbox-mid-v56 {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .rc-inbox-mid-head-v56 {
+        flex: 0 0 auto !important;
+    }
+
+    .rc-inbox-mid-v56 > .rc-message-stream-v56,
+    .rc-message-stream-v56 {
+        flex: 1 1 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+    }
+
+    .rc-inbox-quick-reply-v92 {
+        position: relative !important;
+        inset: auto !important;
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
+        max-height: min(18rem, 42vh) !important;
+        overflow-y: auto !important;
+        z-index: 24 !important;
+        background: var(--rc-surface) !important;
+        border-top: 1px solid var(--rc-border) !important;
+        box-shadow: 0 -8px 22px rgba(15,23,42,.045) !important;
+    }
+
+    .rc-inbox-quick-reply-contenteditable-v93 {
+        min-height: 2.75rem !important;
+        max-height: min(7rem, 18vh) !important;
+    }
+
+    .rc-inbox-quick-reply-footer-v92 {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        background: var(--rc-surface);
+        padding-bottom: .05rem;
+    }
+
+    .rc-inbox-right-v56,
+    .rc-coach-profile-v56 {
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+    }
+
+    @media (max-height: 760px) and (min-width: 901px) {
+        .rc-inbox-panel-head-v56 { padding-top: .55rem !important; padding-bottom: .4rem !important; }
+        .rc-inbox-search-v56 { padding-bottom: .4rem !important; }
+        .rc-inbox-tabs-v56 { padding-bottom: .45rem !important; }
+        .rc-inbox-mid-head-v56 { min-height: 3.7rem !important; padding-block: .45rem !important; }
+        .rc-inbox-quick-reply-toolbar-v92 { padding-bottom: .18rem !important; }
+        .rc-inbox-quick-reply-editor-v92 { padding-top: .32rem !important; padding-bottom: .4rem !important; }
+        .rc-inbox-quick-reply-contenteditable-v93 { min-height: 2.35rem !important; max-height: 4.5rem !important; }
+    }
+
+    @media (max-width: 900px) {
+        .rc-inbox-page-v56,
+        .rc-inbox-shell-v56 {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        .rc-inbox-mid-v56 { overflow: visible !important; }
+        .rc-message-stream-v56 { max-height: 42rem !important; }
+        .rc-inbox-quick-reply-v92 { max-height: none !important; overflow: visible !important; }
+    }
+    @endif
+</style>
+
+@if($section === 'conversations')
+<script id="rc-inbox-viewport-fit-script-v90">
+(() => {
+    if (window.__rcInboxViewportFitV90) {
+        window.__rcInboxViewportFitV90();
+        return;
+    }
+
+    let frame = null;
+
+    const fit = () => {
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+            const shell = document.querySelector('.rc-inbox-shell-v56');
+            if (!shell) return;
+
+            if (window.innerWidth <= 900) {
+                shell.style.removeProperty('--rc-inbox-fit-height');
+                return;
+            }
+
+            const top = Math.max(0, shell.getBoundingClientRect().top);
+            const bottomGap = 14;
+            const available = Math.max(320, Math.floor(window.innerHeight - top - bottomGap));
+            shell.style.setProperty('--rc-inbox-fit-height', `${available}px`);
+        });
+    };
+
+    window.__rcInboxViewportFitV90 = fit;
+    window.addEventListener('resize', fit, { passive: true });
+    window.addEventListener('orientationchange', fit, { passive: true });
+    document.addEventListener('livewire:navigated', fit);
+    document.addEventListener('livewire:initialized', fit);
+
+    if (window.Livewire?.hook) {
+        window.Livewire.hook('morph.updated', ({ el }) => {
+            if (el?.matches?.('.rc-inbox-page-v56, .rc-inbox-shell-v56') || el?.querySelector?.('.rc-inbox-shell-v56')) {
+                fit();
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fit, { once: true });
+    } else {
+        fit();
+    }
+})();
+</script>
+@endif
