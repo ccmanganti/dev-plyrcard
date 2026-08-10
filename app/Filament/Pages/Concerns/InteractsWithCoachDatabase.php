@@ -3210,7 +3210,7 @@ protected function ensureLocalSampleEmailTemplates(): void
     protected function defaultRecruitingTemplateBodyHtml(): string
     {
         return <<<'HTML'
-<p>Hi {{CoachFirstName}},</p>
+<p>Hi {{CoachLastName}},</p>
 
 <p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
 
@@ -5623,8 +5623,8 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 'name' => 'Camp / Visit Interest',
                 'subjectLine' => '{{AthleteName}} - camp interest for {{SchoolName}}',
                 'previewText' => 'Camp and visit interest from {{AthleteName}}.',
-                'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'body' => '<p>Hi {{CoachLastName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachLastName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
                 'source_type' => 'built_in',
             ],
         ];
@@ -11113,7 +11113,7 @@ HTML;
             $body = str_replace(['Hi ', 'Thanks,'], ['Hello ', 'Best regards,'], $body);
         } elseif ($action === 'personalize') {
             if (! str_contains($body, '{{SchoolName}}')) {
-                $body = '<p>Hello {{CoachFirstName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
+                $body = '<p>Hello {{CoachLastName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
             }
         } elseif ($action === 'improve') {
             if (! str_contains($body, '{{ProfileLink}}')) {
