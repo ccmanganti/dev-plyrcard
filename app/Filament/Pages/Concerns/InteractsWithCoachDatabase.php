@@ -3210,7 +3210,7 @@ protected function ensureLocalSampleEmailTemplates(): void
     protected function defaultRecruitingTemplateBodyHtml(): string
     {
         return <<<'HTML'
-<p>Hi {{CoachLastName}},</p>
+<p>Hi Coach {{CoachLastName}},</p>
 
 <p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
 
