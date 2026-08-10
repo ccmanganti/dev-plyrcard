@@ -11068,7 +11068,7 @@ protected function ensureComposeBodyHasFooter(): void
         $body = <<<'HTML'
 <div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
     <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
-        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
+        <p style="margin:0 0 16px;">Hi {{CoachLastName}},</p>
         <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
         <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
         <p style="margin:0 0 12px;">
