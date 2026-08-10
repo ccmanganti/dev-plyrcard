@@ -12709,7 +12709,7 @@ CSS;
                                 <div class="rc-compose-label-v45">Insert Variable</div>
                                 <div class="rc-compose-vars-v45">
                                     <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachFirstName'})">@{{CoachFirstName}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachFirstName'})">@{{CoachLastName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachLastName'})">@{{CoachLastName}}</button>
                                     <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'SchoolName'})">@{{SchoolName}}</button>
                                     <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachTitle'})">@{{CoachTitle}}</button>
                                     <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'AthleteName'})">@{{AthleteName}}</button>
