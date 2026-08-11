@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class School extends Model
 {
@@ -17,6 +17,9 @@ class School extends Model
         'city',
         'street',
         'zipcode',
+        'logo_url',
+        // Kept temporarily for backward compatibility with existing records/code.
+        // New spreadsheet imports no longer write to logo_path.
         'logo_path',
         'website_url',
         'ghl_business_id',
@@ -49,12 +52,14 @@ class School extends Model
         return $this->hasMany(SchoolGhlSyncTarget::class);
     }
 
-    public function getLogoUrlAttribute(): ?string
+    public function favoritedByUsers(): BelongsToMany
     {
-        if (blank($this->logo_path)) {
-            return null;
-        }
-
-        return Storage::disk('public')->url($this->logo_path);
+        return $this->belongsToMany(User::class, 'favorite_schools')->withTimestamps();
     }
+
+    public function listMemberships(): HasMany
+    {
+        return $this->hasMany(MyListSchool::class);
+    }
+
 }

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\School;
+use App\Models\Coach;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -12,6 +14,44 @@ class CoachDatabaseService
     public function __construct(
         protected GoHighLevelService $goHighLevelService,
     ) {}
+
+    public function getLocalRecruitingDataset(User $user): array
+    {
+        $local = app(LocalRecruitingDatabaseService::class);
+        return [
+            'schools' => $local->schoolRows($user),
+            'coaches' => $local->coachRows($user),
+            'lists' => $local->lists($user),
+            'favorite_schools' => $local->favoriteSchools($user),
+        ];
+    }
+
+    public function resolveCoachGhlIdentityByEmail(User $user, string $email): array
+    {
+        return $this->goHighLevelService->resolveCoachContactByEmailForUser($user, $email);
+    }
+
+    public function resolveSchoolGhlIdentityByName(User $user, string $schoolName): array
+    {
+        return $this->goHighLevelService->resolveSchoolBusinessByNameForUser($user, $schoolName);
+    }
+
+    public function getCoachStatsByLocalId(User $user, int $coachId): array
+    {
+        $coach = Coach::query()->find($coachId);
+        return $coach && filled($coach->email)
+            ? $this->goHighLevelService->getCoachTrackingStatsByEmailForUser($user, (string) $coach->email)
+            : ['success' => false, 'stats' => [], 'error' => 'Local coach/email not found.'];
+    }
+
+    public function getSchoolStatsByLocalId(User $user, int $schoolId): array
+    {
+        $school = School::query()->find($schoolId);
+        return $school
+            ? $this->goHighLevelService->getSchoolTrackingStatsByNameForUser($user, (string) $school->name)
+            : ['success' => false, 'stats' => [], 'error' => 'Local school not found.'];
+    }
+
 
     public function canAccess(User $user): bool
     {

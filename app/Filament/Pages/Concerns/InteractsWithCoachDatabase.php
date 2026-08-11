@@ -5,6 +5,7 @@ namespace App\Filament\Pages\Concerns;
 use App\Services\CoachDatabaseService;
 use App\Services\LocalSchoolMembershipService;
 use App\Services\LocalCoachDatabaseSchoolService;
+use App\Services\LocalRecruitingDatabaseService;
 use App\Services\LocalRecruitingTrackingService;
 use App\Services\LocalTemplateMergeValueService;
 use App\Services\CoachDatabaseActionQueueService;
@@ -248,7 +249,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -375,8 +376,8 @@ trait InteractsWithCoachDatabase
         // A previous zero-result sync must not block the dashboard for an entire day.
         // Retry zero totals every five minutes; established totals are reconciled hourly.
         $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinute();
-        $syncKey = 'recruiting:total-emails-sent-sync:v3:'
+        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinutes(5);
+        $syncKey = 'recruiting:total-emails-sent-sync:'
             . (int) $user->getKey()
             . ':'
             . strtolower($locationId);
@@ -395,8 +396,6 @@ trait InteractsWithCoachDatabase
                 Log::warning('Automatic GHL sent-email count sync failed.', [
                     'user_id' => $user->getKey(),
                     'location_id' => $locationId,
-                    'source' => $result['source'] ?? null,
-                    'pages_scanned' => $result['pages_scanned'] ?? 0,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
                     'error' => $result['error'] ?? 'Unknown sync error.',
@@ -415,8 +414,6 @@ trait InteractsWithCoachDatabase
             Log::info('Automatic GHL sent-email dashboard sync completed.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
-                'source' => $result['source'] ?? null,
-                'pages_scanned' => $result['pages_scanned'] ?? 0,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
                 'outbound_emails_counted' => $count,
@@ -510,7 +507,6 @@ trait InteractsWithCoachDatabase
             'conversations' => \App\Filament\Pages\CoachDatabaseConversations::getUrl(),
             'campaigns' => \App\Filament\Pages\CoachDatabaseCampaigns::getUrl(),
             'compose' => \App\Filament\Pages\CoachDatabaseComposeEmail::getUrl(),
-            'support' => \App\Filament\Pages\CoachDatabaseSupport::getUrl(),
             'schedule' => class_exists(\App\Filament\Pages\CoachDatabaseSchedule::class) ? \App\Filament\Pages\CoachDatabaseSchedule::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'schedule']),
             'settings' => class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : \App\Filament\Pages\CoachDatabase::getUrl(['section' => 'settings']),
             'profile' => $this->freeRoleDefaultProfileUrl(),
@@ -1864,68 +1860,19 @@ trait InteractsWithCoachDatabase
         }
 
         $user = Auth::user();
-        $name = trim($name);
-
         if (! $user || ! $this->allowed || $this->locked) {
             return ['success' => false, 'error' => 'This action is not available.'];
         }
 
-        if ($name === '') {
-            return ['success' => false, 'error' => 'Enter a list name.'];
+        try {
+            $record = app(LocalRecruitingDatabaseService::class)->createList($user, $name, $color);
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+
+            $list = collect($this->lists)->first(fn ($row): bool => is_array($row) && (int) ($row['id'] ?? 0) === (int) $record->getKey()) ?: [];
+            return ['success' => true, 'list' => $list, 'message' => 'List created.'];
+        } catch (\Throwable $exception) {
+            return ['success' => false, 'error' => $exception->getMessage() ?: 'Unable to create the list.'];
         }
-
-        $key = Str::slug($name);
-        if ($key === '') {
-            return ['success' => false, 'error' => 'Enter a valid list name.'];
-        }
-
-        $normalizedColor = $this->normalizeListColor($color);
-        $tag = 'plyrcard:list:' . $key;
-        $listKey = 'custom:' . $key;
-
-        // Custom-list definitions are tiny metadata. Store them separately from
-        // the multi-megabyte Coach Database snapshot so this Livewire action
-        // never serializes or rewrites all schools and coaches.
-        $definitions = $this->customListDefinitions();
-        $definitions[$key] = [
-            'key' => $key,
-            'label' => trim($name),
-            'tag' => $tag,
-            'custom' => true,
-            'color' => $normalizedColor,
-        ];
-
-        Cache::put(
-            $this->customListDefinitionsCacheKey(),
-            $definitions,
-            now()->addMonths(12)
-        );
-
-        $list = [
-            'key' => $listKey,
-            'label' => trim($name),
-            'tag' => $tag,
-            'custom' => true,
-            'color' => $normalizedColor,
-            'schools_count' => 0,
-            'coaches_count' => 0,
-            'schools' => [],
-        ];
-
-        // Update only the small Livewire list collection. skipRender() prevents
-        // the complete schools grid from morphing during this request.
-        $this->lists = collect($this->lists)
-            ->reject(fn ($existing): bool => is_array($existing)
-                && in_array((string) ($existing['key'] ?? ''), [$key, $listKey], true))
-            ->push($list)
-            ->values()
-            ->all();
-
-        return [
-            'success' => true,
-            'list' => $list,
-            'message' => 'List created.',
-        ];
     }
 
     protected function customListDefinitionsCacheKey(): string
@@ -2033,114 +1980,21 @@ trait InteractsWithCoachDatabase
         if (method_exists($this, 'skipRender')) {
             $this->skipRender();
         }
-
         $user = Auth::user();
-        $listKey = strtolower(trim($listKey));
-
         if (! $user || ! $this->allowed || $this->locked) {
             return ['success' => false, 'error' => 'This action is not available.'];
         }
 
-        if ($listKey === '') {
-            return ['success' => false, 'error' => 'The list key is missing.'];
+        $deleted = app(LocalRecruitingDatabaseService::class)->deleteList($user, $listKey);
+        if (! $deleted) {
+            return ['success' => false, 'error' => 'The list could not be found.'];
         }
 
-        $normalizedKey = str_starts_with($listKey, 'custom:')
-            ? substr($listKey, 7)
-            : $listKey;
-        $canonicalKey = str_starts_with($listKey, 'custom:')
-            ? 'custom:' . $normalizedKey
-            : $listKey;
-
-        $keyVariants = collect([
-            $listKey,
-            $normalizedKey,
-            'custom:' . $normalizedKey,
-        ])->map(fn ($key): string => strtolower(trim((string) $key)))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        try {
-            $deletedMemberships = 0;
-            $table = 'coach_database_school_memberships';
-
-            // Perform the delete directly against Laravel's local table. This
-            // deliberately avoids GHL and avoids depending on a possibly stale
-            // service class/opcache copy on shared hosting.
-            if (Schema::hasTable($table)) {
-                $locationId = trim((string) (
-                    $user->ghl_location_id
-                    ?? config('ghl.location_id')
-                    ?? ''
-                ));
-
-                $query = DB::table($table)
-                    ->where('user_id', $user->getKey())
-                    ->whereIn('list_key', $keyVariants);
-
-                if ($locationId !== '') {
-                    $query->where('ghl_location_id', $locationId);
-                }
-
-                $deletedMemberships = $query->delete();
-            }
-
-            $definitions = $this->customListDefinitions();
-            foreach ($keyVariants as $key) {
-                unset($definitions[$key]);
-            }
-            Cache::put($this->customListDefinitionsCacheKey(), $definitions, now()->addMonths(12));
-
-            $overridesKey = $this->activeCacheKey() . ':list-label-overrides';
-            $overrides = Cache::get($overridesKey, []);
-            $overrides = is_array($overrides) ? $overrides : [];
-            foreach ($keyVariants as $key) {
-                unset($overrides[$key]);
-            }
-            Cache::put($overridesKey, $overrides, now()->addMonths(12));
-
-            // Tombstones also hide built-in lists such as Dream Schools after
-            // deletion, preventing the base snapshot from recreating the card.
-            $deletedKeys = collect($this->deletedRecruitingListKeys())
-                ->merge($keyVariants)
-                ->unique()
-                ->values()
-                ->all();
-            Cache::put($this->deletedRecruitingListsCacheKey(), $deletedKeys, now()->addMonths(12));
-
-            $this->lists = collect($this->lists)
-                ->reject(fn ($list): bool => is_array($list)
-                    && in_array(strtolower(trim((string) ($list['key'] ?? ''))), $keyVariants, true))
-                ->values()
-                ->all();
-
-            if (in_array(strtolower(trim($this->selectedListKey)), $keyVariants, true)) {
-                $this->selectedListKey = '';
-            }
-
-            return [
-                'success' => true,
-                'list_key' => $canonicalKey,
-                'deleted_memberships' => (int) $deletedMemberships,
-                'message' => 'List permanently deleted from the local database.',
-            ];
-        } catch (\Throwable $exception) {
-            Log::error('Unable to permanently delete local recruiting list.', [
-                'user_id' => $user->getKey(),
-                'list_key' => $listKey,
-                'error' => $exception->getMessage(),
-                'exception' => get_class($exception),
-            ]);
-
-            return [
-                'success' => false,
-                'error' => app()->isLocal()
-                    ? 'Delete failed: ' . $exception->getMessage()
-                    : 'Unable to delete this list from the database. Check laravel.log for the exact exception.',
-            ];
+        $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+        if ($this->selectedListKey === $listKey) {
+            $this->selectedListKey = '';
         }
+        return ['success' => true, 'message' => 'List deleted.'];
     }
 
     public function selectSchoolById(string $schoolId): void
@@ -2165,20 +2019,11 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Drawer opens are cache-only. The complete roster is reconciled during the
-        // detached dataset sync, so a click never calls Recruiting Center or rebuilds the full
-        // snapshot inside a Livewire request.
-        $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
-            $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
-            return (string) ($item['id'] ?? '') === $schoolId
-                || (string) ($item['business_id'] ?? '') === $schoolId
-                || $nameHash === $schoolId
-                || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
-        });
-
-        $this->selectedSchoolId = is_array($school)
-            ? (string) ($school['id'] ?? $school['business_id'] ?? $schoolId)
-            : $schoolId;
+        // v103: Discover/Favorites/My Lists use local schools.id. Do not scan
+        // allSchools() just to open the drawer. The selectedSchool computed
+        // property performs one indexed local School query and loads only that
+        // school's coaches.
+        $this->selectedSchoolId = $schoolId;
     }
 
     public function openDashboardEngagedSchool(int $index): void
@@ -2368,50 +2213,28 @@ trait InteractsWithCoachDatabase
 
         $user = Auth::user();
         $school = $this->schoolRowForCompanyMembership($schoolId);
-        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
-
-        if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This school is missing its local database business ID.'];
+        if (! $user || ! $school || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'The local school could not be found.'];
         }
 
-        $currentKeys = collect($school['list_keys'] ?? $school['lists'] ?? [])
-            ->map(fn ($key): string => trim((string) $key))
-            ->filter()
-            ->unique()
-            ->values();
-
+        $localId = (string) ($school['local_id'] ?? $school['school_id'] ?? $school['id'] ?? '');
+        $currentKeys = collect($this->schoolMembershipKeysForRow($school));
         foreach ($memberships as $listKey => $inList) {
             $listKey = trim((string) $listKey);
             if ($listKey === '') continue;
-
             $desired = filter_var($inList, FILTER_VALIDATE_BOOL);
             $currentKeys = $desired
                 ? $currentKeys->push($listKey)->unique()->values()
                 : $currentKeys->reject(fn (string $key): bool => $key === $listKey)->values();
         }
 
-        $this->applyCompanyListKeysToCachedSchool($schoolId, $currentKeys->all());
+        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys($user, $localId, $currentKeys->all());
+        $this->allSchoolsMemo = null;
+        $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
 
-        $result = app(LocalSchoolMembershipService::class)->replaceListKeys(
-            $user,
-            $businessId,
-            $currentKeys->all(),
-        );
-
-        if (! ($result['success'] ?? false)) {
-            $this->applyCompanyListKeysToCachedSchool(
-                $schoolId,
-                collect($school['list_keys'] ?? $school['lists'] ?? [])->values()->all(),
-            );
-
-            return ['success' => false, 'error' => $result['error'] ?? 'Unable to update school lists.'];
-        }
-
-        return [
-            'success' => true,
-            'states' => collect($memberships)->map(fn ($value): bool => filter_var($value, FILTER_VALIDATE_BOOL))->all(),
-            'school_updates' => 1,
-        ];
+        return ($result['success'] ?? false)
+            ? ['success' => true, 'states' => collect($memberships)->map(fn ($value): bool => filter_var($value, FILTER_VALIDATE_BOOL))->all(), 'school_updates' => 1]
+            : ['success' => false, 'error' => $result['error'] ?? 'Unable to update school lists.'];
     }
 
     public function addCoachToList(string $contactId, string $listKey): void
@@ -2429,107 +2252,60 @@ trait InteractsWithCoachDatabase
     protected function setSchoolCompanyFavoriteState(string $schoolId, bool $favorite, bool $returnResult = false): array
     {
         $user = Auth::user();
-        $school = $this->schoolRowForCompanyMembership($schoolId);
-        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
-
-        if (! $user || ! $school || $businessId === '' || ! $this->allowed || $this->locked) {
-            $result = ['success' => false, 'favorite' => ! $favorite, 'error' => 'This school is missing its local database business ID.'];
-            if (! $returnResult) {
-                Notification::make()->title('Recruiting Center')->body($result['error'])->danger()->send();
-            }
-            return $result;
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'favorite' => ! $favorite, 'error' => 'The player is not available.'];
         }
 
-        $previous = (bool) ($school['is_favorite'] ?? $school['is_favorite_school'] ?? false);
-        $membershipKeys = collect($this->schoolMembershipKeysForRow($school));
-        $membershipKeys = $favorite
-            ? $membershipKeys->push('__favorite__')->unique()->values()
-            : $membershipKeys->reject(fn (string $key): bool => $key === '__favorite__')->values();
-
-        $this->applyCompanyFavoriteToCachedSchool($schoolId, $favorite);
-        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys(
-            $user,
-            $businessId,
-            $membershipKeys->all(),
-        );
-
-        if (! ($result['success'] ?? false)) {
-            $this->applyCompanyFavoriteToCachedSchool($schoolId, $previous);
-            $result = ['success' => false, 'favorite' => $previous, 'error' => $result['error'] ?? 'Unable to update favorite school.'];
-            if (! $returnResult) {
-                Notification::make()->title('Recruiting Center')->body($result['error'])->danger()->send();
-            }
-            return $result;
+        // v104: local-only favorite write. No GHL business/contact API call.
+        $result = app(LocalRecruitingDatabaseService::class)->setFavorite($user, $schoolId, $favorite);
+        if ($result['success'] ?? false) {
+            $this->allSchoolsMemo = null;
+            $this->filteredSchoolsQueryMemo = [];
         }
 
-        return ['success' => true, 'favorite' => $favorite, 'school_updates' => 1];
+        return $result;
     }
 
     protected function setSchoolCompanyListMembership(string $schoolId, string $listKey, bool $inList): array
     {
         $user = Auth::user();
-        $listKey = trim($listKey);
-        $school = $this->schoolRowForCompanyMembership($schoolId);
-        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? ''));
-
-        if (! $user || ! $school || $businessId === '' || $listKey === '') {
-            return ['success' => false, 'error' => 'This school is missing its local database business ID.'];
+        if (! $user || trim($listKey) === '') {
+            return ['success' => false, 'error' => 'The local school or list could not be found.'];
         }
 
-        $previous = collect($school['list_keys'] ?? $school['lists'] ?? [])->values()->all();
-        $membershipKeys = collect($this->schoolMembershipKeysForRow($school));
+        $school = app(LocalRecruitingDatabaseService::class)->findSchool($user, $schoolId);
+        if (! $school) {
+            return ['success' => false, 'error' => 'The local school could not be found.'];
+        }
 
-        $membershipKeys = $inList
-            ? $membershipKeys->push($listKey)->unique()->values()
-            : $membershipKeys->reject(fn (string $key): bool => $key === $listKey)->values();
-
-        $visibleListKeys = $membershipKeys
-            ->reject(fn (string $key): bool => $key === '__favorite__')
-            ->values()
-            ->all();
-
-        $this->applyCompanyListKeysToCachedSchool($schoolId, $visibleListKeys);
-        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys(
+        // v104: local pivot write only. GHL tags are not touched.
+        $result = app(LocalRecruitingDatabaseService::class)->setSchoolsInList(
             $user,
-            $businessId,
-            $membershipKeys->all(),
+            [(int) $school->getKey()],
+            $listKey,
+            $inList,
         );
 
-        if (! ($result['success'] ?? false)) {
-            $this->applyCompanyListKeysToCachedSchool($schoolId, $previous);
-            return ['success' => false, 'error' => $result['error'] ?? 'Unable to update the school list.'];
+        if ($result['success'] ?? false) {
+            $this->allSchoolsMemo = null;
+            $this->filteredSchoolsQueryMemo = [];
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        return ['success' => true, 'in_list' => $inList, 'school_updates' => 1];
+        return ($result['success'] ?? false)
+            ? ['success' => true, 'in_list' => $inList, 'school_updates' => (int) ($result['updated'] ?? 1)]
+            : ['success' => false, 'error' => $result['error'] ?? 'Unable to update the local school list.'];
     }
 
     protected function schoolRowForCompanyMembership(string $schoolId): ?array
     {
         $user = Auth::user();
-
-        if ($user) {
-            $snapshot = $this->activeSnapshotRows();
-            $service = app(LocalCoachDatabaseSchoolService::class);
-            $service->ensureSeeded($user, $snapshot);
-
-            $local = $service->find($user, $schoolId);
-            if (is_array($local)) {
-                return $local;
-            }
-        }
-
-        $schoolId = trim($schoolId);
-        if ($schoolId === '') {
+        if (! $user) {
             return null;
         }
-
-        return collect($this->allSchools())->first(function (array $school) use ($schoolId): bool {
-            return in_array($schoolId, array_filter([
-                trim((string) ($school['id'] ?? '')),
-                trim((string) ($school['business_id'] ?? '')),
-                trim((string) ($school['company_id'] ?? '')),
-            ]), true);
-        });
+        // v104: favorites/lists resolve against canonical schools.id only. No
+        // CoachDatabaseSchool / GHL-business-backed membership lookup is allowed.
+        return app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
     }
 
     protected function applyCompanyFavoriteToCachedSchool(string $schoolId, bool $favorite): void
@@ -3210,7 +2986,7 @@ protected function ensureLocalSampleEmailTemplates(): void
     protected function defaultRecruitingTemplateBodyHtml(): string
     {
         return <<<'HTML'
-<p>Hi Coach {{CoachLastName}},</p>
+<p>Hi {{CoachFirstName}},</p>
 
 <p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
 
@@ -5605,8 +5381,8 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 'name' => 'Intro to Coach',
                 'subjectLine' => 'Prospect for {{SchoolName}} - {{AthleteName}}',
                 'previewText' => 'Quick introduction from {{AthleteName}}.',
-                'body' => '<p>Hi {{CoachLastName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachLastName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>My name is {{AthleteName}} and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>You can view my PLYRCard profile here: <a href="{{ProfileLink}}">{{ProfileLink}}</a></p><p>You can also watch my highlights here: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you for your time,<br>{{AthleteName}}</p>',
                 'source_type' => 'built_in',
             ],
             [
@@ -5623,8 +5399,8 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 'name' => 'Camp / Visit Interest',
                 'subjectLine' => '{{AthleteName}} - camp interest for {{SchoolName}}',
                 'previewText' => 'Camp and visit interest from {{AthleteName}}.',
-                'body' => '<p>Hi {{CoachLastName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
-                'html' => '<p>Hi {{CoachLastName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'body' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
+                'html' => '<p>Hi {{CoachFirstName}},</p><p>I am interested in learning more about upcoming camps, ID sessions, or visit opportunities at {{SchoolName}}.</p><p>I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}. My GPA is {{GPA}}.</p><p>Profile: <a href="{{ProfileLink}}">{{ProfileLink}}</a><br>Highlights: <a href="{{HighlightLink}}">{{HighlightLink}}</a></p><p>Thank you,<br>{{AthleteName}}</p>',
                 'source_type' => 'built_in',
             ],
         ];
@@ -7560,169 +7336,47 @@ protected function templateHtmlForNativeEditor(array $template): string
         return $fallback;
     }
 
-        protected function resolveComposeSchoolRow(string $schoolId): ?array
+    protected function resolveComposeSchoolRow(string $schoolId): ?array
     {
-        $schoolId = trim($schoolId);
-
-        if ($schoolId === '') {
+        $user = Auth::user();
+        if (! $user) {
             return null;
         }
-
-        $normalizedId = strtolower($schoolId);
-        $normalizedSchoolId = $this->normalizeSchoolMatchKey($schoolId);
-
-        // Prefer the active cached snapshot first. The full reload and the
-        // school drawer reconciliation write the freshest cross-referenced
-        // coach IDs, coach emails, embedded coaches, and counts here.
-        $snapshotSchool = collect($this->allSchools())->first(function (array $school) use ($schoolId, $normalizedId, $normalizedSchoolId): bool {
-            $name = strtolower(trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? '')));
-            $nameKey = $this->normalizeSchoolMatchKey($name);
-
-            return (string) ($school['id'] ?? '') === $schoolId
-                || (string) ($school['business_id'] ?? '') === $schoolId
-                || (string) ($school['company_id'] ?? '') === $schoolId
-                || (string) ($school['ghl_business_id'] ?? '') === $schoolId
-                || md5($name) === $schoolId
-                || $name === $normalizedId
-                || ($normalizedSchoolId !== '' && $nameKey === $normalizedSchoolId);
-        });
-
-        if (is_array($snapshotSchool)) {
-            return $snapshotSchool;
-        }
-
-        // Fallback only. The local school table can lag behind the active
-        // snapshot, so do not prefer it over allSchools().
-        $user = Auth::user();
-
-        if ($user) {
-            try {
-                $local = app(LocalCoachDatabaseSchoolService::class)->find($user, $schoolId);
-
-                if (is_array($local)) {
-                    return $local;
-                }
-            } catch (\Throwable $exception) {
-                Log::warning('Unable to resolve Compose Email school from local database.', [
-                    'user_id' => $user->id,
-                    'school_id' => $schoolId,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-        }
-
-        return null;
+        // v104: favorites/lists resolve against canonical schools.id only. No
+        // CoachDatabaseSchool / GHL-business-backed membership lookup is allowed.
+        return app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
     }
 
     protected function composeCoachesForSchool(array $school, bool $requireEmail = true): Collection
     {
-        $schoolName = trim((string) (
-            $school['name']
-            ?? $school['school']
-            ?? $school['school_name']
-            ?? $school['company_name']
-            ?? ''
-        ));
-
-        $businessId = trim((string) (
-            $school['business_id']
-            ?? $school['company_id']
-            ?? $school['ghl_business_id']
-            ?? $school['id']
-            ?? ''
-        ));
-
-        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
-        $embeddedCoaches = collect();
-
-        foreach (['coaches', 'staff', 'coaching_staff', 'contacts'] as $field) {
-            if (is_array($school[$field] ?? null)) {
-                $embeddedCoaches = $embeddedCoaches->merge($school[$field]);
-            }
+        $localSchoolId = (int) ($school['local_id'] ?? $school['school_id'] ?? $school['id'] ?? 0);
+        if ($localSchoolId <= 0) {
+            return collect();
         }
 
-        if (is_array($school['head_coach'] ?? null)) {
-            $embeddedCoaches = $embeddedCoaches->push($school['head_coach']);
-        }
-
-        return collect($this->coachesForSchoolSearch($school))
-            ->merge($embeddedCoaches)
-            ->filter(fn ($coach): bool => is_array($coach))
-            // Final recipient boundary: never allow a cached/embedded coach through
-            // unless its Business ID or exact normalized school/company name matches.
-            // This protects Compose from legacy live snapshots that may contain
-            // coach_ids/coach_emails created by older partial-name matching logic.
-            ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
-                return $this->coachBelongsToSchool(
-                    $coach,
-                    $businessId,
-                    $schoolName,
-                    $normalizedSchoolName
-                );
-            })
-            ->map(function (array $coach) use ($schoolName, $businessId): array {
-                $coachId = trim((string) (
-                    $coach['id']
-                    ?? $coach['contact_id']
-                    ?? $coach['contactId']
-                    ?? $coach['ghl_contact_id']
-                    ?? ''
-                ));
-
-                if ($coachId !== '') {
-                    $coach['id'] = $coachId;
-                    $coach['contact_id'] = $coach['contact_id'] ?? $coachId;
-                    $coach['ghl_contact_id'] = $coach['ghl_contact_id'] ?? $coachId;
-                }
-
-                // Fill display fallbacks only after membership validation. Otherwise
-                // an unrelated coach with blank affiliation fields could be stamped
-                // with the selected school and incorrectly appear valid.
-                $coach['school'] = $coach['school']
-                    ?? $coach['school_name']
-                    ?? $coach['company_name']
-                    ?? $coach['business_name']
-                    ?? $schoolName;
-
-                $coach['school_name'] = $coach['school_name']
-                    ?? $coach['school']
-                    ?? $schoolName;
-
-                $coach['company_name'] = $coach['company_name']
-                    ?? $coach['business_name']
-                    ?? $coach['school']
-                    ?? $schoolName;
-
-                $coach['business_id'] = $coach['business_id']
-                    ?? $coach['company_id']
-                    ?? $coach['ghl_business_id']
-                    ?? $businessId;
-
-                return $coach;
-            })
-            ->filter(function (array $coach) use ($requireEmail): bool {
-                $hasId = filled($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? null);
-                $hasEmail = filled($coach['email'] ?? null);
-
-                return $hasId && (! $requireEmail || $hasEmail);
-            })
-            ->unique(function (array $coach): string {
-                return strtolower(trim((string) (
-                    $coach['id']
-                    ?? $coach['contact_id']
-                    ?? $coach['ghl_contact_id']
-                    ?? $coach['email']
-                    ?? $coach['name']
-                    ?? md5(json_encode($coach) ?: '')
-                )));
-            })
-            ->sortBy(function (array $coach): string {
-                $title = strtolower((string) ($coach['title'] ?? $coach['position'] ?? ''));
-
-                return (str_contains($title, 'head') ? '0' : '1')
-                    . '|'
-                    . strtolower((string) ($coach['name'] ?? $coach['email'] ?? ''));
-            })
+        return \App\Models\Coach::query()
+            ->where('school_id', $localSchoolId)
+            ->when($requireEmail, fn ($query) => $query->whereNotNull('email')->where('email', '<>', ''))
+            ->orderByRaw("CASE WHEN LOWER(title) LIKE '%head%' AND LOWER(title) NOT LIKE '%assistant%' AND LOWER(title) NOT LIKE '%associate%' THEN 0 ELSE 1 END")
+            ->orderBy('last_name')
+            ->get()
+            ->map(fn ($coach): array => [
+                'id' => (string) $coach->getKey(),
+                'local_id' => $coach->getKey(),
+                'contact_id' => $coach->ghl_contact_id ?? null,
+                'ghl_contact_id' => $coach->ghl_contact_id ?? null,
+                'name' => trim((string) ($coach->display_name ?: ($coach->first_name . ' ' . $coach->last_name))),
+                'first_name' => (string) $coach->first_name,
+                'last_name' => (string) $coach->last_name,
+                'email' => (string) $coach->email,
+                'title' => (string) ($coach->title ?? ''),
+                'school_id' => $localSchoolId,
+                'school' => (string) ($school['name'] ?? ''),
+                'school_name' => (string) ($school['name'] ?? ''),
+                'business_id' => $school['business_id'] ?? null,
+                'conference' => $coach->conference,
+                'division' => $coach->division,
+            ])
             ->values();
     }
 
@@ -8307,27 +7961,22 @@ protected function campaignRecipientCoaches(): Collection
     protected function localDashboardSchoolMembershipCounts(): array
     {
         $user = Auth::user();
-
         if (! $user) {
-            return [
-                'favorite_schools' => 0,
-                'saved_schools' => 0,
-            ];
+            return ['favorite_schools' => 0, 'saved_schools' => 0];
         }
 
-        $locationId = trim((string) ($user->ghl_location_id ?? config('ghl.location_id') ?? ''));
+        $favoriteCount = \App\Models\FavoriteSchool::query()
+            ->where('user_id', $user->getKey())
+            ->distinct('school_id')
+            ->count('school_id');
 
-        $rows = DB::table('coach_database_school_memberships')
-            ->where('user_id', $user->id)
-            ->where('ghl_location_id', $locationId)
-            ->selectRaw("COUNT(DISTINCT CASE WHEN list_key = '__favorite__' THEN business_id END) AS favorite_schools")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN list_key <> '__favorite__' THEN business_id END) AS saved_schools")
-            ->first();
+        $savedCount = DB::table('my_list_schools')
+            ->join('my_lists', 'my_lists.id', '=', 'my_list_schools.my_list_id')
+            ->where('my_lists.user_id', $user->getKey())
+            ->distinct('my_list_schools.school_id')
+            ->count('my_list_schools.school_id');
 
-        return [
-            'favorite_schools' => (int) ($rows->favorite_schools ?? 0),
-            'saved_schools' => (int) ($rows->saved_schools ?? 0),
-        ];
+        return ['favorite_schools' => $favoriteCount, 'saved_schools' => $savedCount];
     }
 
     protected function normalizeDashboardSocialPlatform(mixed $platform = null, array $row = []): string
@@ -8779,29 +8428,30 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
 
     public function getDashboardTopEngagedSchoolsProperty(): array
     {
-        $schools = collect($this->topSchools ?: $this->allSchools())
-            ->map(function (array $school): array {
-                $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
-                $clicks = (int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
-                $views = (int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0);
-                $score = ($replies * 20) + ($clicks * 6) + ($views * 2) + (int) ($school['engagement_score'] ?? 0);
-                $school['lead_score'] = $score;
-                $school['has_replied'] = $replies > 0;
-                if (empty($school['id'])) {
-                    $school['id'] = (string) ($school['business_id'] ?? '');
-                }
-                if (empty($school['id']) && ! empty($school['name'])) {
-                    $school['id'] = md5(strtolower(trim((string) $school['name'])));
-                }
-                return $school;
-            })
-            ->filter(fn (array $school): bool => (int) ($school['lead_score'] ?? 0) > 0)
-            ->sortByDesc(fn (array $school): int => (int) ($school['lead_score'] ?? 0))
-            ->take(5)
-            ->values()
-            ->all();
+        // School identity always comes from the local catalog. GHL/snapshot rows
+        // contribute engagement metrics only, matched by exact normalized name.
+        $local = collect($this->allSchools());
+        $remote = collect($this->topSchools ?? [])->filter(fn ($row): bool => is_array($row));
+        $remoteByName = $remote->groupBy(fn (array $row): string => $this->normalizeSchoolMatchKey((string) ($row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? '')));
 
-        return $schools ?: collect($this->allSchools())->take(5)->values()->all();
+        $schools = $local->map(function (array $school) use ($remoteByName): array {
+            $key = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+            $remoteRow = $key !== '' ? collect($remoteByName->get($key, []))->sortByDesc(fn (array $row): int => (int) ($row['engagement_score'] ?? 0))->first() : null;
+            if (is_array($remoteRow)) {
+                foreach (['replies','coach_replies','link_clicks','trigger_link_clicks','trigger_clicks','profile_views','highlight_views','engagement_score'] as $metric) {
+                    if (array_key_exists($metric, $remoteRow)) $school[$metric] = $remoteRow[$metric];
+                }
+            }
+            $replies = (int) ($school['replies'] ?? $school['coach_replies'] ?? 0);
+            $clicks = (int) ($school['link_clicks'] ?? $school['trigger_link_clicks'] ?? $school['trigger_clicks'] ?? 0);
+            $views = (int) ($school['profile_views'] ?? 0) + (int) ($school['highlight_views'] ?? 0);
+            $school['lead_score'] = ($replies * 20) + ($clicks * 6) + ($views * 2) + (int) ($school['engagement_score'] ?? 0);
+            $school['has_replied'] = $replies > 0;
+            return $school;
+        })->filter(fn (array $school): bool => (int) ($school['lead_score'] ?? 0) > 0)
+          ->sortByDesc('lead_score')->take(5)->values()->all();
+
+        return $schools ?: $local->take(5)->values()->all();
     }
 
     protected function prependDashboardActivity(array $activity): void
@@ -9215,106 +8865,16 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
      */
     public function getDiscoverSchoolsClientDatasetProperty(): array
     {
-        $index = $this->schoolCoachSearchIndex();
+        $user = Auth::user();
 
-        return collect($this->allSchools())
-            ->filter(fn ($school): bool => is_array($school) && filled($school['name'] ?? null))
-            ->map(function (array $school) use ($index): array {
-                $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
-                $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
-                $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
+        if (! $user) {
+            return [];
+        }
 
-                $coaches = [];
-                $keys = [];
-
-                if ($businessId !== '') {
-                    $keys[] = 'business:' . strtolower($businessId);
-                }
-                if ($normalizedSchoolName !== '') {
-                    $keys[] = 'school_key:' . $normalizedSchoolName;
-                }
-
-                foreach (array_unique($keys) as $key) {
-                    foreach (($index[$key] ?? []) as $coach) {
-                        if (! is_array($coach)) {
-                            continue;
-                        }
-
-                        if (! $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName)) {
-                            continue;
-                        }
-
-                        $coaches[$this->coachTrackingIdentity($coach)] = $coach;
-                    }
-                }
-
-                $headCoach = collect($coaches)->first(function (array $coach): bool {
-                    return $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''));
-                }) ?: collect($coaches)->first();
-
-                if (! is_array($headCoach)) {
-                    $headCoach = is_array($school['head_coach'] ?? null) ? $school['head_coach'] : [];
-                }
-
-                $logo = trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''));
-                if ($logo === '') {
-                    foreach ($coaches as $coach) {
-                        $logo = trim((string) ($coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? ''));
-                        if ($logo !== '') {
-                            break;
-                        }
-                    }
-                }
-
-                $coachSearchTokens = collect($coaches)
-                    ->flatMap(fn (array $coach): array => [
-                        $coach['name'] ?? '',
-                        $coach['first_name'] ?? '',
-                        $coach['last_name'] ?? '',
-                        $coach['email'] ?? '',
-                        $coach['title'] ?? $coach['position'] ?? '',
-                    ])
-                    ->filter()
-                    ->values()
-                    ->all();
-
-                $id = $businessId !== ''
-                    ? $businessId
-                    : (string) ($school['id'] ?? md5(strtolower($schoolName)));
-
-                return [
-                    'id' => $id,
-                    'business_id' => $businessId,
-                    'name' => $schoolName !== '' ? $schoolName : 'School',
-                    'logo_url' => $logo,
-                    'conference' => (string) ($school['conference'] ?? ''),
-                    'division' => (string) ($school['division'] ?? ''),
-                    'city' => (string) ($school['city'] ?? ''),
-                    'state' => (string) ($school['state'] ?? ''),
-                    'coach_count' => count($coaches),
-                    'head_coach_name' => (string) ($headCoach['name'] ?? ''),
-                    'head_coach_title' => (string) ($headCoach['title'] ?? $headCoach['position'] ?? ''),
-                    'head_coach_email' => (string) ($headCoach['email'] ?? ''),
-                    'search_text' => $this->normalizeSearchText(array_merge([
-                        $schoolName,
-                        $school['conference'] ?? '',
-                        $this->conferenceSearchTokens($school['conference'] ?? ''),
-                        $school['division'] ?? '',
-                        $school['city'] ?? '',
-                        $school['state'] ?? '',
-                    ], $coachSearchTokens)),
-                ];
-            })
-            ->filter(fn (array $school): bool => $school['id'] !== '')
-            ->unique(function (array $school): string {
-                $businessId = strtolower(trim((string) ($school['business_id'] ?? '')));
-                return $businessId !== ''
-                    ? 'business:' . $businessId
-                    : 'name:' . $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
-            })
-            ->sortBy(fn (array $school): string => strtolower($school['name']))
-            ->values()
-            ->all();
+        // v104: Discover Schools is a canonical LOCAL catalog. Do not seed or
+        // read CoachDatabaseSchool here; that table is a legacy GHL/snapshot read model.
+        // GHL is allowed to contribute engagement metrics only, never school identity.
+        return app(LocalRecruitingDatabaseService::class)->schoolRows($user);
     }
 
     public function getFilteredSchoolsProperty(): array
@@ -9583,30 +9143,14 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     protected function schoolMembershipKeysForRow(array $school): array
     {
         $user = Auth::user();
-        $businessId = trim((string) (
-            $school['business_id']
-            ?? $school['company_id']
-            ?? $school['id']
-            ?? ''
-        ));
-
-        // Favorites and My Lists are now stored locally. GHL remains the source
-        // of school/coach data only. An empty local result intentionally means
-        // the school is not in any list; do not fall back to old coach tags or
-        // experimental Business custom fields, or removed memberships reappear.
-        if ($user && $businessId !== '') {
-            return app(LocalSchoolMembershipService::class)
-                ->keysForBusiness($user, $businessId);
+        if (! $user) {
+            return [];
         }
 
-        return collect($school['membership_keys'] ?? [])
-            ->merge($school['list_keys'] ?? [])
-            ->merge($school['lists'] ?? [])
-            ->map(fn ($key): string => strtolower(trim((string) $key)))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $schoolId = trim((string) ($school['local_id'] ?? $school['school_id'] ?? $school['id'] ?? $school['business_id'] ?? ''));
+        return $schoolId !== ''
+            ? app(LocalSchoolMembershipService::class)->keysForSchool($user, $schoolId)
+            : [];
     }
 
     protected function schoolMembershipKeysFromCustomFieldContainers(array $row): array
@@ -9730,13 +9274,11 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     {
         // Lightweight display hydration only. Do not attach the full coach roster
         // to every school card/list option because Livewire serializes the result.
-        // Never let a stale cached aggregate override the reconciled roster.
-        // Older production snapshots may still contain inflated counts from the
-        // legacy partial-name matcher (for example University of Virginia = 19).
-        // coachesForSchoolSearch() now validates every row by authoritative
-        // Business ID or exact normalized school/company name, so its count is
-        // the value Discover Schools should display.
-        $count = $this->coachCountForSchoolSearch($school);
+        $count = max(
+            (int) ($school['coach_count'] ?? 0),
+            (int) ($school['coaches_count'] ?? 0),
+            $this->coachCountForSchoolSearch($school)
+        );
 
         $school['coach_count'] = $count;
         $school['coaches_count'] = $count;
@@ -9778,23 +9320,16 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
     public function getFavoriteSchoolsProperty(): array
     {
         $user = Auth::user();
-
         if (! $user) {
             return [];
         }
 
-        $snapshot = $this->activeSnapshotRows();
-        $service = app(LocalCoachDatabaseSchoolService::class);
-        $service->ensureSeeded($user, $snapshot);
-
         return $this->filterSchoolsForSearch(
-            collect($service->favoriteSchools($user)),
+            collect(app(LocalRecruitingDatabaseService::class)->favoriteSchools($user)),
             $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search,
-        )
-            ->take((int) config('coach-database-sync.ui.school_row_cap', 96))
-            ->values()
-            ->all();
+        )->take((int) config('coach-database-sync.ui.school_row_cap', 96))->values()->all();
     }
+
     public function getFavoriteCoachesProperty(): array { return collect($this->allCoaches())->filter(fn (array $coach): bool => (bool) ($coach['is_favorite_coach'] ?? false))->take(80)->values()->all(); }
 
 
@@ -11068,7 +10603,7 @@ protected function ensureComposeBodyHasFooter(): void
         $body = <<<'HTML'
 <div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
     <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
-        <p style="margin:0 0 16px;">Hi {{CoachLastName}},</p>
+        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
         <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
         <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
         <p style="margin:0 0 12px;">
@@ -11113,7 +10648,7 @@ HTML;
             $body = str_replace(['Hi ', 'Thanks,'], ['Hello ', 'Best regards,'], $body);
         } elseif ($action === 'personalize') {
             if (! str_contains($body, '{{SchoolName}}')) {
-                $body = '<p>Hello {{CoachLastName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
+                $body = '<p>Hello {{CoachFirstName}},</p>' . $body . '<p>I am especially interested in {{SchoolName}} and your program.</p>';
             }
         } elseif ($action === 'improve') {
             if (! str_contains($body, '{{ProfileLink}}')) {
@@ -11711,60 +11246,17 @@ HTML;
 
     public function getComposePreviewCoachProperty(): array
     {
-        $coach = $this->campaignRecipientCoaches()->first();
+        $coach = $this->campaignRecipientCoaches()->first()
+            ?: collect($this->allCoaches())->first(fn (array $coach): bool => filled($coach['email'] ?? null));
 
-        if (is_array($coach)) {
-            return $coach;
-        }
-
-        $schoolName = trim((string) ($this->composeSelectedSchool['name'] ?? ''));
-
-        return [
-            'name' => 'Coach Name',
-            'first_name' => 'Coach Name',
-            'last_name' => '',
-            'school' => $schoolName !== '' ? $schoolName : 'School Name',
-            'title' => 'Coach',
-            'email' => '',
+        return is_array($coach) ? $coach : [
+            'name' => 'Stephens Salas',
+            'first_name' => 'Stephens',
+            'last_name' => 'Salas',
+            'school' => 'Abilene Christian University',
+            'title' => 'Head Coach',
+            'email' => 'stephens.salas@example.com',
         ];
-    }
-
-    public function getComposePreviewSignatureHtmlProperty(): string
-    {
-        return $this->replaceCampaignTokens(
-            $this->ensurePlyrcardEmailSignature(''),
-            $this->composePreviewCoach
-        );
-    }
-
-    public function getComposePreviewTokenValuesProperty(): array
-    {
-        $tokens = [
-            'CoachName',
-            'CoachFirstName',
-            'CoachLastName',
-            'CoachTitle',
-            'CoachEmail',
-            'SchoolName',
-            'AthleteName',
-            'GraduationYear',
-            'Position',
-            'ProfileLink',
-            'HighlightLink',
-            'AthleteEmail',
-            'AthletePhone',
-            'InstagramLink',
-            'TwitterLink',
-            'XLink',
-            'YoutubeLink',
-            'YouTubeLink',
-        ];
-
-        return collect($tokens)
-            ->mapWithKeys(fn (string $token): array => [
-                $token => $this->replaceCampaignTokens('{{'.$token.'}}', $this->composePreviewCoach),
-            ])
-            ->all();
     }
 
     public function getComposeRenderedSubjectProperty(): string
@@ -11778,15 +11270,12 @@ HTML;
             ? $this->campaignBody
             : 'Choose a template or write your message.';
 
-        // Preview the same canonical body that is used at send time, including
-        // exactly one PLYRCARD athlete signature/footer. This keeps Preview
-        // faithful to what coaches actually receive without saving the signature
-        // back into the editable template body.
-        $html = $this->ensurePlyrcardEmailSignature(
-            $this->normalizeTemplateLinksForCurrentTracking(
-                $this->buildComposeHtml($body)
-            )
-        );
+        // Preview the exact final email structure that will be sent. The signature
+        // remains hidden from the Compose editor itself, but Preview Email always
+        // includes the canonical PLYRCARD footer/signature and personalized tokens.
+        $html = $this->buildComposeHtml($body);
+        $html = $this->normalizeTemplateLinksForCurrentTracking($html);
+        $html = $this->ensurePlyrcardEmailSignature($html);
 
         return $this->replaceCampaignTokens($html, $this->composePreviewCoach);
     }
@@ -11799,100 +11288,21 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        // Compose must feel instant after the page is loaded. Build one lightweight,
-        // exact school->coach dataset up front from the already memoized school coach
-        // index. No complete GHL payloads/raw contact blobs are exposed to Alpine.
-        $index = $this->schoolCoachSearchIndex();
-
-        $clientCoachesForSchool = function (array $school) use ($index): array {
-            $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? $school['id'] ?? ''));
-            $schoolName = trim((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
-            $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
-
-            $keys = [];
-            if ($businessId !== '') {
-                $keys[] = 'business:' . strtolower($businessId);
-            }
-            if ($schoolName !== '') {
-                $keys[] = 'school:' . strtolower($schoolName);
-            }
-            if ($normalizedSchoolName !== '') {
-                $keys[] = 'school_key:' . $normalizedSchoolName;
-            }
-
-            $candidates = [];
-            foreach (array_unique($keys) as $key) {
-                foreach (($index[$key] ?? []) as $coach) {
-                    if (is_array($coach)) {
-                        $candidates[$this->coachTrackingIdentity($coach)] = $coach;
-                    }
-                }
-            }
-
-            if (is_array($school['head_coach'] ?? null)) {
-                $headCoach = $school['head_coach'];
-                $candidates[$this->coachTrackingIdentity($headCoach)] = $headCoach;
-            }
-
-            $rows = collect($candidates)
-                ->filter(function (array $coach) use ($businessId, $schoolName, $normalizedSchoolName): bool {
-                    return $this->coachBelongsToSchool($coach, $businessId, $schoolName, $normalizedSchoolName);
-                })
-                ->map(function (array $coach): array {
-                    $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['contactId'] ?? $coach['ghl_contact_id'] ?? ''));
-                    $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
-                    $email = trim((string) ($coach['email'] ?? ''));
-                    $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
-
-                    return [
-                        'id' => $coachId,
-                        'name' => $coachName,
-                        'email' => $email,
-                        'title' => $title,
-                        'is_head' => $this->isHeadCoachTitle($title),
-                        'search_text' => strtolower(trim(implode(' ', array_filter([$coachName, $email, $title])))),
-                    ];
-                })
-                ->filter(fn (array $coach): bool => $coach['id'] !== '' && $coach['email'] !== '')
-                ->unique(fn (array $coach): string => strtolower($coach['id'] !== '' ? $coach['id'] : $coach['email']))
-                ->sortBy(function (array $coach): string {
-                    return ($coach['is_head'] ? '0' : '1') . '|' . strtolower($coach['name']);
-                })
-                ->values()
-                ->all();
-
-            return $rows;
-        };
-
+        // Keep this payload intentionally tiny. Older versions duplicated every coach
+        // inside every school, which made Livewire/Blade JSON serialization explode in
+        // memory on accounts with thousands of coaches.
         return [
             'schools' => collect($this->composeSchoolOptions)
-                ->map(function (array $school) use ($clientCoachesForSchool): array {
-                    $id = trim((string) ($school['id'] ?? $school['business_id'] ?? ''));
-                    $name = trim((string) ($school['name'] ?? 'School'));
-                    $coaches = $clientCoachesForSchool($school);
-
-                    return [
-                        'id' => $id,
-                        'name' => $name,
-                        'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
-                        'conference' => (string) ($school['conference'] ?? ''),
-                        'division' => (string) ($school['division'] ?? ''),
-                        'city' => (string) ($school['city'] ?? ''),
-                        'state' => (string) ($school['state'] ?? ''),
-                        'coach_count' => count($coaches),
-                        'search_text' => strtolower(trim(implode(' ', array_filter([
-                            $name,
-                            (string) ($school['conference'] ?? ''),
-                            (string) ($school['division'] ?? ''),
-                            (string) ($school['city'] ?? ''),
-                            (string) ($school['state'] ?? ''),
-                            (string) data_get($school, 'head_coach.name', ''),
-                            (string) data_get($school, 'head_coach.email', ''),
-                        ])))),
-                        'coaches' => $coaches,
-                    ];
-                })
-                ->filter(fn (array $school): bool => $school['id'] !== '')
+                ->map(fn (array $school): array => [
+                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
+                    'name' => (string) ($school['name'] ?? 'School'),
+                    'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
+                    'conference' => (string) ($school['conference'] ?? ''),
+                    'division' => (string) ($school['division'] ?? ''),
+                    'city' => (string) ($school['city'] ?? ''),
+                    'state' => (string) ($school['state'] ?? ''),
+                    'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
+                ])
                 ->values()
                 ->all(),
         ];
@@ -12157,39 +11567,13 @@ HTML;
         $this->composeChooseCoachesOpen = false;
         $this->composeSchoolSearch = '';
 
-        // Return the exact validated roster to the Alpine Compose controller.
-        // The initial client dataset intentionally omits coach arrays for all
-        // unselected schools to keep the page lightweight, so selection must
-        // hydrate the chosen row explicitly instead of waiting for a DOM morph.
-        $coaches = $this->composeCoachesForSchool($school, true)
-            ->map(function (array $coach): array {
-                $coachId = trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['ghl_contact_id'] ?? ''));
-                $coachName = trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach'));
-                $title = trim((string) ($coach['title'] ?? $coach['position'] ?? 'Coach'));
-
-                return [
-                    'id' => $coachId,
-                    'name' => $coachName,
-                    'email' => (string) ($coach['email'] ?? ''),
-                    'title' => $title,
-                    'is_head' => $this->isHeadCoachTitle($title),
-                    'search_text' => strtolower(trim(implode(' ', array_filter([
-                        $coachName,
-                        (string) ($coach['email'] ?? ''),
-                        $title,
-                    ])))),
-                ];
-            })
-            ->filter(fn (array $coach): bool => $coach['id'] !== '')
-            ->values()
-            ->all();
+        $coachCount = $this->composeCoachesForSchool($school, true)->count();
 
         return [
             'success' => true,
             'school_id' => $resolvedSchoolId,
             'school_name' => (string) ($school['name'] ?? 'School'),
-            'coach_count' => count($coaches),
-            'coaches' => $coaches,
+            'coach_count' => $coachCount,
         ];
     }
 
@@ -12481,81 +11865,65 @@ HTML;
             return null;
         }
 
-        $selectedId = (string) $this->selectedSchoolId;
-        $normalizedSelectedId = strtolower(trim($selectedId));
-
-        $school = collect($this->allSchools())->first(function (array $item) use ($selectedId, $normalizedSelectedId): bool {
-            $name = strtolower(trim((string) ($item['name'] ?? '')));
-            return (string) ($item['id'] ?? '') === $selectedId
-                || (string) ($item['business_id'] ?? '') === $selectedId
-                || md5($name) === $selectedId
-                || $name === $normalizedSelectedId;
-        });
-
-        if (! $school) {
-            $dashboardTopSchools = $this->dashboardTopEngagedSchools ?? [];
-            if ($dashboardTopSchools instanceof \Illuminate\Support\Collection) {
-                $dashboardTopSchools = $dashboardTopSchools->all();
-            }
-
-            $school = collect(is_array($dashboardTopSchools) ? $dashboardTopSchools : [])
-                ->first(function ($item) use ($selectedId, $normalizedSelectedId): bool {
-                    if (! is_array($item)) {
-                        return false;
-                    }
-
-                    $name = strtolower(trim((string) ($item['name'] ?? '')));
-                    return (string) ($item['id'] ?? '') === $selectedId
-                        || (string) ($item['business_id'] ?? '') === $selectedId
-                        || md5($name) === $selectedId
-                        || $name === $normalizedSelectedId;
-                });
-        }
-
-        if (! $school || ! is_array($school)) {
+        $user = Auth::user();
+        if (! $user) {
             return null;
         }
 
-        $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-        $schoolName = trim((string) ($school['name'] ?? ''));
-        $matchedCoaches = collect($this->coachesForSchoolSearch($school));
-
-        $coaches = $matchedCoaches
-            ->filter(fn ($coach): bool => is_array($coach))
-            ->map(function (array $coach) use ($school, $businessId, $schoolName): array {
-                $coach['school'] = $coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? $schoolName;
-                $coach['school_name'] = $coach['school_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['company_name'] = $coach['company_name'] ?? $coach['school'] ?? $schoolName;
-                $coach['business_id'] = $coach['business_id'] ?? $coach['company_id'] ?? $coach['ghl_business_id'] ?? $businessId;
-                $coach['school_logo_url'] = $coach['school_logo_url'] ?? $school['school_logo_url'] ?? $school['logo_url'] ?? null;
-                $coach['business_logo_url'] = $coach['business_logo_url'] ?? $school['business_logo_url'] ?? $school['logo_url'] ?? null;
-
-                return $coach;
-            })
-            ->unique(function (array $coach): string {
-                return strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? serialize($coach))));
-            })
-            ->values();
-
-        if ($coaches->isEmpty() && is_array($school['head_coach'] ?? null) && filled($school['head_coach']['name'] ?? null)) {
-            $headCoach = $school['head_coach'];
-            $headCoach['school'] = $headCoach['school'] ?? $schoolName;
-            $headCoach['school_name'] = $headCoach['school_name'] ?? $schoolName;
-            $headCoach['company_name'] = $headCoach['company_name'] ?? $schoolName;
-            $headCoach['business_id'] = $headCoach['business_id'] ?? $businessId;
-            $headCoach['school_logo_url'] = $headCoach['school_logo_url'] ?? $school['school_logo_url'] ?? $school['logo_url'] ?? null;
-            $coaches = collect([$headCoach]);
+        // v103 fast path: one local school query + one roster eager-load.
+        // This avoids allSchools() and allCoaches(), which rebuild the complete
+        // Discover dataset and were the main source of drawer latency.
+        try {
+            $school = app(LocalRecruitingDatabaseService::class)
+                ->schoolRow($user, (string) $this->selectedSchoolId);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to load local school drawer row.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $this->selectedSchoolId,
+                'error' => $exception->getMessage(),
+            ]);
+            $school = null;
         }
 
-        $school['coaches'] = $coaches->values()->all();
-        $school['coach_count'] = $coaches->count();
-        $school['coaches_count'] = $coaches->count();
-        $school['coach_count_cross_referenced'] = $coaches->count();
+        if (! is_array($school)) {
+            return null;
+        }
 
-        if (blank(data_get($school, 'head_coach.name')) && $coaches->isNotEmpty()) {
-            $school['head_coach'] = $coaches->first(function (array $coach): bool {
-                return str_contains(strtolower((string) ($coach['title'] ?? '')), 'head');
-            }) ?: $coaches->first();
+        // Hybrid stats only: overlay already-cached GHL metrics by exact normalized
+        // school name. Opening the drawer itself performs NO GHL API request.
+        $schoolNameKey = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+        if ($schoolNameKey !== '') {
+            $snapshot = $this->activeSnapshotRows();
+            $remote = collect($snapshot['schools'] ?? [])
+                ->merge($snapshot['top_schools'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->filter(fn (array $row): bool => $this->normalizeSchoolMatchKey((string) (
+                    $row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? ''
+                )) === $schoolNameKey)
+                ->sortByDesc(fn (array $row): int => (int) ($row['engagement_score'] ?? $row['lead_score'] ?? 0))
+                ->first();
+
+            if (is_array($remote)) {
+                foreach ([
+                    'profile_views',
+                    'profile_view_unique_contacts',
+                    'profile_view_school_clicks',
+                    'highlight_views',
+                    'trigger_link_clicks',
+                    'link_clicks',
+                    'replies',
+                    'coach_replies',
+                    'emails_sent',
+                    'sent_emails',
+                    'email_count',
+                    'lead_score',
+                    'engagement_score',
+                ] as $metric) {
+                    if (array_key_exists($metric, $remote)) {
+                        $school[$metric] = $remote[$metric];
+                    }
+                }
+            }
         }
 
         return $school;
@@ -12827,49 +12195,18 @@ HTML;
         if (method_exists($this, 'skipRender')) {
             $this->skipRender();
         }
-
-        $listKey = trim($listKey);
+        $user = Auth::user();
         $newLabel = trim($newLabel);
-
-        if ($listKey === '' || $newLabel === '') {
+        if (! $user || trim($listKey) === '' || $newLabel === '') {
             return ['success' => false, 'error' => 'Enter a valid list name.'];
         }
 
-        $overridesKey = $this->activeCacheKey() . ':list-label-overrides';
-        $overrides = Cache::get($overridesKey, []);
-        $overrides = is_array($overrides) ? $overrides : [];
-
-        // Store both canonical custom-list key forms so the label survives
-        // hydration regardless of whether the list row uses `slug` or
-        // `custom:slug` as its key.
-        $normalizedKey = str_starts_with($listKey, 'custom:')
-            ? substr($listKey, 7)
-            : $listKey;
-
-        $overrides[$listKey] = $newLabel;
-        if ($normalizedKey !== '') {
-            $overrides[$normalizedKey] = $newLabel;
-            $overrides['custom:' . $normalizedKey] = $newLabel;
+        $list = app(LocalRecruitingDatabaseService::class)->resolveList($user, $listKey);
+        if (! $list) {
+            return ['success' => false, 'error' => 'The list could not be found.'];
         }
-
-        Cache::put($overridesKey, $overrides, now()->addMonths(12));
-
-        $this->lists = collect($this->lists)
-            ->map(function ($list) use ($listKey, $newLabel) {
-                if (is_array($list) && (string) ($list['key'] ?? '') === $listKey) {
-                    $list['label'] = $newLabel;
-                }
-                return $list;
-            })
-            ->values()
-            ->all();
-
-        $definitions = $this->customListDefinitions();
-        if (isset($definitions[$normalizedKey]) && is_array($definitions[$normalizedKey])) {
-            $definitions[$normalizedKey]['label'] = $newLabel;
-            Cache::put($this->customListDefinitionsCacheKey(), $definitions, now()->addMonths(12));
-        }
-
+        $list->forceFill(['name' => $newLabel])->save();
+        $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         return ['success' => true, 'label' => $newLabel];
     }
 
@@ -12880,95 +12217,32 @@ HTML;
         }
 
         $user = Auth::user();
-        $listKey = trim($listKey);
-        $schoolIds = collect($schoolIds)
-            ->map(fn ($id): string => trim((string) $id))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if (! $user || ! $this->allowed || $this->locked) {
-            return ['success' => false, 'error' => 'This action is not available.'];
-        }
-        if ($listKey === '') {
-            return ['success' => false, 'error' => 'Choose a list first.'];
-        }
-        if ($schoolIds->isEmpty()) {
-            return ['success' => false, 'error' => 'Select at least one school first.'];
+        if (! $user || trim($listKey) === '') {
+            return ['success' => false, 'error' => 'Missing player or list.'];
         }
 
-        // Build one in-memory index instead of scanning the full school dataset
-        // once for every selected ID.
-        $schoolIndex = collect($this->allSchools())
-            ->filter(fn ($school): bool => is_array($school))
-            ->flatMap(function (array $school): array {
-                $name = strtolower(trim((string) ($school['name'] ?? '')));
-                $keys = array_values(array_unique(array_filter([
-                    trim((string) ($school['id'] ?? '')),
-                    trim((string) ($school['business_id'] ?? '')),
-                    trim((string) ($school['company_id'] ?? '')),
-                    $name !== '' ? md5($name) : '',
-                ])));
-
-                return collect($keys)
-                    ->mapWithKeys(fn (string $key): array => [$key => $school])
-                    ->all();
-            });
-
-        $rows = $schoolIds
-            ->map(fn (string $id): ?array => $schoolIndex->get($id))
-            ->filter()
-            ->map(function (array $school) use ($listKey): array {
-                $keys = collect($school['list_keys'] ?? $school['lists'] ?? [])
-                    ->map(fn ($key): string => trim((string) $key))
-                    ->filter()
-                    ->push($listKey)
-                    ->unique()
-                    ->values()
-                    ->all();
-
-                return [
-                    'school_id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
-                    'business_id' => (string) ($school['business_id'] ?? $school['company_id'] ?? ''),
-                    'list_keys' => $keys,
-                ];
-            })
-            ->filter(fn (array $row): bool => trim($row['business_id']) !== '')
-            ->values();
-
-        if ($rows->isEmpty()) {
-            return ['success' => false, 'error' => 'The selected schools do not have GHL company IDs.'];
-        }
-
-        $ids = $schoolIds->all();
-        $this->applyBulkSchoolListMembershipToCache($ids, $listKey, true);
-
-        $result = app(LocalSchoolMembershipService::class)->replaceListKeysBulk(
+        // v104: one local bulk operation. Selection IDs are canonical schools.id.
+        // No coach lookup, no contact IDs, no GHL tags, and no API calls.
+        $result = app(LocalRecruitingDatabaseService::class)->setSchoolsInList(
             $user,
-            $rows->all(),
+            $schoolIds,
+            $listKey,
+            true,
         );
 
-        $list = collect($this->lists)->first(
-            fn ($item): bool => is_array($item)
-                && (string) ($item['key'] ?? '') === $listKey
-        );
-        $listLabel = is_array($list)
-            ? (string) ($list['label'] ?? Str::headline($listKey))
-            : Str::headline($listKey);
+        if ($result['success'] ?? false) {
+            $this->allSchoolsMemo = null;
+            $this->filteredSchoolsQueryMemo = [];
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+        }
 
+        $updated = (int) ($result['updated'] ?? 0);
         return [
             'success' => (bool) ($result['success'] ?? false),
-            'partial_success' => (bool) ($result['partial_success'] ?? false),
-            'school_count' => $schoolIds->count(),
-            'updated_schools' => (int) ($result['updated'] ?? 0),
-            'failed_schools' => (int) ($result['failed'] ?? 0),
-            'list_key' => $listKey,
-            'list_label' => $listLabel,
+            'updated_schools' => $updated,
+            'school_count' => $updated,
+            'message' => ($result['success'] ?? false) ? "Saved {$updated} school(s) to the list." : null,
             'error' => $result['error'] ?? null,
-            'message' => number_format((int) ($result['updated'] ?? 0)) . ' school(s) added to ' . $listLabel
-                . ((int) ($result['failed'] ?? 0) > 0
-                    ? '; ' . number_format((int) $result['failed']) . ' failed.'
-                    : '.'),
         ];
     }
 
@@ -13770,193 +13044,28 @@ HTML;
             return $this->allSchoolsMemo;
         }
 
+        $user = Auth::user();
+        if (! $user) {
+            return $this->allSchoolsMemo = [];
+        }
+
+        $localRows = collect(app(LocalRecruitingDatabaseService::class)->schoolRows($user));
         $snapshot = $this->activeSnapshotRows();
+        $remoteRows = collect($snapshot['schools'] ?? [])->merge($snapshot['top_schools'] ?? [])->filter(fn ($row): bool => is_array($row));
+        $remoteByName = $remoteRows->groupBy(fn (array $row): string => $this->normalizeSchoolMatchKey((string) ($row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? '')));
 
-        if ((bool) ($snapshot['dataset_reconciled'] ?? false) && is_array($snapshot['schools'] ?? null)) {
-            return $this->allSchoolsMemo = collect($snapshot['schools'])
-                ->filter(fn ($school): bool => is_array($school))
-                ->map(fn (array $school): array => $this->hydrateSchoolRowForDisplay($school))
-                ->values()
-                ->all();
-        }
-
-        $snapshotSchools = collect(is_array($snapshot['schools'] ?? null) ? $snapshot['schools'] : [])
-            ->filter(fn ($school): bool => is_array($school));
-
-        $topSchoolRows = collect(is_array($snapshot['top_schools'] ?? null) ? $snapshot['top_schools'] : [])
-            ->merge(is_array($this->topSchools ?? null) ? $this->topSchools : [])
-            ->merge(is_array($this->dashboardTopEngagedSchools ?? null) ? $this->dashboardTopEngagedSchools : [])
-            ->filter(fn ($school): bool => is_array($school));
-
-        /**
-         * Discover Schools cannot depend only on the paged business/school cache.
-         * On large Recruiting Center accounts that cache may contain only the first page, while
-         * the contacts/coaches cache already contains schools from every coach.
-         * Build lightweight school rows from coaches so Discover can show every
-         * school and still paginate with the existing Load More button.
-         */
-        $coachRows = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [])
-            ->filter(fn ($coach): bool => is_array($coach));
-
-        $coachDerivedSchools = $coachRows
-            ->map(function (array $coach): array {
-                $schoolName = trim($this->firstCoachSchoolName($coach));
-                $businessId = trim($this->firstCoachBusinessId($coach));
-
-                if ($schoolName === '' && $businessId === '') {
-                    return [];
-                }
-
-                $logo = $coach['school_logo_url']
-                    ?? $coach['business_logo_url']
-                    ?? $coach['logo_url']
-                    ?? $coach['logo']
-                    ?? data_get($coach, 'business.logo')
-                    ?? data_get($coach, 'contact.school_logo')
-                    ?? null;
-
-                return [
-                    'id' => $businessId !== '' ? $businessId : 'school-' . md5(strtolower($schoolName)),
-                    'business_id' => $businessId,
-                    'name' => $schoolName !== '' ? $schoolName : (string) ($coach['company_name'] ?? 'School'),
-                    'conference' => $coach['conference'] ?? $coach['school_conference'] ?? '',
-                    'division' => $coach['division'] ?? $coach['school_division'] ?? '',
-                    'city' => $coach['city'] ?? $coach['school_city'] ?? '',
-                    'state' => $coach['state'] ?? $coach['school_state'] ?? '',
-                    'logo_url' => $logo,
-                    'school_logo_url' => $logo,
-                    'business_logo_url' => $logo,
-                    'coach_count' => 1,
-                    'coaches_count' => 1,
-                    'head_coach' => $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? '')) ? $coach : null,
-                ];
-            })
-            ->filter(fn (array $school): bool => filled($school['name'] ?? null));
-
-        $allRows = $snapshotSchools
-            ->merge($coachDerivedSchools)
-            ->merge($topSchoolRows)
-            ->filter(fn ($school): bool => is_array($school) && filled($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? null));
-
-        $coachIdsByKey = [];
-        $headCoachesByKey = [];
-
-        foreach ($coachRows as $coach) {
-            $keys = [];
-
-            // Exact association keys.
-            foreach ($this->coachBusinessIdCandidates($coach) as $businessId) {
-                $keys[] = 'business:' . strtolower(trim((string) $businessId));
-            }
-
-            // Cross-reference keys. Include every known School / Company / Business
-            // name because Recruiting Center sometimes leaves businessId empty even though the
-            // contact's Business Name field is populated correctly.
-            foreach ($this->coachSchoolNameCandidates($coach) as $schoolName) {
-                $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
-                if ($schoolKey !== '') {
-                    $keys[] = 'school:' . $schoolKey;
-                }
-            }
-
-            $identity = $this->coachTrackingIdentity($coach);
-
-            foreach (array_unique(array_filter($keys)) as $key) {
-                $coachIdsByKey[$key] ??= [];
-                $coachIdsByKey[$key][$identity] = true;
-
-                if (! isset($headCoachesByKey[$key]) && $this->isHeadCoachTitle((string) ($coach['title'] ?? $coach['position'] ?? ''))) {
-                    $headCoachesByKey[$key] = $coach;
-                }
-            }
-        }
-
-        $coachCountsByKey = collect($coachIdsByKey)
-            ->map(fn (array $identities): int => count($identities))
-            ->all();
-
-        return $allRows
-            ->groupBy(function (array $school): string {
-                $schoolKey = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
-                if ($schoolKey !== '') {
-                    return 'school:' . $schoolKey;
-                }
-
-                $businessId = trim((string) ($school['business_id'] ?? $school['id'] ?? ''));
-                return 'business:' . strtolower($businessId);
-            })
-            ->map(function ($rows, string $groupKey) use ($coachCountsByKey, $headCoachesByKey): array {
-                $rows = collect($rows)->filter(fn ($school): bool => is_array($school))->values();
-                $primary = $rows->sortByDesc(function (array $school): int {
-                    $nestedCoachCount = is_array($school['coaches'] ?? null)
-                        ? count(array_filter($school['coaches'], fn ($coach): bool => is_array($coach)))
-                        : 0;
-
-                    return (filled($school['business_id'] ?? null) ? 100 : 0)
-                        + (filled($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null) ? 50 : 0)
-                        + max((int) ($school['coach_count'] ?? 0), (int) ($school['coaches_count'] ?? 0), $nestedCoachCount);
-                })->first() ?: [];
-
-                foreach ($rows as $row) {
-                    foreach (['id', 'business_id', 'logo_url', 'school_logo_url', 'business_logo_url', 'conference', 'division', 'city', 'state'] as $field) {
-                        if (blank($primary[$field] ?? null) && filled($row[$field] ?? null)) {
-                            $primary[$field] = $row[$field];
-                        }
-                    }
-
-                    if (blank(data_get($primary, 'head_coach.name')) && filled(data_get($row, 'head_coach.name'))) {
-                        $primary['head_coach'] = $row['head_coach'];
+        return $this->allSchoolsMemo = $localRows->map(function (array $school) use ($remoteByName): array {
+            $key = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+            $remote = $key !== '' ? collect($remoteByName->get($key, []))->sortByDesc(fn (array $row): int => (int) ($row['engagement_score'] ?? 0))->first() : null;
+            if (is_array($remote)) {
+                foreach (['profile_views','profile_view_unique_contacts','profile_view_school_clicks','highlight_views','trigger_link_clicks','replies','lead_score','engagement_score'] as $metric) {
+                    if (array_key_exists($metric, $remote)) {
+                        $school[$metric] = $remote[$metric];
                     }
                 }
-
-                $schoolKey = $this->normalizeSchoolMatchKey((string) ($primary['name'] ?? $primary['school'] ?? $primary['school_name'] ?? $primary['company_name'] ?? ''));
-                $businessKey = trim((string) ($primary['business_id'] ?? $primary['id'] ?? ''));
-                $lookupKeys = array_values(array_filter([
-                    $schoolKey !== '' ? 'school:' . $schoolKey : null,
-                    $businessKey !== '' ? 'business:' . strtolower($businessKey) : null,
-                    $groupKey,
-                ]));
-
-                $nestedCoachCount = 0;
-                foreach ($rows as $row) {
-                    $nestedCoachCount = max(
-                        $nestedCoachCount,
-                        (int) ($row['coach_count'] ?? 0),
-                        (int) ($row['coaches_count'] ?? 0)
-                    );
-                }
-
-                $indexedCoachCount = 0;
-                foreach ($lookupKeys as $key) {
-                    $indexedCoachCount = max($indexedCoachCount, (int) ($coachCountsByKey[$key] ?? 0));
-
-                    if (blank(data_get($primary, 'head_coach.name')) && isset($headCoachesByKey[$key])) {
-                        $primary['head_coach'] = $headCoachesByKey[$key];
-                    }
-                }
-
-                $primary['coach_count'] = max(
-                    (int) ($primary['coach_count'] ?? 0),
-                    (int) ($primary['coaches_count'] ?? 0),
-                    $nestedCoachCount,
-                    $indexedCoachCount,
-                    (is_array($primary['head_coach'] ?? null) && filled($primary['head_coach']['name'] ?? null)) ? 1 : 0
-                );
-                $primary['coaches_count'] = $primary['coach_count'];
-
-                $indexedCount = $this->coachCountForSchoolSearch($primary);
-                if ($indexedCount > 0) {
-                    $primary['coach_count'] = max((int) ($primary['coach_count'] ?? 0), $indexedCount);
-                    $primary['coaches_count'] = $primary['coach_count'];
-                }
-
-                unset($primary['coaches'], $primary['staff'], $primary['coaching_staff'], $primary['contacts']);
-
-                return $this->hydrateSchoolRowForDisplay($primary);
-            })
-            ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
-            ->values()
-            ->all();
+            }
+            return $this->hydrateSchoolRowForDisplay($school);
+        })->values()->all();
     }
 
     protected function allCoaches(): array
@@ -13964,17 +13073,25 @@ HTML;
         if (is_array($this->allCoachesMemo)) {
             return $this->allCoachesMemo;
         }
+        $user = Auth::user();
+        if (! $user) {
+            return $this->allCoachesMemo = [];
+        }
 
+        $local = collect(app(LocalRecruitingDatabaseService::class)->coachRows($user));
         $snapshot = $this->activeSnapshotRows();
+        $remoteByEmail = collect($snapshot['coaches'] ?? [])->filter(fn ($row): bool => is_array($row) && filled($row['email'] ?? null))
+            ->keyBy(fn (array $row): string => strtolower(trim((string) $row['email'])));
 
-        // Use the canonical contact list as the source of truth. Do not re-read
-        // nested school coach arrays here. Old cached snapshots may contain a full
-        // duplicated roster under every school, which causes timeout/memory errors.
-        return $this->allCoachesMemo = collect(is_array($snapshot['coaches'] ?? null) ? $snapshot['coaches'] : [])
-            ->filter(fn ($coach): bool => is_array($coach))
-            ->unique(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? $coach['email'] ?? $coach['name'] ?? md5(json_encode($coach))))))
-            ->values()
-            ->all();
+        return $this->allCoachesMemo = $local->map(function (array $coach) use ($remoteByEmail): array {
+            $remote = $remoteByEmail->get(strtolower(trim((string) ($coach['email'] ?? ''))));
+            return is_array($remote) ? array_merge($remote, $coach, [
+                'id' => $coach['id'],
+                'local_id' => $coach['local_id'] ?? $coach['id'],
+                'contact_id' => $remote['id'] ?? $remote['contact_id'] ?? $coach['contact_id'] ?? null,
+                'ghl_contact_id' => $remote['id'] ?? $remote['contact_id'] ?? $coach['ghl_contact_id'] ?? null,
+            ]) : $coach;
+        })->values()->all();
     }
 
     protected function isHeadCoachTitle(string $title): bool
@@ -14002,10 +13119,8 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
 
-        $user = Auth::user();
-        if ($user) {
-            app(LocalCoachDatabaseSchoolService::class)->ensureSeeded($user, $snapshot);
-        }
+        // v104: snapshot hydration may update GHL stats, but it must never seed
+        // the Discover Schools catalog. Canonical School/Coach rows remain local.
 
         $labelOverrides = Cache::get($this->activeCacheKey() . ':list-label-overrides', []);
         $labelOverrides = is_array($labelOverrides) ? $labelOverrides : [];
@@ -14032,6 +13147,10 @@ HTML;
             })
             ->values()
             ->all();
+        $user = Auth::user();
+        if ($user) {
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+        }
         $this->stats = $snapshot['stats'] ?? [];
         $this->topSchools = $snapshot['top_schools'] ?? [];
         if (isset($snapshot['dashboard_recent_activity']) && is_array($snapshot['dashboard_recent_activity'])) {

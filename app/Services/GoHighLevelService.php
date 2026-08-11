@@ -20,6 +20,100 @@ class GoHighLevelService
         $this->baseUrl = rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/');
     }
 
+
+
+    /**
+     * Resolve a local coach into the current player's GHL subaccount by exact email.
+     * IDs are never trusted across players/locations.
+     */
+    public function resolveCoachContactByEmailForUser(User $user, string $email): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return ['success' => false, 'contact_id' => null, 'contact' => null, 'error' => 'Missing coach email.'];
+        }
+
+        $contactId = $this->findContactIdByEmail($email, $credentials['location_id'], $credentials['token_override']);
+        if (! $contactId) {
+            return ['success' => false, 'contact_id' => null, 'contact' => null, 'error' => 'Coach was not found in GHL by email.'];
+        }
+
+        $contact = $this->fetchContactForDashboard($contactId, $credentials['location_id'], $credentials['token_override'], true);
+        return ['success' => true, 'contact_id' => $contactId, 'contact' => $contact, 'email' => $email];
+    }
+
+    /** Resolve the player's GHL Business ID from an exact normalized local school name. */
+    public function resolveSchoolBusinessByNameForUser(User $user, string $schoolName): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $needle = strtolower(trim((string) preg_replace('/\\s+/', ' ', $schoolName)));
+        if ($needle === '') {
+            return ['success' => false, 'business_id' => null, 'business' => null, 'error' => 'Missing school name.'];
+        }
+
+        $result = $this->getBusinessesForLocation($credentials['location_id'], $credentials['token_override'], 100, 100);
+        $business = collect($result['businesses'] ?? [])->first(function ($row) use ($needle): bool {
+            if (! is_array($row)) return false;
+            $name = strtolower(trim((string) preg_replace('/\\s+/', ' ', (string) ($row['name'] ?? $row['businessName'] ?? $row['companyName'] ?? ''))));
+            return $name === $needle;
+        });
+        $businessId = is_array($business) ? trim((string) ($business['id'] ?? $business['_id'] ?? $business['businessId'] ?? '')) : '';
+
+        return $businessId !== ''
+            ? ['success' => true, 'business_id' => $businessId, 'business' => $business, 'name' => $schoolName]
+            : ['success' => false, 'business_id' => null, 'business' => null, 'error' => 'School was not found in GHL by exact name.'];
+    }
+
+    /** Fetch tracking counters for one coach after resolving the GHL contact by email. */
+    public function getCoachTrackingStatsByEmailForUser(User $user, string $email): array
+    {
+        $resolved = $this->resolveCoachContactByEmailForUser($user, $email);
+        if (! ($resolved['success'] ?? false) || ! is_array($resolved['contact'] ?? null)) {
+            return array_merge($resolved, ['stats' => []]);
+        }
+
+        $credentials = $this->credentialsForUser($user);
+        $map = $this->recruitingTrackingFieldMapForLocation($credentials['location_id'], $credentials['token_override']);
+        $contact = $resolved['contact'];
+        $stats = [];
+        foreach ($this->recruitingTrackingFieldAliases() as $key => $aliases) {
+            $stats[$key] = $this->numericCustomFieldFromContact($contact, array_merge([$key], $aliases), $map);
+        }
+        return array_merge($resolved, ['stats' => $stats]);
+    }
+
+    /** Aggregate school tracking counters after resolving its GHL Business ID by exact name. */
+    public function getSchoolTrackingStatsByNameForUser(User $user, string $schoolName): array
+    {
+        $resolved = $this->resolveSchoolBusinessByNameForUser($user, $schoolName);
+        if (! ($resolved['success'] ?? false)) {
+            return array_merge($resolved, ['stats' => [], 'contacts' => []]);
+        }
+
+        $credentials = $this->credentialsForUser($user);
+        $contactsResult = $this->getContactsByBusinessId(
+            $resolved['business_id'],
+            $credentials['location_id'],
+            $credentials['token_override'],
+            100,
+            50,
+        );
+        $map = $this->recruitingTrackingFieldMapForLocation($credentials['location_id'], $credentials['token_override']);
+        $stats = array_fill_keys(array_keys($this->recruitingTrackingFieldAliases()), 0);
+
+        foreach ($contactsResult['contacts'] ?? [] as $contact) {
+            if (! is_array($contact)) continue;
+            $contactId = trim((string) ($contact['id'] ?? $contact['_id'] ?? ''));
+            $detail = $contactId !== '' ? $this->fetchContactForDashboard($contactId, $credentials['location_id'], $credentials['token_override']) : $contact;
+            foreach ($this->recruitingTrackingFieldAliases() as $key => $aliases) {
+                $stats[$key] += $this->numericCustomFieldFromContact($detail, array_merge([$key], $aliases), $map);
+            }
+        }
+
+        return array_merge($resolved, ['stats' => $stats, 'contacts' => $contactsResult['contacts'] ?? []]);
+    }
+
     public function enabled(): bool
     {
         return filled(config('ghl.token')) && filled(config('ghl.location_id'));
@@ -6669,7 +6763,7 @@ class GoHighLevelService
 
                 if (str_contains(strtolower($activityTitle), 'email sent')) {
                     $title = 'Email sent to ' . $name;
-                    $copy = ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact') . ' • ' . number_format($eventCount) . ' ' . Str::plural('email', $eventCount);
+                    $copy = ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact') . ' â€¢ ' . number_format($eventCount) . ' ' . Str::plural('email', $eventCount);
                 } elseif (str_contains(strtolower($activityTitle), 'clicked')) {
                     $platformLabel = match ($platform) {
                         'instagram' => 'Instagram',
@@ -6680,7 +6774,7 @@ class GoHighLevelService
                         default => Str::headline($platform),
                     };
                     $title = $name;
-                    $copy = 'Clicked ' . $platformLabel . ' ' . number_format($eventCount) . ' ' . Str::plural('time', $eventCount) . ($destination !== '' ? ' • ' . Str::limit($destination, 90) : '');
+                    $copy = 'Clicked ' . $platformLabel . ' ' . number_format($eventCount) . ' ' . Str::plural('time', $eventCount) . ($destination !== '' ? ' â€¢ ' . Str::limit($destination, 90) : '');
                 } else {
                     $title = $activityTitle . ' to ' . $name;
                     $copy = $destination !== '' ? Str::limit($destination, 120) : ($contact['email'] ?? $contact['school'] ?? 'Recruiting contact activity');

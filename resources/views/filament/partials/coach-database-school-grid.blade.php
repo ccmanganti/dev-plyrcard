@@ -60,14 +60,21 @@
                 this.selectedSchoolIds = [...this.selectedSchoolIds, id];
             }
 
-            if (this.$wire && typeof this.$wire.toggleSchoolSelection === 'function') {
-                this.$wire.toggleSchoolSelection(id);
-            }
+            // Selection is UI-only until an action is committed. Keep it entirely
+            // in Alpine so the checkbox and bulk action bar react instantly.
+            this.$dispatch('rc-discover-selection', { ids: [...this.selectedSchoolIds] });
         },
 
         openSchool(id) {
             id = String(id ?? '');
             if (!id) return;
+
+            const school = this.visibleSchools.find(item => String(item?.id ?? '') === id) || null;
+            if (school) {
+                // Open a local shell immediately, before the Livewire round trip.
+                // The server drawer replaces it once the one-school local query finishes.
+                this.$dispatch('rc-open-school-optimistic', { school: { ...school } });
+            }
 
             if (this.$wire && typeof this.$wire.selectSchoolById === 'function') {
                 this.$wire.selectSchoolById(id);
@@ -91,6 +98,8 @@
             return normalized;
         },
     }"
+    x-on:rc-discover-toggle-visible.window="const visible = visibleSchools.map(item => String(item.id)); const all = visible.length > 0 && visible.every(id => isSelected(id)); selectedSchoolIds = all ? selectedSchoolIds.filter(id => !visible.includes(String(id))) : Array.from(new Set([...selectedSchoolIds.map(String), ...visible])); $dispatch('rc-discover-selection', { ids: [...selectedSchoolIds] })"
+    x-on:rc-discover-clear-selection.window="selectedSchoolIds = []; $dispatch('rc-discover-selection', { ids: [] })"
 >
     <div x-show="filteredSchools.length === 0" class="rc-empty rc-discover-empty">
         <strong>No schools found.</strong>

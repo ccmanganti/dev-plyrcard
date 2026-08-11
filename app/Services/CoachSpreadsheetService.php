@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Coach;
 use App\Models\School;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -262,69 +260,50 @@ class CoachSpreadsheetService
         $updated = 0;
         $errors = [];
 
+        // Build one school record per normalized school name. When the same school
+        // appears on several coach rows, prefer a valid non-empty logo URL instead
+        // of allowing a later blank value to replace it.
         $schoolRows = collect($batch)
             ->filter(fn (array $row): bool => filled($row['school_name'] ?? null))
-            ->mapWithKeys(function (array $row): array {
+            ->reduce(function (array $schools, array $row): array {
                 $name = trim((string) ($row['school_name'] ?? ''));
                 $key = $this->normalizeSchoolName($name);
+                $logoUrl = trim((string) ($row['school_logo_url'] ?? ''));
 
-                return [$key => [
-                    'name' => $name,
-                    'logo_url' => $this->nullable((string) ($row['school_logo_url'] ?? '')),
-                ]];
-            });
-
-        $downloadedLogoPaths = [];
-
-        if ($schoolRows->isNotEmpty()) {
-            $existingSchools = School::withTrashed()
-                ->whereIn(DB::raw('LOWER(TRIM(name))'), $schoolRows->keys()->all())
-                ->get()
-                ->keyBy(fn (School $school): string => $this->normalizeSchoolName($school->name));
-
-            foreach ($schoolRows as $schoolKey => $schoolData) {
-                $existingSchool = $existingSchools->get($schoolKey);
-
-                if ($existingSchool && filled($existingSchool->logo_path)) {
-                    continue;
+                if (! isset($schools[$key])) {
+                    $schools[$key] = [
+                        'name' => $name,
+                        'logo_url' => null,
+                    ];
                 }
 
-                $logoUrl = $schoolData['logo_url'] ?? null;
-                if (blank($logoUrl)) {
-                    continue;
+                if ($this->isHttpUrl($logoUrl)) {
+                    $schools[$key]['logo_url'] = $logoUrl;
                 }
 
-                try {
-                    $downloadedLogoPaths[$schoolKey] = $this->downloadSchoolLogo(
-                        (string) $logoUrl,
-                        (string) $schoolData['name'],
-                    );
-                } catch (Throwable $exception) {
-                    Log::warning('Coach import could not download a school logo.', [
-                        'school' => $schoolData['name'],
-                        'logo_url' => $logoUrl,
-                        'message' => $exception->getMessage(),
-                    ]);
-                }
-            }
-        }
+                return $schools;
+            }, []);
 
-        DB::transaction(function () use ($batch, $schoolRows, $downloadedLogoPaths, &$created, &$updated, &$errors): void {
+        DB::transaction(function () use ($batch, $schoolRows, &$created, &$updated, &$errors): void {
             $schoolMap = [];
 
-            if ($schoolRows->isNotEmpty()) {
+            if ($schoolRows !== []) {
                 School::withTrashed()
-                    ->whereIn(DB::raw('LOWER(TRIM(name))'), $schoolRows->keys()->all())
+                    ->whereIn(DB::raw('LOWER(TRIM(name))'), array_keys($schoolRows))
                     ->get()
-                    ->each(function (School $school) use (&$schoolMap, $downloadedLogoPaths): void {
+                    ->each(function (School $school) use (&$schoolMap, $schoolRows): void {
                         if ($school->trashed()) {
                             $school->restore();
                         }
 
                         $schoolKey = $this->normalizeSchoolName($school->name);
+                        $schoolData = $schoolRows[$schoolKey] ?? [];
+                        $logoUrl = trim((string) ($schoolData['logo_url'] ?? ''));
 
-                        if (blank($school->logo_path) && filled($downloadedLogoPaths[$schoolKey] ?? null)) {
-                            $school->forceFill(['logo_path' => $downloadedLogoPaths[$schoolKey]])->save();
+                        // Store the actual remote image URL directly. Do not
+                        // download the image and do not write logo_path.
+                        if ($this->isHttpUrl($logoUrl) && $school->logo_url !== $logoUrl) {
+                            $school->forceFill(['logo_url' => $logoUrl])->save();
                         }
 
                         $schoolMap[$schoolKey] = $school->getKey();
@@ -335,10 +314,13 @@ class CoachSpreadsheetService
                         continue;
                     }
 
+                    $logoUrl = trim((string) ($schoolData['logo_url'] ?? ''));
+
                     $school = School::create([
                         'name' => trim((string) $schoolData['name']),
-                        'logo_path' => $downloadedLogoPaths[$schoolKey] ?? null,
+                        'logo_url' => $this->isHttpUrl($logoUrl) ? $logoUrl : null,
                     ]);
+
                     $schoolMap[$schoolKey] = $school->getKey();
                 }
             }
@@ -355,6 +337,7 @@ class CoachSpreadsheetService
 
             foreach ($batch as $row) {
                 try {
+                    $sourceRow = $row['source_row'] ?? '?';
                     $schoolName = trim((string) ($row['school_name'] ?? ''));
                     unset($row['source_row'], $row['school_name'], $row['school_logo_url']);
 
@@ -373,7 +356,7 @@ class CoachSpreadsheetService
                         $created++;
                     }
                 } catch (Throwable $exception) {
-                    $errors[] = 'Row ' . ($row['source_row'] ?? '?') . ': ' . $exception->getMessage();
+                    $errors[] = 'Row ' . $sourceRow . ': ' . $exception->getMessage();
                 }
             }
 
@@ -432,7 +415,7 @@ class CoachSpreadsheetService
         }
 
         $rows = Coach::query()
-            ->with('school:id,name,logo_path')
+            ->with('school:id,name,logo_url')
             ->when(filled($sport), fn ($query) => $query->where('sport', $sport))
             ->orderBy('sport')
             ->orderBy('last_name')
@@ -509,66 +492,13 @@ class CoachSpreadsheetService
         return strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xlsx' ? new XlsxReader() : new Csv();
     }
 
-    private function downloadSchoolLogo(string $url, string $schoolName): string
+    private function isHttpUrl(string $url): bool
     {
-        $url = trim($url);
-
         if ($url === '' || ! filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new RuntimeException('The school logo URL is invalid.');
+            return false;
         }
 
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            throw new RuntimeException('School logo URLs must use HTTP or HTTPS.');
-        }
-
-        $response = Http::connectTimeout(5)
-            ->timeout(15)
-            ->retry(2, 250)
-            ->withHeaders([
-                'User-Agent' => 'PLYRCard School Logo Importer',
-                'Accept' => 'image/png,image/jpeg,image/webp,image/gif,image/avif',
-            ])
-            ->get($url);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('The school logo could not be downloaded (HTTP ' . $response->status() . ').');
-        }
-
-        $body = $response->body();
-        if ($body === '') {
-            throw new RuntimeException('The school logo response was empty.');
-        }
-
-        if (strlen($body) > 5 * 1024 * 1024) {
-            throw new RuntimeException('The school logo exceeds the 5 MB import limit.');
-        }
-
-        $mime = strtolower(trim((string) $response->header('Content-Type')));
-        $mime = trim(explode(';', $mime)[0]);
-
-        $extension = match ($mime) {
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            'image/gif' => 'gif',
-            'image/avif' => 'avif',
-            default => null,
-        };
-
-        if ($extension === null) {
-            throw new RuntimeException('Unsupported school logo image type: ' . ($mime !== '' ? $mime : 'unknown'));
-        }
-
-        $slug = Str::slug($schoolName) ?: 'school';
-        $hash = substr(sha1($url), 0, 12);
-        $path = "schools/logos/{$slug}-{$hash}.{$extension}";
-
-        if (! Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->put($path, $body);
-        }
-
-        return $path;
+        return in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true);
     }
 
     private function normalizeHeader(string $value): string
