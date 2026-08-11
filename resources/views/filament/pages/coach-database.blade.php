@@ -2372,6 +2372,32 @@
             color: #f8fafc !important;
         }
 
+        /* v106: optimistic local drawer must never blur/lock the whole Discover page. */
+        .rc-school-optimistic-shell-v106 {
+            justify-content: flex-end !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            pointer-events: none;
+        }
+
+        .rc-school-optimistic-panel-v106 {
+            width: min(560px, 100vw) !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            pointer-events: auto;
+            animation: rcOptimisticSchoolInV106 .16s ease-out both;
+        }
+
+        @keyframes rcOptimisticSchoolInV106 {
+            from { transform: translateX(24px); opacity: .65; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+
         .rc-school-modal-close {
             position: absolute;
             top: 1rem;
@@ -6284,6 +6310,8 @@
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="optimisticSchool = $event.detail?.school || null"
         x-on:rc-school-server-drawer-ready.window="optimisticSchool = null"
+        x-on:rc-school-optimistic-clear.window="optimisticSchool = null"
+        x-on:rc-school-optimistic-timeout.window="if (optimisticSchool && String(optimisticSchool.id || '') === String($event.detail?.id || '')) optimisticSchool = null"
         @if(! in_array($section, ['schools', 'favorites', 'lists'], true))
             wire:poll.5s.visible="pollRealtime"
         @endif
@@ -9937,8 +9965,8 @@
 
         {{-- v105: instant client-side school drawer shell. This opens from the already-rendered
              local card payload before Livewire performs the one-school local DB query. --}}
-        <div class="rc-drawer rc-school-modal-backdrop" x-cloak x-show="optimisticSchool" x-transition.opacity x-on:click.self="optimisticSchool=null" style="z-index:9998">
-            <div class="rc-drawer-panel rc-school-modal-panel" x-show="optimisticSchool" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" role="dialog" aria-modal="true">
+        <div class="rc-drawer rc-school-optimistic-shell-v106" x-cloak x-show="optimisticSchool" x-on:click.self="optimisticSchool=null" style="z-index:9998">
+            <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106" x-show="optimisticSchool" role="dialog" aria-modal="true">
                 <button class="rc-school-modal-close" type="button" x-on:click="optimisticSchool=null" aria-label="Close school details">×</button>
                 <div class="rc-school-modal-hero-v72">
                     <div class="rc-school-logo-large-v72">

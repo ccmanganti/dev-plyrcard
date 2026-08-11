@@ -71,13 +71,31 @@
 
             const school = this.visibleSchools.find(item => String(item?.id ?? '') === id) || null;
             if (school) {
-                // Open a local shell immediately, before the Livewire round trip.
-                // The server drawer replaces it once the one-school local query finishes.
+                // Open an immediate local shell. v106 deliberately does NOT use a
+                // page-covering blurred backdrop for this optimistic state.
                 this.$dispatch('rc-open-school-optimistic', { school: { ...school } });
             }
 
             if (this.$wire && typeof this.$wire.selectSchoolById === 'function') {
-                this.$wire.selectSchoolById(id);
+                let request = null;
+                try {
+                    request = this.$wire.selectSchoolById(id);
+                } catch (error) {
+                    console.error(error);
+                    this.$dispatch('rc-school-optimistic-clear');
+                    return;
+                }
+
+                // A failed/aborted Livewire request must never strand the temporary
+                // drawer. The real server drawer clears it itself when it mounts.
+                Promise.resolve(request).catch((error) => {
+                    console.error(error);
+                    this.$dispatch('rc-school-optimistic-clear');
+                });
+
+                window.setTimeout(() => {
+                    this.$dispatch('rc-school-optimistic-timeout', { id });
+                }, 4500);
             }
         },
 
