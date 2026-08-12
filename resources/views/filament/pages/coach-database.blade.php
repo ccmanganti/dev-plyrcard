@@ -6303,15 +6303,249 @@
         };
     </script>
 
+    @php
+        // v113: one canonical local school catalog powers the same drawer from
+        // Dashboard, Discover Schools, Favorites, and My Lists. GHL remains a
+        // stats overlay only; drawer identity/roster/membership are local.
+        $globalSchoolDrawerCatalog = in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true)
+            ? $this->discoverClientSchools
+            : [];
+    @endphp
+
     <div
         class="rc-wrap"
-        x-data="{ discoverSelectedIds: [], optimisticSchool: null }"
+        x-data="{
+            discoverSelectedIds: [],
+            discoverSearch: '',
+            discoverDivision: '',
+            discoverConference: '',
+            discoverAvailableConferences: [],
+            discoverViewMode: 'grid',
+            discoverClientCount: 0,
+            discoverClientShown: 24,
+            discoverListsOpen: false,
+            discoverDrawerTab: 'coaches',
+            discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
+            discoverBulkNotice: '',
+            discoverBulkNoticeTimer: null,
+            discoverNewBulkListName: '',
+            discoverNewDrawerListName: '',
+            discoverCreatingList: false,
+            optimisticSchool: window.__plyrSchoolDrawerOptimistic || null,
+            globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
+            normalizeGlobalSchoolName(value) {
+                return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            },
+            applyGlobalSchoolState(detail) {
+                if (!detail) return;
+                const id = String(detail.id ?? '').trim();
+                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : []).find(item => String(item?.id ?? '').trim() === id);
+                if (row) {
+                    if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) row.is_favorite = !!detail.is_favorite;
+                    if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
+                }
+            },
+            openGlobalSchool(reference) {
+                const source = (reference && typeof reference === 'object') ? reference : { id: reference };
+                const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
+                const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
+                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+                const local = rows.find(row => {
+                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean);
+                    if (sourceId && ids.includes(sourceId)) return true;
+                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
+                    return !!sourceName && rowName === sourceName;
+                }) || null;
+
+                if (!local && (!source || typeof source !== 'object')) return;
+
+                const merged = { ...(local || {}), ...(source || {}) };
+                if (local) {
+                    // Canonical local values must win for all interactive identity/state.
+                    merged.id = local.id;
+                    merged.school_id = local.school_id ?? local.id;
+                    merged.name = local.name ?? merged.name;
+                    merged.logo_url = local.logo_url || merged.logo_url || '';
+                    merged.city = local.city ?? merged.city;
+                    merged.state = local.state ?? merged.state;
+                    merged.division = local.division ?? merged.division;
+                    merged.conference = local.conference ?? merged.conference;
+                    merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
+                    merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coach_count ?? merged.coaches.length ?? 0);
+                    merged.is_favorite = !!local.is_favorite;
+                    merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+                }
+
+                window.__plyrSchoolDrawerOptimistic = merged;
+                this.optimisticSchool = merged;
+                this.discoverDrawerTab = 'coaches';
+                this.discoverListsOpen = false;
+                this.discoverNewDrawerListName = '';
+            },
+            discoverListKey(list) {
+                return String(list?.key || list?.slug || list?.id || '').trim();
+            },
+            discoverListLabel(list) {
+                return String(list?.label || list?.name || this.discoverListKey(list) || 'List');
+            },
+            discoverListColor(list) {
+                return String(list?.color || '#ff6338');
+            },
+            discoverListCount(list) {
+                return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0);
+            },
+            setDiscoverListCount(key, count) {
+                key = String(key || '').toLowerCase();
+                const item = this.discoverLists.find(list => this.discoverListKey(list).toLowerCase() === key);
+                if (item) item.schools_count = Math.max(0, Number(count || 0));
+            },
+            showDiscoverBulkNotice(message) {
+                this.discoverBulkNotice = String(message || '');
+                if (this.discoverBulkNoticeTimer) window.clearTimeout(this.discoverBulkNoticeTimer);
+                this.discoverBulkNoticeTimer = window.setTimeout(() => { this.discoverBulkNotice = ''; }, 3200);
+            },
+            async addSelectedSchoolsToDiscoverList(list) {
+                const ids = [...this.discoverSelectedIds].map(String).filter(Boolean);
+                const key = this.discoverListKey(list);
+                if (!ids.length || !key) return;
+                const label = this.discoverListLabel(list);
+                const previousCount = this.discoverListCount(list);
+                this.setDiscoverListCount(key, previousCount + ids.length);
+                this.showDiscoverBulkNotice(`Adding ${ids.length} school${ids.length === 1 ? '' : 's'} to ${label}...`);
+                try {
+                    const result = await this.$wire.call('queueSchoolIdsToList', ids, key);
+                    if (!result || result.success === false) {
+                        this.setDiscoverListCount(key, previousCount);
+                        this.showDiscoverBulkNotice(result?.error || `Unable to add schools to ${label}.`);
+                        return;
+                    }
+                    const added = Number(result.updated_schools ?? result.school_count ?? ids.length);
+                    const listCount = Number(result.list_count ?? (previousCount + added));
+                    this.setDiscoverListCount(key, listCount);
+                    this.showDiscoverBulkNotice(added > 0
+                        ? `Added ${added} school${added === 1 ? '' : 's'} to ${label}.`
+                        : `Selected school${ids.length === 1 ? ' is' : 's are'} already in ${label}.`);
+                    this.discoverSelectedIds = [];
+                    window.dispatchEvent(new CustomEvent('rc-discover-clear-selection'));
+                } catch (error) {
+                    this.setDiscoverListCount(key, previousCount);
+                    this.showDiscoverBulkNotice(`Unable to add schools to ${label}.`);
+                }
+            },
+            async createDiscoverBulkList() {
+                const name = String(this.discoverNewBulkListName || '').trim();
+                if (!name || this.discoverCreatingList) return;
+                this.discoverCreatingList = true;
+                try {
+                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
+                    if (!result || result.success === false || !result.list) {
+                        this.showDiscoverBulkNotice(result?.error || 'Unable to create the list.');
+                        return;
+                    }
+                    const list = result.list;
+                    const key = this.discoverListKey(list);
+                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
+                        this.discoverLists.push(list);
+                    }
+                    this.discoverNewBulkListName = '';
+                    await this.addSelectedSchoolsToDiscoverList(list);
+                } finally {
+                    this.discoverCreatingList = false;
+                }
+            },
+            async createDiscoverDrawerList() {
+                const name = String(this.discoverNewDrawerListName || '').trim();
+                if (!name || !this.optimisticSchool || this.discoverCreatingList) return;
+                this.discoverCreatingList = true;
+                try {
+                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
+                    if (!result || result.success === false || !result.list) return;
+                    const list = result.list;
+                    const key = this.discoverListKey(list);
+                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
+                        this.discoverLists.push(list);
+                    }
+                    this.discoverNewDrawerListName = '';
+                    if (key && !this.discoverInList(key)) this.toggleDiscoverList(key);
+                } finally {
+                    this.discoverCreatingList = false;
+                }
+            },
+            closeDiscoverSchool() {
+                window.__plyrSchoolDrawerOptimistic = null;
+                this.discoverListsOpen = false;
+                this.discoverDrawerTab = 'coaches';
+                this.optimisticSchool = null;
+                // v110: explicit close event is also consumed by any nested Discover
+                // controller, so a stale Alpine subtree cannot immediately repaint it.
+                window.dispatchEvent(new CustomEvent('rc-discover-drawer-closed'));
+            },
+            favoriteDiscoverSchool() {
+                if (!this.optimisticSchool) return;
+                const previous = !!this.optimisticSchool.is_favorite;
+                const next = !previous;
+                this.optimisticSchool.is_favorite = next;
+                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
+                Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
+                    .then(result => {
+                        if (!result || result.success === false) {
+                            if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
+                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
+                        }
+                    })
+                    .catch(() => {
+                        if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
+                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                    });
+            },
+            toggleDiscoverList(key) {
+                if (!this.optimisticSchool || !key) return;
+                key = String(key).toLowerCase();
+                const previous = Array.isArray(this.optimisticSchool.list_keys) ? [...this.optimisticSchool.list_keys] : [];
+                const has = previous.map(v => String(v).toLowerCase()).includes(key);
+                const list = this.discoverLists.find(item => this.discoverListKey(item).toLowerCase() === key);
+                const previousCount = list ? this.discoverListCount(list) : 0;
+                this.optimisticSchool.list_keys = has
+                    ? previous.filter(v => String(v).toLowerCase() !== key)
+                    : [...previous, key];
+                if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
+                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
+                Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
+                    .then(result => {
+                        if (!result || result.success === false) {
+                            if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
+                            if (list) this.setDiscoverListCount(key, previousCount);
+                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
+                            return;
+                        }
+                        const serverCount = Number(result?.list_counts?.[key]);
+                        if (list && Number.isFinite(serverCount)) this.setDiscoverListCount(key, serverCount);
+                    })
+                    .catch(() => {
+                        if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
+                        if (list) this.setDiscoverListCount(key, previousCount);
+                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                    });
+            },
+            discoverInList(key) {
+                const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
+                return keys.map(v => String(v).toLowerCase()).includes(String(key || '').toLowerCase());
+            }
+        }"
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
-        x-on:rc-open-school-optimistic.window="optimisticSchool = $event.detail?.school || null"
-        x-on:rc-school-server-drawer-ready.window="optimisticSchool = null"
-        x-on:rc-school-optimistic-clear.window="optimisticSchool = null"
-        x-on:rc-school-optimistic-timeout.window="if (optimisticSchool && String(optimisticSchool.id || '') === String($event.detail?.id || '')) optimisticSchool = null"
+        x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
+        x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
+        x-on:rc-school-optimistic-clear.window="closeDiscoverSchool()"
+        x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
+        x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
+        x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
         @if(! in_array($section, ['schools', 'favorites', 'lists'], true))
             wire:poll.5s.visible="pollRealtime"
         @endif
@@ -7067,7 +7301,7 @@
 
                         <div class="rc-radar-schools-v2">
                             @foreach($radarSchoolRows as $radarSchool)
-                                <button type="button" class="rc-radar-card-v2" wire:click="openSchoolDashboardModal(@js($radarSchool['id']))">
+                                <button type="button" class="rc-radar-card-v2" x-on:click.stop="openGlobalSchool(@js($radarSchool))">
                                     <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($radarSchool['logo_url']))
                                             <img src="{{ $radarSchool['logo_url'] }}" alt="{{ $radarSchool['name'] }} logo" loading="lazy" onerror="this.closest('.rc-radar-logo-v2').classList.add('is-missing-logo')">
@@ -7096,7 +7330,7 @@
 
                         <div class="rc-interested-list-v2">
                             @foreach($interestedSchoolRows as $interestedSchool)
-                                <button type="button" class="rc-interested-row-v2" wire:click="openDashboardEngagedSchool({{ (int) ($interestedSchool['rank'] - 1) }})">
+                                <button type="button" class="rc-interested-row-v2" x-on:click.stop="openGlobalSchool(@js($interestedSchool))">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
                                     <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($interestedSchool['logo_url']))
@@ -8427,35 +8661,34 @@
 
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." wire:model.live.debounce.250ms="search" autocomplete="off" />
-                    <span class="rc-discover-search-busy-v73" wire:loading.flex wire:target="search" aria-hidden="true"><span class="rc-spinner-mini"></span></span>
+                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." x-model="discoverSearch" x-on:input.debounce.40ms="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" autocomplete="off" />
                 </div>
 
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
                         @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27 {{ $divisionFilter === $divisionValue ? 'is-active' : '' }}" wire:click="setDivisionFilter(@js($divisionValue))" wire:loading.attr="disabled" wire:target="setDivisionFilter">{{ $divisionLabel }}</button>
+                            <button type="button" class="rc-discover-tab-v27" x-bind:class="discoverDivision === @js($divisionValue) ? 'is-active' : ''" x-on:click="discoverDivision = (discoverDivision === @js($divisionValue) ? '' : @js($divisionValue)); discoverConference=''; $dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })">{{ $divisionLabel }}</button>
                         @endforeach
                     </div>
 
-                    <select class="rc-discover-select-v27" wire:model.live="conferenceFilter" aria-label="Conference filter">
-                        <option value="">All Conferences ({{ number_format(count($this->conferences ?? [])) }})</option>
-                        @foreach($this->conferences as $conference)
-                            <option value="{{ $conference }}">{{ $conference }}</option>
-                        @endforeach
+                    <select class="rc-discover-select-v27" x-model="discoverConference" x-on:change="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" aria-label="Conference filter">
+                        <option value="" x-text="`All Conferences (${Number(discoverAvailableConferences.length || 0).toLocaleString()})`"></option>
+                        <template x-for="conferenceOption in discoverAvailableConferences" :key="`discover-conf-${conferenceOption}`">
+                            <option x-bind:value="conferenceOption" x-text="conferenceOption"></option>
+                        </template>
                     </select>
                 </div>
 
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
-                        <span><strong>{{ number_format($discoverSchoolCount) }}</strong> schools</span>
-                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click="$dispatch('rc-discover-toggle-visible')"><input type="checkbox" x-bind:checked="discoverSelectedIds.length > 0 && discoverSelectedIds.length >= {{ (int) $discoverShownCount }}" readonly tabindex="-1"><span>Select All ({{ number_format($discoverShownCount) }})</span></button>
+                        <span><strong x-text="Number(discoverClientCount || {{ (int) $discoverSchoolCount }}).toLocaleString()"></strong> schools</span>
+                        <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click="$dispatch('rc-discover-toggle-visible')"><input type="checkbox" x-bind:checked="discoverSelectedIds.length > 0 && discoverSelectedIds.length >= discoverClientShown" readonly tabindex="-1"><span>Select All (<span x-text="Number(discoverClientShown || 0).toLocaleString()"></span>)</span></button>
                     </div>
 
                     <div class="rc-discover-right-v27">
                         <div class="rc-discover-toggle-v27" aria-label="School view">
-                            <button type="button" class="{{ $schoolViewMode === 'grid' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('grid')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
-                            <button type="button" class="{{ $schoolViewMode === 'list' ? 'is-active' : '' }}" wire:click="setSchoolViewMode('list')" wire:loading.attr="disabled" wire:target="setSchoolViewMode" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
+                            <button type="button" x-bind:class="discoverViewMode === 'grid' ? 'is-active' : ''" x-on:click="discoverViewMode='grid'; $dispatch('rc-discover-view',{mode:'grid'})" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+                            <button type="button" x-bind:class="discoverViewMode === 'list' ? 'is-active' : ''" x-on:click="discoverViewMode='list'; $dispatch('rc-discover-view',{mode:'list'})" aria-label="List view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
                         </div>
                     </div>
                 </div>
@@ -8473,32 +8706,45 @@
                                     <span>Add to List</span>
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                                 </button>
-                                <div class="rc-discover-bulk-menu-v36" x-cloak x-show="open" x-transition.origin.top.left>
-                                    @forelse($this->lists as $list)
-                                        @php $listKey = (string) ($list['key'] ?? ''); @endphp
-                                        @if($listKey !== '')
-                                            <button type="button" class="rc-discover-bulk-option-v36" x-on:click="const ids=[...discoverSelectedIds]; open=false; if (!ids.length) return; $wire.queueSchoolIdsToList(ids, {{ \Illuminate\Support\Js::from($listKey) }}).then(result => { if (result?.success) { discoverSelectedIds=[]; window.dispatchEvent(new CustomEvent('rc-discover-clear-selection')); } })">
-                                                <span>{{ $list['label'] ?? \Illuminate\Support\Str::headline($listKey) }}</span>
-                                                <span>+</span>
+                                <div class="rc-discover-bulk-menu-v36 rc-discover-list-menu-v112" x-cloak x-show="open" x-transition.origin.top.left>
+                                    <h4>Add to a list</h4>
+                                    <template x-for="list in discoverLists" :key="`bulk-list-${discoverListKey(list)}`">
+                                        <button type="button" class="rc-discover-bulk-option-v36 rc-discover-list-option-v112" x-on:click="open=false; addSelectedSchoolsToDiscoverList(list)">
+                                            <span class="rc-list-check-v81 rc-list-check-plus-v112">+</span>
+                                            <span class="rc-school-list-label-v87">
+                                                <span class="rc-school-list-dot-v72" x-bind:style="`--dot:${discoverListColor(list)}`"></span>
+                                                <span x-text="discoverListLabel(list)"></span>
+                                            </span>
+                                            <small class="rc-list-count-v81" x-text="discoverListCount(list)"></small>
+                                        </button>
+                                    </template>
+                                    <div class="rc-school-list-empty" x-show="discoverLists.length === 0">No lists yet.</div>
+
+                                    <div class="rc-list-quick-create-v112">
+                                        <div class="rc-list-quick-create-title-v112">Create new list</div>
+                                        <div class="rc-list-quick-create-row-v112">
+                                            <input type="text" x-model="discoverNewBulkListName" x-on:keydown.enter.prevent="createDiscoverBulkList()" placeholder="New list name" maxlength="80">
+                                            <button type="button" class="rc-list-quick-create-btn-v112" x-on:click="createDiscoverBulkList()" x-bind:disabled="discoverCreatingList || !String(discoverNewBulkListName || '').trim()">
+                                                <span x-show="!discoverCreatingList">Create &amp; Add</span>
+                                                <span x-show="discoverCreatingList" x-cloak>Creating…</span>
                                             </button>
-                                        @endif
-                                    @empty
-                                        <div class="rc-school-list-empty">No lists yet.</div>
-                                    @endforelse
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="discoverSelectedIds=[]; window.dispatchEvent(new CustomEvent('rc-discover-clear-selection'))">Clear</button>
                 </div>
 
+                <div class="rc-discover-bulk-notice-v112" x-cloak x-show="discoverBulkNotice" x-transition.opacity x-text="discoverBulkNotice"></div>
+
                 {{-- v103: Discover is local DB-backed. Never blur/block the entire grid for local filters or selection. --}}
                 <div class="rc-discover-loading-v27">
-                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->filteredSchools, 'viewMode' => $schoolViewMode, 'selectedSchoolIds' => $selectedSchoolIds])
+                    @include('filament.partials.coach-database-school-grid', ['schools' => $this->discoverClientSchools, 'viewMode' => 'grid', 'selectedSchoolIds' => $selectedSchoolIds])
                 </div>
-
-                @if($this->canLoadMoreSchools)
-                    <div style="margin-top:.35rem;text-align:center"><button class="rc-btn" wire:click="loadMoreSchools" wire:loading.attr="disabled" wire:target="loadMoreSchools"><span wire:loading.remove wire:target="loadMoreSchools">Load more</span><span wire:loading.flex wire:target="loadMoreSchools" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button></div>
-                @endif
+                <div style="margin-top:.35rem;text-align:center" x-show="discoverClientShown < discoverClientCount" x-cloak>
+                    <button class="rc-btn" type="button" x-on:click="$dispatch('rc-discover-load-more')">Load more</button>
+                </div>
             </div>
         @endif
 
@@ -8639,7 +8885,7 @@
                                     </span>
                                 </div>
                                 <span class="rc-fav-list-count-v40">{{ number_format($coachCount) }} {{ \Illuminate\Support\Str::plural('coach', $coachCount) }}</span>
-                                <button type="button" class="rc-fav-list-view-v40" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
+                                <button type="button" class="rc-fav-list-view-v40" x-on:click.stop="openGlobalSchool(@js($school))">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                     View
                                 </button>
@@ -8677,7 +8923,7 @@
                                     <p>{{ $conference !== '' ? $conference : 'Conference unavailable' }} · {{ number_format($coachCount) }} {{ \Illuminate\Support\Str::plural('coach', $coachCount) }}</p>
                                 </div>
                                 <div class="rc-favorite-actions-v37">
-                                    <button type="button" class="rc-favorite-view-v37" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">
+                                    <button type="button" class="rc-favorite-view-v37" x-on:click.stop="openGlobalSchool(@js($school))">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                         View
                                     </button>
@@ -8695,38 +8941,58 @@
 
         @if($section === 'lists')
             <style>
-                .rc-my-lists-v41 { display:grid; gap:1.15rem; }
-                .rc-my-lists-head-v41 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-top:.25rem; }
-                .rc-my-lists-title-v41 h2 { margin:0; color:var(--rc-text); font-size:1.35rem; line-height:1.1; letter-spacing:-.025em; font-weight:750; }
-                .rc-my-lists-title-v41 p { margin:.45rem 0 0; color:var(--rc-muted); font-size:.9rem; line-height:1.4; }
-                .rc-new-list-btn-v41 { min-height:2.85rem; padding:0 1.15rem; border:0; border-radius:.9rem; display:inline-flex; align-items:center; justify-content:center; gap:.55rem; background:#ff6338; color:#fff; font-size:.9rem; font-weight:750; box-shadow:0 15px 30px rgba(255,99,56,.22); cursor:pointer; }
-                .rc-new-list-panel-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; padding:1rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; align-items:center; gap:.65rem; }
-                .rc-new-list-panel-v41 .rc-input { flex:1; min-height:2.65rem; width:100%; border-color:#ff6338; }
-                .rc-list-color-picker-v42 { display:inline-flex; align-items:center; gap:.38rem; flex:0 0 auto; }
-                .rc-list-color-option-v42 { width:1.55rem; height:1.55rem; border-radius:.45rem; border:2px solid transparent; box-shadow:inset 0 0 0 1px rgba(15,23,42,.08); cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; }
-                .rc-list-color-option-v42.is-selected { border-color:var(--rc-text); box-shadow:0 0 0 2px var(--rc-surface), 0 0 0 4px currentColor; }
-                .rc-list-color-option-v42 span { width:100%; height:100%; border-radius:.32rem; display:block; }
-                .rc-list-stack-v41 { display:grid; gap:1rem; }
-                .rc-list-card-v41 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1.15rem; padding:1.05rem 1.2rem; box-shadow:0 14px 35px rgba(15,23,42,.055); display:grid; gap:1rem; }
-                .rc-list-card-head-v41 { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
-                .rc-list-card-title-v41 { display:flex; align-items:center; gap:.7rem; min-width:0; }
-                .rc-list-dot-v41 { width:.72rem; height:.72rem; border-radius:999px; flex:0 0 auto; background:var(--list-color, #ff6338); }
-                .rc-list-card-title-v41 strong { color:var(--rc-text); font-size:1rem; font-weight:750; line-height:1.2; }
-                .rc-list-count-pill-v41 { border-radius:999px; padding:.25rem .65rem; background:var(--rc-soft); color:var(--rc-muted); font-size:.78rem; line-height:1.2; white-space:nowrap; }
-                .rc-list-card-actions-v41 { display:inline-flex; align-items:center; gap:.45rem; flex:0 0 auto; }
-                .rc-list-icon-btn-v41 { width:2rem; height:2rem; border:0; border-radius:.65rem; background:transparent; color:var(--rc-muted); display:grid; place-items:center; cursor:pointer; transition:.16s ease; }
-                .rc-list-icon-btn-v41:hover, .rc-list-icon-btn-v41.is-active { background:var(--rc-soft); color:var(--rc-accent); }
-                .rc-list-chip-wrap-v41 { display:flex; flex-wrap:wrap; gap:.55rem; min-height:2.35rem; }
-                .rc-list-school-chip-v41 { display:inline-flex; align-items:center; gap:.55rem; border:1px solid var(--rc-border); border-radius:.65rem; background:var(--rc-soft); color:var(--rc-text); padding:.35rem .45rem; font-size:.82rem; font-weight:650; line-height:1.2; }
-                .rc-list-chip-logo-v41 { width:1.7rem; height:1.7rem; border-radius:.45rem; border:1px solid var(--rc-border); background:#fff; color:#111827; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto; font-size:.67rem; font-weight:800; }
-                .rc-list-chip-logo-v41 img { width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
-                .rc-list-chip-remove-v41 { border:0; background:transparent; color:var(--rc-muted); width:1rem; height:1rem; display:grid; place-items:center; cursor:pointer; padding:0; }
-                .rc-list-chip-remove-v41:hover { color:#ff6338; }
-                .rc-list-empty-card-v41 { border:1px dashed var(--rc-border); border-radius:1rem; padding:1rem; color:var(--rc-muted); background:var(--rc-surface); }
-                .rc-list-selected-v41 { border-color:rgba(255,99,56,.42); box-shadow:0 14px 35px rgba(255,99,56,.08); }
-                .dark .rc-new-list-btn-v41 { box-shadow:0 15px 30px rgba(255,99,56,.16); }
-                @media (max-width: 980px) { .rc-new-list-panel-v41 { grid-template-columns:1fr; align-items:stretch; } .rc-list-color-picker-v42 { justify-content:flex-start; } }
-                @media (max-width: 780px) { .rc-my-lists-head-v41 { align-items:flex-start; flex-direction:column; } .rc-new-list-btn-v41 { width:100%; } .rc-list-card-head-v41 { align-items:flex-start; flex-direction:column; } }
+                .rc-my-lists-v115{display:grid;gap:1.15rem}
+                .rc-my-lists-head-v115{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-top:.25rem}
+                .rc-my-lists-title-v115 h2{margin:0;color:var(--rc-text);font-size:1.42rem;line-height:1.1;letter-spacing:-.03em;font-weight:800}
+                .rc-my-lists-title-v115 p{margin:.45rem 0 0;color:var(--rc-muted);font-size:.9rem;line-height:1.45}
+                .rc-new-list-btn-v115{min-height:2.75rem;padding:0 1.05rem;border:0;border-radius:.85rem;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;background:#ff6338;color:#fff;font-size:.86rem;font-weight:800;box-shadow:0 13px 26px rgba(255,99,56,.2);cursor:pointer}
+                .rc-new-list-panel-v115{border:1px solid var(--rc-border);background:var(--rc-surface);border-radius:1rem;padding:.9rem;box-shadow:0 14px 35px rgba(15,23,42,.055);display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:.6rem}
+                .rc-new-list-panel-v115 .rc-input{min-height:2.55rem;width:100%;border-color:#ff6338}
+                .rc-list-color-picker-v115{display:inline-flex;align-items:center;gap:.35rem}
+                .rc-list-color-option-v115{width:1.45rem;height:1.45rem;border-radius:.4rem;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px rgba(15,23,42,.08)}
+                .rc-list-color-option-v115.is-selected{border-color:var(--rc-text)}
+                .rc-list-stack-v115{display:grid;gap:1rem}
+                .rc-list-card-v115{position:relative;border:1px solid var(--rc-border);background:var(--rc-surface);border-radius:1.2rem;padding:1rem 1.15rem 1.1rem;box-shadow:0 14px 36px rgba(15,23,42,.055);overflow:hidden}
+                .rc-list-card-head-v115{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:2.3rem}
+                .rc-list-card-title-v115{display:flex;align-items:center;gap:.65rem;min-width:0}
+                .rc-list-dot-v115{width:.72rem;height:.72rem;border-radius:999px;flex:0 0 auto;background:var(--list-color,#ff6338)}
+                .rc-list-card-title-v115 strong{color:var(--rc-text);font-size:1rem;font-weight:800;line-height:1.2}
+                .rc-list-count-pill-v115{border-radius:999px;padding:.24rem .62rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.77rem;white-space:nowrap}
+                .rc-list-card-actions-v115{display:inline-flex;align-items:center;gap:.35rem;flex:0 0 auto}
+                .rc-list-icon-btn-v115{width:2.05rem;height:2.05rem;border:0;border-radius:.62rem;background:transparent;color:#8a94a6;display:grid;place-items:center;cursor:pointer;transition:.15s ease}
+                .rc-list-icon-btn-v115:hover,.rc-list-icon-btn-v115.is-active{background:var(--rc-soft);color:#ff6338}
+                .rc-list-tools-v115{margin:.75rem 0 .65rem}
+                .rc-list-search-v115{position:relative;max-width:31rem}
+                .rc-list-search-v115 input{width:100%;height:2.65rem;padding:0 .85rem 0 2.35rem;border:1px solid var(--rc-border);border-radius:.72rem;background:var(--rc-surface);color:var(--rc-text);outline:none}
+                .rc-list-search-v115 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.1)}
+                .rc-list-search-v115 svg{position:absolute;left:.78rem;top:50%;transform:translateY(-50%);color:#8a94a6}
+                .rc-list-add-results-v115{position:absolute;left:0;right:0;top:calc(100% + .35rem);z-index:40;max-height:15rem;overflow:auto;border:1px solid var(--rc-border);border-radius:.72rem;background:var(--rc-surface);box-shadow:0 18px 40px rgba(15,23,42,.16);padding:.35rem}
+                .rc-list-add-result-v115{width:100%;min-height:2.55rem;border:0;border-radius:.58rem;background:transparent;color:var(--rc-text);display:flex;align-items:center;gap:.55rem;padding:.4rem .55rem;text-align:left;cursor:pointer}
+                .rc-list-add-result-v115:hover{background:var(--rc-soft)}
+                .rc-list-add-logo-v115,.rc-list-chip-logo-v115{width:1.75rem;height:1.75rem;border-radius:.45rem;border:1px solid var(--rc-border);background:#fff;color:#111827;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;font-size:.66rem;font-weight:800}
+                .rc-list-add-logo-v115 img,.rc-list-chip-logo-v115 img{width:100%;height:100%;object-fit:contain;background:#fff}
+                .rc-list-rename-v115{display:flex;align-items:center;gap:.42rem;flex-wrap:wrap}
+                .rc-list-rename-v115 input{height:2.35rem;min-width:17rem;padding:0 .7rem;border:1px solid #ff6338;border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);font-weight:750;outline:none}
+                .rc-list-rename-v115 button{height:2.35rem;padding:0 .7rem;border:0;border-radius:.6rem;font-size:.75rem;font-weight:750;cursor:pointer}
+                .rc-list-rename-save-v115{background:#ff6338;color:#fff}.rc-list-rename-cancel-v115{background:var(--rc-soft);color:var(--rc-text)}
+                .rc-list-delete-confirm-v115{margin:.7rem 0 .8rem;padding:.75rem .9rem;border-radius:.72rem;background:#fff0ee;display:flex;align-items:center;justify-content:space-between;gap:1rem;color:#c7352c;font-size:.82rem;font-weight:650}
+                .rc-list-delete-actions-v115{display:flex;gap:.45rem}.rc-list-delete-actions-v115 button{min-height:2.25rem;padding:0 .8rem;border-radius:.6rem;font-weight:750;cursor:pointer}
+                .rc-list-delete-cancel-v115{border:1px solid var(--rc-border);background:#fff;color:#344054}.rc-list-delete-btn-v115{border:0;background:#d8453b;color:#fff}
+                .rc-list-chip-stage-v115{position:relative;padding-bottom:.1rem}
+                .rc-list-chip-wrap-v115{display:flex;flex-wrap:wrap;gap:.55rem;align-content:flex-start;transition:max-height .2s ease}
+                .rc-list-chip-wrap-v115.is-collapsed{max-height:6.55rem;overflow:hidden}
+                .rc-list-fade-v115{position:absolute;left:0;right:0;bottom:0;height:2.8rem;pointer-events:none;background:linear-gradient(to bottom,rgba(255,255,255,0),var(--rc-surface) 86%)}
+                .rc-list-school-chip-v115{display:inline-flex;align-items:center;gap:.48rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-soft);color:var(--rc-text);padding:.32rem .42rem;font-size:.8rem;font-weight:650;line-height:1.2}
+                .rc-list-chip-name-v115{border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer;max-width:16rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+                .rc-list-chip-remove-v115{border:0;background:transparent;color:#8a94a6;width:1.15rem;height:1.15rem;display:grid;place-items:center;cursor:pointer;padding:0}.rc-list-chip-remove-v115:hover{color:#ff6338}
+                .rc-list-empty-v115{padding:.5rem 0;color:var(--rc-muted);font-size:.82rem}
+                .rc-list-expand-v115{width:2rem;height:2rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:#667085;display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,.08);flex:0 0 auto}
+                .rc-list-expand-v115:hover{color:#ff6338;border-color:rgba(255,99,56,.35)}
+                .rc-list-expand-v115.is-active{color:#ff6338;border-color:rgba(255,99,56,.35);background:rgba(255,99,56,.08)}
+                .rc-list-inline-error-v115{margin-top:.5rem;color:#d92d20;font-size:.76rem;font-weight:600}
+                .dark .rc-list-delete-confirm-v115{background:rgba(216,69,59,.14)}
+                .dark .rc-list-fade-v115{background:linear-gradient(to bottom,rgba(31,31,35,0),var(--rc-surface) 86%)}
+                @media(max-width:780px){.rc-my-lists-head-v115{align-items:flex-start;flex-direction:column}.rc-new-list-btn-v115{width:100%}.rc-list-card-head-v115{align-items:flex-start}.rc-list-rename-v115 input{min-width:11rem}.rc-list-delete-confirm-v115{align-items:flex-start;flex-direction:column}.rc-list-card-actions-v115{align-self:flex-start}}
             </style>
 
             @include('filament.partials.coach-database-header', [
@@ -8747,19 +9013,8 @@
                 };
                 $listLogoUrlFor = function (array $school): string {
                     foreach (['logo_url', 'school_logo_url', 'business_logo_url', 'logo', 'school_logo', 'business_logo'] as $key) {
-                        $value = $school[$key] ?? null;
-                        if (is_scalar($value)) {
-                            $url = trim((string) $value);
-                            $lower = strtolower($url);
-                            if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($url, '//')) {
-                                return str_starts_with($url, '//') ? 'https:' . $url : $url;
-                            }
-                        }
-                    }
-                    foreach (['head_coach.logo_url', 'head_coach.school_logo_url', 'head_coach.business_logo_url'] as $key) {
-                        $url = trim((string) data_get($school, $key, ''));
-                        $lower = strtolower($url);
-                        if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://') || str_starts_with($url, '//')) {
+                        $url = trim((string) ($school[$key] ?? ''));
+                        if ($url !== '' && (str_starts_with(strtolower($url), 'http://') || str_starts_with(strtolower($url), 'https://') || str_starts_with($url, '//'))) {
                             return str_starts_with($url, '//') ? 'https:' . $url : $url;
                         }
                     }
@@ -8767,119 +9022,155 @@
                 };
                 $schoolsForListKey = function (array $list): array {
                     $listKey = (string) ($list['key'] ?? '');
-                    if ($listKey === '') {
-                        return [];
-                    }
-
-                    return collect($this->allSchools())
-                        ->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))
-                        ->values()
-                        ->all();
+                    if ($listKey === '') return [];
+                    return collect($this->allSchools())->filter(fn (array $school): bool => in_array($listKey, $school['list_keys'] ?? [], true))->values()->all();
                 };
+                $allListSchoolOptions = collect($this->allSchools())->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                    $name = (string) ($school['name'] ?? 'School');
+                    return [
+                        'id' => (string) ($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),
+                        'name' => $name,
+                        'logo' => $listLogoUrlFor($school),
+                        'initials' => $listInitials($name),
+                    ];
+                })->filter(fn(array $school): bool => $school['id'] !== '')->values()->all();
             @endphp
 
-            <div class="rc-my-lists-v41">
-                <div class="rc-my-lists-head-v41">
-                    <div class="rc-my-lists-title-v41">
+            <div class="rc-my-lists-v115">
+                <div class="rc-my-lists-head-v115">
+                    <div class="rc-my-lists-title-v115">
                         <h2>My Lists</h2>
                         <p>Organize schools into your own lists — Dream Schools, On the Radar, by conference, however you want.</p>
                     </div>
-                    <button type="button" class="rc-new-list-btn-v41" wire:click="$set('showNewListComposer', true)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    <button type="button" class="rc-new-list-btn-v115" wire:click="$set('showNewListComposer', true)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
                         New List
                     </button>
                 </div>
 
                 @if($showNewListComposer)
-                    <div class="rc-new-list-panel-v41">
-                        <input class="rc-input" placeholder="List name (e.g. Dream Schools)" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus />
-                        <div class="rc-list-color-picker-v42" aria-label="Choose list color">
-                            @foreach(['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'] as $colorOption)
-                                <button
-                                    type="button"
-                                    class="rc-list-color-option-v42 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}"
-                                    style="color: {{ $colorOption }};"
-                                    wire:click="$set('newListColor', '{{ $colorOption }}')"
-                                    title="Use {{ $colorOption }}"
-                                    aria-label="Use list color {{ $colorOption }}"
-                                >
-                                    <span style="background: {{ $colorOption }};"></span>
-                                </button>
+                    <div class="rc-new-list-panel-v115">
+                        <input class="rc-input" placeholder="List name" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus>
+                        <div class="rc-list-color-picker-v115">
+                            @foreach($listColorPalette as $colorOption)
+                                <button type="button" class="rc-list-color-option-v115 {{ strtolower($newListColor) === strtolower($colorOption) ? 'is-selected' : '' }}" style="background:{{ $colorOption }}" wire:click="$set('newListColor', '{{ $colorOption }}')" aria-label="Use {{ $colorOption }}"></button>
                             @endforeach
                         </div>
-                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList" wire:loading.attr="disabled" wire:target="createCustomList">
-                            <span wire:loading.remove wire:target="createCustomList">Create</span>
-                            <span wire:loading.flex wire:target="createCustomList" style="align-items:center;gap:.35rem"><span class="rc-spinner-mini"></span> Creating</span>
-                        </button>
+                        <button class="rc-btn rc-btn-primary" wire:click="createCustomList">Create</button>
                         <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
                     </div>
                 @endif
 
-                <div class="rc-list-stack-v41">
+                <div class="rc-list-stack-v115">
                     @forelse($listRows as $listIndex => $list)
                         @php
                             $listKey = (string) ($list['key'] ?? '');
                             $listLabel = (string) ($list['label'] ?? 'List');
                             $listSchools = $schoolsForListKey($list);
-                            $schoolCount = count($listSchools);
-                            $isSelectedList = $selectedListKey === $listKey;
+                            $listSchoolsLight = collect($listSchools)->map(function (array $school) use ($listLogoUrlFor, $listInitials): array {
+                                $name = (string) ($school['name'] ?? 'School');
+                                return ['id'=>(string)($school['id'] ?? $school['business_id'] ?? md5(strtolower(trim($name)))),'name'=>$name,'logo'=>$listLogoUrlFor($school),'initials'=>$listInitials($name)];
+                            })->values()->all();
                             $listColor = $safeListColor($list['color'] ?? null, $listIndex);
                         @endphp
-                        <article class="rc-list-card-v41 {{ $isSelectedList ? 'rc-list-selected-v41' : '' }}" wire:key="list-card-{{ md5($listKey) }}">
-                            <div class="rc-list-card-head-v41">
-                                <div class="rc-list-card-title-v41">
-                                    <span class="rc-list-dot-v41" style="--list-color: {{ $listColor }};"></span>
-                                    <strong>{{ $listLabel }}</strong>
-                                    <span class="rc-list-count-pill-v41">{{ number_format($schoolCount) }} {{ \Illuminate\Support\Str::plural('school', $schoolCount) }}</span>
+                        <article
+                            class="rc-list-card-v115"
+                            x-cloak
+                            x-show="!deleted"
+                            wire:key="list-card-v115-{{ md5($listKey) }}"
+                            wire:ignore
+                            x-data="{
+                                key:@js($listKey), label:@js($listLabel), items:@js($listSchoolsLight), allSchools:@js($allListSchoolOptions),
+                                addOpen:false, renameOpen:false, confirmDelete:false, deleted:false, expanded:false,
+                                addQuery:'', renameValue:@js($listLabel), adding:{}, removing:{}, savingRename:false, deleting:false, error:'',
+                                get addResults(){ const q=String(this.addQuery||'').trim().toLowerCase(); if(q.length<2)return []; const current=new Set(this.items.map(s=>String(s.id))); return this.allSchools.filter(s=>!current.has(String(s.id))&&String(s.name||'').toLowerCase().includes(q)).slice(0,12); },
+                                get needsCollapse(){ return this.items.length>10; },
+                                async addSchool(s){ const id=String(s?.id||''); if(!id||this.adding[id]||this.items.some(i=>String(i.id)===id))return; const row={id,name:String(s.name||'School'),logo:String(s.logo||''),initials:String(s.initials||'')}; this.error=''; this.items=[...this.items,row]; this.addQuery=''; this.adding={...this.adding,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:true}); if(!r||r.success===false)throw new Error(r?.error||'Unable to add school'); }catch(e){ this.items=this.items.filter(i=>String(i.id)!==id); this.error=e?.message||'Unable to add school.'; }finally{ const n={...this.adding}; delete n[id]; this.adding=n; } },
+                                async removeSchool(s){ const id=String(s?.id||''); if(!id||this.removing[id])return; const ix=this.items.findIndex(i=>String(i.id)===id); if(ix<0)return; const removed=this.items[ix]; this.items=this.items.filter(i=>String(i.id)!==id); this.removing={...this.removing,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:false}); if(!r||r.success===false)throw new Error(r?.error||'Unable to remove school'); }catch(e){ const c=[...this.items]; c.splice(Math.min(ix,c.length),0,removed); this.items=c; this.error=e?.message||'Unable to remove school.'; }finally{ const n={...this.removing}; delete n[id]; this.removing=n; } },
+                                async saveRename(){ const next=String(this.renameValue||'').trim(); if(!next||this.savingRename)return; const old=this.label; this.label=next; this.renameOpen=false; this.savingRename=true; this.error=''; try{ const r=await $wire.call('renameRecruitingList',this.key,next); if(!r||r.success===false)throw new Error(r?.error||'Unable to rename list'); this.label=String(r.label||next); this.renameValue=this.label; }catch(e){ this.label=old; this.renameValue=old; this.renameOpen=true; this.error=e?.message||'Unable to rename list.'; }finally{ this.savingRename=false; } },
+                                async deleteList(){ if(this.deleting)return; this.deleting=true; this.error=''; try{ const r=await $wire.call('deleteCustomList',this.key); if(!r||r.success===false)throw new Error(r?.error||'Unable to delete list'); this.confirmDelete=false; this.deleted=true; }catch(e){ this.error=e?.message||'Unable to delete list.'; }finally{ this.deleting=false; } }
+                            }"
+                        >
+                            <div class="rc-list-card-head-v115">
+                                <div class="rc-list-card-title-v115">
+                                    <span class="rc-list-dot-v115" style="--list-color:{{ $listColor }}"></span>
+                                    <template x-if="!renameOpen"><strong x-text="label"></strong></template>
+                                    <template x-if="renameOpen">
+                                        <span class="rc-list-rename-v115">
+                                            <input type="text" x-model="renameValue" x-on:keydown.enter.prevent="saveRename()" x-on:keydown.escape.prevent="renameOpen=false;renameValue=label" maxlength="80" autofocus>
+                                            <button type="button" class="rc-list-rename-save-v115" x-on:click="saveRename()">Save</button>
+                                            <button type="button" class="rc-list-rename-cancel-v115" x-on:click="renameOpen=false;renameValue=label">Cancel</button>
+                                        </span>
+                                    </template>
+                                    <span class="rc-list-count-pill-v115"><span x-text="items.length"></span> <span x-text="items.length===1?'school':'schools'"></span></span>
                                 </div>
-                                <div class="rc-list-card-actions-v41">
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="startAddingSchoolsToList({{ \Illuminate\Support\Js::from($listKey) }})" title="Add schools to {{ $listLabel }}" aria-label="Add schools to {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                <div class="rc-list-card-actions-v115">
+                                    <button type="button" class="rc-list-icon-btn-v115" x-bind:class="addOpen?'is-active':''" x-on:click="addOpen=!addOpen;renameOpen=false;confirmDelete=false;$nextTick(()=>addOpen&&$refs.addInput?.focus())" title="Add schools" aria-label="Add schools">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41 {{ $isSelectedList ? 'is-active' : '' }}" wire:click="selectList({{ \Illuminate\Support\Js::from($listKey) }})" title="Open {{ $listLabel }}" aria-label="Open {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                                    <button type="button" class="rc-list-icon-btn-v115" x-bind:class="renameOpen?'is-active':''" x-on:click="renameOpen=!renameOpen;addOpen=false;confirmDelete=false;$nextTick(()=>renameOpen&&$el.closest('article')?.querySelector('.rc-list-rename-v115 input')?.focus())" title="Rename list" aria-label="Rename list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 5-5 2 2-5 5H9v-2Z"/></svg>
                                     </button>
-                                    <button type="button" class="rc-list-icon-btn-v41" wire:click="deleteCustomList({{ \Illuminate\Support\Js::from($listKey) }})" wire:confirm="Remove this list? This does not delete schools or coaches." title="Delete {{ $listLabel }}" aria-label="Delete {{ $listLabel }}">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    <button type="button" class="rc-list-icon-btn-v115" x-bind:class="confirmDelete?'is-active':''" x-on:click="confirmDelete=!confirmDelete;addOpen=false;renameOpen=false" title="Delete list" aria-label="Delete list">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                    </button>
+                                    <button type="button" class="rc-list-expand-v115" x-cloak x-show="needsCollapse" x-bind:class="expanded?'is-active':''" x-on:click="expanded=!expanded" :title="expanded?'Minimize list':'Maximize list'" :aria-label="expanded?'Minimize list':'Maximize list'">
+                                        <svg x-show="!expanded" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+                                        <svg x-show="expanded" x-cloak width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="rc-list-chip-wrap-v41">
-                                @forelse($listSchools as $school)
-                                    @php
-                                        $schoolId = (string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? '');
-                                        $schoolName = (string) ($school['name'] ?? 'School');
-                                        $logoUrl = $listLogoUrlFor($school);
-                                        $initials = $listInitials($schoolName);
-                                    @endphp
-                                    <span class="rc-list-school-chip-v41" wire:key="list-chip-{{ md5($listKey.'-'.$schoolId) }}">
-                                        <span class="rc-list-chip-logo-v41">
-                                            @if($logoUrl !== '')
-                                                <img src="{{ $logoUrl }}" alt="{{ $schoolName }} logo" referrerpolicy="no-referrer" onerror="this.remove();">
-                                            @else
-                                                {{ $initials }}
-                                            @endif
-                                        </span>
-                                        <button type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:0;cursor:pointer" wire:click="openSchoolDashboardModal({{ \Illuminate\Support\Js::from($schoolId) }})">{{ $schoolName }}</button>
-                                        <button type="button" class="rc-list-chip-remove-v41" wire:click="removeSchoolFromListById({{ \Illuminate\Support\Js::from($schoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" title="Remove {{ $schoolName }} from {{ $listLabel }}" aria-label="Remove {{ $schoolName }} from {{ $listLabel }}">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                                        </button>
-                                    </span>
-                                @empty
-                                    <div class="rc-subtle">No schools in this list yet. Use the plus button to add schools from Discover Schools.</div>
-                                @endforelse
+                            <div class="rc-list-tools-v115" x-cloak x-show="addOpen" x-transition.opacity>
+                                <div class="rc-list-search-v115">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                                    <input x-ref="addInput" type="search" x-model="addQuery" placeholder="Search a school to add..." autocomplete="off">
+                                    <div class="rc-list-add-results-v115" x-cloak x-show="String(addQuery||'').trim().length>=2">
+                                        <template x-for="school in addResults" :key="`add-${key}-${school.id}`">
+                                            <button type="button" class="rc-list-add-result-v115" x-on:click="addSchool(school)">
+                                                <span class="rc-list-add-logo-v115"><template x-if="school.logo"><img :src="school.logo" :alt="`${school.name} logo`" onerror="this.remove()"></template><span x-show="!school.logo" x-text="school.initials"></span></span>
+                                                <span x-text="school.name"></span>
+                                            </button>
+                                        </template>
+                                        <div class="rc-list-empty-v115" x-show="addResults.length===0">No matching schools available.</div>
+                                    </div>
+                                </div>
                             </div>
+
+                            <div class="rc-list-delete-confirm-v115" x-cloak x-show="confirmDelete" x-transition.opacity>
+                                <span>Delete “<span x-text="label"></span>” and remove all of its school memberships?</span>
+                                <div class="rc-list-delete-actions-v115">
+                                    <button type="button" class="rc-list-delete-cancel-v115" x-on:click="confirmDelete=false">Cancel</button>
+                                    <button type="button" class="rc-list-delete-btn-v115" x-on:click="deleteList()" x-bind:disabled="deleting"><span x-text="deleting?'Deleting…':'Delete'"></span></button>
+                                </div>
+                            </div>
+
+                            <div class="rc-list-chip-stage-v115">
+                                <div class="rc-list-chip-wrap-v115" x-bind:class="needsCollapse&&!expanded?'is-collapsed':''">
+                                    <template x-for="school in items" :key="`list-${key}-${school.id}`">
+                                        <span class="rc-list-school-chip-v115">
+                                            <span class="rc-list-chip-logo-v115"><template x-if="school.logo"><img :src="school.logo" :alt="`${school.name} logo`" onerror="this.remove()"></template><span x-show="!school.logo" x-text="school.initials"></span></span>
+                                            <button type="button" class="rc-list-chip-name-v115" x-on:click.stop="openGlobalSchool(school)" x-text="school.name"></button>
+                                            <button type="button" class="rc-list-chip-remove-v115" x-on:click="removeSchool(school)" :aria-label="`Remove ${school.name}`">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                            </button>
+                                        </span>
+                                    </template>
+                                    <div class="rc-list-empty-v115" x-show="items.length===0">No schools in this list yet. Use the plus button to add one.</div>
+                                </div>
+                                <div class="rc-list-fade-v115" x-cloak x-show="needsCollapse&&!expanded"></div>
+                            </div>
+
+
+                            <div class="rc-list-inline-error-v115" x-cloak x-show="error" x-text="error"></div>
                         </article>
                     @empty
-                        <div class="rc-list-empty-card-v41">
-                            <strong>No lists yet.</strong>
-                            <div class="rc-subtle">Create your first list, then add schools from Discover Schools or school cards.</div>
-                        </div>
+                        <div class="rc-list-empty-v115">No lists yet. Create your first list to start organizing schools.</div>
                     @endforelse
                 </div>
             </div>
         @endif
+
 
         @if($section === 'coaches')
             <div class="rc-card rc-toolbar is-flat"><input class="rc-input" placeholder="Search coaches" wire:model.live.debounce.400ms="coachSearch" /></div>
@@ -9963,190 +10254,138 @@
             </div>
         @endif
 
+        {{-- v108: persistent instant client-side school drawer shell. The selected school is mirrored
+            to window.__plyrSchoolDrawerOptimistic so a Livewire morph cannot reset the open drawer
+            between the optimistic click state and the final local roster response. --}}
         {{-- v105: instant client-side school drawer shell. This opens from the already-rendered
              local card payload before Livewire performs the one-school local DB query. --}}
-        <div class="rc-drawer rc-school-optimistic-shell-v106" x-cloak x-show="optimisticSchool" x-on:click.self="optimisticSchool=null" style="z-index:9998">
-            <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106" x-show="optimisticSchool" role="dialog" aria-modal="true">
-                <button class="rc-school-modal-close" type="button" x-on:click="optimisticSchool=null" aria-label="Close school details">×</button>
+        {{-- v109 Discover drawer: entirely browser-local for opening/closing/filtering and
+             interaction state. Favorite/list calls only persist the already-applied state in
+             the background and use skipRender(), so this drawer is never replaced or flickered. --}}
+        <template x-if="optimisticSchool">
+            <div class="rc-drawer rc-school-optimistic-shell-v106" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+                <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
+                    <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
+
                 <div class="rc-school-modal-hero-v72">
                     <div class="rc-school-logo-large-v72">
                         <img x-show="optimisticSchool?.logo_url" x-bind:src="optimisticSchool?.logo_url || ''" x-bind:alt="`${optimisticSchool?.name || 'School'} logo`" referrerpolicy="no-referrer" onerror="this.style.display='none'">
                         <span x-show="!optimisticSchool?.logo_url" x-text="String(optimisticSchool?.name || 'S').split(/\s+/).slice(0,2).map(v => v[0] || '').join('').toUpperCase()"></span>
                     </div>
                     <div class="rc-school-modal-main">
-                        <span class="rc-school-division-pill" x-text="optimisticSchool?.division || 'Division' "></span>
+                        <span class="rc-school-division-pill" x-text="optimisticSchool?.division || 'Division'"></span>
                         <h2 x-text="optimisticSchool?.name || 'School'"></h2>
-                        <div class="rc-school-modal-meta"><span x-text="`◎ ${optimisticSchool?.conference || 'Conference unavailable'}`"></span></div>
+                        <div class="rc-school-modal-meta">
+                            <span x-text="`◎ ${optimisticSchool?.conference || 'Conference unavailable'}`"></span>
+                            <span x-show="optimisticSchool?.city || optimisticSchool?.state" x-text="`· ${[optimisticSchool?.city, optimisticSchool?.state].filter(Boolean).join(', ')}`"></span>
+                        </div>
+                    </div>
+                    <div class="rc-school-score-wrap">
+                        <div class="rc-school-score-ring" x-text="Math.max(0, Math.min(100, Number(optimisticSchool?.engagement_score || 0)))"></div>
+                        <div class="rc-school-score-label" x-text="Number(optimisticSchool?.engagement_score || 0) >= 70 ? 'HOT' : (Number(optimisticSchool?.engagement_score || 0) >= 35 ? 'WARM' : 'NEW')"></div>
                     </div>
                 </div>
-                <div style="padding:1.1rem 1.4rem;display:flex;align-items:center;gap:.65rem;color:var(--rc-muted)">
-                    <span class="rc-spinner-mini"></span>
-                    <span>Loading local coach roster…</span>
+
+                <div class="rc-school-modal-actions-v72">
+                    <button class="rc-school-action rc-school-action-primary" type="button" x-on:click="if (optimisticSchool?.id) $wire.composeEmailSchool(String(optimisticSchool.id))">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Email Coaches</span>
+                    </button>
+
+                    <button class="rc-school-action" type="button" x-on:click="favoriteDiscoverSchool()" x-bind:class="optimisticSchool?.is_favorite ? 'is-favorited' : ''">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                        <span x-text="optimisticSchool?.is_favorite ? 'Favorited' : 'Favorite'"></span>
+                    </button>
+
+                    <div class="rc-school-list-dropdown-v72" x-on:click.outside="discoverListsOpen=false">
+                        <button class="rc-school-action" type="button" x-on:click="discoverListsOpen=!discoverListsOpen" x-bind:class="(optimisticSchool?.list_keys || []).filter(k => String(k).toLowerCase() !== '__favorite__').length ? 'is-in-list' : ''">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                            <span x-text="(optimisticSchool?.list_keys || []).filter(k => String(k).toLowerCase() !== '__favorite__').length ? 'In Lists' : 'Add to List'"></span>
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <div class="rc-school-list-menu-v72 rc-discover-list-menu-v112" x-cloak x-show="discoverListsOpen" x-transition.opacity.scale.origin.top.left>
+                            <h4>Add to a list</h4>
+                            <template x-for="list in discoverLists" :key="`drawer-list-${discoverListKey(list)}`">
+                                <button type="button" x-bind:style="`--list-color:${discoverListColor(list)}`" x-bind:class="discoverInList(discoverListKey(list)) ? 'is-active' : ''" x-on:click="toggleDiscoverList(discoverListKey(list))">
+                                    <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                    <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" x-bind:style="`--dot:${discoverListColor(list)}`"></span><span x-text="discoverListLabel(list)"></span></span>
+                                    <small class="rc-list-count-v81" x-text="discoverListCount(list)"></small>
+                                </button>
+                            </template>
+                            <div class="rc-school-list-empty" x-show="discoverLists.length === 0">No lists yet.</div>
+
+                            <div class="rc-list-quick-create-v112">
+                                <div class="rc-list-quick-create-title-v112">Create new list</div>
+                                <div class="rc-list-quick-create-row-v112">
+                                    <input type="text" x-model="discoverNewDrawerListName" x-on:keydown.enter.prevent="createDiscoverDrawerList()" placeholder="New list name" maxlength="80">
+                                    <button type="button" class="rc-list-quick-create-btn-v112" x-on:click="createDiscoverDrawerList()" x-bind:disabled="discoverCreatingList || !String(discoverNewDrawerListName || '').trim()">
+                                        <span x-show="!discoverCreatingList">Create &amp; Add</span>
+                                        <span x-show="discoverCreatingList" x-cloak>Creating…</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'">Communications</button>
+                </div>
+
+                <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
+                    <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
+                        <template x-if="Array.isArray(optimisticSchool?.coaches) && optimisticSchool.coaches.length">
+                            <div style="display:grid;gap:.7rem">
+                                <template x-for="coach in optimisticSchool.coaches" :key="`discover-drawer-coach-${coach.id}`">
+                                    <div class="rc-school-coach-card">
+                                        <div class="rc-school-coach-avatar" x-text="String(coach.name || 'C').split(/\s+/).slice(0,2).map(v => v[0] || '').join('').toUpperCase()"></div>
+                                        <div class="rc-school-coach-info">
+                                            <strong>
+                                                <span x-text="coach.name || 'Coach'"></span>
+                                                <span class="rc-head-coach-chip" x-show="String(coach.title || '').toLowerCase().includes('head')">Head Coach</span>
+                                            </strong>
+                                            <span x-text="coach.title || 'Coach'"></span>
+                                            <a x-show="coach.email" x-bind:href="`mailto:${coach.email}`" x-text="coach.email"></a>
+                                        </div>
+                                        <a class="rc-school-copy-btn" x-show="coach.email" x-bind:href="`mailto:${coach.email}`" title="Email coach" x-on:click.stop>
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </a>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <div class="rc-empty" x-show="!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0">
+                            <strong>No local coaches found.</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'roster'" x-cloak>
+                    <div style="min-height:18rem;display:flex;align-items:center;justify-content:center;padding:2rem;text-align:center;">
+                        <div style="max-width:24rem;">
+                            <div style="width:3.25rem;height:3.25rem;margin:0 auto 1rem;border-radius:1rem;display:grid;place-items:center;background:var(--rc-soft);color:var(--rc-accent);font-size:1.35rem;font-weight:900;">↗</div>
+                            <strong style="display:block;font-size:1.15rem;line-height:1.25;color:var(--rc-text);">Roster &amp; Stats Coming Soon</strong>
+                            <span style="display:block;margin-top:.5rem;color:var(--rc-muted);font-size:.9rem;line-height:1.5;">Team roster and school performance insights will be available here soon.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'comms'" x-cloak>
+                    <div class="rc-school-stat-grid">
+                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.emails_sent || optimisticSchool?.emails || 0)"></strong><small>Emails</small></div>
+                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.email_opens || optimisticSchool?.opens || 0)"></strong><small>Opens</small></div>
+                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.link_clicks || optimisticSchool?.clicks || 0)"></strong><small>Clicks</small></div>
+                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.replies || 0)"></strong><small>Replies</small></div>
+                    </div>
+                </section>
             </div>
         </div>
+        </template>
 
-        @if($this->selectedSchool)
-            @php
-                $slideSchool = $this->selectedSchool;
-                $slideSchoolId = (string) ($slideSchool['id'] ?? $slideSchool['business_id'] ?? '');
-                $slideSchoolName = (string) ($slideSchool['name'] ?? 'School');
-                $slideDivision = (string) ($slideSchool['division'] ?? 'Division');
-                $slideConference = (string) ($slideSchool['conference'] ?? 'Conference unavailable');
-                $slideLocation = trim((string) (($slideSchool['city'] ?? '') . ((!empty($slideSchool['city']) && !empty($slideSchool['state'])) ? ', ' : '') . ($slideSchool['state'] ?? '')));
-                $slideCoaches = collect($slideSchool['coaches'] ?? [])->values();
-                $slideReplies = (int) ($slideSchool['replies'] ?? $slideSchool['coach_replies'] ?? 0);
-                $slideClicks = (int) ($slideSchool['link_clicks'] ?? $slideSchool['trigger_link_clicks'] ?? $slideSchool['trigger_clicks'] ?? 0);
-                $slideViews = (int) (($slideSchool['profile_views'] ?? 0) + ($slideSchool['highlight_views'] ?? 0));
-                $slideEmails = (int) ($slideSchool['emails_sent'] ?? $slideSchool['sent_emails'] ?? $slideSchool['email_count'] ?? 0);
-                $slideScore = (int) ($slideSchool['lead_score'] ?? $slideSchool['engagement_score'] ?? max(0, ($slideReplies * 20) + ($slideClicks * 6) + ($slideViews * 2)));
-                $slideLogo = trim((string) ($slideSchool['logo_url'] ?? $slideSchool['school_logo_url'] ?? $slideSchool['business_logo_url'] ?? data_get($slideSchool, 'business.logo') ?? data_get($slideSchool, 'contact.school_logo') ?? data_get($slideSchool, 'head_coach.school_logo_url') ?? data_get($slideSchool, 'head_coach.business_logo_url') ?? ''));
-                if ($slideLogo === '') {
-                    foreach ($slideCoaches as $coach) {
-                        $slideLogo = trim((string) (($coach['school_logo_url'] ?? '') ?: ($coach['business_logo_url'] ?? '') ?: ($coach['logo_url'] ?? '')));
-                        if ($slideLogo !== '') break;
-                    }
-                }
-                $slideInitials = strtoupper(collect(preg_split('/\s+/', trim($slideSchoolName)) ?: [])->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'S');
-                $listRows = collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values();
-                $schoolListKeys = collect($slideSchool['list_keys'] ?? [])->merge($slideSchool['lists'] ?? [])->map(fn($key) => strtolower(trim((string) $key)))->values();
-            @endphp
-
-            <div class="rc-drawer rc-school-modal-backdrop" wire:key="school-drawer" wire:click.self="closeSchool">
-                <div class="rc-drawer-panel rc-school-modal-panel" x-data="{ tab: 'coaches', listsOpen: false }" x-init="window.dispatchEvent(new CustomEvent('rc-school-server-drawer-ready'))" role="dialog" aria-modal="true" aria-label="{{ $slideSchoolName }} details">
-                    <button class="rc-school-modal-close" type="button" wire:click="closeSchool" aria-label="Close school details">×</button>
-
-                    <div class="rc-school-modal-hero-v72">
-                        <div class="rc-school-logo-large-v72">
-                            @if($slideLogo !== '')
-                                <img src="{{ $slideLogo }}" alt="{{ $slideSchoolName }} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();">
-                            @else
-                                <span>{{ $slideInitials }}</span>
-                            @endif
-                        </div>
-                        <div class="rc-school-modal-main">
-                            <span class="rc-school-division-pill">{{ $slideDivision }}</span>
-                            <h2>{{ $slideSchoolName }}</h2>
-                            <div class="rc-school-modal-meta">
-                                <span>◎ {{ $slideConference }}</span>
-                                @if($slideLocation !== '')
-                                    <span>· {{ $slideLocation }}</span>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="rc-school-score-wrap">
-                            <div class="rc-school-score-ring">{{ max(0, min(100, $slideScore)) }}</div>
-                            <div class="rc-school-score-label">{{ $slideScore >= 70 ? 'HOT' : ($slideScore >= 35 ? 'WARM' : 'NEW') }}</div>
-                        </div>
-                    </div>
-
-                    <div class="rc-school-modal-actions-v72">
-                        <button class="rc-school-action rc-school-action-primary" type="button" wire:click="composeEmailSchool({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="composeEmailSchool">
-                            <span wire:loading.remove wire:target="composeEmailSchool">
-                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            </span>
-                            <span class="rc-action-spinner-v81" wire:loading wire:target="composeEmailSchool"></span>
-                            <span>Email Coaches</span>
-                        </button>
-
-                        @if($slideSchool['is_favorite'] ?? false)
-                            <button class="rc-school-action is-favorited" type="button" wire:click="unfavoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="unfavoriteSchoolById">
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="unfavoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="unfavoriteSchoolById">Favorited</span><span wire:loading wire:target="unfavoriteSchoolById">Updating</span>
-                            </button>
-                        @else
-                            <button class="rc-school-action" type="button" wire:click="favoriteSchoolById({{ \Illuminate\Support\Js::from($slideSchoolId) }})" wire:loading.attr="disabled" wire:target="favoriteSchoolById">
-                                <span wire:loading.remove wire:target="favoriteSchoolById"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
-                                <span class="rc-action-spinner-v81" wire:loading wire:target="favoriteSchoolById"></span>
-                                <span wire:loading.remove wire:target="favoriteSchoolById">Favorite</span><span wire:loading wire:target="favoriteSchoolById">Updating</span>
-                            </button>
-                        @endif
-
-                        <div class="rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
-                            <button class="rc-school-action {{ $schoolListKeys->isNotEmpty() ? 'is-in-list' : '' }}" type="button" x-on:click="listsOpen=!listsOpen">
-                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-                                <span>{{ $schoolListKeys->isNotEmpty() ? 'In Lists' : 'Add to List' }}</span>
-                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            </button>
-                            <div class="rc-school-list-menu-v72" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left>
-                                <h4>Add to a list</h4>
-                                @forelse($listRows as $listRow)
-                                    @php
-                                        $listKey = (string) ($listRow['key'] ?? '');
-                                        $listLabel = (string) ($listRow['label'] ?? $listRow['name'] ?? \Illuminate\Support\Str::headline($listKey));
-                                        $defaultListColors = [
-                                            'dream' => '#ff6338',
-                                            'target' => '#3b82f6',
-                                            'safety' => '#22c55e',
-                                            'camp_follow_up' => '#f59e0b',
-                                            'showcase_follow_up' => '#8b5cf6',
-                                            'general_recruiting' => '#64748b',
-                                        ];
-                                        $listColor = (string) ($listRow['color'] ?? $defaultListColors[$listKey] ?? '#ff6338');
-                                        $inList = $schoolListKeys->contains(strtolower($listKey));
-                                        $count = (int) ($listRow['schools_count'] ?? count($listRow['schools'] ?? []));
-                                    @endphp
-                                    <button type="button" class="{{ $inList ? 'is-active' : '' }}" style="--list-color: {{ $listColor }}" wire:click="{{ $inList ? 'removeSchoolFromListById' : 'addSchoolToListById' }}({{ \Illuminate\Support\Js::from($slideSchoolId) }}, {{ \Illuminate\Support\Js::from($listKey) }})" wire:loading.attr="disabled" wire:target="addSchoolToListById,removeSchoolFromListById">
-                                        <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                        <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot: {{ $listColor }}"></span><span>{{ $listLabel }}</span></span>
-                                        <small class="rc-list-count-v81">{{ $count }}</small>
-                                    </button>
-                                @empty
-                                    <button type="button" wire:click="$set('showNewListComposer', true)">Create a list first</button>
-                                @endforelse
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rc-school-modal-rule"></div>
-
-                    <div class="rc-school-tabbar-v72">
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'coaches' ? 'is-active' : ''" x-on:click="tab='coaches'">Coaching Staff</button>
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'roster' ? 'is-active' : ''" x-on:click="tab='roster'">Roster & Stats</button>
-                        <button type="button" class="rc-school-tab-v72" x-bind:class="tab === 'comms' ? 'is-active' : ''" x-on:click="tab='comms'">Communications</button>
-                    </div>
-
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'coaches'" x-transition.opacity>
-                        <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
-                            @forelse($slideCoaches as $coach)
-                                @php
-                                    $coachName = (string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')) ?: 'Coach');
-                                    $coachTitle = (string) ($coach['title'] ?? $coach['position'] ?? 'Coach');
-                                    $coachEmail = (string) ($coach['email'] ?? '');
-                                    $coachInitials = collect(explode(' ', $coachName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                                    $isHead = str_contains(strtolower($coachTitle), 'head');
-                                @endphp
-                                <div class="rc-school-coach-card">
-                                    <div class="rc-school-coach-avatar">{{ strtoupper($coachInitials ?: 'C') }}</div>
-                                    <div class="rc-school-coach-info">
-                                        <strong>{{ $coachName }} @if($isHead)<span class="rc-head-coach-chip">Head Coach</span>@endif</strong>
-                                        <span>{{ $coachTitle }}</span>
-                                        @if($coachEmail !== '')<a href="mailto:{{ $coachEmail }}">{{ $coachEmail }}</a>@endif
-                                    </div>
-                                    @if((string) ($coach['id'] ?? '') !== '')<button class="rc-school-copy-btn" type="button" wire:click="composeEmailCoach({{ \Illuminate\Support\Js::from((string) ($coach['id'] ?? '')) }})" wire:loading.attr="disabled" wire:target="composeEmailCoach" title="Email coach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>@endif
-                                </div>
-                            @empty
-                                <div class="rc-empty">No coaches loaded for this school yet.</div>
-                            @endforelse
-                        </div>
-                    </section>
-
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'roster'" x-transition.opacity>
-                        <div class="rc-coming-soon-v72"><div><strong>Coming Soon</strong><span>Roster and advanced school stats will be available here soon.</span></div></div>
-                    </section>
-
-                    <section class="rc-school-tab-panel-v72" x-show="tab === 'comms'" x-transition.opacity>
-                        <div class="rc-school-stat-grid">
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideEmails) }}</strong><small>Emails</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></span><strong>{{ number_format($slideViews) }}</strong><small>Views</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>{{ number_format($slideClicks) }}</strong><small>Clicks</small></div>
-                            <div class="rc-school-stat-card"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 10 4 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 0 1-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><strong>{{ number_format($slideReplies) }}</strong><small>Replies</small></div>
-                        </div>
-                    </section>
-                </div>
-            </div>
-        @endif
+        {{-- v113: legacy section-specific server drawer removed. The Discover drawer above
+             is the single global drawer for Dashboard, Discover, Favorites, and My Lists. --}}
     </div>
     </div>
 
@@ -10180,6 +10419,180 @@
         .rc-wrap .rc-logo-initials {
             position: relative !important;
             overflow: hidden !important;
+        }
+    </style>
+
+    <style>
+        /* v111: Discover drawer owns the interaction plane. The backdrop catches clicks and
+           the panel opts into pointer events explicitly so nothing can click through to cards. */
+        .rc-wrap .rc-school-optimistic-shell-v106 {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 2147483000 !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: stretch !important;
+            pointer-events: auto !important;
+            background: rgba(15, 23, 42, .34) !important;
+            backdrop-filter: blur(3px) !important;
+            -webkit-backdrop-filter: blur(3px) !important;
+            isolation: isolate !important;
+        }
+        .rc-wrap .rc-school-optimistic-panel-v106,
+        .rc-wrap .rc-discover-drawer-panel-v111 {
+            position: relative !important;
+            z-index: 2147483001 !important;
+            pointer-events: auto !important;
+            width: min(640px, 100vw) !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            overflow-y: auto !important;
+            overflow-x: visible !important;
+            border-radius: 1.35rem 0 0 1.35rem !important;
+        }
+        .rc-wrap .rc-discover-drawer-panel-v111 *,
+        .rc-wrap .rc-discover-drawer-panel-v111 button,
+        .rc-wrap .rc-discover-drawer-panel-v111 a {
+            pointer-events: auto !important;
+        }
+        .rc-wrap .rc-discover-drawer-panel-v111 .rc-school-modal-close {
+            z-index: 2147483003 !important;
+            cursor: pointer !important;
+        }
+        .rc-wrap .rc-discover-drawer-panel-v111 .rc-school-list-dropdown-v72,
+        .rc-wrap .rc-discover-drawer-panel-v111 .rc-school-list-menu-v72 {
+            z-index: 2147483004 !important;
+        }
+        .rc-wrap .rc-discover-tabbar-v111 {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: .35rem !important;
+            margin-top: 1rem !important;
+            padding: .3rem !important;
+            border: 1px solid var(--rc-border) !important;
+            border-radius: 1rem !important;
+            background: var(--rc-soft) !important;
+        }
+        .rc-wrap .rc-discover-tabbar-v111 .rc-school-tab-v72 {
+            min-height: 3rem !important;
+            border: 0 !important;
+            border-radius: .8rem !important;
+            background: transparent !important;
+            color: var(--rc-muted) !important;
+            font-weight: 750 !important;
+            cursor: pointer !important;
+        }
+        .rc-wrap .rc-discover-tabbar-v111 .rc-school-tab-v72.is-active {
+            background: var(--rc-surface) !important;
+            color: var(--rc-text) !important;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .08) !important;
+        }
+        .rc-wrap .rc-discover-tab-panel-v111 {
+            padding-top: 1rem !important;
+        }
+
+        /* v112: Discover bulk/list menus share the polished drawer menu language and
+           include inline list creation without a page rerender. */
+        .rc-wrap .rc-discover-list-menu-v112 {
+            width: min(22rem, 88vw) !important;
+            max-height: 28rem !important;
+            overflow-y: auto !important;
+            padding: .75rem !important;
+            border: 1px solid var(--rc-border) !important;
+            border-radius: 1rem !important;
+            background: var(--rc-surface) !important;
+            box-shadow: 0 22px 55px rgba(15, 23, 42, .18) !important;
+        }
+        .rc-wrap .rc-discover-list-menu-v112 h4 {
+            margin: 0 0 .45rem !important;
+            padding: 0 .15rem !important;
+            font-size: .72rem !important;
+            line-height: 1 !important;
+            text-transform: uppercase !important;
+            letter-spacing: .1em !important;
+            color: var(--rc-muted) !important;
+            font-weight: 800 !important;
+        }
+        .rc-wrap .rc-discover-list-option-v112 {
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+            align-items: center !important;
+            gap: .6rem !important;
+            min-height: 2.9rem !important;
+            padding: .55rem .65rem !important;
+            border-radius: .8rem !important;
+        }
+        .rc-wrap .rc-list-check-plus-v112 {
+            display: inline-grid !important;
+            place-items: center !important;
+            font-size: 1rem !important;
+            line-height: 1 !important;
+            color: var(--rc-muted) !important;
+        }
+        .rc-wrap .rc-list-quick-create-v112 {
+            margin-top: .65rem !important;
+            padding-top: .7rem !important;
+            border-top: 1px solid var(--rc-border) !important;
+        }
+        .rc-wrap .rc-list-quick-create-title-v112 {
+            margin: 0 0 .45rem !important;
+            font-size: .72rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: .09em !important;
+            color: var(--rc-muted) !important;
+            font-weight: 800 !important;
+        }
+        .rc-wrap .rc-list-quick-create-row-v112 {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) auto !important;
+            gap: .45rem !important;
+            align-items: center !important;
+        }
+        .rc-wrap .rc-list-quick-create-row-v112 input {
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 2.55rem !important;
+            padding: 0 .75rem !important;
+            border: 1px solid var(--rc-border) !important;
+            border-radius: .72rem !important;
+            background: var(--rc-surface) !important;
+            color: var(--rc-text) !important;
+            outline: none !important;
+            font-size: .82rem !important;
+        }
+        .rc-wrap .rc-list-quick-create-row-v112 input:focus {
+            border-color: rgba(255, 99, 56, .7) !important;
+            box-shadow: 0 0 0 3px rgba(255, 99, 56, .12) !important;
+        }
+        .rc-wrap .rc-list-quick-create-btn-v112 {
+            min-height: 2.55rem !important;
+            padding: 0 .8rem !important;
+            border: 0 !important;
+            border-radius: .72rem !important;
+            background: var(--rc-accent) !important;
+            color: #fff !important;
+            font-size: .78rem !important;
+            font-weight: 800 !important;
+            white-space: nowrap !important;
+            cursor: pointer !important;
+        }
+        .rc-wrap .rc-list-quick-create-btn-v112:disabled {
+            opacity: .5 !important;
+            cursor: default !important;
+        }
+        .rc-wrap .rc-discover-bulk-notice-v112 {
+            margin: .55rem 0 0 !important;
+            padding: .65rem .8rem !important;
+            border: 1px solid rgba(34, 197, 94, .22) !important;
+            border-radius: .75rem !important;
+            background: rgba(34, 197, 94, .08) !important;
+            color: #15803d !important;
+            font-size: .8rem !important;
+            font-weight: 750 !important;
+        }
+        .dark .rc-wrap .rc-discover-bulk-notice-v112 {
+            color: #86efac !important;
+            background: rgba(34, 197, 94, .12) !important;
         }
     </style>
 

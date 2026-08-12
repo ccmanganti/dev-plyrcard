@@ -235,13 +235,26 @@ class LocalRecruitingDatabaseService
             return ['success' => false, 'updated' => 0, 'error' => 'No valid local schools were supplied.'];
         }
 
+        $beforeCount = $list->schools()->count();
+
         if ($inList) {
             $list->schools()->syncWithoutDetaching($ids);
         } else {
             $list->schools()->detach($ids);
         }
 
-        return ['success' => true, 'updated' => count($ids), 'school_count' => count($ids)];
+        $afterCount = $list->schools()->count();
+        $changed = $inList
+            ? max(0, $afterCount - $beforeCount)
+            : max(0, $beforeCount - $afterCount);
+
+        return [
+            'success' => true,
+            'updated' => $changed,
+            'school_count' => $changed,
+            'list_count' => $afterCount,
+            'list_key' => $list->slug,
+        ];
     }
 
     /**
@@ -402,7 +415,7 @@ class LocalRecruitingDatabaseService
         // coach relations during the Livewire render.
         $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
         $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
-        $catalogKey = 'recruiting:local-school-catalog:v105:' . sha1($schoolVersion . '|' . $coachVersion);
+        $catalogKey = 'recruiting:local-school-catalog:v110:' . sha1($schoolVersion . '|' . $coachVersion);
 
         $baseRows = Cache::remember($catalogKey, now()->addMinutes(15), function () use ($user): array {
             return $this->schoolQuery()
@@ -529,6 +542,23 @@ class LocalRecruitingDatabaseService
                 'school_id' => $school->getKey(),
                 'school' => $school->name,
             ])->all(),
+            // v109: Discover Schools is a browser-local interaction surface. Include the
+            // complete minimal LOCAL roster in the cached catalog so opening a drawer never
+            // requires a Livewire request just to obtain coaches.
+            'coaches' => $coaches->map(fn ($coach): array => [
+                'id' => (string) $coach->id,
+                'local_id' => $coach->id,
+                'name' => (string) ($coach->display_name ?: trim($coach->first_name . ' ' . $coach->last_name)),
+                'first_name' => (string) $coach->first_name,
+                'last_name' => (string) $coach->last_name,
+                'email' => (string) $coach->email,
+                'title' => (string) ($coach->title ?? ''),
+                'sport' => (string) ($coach->sport ?? ''),
+                'division' => (string) ($coach->division ?? ''),
+                'conference' => (string) ($coach->conference ?? ''),
+                'school_id' => $school->getKey(),
+                'school' => (string) $school->name,
+            ])->values()->all(),
             'head_coach' => $head ? [
                 'id' => (string) $head->id,
                 'name' => (string) ($head->display_name ?: trim($head->first_name . ' ' . $head->last_name)),

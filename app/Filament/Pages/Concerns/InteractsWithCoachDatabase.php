@@ -2112,7 +2112,21 @@ trait InteractsWithCoachDatabase
             $this->skipRender();
         }
 
-        return $this->setSchoolCompanyFavoriteState($schoolId, $favorite, true);
+        $user = Auth::user();
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'favorite' => ! $favorite, 'error' => 'This action is not available.'];
+        }
+
+        // v107: drawer favorite writes directly to favorite_schools.
+        // No GHL business/contact lookup and no snapshot/tag mutation.
+        $result = app(LocalRecruitingDatabaseService::class)->setFavorite($user, $schoolId, $favorite);
+
+        if ($result['success'] ?? false) {
+            $this->allSchoolsMemo = null;
+            $this->filteredSchoolsQueryMemo = [];
+        }
+
+        return $result;
     }
 
     public function pollCoachDatabaseActionStatus(): array
@@ -2212,29 +2226,54 @@ trait InteractsWithCoachDatabase
         }
 
         $user = Auth::user();
-        $school = $this->schoolRowForCompanyMembership($schoolId);
-        if (! $user || ! $school || ! $this->allowed || $this->locked) {
+        if (! $user || ! $this->allowed || $this->locked) {
+            return ['success' => false, 'error' => 'This action is not available.'];
+        }
+
+        $database = app(LocalRecruitingDatabaseService::class);
+        $school = $database->findSchool($user, $schoolId);
+        if (! $school) {
             return ['success' => false, 'error' => 'The local school could not be found.'];
         }
 
-        $localId = (string) ($school['local_id'] ?? $school['school_id'] ?? $school['id'] ?? '');
-        $currentKeys = collect($this->schoolMembershipKeysForRow($school));
+        $states = [];
+        $listCounts = [];
         foreach ($memberships as $listKey => $inList) {
             $listKey = trim((string) $listKey);
-            if ($listKey === '') continue;
+            if ($listKey === '') {
+                continue;
+            }
+
             $desired = filter_var($inList, FILTER_VALIDATE_BOOL);
-            $currentKeys = $desired
-                ? $currentKeys->push($listKey)->unique()->values()
-                : $currentKeys->reject(fn (string $key): bool => $key === $listKey)->values();
+            $result = $database->setSchoolsInList(
+                $user,
+                [(int) $school->getKey()],
+                $listKey,
+                $desired,
+            );
+
+            if (! ($result['success'] ?? false)) {
+                return [
+                    'success' => false,
+                    'error' => $result['error'] ?? 'Unable to update the local school list.',
+                    'states' => $states,
+                ];
+            }
+
+            $states[$listKey] = $desired;
+            $listCounts[$listKey] = (int) ($result['list_count'] ?? 0);
         }
 
-        $result = app(LocalSchoolMembershipService::class)->replaceMembershipKeys($user, $localId, $currentKeys->all());
         $this->allSchoolsMemo = null;
-        $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+        $this->filteredSchoolsQueryMemo = [];
 
-        return ($result['success'] ?? false)
-            ? ['success' => true, 'states' => collect($memberships)->map(fn ($value): bool => filter_var($value, FILTER_VALIDATE_BOOL))->all(), 'school_updates' => 1]
-            : ['success' => false, 'error' => $result['error'] ?? 'Unable to update school lists.'];
+        return [
+            'success' => true,
+            'states' => $states,
+            'list_counts' => $listCounts,
+            'school_id' => (int) $school->getKey(),
+            'school_updates' => 1,
+        ];
     }
 
     public function addCoachToList(string $contactId, string $listKey): void
@@ -11850,6 +11889,70 @@ HTML;
         return $base->values()->all();
     }
 
+
+    /**
+     * v109 Discover Schools browser dataset.
+     *
+     * The catalog is canonical LOCAL School/Coach data with player-local favorite/list
+     * membership and cached GHL statistics already overlaid by allSchools(). The browser
+     * can therefore search/filter/open drawers without another Livewire round trip.
+     */
+    public function getDiscoverClientSchoolsProperty(): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return [];
+        }
+
+        // v110: Discover must keep the complete minimal LOCAL roster attached to
+        // each school. allSchools() intentionally hydrates lightweight display rows
+        // and strips coaches for legacy server-rendered views, which made the
+        // browser-local Discover drawer show "No local coaches found" even when the
+        // card correctly showed a non-zero local coach count.
+        $localRows = collect(app(LocalRecruitingDatabaseService::class)->schoolRows($user));
+
+        // GHL contributes only cached/statistical overlays. It never replaces the
+        // canonical local School/Coach identity or the player's local memberships.
+        $snapshot = $this->activeSnapshotRows();
+        $remoteRows = collect($snapshot['schools'] ?? [])
+            ->merge($snapshot['top_schools'] ?? [])
+            ->filter(fn ($row): bool => is_array($row));
+        $remoteByName = $remoteRows->groupBy(
+            fn (array $row): string => $this->normalizeSchoolMatchKey((string) ($row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? ''))
+        );
+
+        return $localRows->map(function (array $school) use ($remoteByName): array {
+            $key = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+            $remote = $key !== ''
+                ? collect($remoteByName->get($key, []))
+                    ->sortByDesc(fn (array $row): int => (int) ($row['engagement_score'] ?? 0))
+                    ->first()
+                : null;
+
+            if (is_array($remote)) {
+                foreach ([
+                    'profile_views',
+                    'profile_view_unique_contacts',
+                    'profile_view_school_clicks',
+                    'highlight_views',
+                    'trigger_link_clicks',
+                    'replies',
+                    'lead_score',
+                    'engagement_score',
+                ] as $metric) {
+                    if (array_key_exists($metric, $remote)) {
+                        $school[$metric] = $remote[$metric];
+                    }
+                }
+            }
+
+            // IMPORTANT: do not call hydrateSchoolRowForDisplay() here. That helper
+            // is intentionally lightweight and removes the full `coaches` array.
+            return $school;
+        })->values()->all();
+    }
+
     public function getSelectedCoachProperty(): ?array
     {
         if (! $this->selectedCoachId) {
@@ -12241,6 +12344,7 @@ HTML;
             'success' => (bool) ($result['success'] ?? false),
             'updated_schools' => $updated,
             'school_count' => $updated,
+            'list_count' => (int) ($result['list_count'] ?? 0),
             'message' => ($result['success'] ?? false) ? "Saved {$updated} school(s) to the list." : null,
             'error' => $result['error'] ?? null,
         ];

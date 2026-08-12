@@ -1271,6 +1271,34 @@ class AdminPanelProvider extends PanelProvider
                 HTML,
             )
             ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => request()->is('admin/coach-database*')
+                    ? <<<'HTML'
+                        <style>
+                            /* Recruiting Center only: the custom page already renders its own
+                             * section content below the Welcome back header, so suppress the
+                             * duplicate Filament page title without affecting other admin pages. */
+                            .fi-page .fi-header-heading-ctn,
+                            .fi-page .fi-page-header-heading-ctn,
+                            .fi-page .fi-header-heading,
+                            .fi-page .fi-page-header-heading,
+                            .fi-page .fi-header-subheading,
+                            .fi-page .fi-page-header-subheading {
+                                display: none !important;
+                            }
+
+                            .fi-page > .fi-header,
+                            .fi-page > header.fi-header,
+                            .fi-page > .fi-page-header {
+                                min-height: 0 !important;
+                                margin-top: 0 !important;
+                                margin-bottom: 0 !important;
+                            }
+                        </style>
+                    HTML
+                    : '',
+            )
+            ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
                 fn (): string => request()->is('admin/force-password-change*')
                     ? ''
