@@ -9740,7 +9740,9 @@ CSS;
                 .rc-message-status-v56.is-opened{color:#16a34a!important;}
                 .rc-message-status-v56.is-error{color:#dc2626!important;}
             </style>
-            <div class="rc-inbox-page-v56">
+            <div class="rc-inbox-page-v56"
+                x-data
+                x-init="$nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); })">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
                         <div class="rc-inbox-panel-head-v56">
@@ -9777,7 +9779,7 @@ CSS;
                         </div>
 
                         @if(empty($inboxConversations))
-                            <div wire:loading.delay.longer.flex wire:target="loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
+                            <div wire:loading.delay.longer.flex wire:target="bootDeferredUiData,loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
                                 <span class="rc-spinner-mini"></span> Loading inbox
                             </div>
                         @endif
@@ -9893,7 +9895,12 @@ CSS;
 
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
                                 @if(empty($threadMessages))
-                                    <div class="rc-inbox-empty-v56 {{ $isLoadingConversationMessages ? 'rc-ui-hidden' : '' }}"><div><strong>No messages loaded yet.</strong><br><button type="button" class="rc-inbox-open-composer-v56" wire:click="loadConversationMessages">Load conversation</button></div></div>
+                                    <div class="rc-inbox-empty-v56">
+                                        <div>
+                                            <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                            <strong>Loading conversation…</strong>
+                                        </div>
+                                    </div>
                                 @else
                                     @php
                                         // GHL may return messages newest-first or oldest-first depending on

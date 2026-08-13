@@ -309,6 +309,17 @@ trait InteractsWithCoachDatabase
         if ($this->section === 'conversations') {
             $this->hydrateCachedInboxConversations();
 
+            // v122: Make the Inbox useful on first paint. If cached conversations
+            // exist, select the newest row immediately and hydrate its cached
+            // messages before any GHL request starts.
+            if (! $this->selectedConversationId && ! empty($this->conversations)) {
+                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+            }
+
+            if ($this->selectedConversationId) {
+                $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+            }
+
             $this->isLoadingConversations = false;
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
@@ -561,6 +572,37 @@ trait InteractsWithCoachDatabase
         } finally {
             $this->isBootingRemoteSection = false;
         }
+    }
+
+    /**
+     * v122: Automatically hydrate/fetch the currently selected Inbox thread.
+     * Cached messages win for instant repeat visits. GHL is only called when
+     * there is no cached message payload for the selected conversation.
+     */
+    public function ensureInboxConversationLoaded(): void
+    {
+        if ($this->section !== 'conversations' || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        if (! $this->selectedConversationId && ! empty($this->conversations)) {
+            $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+        }
+
+        $conversationId = trim((string) $this->selectedConversationId);
+        if ($conversationId === '') {
+            return;
+        }
+
+        if (empty($this->messages)) {
+            $this->hydrateCachedConversationMessages($conversationId);
+        }
+
+        if (! empty($this->messages)) {
+            return;
+        }
+
+        $this->loadConversationMessages(true);
     }
 
     public function pollDeferredUiData(): void
@@ -2762,14 +2804,14 @@ trait InteractsWithCoachDatabase
         Cache::put($this->conversationInboxCacheKey(), [
             'rows' => $rows,
             'cached_at' => now()->toIso8601String(),
-        ], now()->addMinutes(10));
+        ], now()->addMinutes(30));
 
         $user = Auth::user();
         if ($user) {
             Cache::put($this->deferredUiCacheKey('conversations'), [
                 'rows' => $rows,
                 'cached_at' => now()->toIso8601String(),
-            ], now()->addMinutes(10));
+            ], now()->addMinutes(30));
         }
     }
 
@@ -2791,58 +2833,147 @@ trait InteractsWithCoachDatabase
 
     protected function enrichConversationRowsWithLocalDatabase(array $rows): array
     {
-        $coachesById = collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => filled($coach['id'] ?? null))
-            ->keyBy(fn (array $coach): string => (string) ($coach['id'] ?? ''));
-
-        $coachesByEmail = collect($this->allCoaches())
-            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
-            ->keyBy(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))));
-
-        $schoolsByName = collect($this->allSchools())
-            ->filter(fn (array $school): bool => filled($school['name'] ?? null))
-            ->keyBy(fn (array $school): string => strtolower(trim((string) ($school['name'] ?? ''))));
-
-        return collect($rows)
+        $rows = collect($rows)
             ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
-            ->map(function (array $row) use ($coachesById, $coachesByEmail, $schoolsByName): array {
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // v121: Inbox only needs to enrich the conversations returned by GHL.
+        // Do NOT build allCoaches()/allSchools() here; that scans the complete
+        // recruiting catalog on every inbox refresh and makes a 50-row inbox
+        // unnecessarily expensive.
+        $emails = $rows
+            ->map(fn (array $row): string => strtolower(trim((string) ($row['email'] ?? $row['contact_email'] ?? ''))))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $contactIds = $rows
+            ->map(fn (array $row): string => trim((string) ($row['contact_id'] ?? $row['contactId'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $localRows = collect();
+
+        if (! empty($emails) || ! empty($contactIds)) {
+            $localRows = DB::table('coaches')
+                ->leftJoin('schools', 'schools.id', '=', 'coaches.school_id')
+                ->whereNull('coaches.deleted_at')
+                ->where(function ($query) use ($emails, $contactIds): void {
+                    $hasClause = false;
+
+                    if (! empty($emails)) {
+                        $query->whereIn('coaches.email', $emails);
+                        $hasClause = true;
+                    }
+
+                    if (! empty($contactIds)) {
+                        if ($hasClause) {
+                            $query->orWhereIn('coaches.ghl_contact_id', $contactIds);
+                        } else {
+                            $query->whereIn('coaches.ghl_contact_id', $contactIds);
+                        }
+                    }
+                })
+                ->get([
+                    'coaches.id as local_id',
+                    'coaches.ghl_contact_id',
+                    'coaches.school_id',
+                    'coaches.first_name',
+                    'coaches.last_name',
+                    'coaches.display_name',
+                    'coaches.email',
+                    'coaches.phone',
+                    'coaches.title',
+                    'coaches.conference',
+                    'coaches.division',
+                    'coaches.city',
+                    'coaches.state',
+                    'schools.name as school_name',
+                    'schools.logo_url as school_logo_url',
+                    'schools.ghl_business_id as school_business_id',
+                ])
+                ->map(fn ($row): array => (array) $row);
+        }
+
+        $coachesByEmail = $localRows
+            ->filter(fn (array $coach): bool => filled($coach['email'] ?? null))
+            ->keyBy(fn (array $coach): string => strtolower(trim((string) $coach['email'])));
+
+        $coachesByContactId = $localRows
+            ->filter(fn (array $coach): bool => filled($coach['ghl_contact_id'] ?? null))
+            ->keyBy(fn (array $coach): string => trim((string) $coach['ghl_contact_id']));
+
+        return $rows
+            ->map(function (array $row) use ($coachesByEmail, $coachesByContactId): array {
                 $contactId = trim((string) ($row['contact_id'] ?? $row['contactId'] ?? ''));
                 $email = strtolower(trim((string) ($row['email'] ?? $row['contact_email'] ?? '')));
 
-                $coach = $contactId !== '' ? $coachesById->get($contactId) : null;
-                if (! is_array($coach) && $email !== '') {
-                    $coach = $coachesByEmail->get($email);
+                // Email is the safest cross-subaccount identity. The stored GHL
+                // contact ID is only a fallback for legacy/local rows.
+                $coach = $email !== '' ? $coachesByEmail->get($email) : null;
+                if (! is_array($coach) && $contactId !== '') {
+                    $coach = $coachesByContactId->get($contactId);
                 }
 
                 if (is_array($coach)) {
-                    $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
-                    $school = $schoolName !== '' ? $schoolsByName->get(strtolower($schoolName)) : null;
+                    $coachName = trim((string) ($coach['display_name'] ?? ''))
+                        ?: trim((string) (($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')))
+                        ?: 'Coach';
+                    $schoolName = trim((string) ($coach['school_name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
+                    $schoolLogo = trim((string) ($coach['school_logo_url'] ?? ''));
 
-                    $row['contact_name'] = trim((string) ($row['contact_name'] ?? $row['name'] ?? '')) ?: (string) ($coach['name'] ?? 'Coach');
+                    $row['contact_name'] = trim((string) ($row['contact_name'] ?? $row['name'] ?? '')) ?: $coachName;
                     $row['name'] = $row['contact_name'];
                     $row['email'] = trim((string) ($row['email'] ?? '')) ?: (string) ($coach['email'] ?? '');
                     $row['phone'] = trim((string) ($row['phone'] ?? '')) ?: (string) ($coach['phone'] ?? '');
                     $row['title'] = trim((string) ($row['title'] ?? '')) ?: (string) ($coach['title'] ?? 'Coach');
                     $row['school'] = $schoolName ?: (string) ($row['school'] ?? 'School');
                     $row['company_name'] = trim((string) ($row['company_name'] ?? '')) ?: $row['school'];
-                    $row['conference'] = trim((string) ($row['conference'] ?? '')) ?: (string) ($coach['conference'] ?? $school['conference'] ?? '');
-                    $row['division'] = trim((string) ($row['division'] ?? '')) ?: (string) ($coach['division'] ?? $school['division'] ?? '');
-                    $row['city'] = trim((string) ($row['city'] ?? '')) ?: (string) ($coach['city'] ?? $school['city'] ?? '');
-                    $row['state'] = trim((string) ($row['state'] ?? '')) ?: (string) ($coach['state'] ?? $school['state'] ?? '');
-                    $row['school_logo_url'] = trim((string) ($row['school_logo_url'] ?? $row['logo_url'] ?? ''))
-                        ?: (string) ($coach['school_logo_url'] ?? $coach['business_logo_url'] ?? $coach['logo_url'] ?? $school['logo_url'] ?? $school['business_logo_url'] ?? '');
+                    $row['conference'] = trim((string) ($row['conference'] ?? '')) ?: (string) ($coach['conference'] ?? '');
+                    $row['division'] = trim((string) ($row['division'] ?? '')) ?: (string) ($coach['division'] ?? '');
+                    $row['city'] = trim((string) ($row['city'] ?? '')) ?: (string) ($coach['city'] ?? '');
+                    $row['state'] = trim((string) ($row['state'] ?? '')) ?: (string) ($coach['state'] ?? '');
+                    $row['school_logo_url'] = trim((string) ($row['school_logo_url'] ?? $row['logo_url'] ?? '')) ?: $schoolLogo;
                     $row['logo_url'] = trim((string) ($row['logo_url'] ?? '')) ?: (string) ($row['school_logo_url'] ?? '');
-                    $row['local_coach'] = $coach;
+                    $row['business_id'] = $row['business_id'] ?? $coach['school_business_id'] ?? null;
+                    $row['local_coach'] = [
+                        'id' => $coach['local_id'] ?? null,
+                        'local_id' => $coach['local_id'] ?? null,
+                        'ghl_contact_id' => $contactId ?: ($coach['ghl_contact_id'] ?? null),
+                        'school_id' => $coach['school_id'] ?? null,
+                        'name' => $coachName,
+                        'first_name' => $coach['first_name'] ?? null,
+                        'last_name' => $coach['last_name'] ?? null,
+                        'email' => $coach['email'] ?? null,
+                        'phone' => $coach['phone'] ?? null,
+                        'title' => $coach['title'] ?? null,
+                        'conference' => $coach['conference'] ?? null,
+                        'division' => $coach['division'] ?? null,
+                        'school' => $schoolName,
+                        'school_logo_url' => $schoolLogo,
+                    ];
+                    $row['local_school'] = [
+                        'id' => $coach['school_id'] ?? null,
+                        'business_id' => $coach['school_business_id'] ?? null,
+                        'name' => $schoolName,
+                        'logo_url' => $schoolLogo,
+                        'conference' => $coach['conference'] ?? null,
+                        'division' => $coach['division'] ?? null,
+                        'city' => $coach['city'] ?? null,
+                        'state' => $coach['state'] ?? null,
+                    ];
 
-                    $coachStarred = (bool) ($coach['starred'] ?? $coach['is_starred'] ?? false);
+                    $coachStarred = false;
                     $starOverride = $this->conversationStarOverride($contactId);
-                    $row['starred'] = $starOverride ?? $coachStarred;
+                    $row['starred'] = $starOverride ?? (bool) ($row['starred'] ?? $row['is_starred'] ?? $coachStarred);
                     $row['is_starred'] = $row['starred'];
-
-                    if (is_array($school)) {
-                        $row['local_school'] = $school;
-                        $row['business_id'] = $row['business_id'] ?? $school['business_id'] ?? $school['id'] ?? null;
-                    }
                 }
 
                 $row['last_message'] = trim(strip_tags((string) ($row['last_message'] ?? $row['snippet'] ?? '')));
@@ -2913,6 +3044,10 @@ trait InteractsWithCoachDatabase
                 $this->messageLastId = null;
                 $this->hasMoreMessages = false;
                 $this->messages = [];
+
+                if ($this->selectedConversationId !== '') {
+                    $this->hydrateCachedConversationMessages($this->selectedConversationId);
+                }
             }
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversations for inbox.', [
