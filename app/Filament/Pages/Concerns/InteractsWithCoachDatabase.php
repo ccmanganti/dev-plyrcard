@@ -8383,51 +8383,66 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $websiteClicks = 0;
         $trackingCoachRows = collect($this->trackingCoaches());
 
-        $instagramClicks = max(
-            (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
-            $this->dashboardSocialClickTotal($engagementRows, 'instagram'),
-            $trackingCoachRows->sum(fn (array $coach): int => max(
-                (int) ($coach['instagram_click_count'] ?? 0),
-                (int) ($coach['instagram_clicks'] ?? 0),
-            )),
-        );
+        // When LocalRecruitingTrackingService has rows, those same rows are the
+        // authoritative source for both the drawer and Dashboard total. Do not max()
+        // them against legacy cached counters because those counters may include old
+        // imports/duplicate rollups and can inflate a few visible clicks into 1,000+.
+        $hasEngagementRows = $engagementRows->isNotEmpty();
 
-        $youtubeClicks = max(
-            (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
-            $this->dashboardSocialClickTotal($engagementRows, 'youtube'),
-            $trackingCoachRows->sum(fn (array $coach): int => max(
-                (int) ($coach['youtube_click_count'] ?? 0),
-                (int) ($coach['youtube_clicks'] ?? 0),
-            )),
-        );
+        $instagramClicks = $hasEngagementRows
+            ? $this->dashboardSocialClickTotal($engagementRows, 'instagram')
+            : max(
+                (int) ($stats['instagram_click_count'] ?? $stats['instagram_clicks'] ?? 0),
+                $trackingCoachRows->sum(fn (array $coach): int => max(
+                    (int) ($coach['instagram_click_count'] ?? 0),
+                    (int) ($coach['instagram_clicks'] ?? 0),
+                )),
+            );
 
-        $xClicks = max(
-            (int) ($stats['x_click_count'] ?? $stats['twitter_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
-            $this->dashboardSocialClickTotal($engagementRows, 'x'),
-            $trackingCoachRows->sum(fn (array $coach): int => max(
-                (int) ($coach['x_click_count'] ?? 0),
-                (int) ($coach['twitter_click_count'] ?? 0),
-                (int) ($coach['x_clicks'] ?? 0),
-                (int) ($coach['twitter_clicks'] ?? 0),
-            )),
-        );
+        $youtubeClicks = $hasEngagementRows
+            ? $this->dashboardSocialClickTotal($engagementRows, 'youtube')
+            : max(
+                (int) ($stats['youtube_click_count'] ?? $stats['youtube_clicks'] ?? 0),
+                $trackingCoachRows->sum(fn (array $coach): int => max(
+                    (int) ($coach['youtube_click_count'] ?? 0),
+                    (int) ($coach['youtube_clicks'] ?? 0),
+                )),
+            );
+
+        $xClicks = $hasEngagementRows
+            ? $this->dashboardSocialClickTotal($engagementRows, 'x')
+            : max(
+                (int) ($stats['x_click_count'] ?? $stats['twitter_click_count'] ?? $stats['x_clicks'] ?? $stats['twitter_clicks'] ?? 0),
+                $trackingCoachRows->sum(fn (array $coach): int => max(
+                    (int) ($coach['x_click_count'] ?? 0),
+                    (int) ($coach['twitter_click_count'] ?? 0),
+                    (int) ($coach['x_clicks'] ?? 0),
+                    (int) ($coach['twitter_clicks'] ?? 0),
+                )),
+            );
 
         $emailClicks = (int) ($stats['email_click_count'] ?? $stats['email_clicks'] ?? 0);
         $linkClicks = $instagramClicks + $youtubeClicks + $xClicks;
 
         $profileContactIds = $profileRows->pluck('coach_id')->filter()->unique();
         $linkContactIds = $engagementRows->pluck('coach_id')->filter()->unique();
-        $uniqueProfileViewContacts = (int) ($stats['profile_view_unique_contact_count'] ?? $stats['unique_profile_view_contacts'] ?? $profileContactIds->count());
-        $uniqueLinkClickContacts = (int) ($stats['unique_link_click_contacts'] ?? $stats['unique_contact_clicks'] ?? $linkContactIds->count());
-        $uniqueContactClicks = max(
-            $uniqueLinkClickContacts,
-            (int) ($stats['unique_clicks'] ?? 0),
-            (int) ($stats['unique_contact_clicks'] ?? 0)
-        );
+        $uniqueProfileViewContacts = $profileContactIds->isNotEmpty()
+            ? $profileContactIds->count()
+            : (int) ($stats['profile_view_unique_contact_count'] ?? $stats['unique_profile_view_contacts'] ?? 0);
+        $uniqueLinkClickContacts = $linkContactIds->isNotEmpty()
+            ? $linkContactIds->count()
+            : (int) ($stats['unique_link_click_contacts'] ?? $stats['unique_contact_clicks'] ?? 0);
+        $uniqueContactClicks = $uniqueLinkClickContacts;
         $profileViewUniqueSchools = $profileRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
         $profileViewSchoolClicks = $profileRows->where('school_key', '!=', '')->sum('views');
-        $overallSchoolClicks = $engagementRows->where('school_key', '!=', '')->sum('clicks');
-        $schoolsWithClicks = $engagementRows->where('school_key', '!=', '')->pluck('school_key')->unique()->count();
+        $overallSchoolClicks = $engagementRows->sum(fn ($row): int => is_array($row) ? $this->dashboardTrackingRowClickCount($row) : 0);
+        $schoolsWithClicks = $engagementRows->map(function ($row): string {
+            if (! is_array($row)) {
+                return '';
+            }
+
+            return trim((string) ($row['school_key'] ?? $row['school_id'] ?? $row['business_id'] ?? $row['school'] ?? ''));
+        })->filter()->unique()->count();
         $ghlContactClicks = $trackedProfileTotal + $linkClicks;
 
         $emailSentCount = (int) (Auth::user()?->total_emails_sent ?? 0);
@@ -8469,8 +8484,10 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
             'unique_contact_clicks' => $linkContactIds->count(),
             'unique_profile_view_contacts' => $uniqueProfileViewContacts,
             'unique_profile_views' => $uniqueProfileViews,
-            'unique_link_click_contacts' => $linkContactIds->count(),
+            'unique_link_click_contacts' => $uniqueLinkClickContacts,
             'unique_clicks' => $uniqueContactClicks,
+            'engagement_unique_coaches' => $uniqueLinkClickContacts,
+            'engagement_unique_schools' => $schoolsWithClicks,
             'contact_link_clicks' => $ghlContactClicks,
             'ghl_contact_clicks' => $ghlContactClicks,
             'overall_school_clicks' => $overallSchoolClicks,

@@ -6685,30 +6685,24 @@
                 $profileViews = $trackedProfileTotal;
                 $profileUniqueContacts = max((int) ($dashboardMetrics['profile_view_unique_contact_count'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0), $trackedProfileTotal > 0 ? 1 : 0);
                 $profileUniqueSchools = max((int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0));
-                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $trackedProfileTotal);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), $profileUniqueContacts);
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), $profileSchoolClicks + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
+                $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0));
+                // Coach Engagement is social-link activity only. Keep the dashboard
+                // summary tied to the same authoritative rows shown in its drawer.
+                $engagementUniqueCoaches = (int) ($dashboardMetrics['engagement_unique_coaches'] ?? $dashboardMetrics['unique_link_click_contacts'] ?? 0);
+                $engagementUniqueSchools = (int) ($dashboardMetrics['engagement_unique_schools'] ?? $dashboardMetrics['schools_with_clicks'] ?? 0);
 
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
-                $socialClickCount = (int) ($dashboardMetrics['website_click_count'] ?? 0)
-                    + (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
+                $socialClickCount = (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
                     + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
                     + (int) ($dashboardMetrics['x_click_count'] ?? 0);
                 $emailsSent = $emailSentCount;
 
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
-                $coachEngagementTotal = $trackedWebsiteViews
-                    + $trackedInstagramViews
-                    + $trackedYoutubeViews
-                    + $trackedXViews
-                    + $trackedEmailLinkViews
-                    + $emailClickCount
-                    + $socialClickCount
-                    + $emailOpenCount
-                    + $coachReplies;
+                // Match the Coach Engagement drawer exactly: Instagram + YouTube + X.
+                $coachEngagementTotal = $socialClickCount;
 
                 $profileCompletion = 0;
                 $profileUrl = '#';
@@ -6952,7 +6946,7 @@
                     [
                         'label' => 'Coach Engagement',
                         'value' => number_format($coachEngagementTotal),
-                        'sub' => number_format($uniqueClicks) . ' unique clicks · ' . number_format($schoolClicks) . ' school total',
+                        'sub' => number_format($engagementUniqueCoaches) . ' ' . \Illuminate\Support\Str::plural('coach', $engagementUniqueCoaches) . ' · ' . number_format($engagementUniqueSchools) . ' ' . \Illuminate\Support\Str::plural('school', $engagementUniqueSchools),
                         'icon' => 'mail',
                         'tone' => 'green',
                         'target' => 'coach-engagement',
@@ -7498,9 +7492,8 @@
 
                 <div class="rc-detail-stats-v2">
                     <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Player website/profile views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Unique Contacts</small><strong>{{ number_format(max($uniqueProfileViews, $profileViewRows->count())) }}</strong><em>Distinct GHL coach contacts</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Schools Reached</small><strong>{{ number_format($profilePrograms) }}</strong><em>Schools with tracked coach views</em></div></div>
-                    <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>School Clicks</small><strong>{{ number_format($profileSchoolClicks) }}</strong><em>All profile clicks rolled up by school</em></div></div>
+                    <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Unique Contacts</small><strong>{{ number_format($uniqueProfileViews) }}</strong><em>Distinct coaches who viewed your profile</em></div></div>
+                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Schools Reached</small><strong>{{ number_format($profilePrograms) }}</strong><em>Schools represented by those viewers</em></div></div>
                 </div>
 
                 <section class="rc-detail-table-v2">
@@ -7571,6 +7564,40 @@
             [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card { cursor:pointer; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
             [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card:hover { transform:translateY(-1px); }
             [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card.is-filter-active { border-color:#ff6338 !important; box-shadow:0 0 0 2px rgba(255,99,56,.12),0 10px 24px rgba(15,23,42,.08); }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card {
+                position: relative;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 8rem !important;
+                padding: 1.15rem 4.25rem !important;
+                text-align: center !important;
+            }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card > span {
+                position: absolute !important;
+                left: 1.2rem !important;
+                top: 1.2rem !important;
+                width: 2.9rem !important;
+                height: 2.9rem !important;
+            }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card > div {
+                width: 100%;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card small,
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card strong,
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card em { text-align:center !important; }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card strong { font-size:2rem !important; }
+            @media (max-width: 720px) {
+                [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card { padding:1rem 1rem 1rem 4.6rem !important; text-align:left !important; }
+                [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card > div { align-items:flex-start; }
+                [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card small,
+                [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card strong,
+                [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card em { text-align:left !important; }
+            }
             .rc-engagement-brand-icon-v124 { width:1.7rem; height:1.7rem; object-fit:contain; display:block; }
         </style>
 
