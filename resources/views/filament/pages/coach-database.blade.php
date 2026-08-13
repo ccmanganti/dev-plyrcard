@@ -6325,6 +6325,10 @@
             discoverClientShown: 24,
             discoverListsOpen: false,
             discoverDrawerTab: 'coaches',
+            discoverSchoolComms: [],
+            discoverSchoolCommsLoading: false,
+            discoverSchoolCommsLoadedFor: '',
+            dashboardDetail: @js(in_array($section, ['profile-views', 'coach-engagement'], true) ? $section : ''),
             discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
             discoverBulkNotice: '',
             discoverBulkNoticeTimer: null,
@@ -6381,8 +6385,31 @@
                 window.__plyrSchoolDrawerOptimistic = merged;
                 this.optimisticSchool = merged;
                 this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolComms = [];
+                this.discoverSchoolCommsLoading = false;
+                this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
+            },
+            async loadDiscoverCommunications() {
+                const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                if (!id || this.discoverSchoolCommsLoading) return;
+                if (this.discoverSchoolCommsLoadedFor === id) return;
+
+                this.discoverSchoolCommsLoading = true;
+                try {
+                    const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
+                    // Ignore a late response if the user already opened a different school.
+                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (currentId !== id) return;
+                    this.discoverSchoolComms = Array.isArray(rows) ? rows : [];
+                    this.discoverSchoolCommsLoadedFor = id;
+                } catch (error) {
+                    console.error('Unable to load school communication history.', error);
+                    this.discoverSchoolComms = [];
+                } finally {
+                    this.discoverSchoolCommsLoading = false;
+                }
             },
             discoverListKey(list) {
                 return String(list?.key || list?.slug || list?.id || '').trim();
@@ -7168,7 +7195,7 @@
                             <button
                                 type="button"
                                 class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
-                                wire:click="$set('section', @js($stat['target']))"
+                                x-on:click="dashboardDetail = @js($stat['target'])"
                             >
                         @else
                             <button
@@ -7353,7 +7380,7 @@
             </div>
         @endif
 
-        @if($section === 'profile-views')
+        @if(in_array($section, ['dashboard', 'profile-views'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
@@ -7404,8 +7431,7 @@
             @endphp
 
             <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
-                x-show="open"
+                x-show="dashboardDetail === 'profile-views'"
                 x-cloak
                 x-transition:enter="transition ease-out duration-100"
                 x-transition:enter-start="opacity-0"
@@ -7413,19 +7439,19 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
+                x-on:keydown.escape.window="dashboardDetail = ''"
+                x-on:click.self="dashboardDetail = ''">
                 <aside class="rc-stats-drawer-panel"
                     role="dialog"
                     aria-modal="true"
-                    x-show="open"
+                    x-show="dashboardDetail === 'profile-views'"
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="translate-x-full opacity-80"
                     x-transition:enter-end="translate-x-0 opacity-100"
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
                     x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    <button type="button" class="rc-stats-drawer-close" x-on:click="dashboardDetail = ''" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7506,7 +7532,7 @@
             </div>
         @endif
 
-        @if($section === 'coach-engagement')
+        @if(in_array($section, ['dashboard', 'coach-engagement'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
@@ -7546,8 +7572,7 @@
             @endphp
 
             <div class="rc-stats-drawer-backdrop"
-                x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
-                x-show="open"
+                x-show="dashboardDetail === 'coach-engagement'"
                 x-cloak
                 x-transition:enter="transition ease-out duration-100"
                 x-transition:enter-start="opacity-0"
@@ -7555,19 +7580,19 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                x-on:keydown.escape.window="close()"
-                x-on:click.self="close()">
+                x-on:keydown.escape.window="dashboardDetail = ''"
+                x-on:click.self="dashboardDetail = ''">
                 <aside class="rc-stats-drawer-panel"
                     role="dialog"
                     aria-modal="true"
-                    x-show="open"
+                    x-show="dashboardDetail === 'coach-engagement'"
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="translate-x-full opacity-80"
                     x-transition:enter-end="translate-x-0 opacity-100"
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
                     x-transition:leave-end="translate-x-full opacity-80">
-                    <button type="button" class="rc-stats-drawer-close" x-on:click="close()" aria-label="Close details">×</button>
+                    <button type="button" class="rc-stats-drawer-close" x-on:click="dashboardDetail = ''" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
                 <div class="rc-detail-header-v2">
                     <div>
@@ -7591,11 +7616,11 @@
                     <div class="rc-detail-rows-v2">
                         @forelse($coachEngagementRows as $engagementRow)
                             <button type="button" class="rc-detail-row-v2 is-engagement">
-                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform_icon'] }}</span>
-                                <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] }}</strong><small>{{ $engagementRow['copy'] }}</small></span>
-                                <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] }}">{{ $engagementRow['platform'] }}</span>
-                                <span class="rc-detail-count-v2"><b>{{ $engagementRow['clicks'] }}</b><small>{{ \Illuminate\Support\Str::plural('event', $engagementRow['clicks']) }}</small></span>
-                                <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] }}</span>
+                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] ?? 'is-neutral' }}">{{ $engagementRow['platform_icon'] ?? '•' }}</span>
+                                <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] ?? 'Coach engagement' }}</strong><small>{{ $engagementRow['copy'] ?? 'Tracked engagement activity' }}</small></span>
+                                <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] ?? 'is-neutral' }}">{{ $engagementRow['platform'] ?? 'Activity' }}</span>
+                                <span class="rc-detail-count-v2"><b>{{ (int) ($engagementRow['clicks'] ?? $engagementRow['count'] ?? 1) }}</b><small>{{ \Illuminate\Support\Str::plural('event', (int) ($engagementRow['clicks'] ?? $engagementRow['count'] ?? 1)) }}</small></span>
+                                <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] ?? 'Recent' }}</span>
                                 <span class="rc-detail-chevron-v2">›</span>
                             </button>
                         @empty
@@ -9804,7 +9829,11 @@ CSS;
 
                                     window.__rcInboxPendingConversationId = id;
                                     this.selectedConversationId = id;
-                                    this.$wire.selectConversation(id);
+                                    this.$wire.selectConversation(id).then(() => {
+                                        if (window.__rcInboxPendingConversationId === id || this.selectedConversationId === id) {
+                                            this.$wire.refreshConversationMessagesForClient(id);
+                                        }
+                                    });
                                 },
                             }"
                             x-init="init()"
@@ -9822,7 +9851,7 @@ CSS;
                                     $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56 {{ $isSelectedThread ? 'is-selected' : '' }}" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -11637,7 +11666,7 @@ CSS;
                 <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
-                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'">Communications</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications()">Communications</button>
                 </div>
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
@@ -11679,11 +11708,32 @@ CSS;
                 </section>
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'comms'" x-cloak>
-                    <div class="rc-school-stat-grid">
-                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.emails_sent || optimisticSchool?.emails || 0)"></strong><small>Emails</small></div>
-                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.email_opens || optimisticSchool?.opens || 0)"></strong><small>Opens</small></div>
-                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.link_clicks || optimisticSchool?.clicks || 0)"></strong><small>Clicks</small></div>
-                        <div class="rc-school-stat-card"><strong x-text="Number(optimisticSchool?.replies || 0)"></strong><small>Replies</small></div>
+                    <div class="rc-school-comms-history-v123">
+                        <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading">
+                            <span class="rc-spinner-mini"></span><span>Loading conversation history…</span>
+                        </div>
+                        <template x-if="!discoverSchoolCommsLoading && discoverSchoolComms.length">
+                            <div class="rc-school-comms-list-v123">
+                                <template x-for="row in discoverSchoolComms" :key="row.id">
+                                    <div class="rc-school-comms-row-v123">
+                                        <span class="rc-school-comms-direction-v123" x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'" x-text="row.direction === 'inbound' ? '↙' : '↗'"></span>
+                                        <div class="rc-school-comms-copy-v123">
+                                            <strong x-text="row.title || 'Conversation activity'"></strong>
+                                            <span x-text="row.preview || 'No message preview available.'"></span>
+                                            <small>
+                                                <span x-text="row.date_label || ''"></span>
+                                                <span x-show="row.opened"> · Opened</span>
+                                                <span x-show="row.reply"> · Reply</span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length === 0">
+                            <strong>No conversation history yet.</strong>
+                            <span>Emails and replies with coaches from this school will appear here.</span>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -11726,6 +11776,10 @@ CSS;
             position: relative !important;
             overflow: hidden !important;
         }
+    </style>
+
+    <style id="rc-school-comms-v123">
+        .rc-school-comms-history-v123{min-height:14rem;padding:.15rem 0}.rc-school-comms-loading-v123{min-height:10rem;display:flex;align-items:center;justify-content:center;gap:.55rem;color:var(--rc-muted);font-size:.84rem}.rc-school-comms-list-v123{display:grid;gap:.65rem}.rc-school-comms-row-v123{display:grid;grid-template-columns:2.15rem minmax(0,1fr);gap:.7rem;align-items:start;padding:.8rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface)}.rc-school-comms-direction-v123{width:2.15rem;height:2.15rem;display:grid;place-items:center;border-radius:.65rem;background:#fff1ed;color:#ff6338;font-weight:900}.rc-school-comms-direction-v123.is-inbound{background:#ecfdf5;color:#16a34a}.rc-school-comms-copy-v123{min-width:0;display:grid;gap:.18rem}.rc-school-comms-copy-v123 strong{font-size:.82rem;color:var(--rc-text)}.rc-school-comms-copy-v123 span{font-size:.75rem;color:var(--rc-muted);line-height:1.42}.rc-school-comms-copy-v123 small{font-size:.68rem;color:#9aa3b2}
     </style>
 
     <style>
@@ -11944,9 +11998,13 @@ CSS;
                 panelButtonLabel: '',
                 panelButtonUrl: '',
                 composeRefreshHandler: null,
+                savedSelectionRange: null,
+                selectionHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
+                    this.selectionHandler = () => this.captureSelection();
+                    document.addEventListener('selectionchange', this.selectionHandler);
                     this.$nextTick(() => {
                         this.bootEditor();
                         setTimeout(() => this.bootEditor(true), 80);
@@ -11977,6 +12035,10 @@ CSS;
                     }
                 },
                 destroy() {
+                    if (this.selectionHandler) {
+                        document.removeEventListener('selectionchange', this.selectionHandler);
+                        this.selectionHandler = null;
+                    }
                     if (this.composeRefreshHandler) {
                         window.removeEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
                         if (window.__plyrComposeEditorRefreshHandler === this.composeRefreshHandler) {
@@ -12115,8 +12177,9 @@ CSS;
                 },
                 mergeToken(name) { return '{' + '{' + String(name || '').trim() + '}' + '}'; },
                 insertHtml(html) {
-                    this.focusEditor();
+                    if (!this.restoreSelection()) this.focusEditor();
                     document.execCommand('insertHTML', false, html);
+                    this.captureSelection();
                     this.syncNow();
                 },
                 insertMerge(name) {
@@ -12319,6 +12382,31 @@ CSS;
                     Array.from(template.content.childNodes || []).forEach(walk);
                     return template.innerHTML;
                 },
+                captureSelection() {
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection?.();
+                    if (!editor || !selection || selection.rangeCount < 1) return;
+                    const range = selection.getRangeAt(0);
+                    const node = range.commonAncestorContainer;
+                    if (node === editor || editor.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode)) {
+                        this.savedSelectionRange = range.cloneRange();
+                    }
+                },
+                restoreSelection() {
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection?.();
+                    if (!editor || !selection) return false;
+                    editor.focus();
+                    if (!this.savedSelectionRange) return false;
+                    try {
+                        selection.removeAllRanges();
+                        selection.addRange(this.savedSelectionRange);
+                        return true;
+                    } catch (_) {
+                        this.savedSelectionRange = null;
+                        return false;
+                    }
+                },
                 focusEditor() {
                     this.$refs.editor?.focus();
                 },
@@ -12335,8 +12423,9 @@ CSS;
                     return '{' + '{' + String(name || '').trim() + '}' + '}';
                 },
                 insertHtml(html) {
-                    this.focusEditor();
+                    if (!this.restoreSelection()) this.focusEditor();
                     document.execCommand('insertHTML', false, html);
+                    this.captureSelection();
                     this.syncNow();
                 },
                 insertMerge(name) {

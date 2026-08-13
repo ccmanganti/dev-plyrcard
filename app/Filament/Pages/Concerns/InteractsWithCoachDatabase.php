@@ -4151,6 +4151,21 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
 
 
+    public function schoolCommunicationHistoryForClient(string $schoolId): array
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return [];
+        }
+
+        $this->loadSchoolCommunicationHistory($schoolId);
+
+        return collect($this->schoolCommunicationHistories[$schoolId] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values()
+            ->all();
+    }
+
     public function loadSchoolCommunicationHistory(string $schoolId): void
     {
         $user = Auth::user();
@@ -4160,14 +4175,44 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
-            $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
+        // The drawer always carries the canonical local school ID. Resolve that
+        // record directly instead of rebuilding/scanning the complete school catalog.
+        $school = [];
+        if (ctype_digit($schoolId)) {
+            $model = \App\Models\School::query()
+                ->with(['coaches' => fn ($query) => $query->orderBy('last_name')->orderBy('first_name')])
+                ->find((int) $schoolId);
 
-            return (string) ($item['id'] ?? '') === $schoolId
-                || (string) ($item['business_id'] ?? '') === $schoolId
-                || $nameHash === $schoolId
-                || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
-        }) ?: ($this->selectedSchool ?? []);
+            if ($model) {
+                $school = [
+                    'id' => (string) $model->getKey(),
+                    'school_id' => (string) $model->getKey(),
+                    'business_id' => (string) ($model->ghl_business_id ?? ''),
+                    'name' => (string) $model->name,
+                    'logo_url' => (string) ($model->logo_url ?? ''),
+                    'coaches' => $model->coaches->map(fn ($coach): array => [
+                        'id' => (string) $coach->getKey(),
+                        'contact_id' => (string) ($coach->ghl_contact_id ?? ''),
+                        'name' => trim((string) ($coach->display_name ?: (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? '')))),
+                        'first_name' => $coach->first_name,
+                        'last_name' => $coach->last_name,
+                        'email' => $coach->email,
+                        'title' => $coach->title,
+                    ])->values()->all(),
+                ];
+            }
+        }
+
+        if (empty($school)) {
+            $school = collect($this->allSchools())->first(function (array $item) use ($schoolId): bool {
+                $nameHash = md5(strtolower(trim((string) ($item['name'] ?? ''))));
+
+                return (string) ($item['id'] ?? '') === $schoolId
+                    || (string) ($item['business_id'] ?? '') === $schoolId
+                    || $nameHash === $schoolId
+                    || strcasecmp(trim((string) ($item['name'] ?? '')), $schoolId) === 0;
+            }) ?: ($this->selectedSchool ?? []);
+        }
 
         $schoolName = trim((string) ($school['name'] ?? ''));
         $schoolBusinessId = trim((string) ($school['business_id'] ?? $school['id'] ?? $schoolId));
@@ -4426,17 +4471,43 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
+        // Keep the selection request local and fast. The browser owns the selected
+        // highlight immediately; this request only swaps in any cached thread data.
         $this->selectedConversationId = $conversationId;
-        $this->markConversationReadLocally($conversationId);
         $this->messageLastId = null;
         $this->hasMoreMessages = false;
         $this->messages = [];
+        $this->hydrateCachedConversationMessages($conversationId);
 
-        // Opening a conversation is a fresh browser action. Do not reuse a cached
-        // cursor or cached message bodies, because an older normalization pass may
-        // have stored empty bodies and would otherwise prevent those rows from being
-        // downloaded again.
+        $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
+            if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                $row['unread_count'] = 0;
+                $row['status'] = 'Open';
+            }
+            return $row;
+        })->values()->all();
+        $this->cacheInboxConversations($this->conversations);
+    }
+
+    public function refreshConversationMessagesForClient(string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+        if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
+            return;
+        }
+
         $this->loadConversationMessages(true);
+
+        if ($user = Auth::user()) {
+            try {
+                app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+            } catch (\Throwable $exception) {
+                Log::debug('Unable to sync selected conversation read state after message refresh.', [
+                    'conversation_id' => $conversationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     protected function markConversationReadLocally(string $conversationId): void
