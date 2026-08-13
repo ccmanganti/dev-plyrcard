@@ -7532,46 +7532,142 @@
             </div>
         @endif
 
+        <script>
+            window.rcFilterCoachEngagement = function (source, platform) {
+                const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
+                    ? String(platform).toLowerCase()
+                    : '';
+                const drawer = source?.closest?.('[data-rc-modal-id="coach-engagement"]')
+                    || document.querySelector('[data-rc-modal-id="coach-engagement"]');
+
+                if (!drawer) return;
+
+                drawer.dataset.engagementPlatform = normalized;
+
+                drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
+                    const active = card.dataset.engagementFilter === normalized;
+                    card.classList.toggle('is-filter-active', active);
+                    card.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+
+                drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
+                    const rowPlatform = String(row.dataset.platform || '').toLowerCase();
+                    row.hidden = normalized !== '' && rowPlatform !== normalized;
+                });
+
+                const title = drawer.querySelector('[data-engagement-table-title]');
+                if (title) {
+                    const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
+                    title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
+                }
+
+                const clear = drawer.querySelector('[data-engagement-clear]');
+                if (clear) clear.hidden = normalized === '';
+            };
+        </script>
+
+        <style>
+            [data-rc-modal-id="coach-engagement"] [data-engagement-row][hidden] { display: none !important; }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card { cursor:pointer; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card:hover { transform:translateY(-1px); }
+            [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card.is-filter-active { border-color:#ff6338 !important; box-shadow:0 0 0 2px rgba(255,99,56,.12),0 10px 24px rgba(15,23,42,.08); }
+            .rc-engagement-brand-icon-v124 { width:1.7rem; height:1.7rem; object-fit:contain; display:block; }
+        </style>
+
         @if(in_array($section, ['dashboard', 'coach-engagement'], true))
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
 
-                $websiteClicks = (int) ($dashboardMetrics['website_click_count'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $igClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $ytClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-                $emailLinkClicks = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-                $emailClicks = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? $dashboardMetrics['Click count'] ?? 0);
-                $emailOpens = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? $dashboardMetrics['Open count'] ?? 0);
-                $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
-                $uniqueClicks = max((int) ($dashboardMetrics['unique_contact_clicks'] ?? 0), (int) ($dashboardMetrics['unique_clicks'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_views'] ?? 0), (int) ($dashboardMetrics['unique_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_count'] ?? 0), (int) ($dashboardMetrics['unique_link_click_contacts'] ?? 0), (int) ($dashboardMetrics['unique_profile_view_count'] ?? 0));
-                $schoolClicks = max((int) ($dashboardMetrics['overall_school_clicks'] ?? 0), (int) ($dashboardMetrics['school_clicks_total'] ?? 0), (int) ($dashboardMetrics['school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0) + (int) ($dashboardMetrics['school_link_click_count'] ?? 0));
 
-                $coachEngagementRows = collect($this->coachEngagementRows ?? []);
+                $socialIconUrls = [
+                    'instagram' => 'https://img.icons8.com/fluency/48/instagram-new.png',
+                    'youtube' => 'https://img.icons8.com/color/48/youtube-play.png',
+                    'x' => 'https://img.icons8.com/ios-filled/50/x.png',
+                ];
+
+                $normalizeSocialPlatform = function (array $row): string {
+                    $raw = strtolower(trim((string) (
+                        $row['platform_icon_key']
+                        ?? $row['platform']
+                        ?? $row['platform_key']
+                        ?? $row['type']
+                        ?? $row['title']
+                        ?? ''
+                    )));
+
+                    return match (true) {
+                        str_contains($raw, 'instagram'), $raw === 'ig' => 'instagram',
+                        str_contains($raw, 'youtube'), str_contains($raw, 'you_tube'), $raw === 'yt' => 'youtube',
+                        $raw === 'x', str_contains($raw, 'twitter'), str_contains($raw, 'x.com'), str_contains($raw, 'social_click_x') => 'x',
+                        default => '',
+                    };
+                };
+
+                $coachEngagementRows = collect($this->coachEngagementRows ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(function (array $row) use ($normalizeSocialPlatform) {
+                        $canonical = $normalizeSocialPlatform($row);
+                        if ($canonical === '') return null;
+
+                        return array_merge($row, [
+                            'platform_key' => $canonical,
+                            'platform' => match ($canonical) {
+                                'instagram' => 'Instagram',
+                                'youtube' => 'YouTube',
+                                'x' => 'X (Twitter)',
+                            },
+                            'platform_class' => match ($canonical) {
+                                'instagram' => 'is-pink',
+                                'youtube' => 'is-red',
+                                'x' => 'is-neutral',
+                            },
+                            'clicks' => max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1)),
+                            'time_label' => (string) ($row['time_label'] ?? 'Recent'),
+                        ]);
+                    })
+                    ->filter()
+                    ->values();
 
                 if ($coachEngagementRows->isEmpty()) {
-                    $coachEngagementRows = $dashboardRecentActivity->take(8)->map(function ($row, $index) use ($formatActivityTimeLabel) {
-                        $platform = (string) ($row['platform'] ?? ($index % 3 === 0 ? 'Instagram' : ($index % 3 === 1 ? 'YouTube' : 'X')));
-                        $platformLower = strtolower($platform);
-                        $platformClass = str_contains($platformLower, 'you') ? 'is-red' : (str_contains($platformLower, 'instagram') ? 'is-pink' : (str_contains($platformLower, 'website') ? 'is-blue' : 'is-neutral'));
-                        $platformIcon = str_contains($platformLower, 'you') ? '▶' : (str_contains($platformLower, 'instagram') ? '◎' : (str_contains($platformLower, 'website') ? '⌁' : '𝕏'));
-                        $time = $row['time'] ?? null;
+                    $coachEngagementRows = $dashboardRecentActivity
+                        ->filter(fn ($row): bool => is_array($row))
+                        ->map(function (array $row) use ($normalizeSocialPlatform, $formatActivityTimeLabel) {
+                            $canonical = $normalizeSocialPlatform($row);
+                            if ($canonical === '') return null;
+                            $time = $row['time'] ?? $row['created_at'] ?? null;
 
-                        return [
-                            'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
-                            'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Tracked activity'))) ?: 'Tracked activity',
-                            'platform' => $platform,
-                            'platform_class' => $platformClass,
-                            'platform_icon' => $platformIcon,
-                            'clicks' => (int) ($row['clicks'] ?? $row['count'] ?? 1),
-                            'time_label' => $formatActivityTimeLabel($time),
-                        ];
-                    })->values();
+                            return [
+                                'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
+                                'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Social click activity'))) ?: 'Social click activity',
+                                'school_id' => (string) ($row['school_id'] ?? ''),
+                                'platform_key' => $canonical,
+                                'platform' => match ($canonical) {
+                                    'instagram' => 'Instagram',
+                                    'youtube' => 'YouTube',
+                                    'x' => 'X (Twitter)',
+                                },
+                                'platform_class' => match ($canonical) {
+                                    'instagram' => 'is-pink',
+                                    'youtube' => 'is-red',
+                                    'x' => 'is-neutral',
+                                },
+                                'clicks' => max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1)),
+                                'time_label' => $formatActivityTimeLabel($time),
+                            ];
+                        })
+                        ->filter()
+                        ->take(30)
+                        ->values();
                 }
             @endphp
 
             <div class="rc-stats-drawer-backdrop"
+                data-rc-modal-id="coach-engagement"
+                data-engagement-platform=""
                 x-show="dashboardDetail === 'coach-engagement'"
                 x-cloak
                 x-transition:enter="transition ease-out duration-100"
@@ -7591,44 +7687,71 @@
                     x-transition:enter-end="translate-x-0 opacity-100"
                     x-transition:leave="transition ease-in duration-120"
                     x-transition:leave-start="translate-x-0 opacity-100"
-                    x-transition:leave-end="translate-x-full opacity-80">
+                    x-transition:leave-end="translate-x-full opacity-80"
+                    x-on:click.stop>
                     <button type="button" class="rc-stats-drawer-close" x-on:click="dashboardDetail = ''" aria-label="Close details">×</button>
                     <div class="rc-detail-page-v2">
-                <div class="rc-detail-header-v2">
-                    <div>
-                        <h1>Coach Engagement</h1>
-                        <p>How coaches are engaging with your social platforms, and who's clicking through.</p>
-                    </div>
-                    <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
-                    </form>
-                </div>
+                        <div class="rc-detail-header-v2">
+                            <div>
+                                <h1>Coach Engagement</h1>
+                                <p>How coaches are engaging with your social platforms, and who's clicking through.</p>
+                            </div>
+                        </div>
 
-                <div class="rc-detail-stats-v2">
-                    <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Unique Clicks</small><strong>{{ number_format($uniqueClicks) }}</strong><em>deduped coach/profile clicks</em></div></div>
-                    <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>School Clicks</small><strong>{{ number_format($schoolClicks) }}</strong><em>combined clicks from coaches at schools</em></div></div>
-                    <div class="rc-detail-stat-v2 is-red"><span>▶</span><div><small>Social Clicks</small><strong>{{ number_format($igClicks + $ytClicks + $xClicks + $websiteClicks) }}</strong><em>website/social clicks</em></div></div>
-                </div>
-
-                <section class="rc-detail-table-v2">
-                    <header><h2>Who's Clicking</h2><span>● Synced</span></header>
-                    <div class="rc-detail-rows-v2">
-                        @forelse($coachEngagementRows as $engagementRow)
-                            <button type="button" class="rc-detail-row-v2 is-engagement">
-                                <span class="rc-detail-platform-icon-v2 {{ $engagementRow['platform_class'] ?? 'is-neutral' }}">{{ $engagementRow['platform_icon'] ?? '•' }}</span>
-                                <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] ?? 'Coach engagement' }}</strong><small>{{ $engagementRow['copy'] ?? 'Tracked engagement activity' }}</small></span>
-                                <span class="rc-detail-pill-v2 {{ $engagementRow['platform_class'] ?? 'is-neutral' }}">{{ $engagementRow['platform'] ?? 'Activity' }}</span>
-                                <span class="rc-detail-count-v2"><b>{{ (int) ($engagementRow['clicks'] ?? $engagementRow['count'] ?? 1) }}</b><small>{{ \Illuminate\Support\Str::plural('event', (int) ($engagementRow['clicks'] ?? $engagementRow['count'] ?? 1)) }}</small></span>
-                                <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] ?? 'Recent' }}</span>
-                                <span class="rc-detail-chevron-v2">›</span>
+                        <div class="rc-detail-stats-v2">
+                            <button type="button" class="rc-detail-stat-v2 is-neutral rc-engagement-filter-card" data-engagement-filter="x" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'x')">
+                                <span><img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls['x'] }}" alt="X" referrerpolicy="no-referrer"></span>
+                                <div><small>X (Twitter)</small><strong>{{ number_format($xClicks) }}</strong><em>{{ number_format(max(0, $xClicks)) }} clicks</em></div>
                             </button>
-                        @empty
-                            <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked links or open emails.</div>
-                        @endforelse
+                            <button type="button" class="rc-detail-stat-v2 is-pink rc-engagement-filter-card" data-engagement-filter="instagram" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'instagram')">
+                                <span><img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls['instagram'] }}" alt="Instagram" referrerpolicy="no-referrer"></span>
+                                <div><small>Instagram</small><strong>{{ number_format($igClicks) }}</strong><em>{{ number_format(max(0, $igClicks)) }} clicks</em></div>
+                            </button>
+                            <button type="button" class="rc-detail-stat-v2 is-red rc-engagement-filter-card" data-engagement-filter="youtube" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'youtube')">
+                                <span><img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls['youtube'] }}" alt="YouTube" referrerpolicy="no-referrer"></span>
+                                <div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div>
+                            </button>
+                        </div>
+
+                        <section class="rc-detail-table-v2">
+                            <header>
+                                <h2 data-engagement-table-title>Who's Clicking</h2>
+                                <span style="display:inline-flex;align-items:center;gap:.55rem">
+                                    <button type="button" data-engagement-clear hidden onclick="window.rcFilterCoachEngagement(this, '')" class="rc-home-link-v2" style="border:0;background:transparent;cursor:pointer">Show All</button>
+                                    <span>● Synced</span>
+                                </span>
+                            </header>
+                            <div class="rc-detail-rows-v2">
+                                @forelse($coachEngagementRows as $engagementRow)
+                                    @php
+                                        $platformKey = (string) ($engagementRow['platform_key'] ?? '');
+                                        $platformClass = (string) ($engagementRow['platform_class'] ?? 'is-neutral');
+                                        $platformLabel = (string) ($engagementRow['platform'] ?? 'Social');
+                                        $clickCount = max(1, (int) ($engagementRow['clicks'] ?? $engagementRow['count'] ?? 1));
+                                    @endphp
+                                    <button type="button"
+                                        class="rc-detail-row-v2 is-engagement"
+                                        data-engagement-row
+                                        data-platform="{{ $platformKey }}">
+                                        <span class="rc-detail-platform-icon-v2 {{ $platformClass }}">
+                                            @if(isset($socialIconUrls[$platformKey]))
+                                                <img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls[$platformKey] }}" alt="{{ $platformLabel }}" referrerpolicy="no-referrer">
+                                            @else
+                                                •
+                                            @endif
+                                        </span>
+                                        <span class="rc-detail-person-v2"><strong>{{ $engagementRow['title'] ?? 'Coach engagement' }}</strong><small>{{ $engagementRow['copy'] ?? 'Tracked social click activity' }}</small></span>
+                                        <span class="rc-detail-pill-v2 {{ $platformClass }}">{{ $platformLabel }}</span>
+                                        <span class="rc-detail-count-v2"><b>{{ $clickCount }}</b><small>{{ \Illuminate\Support\Str::plural('click', $clickCount) }}</small></span>
+                                        <span class="rc-detail-time-v2">{{ $engagementRow['time_label'] ?? 'Recent' }}</span>
+                                        <span class="rc-detail-chevron-v2" aria-hidden="true">›</span>
+                                    </button>
+                                @empty
+                                    <div class="rc-home-empty-v2">Coach engagement will appear here after coaches click tracked Instagram, YouTube, or X links.</div>
+                                @endforelse
+                            </div>
+                        </section>
                     </div>
-                </section>
-            </div>
                 </aside>
             </div>
         @endif
