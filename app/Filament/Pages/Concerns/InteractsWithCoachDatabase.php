@@ -54,6 +54,8 @@ trait InteractsWithCoachDatabase
     protected ?array $allSchoolsMemo = null;
     protected ?array $allCoachesMemo = null;
     protected ?array $trackingCoachesMemo = null;
+    protected ?array $dashboardTrackingStatsMemo = null;
+    protected ?array $dashboardMetricsMemo = null;
 
     public bool $allowed = false;
     public bool $locked = false;
@@ -3025,7 +3027,7 @@ protected function ensureLocalSampleEmailTemplates(): void
     protected function defaultRecruitingTemplateBodyHtml(): string
     {
         return <<<'HTML'
-<p>Hi {{CoachFirstName}},</p>
+<p>Hi Coach {{CoachLastName}},</p>
 
 <p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p>
 
@@ -3424,7 +3426,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         // Local tracking events are authoritative for profile views, coach engagement,
         // social clicks, email opens, and sent-email totals.
-        $localTrackingStats = app(LocalRecruitingTrackingService::class)->dashboardStats($user);
+        $localTrackingStats = $this->localDashboardTrackingStats($user);
         foreach ($localTrackingStats as $key => $value) {
             $this->stats[$key] = (int) $value;
         }
@@ -3461,7 +3463,27 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->all();
         $this->dashboardActivitySummary = $summary;
 
-        $this->persistDashboardStatsAndActivity($user);
+        // Dashboard rendering must remain read-mostly. Persisting the complete snapshot
+        // here caused the same activity/stats cache to be rewritten during an ordinary
+        // GET request and invalidated the cache that was just read. Background sync /
+        // explicit refresh actions remain responsible for persisting refreshed stats.
+    }
+
+    protected function localDashboardTrackingStats($user = null): array
+    {
+        if (is_array($this->dashboardTrackingStatsMemo)) {
+            return $this->dashboardTrackingStatsMemo;
+        }
+
+        $user ??= Auth::user();
+        if (! $user) {
+            return $this->dashboardTrackingStatsMemo = [];
+        }
+
+        return $this->dashboardTrackingStatsMemo = collect(
+            app(LocalRecruitingTrackingService::class)->dashboardStats($user)
+        )->map(fn ($value): int => is_numeric($value) ? (int) $value : 0)
+            ->all();
     }
 
     protected function mergeDashboardTrackingStats(array $baseStats, array $remoteStats): array
@@ -7477,6 +7499,15 @@ protected function campaignRecipientCoaches(): Collection
                 })
                 ->values(),
 
+        'coaches' => $this->campaignSchoolId === ''
+            ? collect()
+            : $this->composeCoachesForSchool(
+                $this->resolveComposeSchoolRow($this->campaignSchoolId) ?? [],
+                true
+            )
+                ->filter(fn (array $coach): bool => $this->coachIdMatchesComposeSelection($coach, $this->campaignCoachIds))
+                ->values(),
+
         default => $coaches
             ->filter(fn (array $coach): bool => $this->coachIdMatchesComposeSelection($coach, $this->campaignCoachIds))
             ->values(),
@@ -8098,13 +8129,18 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
 
     public function getDashboardMetricsProperty(): array
     {
+        if (is_array($this->dashboardMetricsMemo)) {
+            return $this->dashboardMetricsMemo;
+        }
+
         $stats = $this->stats ?? [];
 
-        // The local tracking table is authoritative. The detail drawers already read
-        // these events, so the headline dashboard cards must use the same source.
+        // The local tracking table is authoritative, but calculate its aggregate set
+        // only once per Livewire request. The previous implementation executed the
+        // same 20+ aggregate queries in mount() and again from this computed property.
         $dashboardUser = Auth::user();
         if ($dashboardUser) {
-            $localTrackingStats = app(LocalRecruitingTrackingService::class)->dashboardStats($dashboardUser);
+            $localTrackingStats = $this->localDashboardTrackingStats($dashboardUser);
             foreach ($localTrackingStats as $key => $value) {
                 $stats[$key] = (int) $value;
                 $this->stats[$key] = (int) $value;
@@ -8199,7 +8235,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
                 || ((int) ($school['engagement_score'] ?? 0) > 0);
         })->count();
 
-        return [
+        return $this->dashboardMetricsMemo = [
             'saved_schools' => $savedSchools,
             'favorite_schools' => $favoriteSchools,
             'engaged_schools' => $engagedSchools,
@@ -10442,7 +10478,38 @@ protected function ensureComposeBodyHasFooter(): void
         $failed = 0;
 
         foreach ($recipients as $coach) {
-            $contactId = trim((string) ($coach['id'] ?? ''));
+            // v118: the UI selects the canonical local coach. Only when Send is
+            // pressed do we resolve that coach inside THIS player's GHL subaccount.
+            // A local coach ID must never be treated as a GHL contact ID.
+            $coachEmail = strtolower(trim((string) ($coach['email'] ?? '')));
+
+            if ($coachEmail === '') {
+                $failed++;
+                continue;
+            }
+
+            $resolvedContact = app(GoHighLevelService::class)
+                ->resolveCoachContactByEmailForUser($user, $coachEmail);
+
+            $contactId = trim((string) ($resolvedContact['contact_id'] ?? ''));
+
+            if (! ($resolvedContact['success'] ?? false) || $contactId === '') {
+                Log::warning('Compose Email could not resolve coach in player GHL subaccount.', [
+                    'user_id' => $user->getKey(),
+                    'coach_local_id' => $coach['local_id'] ?? $coach['id'] ?? null,
+                    'coach_email' => $coachEmail,
+                    'school' => $coach['school'] ?? null,
+                    'error' => $resolvedContact['error'] ?? 'Contact not found by email.',
+                ]);
+                $failed++;
+                continue;
+            }
+
+            // Keep the canonical local row for personalization while attaching the
+            // subaccount-specific GHL identity required by the actual send API.
+            $coach['contact_id'] = $contactId;
+            $coach['ghl_contact_id'] = $contactId;
+            $coach['email'] = $coachEmail;
             $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
             $personalizedBody = $this->replaceCampaignTokens($html, $coach);
 
@@ -10642,7 +10709,7 @@ protected function ensureComposeBodyHasFooter(): void
         $body = <<<'HTML'
 <div style="max-width:680px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:15px;">
     <div style="padding:26px 28px 18px;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;">
-        <p style="margin:0 0 16px;">Hi {{CoachFirstName}},</p>
+        <p style="margin:0 0 16px;">Hi Coach {{CoachLastName}},</p>
         <p style="margin:0 0 16px;">My name is <strong>{{AthleteName}}</strong>. I am a {{GraduationYear}} {{Position}} with {{ClubTeam}}, and I wanted to introduce myself because I am interested in {{SchoolName}}.</p>
         <p style="margin:0 0 16px;">I would appreciate the opportunity to share my profile, highlights, and academic information with your staff. My current GPA is {{GPA}}.</p>
         <p style="margin:0 0 12px;">
@@ -11298,6 +11365,59 @@ HTML;
         ];
     }
 
+    /**
+     * Browser-side merge values used by the instant Compose preview.
+     *
+     * Keep these values sourced from the same canonical send-time token replacer
+     * so Preview and Send cannot drift apart. Coach-specific values are overlaid
+     * in Alpine from the currently selected local Coach record.
+     */
+    public function getComposePreviewTokenValuesProperty(): array
+    {
+        $coach = $this->composePreviewCoach;
+        $tokens = [
+            'AthleteName',
+            'AthleteFirstName',
+            'AthleteLastName',
+            'GraduationYear',
+            'Position',
+            'ClubTeam',
+            'GPA',
+            'AthleteEmail',
+            'AthletePhone',
+            'ProfileLink',
+            'HighlightLink',
+            'InstagramLink',
+            'TwitterLink',
+            'XLink',
+            'YoutubeLink',
+            'YouTubeLink',
+        ];
+
+        $values = [];
+
+        foreach ($tokens as $token) {
+            $placeholder = '{{' . $token . '}}';
+            $resolved = $this->replaceCampaignTokens($placeholder, $coach);
+
+            // Do not leak an unresolved merge token into the browser preview.
+            $values[$token] = $resolved === $placeholder ? '' : $resolved;
+        }
+
+        return $values;
+    }
+
+    /**
+     * Raw canonical signature for the instant browser preview. Alpine replaces
+     * the merge fields with composePreviewTokenValues + the selected local coach.
+     * Send-time rendering still uses ensurePlyrcardEmailSignature() and the same
+     * canonical merge service.
+     */
+    public function getComposePreviewSignatureHtmlProperty(): string
+    {
+        return $this->plyrcardEmailSignatureHtml();
+    }
+
     public function getComposeRenderedSubjectProperty(): string
     {
         return $this->replaceCampaignTokens($this->campaignSubject ?: 'Subject preview', $this->composePreviewCoach);
@@ -11327,24 +11447,92 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        // Keep this payload intentionally tiny. Older versions duplicated every coach
-        // inside every school, which made Livewire/Blade JSON serialization explode in
-        // memory on accounts with thousands of coaches.
-        return [
-            'schools' => collect($this->composeSchoolOptions)
-                ->map(fn (array $school): array => [
-                    'id' => (string) ($school['id'] ?? $school['business_id'] ?? ''),
-                    'name' => (string) ($school['name'] ?? 'School'),
-                    'logo_url' => (string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? ''),
-                    'conference' => (string) ($school['conference'] ?? ''),
-                    'division' => (string) ($school['division'] ?? ''),
-                    'city' => (string) ($school['city'] ?? ''),
-                    'state' => (string) ($school['state'] ?? ''),
-                    'coach_count' => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0),
-                ])
-                ->values()
-                ->all(),
-        ];
+        // v118: Compose selection is backed only by the canonical local School/Coach
+        // tables. The complete minimal roster is serialized once so school search,
+        // Head Coach Only, All Coaches, Choose Coaches, filtering, and checkboxes are
+        // instant Alpine operations with no Livewire/GHL request per click.
+        $schools = \App\Models\School::query()
+            ->select(['id', 'name', 'logo_url', 'city', 'state', 'ghl_business_id'])
+            ->with(['coaches' => function ($query): void {
+                $query
+                    ->select([
+                        'id', 'school_id', 'first_name', 'last_name', 'display_name',
+                        'email', 'title', 'conference', 'division', 'ghl_contact_id',
+                    ])
+                    ->whereNotNull('email')
+                    ->where('email', '<>', '')
+                    ->orderByRaw("CASE WHEN LOWER(title) LIKE '%head%' AND LOWER(title) NOT LIKE '%assistant%' AND LOWER(title) NOT LIKE '%associate%' THEN 0 ELSE 1 END")
+                    ->orderBy('last_name')
+                    ->orderBy('first_name');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->map(function ($school): array {
+                $coaches = $school->coaches
+                    ->map(function ($coach) use ($school): array {
+                        $name = trim((string) ($coach->display_name ?: ($coach->first_name . ' ' . $coach->last_name)));
+                        $title = trim((string) ($coach->title ?? 'Coach'));
+                        $titleKey = strtolower($title);
+                        $isHead = str_contains($titleKey, 'head')
+                            && ! str_contains($titleKey, 'assistant')
+                            && ! str_contains($titleKey, 'associate');
+
+                        return [
+                            // Local coach ID is authoritative inside Compose UI.
+                            'id' => (string) $coach->getKey(),
+                            'local_id' => (int) $coach->getKey(),
+                            'name' => $name !== '' ? $name : 'Coach',
+                            'first_name' => (string) ($coach->first_name ?? ''),
+                            'last_name' => (string) ($coach->last_name ?? ''),
+                            'email' => strtolower(trim((string) ($coach->email ?? ''))),
+                            'title' => $title !== '' ? $title : 'Coach',
+                            'conference' => (string) ($coach->conference ?? ''),
+                            'division' => (string) ($coach->division ?? ''),
+                            'is_head' => $isHead,
+                            'school_id' => (string) $school->getKey(),
+                            'school' => (string) $school->name,
+                            'search_text' => strtolower(trim(implode(' ', array_filter([
+                                $name,
+                                $coach->first_name,
+                                $coach->last_name,
+                                $coach->email,
+                                $coach->title,
+                            ])))),
+                        ];
+                    })
+                    ->values();
+
+                $conference = $coaches->pluck('conference')->filter()->countBy()->sortDesc()->keys()->first() ?? '';
+                $division = $coaches->pluck('division')->filter()->countBy()->sortDesc()->keys()->first() ?? '';
+
+                return [
+                    // Local school ID is authoritative inside Compose UI.
+                    'id' => (string) $school->getKey(),
+                    'local_id' => (int) $school->getKey(),
+                    'business_id' => (string) ($school->ghl_business_id ?? ''),
+                    'name' => (string) $school->name,
+                    'logo_url' => (string) ($school->logo_url ?? ''),
+                    'conference' => (string) $conference,
+                    'division' => (string) $division,
+                    'city' => (string) ($school->city ?? ''),
+                    'state' => (string) ($school->state ?? ''),
+                    'coach_count' => $coaches->count(),
+                    'coaches' => $coaches->all(),
+                    'search_text' => strtolower(trim(implode(' ', array_filter([
+                        $school->name,
+                        $conference,
+                        $division,
+                        $school->city,
+                        $school->state,
+                        $coaches->pluck('name')->implode(' '),
+                        $coaches->pluck('email')->implode(' '),
+                    ])))),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return ['schools' => $schools];
     }
 
         public function getComposeSelectedSchoolProperty(): ?array
@@ -11434,52 +11622,13 @@ HTML;
 
     public function getComposeSchoolOptionsProperty(): array
     {
-        // Search must stay lightweight. Do not resolve coach rosters for every school
-        // while the user is typing; use the reconciled counts already stored on each
-        // school row and only resolve the selected school's roster on demand.
-        return collect($this->allSchools())
-            ->filter(fn ($school): bool => is_array($school)
-                && filled($school['id'] ?? $school['business_id'] ?? null)
-                && filled($school['name'] ?? null))
-            ->groupBy(function (array $school): string {
-                $businessId = strtolower(trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? '')));
-
-                return $businessId !== ''
-                    ? 'business:' . $businessId
-                    : 'name:' . $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
+        // v118: never use snapshot/GHL schools for Compose. Reuse the canonical local
+        // catalog and omit the roster from this server-side convenience property.
+        return collect($this->composeClientDataset['schools'] ?? [])
+            ->map(function (array $school): array {
+                unset($school['coaches']);
+                return $school;
             })
-            ->map(function ($group): array {
-                $rows = collect($group)->values();
-                $primary = $rows->sortByDesc(function (array $school): int {
-                    return (filled($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? null) ? 100 : 0)
-                        + (filled($school['business_id'] ?? null) ? 20 : 0)
-                        + min(9999, (int) ($school['coach_count'] ?? $school['coaches_count'] ?? 0));
-                })->first() ?: [];
-
-                $coachCount = (int) ($rows->max(
-                    fn (array $school): int => (int) ($school['coach_count'] ?? $school['coaches_count'] ?? count($school['coach_ids'] ?? []))
-                ) ?: 0);
-
-                $logo = trim((string) ($primary['logo_url'] ?? $primary['school_logo_url'] ?? $primary['business_logo_url'] ?? ''));
-
-                return [
-                    'id' => (string) ($primary['business_id'] ?? $primary['id'] ?? ''),
-                    'business_id' => (string) ($primary['business_id'] ?? $primary['id'] ?? ''),
-                    'name' => (string) ($primary['name'] ?? 'School'),
-                    'logo_url' => $logo,
-                    'school_logo_url' => $logo,
-                    'business_logo_url' => $logo,
-                    'conference' => (string) ($primary['conference'] ?? ''),
-                    'division' => (string) ($primary['division'] ?? ''),
-                    'city' => (string) ($primary['city'] ?? ''),
-                    'state' => (string) ($primary['state'] ?? ''),
-                    'head_coach' => is_array($primary['head_coach'] ?? null) ? $primary['head_coach'] : null,
-                    'coach_count' => $coachCount,
-                    'coaches_count' => $coachCount,
-                ];
-            })
-            ->filter(fn (array $school): bool => $school['id'] !== '')
-            ->sortBy(fn (array $school): string => strtolower($school['name']))
             ->values()
             ->all();
     }
@@ -11525,54 +11674,8 @@ HTML;
     
     protected function hydrateComposeSchoolCoachesForSelection(array $school): array
     {
-        $user = Auth::user();
-
-        if (! $user || ! $this->allowed || $this->locked) {
-            return $school;
-        }
-
-        $schoolId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? ''));
-
-        try {
-            $snapshot = Cache::get($this->activeCacheKey(), $this->emptySnapshot());
-            $snapshot = is_array($snapshot) ? $snapshot : $this->emptySnapshot();
-
-            // Same path used by school drawer hydration: official GHL business
-            // contacts plus cached contacts whose Business Name / Company Name /
-            // School Name matches the selected company.
-            $this->loadSchoolCoachesIntoSnapshot(
-                $school,
-                $snapshot,
-                app(CoachDatabaseService::class),
-                $user
-            );
-
-            $this->storeSnapshot($snapshot);
-
-            // Clear request-local memoized indexes so Compose immediately reads
-            // the newly reconciled snapshot in this same Livewire request.
-            $this->coachDatabaseSnapshotMemo = null;
-            $this->coachSearchIndexMemo = null;
-            $this->schoolCoachIndexMemo = null;
-            $this->allSchoolsMemo = null;
-            $this->allCoachesMemo = null;
-            $this->trackingCoachesMemo = null;
-            $this->filteredSchoolsQueryMemo = [];
-
-            $this->hydrateFromSnapshot($snapshot);
-
-            if ($schoolId !== '') {
-                return $this->resolveComposeSchoolRow($schoolId) ?: $school;
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('Unable to hydrate Compose Email school coaches.', [
-                'user_id' => $user->id,
-                'school_id' => $schoolId,
-                'school_name' => $school['name'] ?? null,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
+        // v118 compatibility shim. Compose roster hydration is intentionally local.
+        // Do not call GHL while selecting a school or coach.
         return $school;
     }
 
