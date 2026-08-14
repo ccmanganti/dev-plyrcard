@@ -11942,6 +11942,168 @@ CSS;
         {{-- v113: legacy section-specific server drawer removed. The Discover drawer above
              is the single global drawer for Dashboard, Discover, Favorites, and My Lists. --}}
     </div>
+
+<script data-navigate-once>
+(() => {
+    if (window.__plyrRcInstantSpaInstalled) return;
+    window.__plyrRcInstantSpaInstalled = true;
+
+    const pathToSection = (pathname) => {
+        const path = String(pathname || '').replace(/\/+$/, '') || '/';
+        if (!path.startsWith('/admin/coach-database')) return null;
+        if (path === '/admin/coach-database') return 'dashboard';
+        if (/\/(schools)$/.test(path)) return 'schools';
+        if (/\/(coaches)$/.test(path)) return 'coaches';
+        if (/\/(favorites)$/.test(path)) return 'favorites';
+        if (/\/(lists)$/.test(path)) return 'lists';
+        if (/\/(templates|campaigns)$/.test(path)) return 'campaigns';
+        if (/\/(compose-email|compose)$/.test(path)) return 'compose';
+        if (/\/(conversations|inbox)$/.test(path)) return 'conversations';
+        if (/\/(schedule|my-schedule)$/.test(path)) return 'schedule';
+        if (/\/(settings)$/.test(path)) return 'settings';
+        if (/\/(support)$/.test(path)) return 'support';
+        return null;
+    };
+
+    const labels = {
+        dashboard: 'Dashboard',
+        schools: 'Discover Schools',
+        coaches: 'Coaches',
+        favorites: 'Favorites',
+        lists: 'My Lists',
+        campaigns: 'Templates',
+        compose: 'Compose Email',
+        conversations: 'Inbox',
+        schedule: 'My Schedule',
+        settings: 'Settings',
+        support: 'Support',
+    };
+
+    const sectionFromAnchor = (anchor) => {
+        try {
+            const url = new URL(anchor.href, window.location.href);
+            if (url.origin !== window.location.origin) return null;
+            return pathToSection(url.pathname);
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const setSidebarActive = (section) => {
+        document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
+            const candidate = sectionFromAnchor(anchor);
+            const active = candidate === section;
+            anchor.classList.toggle('rc-fast-active', active);
+            if (active) anchor.setAttribute('aria-current', 'page');
+            else if (anchor.getAttribute('aria-current') === 'page') anchor.removeAttribute('aria-current');
+        });
+    };
+
+    const removeCover = () => {
+        document.getElementById('rc-instant-route-cover-v130')?.remove();
+        document.documentElement.classList.remove('rc-route-switching-v130');
+    };
+
+    const showCover = (section) => {
+        removeCover();
+        const root = document.querySelector('.rc-livewire-root');
+        if (!root) return;
+
+        document.documentElement.classList.add('rc-route-switching-v130');
+        setSidebarActive(section);
+
+        const cover = document.createElement('div');
+        cover.id = 'rc-instant-route-cover-v130';
+        cover.className = 'rc-instant-route-cover-v130';
+        cover.innerHTML = `
+            <div class="rc-instant-route-head-v130">
+                <div>
+                    <strong>${labels[section] || 'Recruiting Center'}</strong>
+                    <span>Loading saved data...</span>
+                </div>
+            </div>
+            <div class="rc-instant-route-grid-v130">
+                <i></i><i></i><i></i><i></i>
+            </div>
+            <div class="rc-instant-route-panel-v130"></div>
+        `;
+        root.prepend(cover);
+    };
+
+    // IMPORTANT: do not prevent the click. Filament SPA / wire:navigate must own
+    // navigation so the old Livewire component snapshot is not posted as part of
+    // every Recruiting Center tab switch. We only provide immediate visual feedback.
+    document.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
+        if (!anchor) return;
+        const section = sectionFromAnchor(anchor);
+        if (!section || !document.querySelector('.rc-livewire-root')) return;
+        showCover(section);
+    }, true);
+
+    document.addEventListener('livewire:navigated', () => {
+        removeCover();
+        const section = pathToSection(window.location.pathname);
+        if (section) setSidebarActive(section);
+    });
+
+    window.addEventListener('pageshow', removeCover);
+    window.addEventListener('popstate', () => {
+        const section = pathToSection(window.location.pathname);
+        if (section) showCover(section);
+    });
+
+    const initial = pathToSection(window.location.pathname);
+    if (initial) setSidebarActive(initial);
+})();
+</script>
+
+<style data-navigate-once>
+.fi-sidebar a.rc-fast-active,
+.fi-sidebar a.rc-fast-active:hover {
+    background: rgba(255, 99, 56, .14) !important;
+    color: #ff6338 !important;
+}
+.fi-sidebar a.rc-fast-active svg { color: #ff6338 !important; }
+.rc-livewire-root { position: relative; min-height: 20rem; }
+.rc-instant-route-cover-v130 {
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    min-height: min(72vh, 52rem);
+    padding: .35rem 0 1rem;
+    background: var(--rc-surface, #fff);
+    color: var(--rc-text, #111827);
+    animation: rcInstantOpenV130 .09s ease-out both;
+}
+.rc-instant-route-head-v130 {
+    min-height: 5.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.rc-instant-route-head-v130 div { display: grid; gap: .3rem; }
+.rc-instant-route-head-v130 strong { font-size: 1.45rem; letter-spacing: -.03em; }
+.rc-instant-route-head-v130 span { color: var(--rc-muted, #6b7280); font-size: .82rem; }
+.rc-instant-route-grid-v130 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
+.rc-instant-route-grid-v130 i,
+.rc-instant-route-panel-v130 {
+    display: block;
+    border: 1px solid var(--rc-border, #e5e7eb);
+    background: linear-gradient(90deg, rgba(148,163,184,.08), rgba(148,163,184,.16), rgba(148,163,184,.08));
+    background-size: 220% 100%;
+    animation: rcInstantShimmerV130 1s linear infinite;
+}
+.rc-instant-route-grid-v130 i { height: 8rem; border-radius: 1rem; }
+.rc-instant-route-panel-v130 { height: 18rem; border-radius: 1rem; margin-top: 1rem; }
+@keyframes rcInstantOpenV130 { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes rcInstantShimmerV130 { to { background-position: -220% 0; } }
+@media (max-width: 900px) { .rc-instant-route-grid-v130 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 560px) { .rc-instant-route-grid-v130 { grid-template-columns: 1fr; } .rc-instant-route-grid-v130 i:nth-child(n+3) { display:none; } }
+</style>
+
     </div>
 
     <style>
@@ -14286,166 +14448,5 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 @endif
 
 
-
-<script data-navigate-once>
-(() => {
-    if (window.__plyrRcInstantSpaInstalled) return;
-    window.__plyrRcInstantSpaInstalled = true;
-
-    const pathToSection = (pathname) => {
-        const path = String(pathname || '').replace(/\/+$/, '') || '/';
-        if (!path.startsWith('/admin/coach-database')) return null;
-        if (path === '/admin/coach-database') return 'dashboard';
-        if (/\/(schools)$/.test(path)) return 'schools';
-        if (/\/(coaches)$/.test(path)) return 'coaches';
-        if (/\/(favorites)$/.test(path)) return 'favorites';
-        if (/\/(lists)$/.test(path)) return 'lists';
-        if (/\/(templates|campaigns)$/.test(path)) return 'campaigns';
-        if (/\/(compose-email|compose)$/.test(path)) return 'compose';
-        if (/\/(conversations|inbox)$/.test(path)) return 'conversations';
-        if (/\/(schedule|my-schedule)$/.test(path)) return 'schedule';
-        if (/\/(settings)$/.test(path)) return 'settings';
-        if (/\/(support)$/.test(path)) return 'support';
-        return null;
-    };
-
-    const labels = {
-        dashboard: 'Dashboard',
-        schools: 'Discover Schools',
-        coaches: 'Coaches',
-        favorites: 'Favorites',
-        lists: 'My Lists',
-        campaigns: 'Templates',
-        compose: 'Compose Email',
-        conversations: 'Inbox',
-        schedule: 'My Schedule',
-        settings: 'Settings',
-        support: 'Support',
-    };
-
-    const sectionFromAnchor = (anchor) => {
-        try {
-            const url = new URL(anchor.href, window.location.href);
-            if (url.origin !== window.location.origin) return null;
-            return pathToSection(url.pathname);
-        } catch (_) {
-            return null;
-        }
-    };
-
-    const setSidebarActive = (section) => {
-        document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
-            const candidate = sectionFromAnchor(anchor);
-            const active = candidate === section;
-            anchor.classList.toggle('rc-fast-active', active);
-            if (active) anchor.setAttribute('aria-current', 'page');
-            else if (anchor.getAttribute('aria-current') === 'page') anchor.removeAttribute('aria-current');
-        });
-    };
-
-    const removeCover = () => {
-        document.getElementById('rc-instant-route-cover-v130')?.remove();
-        document.documentElement.classList.remove('rc-route-switching-v130');
-    };
-
-    const showCover = (section) => {
-        removeCover();
-        const root = document.querySelector('.rc-livewire-root');
-        if (!root) return;
-
-        document.documentElement.classList.add('rc-route-switching-v130');
-        setSidebarActive(section);
-
-        const cover = document.createElement('div');
-        cover.id = 'rc-instant-route-cover-v130';
-        cover.className = 'rc-instant-route-cover-v130';
-        cover.innerHTML = `
-            <div class="rc-instant-route-head-v130">
-                <div>
-                    <strong>${labels[section] || 'Recruiting Center'}</strong>
-                    <span>Loading saved data...</span>
-                </div>
-            </div>
-            <div class="rc-instant-route-grid-v130">
-                <i></i><i></i><i></i><i></i>
-            </div>
-            <div class="rc-instant-route-panel-v130"></div>
-        `;
-        root.prepend(cover);
-    };
-
-    // IMPORTANT: do not prevent the click. Filament SPA / wire:navigate must own
-    // navigation so the old Livewire component snapshot is not posted as part of
-    // every Recruiting Center tab switch. We only provide immediate visual feedback.
-    document.addEventListener('click', (event) => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
-        if (!anchor) return;
-        const section = sectionFromAnchor(anchor);
-        if (!section || !document.querySelector('.rc-livewire-root')) return;
-        showCover(section);
-    }, true);
-
-    document.addEventListener('livewire:navigated', () => {
-        removeCover();
-        const section = pathToSection(window.location.pathname);
-        if (section) setSidebarActive(section);
-    });
-
-    window.addEventListener('pageshow', removeCover);
-    window.addEventListener('popstate', () => {
-        const section = pathToSection(window.location.pathname);
-        if (section) showCover(section);
-    });
-
-    const initial = pathToSection(window.location.pathname);
-    if (initial) setSidebarActive(initial);
-})();
-</script>
-
-<style data-navigate-once>
-.fi-sidebar a.rc-fast-active,
-.fi-sidebar a.rc-fast-active:hover {
-    background: rgba(255, 99, 56, .14) !important;
-    color: #ff6338 !important;
-}
-.fi-sidebar a.rc-fast-active svg { color: #ff6338 !important; }
-.rc-livewire-root { position: relative; min-height: 20rem; }
-.rc-instant-route-cover-v130 {
-    position: absolute;
-    inset: 0;
-    z-index: 80;
-    min-height: min(72vh, 52rem);
-    padding: .35rem 0 1rem;
-    background: var(--rc-surface, #fff);
-    color: var(--rc-text, #111827);
-    animation: rcInstantOpenV130 .09s ease-out both;
-}
-.rc-instant-route-head-v130 {
-    min-height: 5.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-.rc-instant-route-head-v130 div { display: grid; gap: .3rem; }
-.rc-instant-route-head-v130 strong { font-size: 1.45rem; letter-spacing: -.03em; }
-.rc-instant-route-head-v130 span { color: var(--rc-muted, #6b7280); font-size: .82rem; }
-.rc-instant-route-grid-v130 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
-.rc-instant-route-grid-v130 i,
-.rc-instant-route-panel-v130 {
-    display: block;
-    border: 1px solid var(--rc-border, #e5e7eb);
-    background: linear-gradient(90deg, rgba(148,163,184,.08), rgba(148,163,184,.16), rgba(148,163,184,.08));
-    background-size: 220% 100%;
-    animation: rcInstantShimmerV130 1s linear infinite;
-}
-.rc-instant-route-grid-v130 i { height: 8rem; border-radius: 1rem; }
-.rc-instant-route-panel-v130 { height: 18rem; border-radius: 1rem; margin-top: 1rem; }
-@keyframes rcInstantOpenV130 { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-@keyframes rcInstantShimmerV130 { to { background-position: -220% 0; } }
-@media (max-width: 900px) { .rc-instant-route-grid-v130 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-@media (max-width: 560px) { .rc-instant-route-grid-v130 { grid-template-columns: 1fr; } .rc-instant-route-grid-v130 i:nth-child(n+3) { display:none; } }
-</style>
 
 </x-filament-panels::page>
