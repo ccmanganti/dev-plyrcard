@@ -9697,9 +9697,14 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         // to every school card/list option because Livewire serializes the result.
         $count = max(
             (int) ($school['coach_count'] ?? 0),
-            (int) ($school['coaches_count'] ?? 0),
-            $this->coachCountForSchoolSearch($school)
+            (int) ($school['coaches_count'] ?? 0)
         );
+
+        // v131: canonical local school rows already carry an authoritative coach count.
+        // Do not rescan the complete coach catalog once per visible school.
+        if ($count <= 0 && empty($school['_local_memberships_hydrated'])) {
+            $count = $this->coachCountForSchoolSearch($school);
+        }
 
         $school['coach_count'] = $count;
         $school['coaches_count'] = $count;
@@ -9707,15 +9712,34 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         // Read school list membership from the same Business custom-field
         // containers already used for the school logo. The Business record is
         // the source of truth; coach/contact tags are not used for school lists.
-        $membershipKeys = $this->schoolMembershipKeysForRow($school);
+        if (! empty($school['_local_memberships_hydrated'])) {
+            // v131: LocalRecruitingDatabaseService overlaid every player's memberships in
+            // two bulk queries before caching the catalog. Reuse that payload here instead
+            // of issuing school + list + favorite queries for every rendered school.
+            $listKeys = collect($school['list_keys'] ?? $school['lists'] ?? [])
+                ->map(fn ($key): string => strtolower(trim((string) $key)))
+                ->filter(fn (string $key): bool => $key !== '' && $key !== '__favorite__')
+                ->unique()
+                ->values()
+                ->all();
+            $isFavorite = (bool) ($school['is_favorite'] ?? $school['is_favorite_school'] ?? false);
+            $membershipKeys = $isFavorite
+                ? array_values(array_unique([...$listKeys, '__favorite__']))
+                : $listKeys;
+        } else {
+            $membershipKeys = $this->schoolMembershipKeysForRow($school);
+            $listKeys = collect($membershipKeys)
+                ->reject(fn (string $key): bool => $key === '__favorite__')
+                ->values()
+                ->all();
+            $isFavorite = in_array('__favorite__', $membershipKeys, true);
+        }
+
         $school['membership_keys'] = $membershipKeys;
-        $school['list_keys'] = collect($membershipKeys)
-            ->reject(fn (string $key): bool => $key === '__favorite__')
-            ->values()
-            ->all();
-        $school['lists'] = $school['list_keys'];
-        $school['is_favorite'] = in_array('__favorite__', $membershipKeys, true);
-        $school['is_favorite_school'] = $school['is_favorite'];
+        $school['list_keys'] = $listKeys;
+        $school['lists'] = $listKeys;
+        $school['is_favorite'] = $isFavorite;
+        $school['is_favorite_school'] = $isFavorite;
 
         if (blank(data_get($school, 'head_coach.name'))) {
             foreach ($this->coachesForSchoolSearch($school) as $coach) {
@@ -9732,7 +9756,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
             }
         }
 
-        unset($school['coaches'], $school['staff'], $school['coaching_staff'], $school['contacts']);
+        unset($school['coaches'], $school['staff'], $school['coaching_staff'], $school['contacts'], $school['_local_memberships_hydrated']);
 
         return $school;
     }

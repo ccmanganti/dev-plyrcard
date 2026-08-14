@@ -26,21 +26,20 @@ class LocalRecruitingDatabaseService
     ];
 
     /**
-     * v129 local Recruiting Center cache policy.
+     * v131 stable local Recruiting Center cache policy.
      *
      * The canonical School/Coach catalog is shared by all players, while Favorites
      * and My Lists are player-scoped. Mutating methods below explicitly invalidate
      * player caches so local interactions stay immediate without waiting for TTLs.
      */
-    protected int $catalogCacheMinutes = 60;
-    protected int $playerCacheMinutes = 30;
+    protected int $catalogFingerprintMinutes = 10;
 
     protected function catalogFingerprint(): string
     {
-        // Avoid two MAX(updated_at) queries on every Livewire render. A short-lived
-        // fingerprint gives imports at most a 30-second propagation window while
-        // keeping normal tab switches entirely cache-backed.
-        return Cache::remember('recruiting:local-catalog-fingerprint:v129', now()->addSeconds(30), function (): string {
+        // Avoid two MAX(updated_at) queries on every Livewire render. The fingerprint is checked on a modest cadence, while the expensive catalog/player
+        // payloads themselves are version-keyed and persistent. User mutations explicitly
+        // invalidate their player caches, so normal tab switches do not randomly go cold.
+        return Cache::remember('recruiting:local-catalog-fingerprint:v131', now()->addMinutes($this->catalogFingerprintMinutes), function (): string {
             $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
             $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
 
@@ -50,32 +49,32 @@ class LocalRecruitingDatabaseService
 
     protected function baseCatalogCacheKey(): string
     {
-        return 'recruiting:local-school-catalog:v129:' . $this->catalogFingerprint();
+        return 'recruiting:local-school-catalog:v131:' . $this->catalogFingerprint();
     }
 
     protected function coachCatalogCacheKey(): string
     {
-        return 'recruiting:local-coach-catalog:v129:' . $this->catalogFingerprint();
+        return 'recruiting:local-coach-catalog:v131:' . $this->catalogFingerprint();
     }
 
     protected function playerSchoolRowsCacheKey(User $user): string
     {
-        return 'recruiting:player-school-rows:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-school-rows:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
     }
 
     protected function playerListsCacheKey(User $user): string
     {
-        return 'recruiting:player-lists:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-lists:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
     }
 
     protected function playerFavoritesCacheKey(User $user): string
     {
-        return 'recruiting:player-favorites:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-favorites:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
     }
 
     protected function defaultListsMarkerKey(User $user): string
     {
-        return 'recruiting:default-lists-ready:v129:' . $user->getKey();
+        return 'recruiting:default-lists-ready:v131:' . $user->getKey();
     }
 
     public function forgetUserCaches(User $user): void
@@ -87,7 +86,7 @@ class LocalRecruitingDatabaseService
 
     public function forgetCatalogCaches(): void
     {
-        Cache::forget('recruiting:local-catalog-fingerprint:v129');
+        Cache::forget('recruiting:local-catalog-fingerprint:v131');
     }
 
     public function ensureDefaultLists(User $user): void
@@ -111,16 +110,15 @@ class LocalRecruitingDatabaseService
         })->values()->all();
 
         MyList::query()->insertOrIgnore($rows);
-        Cache::put($this->defaultListsMarkerKey($user), true, now()->addHours(12));
+        Cache::forever($this->defaultListsMarkerKey($user), true);
     }
 
     public function lists(User $user): array
     {
         $this->ensureDefaultLists($user);
 
-        return Cache::remember(
+        return Cache::rememberForever(
             $this->playerListsCacheKey($user),
-            now()->addMinutes($this->playerCacheMinutes),
             function () use ($user): array {
                 return MyList::query()
                     ->where('user_id', $user->getKey())
@@ -417,9 +415,8 @@ class LocalRecruitingDatabaseService
 
     public function favoriteSchools(User $user): array
     {
-        return Cache::remember(
+        return Cache::rememberForever(
             $this->playerFavoritesCacheKey($user),
-            now()->addMinutes($this->playerCacheMinutes),
             fn (): array => collect($this->schoolRows($user))
                 ->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))
                 ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
@@ -507,13 +504,11 @@ class LocalRecruitingDatabaseService
 
     public function schoolRows(User $user): array
     {
-        return Cache::remember(
+        return Cache::rememberForever(
             $this->playerSchoolRowsCacheKey($user),
-            now()->addMinutes($this->playerCacheMinutes),
             function () use ($user): array {
-                $baseRows = Cache::remember(
+                $baseRows = Cache::rememberForever(
                     $this->baseCatalogCacheKey(),
-                    now()->addMinutes($this->catalogCacheMinutes),
                     function (): array {
                         return $this->schoolQuery()
                             ->orderBy('schools.name')
@@ -552,6 +547,7 @@ class LocalRecruitingDatabaseService
                     $row['is_favorite_school'] = $favorite;
                     $row['list_keys'] = array_values(array_unique($keys));
                     $row['lists'] = $row['list_keys'];
+                    $row['_local_memberships_hydrated'] = true;
 
                     return $row;
                 })->all();
@@ -561,9 +557,8 @@ class LocalRecruitingDatabaseService
 
     public function coachRows(User $user): array
     {
-        return Cache::remember(
+        return Cache::rememberForever(
             $this->coachCatalogCacheKey(),
-            now()->addMinutes($this->catalogCacheMinutes),
             function (): array {
                 return Coach::query()
                     ->with('school:id,name,logo_url,ghl_business_id')
