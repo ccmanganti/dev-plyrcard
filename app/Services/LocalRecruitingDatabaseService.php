@@ -25,34 +25,117 @@ class LocalRecruitingDatabaseService
         'general_recruiting' => ['name' => 'General Recruiting', 'color' => '#64748b', 'sort_order' => 60],
     ];
 
+    /**
+     * v129 local Recruiting Center cache policy.
+     *
+     * The canonical School/Coach catalog is shared by all players, while Favorites
+     * and My Lists are player-scoped. Mutating methods below explicitly invalidate
+     * player caches so local interactions stay immediate without waiting for TTLs.
+     */
+    protected int $catalogCacheMinutes = 60;
+    protected int $playerCacheMinutes = 30;
+
+    protected function catalogFingerprint(): string
+    {
+        // Avoid two MAX(updated_at) queries on every Livewire render. A short-lived
+        // fingerprint gives imports at most a 30-second propagation window while
+        // keeping normal tab switches entirely cache-backed.
+        return Cache::remember('recruiting:local-catalog-fingerprint:v129', now()->addSeconds(30), function (): string {
+            $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
+            $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
+
+            return sha1($schoolVersion . '|' . $coachVersion);
+        });
+    }
+
+    protected function baseCatalogCacheKey(): string
+    {
+        return 'recruiting:local-school-catalog:v129:' . $this->catalogFingerprint();
+    }
+
+    protected function coachCatalogCacheKey(): string
+    {
+        return 'recruiting:local-coach-catalog:v129:' . $this->catalogFingerprint();
+    }
+
+    protected function playerSchoolRowsCacheKey(User $user): string
+    {
+        return 'recruiting:player-school-rows:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+    }
+
+    protected function playerListsCacheKey(User $user): string
+    {
+        return 'recruiting:player-lists:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+    }
+
+    protected function playerFavoritesCacheKey(User $user): string
+    {
+        return 'recruiting:player-favorites:v129:' . $user->getKey() . ':' . $this->catalogFingerprint();
+    }
+
+    protected function defaultListsMarkerKey(User $user): string
+    {
+        return 'recruiting:default-lists-ready:v129:' . $user->getKey();
+    }
+
+    public function forgetUserCaches(User $user): void
+    {
+        Cache::forget($this->playerSchoolRowsCacheKey($user));
+        Cache::forget($this->playerListsCacheKey($user));
+        Cache::forget($this->playerFavoritesCacheKey($user));
+    }
+
+    public function forgetCatalogCaches(): void
+    {
+        Cache::forget('recruiting:local-catalog-fingerprint:v129');
+    }
+
     public function ensureDefaultLists(User $user): void
     {
-        foreach (self::DEFAULT_LISTS as $slug => $definition) {
-            MyList::query()->firstOrCreate(
-                ['user_id' => $user->getKey(), 'slug' => $slug],
-                [
-                    'name' => $definition['name'],
-                    'color' => $definition['color'],
-                    'is_system' => true,
-                    'sort_order' => $definition['sort_order'],
-                ],
-            );
+        if (Cache::has($this->defaultListsMarkerKey($user))) {
+            return;
         }
+
+        $now = now();
+        $rows = collect(self::DEFAULT_LISTS)->map(function (array $definition, string $slug) use ($user, $now): array {
+            return [
+                'user_id' => $user->getKey(),
+                'name' => $definition['name'],
+                'slug' => $slug,
+                'color' => $definition['color'],
+                'is_system' => true,
+                'sort_order' => $definition['sort_order'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->values()->all();
+
+        MyList::query()->insertOrIgnore($rows);
+        Cache::put($this->defaultListsMarkerKey($user), true, now()->addHours(12));
     }
 
     public function lists(User $user): array
     {
         $this->ensureDefaultLists($user);
 
-        return MyList::query()
-            ->where('user_id', $user->getKey())
-            ->withCount('schools')
-            ->with(['schools' => fn ($query) => $query->withCount('coaches')->with(['coaches:id,school_id,conference,division'])->orderBy('name')])
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (MyList $list): array => $this->listDisplayRow($list))
-            ->all();
+        return Cache::remember(
+            $this->playerListsCacheKey($user),
+            now()->addMinutes($this->playerCacheMinutes),
+            function () use ($user): array {
+                return MyList::query()
+                    ->where('user_id', $user->getKey())
+                    ->withCount('schools')
+                    ->with(['schools' => fn ($query) => $query
+                        ->withCount('coaches')
+                        ->with(['coaches:id,school_id,conference,division'])
+                        ->orderBy('name')])
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get()
+                    ->map(fn (MyList $list): array => $this->listDisplayRow($list))
+                    ->all();
+            },
+        );
     }
 
     public function createList(User $user, string $name, string $color = '#ff6338'): MyList
@@ -73,7 +156,7 @@ class LocalRecruitingDatabaseService
             $slug = $baseSlug . '-' . $suffix++;
         }
 
-        return MyList::query()->create([
+        $list = MyList::query()->create([
             'user_id' => $user->getKey(),
             'name' => $name,
             'slug' => $slug,
@@ -81,6 +164,10 @@ class LocalRecruitingDatabaseService
             'is_system' => false,
             'sort_order' => 100,
         ]);
+
+        $this->forgetUserCaches($user);
+
+        return $list;
     }
 
     public function deleteList(User $user, string $listKey): bool
@@ -89,7 +176,11 @@ class LocalRecruitingDatabaseService
         if (! $list) {
             return false;
         }
-        return (bool) $list->delete();
+        $deleted = (bool) $list->delete();
+        if ($deleted) {
+            $this->forgetUserCaches($user);
+        }
+        return $deleted;
     }
 
     public function resolveList(User $user, string $listKey): ?MyList
@@ -200,6 +291,8 @@ class LocalRecruitingDatabaseService
             }
         });
 
+        $this->forgetUserCaches($user);
+
         return [
             'success' => true,
             'school_id' => $school->getKey(),
@@ -248,6 +341,8 @@ class LocalRecruitingDatabaseService
             ? max(0, $afterCount - $beforeCount)
             : max(0, $beforeCount - $afterCount);
 
+        $this->forgetUserCaches($user);
+
         return [
             'success' => true,
             'updated' => $changed,
@@ -279,6 +374,8 @@ class LocalRecruitingDatabaseService
                 ->where('school_id', $school->getKey())
                 ->delete();
         }
+
+        $this->forgetUserCaches($user);
 
         return ['success' => true, 'favorite' => $favorite, 'school_id' => $school->getKey()];
     }
@@ -312,21 +409,23 @@ class LocalRecruitingDatabaseService
             $deleted += $list->schools()->count();
             $list->schools()->detach();
         }
+        if ($deleted > 0) {
+            $this->forgetUserCaches($user);
+        }
         return $deleted;
     }
 
     public function favoriteSchools(User $user): array
     {
-        $schoolIds = FavoriteSchool::query()
-            ->where('user_id', $user->getKey())
-            ->pluck('school_id');
-
-        return $this->schoolQuery()
-            ->whereIn('schools.id', $schoolIds)
-            ->orderBy('schools.name')
-            ->get()
-            ->map(fn (School $school): array => $this->schoolDisplayRow($user, $school, true))
-            ->all();
+        return Cache::remember(
+            $this->playerFavoritesCacheKey($user),
+            now()->addMinutes($this->playerCacheMinutes),
+            fn (): array => collect($this->schoolRows($user))
+                ->filter(fn (array $school): bool => (bool) ($school['is_favorite'] ?? false))
+                ->sortBy(fn (array $school): string => strtolower((string) ($school['name'] ?? '')))
+                ->values()
+                ->all(),
+        );
     }
 
     /**
@@ -408,91 +507,104 @@ class LocalRecruitingDatabaseService
 
     public function schoolRows(User $user): array
     {
-        // The canonical school catalog is shared by every player. Cache only the
-        // user-neutral School/Coach display rows, then overlay this player's
-        // Favorites/My Lists in two small local queries. This prevents every
-        // checkbox click or drawer open from re-hydrating ~1,000 schools and all
-        // coach relations during the Livewire render.
-        $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
-        $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
-        $catalogKey = 'recruiting:local-school-catalog:v110:' . sha1($schoolVersion . '|' . $coachVersion);
+        return Cache::remember(
+            $this->playerSchoolRowsCacheKey($user),
+            now()->addMinutes($this->playerCacheMinutes),
+            function () use ($user): array {
+                $baseRows = Cache::remember(
+                    $this->baseCatalogCacheKey(),
+                    now()->addMinutes($this->catalogCacheMinutes),
+                    function (): array {
+                        return $this->schoolQuery()
+                            ->orderBy('schools.name')
+                            ->get()
+                            ->map(function (School $school): array {
+                                // Base catalog is user-neutral. Player membership is overlaid below.
+                                $row = $this->schoolDisplayRow(new User(), $school, false);
+                                $row['list_keys'] = [];
+                                $row['lists'] = [];
+                                $row['is_favorite'] = false;
+                                $row['is_favorite_school'] = false;
+                                return $row;
+                            })
+                            ->all();
+                    },
+                );
 
-        $baseRows = Cache::remember($catalogKey, now()->addMinutes(15), function () use ($user): array {
-            return $this->schoolQuery()
-                ->orderBy('schools.name')
-                ->get()
-                ->map(function (School $school) use ($user): array {
-                    $row = $this->schoolDisplayRow($user, $school, false);
-                    $row['list_keys'] = [];
-                    $row['lists'] = [];
+                $favoriteIds = FavoriteSchool::query()
+                    ->where('user_id', $user->getKey())
+                    ->pluck('school_id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->flip();
+
+                $memberships = $this->membershipMapBySchoolId($user);
+
+                return collect($baseRows)->map(function (array $row) use ($favoriteIds, $memberships): array {
+                    $schoolId = (int) ($row['local_id'] ?? $row['school_id'] ?? $row['id'] ?? 0);
+                    $favorite = $schoolId > 0 && $favoriteIds->has($schoolId);
+                    $keys = $memberships[$schoolId] ?? [];
+
+                    if ($favorite && ! in_array(self::FAVORITE_KEY, $keys, true)) {
+                        $keys[] = self::FAVORITE_KEY;
+                    }
+
+                    $row['is_favorite'] = $favorite;
+                    $row['is_favorite_school'] = $favorite;
+                    $row['list_keys'] = array_values(array_unique($keys));
+                    $row['lists'] = $row['list_keys'];
+
                     return $row;
-                })
-                ->all();
-        });
-
-        $favoriteIds = FavoriteSchool::query()
-            ->where('user_id', $user->getKey())
-            ->pluck('school_id')
-            ->map(fn ($id): int => (int) $id)
-            ->flip();
-        $memberships = $this->membershipMapBySchoolId($user);
-
-        return collect($baseRows)->map(function (array $row) use ($favoriteIds, $memberships): array {
-            $schoolId = (int) ($row['local_id'] ?? $row['school_id'] ?? $row['id'] ?? 0);
-            $favorite = $schoolId > 0 && $favoriteIds->has($schoolId);
-            $keys = $memberships[$schoolId] ?? [];
-            if ($favorite && ! in_array(self::FAVORITE_KEY, $keys, true)) {
-                $keys[] = self::FAVORITE_KEY;
-            }
-
-            $row['is_favorite'] = $favorite;
-            $row['is_favorite_school'] = $favorite;
-            $row['list_keys'] = array_values(array_unique($keys));
-            $row['lists'] = $row['list_keys'];
-            return $row;
-        })->all();
+                })->all();
+            },
+        );
     }
 
     public function coachRows(User $user): array
     {
-        return Coach::query()
-            ->with('school:id,name,logo_url,ghl_business_id')
-            ->orderBy('school_id')
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get()
-            ->map(function (Coach $coach): array {
-                $school = $coach->school;
-                return [
-                    'id' => (string) $coach->getKey(),
-                    'local_id' => $coach->getKey(),
-                    'contact_id' => $coach->ghl_contact_id ?? null,
-                    'ghl_contact_id' => $coach->ghl_contact_id ?? null,
-                    'name' => trim((string) ($coach->display_name ?: ($coach->first_name . ' ' . $coach->last_name))),
-                    'first_name' => (string) $coach->first_name,
-                    'last_name' => (string) $coach->last_name,
-                    'email' => (string) $coach->email,
-                    'secondary_email' => $coach->secondary_email,
-                    'phone' => $coach->phone,
-                    'title' => $coach->title,
-                    'sport' => $coach->sport,
-                    'division' => $coach->division,
-                    'conference' => $coach->conference,
-                    'school_id' => $school?->getKey(),
-                    'business_id' => $school?->ghl_business_id,
-                    'company_id' => $school?->ghl_business_id,
-                    'school' => $school?->name,
-                    'school_name' => $school?->name,
-                    'company_name' => $school?->name,
-                    'business_name' => $school?->name,
-                    'logo_url' => $school?->logo_url,
-                    'school_logo_url' => $school?->logo_url,
-                    'business_logo_url' => $school?->logo_url,
-                    'state' => $coach->state,
-                    'city' => $coach->city,
-                ];
-            })
-            ->all();
+        return Cache::remember(
+            $this->coachCatalogCacheKey(),
+            now()->addMinutes($this->catalogCacheMinutes),
+            function (): array {
+                return Coach::query()
+                    ->with('school:id,name,logo_url,ghl_business_id')
+                    ->orderBy('school_id')
+                    ->orderBy('last_name')
+                    ->orderBy('first_name')
+                    ->get()
+                    ->map(function (Coach $coach): array {
+                        $school = $coach->school;
+                        return [
+                            'id' => (string) $coach->getKey(),
+                            'local_id' => $coach->getKey(),
+                            'contact_id' => $coach->ghl_contact_id ?? null,
+                            'ghl_contact_id' => $coach->ghl_contact_id ?? null,
+                            'name' => trim((string) ($coach->display_name ?: ($coach->first_name . ' ' . $coach->last_name))),
+                            'first_name' => (string) $coach->first_name,
+                            'last_name' => (string) $coach->last_name,
+                            'email' => (string) $coach->email,
+                            'secondary_email' => $coach->secondary_email,
+                            'phone' => $coach->phone,
+                            'title' => $coach->title,
+                            'sport' => $coach->sport,
+                            'division' => $coach->division,
+                            'conference' => $coach->conference,
+                            'school_id' => $school?->getKey(),
+                            'business_id' => $school?->ghl_business_id,
+                            'company_id' => $school?->ghl_business_id,
+                            'school' => $school?->name,
+                            'school_name' => $school?->name,
+                            'company_name' => $school?->name,
+                            'business_name' => $school?->name,
+                            'logo_url' => $school?->logo_url,
+                            'school_logo_url' => $school?->logo_url,
+                            'business_logo_url' => $school?->logo_url,
+                            'state' => $coach->state,
+                            'city' => $coach->city,
+                        ];
+                    })
+                    ->all();
+            },
+        );
     }
 
     protected function schoolQuery()

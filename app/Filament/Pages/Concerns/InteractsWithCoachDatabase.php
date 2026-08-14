@@ -54,6 +54,8 @@ trait InteractsWithCoachDatabase
     protected ?array $allSchoolsMemo = null;
     protected ?array $allCoachesMemo = null;
     protected ?array $trackingCoachesMemo = null;
+    protected ?array $discoverClientSchoolsMemo = null;
+    protected ?array $favoriteSchoolsMemo = null;
     protected ?array $dashboardTrackingStatsMemo = null;
     protected ?array $dashboardMetricsMemo = null;
 
@@ -2490,6 +2492,8 @@ trait InteractsWithCoachDatabase
 
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
+            $this->discoverClientSchoolsMemo = null;
+            $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
@@ -9736,12 +9740,16 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
 
     public function getFavoriteSchoolsProperty(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
+        if (is_array($this->favoriteSchoolsMemo)) {
+            return $this->favoriteSchoolsMemo;
         }
 
-        return $this->filterSchoolsForSearch(
+        $user = Auth::user();
+        if (! $user) {
+            return $this->favoriteSchoolsMemo = [];
+        }
+
+        return $this->favoriteSchoolsMemo = $this->filterSchoolsForSearch(
             collect(app(LocalRecruitingDatabaseService::class)->favoriteSchools($user)),
             $this->favoriteSchoolSearch !== '' ? $this->favoriteSchoolSearch : $this->search,
         )->take((int) config('coach-database-sync.ui.school_row_cap', 96))->values()->all();
@@ -12344,58 +12352,22 @@ HTML;
      */
     public function getDiscoverClientSchoolsProperty(): array
     {
-        $user = Auth::user();
-
-        if (! $user) {
-            return [];
+        if (is_array($this->discoverClientSchoolsMemo)) {
+            return $this->discoverClientSchoolsMemo;
         }
 
-        // v110: Discover must keep the complete minimal LOCAL roster attached to
-        // each school. allSchools() intentionally hydrates lightweight display rows
-        // and strips coaches for legacy server-rendered views, which made the
-        // browser-local Discover drawer show "No local coaches found" even when the
-        // card correctly showed a non-zero local coach count.
-        $localRows = collect(app(LocalRecruitingDatabaseService::class)->schoolRows($user));
+        $user = Auth::user();
+        if (! $user) {
+            return $this->discoverClientSchoolsMemo = [];
+        }
 
-        // GHL contributes only cached/statistical overlays. It never replaces the
-        // canonical local School/Coach identity or the player's local memberships.
-        $snapshot = $this->activeSnapshotRows();
-        $remoteRows = collect($snapshot['schools'] ?? [])
-            ->merge($snapshot['top_schools'] ?? [])
-            ->filter(fn ($row): bool => is_array($row));
-        $remoteByName = $remoteRows->groupBy(
-            fn (array $row): string => $this->normalizeSchoolMatchKey((string) ($row['name'] ?? $row['school_name'] ?? $row['company_name'] ?? ''))
+        // v129: this browser interaction catalog is intentionally LOCAL-only.
+        // Dashboard cards can pass their already-loaded GHL stats into the global
+        // drawer as the source row. Discover/Favorites/My Lists do not need to read
+        // or group the legacy multi-megabyte snapshot just to render local schools.
+        return $this->discoverClientSchoolsMemo = array_values(
+            app(LocalRecruitingDatabaseService::class)->schoolRows($user)
         );
-
-        return $localRows->map(function (array $school) use ($remoteByName): array {
-            $key = $this->normalizeSchoolMatchKey((string) ($school['name'] ?? ''));
-            $remote = $key !== ''
-                ? collect($remoteByName->get($key, []))
-                    ->sortByDesc(fn (array $row): int => (int) ($row['engagement_score'] ?? 0))
-                    ->first()
-                : null;
-
-            if (is_array($remote)) {
-                foreach ([
-                    'profile_views',
-                    'profile_view_unique_contacts',
-                    'profile_view_school_clicks',
-                    'highlight_views',
-                    'trigger_link_clicks',
-                    'replies',
-                    'lead_score',
-                    'engagement_score',
-                ] as $metric) {
-                    if (array_key_exists($metric, $remote)) {
-                        $school[$metric] = $remote[$metric];
-                    }
-                }
-            }
-
-            // IMPORTANT: do not call hydrateSchoolRowForDisplay() here. That helper
-            // is intentionally lightweight and removes the full `coaches` array.
-            return $school;
-        })->values()->all();
     }
 
     public function getSelectedCoachProperty(): ?array
@@ -12754,6 +12726,7 @@ HTML;
             return ['success' => false, 'error' => 'The list could not be found.'];
         }
         $list->forceFill(['name' => $newLabel])->save();
+        app(LocalRecruitingDatabaseService::class)->forgetUserCaches($user);
         $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         return ['success' => true, 'label' => $newLabel];
     }
@@ -13585,6 +13558,8 @@ HTML;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
         $this->trackingCoachesMemo = null;
+        $this->discoverClientSchoolsMemo = null;
+        $this->favoriteSchoolsMemo = null;
     }
 
     protected function allSchools(): array
@@ -13667,6 +13642,8 @@ HTML;
         $this->schoolCoachIndexMemo = null;
         $this->allSchoolsMemo = null;
         $this->allCoachesMemo = null;
+        $this->discoverClientSchoolsMemo = null;
+        $this->favoriteSchoolsMemo = null;
 
         // v104: snapshot hydration may update GHL stats, but it must never seed
         // the Discover Schools catalog. Canonical School/Coach rows remain local.
