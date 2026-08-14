@@ -2,7 +2,6 @@
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
         x-data
-        x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
         x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
     <style>
         :root {
@@ -14290,8 +14289,8 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 
 <script data-navigate-once>
 (() => {
-    if (window.__plyrRcPersistentNavInstalled) return;
-    window.__plyrRcPersistentNavInstalled = true;
+    if (window.__plyrRcInstantSpaInstalled) return;
+    window.__plyrRcInstantSpaInstalled = true;
 
     const pathToSection = (pathname) => {
         const path = String(pathname || '').replace(/\/+$/, '') || '/';
@@ -14310,6 +14309,20 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         return null;
     };
 
+    const labels = {
+        dashboard: 'Dashboard',
+        schools: 'Discover Schools',
+        coaches: 'Coaches',
+        favorites: 'Favorites',
+        lists: 'My Lists',
+        campaigns: 'Templates',
+        compose: 'Compose Email',
+        conversations: 'Inbox',
+        schedule: 'My Schedule',
+        settings: 'Settings',
+        support: 'Support',
+    };
+
     const sectionFromAnchor = (anchor) => {
         try {
             const url = new URL(anchor.href, window.location.href);
@@ -14319,8 +14332,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             return null;
         }
     };
-
-    const currentRoot = () => document.querySelector('.rc-livewire-root');
 
     const setSidebarActive = (section) => {
         document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
@@ -14332,55 +14343,60 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         });
     };
 
-    const switchSection = (section, href = null, replace = false) => {
-        const root = currentRoot();
-        if (!root || !section) return false;
-
-        // Update navigation feedback before the Livewire request even starts.
-        root.dataset.rcCurrentSection = section;
-        setSidebarActive(section);
-
-        if (href) {
-            const target = new URL(href, window.location.href);
-            const historyFn = replace ? 'replaceState' : 'pushState';
-            window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
-        }
-
-        window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
-        return true;
+    const removeCover = () => {
+        document.getElementById('rc-instant-route-cover-v130')?.remove();
+        document.documentElement.classList.remove('rc-route-switching-v130');
     };
 
+    const showCover = (section) => {
+        removeCover();
+        const root = document.querySelector('.rc-livewire-root');
+        if (!root) return;
+
+        document.documentElement.classList.add('rc-route-switching-v130');
+        setSidebarActive(section);
+
+        const cover = document.createElement('div');
+        cover.id = 'rc-instant-route-cover-v130';
+        cover.className = 'rc-instant-route-cover-v130';
+        cover.innerHTML = `
+            <div class="rc-instant-route-head-v130">
+                <div>
+                    <strong>${labels[section] || 'Recruiting Center'}</strong>
+                    <span>Loading saved data...</span>
+                </div>
+            </div>
+            <div class="rc-instant-route-grid-v130">
+                <i></i><i></i><i></i><i></i>
+            </div>
+            <div class="rc-instant-route-panel-v130"></div>
+        `;
+        root.prepend(cover);
+    };
+
+    // IMPORTANT: do not prevent the click. Filament SPA / wire:navigate must own
+    // navigation so the old Livewire component snapshot is not posted as part of
+    // every Recruiting Center tab switch. We only provide immediate visual feedback.
     document.addEventListener('click', (event) => {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
         const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
         if (!anchor) return;
-
         const section = sectionFromAnchor(anchor);
-        if (!section || !currentRoot()) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-        switchSection(section, anchor.href, false);
+        if (!section || !document.querySelector('.rc-livewire-root')) return;
+        showCover(section);
     }, true);
 
-    window.addEventListener('popstate', () => {
+    document.addEventListener('livewire:navigated', () => {
+        removeCover();
         const section = pathToSection(window.location.pathname);
-        if (section && currentRoot()) switchSection(section, null, true);
+        if (section) setSidebarActive(section);
     });
 
-    document.addEventListener('livewire:init', () => {
-        if (window.Livewire?.on) {
-            Livewire.on('rc-section-switched', ({ section } = {}) => {
-                if (section) setSidebarActive(section);
-            });
-            Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
-                if (section === 'conversations') {
-                    window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
-                }
-            });
-        }
-    }, { once: true });
+    window.addEventListener('pageshow', removeCover);
+    window.addEventListener('popstate', () => {
+        const section = pathToSection(window.location.pathname);
+        if (section) showCover(section);
+    });
 
     const initial = pathToSection(window.location.pathname);
     if (initial) setSidebarActive(initial);
@@ -14393,9 +14409,43 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     background: rgba(255, 99, 56, .14) !important;
     color: #ff6338 !important;
 }
-.fi-sidebar a.rc-fast-active svg {
-    color: #ff6338 !important;
+.fi-sidebar a.rc-fast-active svg { color: #ff6338 !important; }
+.rc-livewire-root { position: relative; min-height: 20rem; }
+.rc-instant-route-cover-v130 {
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    min-height: min(72vh, 52rem);
+    padding: .35rem 0 1rem;
+    background: var(--rc-surface, #fff);
+    color: var(--rc-text, #111827);
+    animation: rcInstantOpenV130 .09s ease-out both;
 }
+.rc-instant-route-head-v130 {
+    min-height: 5.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.rc-instant-route-head-v130 div { display: grid; gap: .3rem; }
+.rc-instant-route-head-v130 strong { font-size: 1.45rem; letter-spacing: -.03em; }
+.rc-instant-route-head-v130 span { color: var(--rc-muted, #6b7280); font-size: .82rem; }
+.rc-instant-route-grid-v130 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
+.rc-instant-route-grid-v130 i,
+.rc-instant-route-panel-v130 {
+    display: block;
+    border: 1px solid var(--rc-border, #e5e7eb);
+    background: linear-gradient(90deg, rgba(148,163,184,.08), rgba(148,163,184,.16), rgba(148,163,184,.08));
+    background-size: 220% 100%;
+    animation: rcInstantShimmerV130 1s linear infinite;
+}
+.rc-instant-route-grid-v130 i { height: 8rem; border-radius: 1rem; }
+.rc-instant-route-panel-v130 { height: 18rem; border-radius: 1rem; margin-top: 1rem; }
+@keyframes rcInstantOpenV130 { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes rcInstantShimmerV130 { to { background-position: -220% 0; } }
+@media (max-width: 900px) { .rc-instant-route-grid-v130 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 560px) { .rc-instant-route-grid-v130 { grid-template-columns: 1fr; } .rc-instant-route-grid-v130 i:nth-child(n+3) { display:none; } }
 </style>
 
 </x-filament-panels::page>
