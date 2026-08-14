@@ -1,5 +1,9 @@
 <x-filament-panels::page>
-    <div class="rc-livewire-root">
+    <div class="rc-livewire-root"
+        data-rc-current-section="{{ $section }}"
+        x-data
+        x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
+        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -7399,27 +7403,55 @@
                     ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
                 ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
 
+                // v126: The viewer table is coach/school activity only. Collapse repeated
+                // snapshots for the same coach and rank by the highest tracked view count.
+                // Platform summary rows are intentionally not mixed into this table.
                 $activityProfileRows = $dashboardRecentActivity
-                    ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
-                    ->take(8)
-                    ->values()
-                    ->map(function ($activity, $index) use ($formatActivityTimeLabel) {
+                    ->filter(fn ($activity) => is_array($activity) && str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
+                    ->map(function (array $activity) use ($formatActivityTimeLabel) {
                         $title = (string) ($activity['title'] ?? 'Coach viewed profile');
+                        $copy = trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity';
                         $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-                        $time = $activity['time'] ?? null;
+                        $time = $activity['time'] ?? $activity['created_at'] ?? null;
+                        $views = max(1, (int) ($activity['views'] ?? $activity['count'] ?? 0));
+
+                        // Older activity snapshots sometimes keep the rolled-up count only
+                        // in the copy, e.g. "16 tracked profile views".
+                        if (preg_match('/(\d[\d,]*)\s+tracked\s+profile\s+views?/i', $copy, $matches)) {
+                            $views = max($views, (int) str_replace(',', '', $matches[1]));
+                        }
+
+                        $schoolId = trim((string) ($activity['school_id'] ?? $activity['school_business_id'] ?? $activity['business_id'] ?? ''));
+                        $coachKey = trim((string) ($activity['coach_id'] ?? $activity['coach_contact_id'] ?? $activity['contact_id'] ?? ''));
+                        $identityKey = $coachKey !== ''
+                            ? 'coach:' . $coachKey
+                            : 'viewer:' . $schoolId . '|' . strtolower(trim($title));
 
                         return [
+                            'identity_key' => $identityKey,
+                            'school_id' => $schoolId,
                             'title' => $title,
-                            'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity',
-                            'views' => (int) ($activity['views'] ?? $activity['count'] ?? 1),
+                            'copy' => $copy,
+                            'views' => $views,
                             'type' => (string) ($activity['platform'] ?? $activity['source'] ?? 'Profile'),
                             'logo' => $activity['logo'] ?? null,
                             'initials' => strtoupper($initials ?: 'PV'),
+                            'time' => $time,
                             'time_label' => $formatActivityTimeLabel($time),
                         ];
-                    });
+                    })
+                    ->groupBy('identity_key')
+                    ->map(function ($rows) {
+                        // Each cached activity row may itself already be rolled up, so use
+                        // the largest count rather than summing snapshots and double-counting.
+                        return collect($rows)->sortByDesc(fn ($row) => (int) ($row['views'] ?? 0))->first();
+                    })
+                    ->filter()
+                    ->sortByDesc(fn ($row) => (int) ($row['views'] ?? 0))
+                    ->take(30)
+                    ->values();
 
-                $profileViewRows = $activityProfileRows->merge($profileBreakdownRows)->values()->map(function ($row, $index) {
+                $profileViewRows = $activityProfileRows->values()->map(function ($row, $index) {
                     return array_merge($row, ['rank' => $index + 1]);
                 });
             @endphp
@@ -7500,7 +7532,15 @@
                     <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
-                            <button type="button" class="rc-detail-row-v2">
+                            <button
+                                type="button"
+                                class="rc-detail-row-v2"
+                                @if(! empty($profileRow['school_id']))
+                                    x-on:click.stop="dashboardDetail = ''; $nextTick(() => openGlobalSchool(@js((string) $profileRow['school_id'])))"
+                                @else
+                                    disabled
+                                @endif
+                            >
                                 <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
                                 <span class="rc-detail-avatar-v2">
                                     @if(! empty($profileRow['logo']))
@@ -7690,6 +7730,11 @@
                         ->take(30)
                         ->values();
                 }
+
+                // v126: Highest social-click totals always rank first, regardless of source.
+                $coachEngagementRows = $coachEngagementRows
+                    ->sortByDesc(fn ($row) => (int) ($row['clicks'] ?? $row['count'] ?? 0))
+                    ->values();
             @endphp
 
             <div class="rc-stats-drawer-backdrop"
@@ -7759,7 +7804,12 @@
                                     <button type="button"
                                         class="rc-detail-row-v2 is-engagement"
                                         data-engagement-row
-                                        data-platform="{{ $platformKey }}">
+                                        data-platform="{{ $platformKey }}"
+                                        @if(! empty($engagementRow['school_id']))
+                                            x-on:click.stop="dashboardDetail = ''; $nextTick(() => openGlobalSchool(@js((string) $engagementRow['school_id'])))"
+                                        @else
+                                            disabled
+                                        @endif>
                                         <span class="rc-detail-platform-icon-v2 {{ $platformClass }}">
                                             @if(isset($socialIconUrls[$platformKey]))
                                                 <img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls[$platformKey] }}" alt="{{ $platformLabel }}" referrerpolicy="no-referrer">
@@ -8871,10 +8921,10 @@
                 <div class="rc-discover-bulk-v36" x-cloak x-show="discoverSelectedIds.length > 0" x-transition.opacity wire:key="discover-bulk-selection-bar">
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36"><span x-text="Number(discoverSelectedIds.length).toLocaleString()"></span> selected</span>
-                            <!-- <button type="button" class="rc-discover-bulk-email-v36" x-on:click="if (discoverSelectedIds.length) $wire.emailSchoolIds([...discoverSelectedIds])">
+                            <button type="button" class="rc-discover-bulk-email-v36" x-on:click="if (discoverSelectedIds.length) $wire.emailSchoolIds([...discoverSelectedIds])">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                 <span>Email</span>
-                            </button> -->
+                            </button>
                             <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
                                 <button type="button" x-on:click="open = ! open">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -14235,5 +14285,117 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     }
 </style>
 @endif
+
+
+
+<script data-navigate-once>
+(() => {
+    if (window.__plyrRcPersistentNavInstalled) return;
+    window.__plyrRcPersistentNavInstalled = true;
+
+    const pathToSection = (pathname) => {
+        const path = String(pathname || '').replace(/\/+$/, '') || '/';
+        if (!path.startsWith('/admin/coach-database')) return null;
+        if (path === '/admin/coach-database') return 'dashboard';
+        if (/\/(schools)$/.test(path)) return 'schools';
+        if (/\/(coaches)$/.test(path)) return 'coaches';
+        if (/\/(favorites)$/.test(path)) return 'favorites';
+        if (/\/(lists)$/.test(path)) return 'lists';
+        if (/\/(templates|campaigns)$/.test(path)) return 'campaigns';
+        if (/\/(compose-email|compose)$/.test(path)) return 'compose';
+        if (/\/(conversations|inbox)$/.test(path)) return 'conversations';
+        if (/\/(schedule|my-schedule)$/.test(path)) return 'schedule';
+        if (/\/(settings)$/.test(path)) return 'settings';
+        if (/\/(support)$/.test(path)) return 'support';
+        return null;
+    };
+
+    const sectionFromAnchor = (anchor) => {
+        try {
+            const url = new URL(anchor.href, window.location.href);
+            if (url.origin !== window.location.origin) return null;
+            return pathToSection(url.pathname);
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const currentRoot = () => document.querySelector('.rc-livewire-root');
+
+    const setSidebarActive = (section) => {
+        document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
+            const candidate = sectionFromAnchor(anchor);
+            const active = candidate === section;
+            anchor.classList.toggle('rc-fast-active', active);
+            if (active) anchor.setAttribute('aria-current', 'page');
+            else if (anchor.getAttribute('aria-current') === 'page') anchor.removeAttribute('aria-current');
+        });
+    };
+
+    const switchSection = (section, href = null, replace = false) => {
+        const root = currentRoot();
+        if (!root || !section) return false;
+
+        // Update navigation feedback before the Livewire request even starts.
+        root.dataset.rcCurrentSection = section;
+        setSidebarActive(section);
+
+        if (href) {
+            const target = new URL(href, window.location.href);
+            const historyFn = replace ? 'replaceState' : 'pushState';
+            window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
+        }
+
+        window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
+        return true;
+    };
+
+    document.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
+        if (!anchor) return;
+
+        const section = sectionFromAnchor(anchor);
+        if (!section || !currentRoot()) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        switchSection(section, anchor.href, false);
+    }, true);
+
+    window.addEventListener('popstate', () => {
+        const section = pathToSection(window.location.pathname);
+        if (section && currentRoot()) switchSection(section, null, true);
+    });
+
+    document.addEventListener('livewire:init', () => {
+        if (window.Livewire?.on) {
+            Livewire.on('rc-section-switched', ({ section } = {}) => {
+                if (section) setSidebarActive(section);
+            });
+            Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
+                if (section === 'conversations') {
+                    window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
+                }
+            });
+        }
+    }, { once: true });
+
+    const initial = pathToSection(window.location.pathname);
+    if (initial) setSidebarActive(initial);
+})();
+</script>
+
+<style data-navigate-once>
+.fi-sidebar a.rc-fast-active,
+.fi-sidebar a.rc-fast-active:hover {
+    background: rgba(255, 99, 56, .14) !important;
+    color: #ff6338 !important;
+}
+.fi-sidebar a.rc-fast-active svg {
+    color: #ff6338 !important;
+}
+</style>
 
 </x-filament-panels::page>

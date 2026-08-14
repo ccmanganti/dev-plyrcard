@@ -373,6 +373,118 @@ trait InteractsWithCoachDatabase
     }
 
     /**
+     * v128: Switch Recruiting Center tabs inside the already-mounted Livewire page.
+     *
+     * Sidebar navigation dispatches this method instead of loading another Filament
+     * page. Only the state required by the destination section is initialized.
+     */
+    public function switchRecruitingSection(string $section): void
+    {
+        $allowedSections = [
+            'dashboard', 'schools', 'coaches', 'favorites', 'lists',
+            'conversations', 'campaigns', 'compose', 'support',
+            'schedule', 'settings', 'profile',
+        ];
+
+        $section = strtolower(trim($section));
+
+        if (! in_array($section, $allowedSections, true)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        if ($this->isFreeRoleRestrictedUser($user) && ! $this->canFreeRoleAccessCoachDatabaseSection($section)) {
+            $this->redirect($this->freeRoleDefaultProfileUrl(), navigate: true);
+            return;
+        }
+
+        if ($section === 'profile') {
+            $this->redirect($this->freeRoleDefaultProfileUrl(), navigate: true);
+            return;
+        }
+
+        if ($this->section === $section) {
+            return;
+        }
+
+        // Clear only transient UI state that should never leak between tabs. Keep
+        // local catalogs, lists, templates and inbox caches warm in this component.
+        $this->search = '';
+        $this->coachSearch = '';
+        $this->favoriteSchoolSearch = '';
+        $this->listSchoolSearch = '';
+        $this->composeSchoolSearch = '';
+        $this->conversationSearch = '';
+        $this->divisionFilter = '';
+        $this->conferenceFilter = '';
+        $this->selectedSchoolId = null;
+        $this->showComposePreview = false;
+        $this->composeTemplateMenuOpen = false;
+        $this->composeChooseCoachesOpen = false;
+        $this->composeSchoolPickerOpen = false;
+
+        $this->section = $section;
+
+        if ($section === 'dashboard') {
+            // Hydrate the dashboard snapshot only when Dashboard is actually opened.
+            if ($this->dashboardMetricsMemo === null && empty($this->stats) && empty($this->topSchools)) {
+                $cached = Cache::get($this->activeCacheKey());
+                if (is_array($cached)) {
+                    $this->hydrateFromSnapshot($cached);
+                }
+            }
+
+            if (empty($this->dashboardRecentActivity)) {
+                $this->loadDashboardActivity();
+            }
+        }
+
+        if (in_array($section, ['schools', 'favorites', 'lists', 'compose'], true) && empty($this->lists)) {
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
+        }
+
+        if ($section === 'conversations') {
+            $this->hydrateCachedInboxConversations();
+
+            if (! $this->selectedConversationId && ! empty($this->conversations)) {
+                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+            }
+
+            if ($this->selectedConversationId && empty($this->messages)) {
+                $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+            }
+
+            // The browser asks for the remote refresh after this render. Do not
+            // block the section switch on GHL.
+            $this->inboxInitialLoadCompleted = false;
+            $this->dispatch('rc-fast-section-ready', section: 'conversations');
+        }
+
+        if (in_array($section, ['campaigns', 'compose'], true) && empty($this->templates)) {
+            $this->loadTemplates();
+        }
+
+        if ($section === 'compose') {
+            $this->campaignTargetMode = $this->campaignTargetMode ?: 'list';
+            $this->ensureComposeBodyHasFooter();
+        }
+
+        if ($section === 'settings') {
+            $this->loadNotificationSettings();
+        }
+
+        if ($section === 'schedule') {
+            $this->showScheduleForm = false;
+        }
+
+        $this->dispatch('rc-section-switched', section: $section);
+    }
+
+    /**
      * Occasionally reconcile the local sent-email total against GHL.
      *
      * The dashboard mount calls this method. A cache marker prevents the
