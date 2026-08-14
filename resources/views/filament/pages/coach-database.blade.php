@@ -11941,7 +11941,6 @@ CSS;
 
         {{-- v113: legacy section-specific server drawer removed. The Discover drawer above
              is the single global drawer for Dashboard, Discover, Favorites, and My Lists. --}}
-    </div>
 
 <script data-navigate-once>
 (() => {
@@ -14448,5 +14447,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 @endif
 
 
+
+    </div>
 
 </x-filament-panels::page>
