@@ -8871,10 +8871,10 @@
                 <div class="rc-discover-bulk-v36" x-cloak x-show="discoverSelectedIds.length > 0" x-transition.opacity wire:key="discover-bulk-selection-bar">
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36"><span x-text="Number(discoverSelectedIds.length).toLocaleString()"></span> selected</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" x-on:click="if (discoverSelectedIds.length) $wire.emailSchoolIds([...discoverSelectedIds])">
+                            <!-- <button type="button" class="rc-discover-bulk-email-v36" x-on:click="if (discoverSelectedIds.length) $wire.emailSchoolIds([...discoverSelectedIds])">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
                                 <span>Email</span>
-                            </button>
+                            </button> -->
                             <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
                                 <button type="button" x-on:click="open = ! open">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>

@@ -37,6 +37,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // v127: Keep the Filament shell mounted between Recruiting Center pages.
+            // Hover prefetching starts the next page request before the click, which makes
+            // sidebar navigation feel much closer to a single-page application.
+            ->spa(hasPrefetching: true)
             ->homeUrl(function (): string {
                 $user = auth()->user();
 

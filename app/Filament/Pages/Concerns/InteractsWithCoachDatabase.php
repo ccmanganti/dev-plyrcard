@@ -200,7 +200,7 @@ trait InteractsWithCoachDatabase
     public string $composeTemplateSaveName = '';
 
 
-    protected function refreshRecruitingAccountReadiness($user = null): void
+    protected function refreshRecruitingAccountReadiness($user = null, bool $refreshUser = false): void
     {
         $user ??= Auth::user();
 
@@ -210,13 +210,16 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Always evaluate the actual database columns. This prevents a model
-        // accessor or application-level GHL fallback from making an account
-        // look activated while its own fields are still empty.
-        try {
-            $user->refresh();
-        } catch (\Throwable) {
-            // Continue with the currently hydrated model when refresh is unavailable.
+        // v127: Auth already gives us a fresh User model on a normal page request.
+        // Avoid an extra SELECT on every Recruiting Center tab navigation. The explicit
+        // readiness checker can still force a refresh when credentials may have changed
+        // while the current Livewire component is already mounted.
+        if ($refreshUser) {
+            try {
+                $user->refresh();
+            } catch (\Throwable) {
+                // Continue with the currently hydrated model when refresh is unavailable.
+            }
         }
 
         $rawApiKey = method_exists($user, 'getRawOriginal')
@@ -241,7 +244,7 @@ trait InteractsWithCoachDatabase
     {
         $wasReady = $this->isRecruitingAccountReady;
 
-        $this->refreshRecruitingAccountReadiness();
+        $this->refreshRecruitingAccountReadiness(refreshUser: true);
 
         if (! $wasReady && $this->isRecruitingAccountReady) {
             $this->dispatch('rc-recruiting-account-ready');
@@ -251,19 +254,18 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
 
+        // v127: Do not re-query the authenticated user on every tab navigation.
         $this->refreshRecruitingAccountReadiness($user);
 
         if (! $user) {
             return;
         }
 
-        // Do not initialize Recruiting Center services or cached account data
-        // until this user's own GHL credentials have been assigned.
         if (! $this->isRecruitingAccountReady) {
             $this->allowed = false;
             $this->locked = true;
@@ -279,39 +281,44 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        // getInitialState() is local/permission-only. Keep it for access gating, but do not
+        // hydrate the legacy multi-megabyte Recruiting Center snapshot on every page.
         $state = $coachDatabaseService->getInitialState($user);
         $this->allowed = (bool) ($state['allowed'] ?? false);
         $this->locked = (bool) ($state['locked'] ?? false);
         $this->reason = $state['reason'] ?? null;
         $this->error = $state['error'] ?? null;
 
-        $cached = Cache::get($this->activeCacheKey());
-        if (is_array($cached)) {
-            $this->hydrateFromSnapshot($cached);
-        } else {
-            $this->storeSnapshot($this->emptySnapshot($state));
-            $this->hydrateFromSnapshot(Cache::get($this->activeCacheKey(), []));
+        if (! $this->allowed || $this->locked) {
+            return;
         }
 
-        // Hydrate the last successful remote UI payload first. The page paints
-        // immediately with stale-while-revalidate data, then wire:init refreshes
-        // only the active section in a second request.
-        $this->hydrateDeferredUiCache();
-        $this->refreshRecruitingSyncStatus();
-
-        // Discover Schools, Favorites, and My Lists are database-backed.
-        // Do not start the legacy GHL contact-tag synchronization for these pages.
-
+        // Dashboard is the only section that needs the legacy cached stats/top-school
+        // snapshot during first paint. Local pages query their canonical local tables and
+        // remote sections hydrate only their own small caches below.
         if ($this->section === 'dashboard') {
+            $cached = Cache::get($this->activeCacheKey());
+
+            if (is_array($cached)) {
+                $this->hydrateFromSnapshot($cached);
+            } else {
+                $this->storeSnapshot($this->emptySnapshot($state));
+                $this->hydrateFromSnapshot(Cache::get($this->activeCacheKey(), []));
+            }
+
+            $this->refreshRecruitingSyncStatus();
             $this->loadDashboardActivity();
+        }
+
+        // These sections need the player's local lists for the global school drawer,
+        // Compose list targeting, or the My Lists page itself. Do one local load only.
+        if (in_array($this->section, ['schools', 'favorites', 'lists', 'compose'], true)) {
+            $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
         if ($this->section === 'conversations') {
             $this->hydrateCachedInboxConversations();
 
-            // v122: Make the Inbox useful on first paint. If cached conversations
-            // exist, select the newest row immediately and hydrate its cached
-            // messages before any GHL request starts.
             if (! $this->selectedConversationId && ! empty($this->conversations)) {
                 $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
             }
