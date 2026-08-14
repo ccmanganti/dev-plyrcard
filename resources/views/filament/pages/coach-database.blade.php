@@ -12103,8 +12103,6 @@ CSS;
 @media (max-width: 560px) { .rc-instant-route-grid-v130 { grid-template-columns: 1fr; } .rc-instant-route-grid-v130 i:nth-child(n+3) { display:none; } }
 </style>
 
-    </div>
-
     <style>
         /* v100: keep logo fallback initials from ever becoming a full-page overlay.
            This is intentionally non-invasive: it does not touch data loading, school loading,
