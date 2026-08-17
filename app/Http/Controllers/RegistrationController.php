@@ -174,7 +174,6 @@ class RegistrationController extends PublicPlayerIntakeController
                 $isPaid ? 'required' : 'nullable',
                 'string',
                 'max:50',
-                Rule::unique('users', 'phone'),
             ],
             'password' => [
                 'required',
@@ -217,20 +216,11 @@ class RegistrationController extends PublicPlayerIntakeController
         if ($isPaid) {
             $rules = array_merge($rules, [
                 'requested_domain' => ['required', 'string', 'max:255'],
-                'target_divisions' => ['required', 'array', 'min:1'],
-                'target_divisions.*' => ['string', 'max:100'],
-                'target_regions' => ['required', 'array', 'min:1'],
-                'target_regions.*' => ['string', 'max:100'],
-                'target_schools' => ['nullable', 'string', 'max:2000'],
-                'highlight_film_url' => ['nullable', 'url', 'max:1000'],
-                'recruiting_goal' => ['nullable', 'string', 'max:2000'],
 
                 'billing_name' => ['required', 'string', 'max:255'],
                 'billing_email' => ['required', 'email:rfc', 'max:255'],
                 'billing_phone' => ['required', 'string', 'max:50'],
-                'billing_company' => ['nullable', 'string', 'max:255'],
                 'billing_address_1' => ['required', 'string', 'max:255'],
-                'billing_address_2' => ['nullable', 'string', 'max:255'],
                 'billing_city' => ['required', 'string', 'max:255'],
                 'billing_state' => ['required', 'string', 'max:255'],
                 'billing_postal_code' => ['required', 'string', 'max:30'],
@@ -385,11 +375,6 @@ class RegistrationController extends PublicPlayerIntakeController
                 'league_name' => $validated['league_name'],
                 'club_name' => $validated['club_name'],
                 'age_group' => $validated['age_group'],
-                'target_divisions' => $validated['target_divisions'] ?? [],
-                'target_regions' => $validated['target_regions'] ?? [],
-                'target_schools' => $validated['target_schools'] ?? null,
-                'highlight_film_url' => $validated['highlight_film_url'] ?? null,
-                'recruiting_goal' => $validated['recruiting_goal'] ?? null,
                 'domain_rdap_verified' => $isPaid ? (bool) ($domainLookup['verified'] ?? false) : false,
                 'domain_rdap_status' => $isPaid ? ($domainLookup['status'] ?? null) : null,
                 'domain_lookup_source' => $isPaid ? 'rdap' : null,
@@ -398,6 +383,8 @@ class RegistrationController extends PublicPlayerIntakeController
 
             $recurring = (int) ($plan['recurring_amount_cents'] ?? 0);
             $setup = (int) ($plan['setup_fee_cents'] ?? 0);
+            $chargeFirstMonthUpfront = (bool) ($plan['charge_first_month_upfront'] ?? true);
+            $initialAmount = $setup + ($chargeFirstMonthUpfront ? $recurring : 0);
 
             $billing = BillingInformation::create([
                 'user_id' => $user->id,
@@ -406,9 +393,7 @@ class RegistrationController extends PublicPlayerIntakeController
                     : trim($validated['first_name'] . ' ' . $validated['last_name']),
                 'billing_email' => $isPaid ? $validated['billing_email'] : $validated['email'],
                 'billing_phone' => $isPaid ? $validated['billing_phone'] : ($validated['phone'] ?? null),
-                'billing_company' => $validated['billing_company'] ?? null,
                 'billing_address_1' => $validated['billing_address_1'] ?? null,
-                'billing_address_2' => $validated['billing_address_2'] ?? null,
                 'billing_city' => $validated['billing_city'] ?? null,
                 'billing_state' => $validated['billing_state'] ?? ($validated['state'] ?? null),
                 'billing_postal_code' => $validated['billing_postal_code'] ?? null,
@@ -418,7 +403,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'currency' => 'USD',
                 'recurring_amount_cents' => $recurring,
                 'setup_fee_cents' => $setup,
-                'initial_amount_cents' => $recurring + $setup,
+                'initial_amount_cents' => $initialAmount,
                 'payment_status' => $isPaid ? 'pending' : 'not_required',
                 'subscription_status' => $isPaid ? 'pending' : 'free',
                 'payment_provider' => $isPaid ? 'ghl_invoice' : null,
@@ -538,8 +523,8 @@ class RegistrationController extends PublicPlayerIntakeController
             'redirect_url' => url('/admin/my-profile'),
             'message' => $isPaid
                 ? ($billing->payment_status === 'invoice_error'
-                    ? 'Your PLYRCARD account was created, but the secure HighLevel invoice could not be sent automatically. Your paid access remains locked until billing is completed.'
-                    : 'Your PLYRCARD account was created. Complete the secure HighLevel invoice sent to your billing contact to activate paid access.')
+                    ? 'Your PLYRCARD account was created, but payment could not be started. Please try again from your account.'
+                    : 'Your PLYRCARD account was created. Complete payment to activate your plan.')
                 : 'Your free PLYRCARD account is ready.',
         ]);
     }
@@ -605,6 +590,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'label' => 'My Journey',
                 'recurring_amount_cents' => 4900,
                 'setup_fee_cents' => 0,
+                'charge_first_month_upfront' => true,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
             ],
@@ -612,6 +598,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'label' => 'Amplify',
                 'recurring_amount_cents' => 4900,
                 'setup_fee_cents' => 50000,
+                'charge_first_month_upfront' => false,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
             ],
@@ -619,6 +606,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'label' => 'Free',
                 'recurring_amount_cents' => 0,
                 'setup_fee_cents' => 0,
+                'charge_first_month_upfront' => false,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'Free',
             ],

@@ -545,6 +545,13 @@ trait InteractsWithCoachDatabase
             $this->stats['emails_sent'] = $count;
             $this->stats['email_sent_count'] = $count;
 
+            // The Dashboard computed property may already have been evaluated during
+            // first paint. Force it to rebuild from the freshly refreshed User model
+            // in this same Livewire request instead of showing the old memoized count.
+            $this->dashboardMetricsMemo = null;
+
+            $this->dispatch('rc-email-sent-count-updated', count: $count);
+
             Log::info('Automatic GHL sent-email dashboard sync completed.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
@@ -8337,6 +8344,102 @@ protected function campaignRecipientCoaches(): Collection
         return $schoolName !== '' ? md5(strtolower($schoolName)) : '';
     }
 
+    /**
+     * Convert a tracking/activity row's external school identity into the canonical
+     * local schools.id used by the global school drawer. Tracking rows commonly carry
+     * GHL business IDs, while the drawer catalog is keyed by the local School model ID.
+     */
+    protected function withCanonicalDashboardSchool(array $row): array
+    {
+        $schools = collect($this->allSchools())->filter(fn ($school): bool => is_array($school))->values();
+        $coaches = collect($this->allCoaches())->filter(fn ($coach): bool => is_array($coach))->values();
+
+        $candidateIds = collect([
+            $row['school_id'] ?? null,
+            $row['school_business_id'] ?? null,
+            $row['business_id'] ?? null,
+            $row['company_id'] ?? null,
+            $row['ghl_business_id'] ?? null,
+        ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
+
+        $coachIds = collect([
+            $row['coach_id'] ?? null,
+            $row['coach_contact_id'] ?? null,
+            $row['contact_id'] ?? null,
+        ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique()->values();
+
+        $coachEmail = strtolower(trim((string) ($row['coach_email'] ?? $row['email'] ?? '')));
+        $coach = $coaches->first(function (array $coach) use ($coachIds, $coachEmail): bool {
+            $ids = collect([
+                $coach['id'] ?? null,
+                $coach['contact_id'] ?? null,
+                $coach['ghl_contact_id'] ?? null,
+            ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter();
+
+            if ($coachIds->isNotEmpty() && $ids->intersect($coachIds)->isNotEmpty()) {
+                return true;
+            }
+
+            return $coachEmail !== ''
+                && strtolower(trim((string) ($coach['email'] ?? $coach['contact_email'] ?? ''))) === $coachEmail;
+        });
+
+        $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? $row['company_name'] ?? ''));
+
+        if (is_array($coach)) {
+            $candidateIds = $candidateIds->merge(collect([
+                $coach['school_id'] ?? null,
+                $coach['business_id'] ?? null,
+                $coach['company_id'] ?? null,
+                $coach['ghl_business_id'] ?? null,
+            ])->map(fn ($value): string => trim((string) $value))->filter())->unique()->values();
+
+            if ($schoolName === '') {
+                $schoolName = trim((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? ''));
+            }
+        }
+
+        $normalizedSchoolName = $this->normalizeSchoolMatchKey($schoolName);
+
+        $school = $schools->first(function (array $school) use ($candidateIds, $normalizedSchoolName): bool {
+            $ids = collect([
+                $school['id'] ?? null,
+                $school['school_id'] ?? null,
+                $school['business_id'] ?? null,
+                $school['company_id'] ?? null,
+                $school['ghl_business_id'] ?? null,
+            ])->map(fn ($value): string => trim((string) $value))->filter();
+
+            if ($candidateIds->isNotEmpty() && $ids->intersect($candidateIds)->isNotEmpty()) {
+                return true;
+            }
+
+            return $normalizedSchoolName !== ''
+                && $this->normalizeSchoolMatchKey((string) ($school['name'] ?? $school['school_name'] ?? $school['company_name'] ?? '')) === $normalizedSchoolName;
+        });
+
+        if (! is_array($school)) {
+            return $row;
+        }
+
+        $localId = trim((string) ($school['id'] ?? $school['school_id'] ?? ''));
+        $businessId = trim((string) ($school['business_id'] ?? $school['company_id'] ?? $school['ghl_business_id'] ?? ''));
+        $name = trim((string) ($school['name'] ?? $school['school_name'] ?? $schoolName));
+
+        if ($localId !== '') {
+            $row['school_id'] = $localId;
+        }
+        if ($businessId !== '') {
+            $row['school_business_id'] = $businessId;
+        }
+        if ($name !== '') {
+            $row['school'] = $name;
+            $row['school_name'] = $name;
+        }
+
+        return $row;
+    }
+
     public function getProfileViewRowsProperty(): array
     {
         $user = Auth::user();
@@ -8344,7 +8447,11 @@ protected function campaignRecipientCoaches(): Collection
         if ($user) {
             $rows = app(LocalRecruitingTrackingService::class)->profileViewRows($user);
             if (! empty($rows)) {
-                return $rows;
+                return collect($rows)
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => $this->withCanonicalDashboardSchool($row))
+                    ->values()
+                    ->all();
             }
         }
 
@@ -8630,7 +8737,11 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         if ($user) {
             $rows = app(LocalRecruitingTrackingService::class)->coachEngagementRows($user);
             if (! empty($rows)) {
-                return $rows;
+                return collect($rows)
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => $this->withCanonicalDashboardSchool($row))
+                    ->values()
+                    ->all();
             }
         }
 
@@ -8974,6 +9085,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         return $baseRows
             ->map(fn (array $item): ?array => $this->normalizeDashboardActivityRow($item))
             ->filter()
+            ->map(fn (array $item): array => $this->withCanonicalDashboardSchool($item))
             ->unique(fn (array $item): string => $this->dashboardActivityIdentity($item))
             ->sortByDesc(fn (array $item): int => (int) ($item['_timestamp'] ?? 0))
             ->take(8)
@@ -11596,7 +11708,30 @@ HTML;
             return;
         }
 
-        $this->redirect($this->pageUrl('compose') . '?school=' . urlencode($schoolId), navigate: true);
+        // v132: Recruiting Center uses a persistent Livewire shell. Redirecting to
+        // ?school= only updates the URL; mount() does not run again, so Compose can
+        // open with an empty school field. Switch sections in-place and select the
+        // canonical local school during the same Livewire request.
+        if ($this->section !== 'compose') {
+            $this->switchRecruitingSection('compose');
+        }
+
+        $result = $this->selectComposeSchool($schoolId);
+
+        if (! ($result['success'] ?? false)) {
+            Notification::make()
+                ->title('Compose Email')
+                ->body((string) ($result['error'] ?? 'The selected school could not be attached to Compose Email.'))
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $this->dispatch(
+            'rc-compose-school-selected',
+            schoolId: (string) ($result['school_id'] ?? $schoolId),
+            schoolName: (string) ($result['school_name'] ?? ''),
+        );
     }
 
     public function composeEmailCoach(string $coachId): void

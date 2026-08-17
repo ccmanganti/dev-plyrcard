@@ -7382,7 +7382,7 @@
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
+                $dashboardRecentActivity = collect($this->getDashboardRecentActivityProperty())->values();
 
                 $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
@@ -7406,8 +7406,14 @@
                 // v126: The viewer table is coach/school activity only. Collapse repeated
                 // snapshots for the same coach and rank by the highest tracked view count.
                 // Platform summary rows are intentionally not mixed into this table.
-                $activityProfileRows = $dashboardRecentActivity
-                    ->filter(fn ($activity) => is_array($activity) && str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
+                $profileActivitySource = collect($this->profileViewRows ?? [])->filter(fn ($activity) => is_array($activity))->values();
+                if ($profileActivitySource->isEmpty()) {
+                    $profileActivitySource = $dashboardRecentActivity
+                        ->filter(fn ($activity) => is_array($activity) && str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
+                        ->values();
+                }
+
+                $activityProfileRows = $profileActivitySource
                     ->map(function (array $activity) use ($formatActivityTimeLabel) {
                         $title = (string) ($activity['title'] ?? 'Coach viewed profile');
                         $copy = trim(strip_tags((string) ($activity['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity';
@@ -8921,10 +8927,6 @@
                 <div class="rc-discover-bulk-v36" x-cloak x-show="discoverSelectedIds.length > 0" x-transition.opacity wire:key="discover-bulk-selection-bar">
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36"><span x-text="Number(discoverSelectedIds.length).toLocaleString()"></span> selected</span>
-                            <button type="button" class="rc-discover-bulk-email-v36" x-on:click="if (discoverSelectedIds.length) $wire.emailSchoolIds([...discoverSelectedIds])">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                                <span>Email</span>
-                            </button>
                             <div class="rc-discover-bulk-list-v36" x-data="{ open: false }" x-on:click.outside="open = false">
                                 <button type="button" x-on:click="open = ! open">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -9810,49 +9812,63 @@ CSS;
                     let observer = null;
                     let observedStream = null;
                     let loadingOlderMessages = false;
+                    let forceLatestAfterConversationChange = true;
+                    let olderAnchor = null;
+                    let scrollListener = null;
 
                     const getStream = () => document.querySelector('[data-rc-inbox-message-stream]');
+                    const isNearBottom = (stream, threshold = 120) => {
+                        if (!stream) return false;
+                        return (stream.scrollHeight - stream.scrollTop - stream.clientHeight) <= threshold;
+                    };
 
-                    const moveToLatest = () => {
+                    const moveToLatest = (force = false) => {
                         if (loadingOlderMessages) return false;
 
                         const stream = getStream();
                         if (!stream) return false;
+                        if (!force && !forceLatestAfterConversationChange && !isNearBottom(stream)) return false;
 
-                        // scrollTo is more reliable than assigning scrollTop while a
-                        // Livewire morph is still settling.
                         stream.scrollTo({ top: stream.scrollHeight, behavior: 'auto' });
+                        forceLatestAfterConversationChange = false;
                         return true;
                     };
 
-                    const keepOlderMessagesAtTop = () => {
-                        const run = ++activeRun;
-                        const delays = [0, 16, 50, 120, 250, 500, 900];
+                    const restoreOlderAnchor = () => {
+                        if (!loadingOlderMessages || !olderAnchor) return;
 
+                        const run = ++activeRun;
+                        const delays = [0, 16, 50, 120, 250, 500];
                         delays.forEach((delay, index) => {
                             window.setTimeout(() => {
-                                if (run !== activeRun) return;
-
+                                if (run !== activeRun || !olderAnchor) return;
                                 const stream = getStream();
-                                if (stream) stream.scrollTo({ top: 0, behavior: 'auto' });
+                                if (!stream) return;
+
+                                const addedHeight = Math.max(0, stream.scrollHeight - olderAnchor.height);
+                                stream.scrollTop = Math.max(0, olderAnchor.top + addedHeight);
 
                                 if (index === delays.length - 1) {
                                     loadingOlderMessages = false;
+                                    olderAnchor = null;
                                 }
                             }, delay);
                         });
                     };
 
-                    const showLatestMessage = () => {
+                    const showLatestMessage = (force = false) => {
                         if (loadingOlderMessages) return;
 
-                        const run = ++activeRun;
-                        const delays = [0, 16, 50, 120, 250, 500, 900, 1400];
+                        const stream = getStream();
+                        if (!stream) return;
+                        if (!force && !forceLatestAfterConversationChange && !isNearBottom(stream)) return;
 
+                        const run = ++activeRun;
+                        const delays = force ? [0, 16, 50, 120, 250, 500, 900] : [0, 50, 180];
                         delays.forEach((delay) => {
                             window.setTimeout(() => {
                                 if (run !== activeRun || loadingOlderMessages) return;
-                                moveToLatest();
+                                moveToLatest(force);
                             }, delay);
                         });
                     };
@@ -9863,29 +9879,45 @@ CSS;
                         if (observedStream === stream) return;
 
                         observer?.disconnect();
+                        if (observedStream && scrollListener) {
+                            observedStream.removeEventListener('scroll', scrollListener);
+                        }
+
                         observedStream = stream;
+                        scrollListener = () => {
+                            // Once the user intentionally scrolls away from the newest
+                            // message, never fight them by snapping back to the bottom.
+                            if (!loadingOlderMessages && !isNearBottom(stream)) {
+                                forceLatestAfterConversationChange = false;
+                                activeRun += 1;
+                            }
+                        };
+                        stream.addEventListener('scroll', scrollListener, { passive: true });
+
                         observer = new MutationObserver(() => {
                             if (loadingOlderMessages) {
-                                keepOlderMessagesAtTop();
+                                restoreOlderAnchor();
                                 return;
                             }
 
-                            showLatestMessage();
+                            if (forceLatestAfterConversationChange || isNearBottom(stream)) {
+                                showLatestMessage(forceLatestAfterConversationChange);
+                            }
                         });
                         observer.observe(stream, { childList:true, subtree:true });
 
-                        // Shadow-root email content and images can increase the final
-                        // message height without mutating the outer Livewire tree.
                         stream.addEventListener('load', () => {
                             if (loadingOlderMessages) {
-                                const current = getStream();
-                                if (current) current.scrollTop = 0;
+                                restoreOlderAnchor();
                                 return;
                             }
 
-                            showLatestMessage();
+                            if (forceLatestAfterConversationChange || isNearBottom(stream)) {
+                                showLatestMessage(forceLatestAfterConversationChange);
+                            }
                         }, true);
-                        showLatestMessage();
+
+                        if (forceLatestAfterConversationChange) showLatestMessage(true);
                     };
 
                     document.addEventListener('click', (event) => {
@@ -9895,30 +9927,32 @@ CSS;
                         const loadOlderButton = clickedElement?.getAttribute('wire:click') === 'loadOlderConversationMessages'
                             ? clickedElement
                             : null;
-                        if (loadOlderButton) {
-                            loadingOlderMessages = true;
-                            activeRun += 1;
 
+                        if (loadOlderButton) {
                             const stream = getStream();
-                            if (stream) stream.scrollTop = 0;
+                            loadingOlderMessages = true;
+                            forceLatestAfterConversationChange = false;
+                            activeRun += 1;
+                            olderAnchor = stream ? { height: stream.scrollHeight, top: stream.scrollTop } : null;
                             return;
                         }
 
                         if (!event.target?.closest?.('[data-rc-inbox-conversation-trigger]')) return;
                         loadingOlderMessages = false;
+                        olderAnchor = null;
+                        forceLatestAfterConversationChange = true;
                         activeRun += 1;
 
-                        // Wait for the selected conversation request to finish, then place
-                        // the viewport at the newest message.
                         window.setTimeout(() => {
                             observeStream();
-                            showLatestMessage();
+                            showLatestMessage(true);
                         }, 0);
                     }, true);
 
                     const boot = () => {
+                        forceLatestAfterConversationChange = true;
                         observeStream();
-                        showLatestMessage();
+                        showLatestMessage(true);
                     };
 
                     document.addEventListener('DOMContentLoaded', boot, { once:true });
@@ -9930,11 +9964,9 @@ CSS;
                             if (el?.matches?.('[data-rc-inbox-message-stream]')
                                 || el?.querySelector?.('[data-rc-inbox-message-stream]')) {
                                 observeStream();
-
-                                if (loadingOlderMessages) {
-                                    keepOlderMessagesAtTop();
-                                } else {
-                                    showLatestMessage();
+                                if (loadingOlderMessages) restoreOlderAnchor();
+                                else if (forceLatestAfterConversationChange || isNearBottom(getStream())) {
+                                    showLatestMessage(forceLatestAfterConversationChange);
                                 }
                             }
                         });
@@ -9943,18 +9975,14 @@ CSS;
                             succeed(() => {
                                 queueMicrotask(() => {
                                     observeStream();
-
-                                    if (loadingOlderMessages) {
-                                        keepOlderMessagesAtTop();
-                                    } else {
-                                        showLatestMessage();
+                                    if (loadingOlderMessages) restoreOlderAnchor();
+                                    else if (forceLatestAfterConversationChange || isNearBottom(getStream())) {
+                                        showLatestMessage(forceLatestAfterConversationChange);
                                     }
                                 });
                             });
                         });
                     }
-
-                    if (document.readyState !== 'loading') boot();
                 })();
             </script>
 

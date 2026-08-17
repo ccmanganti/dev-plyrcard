@@ -101,23 +101,29 @@ class GhlBillingService
 
         $send = $this->sendInvoice($invoiceId, $locationId, $token);
 
+        $paymentUrlPaths = [
+            'paymentUrl',
+            'payment_url',
+            'invoiceUrl',
+            'invoice_url',
+            'url',
+            'data.paymentUrl',
+            'data.invoiceUrl',
+            'invoice.paymentUrl',
+            'invoice.invoiceUrl',
+        ];
+
+        $sendBody = is_array($send['response'] ?? null) ? $send['response'] : [];
+        $paymentUrl = $this->firstString($body, $paymentUrlPaths)
+            ?: $this->firstString($sendBody, $paymentUrlPaths);
+
         return [
             'success' => true,
             'invoice_id' => $invoiceId,
             'invoice_sent' => (bool) ($send['success'] ?? false),
             'invoice_response' => $body,
             'send_response' => $send,
-            'payment_url' => $this->firstString($body, [
-                'paymentUrl',
-                'payment_url',
-                'invoiceUrl',
-                'invoice_url',
-                'url',
-                'data.paymentUrl',
-                'data.invoiceUrl',
-                'invoice.paymentUrl',
-                'invoice.invoiceUrl',
-            ]),
+            'payment_url' => $paymentUrl,
         ];
     }
 
@@ -300,7 +306,12 @@ class GhlBillingService
         $currency = strtoupper((string) ($billing->currency ?: 'USD'));
         $items = [];
 
-        if (($billing->recurring_amount_cents ?? 0) > 0) {
+        $chargeFirstMonthUpfront = (bool) config(
+            'plyrcard-registration.plans.' . $billing->plan_key . '.charge_first_month_upfront',
+            true,
+        );
+
+        if ($chargeFirstMonthUpfront && ($billing->recurring_amount_cents ?? 0) > 0) {
             $items[] = [
                 'name' => $this->planLabel($billing->plan_key) . ' - First Month',
                 'description' => 'First month of PLYRCARD membership',
@@ -344,18 +355,12 @@ class GhlBillingService
             'customFields' => [],
             'address' => array_filter([
                 'addressLine1' => $billing->billing_address_1,
-                'addressLine2' => $billing->billing_address_2,
                 'city' => $billing->billing_city,
                 'state' => $billing->billing_state,
                 'countryCode' => $this->countryCode($billing->billing_country),
                 'postalCode' => $billing->billing_postal_code,
             ], fn ($value) => filled($value)),
         ];
-
-        if (filled($billing->billing_company)) {
-            $details['companyName'] = $billing->billing_company;
-        }
-
         return $details;
     }
 

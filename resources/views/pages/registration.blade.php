@@ -4,7 +4,9 @@
     $planLabel = $plan['label'] ?? 'Free';
     $recurringDollars = number_format(((int) ($plan['recurring_amount_cents'] ?? 0)) / 100, 2);
     $setupDollars = number_format(((int) ($plan['setup_fee_cents'] ?? 0)) / 100, 2);
-    $initialDollars = number_format((((int) ($plan['recurring_amount_cents'] ?? 0)) + ((int) ($plan['setup_fee_cents'] ?? 0))) / 100, 2);
+    $chargeFirstMonthUpfront = (bool) ($plan['charge_first_month_upfront'] ?? true);
+    $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0)) + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0);
+    $initialDollars = number_format($initialCents / 100, 2);
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -49,8 +51,11 @@
       <div class="v">{{ $planLabel }}</div>
       <div class="pz">
         @if($isPaid)
-          <b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b> / month
-          @if($isAmplify) &middot; ${{ rtrim(rtrim($setupDollars, '0'), '.') }} setup @endif
+          @if($isAmplify)
+            <b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b> setup &middot; then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month
+          @else
+            <b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b> / month
+          @endif
         @else
           <b>$0</b> &middot; no card required
         @endif
@@ -62,8 +67,7 @@
       <li class="on"><span class="dot">1</span><span class="lb">Claim your domain</span></li>
       <li><span class="dot">2</span><span class="lb">Your account</span></li>
       <li><span class="dot">3</span><span class="lb">Athlete profile</span></li>
-      <li><span class="dot">4</span><span class="lb">Recruiting goals</span></li>
-      <li><span class="dot">5</span><span class="lb">Confirm &amp; billing</span></li>
+      <li><span class="dot">4</span><span class="lb">Billing &amp; payment</span></li>
     @else
       <li class="on"><span class="dot">1</span><span class="lb">Your account</span></li>
       <li><span class="dot">2</span><span class="lb">Athlete basics</span></li>
@@ -71,7 +75,7 @@
       <li><span class="dot">4</span><span class="lb">Claim your link</span></li>
     @endif
   </ol>
-  <div class="rail-foot">Already a member? <a href="/login">Log in</a><br>{{ $isPaid ? 'Paid access unlocks only after HighLevel confirms payment.' : 'Takes about 2 minutes. Photos and highlights can come later.' }}</div>
+  <div class="rail-foot">Already a member? <a href="/login">Log in</a><br>{{ $isPaid ? 'Complete payment to activate your selected plan.' : 'Takes about 2 minutes. Photos and highlights can come later.' }}</div>
 </aside>
 <main class="stage"><div class="card">
 <div class="form-alert" id="formAlert" role="alert"></div>
@@ -87,15 +91,15 @@
 
 @if($isPaid)
 <section class="panel active" data-step="1">
-  <div class="eyebrow">Step 01 of 05</div><h1>Claim your name</h1>
-  <p class="sub">Search a real domain for your PLYRSITE. PLYRCARD checks the domain registry through RDAP before you can select it, then confirms final registrar purchasability during provisioning.</p>
+  <div class="eyebrow">Step 01 of 04</div><h1>Claim your name</h1>
+  <p class="sub">Search for the domain you want to use for your PLYRSITE and choose an available option.</p>
   <div style="margin-top:28px">
     <div class="browser"><div class="tl"><i></i><i></i><i></i></div><div class="bar"><span class="txt" id="urlbar"><b>yourname.com</b></span></div></div>
     <div class="browser-body" id="bbody">
       <div class="dsearch"><input id="dq" type="text" placeholder="Your name or exact domain (e.g. alexsmith.com)" autocomplete="off"><button type="button" id="dgo">Search</button></div>
-      <div class="loading-line" id="dload"><i></i><span>Checking PLYRCARD reservations and the live RDAP registry</span></div>
+      <div class="loading-line" id="dload"><i></i><span>Checking domain availability</span></div>
       <div class="results" id="dres"></div>
-      <div class="own"><b>Live domain check powered by RDAP.</b> “Available” means the registry returned no current registration record. A registrar can still mark a domain reserved, premium, or otherwise unavailable to purchase, so final purchasability is confirmed during provisioning.</div>
+      <div class="own"><b>Choose the domain you want.</b> Final registration is completed after your order is confirmed.</div>
     </div>
   </div>
   <div class="msg" id="dmsg" style="margin-top:12px">Choose an available domain request to continue.</div>
@@ -103,7 +107,7 @@
 </section>
 
 <section class="panel" data-step="2">
-  <div class="eyebrow">Step 02 of 05</div><h1>Your account</h1><p class="sub">This is the login you'll use for your recruiting dashboard.</p>
+  <div class="eyebrow">Step 02 of 04</div><h1>Your account</h1><p class="sub">This is the login you'll use for your recruiting dashboard.</p>
   <div class="fields">
     <div class="row"><div class="f"><label>First name</label><input name="first_name" id="fn" type="text" autocomplete="given-name"><div class="msg">Enter your first name.</div></div><div class="f"><label>Last name</label><input name="last_name" id="ln" type="text" autocomplete="family-name"><div class="msg">Enter your last name.</div></div></div>
     <div class="f"><label>Email</label><input name="email" id="em" type="email" autocomplete="email" placeholder="you@email.com"><div class="msg">Enter a valid email.</div><div class="hint">Receipts, payment notices, and account alerts go here.</div></div>
@@ -115,48 +119,35 @@
 </section>
 
 <section class="panel" data-step="3">
-  <div class="eyebrow">Step 03 of 05</div><h1>Athlete profile</h1><p class="sub">Enough to build the foundation of your card before onboarding.</p>
+  <div class="eyebrow">Step 03 of 04</div><h1>Athlete profile</h1><p class="sub">Enough to build the foundation of your card before onboarding.</p>
   @include('pages.registration-athlete-fields', ['paid' => true])
   <div class="nav"><button type="button" class="btn gho" data-go="2">Back</button><button type="button" class="btn pri" data-go="4">Continue</button></div>
 </section>
 
 <section class="panel" data-step="4">
-  <div class="eyebrow">Step 04 of 05</div><h1>Where you're aiming</h1><p class="sub">These answers shape the coach lists and outreach support waiting in your account.</p>
-  <div class="fields">
-    <div class="f"><span class="legend">Target divisions <span class="opt">— pick all that apply</span></span><div class="chips multi" data-name="target_divisions"><button type="button" class="chip">NCAA DI</button><button type="button" class="chip">NCAA DII</button><button type="button" class="chip">NCAA DIII</button><button type="button" class="chip">NAIA</button><button type="button" class="chip">NJCAA</button><button type="button" class="chip">Still deciding</button></div><div class="msg">Pick at least one.</div></div>
-    <div class="f"><span class="legend">Regions you'd go <span class="opt">— pick all that apply</span></span><div class="chips multi" data-name="target_regions"><button type="button" class="chip">Northeast</button><button type="button" class="chip">Mid-Atlantic</button><button type="button" class="chip">Southeast</button><button type="button" class="chip">Midwest</button><button type="button" class="chip">South</button><button type="button" class="chip">West</button><button type="button" class="chip">Anywhere</button></div><div class="msg">Pick at least one.</div></div>
-    <div class="f"><label>Programs on your list <span class="opt">— optional</span></label><textarea name="target_schools" placeholder="Seattle U, VCU, Pitt, Georgetown"></textarea></div>
-    <div class="f"><label>Highlight film link <span class="opt">— optional</span></label><input name="highlight_film_url" type="url" placeholder="https://..."></div>
-    <div class="f"><label>What would make this worth it? <span class="opt">— optional</span></label><textarea name="recruiting_goal" placeholder="Get on the radar of programs that fit my academic and athletic goals."></textarea></div>
-  </div>
-  <div class="nav"><button type="button" class="btn gho" data-go="3">Back</button><button type="button" class="btn pri" data-go="5">Continue</button></div>
-</section>
-
-<section class="panel" data-step="5">
-  <div class="eyebrow">Step 05 of 05</div><h1>Confirm and start</h1><p class="sub">Your account is created first. HighLevel then sends the secure invoice to the billing contact below. Paid access unlocks only after payment is confirmed.</p>
+  <div class="eyebrow">Step 04 of 04</div><h1>Billing &amp; payment</h1><p class="sub">Review your plan and enter the billing details for your order.</p>
   <div class="order"><div class="order-h">{{ $planLabel }}</div><ul>
     <li><span><span id="ord-dom">yourname.com</span> domain request</span><b>Included</b></li>
     <li><span>PLYRSITE profile and recruiting tools</span><b>Included</b></li>
-    @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time production setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
-  </ul><div class="total"><div class="l">Due on initial invoice<small>Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month</small></div><div class="r">${{ $initialDollars }}</div></div></div>
+    @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
+  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month starting next billing cycle @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
   <div class="fields" style="margin-top:24px">
-    <div class="divider"><span>Billing contact</span></div>
+    <div class="divider"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name"><div class="msg">Enter billing name.</div></div>
     <div class="row"><div class="f"><label>Billing email</label><input name="billing_email" id="billingEmail" type="email" autocomplete="email"><div class="msg">Enter billing email.</div></div><div class="f"><label>Billing phone</label><input name="billing_phone" id="billingPhone" type="tel" autocomplete="tel"><div class="msg">Enter billing phone.</div></div></div>
-    <div class="f"><label>Company <span class="opt">— optional</span></label><input name="billing_company" type="text" autocomplete="organization"></div>
     <div class="f"><label>Address</label><input name="billing_address_1" id="ba1" type="text" autocomplete="address-line1"><div class="msg">Enter billing address.</div></div>
-    <div class="f"><label>Address line 2 <span class="opt">— optional</span></label><input name="billing_address_2" type="text" autocomplete="address-line2"></div>
     <div class="row3"><div class="f"><label>City</label><input name="billing_city" id="bcity" type="text" autocomplete="address-level2"><div class="msg">Enter city.</div></div><div class="f"><label>State</label><input name="billing_state" id="bstate" type="text" autocomplete="address-level1"><div class="msg">Enter state.</div></div><div class="f"><label>ZIP</label><input name="billing_postal_code" id="bzip" class="mono" type="text" autocomplete="postal-code"><div class="msg">Enter ZIP.</div></div></div>
     <div class="f"><label>Country</label><select name="billing_country" id="bcountry"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="AU">Australia</option><option value="PH">Philippines</option></select></div>
-    <div class="pay-note"><span><strong>No card number is collected by this Laravel form.</strong> HighLevel sends the secure payment experience after account creation, so PLYRCARD never receives or stores your PAN or CVC.</span></div>
-    <div class="f"><label class="check"><input type="checkbox" name="terms" id="terms" value="1"><span>I agree to the Terms, Privacy Policy, and applicable domain terms. Paid access activates after the initial invoice is paid.</span></label><div class="msg">Please accept the terms.</div></div>
+    <div class="divider"><span>Card information</span></div>
+    <div class="payment-next"><div class="payment-next-icon">••••</div><div><b>Continue to card details</b><span>Your card details are entered on the payment screen after you continue.</span></div></div>
+    <div class="f"><label class="check"><input type="checkbox" name="terms" id="terms" value="1"><span>I agree to the Terms, Privacy Policy, and applicable domain terms.</span></label><div class="msg">Please accept the terms.</div></div>
   </div>
-  <div class="nav"><button type="button" class="btn gho" data-go="4">Back</button><button type="button" class="btn pri" id="submitRegistration">Create account &amp; send secure invoice</button></div>
+  <div class="nav"><button type="button" class="btn gho" data-go="3">Back</button><button type="button" class="btn pri" id="submitRegistration">Create account &amp; continue to payment</button></div>
 </section>
 
-<section class="panel" data-step="6">
-  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Complete your payment</h1><div class="live-dom" id="final-dom">yourname.com</div><div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Waiting for HighLevel payment confirmation</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Your secure invoice is being sent to the billing contact.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Open secure payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
-  <div class="next"><h3>What happens next</h3><ol><li><div><b>Pay the secure HighLevel invoice</b>Your paid features remain locked until the verified InvoicePaid event reaches PLYRCARD.</div></li><li><div><b>Paid access activates automatically</b>My Journey features unlock after payment; Amplify uses the same My Journey app entitlement plus its Amplify billing/service tier.</div></li><li><div><b>Domain provisioning begins</b>The requested domain is only treated as registered after final registrar verification.</div></li><li><div><b>Your monthly billing schedule starts after payment</b>The first future invoice is scheduled one month after the initial payment clears.</div></li></ol></div>
+<section class="panel" data-step="5">
+  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1><div class="live-dom" id="final-dom">yourname.com</div><div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Continue to payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
+  <div class="next"><h3>What happens next</h3><ol><li><div><b>Complete your payment</b>Your selected paid plan activates after payment is completed.</div></li><li><div><b>Your domain moves forward</b>Your selected domain proceeds to the registration stage.</div></li><li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
 </section>
 @else
 <section class="panel active" data-step="1">
@@ -187,7 +178,7 @@
 'use strict';
 const PAID=@json($isPaid), PLAN=@json($planKey), POS=@json($sportPositions), HANDLE_URL=@json(route('marketing.registration.check-handle')), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status'));
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=PAID?5:4, successStep=PAID?6:5;
+const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=PAID?4:4, successStep=PAID?5:5;
 let cur=1, division='', pickedPositions=[], chosenDomain='', handleAvailable=false, handleTimer=null, statusPoll=null;
 function showAlert(message){alertBox.textContent=message||'Please review the form and try again.';alertBox.classList.add('show');window.scrollTo({top:0,behavior:'smooth'})}
 function clearAlert(){alertBox.classList.remove('show');alertBox.textContent=''}
@@ -199,17 +190,14 @@ if($('#pw'))$('#pw').addEventListener('input',pwState);if($('#peek'))$('#peek').
 function goto(n){$$('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));$$('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});if($('#mbar'))$('#mbar').style.width=(Math.min(n,maxStep)/maxStep*100)+'%';cur=n;window.scrollTo({top:0,behavior:'smooth'})}
 function validateAccount(){let e=[];e.push(bad($('#fn'),!$('#fn')?.value.trim()));e.push(bad($('#ln'),!$('#ln')?.value.trim()));e.push(bad($('#em'),!mail($('#em')?.value||'')));if(PAID)e.push(bad($('#ph'),($('#ph')?.value||'').replace(/\D/g,'').length<7));e.push(bad($('#pw'),!pwState()));if($('#minor')?.checked){e.push(bad($('#gn'),!$('#gn')?.value.trim()));e.push(bad($('#ge'),!mail($('#ge')?.value||'')))}return !e.includes(true)}
 function validateAthlete(){let e=[];e.push(bad($('#sport'),!$('#sport')?.value));const dm=$('#divisionWrap .msg');if(dm)dm.classList.toggle('show',!division);e.push(!division);e.push(bad($('#grad'),!$('#grad')?.value));const pm=$('#positionWrap .msg');if(pm)pm.classList.toggle('show',pickedPositions.length===0);e.push(pickedPositions.length===0);e.push(bad($('#hs'),!$('#hs')?.value.trim()));e.push(bad($('#st'),!$('#st')?.value));if(PAID||cur===3){e.push(bad($('#club'),!$('#club')?.value.trim()));e.push(bad($('#league'),!$('#league')?.value.trim()));e.push(bad($('#age'),!$('#age')?.value));if(PAID){e.push(bad($('#cn'),!$('#cn')?.value.trim()));e.push(bad($('#ce'),!mail($('#ce')?.value||'')))}}return !e.includes(true)}
-function validateGoals(){let ok=true;$$('.multi').forEach(group=>{const any=group.querySelector('.chip[aria-pressed="true"]');const m=group.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!any);if(!any)ok=false});return ok}
 function validateBilling(){let e=[];['billingName','billingEmail','billingPhone','ba1','bcity','bstate','bzip'].forEach(id=>{const el=$('#'+id);let invalid=!el?.value.trim();if(id==='billingEmail')invalid=!mail(el?.value||'');e.push(bad(el,invalid))});const terms=$('#terms');const m=terms?.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!terms?.checked);e.push(!terms?.checked);return !e.includes(true)}
-function validate(step){if(PAID){if(step===1){const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}if(step===2)return validateAccount();if(step===3)return validateAthlete();if(step===4)return validateGoals();if(step===5)return validateBilling()}else{if(step===1)return validateAccount();if(step===2)return validateAthlete();if(step===3)return validateAthlete();if(step===4){const terms=$('#terms'),m=terms?.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!terms?.checked);return handleAvailable&&!!terms?.checked}}return true}
-$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{const n=+b.dataset.go;if(n>cur&&!validate(cur))return;clearAlert();if(PAID&&n===5){if($('#billingName')&&!$('#billingName').value)$('#billingName').value=($('#fn').value+' '+$('#ln').value).trim();if($('#billingEmail')&&!$('#billingEmail').value)$('#billingEmail').value=$('#em').value;if($('#billingPhone')&&!$('#billingPhone').value)$('#billingPhone').value=$('#ph').value;if($('#bstate')&&!$('#bstate').value)$('#bstate').value=$('#st')?.value||''}goto(n)}));
+function validate(step){if(PAID){if(step===1){const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}if(step===2)return validateAccount();if(step===3)return validateAthlete();if(step===4)return validateBilling()}else{if(step===1)return validateAccount();if(step===2)return validateAthlete();if(step===3)return validateAthlete();if(step===4){const terms=$('#terms'),m=terms?.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!terms?.checked);return handleAvailable&&!!terms?.checked}}return true}
+$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{const n=+b.dataset.go;if(n>cur&&!validate(cur))return;clearAlert();if(PAID&&n===4){if($('#billingName')&&!$('#billingName').value)$('#billingName').value=($('#fn').value+' '+$('#ln').value).trim();if($('#billingEmail')&&!$('#billingEmail').value)$('#billingEmail').value=$('#em').value;if($('#billingPhone')&&!$('#billingPhone').value)$('#billingPhone').value=$('#ph').value;if($('#bstate')&&!$('#bstate').value)$('#bstate').value=$('#st')?.value||''}goto(n)}));
 $$('input,select,textarea').forEach(el=>el.addEventListener('input',()=>{el.classList.remove('err');el.closest('.f')?.querySelector('.msg')?.classList.remove('show')}));
 // Gender segmented control.
 $$('#divisionWrap button').forEach(b=>b.addEventListener('click',()=>{$$('#divisionWrap button').forEach(x=>x.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');division=b.dataset.value;$('#genderHidden').value=division;$('#divisionWrap .msg')?.classList.remove('show')}));
 // Sport-specific position chips use the same keys already stored by the intake/profile flow.
 if($('#sport'))$('#sport').addEventListener('change',function(){pickedPositions=[];const box=$('#pos');box.innerHTML='';const items=POS[this.value]||{};Object.entries(items).forEach(([key,label])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=label;b.dataset.value=key;b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>{const on=b.getAttribute('aria-pressed')==='true';if(!on&&pickedPositions.length>=3)return;b.setAttribute('aria-pressed',on?'false':'true');pickedPositions=on?pickedPositions.filter(x=>x!==key):pickedPositions.concat(key);$('#positionWrap .msg')?.classList.remove('show')});box.appendChild(b)});if(!Object.keys(items).length)box.innerHTML='<span class="hint">No positions configured for this sport.</span>'});
-// Generic multi-select chip groups.
-$$('.multi .chip').forEach(b=>{b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>{b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true');b.closest('.f')?.querySelector('.msg')?.classList.remove('show')})});
 function slug(v,hyphen=true){let s=(v||'').toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,hyphen?'-':'').replace(/-+/g,'-').replace(/^-|-$/g,'');return s}
 async function jsonGet(url,params){const u=new URL(url,window.location.origin);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{headers:{Accept:'application/json'}});return r.json()}
 if(PAID){
@@ -250,10 +238,10 @@ if(PAID){
  async function checkHandle(){const h=slug(handle.value,true);handle.value=h;preview.textContent=h||'your-name';handleAvailable=false;submit.disabled=true;claim.classList.remove('live');if(h.length<3){setHandleStatus('','Use at least 3 characters');return}setHandleStatus('wait','Checking availability');try{const res=await jsonGet(HANDLE_URL,{handle:h});handleAvailable=!!res.available;if(handleAvailable){claim.classList.add('live');setHandleStatus('ok',res.message);submit.disabled=!$('#terms')?.checked}else setHandleStatus('no',res.message)}catch(e){setHandleStatus('no','Could not check availability. Try again.')}}
  handle.addEventListener('input',()=>{clearTimeout(handleTimer);handleTimer=setTimeout(checkHandle,350)});$('#terms').addEventListener('change',()=>{submit.disabled=!(handleAvailable&&$('#terms').checked)});
 }
-function rebuildDynamicInputs(){const box=$('#dynamicInputs');box.innerHTML='';const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;box.appendChild(i)};pickedPositions.forEach(v=>add('position[]',v));$$('.multi').forEach(group=>{const name=group.dataset.name;group.querySelectorAll('.chip[aria-pressed="true"]').forEach(chip=>add(name+'[]',chip.textContent.trim()))})}
-async function submitRegistration(){if(!validate(maxStep))return;clearAlert();rebuildDynamicInputs();setLoading(true);const fd=new FormData(form);try{const r=await fetch(form.action,{method:'POST',body:fd,headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}});const data=await r.json().catch(()=>({}));if(!r.ok){const errors=data.errors||{};const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';showAlert(first);return}if(PAID){$('#doneMessage').textContent=data.message||'Your secure invoice has been sent.';if(data.payment_url){const a=$('#paymentLink');a.href=data.payment_url;a.style.display='inline-flex'}goto(successStep);startPaymentPolling()}else{$('#sent-to').textContent=$('#em').value;$('#doneMessage').textContent=data.message||'Your account is ready.';goto(successStep)}}catch(e){showAlert('We could not complete registration. Check your connection and try again.')}finally{setLoading(false)}}
+function rebuildDynamicInputs(){const box=$('#dynamicInputs');box.innerHTML='';const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;box.appendChild(i)};pickedPositions.forEach(v=>add('position[]',v))}
+async function submitRegistration(){if(!validate(maxStep))return;clearAlert();rebuildDynamicInputs();setLoading(true);const fd=new FormData(form);try{const r=await fetch(form.action,{method:'POST',body:fd,headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}});const data=await r.json().catch(()=>({}));if(!r.ok){const errors=data.errors||{};const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';showAlert(first);return}if(PAID){if(data.payment_url){window.location.assign(data.payment_url);return}$('#doneMessage').textContent=data.message||'Continue to payment to activate your plan.';goto(successStep);startPaymentPolling()}else{$('#sent-to').textContent=$('#em').value;$('#doneMessage').textContent=data.message||'Your account is ready.';goto(successStep)}}catch(e){showAlert('We could not complete registration. Check your connection and try again.')}finally{setLoading(false)}}
 if($('#submitRegistration'))$('#submitRegistration').addEventListener('click',submitRegistration);
-function startPaymentPolling(){if(!PAID)return;clearInterval(statusPoll);statusPoll=setInterval(async()=>{try{const r=await fetch(STATUS_URL,{headers:{Accept:'application/json'}});if(!r.ok)return;const data=await r.json();if(data.paid){clearInterval(statusPoll);const p=$('#paymentProv');p.classList.add('paid');$('#paymentProvText').textContent='Payment confirmed — paid access active';$('#paidDoneTitle').textContent='You’re in';$('#continueProfile').style.display='inline-flex';$('#doneMessage').textContent='HighLevel confirmed your payment. Your paid PLYRCARD access is now active and your domain request is ready for provisioning.'}}catch(e){}},5000)}
+function startPaymentPolling(){if(!PAID)return;clearInterval(statusPoll);statusPoll=setInterval(async()=>{try{const r=await fetch(STATUS_URL,{headers:{Accept:'application/json'}});if(!r.ok)return;const data=await r.json();if(data.paid){clearInterval(statusPoll);const p=$('#paymentProv');p.classList.add('paid');$('#paymentProvText').textContent='Payment confirmed — plan active';$('#paidDoneTitle').textContent='You’re in';$('#continueProfile').style.display='inline-flex';$('#doneMessage').textContent='Your payment is confirmed. Your paid PLYRCARD plan is now active.'}}catch(e){}},5000)}
 })();
 </script>
 </body>
