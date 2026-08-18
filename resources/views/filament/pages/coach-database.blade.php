@@ -7263,13 +7263,13 @@
                             @if($stat['label'] === 'Emails Sent')
                                 <div class="rc-home-stat-sub-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">
                                     @if(filled($dashboardEmailFetchError ?? null))
-                                        <span class="rc-email-live-fetch-error-v136">Fetch failed · showing last saved count</span>
+                                        <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
                                     @else
-                                        <span>{{ $dashboardEmailFetchStatus ?: 'Live GHL outbound email total' }}</span>
+                                        <span>{{ $dashboardEmailFetchStatus ?: 'Email activity' }}</span>
                                     @endif
                                 </div>
                                 <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
-                                    Fetching outbound email messages from GHL…
+                                    Updating sent email count…
                                 </div>
                             @else
                                 <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>

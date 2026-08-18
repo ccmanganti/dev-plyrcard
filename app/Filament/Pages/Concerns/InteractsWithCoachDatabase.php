@@ -551,9 +551,9 @@ trait InteractsWithCoachDatabase
             ]);
 
             if (! ($result['success'] ?? false)) {
-                $error = trim((string) ($result['error'] ?? 'Unable to procure conversations from GHL.'));
-                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to procure conversations from GHL.';
-                $this->dashboardEmailFetchStatus = 'Conversation fetch failed.';
+                $error = trim((string) ($result['error'] ?? 'Unable to refresh email activity.'));
+                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to refresh email activity.';
+                $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
                 Log::warning('Dashboard conversation procurement failed.', [
                     'user_id' => $user->getKey(),
@@ -580,9 +580,7 @@ trait InteractsWithCoachDatabase
             $this->stats['emails_sent'] = $count;
             $this->stats['email_sent_count'] = $count;
             $this->dashboardMetricsMemo = null;
-            $this->dashboardEmailFetchStatus = 'Fetched ' . number_format(count($conversations))
-                . ' conversations · ' . number_format($count) . ' outbound email'
-                . ($count === 1 ? '' : 's') . '.';
+            $this->dashboardEmailFetchStatus = 'Updated just now';
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
@@ -590,8 +588,11 @@ trait InteractsWithCoachDatabase
                 'user_id' => $user->getKey(),
                 'conversations_procured' => count($conversations),
                 'api_total' => $result['total'] ?? count($conversations),
+                'pages_fetched' => $result['pages_fetched'] ?? null,
+                'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
+                'pagination_truncated' => $result['pagination_truncated'] ?? false,
                 'outbound_emails_counted' => $count,
-                'source' => 'ghl_conversations_local_count',
+                'source' => 'conversations_local_count',
             ]);
         } catch (\Throwable $exception) {
             $this->dashboardEmailFetchError = $exception->getMessage();
@@ -639,16 +640,14 @@ trait InteractsWithCoachDatabase
                     ?? ''
                 )));
 
-                // If GHL supplies the channel/type, require Email. Older conversation
-                // payloads can omit it; in that case the outbound direction is retained
-                // instead of dropping a valid sent-email row solely because of schema drift.
-                if ($messageType !== ''
-                    && ! str_contains($messageType, 'email')
-                    && ! in_array($messageType, ['type_email', 'mail'], true)) {
-                    return false;
-                }
+                // Emails Sent must be strict: count only rows that are explicitly both
+                // outbound and email. If the conversation payload omits the channel/type,
+                // do not guess, because that could count SMS, calls, or other outbound activity.
+                $isEmail = $messageType !== ''
+                    && (str_contains($messageType, 'email')
+                        || in_array($messageType, ['type_email', 'mail'], true));
 
-                return true;
+                return $isEmail;
             })
             ->count();
     }

@@ -3177,6 +3177,8 @@ class GoHighLevelService
             $page = 0;
             $pageSuccess = false;
             $total = 0;
+            $paginationStoppedOnDuplicatePage = false;
+            $paginationTruncated = false;
 
             do {
                 $params = array_merge($baseParams, ['limit' => $requestedLimit]);
@@ -3210,6 +3212,7 @@ class GoHighLevelService
 
                 $pageSuccess = true;
                 $items = $this->extractConversationsFromResponse($data);
+                $uniqueBefore = count($allItems);
 
                 foreach ($items as $item) {
                     if (is_array($item)) {
@@ -3218,15 +3221,41 @@ class GoHighLevelService
                     }
                 }
 
-                $total = (int) ($data['total'] ?? $data['meta']['total'] ?? data_get($data, 'conversations.total') ?? 0);
+                $uniqueAfter = count($allItems);
+                $newUniqueRows = max(0, $uniqueAfter - $uniqueBefore);
+
+                // Prefer nested/meta totals when present. Some response shapes expose a
+                // top-level `total` that can equal only the current page size (often 100),
+                // which previously caused fetch_all to stop after page one.
+                $reportedTotal = data_get($data, 'meta.total')
+                    ?? data_get($data, 'conversations.total')
+                    ?? data_get($data, 'data.total')
+                    ?? ($data['total'] ?? null);
+                if (is_numeric($reportedTotal)) {
+                    $total = max($total, (int) $reportedTotal);
+                }
+
                 $count = count($items);
                 $skip += $requestedLimit;
                 $page++;
 
+                // For fetch_all, page until the API returns a short page. Do not trust a
+                // `total` field to decide whether another page exists because some API
+                // versions report the page count there. Also stop safely if the API ignores
+                // `skip` and gives us a duplicate page, preventing a 100-page loop.
+                $paginationStoppedOnDuplicatePage = $fetchAll
+                    && $count > 0
+                    && $newUniqueRows === 0;
+
+                $paginationTruncated = $fetchAll
+                    && $count >= $requestedLimit
+                    && ! $paginationStoppedOnDuplicatePage
+                    && (count($allItems) >= $maxRows || $page >= $maxPages);
+
                 $hasMore = $fetchAll
                     && $count >= $requestedLimit
+                    && $newUniqueRows > 0
                     && count($allItems) < $maxRows
-                    && ($total === 0 || count($allItems) < $total)
                     && $page < $maxPages;
             } while ($hasMore);
 
@@ -3241,7 +3270,10 @@ class GoHighLevelService
                 return [
                     'success' => true,
                     'conversations' => $conversations,
-                    'total' => $total ?: count($conversations),
+                    'total' => max($total, count($conversations)),
+                    'pages_fetched' => $page,
+                    'pagination_stopped_on_duplicate_page' => $paginationStoppedOnDuplicatePage,
+                    'pagination_truncated' => $paginationTruncated,
                     'error' => null,
                 ];
             }
