@@ -82,7 +82,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
       <li><span class="dot">4</span><span class="lb">Claim your link</span></li>
     @endif
   </ol>
-  <div class="rail-foot">Already a member? <a href="/login">Log in</a><br>{{ $isPaid ? 'Complete payment to activate your selected plan.' : 'Takes about 2 minutes. Photos and highlights can come later.' }}</div>
+  <div class="rail-foot">Already a member? <a href="/admin">Log in</a><br>{{ $isPaid ? 'Complete payment to activate your selected plan.' : 'Takes about 2 minutes. Photos and highlights can come later.' }}</div>
 </aside>
 <main class="stage"><div class="card">
 <div class="form-alert" id="formAlert" role="alert"></div>
