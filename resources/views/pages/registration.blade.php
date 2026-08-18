@@ -1,4 +1,5 @@
 @php
+    $activePage = 'registration';
     $isPaid = $isPaidPlan;
     $isAmplify = $planKey === 'amplify';
     $planLabel = $plan['label'] ?? 'Free';
@@ -21,7 +22,7 @@
 <style>
 :root{--ink:#0C0E11;--surface:#131619;--raised:#1A1E23;--line:#262C33;--line-soft:#1E242A;--coral:#FF5A3C;--coral-hi:#FF6E52;--paper:#F2F0ED;--mute:#868E99;--dim:#5E6670;--good:#4ADE9B;--warn:#FFB84D;--danger:#FF7A63;--r:10px}
 *{box-sizing:border-box;margin:0;padding:0}html{-webkit-text-size-adjust:100%}body{background:var(--ink);color:var(--paper);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}a{color:inherit}::selection{background:var(--coral);color:#0C0E11}:focus-visible{outline:2px solid var(--coral);outline-offset:2px;border-radius:4px}
-.shell{display:grid;grid-template-columns:300px 1fr;min-height:100vh}.rail{background:var(--surface);border-right:1px solid var(--line-soft);padding:34px 30px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}.logo{font-family:Archivo;font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--paper);text-decoration:none;display:block}.logo span{color:var(--coral)}
+.registration-ui-updated{padding-top:calc(var(--header-h,60px) + env(safe-area-inset-top,0px))}.shell{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - var(--header-h,60px))}.rail{background:var(--surface);border-right:1px solid var(--line-soft);padding:34px 30px;display:flex;flex-direction:column;position:sticky;top:calc(var(--header-h,60px) + env(safe-area-inset-top,0px));height:calc(100vh - var(--header-h,60px) - env(safe-area-inset-top,0px))}.logo{font-family:Archivo;font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--paper);text-decoration:none;display:block}.logo span{color:var(--coral)}
 .tier{margin-top:26px;border:1px solid var(--line);border-left:2px solid var(--coral);border-radius:var(--r);padding:14px 15px;background:var(--raised)}.tier .k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--mute);font-weight:700}.tier .v{font-family:Archivo;font-weight:800;font-size:19px;margin-top:5px;letter-spacing:-.02em}.tier .pz{font-size:12.5px;color:var(--mute);margin-top:4px}.tier .pz b{color:var(--paper);font-weight:600}
 .steps{list-style:none;margin-top:30px;flex:1}.steps li{display:flex;gap:13px;align-items:flex-start;padding:10px 0;position:relative}.steps li::before{content:"";position:absolute;left:12px;top:33px;bottom:-3px;width:1px;background:var(--line)}.steps li:last-child::before{display:none}.dot{width:25px;height:25px;flex:0 0 25px;border-radius:50%;border:1px solid var(--line);background:var(--ink);display:grid;place-items:center;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;color:var(--mute);transition:.25s}.steps li.on .dot{border-color:var(--coral);color:var(--coral);box-shadow:0 0 0 4px rgba(255,90,60,.11)}.steps li.done .dot{background:var(--coral);border-color:var(--coral);color:#0C0E11}.steps .lb{font-size:13.5px;font-weight:500;color:var(--mute);padding-top:3px}.steps li.on .lb,.steps li.done .lb{color:var(--paper)}.steps li.on .lb{font-weight:600}.rail-foot{font-size:11.5px;color:var(--mute);line-height:1.6;border-top:1px solid var(--line-soft);padding-top:16px}.rail-foot a{color:var(--paper);text-decoration:none;border-bottom:1px solid var(--line)}
 .mbar{display:none}.stage{padding:54px 40px 90px;display:flex;justify-content:center}.card{width:100%;max-width:580px}.eyebrow{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--coral)}h1{font-family:Archivo;font-weight:800;font-size:clamp(28px,5vw,38px);letter-spacing:-.03em;line-height:1.05;margin:11px 0 9px}.sub{color:var(--mute);font-size:15px;max-width:48ch;line-height:1.55}.panel{display:none}.panel.active{display:block;animation:in .3s ease both}@keyframes in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
@@ -40,14 +41,14 @@
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
-<body>
+<body class="registration-ui-updated">
+@include('partials.navigation')
 <div class="page-loader" id="pageLoader" aria-hidden="true"><div class="tail-spinner" aria-label="Loading"></div></div>
 <div class="mbar"><i id="mbar"></i></div>
 <div class="shell">
 <aside class="rail">
   <div>
-    <a href="/" class="logo">PLYR<span>CARD</span></a>
-    <div class="tier">
+    <div class="tier" style="margin-top:0">
       <div class="k">Selected plan</div>
       <div class="v">{{ $planLabel }}</div>
       <div class="pz">
@@ -204,7 +205,36 @@ $$('#divisionWrap button').forEach(b=>b.addEventListener('click',()=>{$$('#divis
 // Sport-specific position chips use the same keys already stored by the intake/profile flow.
 if($('#sport'))$('#sport').addEventListener('change',function(){pickedPositions=[];const box=$('#pos');box.innerHTML='';const items=POS[this.value]||{};Object.entries(items).forEach(([key,label])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=label;b.dataset.value=key;b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>{const on=b.getAttribute('aria-pressed')==='true';if(!on&&pickedPositions.length>=3)return;b.setAttribute('aria-pressed',on?'false':'true');pickedPositions=on?pickedPositions.filter(x=>x!==key):pickedPositions.concat(key);$('#positionWrap .msg')?.classList.remove('show')});box.appendChild(b)});if(!Object.keys(items).length)box.innerHTML='<span class="hint">No positions configured for this sport.</span>'});
 function slug(v,hyphen=true){let s=(v||'').toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,hyphen?'-':'').replace(/-+/g,'-').replace(/^-|-$/g,'');return s}
-async function jsonGet(url,params){const u=new URL(url,window.location.origin);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{headers:{Accept:'application/json'}});return r.json()}
+async function jsonGet(url,params){const u=new URL(url,window.location.origin);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{headers:{Accept:'application/json'}});if(!r.ok)throw new Error('Lookup request failed');return r.json()}
+async function browserRdapCheck(domain){
+  const tld=(domain.split('.').pop()||'').toLowerCase();
+  const direct={com:'https://rdap.verisign.com/com/v1/domain/',net:'https://rdap.verisign.com/net/v1/domain/'};
+  const url=(direct[tld]||'https://rdap.org/domain/')+encodeURIComponent(domain);
+  try{
+    const r=await fetch(url,{method:'GET',redirect:'follow',headers:{Accept:'application/rdap+json, application/json'}});
+    if(r.status===404){
+      // A 404 from an authoritative registry means there is no registration
+      // object. A 404 that never left rdap.org means no service was found.
+      const finalHost=new URL(r.url||url).hostname.toLowerCase();
+      if(direct[tld]||finalHost!=='rdap.org')return{available:true,status:'available',domain,message:'This domain appears available.',rdap_verified:true,lookup_source:'browser-rdap'};
+      return{available:false,status:'unknown',domain,message:'Could not verify this domain right now.'};
+    }
+    if(r.ok){
+      const data=await r.json().catch(()=>null);
+      if(data&&(data.objectClassName==='domain'||data.ldhName||data.unicodeName||data.handle))return{available:false,status:'registered',domain,message:'That domain is already registered.',rdap_verified:true,lookup_source:'browser-rdap'};
+    }
+    return{available:false,status:'unknown',domain,message:r.status===429?'Domain lookup is busy. Please try again.':'Could not verify this domain right now.'};
+  }catch(e){
+    return{available:false,status:'unknown',domain,message:'Could not verify this domain right now.'};
+  }
+}
+async function verifiedDomainCheck(domain){
+  try{
+    const server=await jsonGet(DOMAIN_URL,{domain});
+    if(server.status!=='unknown')return server;
+  }catch(e){}
+  return browserRdapCheck(domain);
+}
 if(PAID){
  const search=async()=>{
    const raw=$('#dq').value.trim().toLowerCase();
@@ -216,10 +246,7 @@ if(PAID){
    const candidates=(looksLikeDomain?[exact]:[base+'.com',hy+'.com',base+'athlete.com',base+'.net',base+'.co'])
      .filter((v,i,a)=>v.length>3&&a.indexOf(v)===i).slice(0,5);
    $('#dres').classList.remove('show');$('#dload').classList.add('show');
-   const results=await Promise.all(candidates.map(async d=>{
-     try{return await jsonGet(DOMAIN_URL,{domain:d})}
-     catch(e){return{available:false,status:'unknown',domain:d,message:'Could not reach the domain lookup service.'}}
-   }));
+   const results=await Promise.all(candidates.map(d=>verifiedDomainCheck(d)));
    $('#dload').classList.remove('show');
    const box=$('#dres');box.innerHTML='';
    results.forEach(res=>{

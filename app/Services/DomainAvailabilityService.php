@@ -48,7 +48,12 @@ class DomainAvailabilityService
         }
 
         $tld = strtolower((string) str($domain)->afterLast('.'));
-        $baseUrl = $this->resolveRdapBaseUrl($tld);
+
+        // Prefer known registry endpoints for the most common PLYRCARD search
+        // candidates. This removes the IANA bootstrap request from the hot path
+        // for .com/.net and makes local development substantially more reliable.
+        $baseUrl = $this->commonRegistryBaseUrl($tld)
+            ?: $this->resolveRdapBaseUrl($tld);
 
         if ($baseUrl) {
             $direct = $this->queryRdapUrl(
@@ -56,7 +61,7 @@ class DomainAvailabilityService
                 $domain,
                 $tld,
                 $baseUrl,
-                'iana-bootstrap',
+                $this->commonRegistryBaseUrl($tld) ? 'direct-registry' : 'iana-bootstrap',
             );
 
             if (($direct['verified'] ?? false) === true) {
@@ -214,6 +219,16 @@ class DomainAvailabilityService
             $rdapServer,
             $lookupPath,
         );
+    }
+
+    protected function commonRegistryBaseUrl(string $tld): ?string
+    {
+        return match (strtolower(trim($tld))) {
+            // Verisign's published RDAP bootstrap endpoints.
+            'com' => 'https://rdap.verisign.com/com/v1/',
+            'net' => 'https://rdap.verisign.com/net/v1/',
+            default => null,
+        };
     }
 
     protected function resolveRdapBaseUrl(string $tld): ?string
