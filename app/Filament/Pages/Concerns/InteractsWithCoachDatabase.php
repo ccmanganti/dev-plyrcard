@@ -513,7 +513,7 @@ trait InteractsWithCoachDatabase
         $user = Auth::user();
 
         $this->dashboardEmailFetchError = null;
-        $this->dashboardEmailFetchStatus = 'Fetching live sent-email count from GHL…';
+        $this->dashboardEmailFetchStatus = 'Fetching all conversations from GHL…';
         $this->isFetchingDashboardEmailsSent = true;
 
         if (! $user) {
@@ -531,70 +531,126 @@ trait InteractsWithCoachDatabase
         }
 
         try {
-            Log::info('Dashboard live sent-email fetch started.', [
+            Log::info('Dashboard conversation procurement started for local sent-email count.', [
                 'user_id' => $user->getKey(),
-                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
             ]);
 
-            $result = app(GoHighLevelService::class)->syncTotalEmailsSentFromGhl($user);
+            // v137: use the exact same conversation procurement method as Inbox.
+            // Do not call the per-conversation messages endpoint and do not use the
+            // export endpoint. Fetch every available conversation first, then count
+            // outbound email rows locally from the normalized conversation payload.
+            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                'fetch_all' => true,
+                'limit' => 100,
+                'max_rows' => 10000,
+                'max_pages' => 100,
+                'status' => 'all',
+                'search' => '',
+                'sortBy' => 'last_message_date',
+                'sort' => 'desc',
+            ]);
 
             if (! ($result['success'] ?? false)) {
-                $error = trim((string) ($result['error'] ?? 'Unable to fetch outbound email messages from GHL.'));
-                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to fetch outbound email messages from GHL.';
-                $this->dashboardEmailFetchStatus = 'GHL sent-email fetch failed.';
+                $error = trim((string) ($result['error'] ?? 'Unable to procure conversations from GHL.'));
+                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to procure conversations from GHL.';
+                $this->dashboardEmailFetchStatus = 'Conversation fetch failed.';
 
-                Log::warning('Dashboard GHL sent-email count fetch failed.', [
+                Log::warning('Dashboard conversation procurement failed.', [
                     'user_id' => $user->getKey(),
-                    'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
-                    'conversations_available' => $result['conversations_available'] ?? $result['total'] ?? null,
-                    'conversations_scanned' => $result['conversations_scanned'] ?? 0,
-                    'conversations_failed' => $result['conversations_failed'] ?? 0,
-                    'messages_scanned' => $result['messages_scanned'] ?? 0,
-                    'outbound_rows_seen' => $result['outbound_rows_seen'] ?? 0,
-                    'source' => $result['source'] ?? 'ghl_conversations',
+                    'status' => $result['status'] ?? null,
                     'error' => $this->dashboardEmailFetchError,
                 ]);
 
                 return;
             }
 
-            $count = max(0, (int) ($result['count'] ?? 0));
+            $conversations = collect($result['conversations'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values()
+                ->all();
 
-            // The service persists users.total_emails_sent. Refresh the same authenticated
-            // model so Dashboard metrics are rebuilt from the newly fetched API value.
+            $count = $this->countOutboundEmailConversationsLocally($conversations);
+
+            // The count is derived locally from the freshly procured API rows. Persist
+            // only the final result so the existing Dashboard metric remains compatible.
+            $user->forceFill(['total_emails_sent' => $count])->save();
             $user->refresh();
             Auth::setUser($user);
 
             $this->stats['emails_sent'] = $count;
             $this->stats['email_sent_count'] = $count;
             $this->dashboardMetricsMemo = null;
-            $this->dashboardEmailFetchStatus = 'Live GHL count updated: ' . number_format($count) . ' sent email' . ($count === 1 ? '' : 's') . '.';
+            $this->dashboardEmailFetchStatus = 'Fetched ' . number_format(count($conversations))
+                . ' conversations · ' . number_format($count) . ' outbound email'
+                . ($count === 1 ? '' : 's') . '.';
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Dashboard GHL sent-email count fetched from Conversations API.', [
+            Log::info('Dashboard sent-email count calculated locally from conversations.', [
                 'user_id' => $user->getKey(),
-                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
-                'conversations_available' => $result['conversations_available'] ?? $result['total'] ?? null,
-                'conversations_scanned' => $result['conversations_scanned'] ?? 0,
-                'conversations_failed' => $result['conversations_failed'] ?? 0,
-                'messages_scanned' => $result['messages_scanned'] ?? 0,
-                'outbound_rows_seen' => $result['outbound_rows_seen'] ?? 0,
-                'source' => $result['source'] ?? 'ghl_conversations',
+                'conversations_procured' => count($conversations),
+                'api_total' => $result['total'] ?? count($conversations),
                 'outbound_emails_counted' => $count,
+                'source' => 'ghl_conversations_local_count',
             ]);
         } catch (\Throwable $exception) {
             $this->dashboardEmailFetchError = $exception->getMessage();
-            $this->dashboardEmailFetchStatus = 'GHL sent-email fetch failed.';
+            $this->dashboardEmailFetchStatus = 'Conversation fetch failed.';
 
-            Log::warning('Dashboard GHL sent-email count fetch threw an exception.', [
+            Log::warning('Dashboard local conversation sent-email count threw an exception.', [
                 'user_id' => $user->getKey(),
-                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
                 'error' => $exception->getMessage(),
             ]);
         } finally {
             $this->isFetchingDashboardEmailsSent = false;
         }
+    }
+
+    /**
+     * Count outbound email activity only from conversation rows already returned by
+     * GoHighLevelService::getConversationsForUser(). No additional API calls happen here.
+     */
+    protected function countOutboundEmailConversationsLocally(array $conversations): int
+    {
+        return collect($conversations)
+            ->filter(fn ($row): bool => is_array($row))
+            ->filter(function (array $row): bool {
+                $direction = strtolower(trim((string) (
+                    $row['last_message_direction']
+                    ?? $row['lastMessageDirection']
+                    ?? $row['message_direction']
+                    ?? $row['direction']
+                    ?? ''
+                )));
+                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
+
+                $isOutbound = str_starts_with($direction, 'outbound')
+                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
+
+                if (! $isOutbound) {
+                    return false;
+                }
+
+                $messageType = strtolower(trim((string) (
+                    $row['last_message_type']
+                    ?? $row['lastMessageType']
+                    ?? $row['message_type']
+                    ?? $row['type']
+                    ?? ''
+                )));
+
+                // If GHL supplies the channel/type, require Email. Older conversation
+                // payloads can omit it; in that case the outbound direction is retained
+                // instead of dropping a valid sent-email row solely because of schema drift.
+                if ($messageType !== ''
+                    && ! str_contains($messageType, 'email')
+                    && ! in_array($messageType, ['type_email', 'mail'], true)) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->count();
     }
 
     /** Backwards-compatible alias for older callers. */

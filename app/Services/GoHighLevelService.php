@@ -5353,6 +5353,8 @@ class GoHighLevelService
         $contact = is_array($item['contact'] ?? null) ? $item['contact'] : [];
         $lastMessage = is_array($item['lastMessage'] ?? null) ? $item['lastMessage'] : [];
         $lastBody = $lastMessage['body'] ?? $lastMessage['message'] ?? $lastMessage['text'] ?? $item['lastMessageBody'] ?? $item['lastMessage'] ?? '';
+        $lastDirection = (string) ($item['lastMessageDirection'] ?? $item['last_message_direction'] ?? $item['direction'] ?? $item['messageDirection'] ?? $lastMessage['direction'] ?? $lastMessage['messageDirection'] ?? '');
+        $lastType = (string) ($item['lastMessageType'] ?? $item['last_message_type'] ?? $item['messageType'] ?? $item['message_type'] ?? $item['type'] ?? $lastMessage['type'] ?? $lastMessage['messageType'] ?? '');
 
         $rawForAssets = json_encode($item) ?: '';
         $hasImage = (bool) preg_match('/<img\b|\.(png|jpe?g|gif|webp)(\?|\"|\'|$)/i', $rawForAssets);
@@ -5366,6 +5368,10 @@ class GoHighLevelService
             'status' => (string) ($item['status'] ?? (($item['unreadCount'] ?? 0) ? 'Unread' : 'Open')),
             'last_message' => trim(strip_tags((string) $lastBody)),
             'last_message_at' => $item['lastMessageDate'] ?? $item['lastMessageAt'] ?? $item['last_message_date'] ?? $item['updatedAt'] ?? null,
+            'last_message_direction' => $lastDirection,
+            'direction' => $lastDirection,
+            'last_message_type' => $lastType,
+            'message_type' => $lastType,
             'unread_count' => (int) ($item['unreadCount'] ?? $item['unread_count'] ?? 0),
             'has_image' => $hasImage,
             'has_file' => $hasFile,
