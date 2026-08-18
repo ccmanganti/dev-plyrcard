@@ -66,6 +66,7 @@ trait InteractsWithCoachDatabase
     public ?string $error = null;
 
     public string $section = 'dashboard';
+    public int $dashboardVisitVersion = 0;
     public string $search = '';
     public string $coachSearch = '';
     public string $conversationSearch = '';
@@ -444,10 +445,10 @@ trait InteractsWithCoachDatabase
                 $this->loadDashboardActivity();
             }
 
-            // v133: persistent-shell navigation does not remount the page or rerun
-            // wire:init. Ask the browser to start the GHL email reconciliation only
-            // after Dashboard is visibly open so the tab switch itself stays fast.
-            $this->dispatch('rc-fast-section-ready', section: 'dashboard');
+            // v135: every Dashboard entry gets its own visit version. The Dashboard
+            // element uses this value to start one fresh Conversations-API email count
+            // after the section is already visible.
+            $this->dashboardVisitVersion++;
         }
 
         if (in_array($section, ['schools', 'favorites', 'lists', 'compose'], true) && empty($this->lists)) {
@@ -509,37 +510,25 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // v134: use a new guard key so the previous export-based marker cannot
-        // suppress the first Conversations-API reconciliation after deployment.
-        // Keep the window short while testing/using the dashboard.
-        $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addMinute() : now()->addSeconds(30);
-        $syncKey = 'recruiting:total-emails-sent-sync:v134:'
-            . (int) $user->getKey()
-            . ':'
-            . strtolower($locationId);
-
-        if (! Cache::add($syncKey, true, $ttl)) {
-            return;
-        }
-
+        // v135: this method is invoked once per actual Dashboard visit. Do not use a
+        // TTL/cache guard here: entering Dashboard must always fetch the latest count
+        // from the same Conversations API used by Inbox.
         try {
             $result = app(GoHighLevelService::class)
                 ->syncTotalEmailsSentFromGhl($user);
 
             if (! ($result['success'] ?? false)) {
-                Cache::forget($syncKey);
-
-                Log::warning('Automatic GHL sent-email count sync failed.', [
+                Log::warning('Dashboard GHL sent-email count fetch failed.', [
                     'user_id' => $user->getKey(),
                     'location_id' => $locationId,
+                    'conversations_available' => $result['conversations_available'] ?? null,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
+                    'conversations_failed' => $result['conversations_failed'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
-                    'pages_scanned' => $result['pages_scanned'] ?? 0,
-                    'source' => $result['source'] ?? 'unknown',
+                    'outbound_rows_seen' => $result['outbound_rows_seen'] ?? 0,
+                    'source' => $result['source'] ?? 'ghl_conversations',
                     'error' => $result['error'] ?? 'Unknown sync error.',
                 ]);
-
                 return;
             }
 
@@ -549,27 +538,23 @@ trait InteractsWithCoachDatabase
 
             $this->stats['emails_sent'] = $count;
             $this->stats['email_sent_count'] = $count;
-
-            // The Dashboard computed property may already have been evaluated during
-            // first paint. Force it to rebuild from the freshly refreshed User model
-            // in this same Livewire request instead of showing the old memoized count.
             $this->dashboardMetricsMemo = null;
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Automatic GHL sent-email dashboard sync completed.', [
+            Log::info('Dashboard GHL sent-email count fetched from Conversations API.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
+                'conversations_available' => $result['conversations_available'] ?? null,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
+                'conversations_failed' => $result['conversations_failed'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
-                'pages_scanned' => $result['pages_scanned'] ?? 0,
-                'source' => $result['source'] ?? 'unknown',
+                'outbound_rows_seen' => $result['outbound_rows_seen'] ?? 0,
+                'source' => $result['source'] ?? 'ghl_conversations',
                 'outbound_emails_counted' => $count,
             ]);
         } catch (\Throwable $exception) {
-            Cache::forget($syncKey);
-
-            Log::warning('Automatic GHL sent-email count sync threw an exception.', [
+            Log::warning('Dashboard GHL sent-email count fetch threw an exception.', [
                 'user_id' => $user->getKey(),
                 'location_id' => $locationId,
                 'error' => $exception->getMessage(),
@@ -682,10 +667,6 @@ trait InteractsWithCoachDatabase
         $this->isBootingRemoteSection = true;
 
         try {
-            if ($this->section === 'dashboard') {
-                $this->syncTotalEmailsSentFromGhlOccasionally();
-            }
-
             if ($this->section === 'conversations') {
                 $this->hydrateCachedInboxConversations();
 

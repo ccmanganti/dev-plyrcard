@@ -3,8 +3,7 @@
         data-rc-current-section="{{ $section }}"
         x-data
         x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
-        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }"
-        x-on:rc-fast-dashboard-refresh.window="if (($event.detail?.section || '') === 'dashboard') { $nextTick(async () => { await $wire.syncTotalEmailsSentFromGhlOccasionally(); }) }">
+        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -7132,7 +7131,9 @@
                 }
             @endphp
 
-            <div class="rc-home-dashboard-v2">
+            <div class="rc-home-dashboard-v2"
+                x-data="{ dashboardEmailVisitKey: @js('dashboard-' . (int) $dashboardVisitVersion) }"
+                x-init="if (window.__plyrDashboardEmailVisitKey !== dashboardEmailVisitKey) { window.__plyrDashboardEmailVisitKey = dashboardEmailVisitKey; $nextTick(() => $wire.syncTotalEmailsSentFromGhlOccasionally()) }">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -14406,9 +14407,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
                 if (section === 'conversations') {
                     window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
-                }
-                if (section === 'dashboard') {
-                    window.dispatchEvent(new CustomEvent('rc-fast-dashboard-refresh', { detail: { section } }));
                 }
             });
         }
