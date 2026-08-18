@@ -203,11 +203,22 @@ class ExternalSocialTrackingController extends Controller
             return '';
         }
 
-        if (Str::startsWith($value, ['http://', 'https://'])) {
+        // Full URLs are accepted as-is after validation.
+        if (Str::startsWith(strtolower($value), ['http://', 'https://'])) {
             return filter_var($value, FILTER_VALIDATE_URL) ? $value : '';
         }
 
-        if (str_contains($value, '.')) {
+        // Accept scheme-less URLs only when they clearly point to the expected
+        // social platform. Do NOT treat every value containing a dot as a URL:
+        // Instagram handles such as "layla.harris_29" legitimately contain dots.
+        $lower = strtolower(ltrim($value, '/'));
+        $looksLikePlatformUrl = match ($platform) {
+            'instagram' => Str::startsWith($lower, ['instagram.com/', 'www.instagram.com/']),
+            'youtube' => Str::startsWith($lower, ['youtube.com/', 'www.youtube.com/', 'youtu.be/']),
+            'x' => Str::startsWith($lower, ['x.com/', 'www.x.com/', 'twitter.com/', 'www.twitter.com/']),
+        };
+
+        if ($looksLikePlatformUrl) {
             $candidate = 'https://' . ltrim($value, '/');
 
             return filter_var($candidate, FILTER_VALIDATE_URL) ? $candidate : '';
