@@ -67,6 +67,9 @@ trait InteractsWithCoachDatabase
 
     public string $section = 'dashboard';
     public int $dashboardVisitVersion = 0;
+    public bool $isFetchingDashboardEmailsSent = false;
+    public ?string $dashboardEmailFetchError = null;
+    public ?string $dashboardEmailFetchStatus = null;
     public string $search = '';
     public string $coachSearch = '';
     public string $conversationSearch = '';
@@ -497,55 +500,82 @@ trait InteractsWithCoachDatabase
      * Dashboard visit. v134 deliberately uses the same Conversations API family
      * as Inbox and counts only outbound TYPE_EMAIL messages across all threads.
      */
-    public function syncTotalEmailsSentFromGhlOccasionally($user = null): void
+    /**
+     * v136: Fetch the live sent-email total every time Dashboard is entered.
+     *
+     * Do not pre-check $user->ghl_location_id here. Inbox resolves the effective
+     * location/token through GoHighLevelService::credentialsForUser(), so Dashboard
+     * must use that exact same credential path. A direct user-field check can silently
+     * skip the API even while Inbox itself is working.
+     */
+    public function fetchDashboardEmailSentCount(): void
     {
-        $user ??= Auth::user();
+        $user = Auth::user();
 
-        if (! $user || ! Schema::hasColumn('users', 'total_emails_sent')) {
+        $this->dashboardEmailFetchError = null;
+        $this->dashboardEmailFetchStatus = 'Fetching live sent-email count from GHL…';
+        $this->isFetchingDashboardEmailsSent = true;
+
+        if (! $user) {
+            $this->dashboardEmailFetchError = 'No authenticated user is available.';
+            $this->dashboardEmailFetchStatus = 'Unable to fetch sent emails.';
+            $this->isFetchingDashboardEmailsSent = false;
             return;
         }
 
-        $locationId = trim((string) ($user->ghl_location_id ?? ''));
-        if ($locationId === '') {
+        if (! Schema::hasColumn('users', 'total_emails_sent')) {
+            $this->dashboardEmailFetchError = 'The total_emails_sent column is unavailable.';
+            $this->dashboardEmailFetchStatus = 'Unable to store sent-email count.';
+            $this->isFetchingDashboardEmailsSent = false;
             return;
         }
 
-        // v135: this method is invoked once per actual Dashboard visit. Do not use a
-        // TTL/cache guard here: entering Dashboard must always fetch the latest count
-        // from the same Conversations API used by Inbox.
         try {
-            $result = app(GoHighLevelService::class)
-                ->syncTotalEmailsSentFromGhl($user);
+            Log::info('Dashboard live sent-email fetch started.', [
+                'user_id' => $user->getKey(),
+                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
+            ]);
+
+            $result = app(GoHighLevelService::class)->syncTotalEmailsSentFromGhl($user);
 
             if (! ($result['success'] ?? false)) {
+                $error = trim((string) ($result['error'] ?? 'Unable to fetch outbound email messages from GHL.'));
+                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to fetch outbound email messages from GHL.';
+                $this->dashboardEmailFetchStatus = 'GHL sent-email fetch failed.';
+
                 Log::warning('Dashboard GHL sent-email count fetch failed.', [
                     'user_id' => $user->getKey(),
-                    'location_id' => $locationId,
-                    'conversations_available' => $result['conversations_available'] ?? null,
+                    'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
+                    'conversations_available' => $result['conversations_available'] ?? $result['total'] ?? null,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                     'conversations_failed' => $result['conversations_failed'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
                     'outbound_rows_seen' => $result['outbound_rows_seen'] ?? 0,
                     'source' => $result['source'] ?? 'ghl_conversations',
-                    'error' => $result['error'] ?? 'Unknown sync error.',
+                    'error' => $this->dashboardEmailFetchError,
                 ]);
+
                 return;
             }
 
             $count = max(0, (int) ($result['count'] ?? 0));
+
+            // The service persists users.total_emails_sent. Refresh the same authenticated
+            // model so Dashboard metrics are rebuilt from the newly fetched API value.
             $user->refresh();
             Auth::setUser($user);
 
             $this->stats['emails_sent'] = $count;
             $this->stats['email_sent_count'] = $count;
             $this->dashboardMetricsMemo = null;
+            $this->dashboardEmailFetchStatus = 'Live GHL count updated: ' . number_format($count) . ' sent email' . ($count === 1 ? '' : 's') . '.';
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
             Log::info('Dashboard GHL sent-email count fetched from Conversations API.', [
                 'user_id' => $user->getKey(),
-                'location_id' => $locationId,
-                'conversations_available' => $result['conversations_available'] ?? null,
+                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
+                'conversations_available' => $result['conversations_available'] ?? $result['total'] ?? null,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                 'conversations_failed' => $result['conversations_failed'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
@@ -554,12 +584,23 @@ trait InteractsWithCoachDatabase
                 'outbound_emails_counted' => $count,
             ]);
         } catch (\Throwable $exception) {
+            $this->dashboardEmailFetchError = $exception->getMessage();
+            $this->dashboardEmailFetchStatus = 'GHL sent-email fetch failed.';
+
             Log::warning('Dashboard GHL sent-email count fetch threw an exception.', [
                 'user_id' => $user->getKey(),
-                'location_id' => $locationId,
+                'user_ghl_location_id' => trim((string) ($user->ghl_location_id ?? '')) ?: null,
                 'error' => $exception->getMessage(),
             ]);
+        } finally {
+            $this->isFetchingDashboardEmailsSent = false;
         }
+    }
+
+    /** Backwards-compatible alias for older callers. */
+    public function syncTotalEmailsSentFromGhlOccasionally($user = null): void
+    {
+        $this->fetchDashboardEmailSentCount();
     }
 
     protected function coachDatabaseSection(): string

@@ -7131,9 +7131,15 @@
                 }
             @endphp
 
+            <style id="rc-dashboard-email-live-fetch-v136">
+                .rc-email-live-fetch-value-v136{align-items:center;gap:.45rem;font-size:1.15rem!important;letter-spacing:-.02em!important}
+                .rc-email-live-fetch-status-v136{align-items:center;gap:.35rem}
+                .rc-email-live-fetch-error-v136{color:#ef4444;font-weight:700}
+            </style>
+
             <div class="rc-home-dashboard-v2"
-                x-data="{ dashboardEmailVisitKey: @js('dashboard-' . (int) $dashboardVisitVersion) }"
-                x-init="if (window.__plyrDashboardEmailVisitKey !== dashboardEmailVisitKey) { window.__plyrDashboardEmailVisitKey = dashboardEmailVisitKey; $nextTick(() => $wire.syncTotalEmailsSentFromGhlOccasionally()) }">
+                wire:key="rc-home-dashboard-email-fetch-{{ (int) $dashboardVisitVersion }}"
+                wire:init="fetchDashboardEmailSentCount">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -7237,7 +7243,15 @@
 
                             <div class="rc-home-stat-copy-v2">
                                 <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
-                                <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
+                                @if($stat['label'] === 'Emails Sent')
+                                    <div class="rc-home-stat-value-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">{{ $stat['value'] }}</div>
+                                    <div class="rc-home-stat-value-v2 rc-email-live-fetch-value-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
+                                        <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                        <span>Fetching…</span>
+                                    </div>
+                                @else
+                                    <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
+                                @endif
                             </div>
 
                             @if(isset($stat['progress']))
@@ -7246,7 +7260,20 @@
                                 </div>
                             @endif
 
-                            <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
+                            @if($stat['label'] === 'Emails Sent')
+                                <div class="rc-home-stat-sub-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">
+                                    @if(filled($dashboardEmailFetchError ?? null))
+                                        <span class="rc-email-live-fetch-error-v136">Fetch failed · showing last saved count</span>
+                                    @else
+                                        <span>{{ $dashboardEmailFetchStatus ?: 'Live GHL outbound email total' }}</span>
+                                    @endif
+                                </div>
+                                <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
+                                    Fetching outbound email messages from GHL…
+                                </div>
+                            @else
+                                <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
+                            @endif
                         </button>
                     @endforeach
                 </div>
