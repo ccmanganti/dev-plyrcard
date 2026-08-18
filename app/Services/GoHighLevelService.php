@@ -2951,329 +2951,10 @@ class GoHighLevelService
      */
     public function syncTotalEmailsSentFromGhl(User $user): array
     {
-        $credentials = $this->credentialsForUser($user);
-        $locationId = trim((string) ($credentials['location_id'] ?? ''));
-        $token = $this->tokenForLocation($locationId, $credentials['token_override'] ?? null);
-
-        if ($locationId === '' || ! $token) {
-            return [
-                'success' => false,
-                'count' => null,
-                'messages_scanned' => 0,
-                'pages_scanned' => 0,
-                'source' => 'ghl_export',
-                'error' => 'Missing recruiting data connection.',
-            ];
-        }
-
-        // v133: use HighLevel's location-wide Conversations message export endpoint.
-        // channel=Email is important: HighLevel documents that omitting the channel
-        // excludes email messages from this export endpoint.
-        $seen = [];
-        $messagesScanned = 0;
-        $pagesScanned = 0;
-        $unclassified = 0;
-        $cursor = null;
-        $pageGuard = 0;
-
-        do {
-            $pageGuard++;
-
-            $params = [
-                'locationId' => $locationId,
-                'channel' => 'Email',
-                'limit' => 100,
-            ];
-
-            if (filled($cursor)) {
-                $params['cursor'] = $cursor;
-            }
-
-            try {
-                $response = Http::withHeaders(['Version' => 'v3'])
-                    ->timeout(max(30, (int) config('ghl.timeout', 20)))
-                    ->retry(2, 250, throw: false)
-                    ->withToken($token)
-                    ->acceptJson()
-                    ->get("{$this->baseUrl}/conversations/messages/export", $params);
-            } catch (\Throwable $exception) {
-                Log::warning('GHL email export threw; using conversation fallback.', [
-                    'user_id' => $user->getKey(),
-                    'location_id' => $locationId,
-                    'page' => $pageGuard,
-                    'error' => $exception->getMessage(),
-                ]);
-
-                return $this->syncTotalEmailsSentFromGhlByConversations($user);
-            }
-
-            $data = $response->json();
-            $data = is_array($data) ? $data : [];
-
-            if ($response->failed()) {
-                Log::warning('GHL email export failed; using conversation fallback.', [
-                    'user_id' => $user->getKey(),
-                    'location_id' => $locationId,
-                    'page' => $pageGuard,
-                    'status' => $response->status(),
-                    'body' => mb_substr((string) $response->body(), 0, 2000),
-                ]);
-
-                return $this->syncTotalEmailsSentFromGhlByConversations($user);
-            }
-
-            $items = $this->extractExportedEmailMessages($data);
-            $pagesScanned++;
-
-            Log::info('GHL email export page inspected.', [
-                'user_id' => $user->getKey(),
-                'location_id' => $locationId,
-                'page' => $pagesScanned,
-                'items_found' => count($items),
-                'cursor_present' => filled($cursor),
-                'top_level_keys' => array_keys($data),
-            ]);
-
-            foreach ($items as $message) {
-                if (! is_array($message)) {
-                    continue;
-                }
-
-                $messagesScanned++;
-                $direction = $this->extractGhlMessageDirection($message);
-                $isOutbound = $direction === 'outbound';
-
-                if ($direction === 'unknown') {
-                    $isOutbound = $this->isLikelyOutboundEmailMessage($message, $user);
-                    if (! $isOutbound) {
-                        $unclassified++;
-                    }
-                }
-
-                if (! $isOutbound) {
-                    continue;
-                }
-
-                $id = $this->extractGhlMessageUniqueId($message);
-
-                if ($id === '') {
-                    $id = hash('sha256', json_encode([
-                        data_get($message, 'conversationId'),
-                        data_get($message, 'conversation_id'),
-                        data_get($message, 'contactId'),
-                        data_get($message, 'dateAdded'),
-                        data_get($message, 'createdAt'),
-                        data_get($message, 'subject'),
-                        data_get($message, 'emailFrom'),
-                        data_get($message, 'emailTo'),
-                    ]) ?: serialize($message));
-                }
-
-                $seen[$id] = true;
-            }
-
-            $nextCursor = trim((string) (
-                data_get($data, 'nextCursor')
-                ?? data_get($data, 'next_cursor')
-                ?? data_get($data, 'meta.nextCursor')
-                ?? data_get($data, 'meta.next_cursor')
-                ?? data_get($data, 'pagination.nextCursor')
-                ?? data_get($data, 'pagination.next_cursor')
-                ?? data_get($data, 'data.nextCursor')
-                ?? data_get($data, 'data.next_cursor')
-                ?? ''
-            ));
-
-            // Protect against an API response repeating the same cursor forever.
-            $hasMore = $nextCursor !== ''
-                && $nextCursor !== (string) $cursor
-                && $pageGuard < 500;
-            $cursor = $nextCursor !== '' ? $nextCursor : null;
-        } while ($hasMore);
-
-        // A successful 200 with no recognizable rows is not enough evidence to
-        // overwrite a previously known count with zero. Fall back to the normal
-        // Conversations API in case the account/token does not expose export rows.
-        if ($messagesScanned === 0) {
-            Log::warning('GHL email export returned no recognizable rows; using conversation fallback.', [
-                'user_id' => $user->getKey(),
-                'location_id' => $locationId,
-                'pages_scanned' => $pagesScanned,
-            ]);
-
-            return $this->syncTotalEmailsSentFromGhlByConversations($user);
-        }
-
-        $total = count($seen);
-        $user->forceFill(['total_emails_sent' => $total])->save();
-
-        Log::info('GHL sent-email count synchronized through export endpoint.', [
-            'user_id' => $user->getKey(),
-            'location_id' => $locationId,
-            'pages_scanned' => $pagesScanned,
-            'messages_scanned' => $messagesScanned,
-            'unclassified_messages' => $unclassified,
-            'outbound_emails_counted' => $total,
-        ]);
-
-        return [
-            'success' => true,
-            'count' => $total,
-            'messages_scanned' => $messagesScanned,
-            'pages_scanned' => $pagesScanned,
-            'source' => 'ghl_export',
-            'error' => null,
-        ];
-    }
-
-    protected function extractExportedEmailMessages(array $payload): array
-    {
-        $candidates = [
-            data_get($payload, 'messages'),
-            data_get($payload, 'data.messages'),
-            data_get($payload, 'data'),
-            data_get($payload, 'results.messages'),
-            data_get($payload, 'results'),
-            data_get($payload, 'items'),
-            data_get($payload, 'records'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (! is_array($candidate) || $candidate === []) {
-                continue;
-            }
-
-            $rows = array_is_list($candidate) ? $candidate : [];
-            $rows = array_values(array_filter($rows, fn ($row): bool => is_array($row)));
-
-            if ($rows !== []) {
-                return $rows;
-            }
-        }
-
-        // Defensive recursive fallback in case HighLevel changes the response envelope.
-        $walk = function (array $node) use (&$walk): array {
-            foreach ($node as $value) {
-                if (! is_array($value) || $value === []) {
-                    continue;
-                }
-
-                if (array_is_list($value)) {
-                    $rows = array_values(array_filter($value, fn ($row): bool => is_array($row)));
-                    if ($rows !== [] && $this->looksLikeGhlMessage($rows[0])) {
-                        return $rows;
-                    }
-                }
-
-                $nested = $walk($value);
-                if ($nested !== []) {
-                    return $nested;
-                }
-            }
-
-            return [];
-        };
-
-        return $walk($payload);
-    }
-
-    protected function looksLikeGhlMessage(array $message): bool
-    {
-        return collect([
-            'id', 'messageId', 'emailMessageId', 'conversationId', 'contactId',
-            'direction', 'messageDirection', 'type', 'messageType', 'emailFrom',
-            'emailTo', 'subject', 'body', 'html',
-        ])->contains(fn (string $key): bool => array_key_exists($key, $message));
-    }
-
-    protected function extractGhlMessageDirection(array $message): string
-    {
-        $values = [
-            data_get($message, 'direction'),
-            data_get($message, 'messageDirection'),
-            data_get($message, 'message_direction'),
-            data_get($message, 'meta.direction'),
-            data_get($message, 'meta.email.direction'),
-            data_get($message, 'emailMessage.direction'),
-            data_get($message, 'status.direction'),
-        ];
-
-        foreach ($values as $value) {
-            $normalized = strtolower(trim((string) $value));
-            $normalized = preg_replace('/[^a-z]+/', '_', $normalized) ?: '';
-
-            if ($normalized === '') {
-                continue;
-            }
-
-            if (str_starts_with($normalized, 'outbound') || in_array($normalized, ['outgoing', 'sent'], true)) {
-                return 'outbound';
-            }
-
-            if (str_starts_with($normalized, 'inbound') || in_array($normalized, ['incoming', 'received'], true)) {
-                return 'inbound';
-            }
-        }
-
-        if ((bool) data_get($message, 'isOutbound', false) || (bool) data_get($message, 'outbound', false)) {
-            return 'outbound';
-        }
-
-        if ((bool) data_get($message, 'isInbound', false) || (bool) data_get($message, 'inbound', false)) {
-            return 'inbound';
-        }
-
-        return 'unknown';
-    }
-
-    protected function isLikelyOutboundEmailMessage(array $message, User $user): bool
-    {
-        $from = strtolower(trim((string) (
-            data_get($message, 'from')
-            ?? data_get($message, 'emailFrom')
-            ?? data_get($message, 'sender.email')
-            ?? data_get($message, 'emailMessage.from')
-            ?? data_get($message, 'emailMessage.fromEmail')
-            ?? ''
-        )));
-
-        $ownAddresses = collect([
-            $user->email ?? null,
-            $user->personal_email ?? null,
-            config('mail.from.address'),
-        ])->filter()->map(fn ($value) => strtolower(trim((string) $value)))->unique();
-
-        if ($from !== '' && $ownAddresses->contains(fn (string $address): bool => $address !== '' && str_contains($from, $address))) {
-            return true;
-        }
-
-        // HighLevel export rows commonly identify the sending location user only
-        // on outbound messages.
-        if (filled(data_get($message, 'userId')) || filled(data_get($message, 'user_id'))) {
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function extractGhlMessageUniqueId(array $message): string
-    {
-        foreach ([
-            data_get($message, 'emailMessageId'),
-            data_get($message, 'email_message_id'),
-            data_get($message, 'messageId'),
-            data_get($message, 'message_id'),
-            data_get($message, 'id'),
-            data_get($message, '_id'),
-            data_get($message, 'meta.email.messageIds.0'),
-        ] as $id) {
-            $id = trim((string) $id);
-            if ($id !== '') {
-                return $id;
-            }
-        }
-
-        return '';
+        // v134: use the exact same Conversations API family as Inbox.
+        // Do not use /conversations/messages/export. Load every conversation,
+        // then page through its TYPE_EMAIL messages and count outbound messages only.
+        return $this->syncTotalEmailsSentFromGhlByConversations($user);
     }
 
     protected function syncTotalEmailsSentFromGhlByConversations(User $user): array
@@ -3281,7 +2962,8 @@ class GoHighLevelService
         $conversationResult = $this->getConversationsForUser($user, [
             'fetch_all' => true,
             'limit' => 100,
-            'max_rows' => 1000,
+            'max_rows' => (int) config('ghl.sent_email_count_max_conversations', 5000),
+            'max_pages' => (int) config('ghl.sent_email_count_max_conversation_pages', 50),
         ]);
 
         if (! ($conversationResult['success'] ?? false)) {
@@ -3289,15 +2971,19 @@ class GoHighLevelService
                 'success' => false,
                 'count' => null,
                 'conversations_scanned' => 0,
+                'conversations_failed' => 0,
                 'messages_scanned' => 0,
-                'source' => 'conversation_fallback',
+                'outbound_emails_counted' => 0,
+                'source' => 'ghl_conversations',
                 'error' => $conversationResult['error'] ?? 'Unable to retrieve GHL conversations.',
             ];
         }
 
         $seen = [];
         $conversationsScanned = 0;
+        $conversationsFailed = 0;
         $messagesScanned = 0;
+        $outboundRows = 0;
 
         foreach ($conversationResult['conversations'] ?? [] as $conversation) {
             if (! is_array($conversation)) {
@@ -3318,9 +3004,11 @@ class GoHighLevelService
             $conversationsScanned++;
             $lastMessageId = null;
             $pageGuard = 0;
+            $conversationFailed = false;
 
             do {
                 $pageGuard++;
+
                 $result = $this->getConversationMessagesForUser(
                     user: $user,
                     conversationId: $conversationId,
@@ -3329,14 +3017,17 @@ class GoHighLevelService
                 );
 
                 if (! ($result['success'] ?? false)) {
-                    return [
-                        'success' => false,
-                        'count' => null,
-                        'conversations_scanned' => $conversationsScanned,
-                        'messages_scanned' => $messagesScanned,
-                        'source' => 'conversation_fallback',
-                        'error' => "Unable to retrieve messages for conversation {$conversationId}.",
-                    ];
+                    $conversationFailed = true;
+                    $conversationsFailed++;
+
+                    Log::warning('GHL sent-email sync could not read one conversation.', [
+                        'user_id' => $user->getKey(),
+                        'location_id' => $user->ghl_location_id,
+                        'conversation_id' => $conversationId,
+                        'page' => $pageGuard,
+                        'error' => $result['error'] ?? 'Unable to load conversation messages.',
+                    ]);
+                    break;
                 }
 
                 foreach ($result['messages'] ?? [] as $message) {
@@ -3345,41 +3036,45 @@ class GoHighLevelService
                     }
 
                     $messagesScanned++;
-                    $direction = $this->extractGhlMessageDirection($message);
 
-                    if ($direction !== 'outbound') {
-                        continue;
-                    }
-
-                    // The export endpoint is email-only. The fallback endpoint may
-                    // contain other channels, so only count rows that are emails or
-                    // carry email-specific fields.
+                    // getConversationMessagesForUser() already requests TYPE_EMAIL,
+                    // but retain the check so a malformed API row cannot inflate the total.
                     $type = strtolower(trim((string) (
                         $message['type']
                         ?? $message['messageType']
                         ?? $message['message_type']
-                        ?? data_get($message, 'meta.type')
-                        ?? ''
+                        ?? 'TYPE_EMAIL'
                     )));
-                    $looksLikeEmail = $type === ''
-                        || str_contains($type, 'email')
-                        || filled($message['emailMessageId'] ?? null)
-                        || filled($message['email_message_id'] ?? null)
-                        || filled(data_get($message, 'meta.email'));
 
-                    if (! $looksLikeEmail) {
+                    if ($type !== '' && ! str_contains($type, 'email')) {
                         continue;
                     }
 
+                    $direction = $this->extractGhlMessageDirection($message);
+                    $isOutbound = $direction === 'outbound';
+
+                    // Some normalized Inbox rows carry sender/recipient data but no
+                    // explicit direction. Use the same sender inference rather than
+                    // silently dropping a real outbound email.
+                    if ($direction === 'unknown') {
+                        $isOutbound = $this->isLikelyOutboundEmailMessage($message, $user);
+                    }
+
+                    if (! $isOutbound) {
+                        continue;
+                    }
+
+                    $outboundRows++;
                     $id = $this->extractGhlMessageUniqueId($message);
+
                     if ($id === '') {
                         $id = hash('sha256', json_encode([
                             $conversationId,
-                            data_get($message, 'dateAdded'),
-                            data_get($message, 'createdAt'),
-                            data_get($message, 'subject'),
-                            data_get($message, 'emailFrom'),
-                            data_get($message, 'emailTo'),
+                            $message['created_at'] ?? null,
+                            $message['subject'] ?? null,
+                            $message['from'] ?? null,
+                            $message['to'] ?? null,
+                            $message['body'] ?? null,
                         ]) ?: serialize($message));
                     }
 
@@ -3389,20 +3084,41 @@ class GoHighLevelService
                 $next = trim((string) ($result['last_message_id'] ?? ''));
                 $hasMore = (bool) ($result['has_more'] ?? false)
                     && $next !== ''
-                    && $next !== $lastMessageId
-                    && $pageGuard < 200;
+                    && $next !== (string) $lastMessageId
+                    && $pageGuard < (int) config('ghl.sent_email_count_max_message_pages_per_conversation', 200);
                 $lastMessageId = $next !== '' ? $next : null;
             } while ($hasMore);
+
+            if ($conversationFailed) {
+                continue;
+            }
+        }
+
+        // Never replace a known good total with a partial scan. One failed
+        // conversation means the location-wide total is incomplete.
+        if ($conversationsFailed > 0) {
+            return [
+                'success' => false,
+                'count' => null,
+                'conversations_scanned' => $conversationsScanned,
+                'conversations_failed' => $conversationsFailed,
+                'messages_scanned' => $messagesScanned,
+                'outbound_emails_counted' => count($seen),
+                'source' => 'ghl_conversations',
+                'error' => 'One or more GHL conversations could not be fully scanned. Existing sent-email total was preserved.',
+            ];
         }
 
         $total = count($seen);
         $user->forceFill(['total_emails_sent' => $total])->save();
 
-        Log::info('GHL sent-email count synchronized through conversation fallback.', [
+        Log::info('GHL sent-email count synchronized from Conversations API.', [
             'user_id' => $user->getKey(),
             'location_id' => $user->ghl_location_id,
+            'conversations_available' => (int) ($conversationResult['total'] ?? 0),
             'conversations_scanned' => $conversationsScanned,
             'messages_scanned' => $messagesScanned,
+            'outbound_rows_seen' => $outboundRows,
             'outbound_emails_counted' => $total,
         ]);
 
@@ -3410,8 +3126,10 @@ class GoHighLevelService
             'success' => true,
             'count' => $total,
             'conversations_scanned' => $conversationsScanned,
+            'conversations_failed' => 0,
             'messages_scanned' => $messagesScanned,
-            'source' => 'conversation_fallback',
+            'outbound_emails_counted' => $total,
+            'source' => 'ghl_conversations',
             'error' => null,
         ];
     }
@@ -3430,7 +3148,9 @@ class GoHighLevelService
         $requestedLimit = min(max($requestedLimit, 1), 100);
         $fetchAll = (bool) ($query['fetch_all'] ?? false);
         $maxRows = (int) ($query['max_rows'] ?? 500);
-        $maxRows = min(max($maxRows, $requestedLimit), 1000);
+        $maxRows = min(max($maxRows, $requestedLimit), 10000);
+        $maxPages = (int) ($query['max_pages'] ?? 10);
+        $maxPages = min(max($maxPages, 1), 100);
 
         $baseParams = array_filter([
             'locationId' => $locationId,
@@ -3507,7 +3227,7 @@ class GoHighLevelService
                     && $count >= $requestedLimit
                     && count($allItems) < $maxRows
                     && ($total === 0 || count($allItems) < $total)
-                    && $page < 10;
+                    && $page < $maxPages;
             } while ($hasMore);
 
             if ($pageSuccess) {

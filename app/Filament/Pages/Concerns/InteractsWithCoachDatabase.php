@@ -493,8 +493,8 @@ trait InteractsWithCoachDatabase
 
     /**
      * Reconcile the local sent-email total against GHL without blocking every
-     * Dashboard visit. v133 uses the location-wide email export endpoint in the
-     * service, so a short cache guard is enough to avoid duplicate requests.
+     * Dashboard visit. v134 deliberately uses the same Conversations API family
+     * as Inbox and counts only outbound TYPE_EMAIL messages across all threads.
      */
     public function syncTotalEmailsSentFromGhlOccasionally($user = null): void
     {
@@ -509,12 +509,12 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // v133: do not leave an established total stale for an hour. The export
-        // request is location-wide and paginated, so refresh regularly while still
-        // preventing duplicate Livewire requests from hammering HighLevel.
+        // v134: use a new guard key so the previous export-based marker cannot
+        // suppress the first Conversations-API reconciliation after deployment.
+        // Keep the window short while testing/using the dashboard.
         $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addMinutes(5) : now()->addMinutes(2);
-        $syncKey = 'recruiting:total-emails-sent-sync:v133:'
+        $ttl = $currentCount > 0 ? now()->addMinute() : now()->addSeconds(30);
+        $syncKey = 'recruiting:total-emails-sent-sync:v134:'
             . (int) $user->getKey()
             . ':'
             . strtolower($locationId);
