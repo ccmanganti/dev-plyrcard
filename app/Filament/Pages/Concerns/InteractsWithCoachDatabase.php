@@ -443,6 +443,11 @@ trait InteractsWithCoachDatabase
             if (empty($this->dashboardRecentActivity)) {
                 $this->loadDashboardActivity();
             }
+
+            // v133: persistent-shell navigation does not remount the page or rerun
+            // wire:init. Ask the browser to start the GHL email reconciliation only
+            // after Dashboard is visibly open so the tab switch itself stays fast.
+            $this->dispatch('rc-fast-section-ready', section: 'dashboard');
         }
 
         if (in_array($section, ['schools', 'favorites', 'lists', 'compose'], true) && empty($this->lists)) {
@@ -487,12 +492,9 @@ trait InteractsWithCoachDatabase
     }
 
     /**
-     * Occasionally reconcile the local sent-email total against GHL.
-     *
-     * The dashboard mount calls this method. A cache marker prevents the
-     * expensive conversation/message scan from running more than once per day
-     * for the same user and GHL location. Failed scans release the marker so a
-     * later dashboard request can retry.
+     * Reconcile the local sent-email total against GHL without blocking every
+     * Dashboard visit. v133 uses the location-wide email export endpoint in the
+     * service, so a short cache guard is enough to avoid duplicate requests.
      */
     public function syncTotalEmailsSentFromGhlOccasionally($user = null): void
     {
@@ -507,11 +509,12 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // A previous zero-result sync must not block the dashboard for an entire day.
-        // Retry zero totals every five minutes; established totals are reconciled hourly.
+        // v133: do not leave an established total stale for an hour. The export
+        // request is location-wide and paginated, so refresh regularly while still
+        // preventing duplicate Livewire requests from hammering HighLevel.
         $currentCount = max(0, (int) ($user->total_emails_sent ?? 0));
-        $ttl = $currentCount > 0 ? now()->addHour() : now()->addMinutes(5);
-        $syncKey = 'recruiting:total-emails-sent-sync:'
+        $ttl = $currentCount > 0 ? now()->addMinutes(5) : now()->addMinutes(2);
+        $syncKey = 'recruiting:total-emails-sent-sync:v133:'
             . (int) $user->getKey()
             . ':'
             . strtolower($locationId);
@@ -532,6 +535,8 @@ trait InteractsWithCoachDatabase
                     'location_id' => $locationId,
                     'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                     'messages_scanned' => $result['messages_scanned'] ?? 0,
+                    'pages_scanned' => $result['pages_scanned'] ?? 0,
+                    'source' => $result['source'] ?? 'unknown',
                     'error' => $result['error'] ?? 'Unknown sync error.',
                 ]);
 
@@ -557,6 +562,8 @@ trait InteractsWithCoachDatabase
                 'location_id' => $locationId,
                 'conversations_scanned' => $result['conversations_scanned'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
+                'pages_scanned' => $result['pages_scanned'] ?? 0,
+                'source' => $result['source'] ?? 'unknown',
                 'outbound_emails_counted' => $count,
             ]);
         } catch (\Throwable $exception) {

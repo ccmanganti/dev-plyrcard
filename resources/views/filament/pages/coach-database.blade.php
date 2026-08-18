@@ -3,7 +3,8 @@
         data-rc-current-section="{{ $section }}"
         x-data
         x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
-        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
+        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }"
+        x-on:rc-fast-dashboard-refresh.window="if (($event.detail?.section || '') === 'dashboard') { $nextTick(async () => { await $wire.syncTotalEmailsSentFromGhlOccasionally(); }) }">
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -14405,6 +14406,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
                 if (section === 'conversations') {
                     window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
+                }
+                if (section === 'dashboard') {
+                    window.dispatchEvent(new CustomEvent('rc-fast-dashboard-refresh', { detail: { section } }));
                 }
             });
         }
