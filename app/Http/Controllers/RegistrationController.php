@@ -9,7 +9,6 @@ use App\Models\League;
 use App\Models\School;
 use App\Models\User;
 use App\Models\Website;
-use App\Services\GhlBillingService;
 use App\Services\GoHighLevelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,7 +66,7 @@ class RegistrationController extends PublicPlayerIntakeController
         $exists = Website::query()->whereRaw('LOWER(slug) = ?', [strtolower($handle)])->exists()
             || BillingInformation::query()
                 ->whereRaw('LOWER(requested_handle) = ?', [strtolower($handle)])
-                ->whereIn('payment_status', ['pending', 'invoice_created', 'invoice_sent', 'paid', 'not_required'])
+                ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid', 'not_required'])
                 ->exists();
 
         return response()->json([
@@ -102,7 +101,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
         $requestedLocally = BillingInformation::query()
             ->whereRaw('LOWER(requested_domain) = ?', [strtolower($domain)])
-            ->whereIn('payment_status', ['pending', 'invoice_created', 'invoice_sent', 'paid'])
+            ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])
             ->exists();
 
         if ($claimedLocally || $requestedLocally) {
@@ -143,7 +142,6 @@ class RegistrationController extends PublicPlayerIntakeController
         // Resolve the registration-only services through Laravel's container instead of
         // adding parameters to the overridden parent method.
         $ghl = app(GoHighLevelService::class);
-        $ghlBilling = app(GhlBillingService::class);
         $domainAvailability = app(\App\Services\DomainAvailabilityService::class);
         $planKey = $this->normalizePlanKey(
             $request->query('utm_plan', $request->input('plan_key', 'free'))
@@ -262,7 +260,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 ->exists()
                 || BillingInformation::query()
                     ->whereRaw('LOWER(requested_domain) = ?', [strtolower($validated['requested_domain'])])
-                    ->whereIn('payment_status', ['pending', 'invoice_created', 'invoice_sent', 'paid'])
+                    ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])
                     ->exists();
 
             if ($domainConflict) {
@@ -292,7 +290,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 || Website::query()->whereRaw('LOWER(slug) = ?', [strtolower($handle)])->exists()
                 || BillingInformation::query()
                     ->whereRaw('LOWER(requested_handle) = ?', [strtolower($handle)])
-                    ->whereIn('payment_status', ['pending', 'invoice_created', 'invoice_sent', 'paid', 'not_required'])
+                    ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid', 'not_required'])
                     ->exists()) {
                 throw ValidationException::withMessages([
                     'requested_handle' => 'That PLYRSITE link is already taken or reserved.',
@@ -406,8 +404,8 @@ class RegistrationController extends PublicPlayerIntakeController
                 'initial_amount_cents' => $initialAmount,
                 'payment_status' => $isPaid ? 'pending' : 'not_required',
                 'subscription_status' => $isPaid ? 'pending' : 'free',
-                'payment_provider' => $isPaid ? 'ghl_invoice' : null,
-                'payment_type' => $isPaid ? 'invoice' : null,
+                'payment_provider' => $isPaid ? 'ghl_survey' : null,
+                'payment_type' => $isPaid ? 'card' : null,
                 'requested_domain' => $isPaid ? $validated['requested_domain'] : null,
                 'requested_handle' => ! $isPaid ? $validated['requested_handle'] : null,
                 'registration_meta' => $registrationMeta,
@@ -419,7 +417,7 @@ class RegistrationController extends PublicPlayerIntakeController
         });
 
         $ghlContactId = null;
-        $invoiceResult = null;
+        $paymentFormUrl = null;
 
         try {
             $ghlContactId = $ghl->upsertContact([
@@ -460,49 +458,34 @@ class RegistrationController extends PublicPlayerIntakeController
             $billing->forceFill([
                 'ghl_contact_id' => $ghlContactId,
                 'ghl_location_id' => $locationId,
-                'ghl_sync_status' => 'contact_synced',
+                'ghl_sync_status' => $isPaid ? 'payment_form_ready' : 'synced',
+                'payment_status' => $isPaid ? 'payment_form_ready' : $billing->payment_status,
+                'ghl_sync_response' => ['contact_id' => $ghlContactId],
                 'ghl_synced_at' => now(),
             ])->save();
-
-            if ($isPaid) {
-                $invoiceResult = $ghlBilling->createInitialRegistrationInvoice($user, $billing);
-
-                if ($invoiceResult['success'] ?? false) {
-                    $billing->forceFill([
-                        'ghl_invoice_id' => $invoiceResult['invoice_id'] ?? null,
-                        'payment_status' => ($invoiceResult['invoice_sent'] ?? false) ? 'invoice_sent' : 'invoice_created',
-                        'ghl_sync_status' => ($invoiceResult['invoice_sent'] ?? false) ? 'invoice_sent' : 'invoice_created',
-                        'ghl_sync_response' => [
-                            'contact_id' => $ghlContactId,
-                            'invoice' => $invoiceResult,
-                        ],
-                        'ghl_synced_at' => now(),
-                    ])->save();
-                } else {
-                    $billing->forceFill([
-                        'payment_status' => 'invoice_error',
-                        'ghl_sync_status' => 'invoice_error',
-                        'ghl_sync_response' => [
-                            'contact_id' => $ghlContactId,
-                            'invoice' => $invoiceResult,
-                        ],
-                        'ghl_synced_at' => now(),
-                    ])->save();
-                }
-            } else {
-                $billing->forceFill([
-                    'ghl_sync_status' => 'synced',
-                    'ghl_sync_response' => ['contact_id' => $ghlContactId],
-                    'ghl_synced_at' => now(),
-                ])->save();
-            }
         } else {
             $billing->forceFill([
                 'ghl_sync_status' => 'contact_sync_error',
-                'payment_status' => $isPaid ? 'invoice_error' : $billing->payment_status,
                 'ghl_sync_response' => ['message' => 'GHL contact could not be created or resolved.'],
                 'ghl_synced_at' => now(),
             ])->save();
+        }
+
+        if ($isPaid) {
+            $paymentFormUrl = $this->buildRegistrationPaymentFormUrl(
+                $planKey,
+                $plan,
+                $user,
+                $billing,
+                $ghlContactId,
+            );
+
+            if (! $paymentFormUrl) {
+                $billing->forceFill([
+                    'payment_status' => 'payment_form_error',
+                    'ghl_sync_status' => 'payment_form_error',
+                ])->save();
+            }
         }
 
         Auth::login($user, true);
@@ -518,13 +501,14 @@ class RegistrationController extends PublicPlayerIntakeController
             'billing_id' => $billing->id,
             'payment_status' => $billing->payment_status,
             'subscription_status' => $billing->subscription_status,
-            'invoice_sent' => (bool) data_get($invoiceResult, 'invoice_sent', false),
-            'payment_url' => data_get($invoiceResult, 'payment_url'),
+            'payment_form_url' => $paymentFormUrl,
+            // Keep payment_url for compatibility with older registration JavaScript.
+            'payment_url' => $paymentFormUrl,
             'redirect_url' => url('/admin/my-profile'),
             'message' => $isPaid
-                ? ($billing->payment_status === 'invoice_error'
-                    ? 'Your PLYRCARD account was created, but payment could not be started. Please try again from your account.'
-                    : 'Your PLYRCARD account was created. Complete payment to activate your plan.')
+                ? ($paymentFormUrl
+                    ? 'Your account is ready. Enter your card details below to complete payment.'
+                    : 'Your account was created, but the payment form could not be opened. Please try again.')
                 : 'Your free PLYRCARD account is ready.',
         ]);
     }
@@ -593,6 +577,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'charge_first_month_upfront' => true,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
+                'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
             ],
             'amplify' => [
                 'label' => 'Amplify',
@@ -601,6 +586,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'charge_first_month_upfront' => false,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
+                'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
             ],
             default => [
                 'label' => 'Free',
@@ -611,6 +597,65 @@ class RegistrationController extends PublicPlayerIntakeController
                 'role_after_payment' => 'Free',
             ],
         };
+    }
+
+    protected function buildRegistrationPaymentFormUrl(
+        string $planKey,
+        array $plan,
+        User $user,
+        BillingInformation $billing,
+        ?string $contactId = null,
+    ): ?string {
+        $baseUrl = trim((string) ($plan['payment_form_url'] ?? ''));
+
+        if ($baseUrl === '') {
+            $baseUrl = match ($planKey) {
+                'my-journey' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
+                'amplify' => 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
+                default => '',
+            };
+        }
+
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        $label = (string) ($plan['label'] ?? Str::headline($planKey));
+        $email = $billing->billing_email ?: $user->email;
+        $phone = $billing->billing_phone ?: $user->phone;
+
+        $params = array_filter([
+            'notrack' => 'true',
+            'utm_plan' => $planKey,
+            'selected_plan' => $label,
+            'plan' => $planKey,
+            'first_name' => $user->first_name,
+            'firstName' => $user->first_name,
+            'contact.first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'lastName' => $user->last_name,
+            'contact.last_name' => $user->last_name,
+            'email' => $email,
+            'contact.email' => $email,
+            'phone' => $phone,
+            'contact.phone' => $phone,
+            'billing_name' => $billing->billing_name,
+            'billing_email' => $email,
+            'billing_phone' => $phone,
+            'billing_address_1' => $billing->billing_address_1,
+            'billing_city' => $billing->billing_city,
+            'billing_state' => $billing->billing_state,
+            'billing_postal_code' => $billing->billing_postal_code,
+            'billing_country' => $billing->billing_country,
+            'requested_domain' => $billing->requested_domain,
+            'user_id' => $user->id,
+            'contact_id' => $contactId,
+            'app_url' => url('/admin/my-profile'),
+        ], fn ($value) => filled($value));
+
+        $separator = str_contains($baseUrl, '?') ? '&' : '?';
+
+        return $baseUrl . $separator . http_build_query($params);
     }
 
     protected function normalizeRegistrationGender(string $gender): string

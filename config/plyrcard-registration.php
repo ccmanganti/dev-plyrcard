@@ -28,6 +28,7 @@ return [
             'charge_first_month_upfront' => true,
             'role_after_registration' => 'Free',
             'role_after_payment' => 'My Journey',
+            'payment_form_url' => env('GHL_MY_JOURNEY_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true'),
         ],
 
         'amplify' => [
@@ -37,6 +38,7 @@ return [
             'charge_first_month_upfront' => false,
             'role_after_registration' => 'Free',
             'role_after_payment' => 'My Journey',
+            'payment_form_url' => env('GHL_AMPLIFY_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true'),
         ],
     ],
 
