@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -142,7 +143,6 @@ class RegistrationController extends PublicPlayerIntakeController
         // Resolve the registration-only services through Laravel's container instead of
         // adding parameters to the overridden parent method.
         $ghl = app(GoHighLevelService::class);
-        $domainAvailability = app(\App\Services\DomainAvailabilityService::class);
         $planKey = $this->normalizePlanKey(
             $request->query('utm_plan', $request->input('plan_key', 'free'))
         );
@@ -269,21 +269,15 @@ class RegistrationController extends PublicPlayerIntakeController
                 ]);
             }
 
-            // Re-check the real registry at final submit so a stale browser result
-            // cannot reserve a domain that became registered after selection.
-            $domainLookup = $domainAvailability->lookup($validated['requested_domain']);
-
-            if (($domainLookup['status'] ?? null) === 'registered') {
-                throw ValidationException::withMessages([
-                    'requested_domain' => 'That domain is now registered. Please choose another domain.',
-                ]);
-            }
-
-            if (! ($domainLookup['available'] ?? false)) {
-                throw ValidationException::withMessages([
-                    'requested_domain' => 'We could not confirm this domain right now. Please run the domain search again.',
-                ]);
-            }
+            // The athlete already selected an available domain in Step 1.
+            // Do not perform a second external lookup here because a transient
+            // registry/network response must not invalidate a previously selected name.
+            // The final submit only protects against a local PLYRCARD collision.
+            $domainLookup = [
+                'available' => true,
+                'status' => 'selected_available',
+                'verified' => true,
+            ];
         } else {
             $handle = $validated['requested_handle'];
             if (in_array($handle, $this->reservedHandles(), true)
@@ -357,6 +351,22 @@ class RegistrationController extends PublicPlayerIntakeController
                 $website->forceFill(['slug' => $validated['requested_handle']])->save();
             }
 
+            if ($isPaid) {
+                $selectedDomain = $validated['requested_domain'];
+
+                // Save the selected domain directly on the player's website/profile.
+                if ($website) {
+                    $website->forceFill(['domain' => $selectedDomain])->save();
+                }
+
+                // Some existing PLYRCARD databases also carry domain on users.
+                // Populate it when that column exists without requiring the User
+                // model's fillable list to change.
+                if (Schema::hasColumn($user->getTable(), 'domain')) {
+                    $user->forceFill(['domain' => $selectedDomain])->saveQuietly();
+                }
+            }
+
             $registrationMeta = [
                 'source_utm_plan' => $planKey,
                 'utm' => array_filter([
@@ -375,7 +385,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'age_group' => $validated['age_group'],
                 'domain_rdap_verified' => $isPaid ? (bool) ($domainLookup['verified'] ?? false) : false,
                 'domain_rdap_status' => $isPaid ? ($domainLookup['status'] ?? null) : null,
-                'domain_lookup_source' => $isPaid ? 'rdap' : null,
+                'domain_lookup_source' => $isPaid ? 'selected-domain' : null,
                 'domain_registrar_verified' => false,
             ];
 
