@@ -124,7 +124,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'status' => $lookup['status'] ?? 'unknown',
             'domain' => $domain,
             'message' => match ($lookup['status'] ?? 'unknown') {
-                'available' => 'RDAP found no current registration. Available to request.',
+                'available' => 'This domain appears available.',
                 'registered' => 'That domain is already registered.',
                 default => $lookup['message'] ?? 'We could not verify this domain right now. Please try again.',
             },
@@ -281,7 +281,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
             if (! ($domainLookup['available'] ?? false)) {
                 throw ValidationException::withMessages([
-                    'requested_domain' => 'We could not confirm this domain through RDAP right now. Please run the domain search again.',
+                    'requested_domain' => 'We could not confirm this domain right now. Please run the domain search again.',
                 ]);
             }
         } else {

@@ -55,6 +55,7 @@ return [
     */
     'domain_lookup' => [
         'bootstrap_url' => env('RDAP_BOOTSTRAP_URL', 'https://data.iana.org/rdap/dns.json'),
+        'fallback_base_url' => env('RDAP_FALLBACK_BASE_URL', 'https://rdap.org'),
         'bootstrap_cache_hours' => (int) env('RDAP_BOOTSTRAP_CACHE_HOURS', 24),
         'result_cache_minutes' => (int) env('RDAP_RESULT_CACHE_MINUTES', 10),
         'connect_timeout' => (int) env('RDAP_CONNECT_TIMEOUT', 3),
