@@ -28,15 +28,31 @@ class ExternalSocialTrackingController extends Controller
     public function platform(Request $request, string $slug, string $platform): RedirectResponse
     {
         $lookup = strtolower(trim(urldecode($slug)));
+        $requestedWebsiteId = $this->requestedWebsiteId($request);
 
-        $website = Website::query()
-            ->where(function ($query) use ($lookup): void {
-                $query->whereRaw('LOWER(slug) = ?', [$lookup])
-                    ->orWhereRaw('LOWER(name) = ?', [$lookup]);
-            })
-            ->with('user')
-            ->latest('updated_at')
-            ->first();
+        $website = $requestedWebsiteId
+            ? Website::query()
+                ->whereKey($requestedWebsiteId)
+                ->where('is_active', true)
+                ->where(function ($query) use ($lookup): void {
+                    $query->whereRaw('LOWER(slug) = ?', [$lookup])
+                        ->orWhereRaw('LOWER(name) = ?', [$lookup]);
+                })
+                ->with('user')
+                ->first()
+            : null;
+
+        if (! $website) {
+            $website = Website::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($lookup): void {
+                    $query->whereRaw('LOWER(slug) = ?', [$lookup])
+                        ->orWhereRaw('LOWER(name) = ?', [$lookup]);
+                })
+                ->with('user')
+                ->latest('updated_at')
+                ->first();
+        }
 
         return $this->trackAndRedirect($request, $website, $platform);
     }
@@ -47,18 +63,33 @@ class ExternalSocialTrackingController extends Controller
      */
     public function customDomain(Request $request, string $platform): RedirectResponse
     {
-        $host = strtolower(trim($request->getHost()));
-        $plainHost = Str::startsWith($host, 'www.') ? Str::after($host, 'www.') : $host;
+        $host = $this->normalizeHost($request->getHost());
+        $requestedWebsiteId = $this->requestedWebsiteId($request);
 
-        $website = Website::query()
-            ->where(function ($query) use ($host, $plainHost): void {
-                $query->whereRaw('LOWER(domain) = ?', [$host])
-                    ->orWhereRaw('LOWER(domain) = ?', [$plainHost])
-                    ->orWhereRaw('LOWER(domain) = ?', ['www.' . $plainHost]);
-            })
-            ->with('user')
-            ->latest('updated_at')
-            ->first();
+        // Generated campaign links carry rc_website_id. Resolve that exact Website first
+        // and verify that the incoming custom domain belongs to it. This prevents a newer
+        // stale/duplicate Website row on the same domain from being selected accidentally.
+        $website = $requestedWebsiteId
+            ? Website::query()
+                ->whereKey($requestedWebsiteId)
+                ->where('is_active', true)
+                ->with('user')
+                ->first()
+            : null;
+
+        if ($website && ! $this->websiteMatchesHost($website, $host)) {
+            $website = null;
+        }
+
+        // Backwards compatibility for links generated before rc_website_id existed.
+        if (! $website) {
+            $website = Website::query()
+                ->where('is_active', true)
+                ->with('user')
+                ->latest('updated_at')
+                ->get()
+                ->first(fn (Website $candidate): bool => $this->websiteMatchesHost($candidate, $host));
+        }
 
         return $this->trackAndRedirect($request, $website, $platform);
     }
@@ -296,6 +327,44 @@ class ExternalSocialTrackingController extends Controller
         }
 
         return $default;
+    }
+
+    protected function requestedWebsiteId(Request $request): ?int
+    {
+        $value = $this->mergeValue($request->query('rc_website_id'));
+
+        if ($value === '' || ! ctype_digit($value)) {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 ? $id : null;
+    }
+
+    protected function websiteMatchesHost(Website $website, string $requestHost): bool
+    {
+        $websiteHost = $this->normalizeHost((string) $website->domain);
+
+        return $websiteHost !== '' && hash_equals($websiteHost, $requestHost);
+    }
+
+    protected function normalizeHost(?string $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (! Str::startsWith($value, ['http://', 'https://'])) {
+            $value = 'https://' . ltrim($value, '/');
+        }
+
+        $host = strtolower(trim((string) parse_url($value, PHP_URL_HOST)));
+        $host = preg_replace('/^www\./i', '', $host) ?: $host;
+
+        return rtrim($host, '.');
     }
 
     protected function normalizePlatform(string $platform): string

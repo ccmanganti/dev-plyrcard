@@ -85,9 +85,59 @@ class ExternalTrackingUrlGeneratorController extends Controller
             'include_email' => $request->boolean('include_email'),
         ]);
 
+        // v139: bind every generated public/tracking URL to the exact Website selected
+        // in the generator. The social redirect controller verifies this ID against the
+        // incoming host before using it, while old links without the parameter continue
+        // to work through the domain fallback.
+        $generated = $this->appendWebsiteIdentityToGenerated(
+            $generated,
+            (int) $website->getKey(),
+        );
+
         return redirect()
             ->route('admin.external-tracking-url-generator', ['player' => $player->getKey()])
             ->with('generated', $generated);
+    }
+
+    protected function appendWebsiteIdentityToGenerated(mixed $value, int $websiteId): mixed
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->appendWebsiteIdentityToGenerated($item, $websiteId);
+            }
+
+            return $value;
+        }
+
+        if (! is_string($value) || ! preg_match('~^https?://~i', trim($value))) {
+            return $value;
+        }
+
+        return $this->appendQueryParameter($value, 'rc_website_id', (string) $websiteId);
+    }
+
+    protected function appendQueryParameter(string $url, string $key, string $value): string
+    {
+        // Preserve merge tags such as {{contact.id}} exactly as generated. Rebuilding
+        // the URL with parse_str/http_build_query would URL-encode those placeholders.
+        if (preg_match('/(?:^|[?&])' . preg_quote($key, '/') . '=/', $url)) {
+            return $url;
+        }
+
+        $fragment = '';
+        if (str_contains($url, '#')) {
+            [$url, $fragmentValue] = explode('#', $url, 2);
+            $fragment = '#' . $fragmentValue;
+        }
+
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url
+            . $separator
+            . rawurlencode($key)
+            . '='
+            . rawurlencode($value)
+            . $fragment;
     }
 
     protected function authorizeAdmin(Request $request): void
