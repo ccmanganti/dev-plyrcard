@@ -5,6 +5,8 @@ namespace App\Models;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -15,15 +17,15 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements HasName, FilamentUser
+class User extends Authenticatable implements HasName, FilamentUser, MustVerifyEmailContract
 {
-    use HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasFactory, Notifiable, HasRoles, SoftDeletes, MustVerifyEmail;
 
     protected $fillable = [
-        'first_name','last_name','gender','personal_email','email','phone','country','state','city','street','gpa','ncaa_field_id','year','birth','height','weight','jersey_number','sport','position','dominant_foot','academic_accolades','sports_accolades','natl_team_exp','team_name','ig_handle','x_handle','yt_url','press','parent','parent_email','parent_phone','sec_parent','sec_parent_email','sec_parent_phone','club_coach','club_coach_email','club_coach_phone','natl_coach','natl_coach_email','natl_coach_phone','tech_trainer','tech_trainer_email','tech_trainer_phone','snc_trainer','snc_trainer_email','snc_trainer_phone','school_id','club_id','league_id','club_league_id','pro_club_name','pro_club_logo','legacy_club_id','legacy_league_id','legacy_team_name','national_team_id','password','plyrcard_image','player_image','action_image','national_team_image','mobile_hero_image','youtube_thumbnail','raw_player_images','player_bio','featured_video_url','featured_video_urls','youtube_channel_id','youtube_uploads_playlist_id','youtube_cached_videos','youtube_cache_refreshed_at','national_team_period','max_speed','profile_completion_percentage','profile_completion_threshold_sent_at',
+        'first_name','last_name','gender','personal_email','email','phone','country','state','city','street','gpa','ncaa_field_id','year','birth','height','weight','jersey_number','sport','position','dominant_foot','academic_accolades','sports_accolades','natl_team_exp','team_name','team_id','ig_handle','x_handle','yt_url','press','parent','parent_email','parent_phone','sec_parent','sec_parent_email','sec_parent_phone','club_coach','club_coach_email','club_coach_phone','natl_coach','natl_coach_email','natl_coach_phone','tech_trainer','tech_trainer_email','tech_trainer_phone','snc_trainer','snc_trainer_email','snc_trainer_phone','school_id','club_id','league_id','club_league_id','pro_club_name','pro_club_logo','legacy_club_id','legacy_league_id','legacy_team_name','national_team_id','password','plyrcard_image','player_image','action_image','national_team_image','mobile_hero_image','youtube_thumbnail','raw_player_images','player_bio','featured_video_url','featured_video_urls','youtube_channel_id','youtube_uploads_playlist_id','youtube_cached_videos','youtube_cache_refreshed_at','national_team_period','max_speed','profile_completion_percentage','profile_completion_threshold_sent_at',
         'ghl_contact_id','ghl_location_id','ghl_api_key','total_emails_sent',
         'club_referral_id','registration_source','utm_club_id','utm_league_id','utm_team_name',
-        'must_change_password','onboarding_completed_at',
+        'must_change_password','onboarding_completed_at','email_verification_sent_at',
     ];
 
     protected $hidden = ['password','remember_token','ghl_api_key'];
@@ -43,7 +45,7 @@ class User extends Authenticatable implements HasName, FilamentUser
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime','password' => 'hashed','natl_team_exp' => 'boolean','position' => 'array','youtube_cached_videos' => 'array','youtube_cache_refreshed_at' => 'datetime','raw_player_images' => 'array','club_referral_id' => 'integer','utm_club_id' => 'integer','utm_league_id' => 'integer','total_emails_sent' => 'integer','must_change_password' => 'boolean','onboarding_completed_at' => 'datetime',
+            'email_verified_at' => 'datetime','email_verification_sent_at' => 'datetime','password' => 'hashed','natl_team_exp' => 'boolean','position' => 'array','youtube_cached_videos' => 'array','youtube_cache_refreshed_at' => 'datetime','raw_player_images' => 'array','club_referral_id' => 'integer','utm_club_id' => 'integer','utm_league_id' => 'integer','total_emails_sent' => 'integer','must_change_password' => 'boolean','onboarding_completed_at' => 'datetime',
         ];
     }
 
@@ -62,7 +64,9 @@ class User extends Authenticatable implements HasName, FilamentUser
     public function league(): BelongsTo { return $this->belongsTo(League::class); }
     public function legacyLeague(): BelongsTo { return $this->belongsTo(League::class, 'legacy_league_id'); }
     public function clubLeague(): BelongsTo { return $this->belongsTo(ClubLeague::class); }
+    public function team(): BelongsTo { return $this->belongsTo(Team::class); }
     public function activeWebsite(): HasOne { return $this->hasOne(Website::class)->where('is_active', true); }
+    public function billingInformation(): HasOne { return $this->hasOne(BillingInformation::class); }
 
     public function schedules(): BelongsToMany
     {
@@ -76,22 +80,9 @@ class User extends Authenticatable implements HasName, FilamentUser
 
     public function clubReferrals(): HasMany { return $this->hasMany(ClubReferral::class, 'club_manager_id'); }
     public function registrationReferral(): BelongsTo { return $this->belongsTo(ClubReferral::class, 'club_referral_id'); }
-
-    // Player-exclusive recruiting relationships.
-    public function favoriteSchoolRecords(): HasMany
-    {
-        return $this->hasMany(FavoriteSchool::class);
-    }
-
-    public function favoriteSchools(): BelongsToMany
-    {
-        return $this->belongsToMany(School::class, 'favorite_schools')->withTimestamps();
-    }
-
-    public function recruitingLists(): HasMany
-    {
-        return $this->hasMany(MyList::class);
-    }
+    public function favoriteSchoolRecords(): HasMany { return $this->hasMany(FavoriteSchool::class); }
+    public function favoriteSchools(): BelongsToMany { return $this->belongsToMany(School::class, 'favorite_schools')->withTimestamps(); }
+    public function recruitingLists(): HasMany { return $this->hasMany(MyList::class); }
 
     public function isClubManager(): bool
     {

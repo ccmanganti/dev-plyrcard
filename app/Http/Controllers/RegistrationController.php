@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -29,6 +31,9 @@ class RegistrationController extends PublicPlayerIntakeController
             $request->query('utm_plan', $request->query('plan', 'free'))
         );
 
+        $leagues = $this->canonicalLeagueQuery()->orderBy('name')->get();
+        $programs = $this->activeClubLeagueQuery()->with(['club', 'league'])->get();
+
         return view('pages.registration', [
             'planKey' => $planKey,
             'plan' => $this->planConfig($planKey),
@@ -36,6 +41,30 @@ class RegistrationController extends PublicPlayerIntakeController
             'sportPositions' => $this->sportPositions,
             'states' => $this->states(),
             'ageGroups' => $this->getAgeGroupOptions(),
+            'leagueDirectory' => $leagues->map(function (League $league) {
+                $genders = collect($league->genders ?: [$league->gender])
+                    ->map(fn ($value) => $this->normalizeGender($value))
+                    ->filter()->unique()->values()->all();
+                return [
+                    'id' => (string) $league->id,
+                    'name' => $league->name,
+                    'genders' => $genders,
+                    'sport' => filled($league->sport) ? strtolower((string) $league->sport) : null,
+                ];
+            })->values(),
+            'clubDirectory' => $programs->map(function (ClubLeague $program) {
+                $genders = collect($program->genders ?: $program->league?->genders ?: [$program->league?->gender])
+                    ->map(fn ($value) => $this->normalizeGender($value))
+                    ->filter()->unique()->values()->all();
+                return [
+                    'id' => (string) $program->club_id,
+                    'name' => $program->club?->name,
+                    'league_id' => (string) $program->league_id,
+                    'club_league_id' => (string) $program->id,
+                    'genders' => $genders,
+                    'sport' => filled($program->sport) ? strtolower((string) $program->sport) : (filled($program->league?->sport) ? strtolower((string) $program->league->sport) : null),
+                ];
+            })->filter(fn ($row) => filled($row['id']) && filled($row['name']))->values(),
             'trackingParams' => array_filter($request->only([
                 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
                 'utm_club_id', 'utm_league_id', 'utm_team_name',
@@ -191,14 +220,15 @@ class RegistrationController extends PublicPlayerIntakeController
             'gpa' => ['nullable', 'string', 'max:50'],
             'position' => ['required', 'array', 'min:1', 'max:3'],
             'position.*' => ['required', 'string', 'max:100'],
-            'high_school' => ['required', 'string', 'max:255'],
+            'high_school' => ['nullable', 'string', 'max:255'],
             'state' => ['required', 'string', 'max:100'],
-            'club_name' => ['required', 'string', 'max:255'],
-            'league_name' => ['required', 'string', 'max:255'],
-            'age_group' => ['required', 'string', 'max:50'],
+            'league_id' => ['required', 'integer', 'exists:leagues,id'],
+            'club_id' => ['required', 'string', 'max:50'],
+            'club_other' => ['nullable', 'string', 'max:255'],
+            'team_name' => ['required', Rule::in($this->getAgeGroupOptions())],
             'jersey_number' => ['nullable', 'integer', 'min:0', 'max:99'],
-            'club_coach' => [$isPaid ? 'required' : 'nullable', 'nullable', 'string', 'max:255'],
-            'club_coach_email' => [$isPaid ? 'required' : 'nullable', 'nullable', 'email:rfc', 'max:255'],
+            'club_coach' => ['nullable', 'string', 'max:255'],
+            'club_coach_email' => ['nullable', 'email:rfc', 'max:255'],
 
             'terms' => ['accepted'],
             'utm_source' => ['nullable', 'string', 'max:255'],
@@ -224,8 +254,6 @@ class RegistrationController extends PublicPlayerIntakeController
                 'billing_postal_code' => ['required', 'string', 'max:30'],
                 'billing_country' => ['required', 'string', 'max:100'],
             ]);
-        } else {
-            $rules['requested_handle'] = ['required', 'string', 'min:3', 'max:80'];
         }
 
         $validated = $request->validate($rules, [
@@ -279,17 +307,10 @@ class RegistrationController extends PublicPlayerIntakeController
                 'verified' => true,
             ];
         } else {
-            $handle = $validated['requested_handle'];
-            if (in_array($handle, $this->reservedHandles(), true)
-                || Website::query()->whereRaw('LOWER(slug) = ?', [strtolower($handle)])->exists()
-                || BillingInformation::query()
-                    ->whereRaw('LOWER(requested_handle) = ?', [strtolower($handle)])
-                    ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid', 'not_required'])
-                    ->exists()) {
-                throw ValidationException::withMessages([
-                    'requested_handle' => 'That PLYRSITE link is already taken or reserved.',
-                ]);
-            }
+            $validated['requested_handle'] = $this->generateAutomaticHandle(
+                $validated['first_name'],
+                $validated['last_name'],
+            );
         }
 
         [$user, $billing] = DB::transaction(function () use (
@@ -302,10 +323,12 @@ class RegistrationController extends PublicPlayerIntakeController
             $positions,
             $domainLookup,
         ) {
-            $school = $this->resolveRegistrationSchool($validated['high_school'], $validated['state']);
-            [$league, $club, $clubLeague] = $this->resolveRegistrationLeagueClub(
-                $validated['league_name'],
-                $validated['club_name'],
+            $school = $this->resolveRegistrationSchool($validated['high_school'] ?? null, $validated['state']);
+            [$league, $club, $clubLeague, $teamName] = $this->resolveRegistrationProgram(
+                (int) $validated['league_id'],
+                $validated['club_id'],
+                $validated['club_other'] ?? null,
+                $validated['team_name'],
                 $gender,
                 $sport,
             );
@@ -329,7 +352,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'league_id' => $league?->id,
                 'club_id' => $club?->id,
                 'club_league_id' => $clubLeague?->id,
-                'team_name' => strtoupper((string) $validated['age_group']),
+                'team_name' => $teamName,
                 'club_coach' => $validated['club_coach'] ?? null,
                 'club_coach_email' => $validated['club_coach_email'] ?? null,
                 'parent' => $validated['guardian_name'] ?? null,
@@ -379,10 +402,10 @@ class RegistrationController extends PublicPlayerIntakeController
                     'league_id' => $validated['utm_league_id'] ?? null,
                     'team_name' => $validated['utm_team_name'] ?? null,
                 ], fn ($value) => filled($value)),
-                'high_school' => $validated['high_school'],
-                'league_name' => $validated['league_name'],
-                'club_name' => $validated['club_name'],
-                'age_group' => $validated['age_group'],
+                'high_school' => $validated['high_school'] ?? null,
+                'league_name' => $league?->name,
+                'club_name' => $club?->name,
+                'team_name' => $teamName,
                 'domain_rdap_verified' => $isPaid ? (bool) ($domainLookup['verified'] ?? false) : false,
                 'domain_rdap_status' => $isPaid ? ($domainLookup['status'] ?? null) : null,
                 'domain_lookup_source' => $isPaid ? 'selected-domain' : null,
@@ -502,6 +525,23 @@ class RegistrationController extends PublicPlayerIntakeController
         $request->session()->regenerate();
         $request->session()->regenerateToken();
 
+        try {
+            $verificationUrl = URL::temporarySignedRoute(
+                'registration.verify-email',
+                now()->addHours(72),
+                ['user' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+            );
+            Mail::to($user->email)->send(new \App\Mail\RegistrationVerificationMail($user, $verificationUrl));
+            if (Schema::hasColumn('users', 'email_verification_sent_at')) {
+                $user->forceFill(['email_verification_sent_at' => now()])->saveQuietly();
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Registration verification email could not be sent.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
         $billing->refresh();
 
         return response()->json([
@@ -519,7 +559,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 ? ($paymentFormUrl
                     ? 'Your account is ready. Enter your card details below to complete payment.'
                     : 'Your account was created, but the payment form could not be opened. Please try again.')
-                : 'Your free PLYRCARD account is ready.',
+                : 'Your free PLYRCARD account is ready. Check your email to verify your address.',
         ]);
     }
 
@@ -717,70 +757,81 @@ class RegistrationController extends PublicPlayerIntakeController
         ];
     }
 
-    protected function resolveRegistrationSchool(string $name, ?string $state): School
+    protected function resolveRegistrationSchool(?string $name, ?string $state): ?School
     {
-        $name = trim($name);
+        $name = trim((string) $name);
+        if ($name === '') {
+            return null;
+        }
 
-        $school = School::query()
-            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
-            ->first();
-
-        return $school ?: School::create([
-            'name' => $name,
-            'state' => $state,
-        ]);
+        return School::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->first()
+            ?: School::create(['name' => $name, 'state' => $state]);
     }
 
-    protected function resolveRegistrationLeagueClub(
-        string $leagueName,
-        string $clubName,
+    protected function resolveRegistrationProgram(
+        int $leagueId,
+        string $clubId,
+        ?string $clubOther,
+        string $teamName,
         string $gender,
         string $sport,
     ): array {
-        $leagueName = trim($leagueName);
-        $clubName = trim($clubName);
+        $league = $this->canonicalLeagueQuery()->findOrFail($leagueId);
 
-        $league = League::query()
-            ->whereRaw('LOWER(name) = ?', [strtolower($leagueName)])
-            ->first();
+        if (! $league->supportsGender($gender) || ! $this->isLeagueSportCompatible($league->sport, $sport)) {
+            throw ValidationException::withMessages(['league_id' => 'The selected league does not match the athlete gender and sport.']);
+        }
 
-        if (! $league) {
-            $league = League::create([
-                'name' => $leagueName,
-                'genders' => [$gender],
-                'gender' => $gender,
-                'sport' => $sport,
+        if ($clubId === '__other__') {
+            $clubName = trim((string) $clubOther);
+            if ($clubName === '') {
+                throw ValidationException::withMessages(['club_other' => 'Enter the club name.']);
+            }
+            $club = Club::firstOrCreate(['name' => $clubName]);
+            $program = ClubLeague::firstOrCreate(
+                ['club_id' => $club->id, 'league_id' => $league->id],
+                ['genders' => [$gender], 'sport' => $sport, 'is_active' => true, 'sort_order' => 0],
+            );
+        } else {
+            $club = Club::query()->find($clubId);
+            $program = $club ? $this->activeClubLeagueQuery()
+                ->where('club_id', $club->id)
+                ->where('league_id', $league->id)
+                ->where(function ($query) use ($sport) { $query->whereNull('sport')->orWhere('sport', $sport); })
+                ->first() : null;
+            if ($program && ! $this->gendersContain($program->genders ?: $league->genders ?: [$league->gender], $gender)) {
+                $program = null;
+            }
+            if (! $club || ! $program) {
+                throw ValidationException::withMessages(['club_id' => 'The selected club does not match the selected gender, sport, and league.']);
+            }
+        }
+
+        $teamName = strtoupper(trim($teamName));
+        if (! in_array($teamName, $this->getAgeGroupOptions(), true)) {
+            throw ValidationException::withMessages([
+                'team_name' => 'Select a valid team age group.',
             ]);
         }
 
-        $club = Club::query()
-            ->whereRaw('LOWER(name) = ?', [strtolower($clubName)])
-            ->first();
+        return [$league, $club, $program, $teamName];
+    }
 
-        if (! $club) {
-            $club = Club::create(['name' => $clubName]);
+    protected function generateAutomaticHandle(string $firstName, string $lastName): string
+    {
+        $base = Str::slug(trim($firstName . ' ' . $lastName)) ?: 'player';
+        if (in_array($base, $this->reservedHandles(), true)) {
+            $base .= '-player';
         }
-
-        $program = ClubLeague::query()
-            ->where('club_id', $club->id)
-            ->where('league_id', $league->id)
-            ->where(function ($query) use ($sport) {
-                $query->whereNull('sport')->orWhere('sport', $sport);
-            })
-            ->first();
-
-        if (! $program) {
-            $program = ClubLeague::create([
-                'club_id' => $club->id,
-                'league_id' => $league->id,
-                'genders' => [$gender],
-                'sport' => $sport,
-                'is_active' => true,
-                'sort_order' => 0,
-            ]);
+        $slug = $base;
+        $counter = 2;
+        while (
+            Website::query()->whereRaw('LOWER(slug) = ?', [strtolower($slug)])->exists()
+            || BillingInformation::query()->whereRaw('LOWER(requested_handle) = ?', [strtolower($slug)])->whereIn('payment_status', ['pending','payment_form_ready','paid','not_required'])->exists()
+        ) {
+            $slug = $base . '-' . $counter++;
         }
-
-        return [$league, $club, $program];
+        return $slug;
     }
 
     protected function states(): array

@@ -531,35 +531,92 @@ trait InteractsWithCoachDatabase
         }
 
         try {
-            Log::info('Dashboard sent-email reconciliation started.', [
+            Log::info('Dashboard Inbox-conversation sent-email count started.', [
                 'user_id' => $user->getKey(),
             ]);
 
-            // Count every unique TYPE_EMAIL message with an explicit outbound direction.
-            // This uses the same Conversations API family as Inbox, scans all conversation
-            // pages and all message pages, and excludes inbound/unknown-direction rows.
-            $result = app(GoHighLevelService::class)->syncTotalEmailsSentFromGhl($user);
+            // v142: use the SAME function that populates Inbox conversations.
+            // Do not call /conversations/{id}/messages and do not call export.
+            // We fetch all conversation rows through /conversations/search and
+            // count rows whose latest message is explicitly outbound + email.
+            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                'fetch_all' => true,
+                'limit' => 100,
+                'max_rows' => 10000,
+                'max_pages' => 100,
+                'status' => 'all',
+                'search' => '',
+                'sortBy' => 'last_message_date',
+                'sort' => 'desc',
+            ]);
 
             if (! ($result['success'] ?? false)) {
-                $error = trim((string) ($result['error'] ?? 'Unable to refresh email activity.'));
-                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to refresh email activity.';
+                $error = trim((string) ($result['error'] ?? 'Unable to load Inbox conversations.'));
+                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to load Inbox conversations.';
                 $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-                Log::warning('Dashboard sent-email reconciliation failed.', [
+                Log::warning('Dashboard Inbox-conversation sent-email count failed.', [
                     'user_id' => $user->getKey(),
-                    'conversations_scanned' => $result['conversations_scanned'] ?? null,
-                    'conversations_failed' => $result['conversations_failed'] ?? null,
-                    'messages_scanned' => $result['messages_scanned'] ?? null,
-                    'outbound_rows_seen' => $result['outbound_rows_seen'] ?? null,
-                    'inbound_rows_seen' => $result['inbound_rows_seen'] ?? null,
-                    'unknown_direction_rows' => $result['unknown_direction_rows'] ?? null,
+                    'status' => $result['status'] ?? null,
                     'error' => $this->dashboardEmailFetchError,
                 ]);
 
                 return;
             }
 
-            $count = max(0, (int) ($result['count'] ?? 0));
+            $conversations = collect($result['conversations'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values();
+
+            $outbound = 0;
+            $inbound = 0;
+            $unknownDirection = 0;
+            $nonEmail = 0;
+
+            foreach ($conversations as $row) {
+                $direction = strtolower(trim((string) (
+                    $row['last_message_direction']
+                    ?? $row['lastMessageDirection']
+                    ?? $row['message_direction']
+                    ?? $row['direction']
+                    ?? ''
+                )));
+                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
+
+                $messageType = strtolower(trim((string) (
+                    $row['last_message_type']
+                    ?? $row['lastMessageType']
+                    ?? $row['message_type']
+                    ?? $row['type']
+                    ?? ''
+                )));
+                $messageType = preg_replace('/[^a-z0-9]+/', '_', $messageType) ?: '';
+
+                $isEmail = str_contains($messageType, 'email')
+                    || in_array($messageType, ['type_email', 'mail'], true);
+
+                if (! $isEmail) {
+                    $nonEmail++;
+                    continue;
+                }
+
+                $isOutbound = str_starts_with($direction, 'outbound')
+                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
+                $isInbound = str_starts_with($direction, 'inbound')
+                    || in_array($direction, ['incoming', 'received', 'receive', 'in'], true);
+
+                if ($isOutbound) {
+                    $outbound++;
+                } elseif ($isInbound) {
+                    $inbound++;
+                } else {
+                    $unknownDirection++;
+                }
+            }
+
+            $count = $outbound;
+
+            $user->forceFill(['total_emails_sent' => $count])->save();
             $user->refresh();
             Auth::setUser($user);
 
@@ -570,21 +627,23 @@ trait InteractsWithCoachDatabase
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Dashboard sent-email reconciliation completed.', [
+            Log::info('Dashboard Inbox-conversation sent-email count completed.', [
                 'user_id' => $user->getKey(),
-                'conversations_scanned' => $result['conversations_scanned'] ?? null,
-                'messages_scanned' => $result['messages_scanned'] ?? null,
-                'message_pages_scanned' => $result['message_pages_scanned'] ?? null,
-                'outbound_rows_seen' => $result['outbound_rows_seen'] ?? null,
-                'inbound_rows_seen' => $result['inbound_rows_seen'] ?? null,
-                'unknown_direction_rows' => $result['unknown_direction_rows'] ?? null,
-                'outbound_emails_counted' => $count,
+                'conversations_loaded' => $conversations->count(),
+                'api_total' => $result['total'] ?? $conversations->count(),
+                'pages_fetched' => $result['pages_fetched'] ?? null,
+                'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
+                'pagination_truncated' => $result['pagination_truncated'] ?? false,
+                'outbound_email_conversations' => $outbound,
+                'inbound_email_conversations' => $inbound,
+                'unknown_direction_email_conversations' => $unknownDirection,
+                'non_email_conversations' => $nonEmail,
             ]);
         } catch (\Throwable $exception) {
             $this->dashboardEmailFetchError = $exception->getMessage();
             $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-            Log::warning('Dashboard sent-email reconciliation threw an exception.', [
+            Log::warning('Dashboard Inbox-conversation sent-email count threw an exception.', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);

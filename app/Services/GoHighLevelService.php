@@ -5451,6 +5451,27 @@ class GoHighLevelService
             'email' => (string) ($item['email'] ?? $item['contactEmail'] ?? $contact['email'] ?? ''),
             'status' => (string) ($item['status'] ?? (($item['unreadCount'] ?? 0) ? 'Unread' : 'Open')),
             'last_message' => trim(strip_tags((string) $lastBody)),
+            // Preserve the exact last-message metadata returned by the same
+            // /conversations/search request used by Inbox. Dashboard can then
+            // count outbound email conversation rows without making a second
+            // per-conversation messages request that may fail independently.
+            'last_message_direction' => (string) (
+                $item['lastMessageDirection']
+                ?? $item['last_message_direction']
+                ?? $item['direction']
+                ?? $lastMessage['direction']
+                ?? $lastMessage['messageDirection']
+                ?? ''
+            ),
+            'last_message_type' => (string) (
+                $item['lastMessageType']
+                ?? $item['last_message_type']
+                ?? $item['messageType']
+                ?? $item['type']
+                ?? $lastMessage['messageType']
+                ?? $lastMessage['type']
+                ?? ''
+            ),
             'last_message_at' => $item['lastMessageDate'] ?? $item['lastMessageAt'] ?? $item['last_message_date'] ?? $item['updatedAt'] ?? null,
             'unread_count' => (int) ($item['unreadCount'] ?? $item['unread_count'] ?? 0),
             'has_image' => $hasImage,

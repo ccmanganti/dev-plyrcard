@@ -14,6 +14,7 @@ use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\RecruitingProfileViewTrackingController;
 use App\Http\Controllers\Admin\ExternalTrackingUrlGeneratorController;
 use App\Http\Controllers\ExternalSocialTrackingController;
+use App\Http\Middleware\SendPlayerActivityEmail;
 
 /*
  * Load this file from routes/web.php before any catch-all /{slug} route:
@@ -31,11 +32,13 @@ Route::middleware('auth')->group(function (): void {
 /* Platform-hosted player: /Sample/out/instagram */
 Route::get('/{slug}/out/{platform}', [ExternalSocialTrackingController::class, 'platform'])
     ->where('platform', 'instagram|youtube|x')
+    ->middleware(SendPlayerActivityEmail::class)
     ->name('external.social.platform');
 
 /* Parked/custom domain player: /out/instagram */
 Route::get('/out/{platform}', [ExternalSocialTrackingController::class, 'customDomain'])
     ->where('platform', 'instagram|youtube|x')
+    ->middleware(SendPlayerActivityEmail::class)
     ->name('external.social.custom-domain');
 
 Route::get('/track/click/{token}', [TrackingController::class, 'click'])->where('token', '[^/]+')->name('tracking.click');
@@ -97,6 +100,7 @@ $reservedWebsiteSlugs = implode('|', [
 */
 
 Route::get('/', [PublicWebsiteController::class, 'home'])
+    ->middleware(SendPlayerActivityEmail::class)
     ->name('website.home');
 
 /*
@@ -400,5 +404,6 @@ Route::middleware(['auth'])->group(function () {
 */
 
 Route::get('/{websiteName}', [PublicWebsiteController::class, 'showByName'])
+    ->middleware(SendPlayerActivityEmail::class)
     ->where('websiteName', '^(?!(' . $reservedWebsiteSlugs . ')$)[A-Za-z0-9\-]+$')
     ->name('website.show-by-name');
